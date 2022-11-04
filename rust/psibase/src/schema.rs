@@ -2,6 +2,7 @@ use crate::reflect::{
     ArgVisitor, EnumVisitor, MethodsVisitor, NamedVisitor, Reflect, StructVisitor, UnnamedVisitor,
     Visitor,
 };
+use crate::Hex;
 use psibase_macros::Reflect;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -58,6 +59,7 @@ where
     option(Box<TypeRef<String>>),
     tuple(Vec<TypeRef<String>>),
     array(Box<TypeRef<String>>, u32),
+    hex(u32),
 }
 
 #[derive(Debug, Clone, Reflect, Serialize, Deserialize)]
@@ -236,6 +238,12 @@ impl<'a> Visitor for TypeBuilder<'a> {
         let inner = self.schema_builder.get_type_ref::<Inner>(false);
         self.schema_builder
             .insert::<[Inner; SIZE]>(None, TypeRef::array(Box::new(inner), SIZE as u32))
+            .clone()
+    }
+
+    fn hex<const SIZE: usize>(self) -> Self::Return {
+        self.schema_builder
+            .insert::<Hex<[u8; SIZE]>>(None, TypeRef::hex(SIZE as u32))
             .clone()
     }
 

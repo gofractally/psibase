@@ -207,6 +207,7 @@ We used `{type reference}` to indicate a type reference in the definitions above
 - `{"option": {inner type}}` - an optional of inner type
 - `{"tuple": [{inner type}, ...]}` - a tuple of inner types
 - `{"array": [{inner type}, size]}` - a fixed-size array of inner type
+- `{"hex": size}` - a fixed-size byte array, represented as a hex string in JSON
 
 Built-in types live in a separate namespace from user-defined types to minimize conflicts in the future if more built-in types are added.
 
@@ -232,6 +233,7 @@ The following break backwards compatibility; if you do these, data will end up c
 - `i8`, `i16`, `i32`, `i64`: signed integers
 - `f32`, `f64`: floating-point types
 - `string`
+- `hex`: a variable-size byte array, represented as a hex string in JSON
 
 ## TODO
 
@@ -271,6 +273,10 @@ The schema schema defines both the JSON format and the binary (fracpack) format 
         {
           "name": "array",
           "ty": { "tuple": [{ "user": "TypeRef" }, { "ty": "u32" }] }
+        },
+        {
+          "name": "hex",
+          "ty": { "ty": "u32" }
         }
       ]
     },

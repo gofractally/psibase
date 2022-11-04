@@ -73,17 +73,20 @@ Both psio and serde_json represent vectors (`std::Vector`, `Vec`) and arrays (`s
 
 Byte vectors and arrays create a tricky problem. The JSON array-of-numbers representation is wasteful and annoying for this; hex strings are more compact and readable. Base-64 is even more compact, but it is near impossible to read and there are 7 standard RFC encodings, plus more.
 
-When should a vector or array use a hex representation? It's convenient to automatically switch when the element type is an 8-bit number, but this can be jarring for new service developers who don't expect it. We could have a separate "bytes" type, but that's annoying for experienced developers in both Rust and C++. serdes already made a choice: vectors by default use the array notation in JSON. `serialize_with` and `deserialize_with` can opt into other representations, but they are cumbersome in nested types, e.g. `Option<Vec<u8>>`. That leaves a separate "bytes" type. Both Rust and C++ support move semantics to handle any efficiency issues.
+When should a vector or array use a hex representation? It's convenient to automatically switch when the element type is an 8-bit number, but this can be jarring for new service developers who don't expect it. We could have a separate hex type, but that's annoying for experienced developers in both Rust and C++. serdes already made a choice: vectors by default use the array notation in JSON. `serialize_with` and `deserialize_with` can opt into other representations, but they are cumbersome in nested types, e.g. `Option<Vec<u8>>`. That leaves a separate hex type.
 
-- TODO: C++: A fixed-size bytes type
-- TODO: C++: Switch existing byte vectors and arrays within psibase structs to bytes wrappers
+The Rust psibase library provides this wrapper type, which uses hex strings as its JSON format:
+
+```rust
+// T must be `Vec<u8>`, `&[u8]`, or `[u8; SIZE]`
+pub struct Hex<T>(pub T);
+```
+
+- TODO: C++: A fixed-size hex type
+- TODO: C++: Switch existing byte vectors and arrays within psibase structs to hex wrappers
 - TODO: C++: Remove hex representation from `std::vector<*>` and `std::array<*>`
 - TODO: C++: fracpack support for encoding `psio::bytes` as a vector instead of a struct of vector
-- TODO: C++: fracpack support for encoding new fixed-size bytes type as an array instead of a struct of array
-- TODO: Rust: A bytes type
-- TODO: Rust: A fixed-size bytes type
-- TODO: Rust: fracpack support for encoding bytes type as a vector instead of a struct of vector
-- TODO: Rust: fracpack support for encoding fixed-size bytes type as an array instead of a struct of array
+- TODO: C++: fracpack support for encoding new fixed-size hex type as an array instead of a struct of array
 
 ## Variants / Enums
 

@@ -76,6 +76,9 @@ impl<'a> Visitor for TemplateGenerator<'a> {
     fn array<Inner: Reflect, const SIZE: usize>(self) {
         unimplemented!()
     }
+    fn hex<const SIZE: usize>(self) {
+        unimplemented!()
+    }
     fn tuple<T: Reflect>(self, _fields_len: usize) -> Self::TupleVisitor {
         unimplemented!()
     }
@@ -240,6 +243,11 @@ impl<'a> Visitor for ValueGenerator<'a> {
     fn array<Inner: Reflect, const SIZE: usize>(self) {
         if !self.skip {
             self.result.push_str("[]");
+        }
+    }
+    fn hex<const SIZE: usize>(self) {
+        if !self.skip {
+            self.result.push_str("\"\"");
         }
     }
     fn tuple<T: Reflect>(self, _fields_len: usize) -> Self::TupleVisitor {

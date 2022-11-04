@@ -695,6 +695,10 @@ fn test_schema_schema() {
                 {
                     "name": "array",
                     "ty": {"tuple": [{"user": "TypeRef"}, {"ty": "u32"}]}
+                },
+                {
+                    "name": "hex",
+                    "ty": {"ty": "u32"}
                 }
             ]
         },

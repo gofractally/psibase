@@ -42,6 +42,7 @@ pub trait Visitor {
     fn option<Inner: Reflect>(self) -> Self::Return;
     fn container<T: Reflect, Inner: Reflect>(self) -> Self::Return;
     fn array<Inner: Reflect, const SIZE: usize>(self) -> Self::Return;
+    fn hex<const SIZE: usize>(self) -> Self::Return;
     fn tuple<T: Reflect>(self, fields_len: usize) -> Self::TupleVisitor;
     fn struct_single<T: Reflect, Inner: Reflect>(self, name: Cow<'static, str>) -> Self::Return;
     fn struct_tuple<T: Reflect>(
