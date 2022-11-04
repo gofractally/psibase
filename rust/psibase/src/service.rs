@@ -135,7 +135,7 @@ impl Caller for ServiceCaller {
             sender: self.sender,
             service: self.service,
             method,
-            rawData: args.packed(),
+            rawData: args.packed().into(),
         }
         .packed();
         unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
@@ -146,7 +146,7 @@ impl Caller for ServiceCaller {
             sender: self.sender,
             service: self.service,
             method,
-            rawData: args.packed(),
+            rawData: args.packed().into(),
         }
         .packed();
         let ret = get_result_bytes(unsafe { native_raw::call(act.as_ptr(), act.len() as u32) });
@@ -170,7 +170,7 @@ impl Caller for ActionPacker {
             sender: self.sender,
             service: self.service,
             method,
-            rawData: args.packed(),
+            rawData: args.packed().into(),
         }
     }
 
@@ -179,7 +179,7 @@ impl Caller for ActionPacker {
             sender: self.sender,
             service: self.service,
             method,
-            rawData: args.packed(),
+            rawData: args.packed().into(),
         }
     }
 }

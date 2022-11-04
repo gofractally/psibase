@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Action, Fracpack, Reflect};
+use crate::{Action, Fracpack, Reflect, Hex};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct ActionTrace {
     pub action: Action,
-    pub raw_retval: Vec<u8>,
+    pub raw_retval: Hex<Vec<u8>>,
     pub inner_traces: Vec<InnerTrace>,
     pub error: Option<String>,
 }
@@ -26,7 +26,7 @@ impl fmt::Display for ActionTrace {
 #[serde(rename_all = "camelCase")]
 pub struct EventTrace {
     pub name: String,
-    pub data: Vec<u8>,
+    pub data: Hex<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]

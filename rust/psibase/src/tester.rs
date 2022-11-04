@@ -261,7 +261,7 @@ impl Chain {
         self.new_account(account)?;
         // TODO: update setcode_sys::setCode to not need a vec. Needs changes to the service macro.
         services::setcode_sys::Wrapper::push_from(self, account)
-            .setCode(account, 0, 0, code.to_vec())
+            .setCode(account, 0, 0, code.to_vec().into())
             .get()
     }
 }
@@ -342,13 +342,13 @@ impl<'a> Caller for ChainPusher<'a> {
                 sender: self.sender,
                 service: self.service,
                 method,
-                rawData: args.packed(),
+                rawData: args.packed().into(),
             }],
             claims: vec![],
         };
         self.chain.fill_tapos(&mut trx, 2);
         let trace = self.chain.push(&SignedTransaction {
-            transaction: trx.packed(),
+            transaction: trx.packed().into(),
             proofs: Default::default(),
         });
         ChainEmptyResult { trace }
@@ -365,13 +365,13 @@ impl<'a> Caller for ChainPusher<'a> {
                 sender: self.sender,
                 service: self.service,
                 method,
-                rawData: args.packed(),
+                rawData: args.packed().into(),
             }],
             claims: vec![],
         };
         self.chain.fill_tapos(&mut trx, 2);
         let trace = self.chain.push(&SignedTransaction {
-            transaction: trx.packed(),
+            transaction: trx.packed().into(),
             proofs: Default::default(),
         });
         ChainResult::<Ret> {

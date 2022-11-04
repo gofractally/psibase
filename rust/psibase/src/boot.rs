@@ -56,7 +56,7 @@ macro_rules! sgc {
             flags: $flags,
             vmType: 0,
             vmVersion: 0,
-            code: include_bytes!(concat!("../boot-image/", $wasm)),
+            code: include_bytes!(concat!("../boot-image/", $wasm)).into(),
         }
     };
 }
@@ -105,7 +105,7 @@ fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
 fn to_claim(key: &PublicKey) -> Claim {
     Claim {
         service: account!("verifyec-sys"),
-        rawData: key.packed(),
+        rawData: key.packed().into(),
     }
 }
 
@@ -135,7 +135,7 @@ fn store_sys(
     psispace_sys::Wrapper::pack_from_to(sender, service).storeSys(
         path.to_string(),
         content_type.to_string(),
-        content.to_vec(),
+        content.to_vec().into(),
     )
 }
 
@@ -185,11 +185,11 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sender: AccountNumber { value: 0 },
         service: AccountNumber { value: 0 },
         method: method!("boot"),
-        rawData: genesis_action_data.packed(),
+        rawData: genesis_action_data.packed().into(),
     }];
 
     SignedTransaction {
-        transaction: without_tapos(actions, expiration).packed(),
+        transaction: without_tapos(actions, expiration).packed().into(),
         proofs: vec![],
     }
 }
@@ -261,13 +261,13 @@ pub fn create_boot_transactions(
             sender: account!("token-sys"),
             service: account!("token-sys"),
             method: method!("init"),
-            rawData: ().packed(),
+            rawData: ().packed().into(),
         },
         Action {
             sender: account!("symbol-sys"),
             service: account!("symbol-sys"),
             method: method!("init"),
-            rawData: ().packed(),
+            rawData: ().packed().into(),
         },
     ];
     let mut actions = Vec::new();
@@ -441,25 +441,29 @@ pub fn create_boot_transactions(
                 sender: account!("symbol-sys"),
                 service: account!("token-sys"),
                 method: method!("setTokenConf"),
-                rawData: (1u32, method!("untradeable"), false).packed(),
+                rawData: (1u32, method!("untradeable"), false).packed().into(),
             },
             Action {
                 sender: account!("symbol-sys"),
                 service: account!("token-sys"),
                 method: method!("mint"),
-                rawData: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed(),
+                rawData: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed().into(),
             },
             Action {
                 sender: account!("symbol-sys"),
                 service: account!("token-sys"),
                 method: method!("credit"),
-                rawData: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",)).packed(),
+                rawData: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",))
+                    .packed()
+                    .into(),
             },
             Action {
                 sender: account!("symbol-sys"),
                 service: account!("token-sys"),
                 method: method!("credit"),
-                rawData: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",)).packed(),
+                rawData: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",))
+                    .packed()
+                    .into(),
             },
         ];
         actions.append(&mut create_and_fund_example_users);
@@ -471,7 +475,7 @@ pub fn create_boot_transactions(
             Some(k) => to_claim(k),
             None => Claim {
                 service: AccountNumber::new(0),
-                rawData: vec![],
+                rawData: Default::default(),
             },
         },
     ));
@@ -491,7 +495,9 @@ pub fn create_boot_transactions(
             n += 1;
         }
         transactions.push(SignedTransaction {
-            transaction: without_tapos(actions.drain(..n).collect(), expiration).packed(),
+            transaction: without_tapos(actions.drain(..n).collect(), expiration)
+                .packed()
+                .into(),
             proofs: vec![],
         });
     }

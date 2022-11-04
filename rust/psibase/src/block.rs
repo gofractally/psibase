@@ -1,10 +1,10 @@
 #![allow(non_snake_case)]
 
-use crate::{AccountNumber, Fracpack, MethodNumber, Reflect, TimePointSec, ToKey};
+use crate::{AccountNumber, Fracpack, Hex, MethodNumber, Reflect, TimePointSec, ToKey};
 use serde::{Deserialize, Serialize};
 
 // TODO: move
-pub type Checksum256 = [u8; 32];
+pub type Checksum256 = Hex<[u8; 32]>;
 
 pub type BlockNum = u32;
 
@@ -31,10 +31,10 @@ pub struct Action {
     pub method: MethodNumber,
 
     /// Data for the method
-    pub rawData: Vec<u8>,
+    pub rawData: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
@@ -42,7 +42,7 @@ pub struct SharedAction<'a> {
     pub sender: AccountNumber,
     pub service: AccountNumber,
     pub method: MethodNumber,
-    pub rawData: &'a [u8],
+    pub rawData: Hex<&'a [u8]>,
 }
 
 /// The genesis action is the first action of the first transaction of
@@ -57,7 +57,7 @@ pub struct GenesisActionData {
     pub services: Vec<GenesisService>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
@@ -76,10 +76,10 @@ pub struct GenesisService {
     pub flags: u64,
     pub vmType: u8,
     pub vmVersion: u8,
-    pub code: Vec<u8>,
+    pub code: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
@@ -88,7 +88,7 @@ pub struct SharedGenesisService<'a> {
     pub flags: u64,
     pub vmType: u8,
     pub vmVersion: u8,
-    pub code: &'a [u8],
+    pub code: Hex<&'a [u8]>,
 }
 
 #[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
@@ -97,7 +97,7 @@ pub struct SharedGenesisService<'a> {
 #[to_key(psibase_mod = "crate")]
 pub struct Claim {
     pub service: AccountNumber,
-    pub rawData: Vec<u8>,
+    pub rawData: Hex<Vec<u8>>,
 }
 
 /// Rules for TAPOS:
@@ -154,8 +154,8 @@ pub struct Transaction {
 #[to_key(psibase_mod = "crate")]
 pub struct SignedTransaction {
     // Contains a packed `Transaction`. TODO: shared_view_ptr
-    pub transaction: Vec<u8>,
-    pub proofs: Vec<Vec<u8>>,
+    pub transaction: Hex<Vec<u8>>,
+    pub proofs: Vec<Hex<Vec<u8>>>,
 }
 
 type TermNum = u32;
@@ -197,7 +197,7 @@ pub struct BlockHeader {
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
-    pub subjectiveData: Vec<Vec<u8>>,
+    pub subjectiveData: Vec<Hex<Vec<u8>>>,
 }
 
 #[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
@@ -206,7 +206,7 @@ pub struct Block {
 #[to_key(psibase_mod = "crate")]
 pub struct SignedBlock {
     pub block: Block,
-    pub signature: Vec<u8>,
+    pub signature: Hex<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]

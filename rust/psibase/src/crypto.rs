@@ -299,7 +299,8 @@ pub fn sign_transaction(
             service: AccountNumber::new(account_raw!("verifyec-sys")),
             rawData: fracpack::Pack::packed(&PublicKey::from(
                 &secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, k),
-            )),
+            ))
+            .into(),
         })
         .collect();
     let transaction = fracpack::Pack::packed(&trx);
@@ -311,10 +312,11 @@ pub fn sign_transaction(
             fracpack::Pack::packed(&Signature::from(
                 secp256k1::SECP256K1.sign_ecdsa(&digest, k),
             ))
+            .into()
         })
         .collect();
     Ok(crate::SignedTransaction {
-        transaction,
+        transaction: transaction.into(),
         proofs,
     })
 }

@@ -57,6 +57,8 @@ pub mod server_interface {
 )]
 #[allow(non_snake_case, unused_variables)]
 pub mod storage_interface {
+    use crate::Hex;
+
     /// Store a file
     ///
     /// Define this action in your service to handle file storage requests. This action
@@ -71,7 +73,7 @@ pub mod storage_interface {
     ///
     /// (TODO) simplifies implementing this.
     #[action]
-    fn storeSys(path: String, contentType: String, content: Vec<u8>) {
+    fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
         unimplemented!()
     }
 }

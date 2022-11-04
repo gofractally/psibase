@@ -46,7 +46,7 @@ pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" && (request.target == "/" || request.target == "/index.html") {
         Some(HttpReply {
             contentType: "text/html".into(),
-            body: SIMPLE_UI.to_vec(),
+            body: SIMPLE_UI.to_vec().into(),
             headers: vec![],
         })
     } else {
@@ -67,7 +67,7 @@ pub fn serve_schema<Wrapper: Reflect>(request: &HttpRequest) -> Option<HttpReply
     if request.method == "GET" && request.target == "/schema" {
         Some(HttpReply {
             contentType: "text/html".into(),
-            body: to_vec(&create_schema::<Wrapper>()).unwrap(),
+            body: to_vec(&create_schema::<Wrapper>()).unwrap().into(),
             headers: vec![],
         })
     } else {
@@ -126,7 +126,7 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
             }
             HttpReply {
                 contentType: "application/octet-stream".into(),
-                body: arg_struct_result.unwrap().packed(),
+                body: arg_struct_result.unwrap().packed().into(),
                 headers: vec![],
             }
         }
@@ -166,13 +166,13 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
             let res = schema.execute(request).await;
             Some(HttpReply {
                 contentType: "application/json".into(),
-                body: serde_json::to_vec(&res).unwrap(),
+                body: serde_json::to_vec(&res).unwrap().into(),
                 headers: vec![],
             })
         } else if request.method == "GET" {
             Some(HttpReply {
                 contentType: "text".into(), // TODO
-                body: schema.sdl().into(),
+                body: schema.sdl().into_bytes().into(),
                 headers: vec![],
             })
         } else {
@@ -186,7 +186,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
             let res = schema.execute(request).await;
             Some(HttpReply {
                 contentType: "application/json".into(),
-                body: serde_json::to_vec(&res).unwrap(),
+                body: serde_json::to_vec(&res).unwrap().into(),
                 headers: vec![],
             })
         }

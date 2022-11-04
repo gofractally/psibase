@@ -33,7 +33,7 @@ mod service {
         fn from(content_row: ContentRow) -> Self {
             HttpReply {
                 contentType: content_row.content_type,
-                body: content_row.content,
+                body: content_row.content.into(),
                 headers: Vec::new(),
             }
         }
@@ -308,7 +308,7 @@ mod tests {
             reply,
             &HttpReply {
                 contentType: content_type.to_owned(),
-                body: content.clone(),
+                body: content.clone().into(),
                 headers: Vec::new(),
             },
             "unexpected http reply {:?}",
@@ -327,7 +327,7 @@ mod tests {
             target: target.to_string(),
             method: "GET".to_string(),
             contentType: "".to_string(),
-            body: Vec::new(),
+            body: Vec::new().into(),
         })
     }
 }

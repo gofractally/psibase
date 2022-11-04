@@ -207,7 +207,7 @@ struct SetCodeAction {
 }
 
 fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
-    setcode_sys::Wrapper::pack_from(account).setCode(account, 0, 0, wasm)
+    setcode_sys::Wrapper::pack_from(account).setCode(account, 0, 0, wasm.into())
 }
 
 fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
@@ -224,7 +224,7 @@ fn store_sys(
     psispace_sys::Wrapper::pack_from_to(sender, service).storeSys(
         path.to_string(),
         content_type.to_string(),
-        content.to_vec(),
+        content.to_vec().into(),
     )
 }
 

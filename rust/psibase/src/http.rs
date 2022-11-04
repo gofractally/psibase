@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{Fracpack, Reflect, ToKey};
+use crate::{Fracpack, Reflect, ToKey, Hex};
 use serde::{Deserialize, Serialize};
 
 /// An HTTP header
@@ -50,7 +50,7 @@ pub struct HttpRequest {
     pub contentType: String,
 
     /// Request body, e.g. POST data
-    pub body: Vec<u8>,
+    pub body: Hex<Vec<u8>>,
 }
 
 /// An HTTP reply
@@ -67,7 +67,7 @@ pub struct HttpReply {
     pub contentType: String,
 
     /// Response body
-    pub body: Vec<u8>,
+    pub body: Hex<Vec<u8>>,
 
     /// HTTP Headers
     pub headers: Vec<HttpHeader>,

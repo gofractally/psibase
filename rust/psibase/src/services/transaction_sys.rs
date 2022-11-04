@@ -145,6 +145,8 @@ pub mod auth_interface {
 #[crate::service(name = "transact-sys", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
+    use crate::Hex;
+
     /// Only called once during chain initialization
     ///
     /// This enables the auth checking system. Before this point, `transaction_sys`
@@ -194,7 +196,7 @@ mod service {
     fn runAs(
         action: crate::Action,
         allowedActions: Vec<crate::services::transaction_sys::ServiceMethod>,
-    ) -> Vec<u8> {
+    ) -> Hex<Vec<u8>> {
         unimplemented!()
     }
 

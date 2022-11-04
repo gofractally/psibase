@@ -1,8 +1,11 @@
-use crate::reflect;
+use crate::{reflect, ToKey};
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ops::Deref;
 
-trait ToHex: Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect {
+trait ToHex:
+    Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect + ToKey
+{
     fn to_hex(&self) -> String;
 }
 
@@ -28,6 +31,37 @@ where
     }
 }
 
+impl<T> Deref for Hex<T>
+where
+    T: ToHex,
+{
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> From<T> for Hex<T>
+where
+    T: ToHex,
+{
+    fn from(inner: T) -> Self {
+        Self(inner)
+    }
+}
+
+impl<'a, const SIZE: usize> From<&'a [u8; SIZE]> for Hex<&'a [u8]> {
+    fn from(inner: &'a [u8; SIZE]) -> Self {
+        Self(inner)
+    }
+}
+
+impl From<String> for Hex<Vec<u8>> {
+    fn from(s: String) -> Self {
+        Hex(s.into())
+    }
+}
+
 impl reflect::Reflect for Hex<Vec<u8>> {
     type StaticType = Self;
     fn reflect<V: reflect::Visitor>(visitor: V) -> V::Return {
@@ -46,6 +80,15 @@ impl<const SIZE: usize> reflect::Reflect for Hex<[u8; SIZE]> {
     type StaticType = Self;
     fn reflect<V: reflect::Visitor>(visitor: V) -> V::Return {
         visitor.hex::<SIZE>()
+    }
+}
+
+impl<T> ToKey for Hex<T>
+where
+    T: ToHex + crate::fracpack::Pack,
+{
+    fn append_key(&self, key: &mut Vec<u8>) {
+        self.0.append_key(key)
     }
 }
 
