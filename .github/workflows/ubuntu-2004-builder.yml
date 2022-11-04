@@ -34,7 +34,7 @@ jobs:
         run: |
           REGISTRY="ghcr.io"
           IMAGE="${REGISTRY}/${{ github.repository_owner }}/psibase-ubuntu-2004-builder"
-          TAGS="${IMAGE}:${{ github.sha }}"
+          TAGS="${IMAGE}:${{ github.sha }},${IMAGE}:latest"
           echo "tags=${TAGS,,}" >> $GITHUB_OUTPUT
 
       - name: Showtag
