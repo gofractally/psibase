@@ -7,7 +7,7 @@ use crate::{
     SharedGenesisActionData, SharedGenesisService, SignedTransaction, Tapos, TimePointSec,
     Transaction,
 };
-use fracpack::Packable;
+use fracpack::Pack;
 use include_dir::{include_dir, Dir};
 use psibase_macros::account_raw;
 

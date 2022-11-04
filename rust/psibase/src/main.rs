@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
-use fracpack::Packable;
+use fracpack::Pack;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
 use psibase::services::{account_sys, auth_ec_sys, proxy_sys, psispace_sys, setcode_sys};

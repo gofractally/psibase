@@ -8,7 +8,7 @@
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
 use crate::{native_raw, AccountNumber, DbId, ToKey};
-use fracpack::{Packable, PackableOwned};
+use fracpack::{Pack, Unpack, UnpackOwned};
 
 /// Write message to console
 ///
@@ -145,7 +145,7 @@ pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
 }
 
 /// Set the currently-executing action's return value
-pub fn set_retval<'a, T: Packable<'a>>(val: &T) {
+pub fn set_retval<T: Pack>(val: &T) {
     let bytes = val.packed();
     unsafe { native_raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
 }
@@ -176,7 +176,7 @@ pub fn kv_put_bytes(db: DbId, key: &[u8], value: &[u8]) {
 /// Set a key-value pair
 ///
 /// If key already exists, then replace the existing value.
-pub fn kv_put<'a, K: ToKey, V: Packable<'a>>(db: DbId, key: &K, value: &V) {
+pub fn kv_put<K: ToKey, V: Pack>(db: DbId, key: &K, value: &V) {
     kv_put_bytes(db, &key.to_key(), &value.packed())
 }
 
@@ -190,7 +190,7 @@ pub fn put_sequential_bytes(db: DbId, value: &[u8]) -> u64 {
 /// Add a sequentially-numbered record
 ///
 /// Returns the id.
-pub fn put_sequential<'a, Type: Packable<'a>, V: Packable<'a>>(
+pub fn put_sequential<Type: Pack, V: Pack>(
     db: DbId,
     service: AccountNumber,
     ty: &Type,
@@ -220,7 +220,7 @@ pub fn kv_get_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// Get a key-value pair, if any
-pub fn kv_get<V: PackableOwned, K: ToKey>(db: DbId, key: &K) -> Result<Option<V>, fracpack::Error> {
+pub fn kv_get<V: UnpackOwned, K: ToKey>(db: DbId, key: &K) -> Result<Option<V>, fracpack::Error> {
     if let Some(v) = kv_get_bytes(db, &key.to_key()) {
         Ok(Some(V::unpacked(&v)?))
     } else {
@@ -246,7 +246,7 @@ pub fn kv_greater_equal_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Opti
 /// If one is found, and the first `match_key_size` bytes of the found key
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
-pub fn kv_greater_equal<K: ToKey, V: PackableOwned>(
+pub fn kv_greater_equal<K: ToKey, V: UnpackOwned>(
     db_id: DbId,
     key: &K,
     match_key_size: u32,
@@ -271,7 +271,7 @@ pub fn kv_less_than_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Option<V
 /// If one is found, and the first `match_key_size` bytes of the found key
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
-pub fn kv_less_than<K: ToKey, V: PackableOwned>(
+pub fn kv_less_than<K: ToKey, V: UnpackOwned>(
     db_id: DbId,
     key: &K,
     match_key_size: u32,
@@ -291,7 +291,7 @@ pub fn kv_max_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
 /// Get the maximum key-value pair which has key as a prefix
 ///
 /// If one is found, then returns the value. Use [get_key_bytes] to get the found key.
-pub fn kv_max<K: ToKey, V: PackableOwned>(db_id: DbId, key: &K) -> Option<V> {
+pub fn kv_max<K: ToKey, V: UnpackOwned>(db_id: DbId, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db_id, &key.to_key());
     bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
 }

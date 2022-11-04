@@ -1,4 +1,4 @@
-use fracpack::{Packable, PackableOwned, Result};
+use fracpack::{Pack, Result, Unpack, UnpackOwned};
 use test_fracpack::*;
 
 fn get_tests1() -> [OuterStruct; 3] {
@@ -263,7 +263,7 @@ fn get_tests1() -> [OuterStruct; 3] {
     ]
 } // get_tests1()
 
-fn round_trip_field<T: fracpack::PackableOwned + PartialEq + std::fmt::Debug>(
+fn round_trip_field<T: Pack + UnpackOwned + PartialEq + std::fmt::Debug>(
     index: usize,
     field: &T,
     field_name: &str,
@@ -459,7 +459,7 @@ fn test_tuples() {
 
 fn pack_and_compare<T>(src_struct: &T, expected_hex: &str) -> Vec<u8>
 where
-    T: PackableOwned + PartialEq + std::fmt::Debug,
+    T: Pack + UnpackOwned + PartialEq + std::fmt::Debug,
 {
     let mut bytes: Vec<u8> = Vec::new();
     src_struct.pack(&mut bytes);
@@ -473,7 +473,7 @@ where
 
 fn unpack_and_compare<T>(src_struct: &T, bytes: &[u8])
 where
-    T: PackableOwned,
+    T: UnpackOwned,
     T: PartialEq<T>,
     T: std::fmt::Debug,
 {

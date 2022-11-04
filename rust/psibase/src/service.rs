@@ -1,4 +1,4 @@
-use crate::fracpack::{Packable, PackableOwned};
+use crate::fracpack::{Pack, UnpackOwned};
 use crate::reflect::Reflect;
 use crate::{get_result_bytes, native_raw, reflect, AccountNumber, Action, MethodNumber, Reflect};
 use serde::de::DeserializeOwned;
@@ -73,8 +73,8 @@ pub trait ProcessActionStruct {
     type Output;
 
     fn process<
-        Return: Reflect + PackableOwned + Serialize + DeserializeOwned,
-        ArgStruct: Reflect + PackableOwned + Serialize + DeserializeOwned,
+        Return: Reflect + Serialize + DeserializeOwned,
+        ArgStruct: Reflect + Pack + Serialize + DeserializeOwned,
     >(
         self,
     ) -> Self::Output;
@@ -86,15 +86,15 @@ pub trait WithActionStruct {
 
 pub trait Caller: Clone {
     type ReturnsNothing;
-    type ReturnType<T: PackableOwned>;
+    type ReturnType<T: UnpackOwned>;
 
-    fn call_returns_nothing<Args: PackableOwned>(
+    fn call_returns_nothing<Args: Pack>(
         &self,
         method: MethodNumber,
         args: Args,
     ) -> Self::ReturnsNothing;
 
-    fn call<Ret: PackableOwned, Args: PackableOwned>(
+    fn call<Ret: UnpackOwned, Args: Pack>(
         &self,
         method: MethodNumber,
         args: Args,
@@ -106,10 +106,10 @@ pub struct JustSchema;
 
 impl Caller for JustSchema {
     type ReturnsNothing = ();
-    type ReturnType<T: PackableOwned> = ();
+    type ReturnType<T: UnpackOwned> = ();
 
-    fn call_returns_nothing<Args: PackableOwned>(&self, _method: MethodNumber, _args: Args) {}
-    fn call<Ret: PackableOwned, Args: PackableOwned>(&self, _method: MethodNumber, _args: Args) {}
+    fn call_returns_nothing<Args: Pack>(&self, _method: MethodNumber, _args: Args) {}
+    fn call<Ret: UnpackOwned, Args: Pack>(&self, _method: MethodNumber, _args: Args) {}
 }
 
 impl reflect::Reflect for JustSchema {
@@ -128,9 +128,9 @@ pub struct ServiceCaller {
 
 impl Caller for ServiceCaller {
     type ReturnsNothing = ();
-    type ReturnType<T: PackableOwned> = T;
+    type ReturnType<T: UnpackOwned> = T;
 
-    fn call_returns_nothing<Args: PackableOwned>(&self, method: MethodNumber, args: Args) {
+    fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {
         let act = Action {
             sender: self.sender,
             service: self.service,
@@ -141,11 +141,7 @@ impl Caller for ServiceCaller {
         unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
     }
 
-    fn call<Ret: PackableOwned, Args: PackableOwned>(
-        &self,
-        method: MethodNumber,
-        args: Args,
-    ) -> Ret {
+    fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {
         let act = Action {
             sender: self.sender,
             service: self.service,
@@ -167,13 +163,9 @@ pub struct ActionPacker {
 
 impl Caller for ActionPacker {
     type ReturnsNothing = Action;
-    type ReturnType<T: PackableOwned> = Action;
+    type ReturnType<T: UnpackOwned> = Action;
 
-    fn call_returns_nothing<Args: PackableOwned>(
-        &self,
-        method: MethodNumber,
-        args: Args,
-    ) -> Action {
+    fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) -> Action {
         Action {
             sender: self.sender,
             service: self.service,
@@ -182,11 +174,7 @@ impl Caller for ActionPacker {
         }
     }
 
-    fn call<Ret: PackableOwned, Args: PackableOwned>(
-        &self,
-        method: MethodNumber,
-        args: Args,
-    ) -> Action {
+    fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Action {
         Action {
             sender: self.sender,
             service: self.service,

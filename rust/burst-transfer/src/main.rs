@@ -1,7 +1,7 @@
 use std::sync::atomic::AtomicI32;
 
 use anyhow::{anyhow, Context};
-use psibase::fracpack::Packable;
+use psibase::fracpack::Pack;
 
 /// Randomly push transfers to a blockchain in bursts
 #[derive(clap::Parser, Debug)]

@@ -11,7 +11,7 @@ use crate::{
     Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
-use fracpack::Packable;
+use fracpack::{Pack, Unpack};
 use psibase_macros::account_raw;
 use std::cell::{Cell, RefCell};
 use std::{marker::PhantomData, ptr::null_mut};
@@ -284,12 +284,12 @@ impl ChainEmptyResult {
     }
 }
 
-pub struct ChainResult<T: fracpack::PackableOwned> {
+pub struct ChainResult<T: fracpack::UnpackOwned> {
     pub trace: TransactionTrace,
     _marker: PhantomData<T>,
 }
 
-impl<T: fracpack::PackableOwned> ChainResult<T> {
+impl<T: fracpack::UnpackOwned> ChainResult<T> {
     pub fn get(&self) -> Result<T, anyhow::Error> {
         if let Some(e) = &self.trace.error {
             return Err(anyhow!("{}", e));
@@ -329,9 +329,9 @@ pub struct ChainPusher<'a> {
 
 impl<'a> Caller for ChainPusher<'a> {
     type ReturnsNothing = ChainEmptyResult;
-    type ReturnType<T: fracpack::PackableOwned> = ChainResult<T>;
+    type ReturnType<T: fracpack::UnpackOwned> = ChainResult<T>;
 
-    fn call_returns_nothing<Args: fracpack::PackableOwned>(
+    fn call_returns_nothing<Args: fracpack::Pack>(
         &self,
         method: crate::MethodNumber,
         args: Args,
@@ -354,7 +354,7 @@ impl<'a> Caller for ChainPusher<'a> {
         ChainEmptyResult { trace }
     }
 
-    fn call<Ret: fracpack::PackableOwned, Args: fracpack::PackableOwned>(
+    fn call<Ret: fracpack::UnpackOwned, Args: fracpack::Pack>(
         &self,
         method: crate::MethodNumber,
         args: Args,

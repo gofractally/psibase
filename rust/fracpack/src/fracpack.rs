@@ -16,7 +16,7 @@
 //! # Example use
 //!
 //! ```
-//! use fracpack::{Fracpack, Packable, Result};
+//! use fracpack::{Fracpack, Pack, Unpack, Result};
 //!
 //! #[derive(Fracpack, PartialEq, Debug)]
 //! #[fracpack(fracpack_mod = "fracpack")]
@@ -45,13 +45,13 @@
 //!
 //! # Caution
 //!
-//! In Rust, it's easy to accidentally convert from a fixed-size
-//! array reference (`&[u8;7]`) to a slice (`&[u8]`). This matters
+//! It's easy to accidentally convert from a fixed-size
+//! array reference (`&[T;7]`) to a slice (`&[T]`). This matters
 //! to fracpack, which has different, and incompatible, encodings
 //! for the two types.
 
 use custom_error::custom_error;
-use std::{mem, rc::Rc, sync::Arc};
+use std::{cell::RefCell, mem, rc::Rc, sync::Arc};
 
 pub use psibase_macros::Fracpack;
 
@@ -67,25 +67,25 @@ custom_error! {pub Error
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Use this trait on generic functions instead of [Packable] when
+/// Use this trait on generic functions instead of [Unpack] when
 /// the deserialized data may only be owned instead of borrowed from
 /// the source.
 ///
 /// ```
-/// use fracpack::{PackableOwned, Error};
+/// use fracpack::{UnpackOwned, Error};
 ///
-/// pub fn get_unpacked<T: PackableOwned>(packed: &[u8]) -> Result<T, Error> {
+/// pub fn get_unpacked<T: UnpackOwned>(packed: &[u8]) -> Result<T, Error> {
 ///     T::unpacked(packed)
 /// }
 /// ```
-pub trait PackableOwned: for<'a> Packable<'a> {}
-impl<T> PackableOwned for T where T: for<'a> Packable<'a> {}
+pub trait UnpackOwned: for<'a> Unpack<'a> {}
+impl<T> UnpackOwned for T where T: for<'a> Unpack<'a> {}
 
-/// Pack and unpack fracpack data
+/// Convert to fracpack format
 ///
 /// Use [`#[derive(Fracpack)]`](psibase_macros::Fracpack) to implement
 /// this trait; manually implementing it is unsupported.
-pub trait Packable<'a>: Sized {
+pub trait Pack {
     #[doc(hidden)]
     const FIXED_SIZE: u32;
 
@@ -102,7 +102,7 @@ pub trait Packable<'a>: Sized {
     /// Example:
     ///
     /// ```rust
-    /// use fracpack::Packable;
+    /// use fracpack::Pack;
     ///
     /// fn convert(src: &(u32, String)) -> Vec<u8> {
     ///     let mut bytes = Vec::new();
@@ -111,7 +111,7 @@ pub trait Packable<'a>: Sized {
     /// }
     /// ```
     ///
-    /// See [Packable::packed], which is often more convenient.
+    /// See [Pack::packed], which is often more convenient.
     fn pack(&self, dest: &mut Vec<u8>);
 
     /// Convert to fracpack format
@@ -121,7 +121,7 @@ pub trait Packable<'a>: Sized {
     /// Example:
     ///
     /// ```rust
-    /// use fracpack::Packable;
+    /// use fracpack::Pack;
     ///
     /// fn packSomething(a: u32, b: &str) -> Vec<u8> {
     ///     (a, b).packed()
@@ -133,65 +133,9 @@ pub trait Packable<'a>: Sized {
         bytes
     }
 
-    /// Convert from fracpack format. Also verifies the integrity of the data.
-    ///
-    /// This unpacks `Self` from `src` starting at position `pos`.
-    ///
-    /// Example:
-    ///
-    /// ```rust
-    /// use fracpack::Packable;
-    ///
-    /// fn unpackSomething(src: &[u8]) -> String {
-    ///     let mut pos = 0;
-    ///     String::unpack(src, &mut pos).unwrap()
-    /// }
-    /// ```
-    ///
-    /// See [Packable::unpacked], which is often more convenient.
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self>;
-
-    /// Convert from fracpack format. Also verifies the integrity of the data.
-    ///
-    /// This unpacks `Self` from `src`.
-    ///
-    /// Example:
-    ///
-    /// ```rust
-    /// use fracpack::Packable;
-    ///
-    /// fn unpackSomething(src: &[u8]) -> (String, String) {
-    ///     <(String, String)>::unpacked(src).unwrap()
-    /// }
-    /// ```
-    fn unpacked(src: &'a [u8]) -> Result<Self> {
-        let mut pos = 0;
-        Self::unpack(src, &mut pos)
-    }
-
-    /// Verify the integrity of fracpack data. You don't need to call this if
-    /// using [Packable::unpack] since it verifies integrity during unpack.
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()>;
-
-    /// Verify the integrity of fracpack data, plus make sure there is no
-    /// leftover data after it.
-    fn verify_no_extra(src: &'a [u8]) -> Result<()> {
-        let mut pos = 0;
-        Self::verify(src, &mut pos)?;
-        if pos as usize != src.len() {
-            return Err(Error::ExtraData);
-        }
-        Ok(())
-    }
-
     #[doc(hidden)]
     fn is_empty_container(&self) -> bool {
         false
-    }
-
-    #[doc(hidden)]
-    fn new_empty_container() -> Result<Self> {
-        Err(Error::BadOffset)
     }
 
     #[doc(hidden)]
@@ -216,6 +160,77 @@ pub trait Packable<'a>: Sized {
         if Self::VARIABLE_SIZE && !self.is_empty_container() {
             self.pack(dest);
         }
+    }
+}
+
+/// Unpack fracpack data
+///
+/// Use [`#[derive(Fracpack)]`](psibase_macros::Fracpack) to implement
+/// this trait; manually implementing it is unsupported.
+pub trait Unpack<'a>: Sized {
+    #[doc(hidden)]
+    const FIXED_SIZE: u32;
+
+    #[doc(hidden)]
+    const VARIABLE_SIZE: bool;
+
+    #[doc(hidden)]
+    const IS_OPTIONAL: bool = false;
+
+    /// Convert from fracpack format. Also verifies the integrity of the data.
+    ///
+    /// This unpacks `Self` from `src` starting at position `pos`.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use fracpack::Unpack;
+    ///
+    /// fn unpackSomething(src: &[u8]) -> String {
+    ///     let mut pos = 0;
+    ///     String::unpack(src, &mut pos).unwrap()
+    /// }
+    /// ```
+    ///
+    /// See [Pack::unpacked], which is often more convenient.
+    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self>;
+
+    /// Convert from fracpack format. Also verifies the integrity of the data.
+    ///
+    /// This unpacks `Self` from `src`.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use fracpack::Unpack;
+    ///
+    /// fn unpackSomething(src: &[u8]) -> (String, String) {
+    ///     <(String, String)>::unpacked(src).unwrap()
+    /// }
+    /// ```
+    fn unpacked(src: &'a [u8]) -> Result<Self> {
+        let mut pos = 0;
+        Self::unpack(src, &mut pos)
+    }
+
+    /// Verify the integrity of fracpack data. You don't need to call this if
+    /// using [Pack::unpack] since it verifies integrity during unpack.
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()>;
+
+    /// Verify the integrity of fracpack data, plus make sure there is no
+    /// leftover data after it.
+    fn verify_no_extra(src: &'a [u8]) -> Result<()> {
+        let mut pos = 0;
+        Self::verify(src, &mut pos)?;
+        if pos as usize != src.len() {
+            return Err(Error::ExtraData);
+        }
+        Ok(())
+    }
+
+    #[doc(hidden)]
+    fn new_empty_container() -> Result<Self> {
+        Err(Error::BadOffset)
     }
 
     #[doc(hidden)]
@@ -270,7 +285,7 @@ pub trait Packable<'a>: Sized {
             Self::verify(src, fixed_pos)
         }
     }
-} // Packable
+}
 
 fn read_u8_arr<const SIZE: usize>(src: &[u8], pos: &mut u32) -> Result<[u8; SIZE]> {
     let mut bytes: [u8; SIZE] = [0; SIZE];
@@ -300,7 +315,7 @@ impl MissingBoolConversions for bool {
     }
 }
 
-impl<'a, T: Packable<'a>> Packable<'a> for &'a T {
+impl<'a, T: Pack> Pack for &'a T {
     const FIXED_SIZE: u32 = T::FIXED_SIZE;
     const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
     const IS_OPTIONAL: bool = T::IS_OPTIONAL;
@@ -309,20 +324,8 @@ impl<'a, T: Packable<'a>> Packable<'a> for &'a T {
         (*self).pack(dest)
     }
 
-    fn unpack(_src: &'a [u8], _pos: &mut u32) -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        <T>::verify(src, pos)
-    }
-
     fn is_empty_container(&self) -> bool {
         (*self).is_empty_container()
-    }
-
-    fn new_empty_container() -> Result<Self> {
-        Err(Error::UnpackRef)
     }
 
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
@@ -335,6 +338,24 @@ impl<'a, T: Packable<'a>> Packable<'a> for &'a T {
 
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
         (*self).embedded_variable_pack(dest)
+    }
+}
+
+impl<'a, T: Unpack<'a>> Unpack<'a> for &'a T {
+    const FIXED_SIZE: u32 = T::FIXED_SIZE;
+    const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
+    const IS_OPTIONAL: bool = T::IS_OPTIONAL;
+
+    fn unpack(_src: &'a [u8], _pos: &mut u32) -> Result<Self> {
+        Err(Error::UnpackRef)
+    }
+
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        <T>::verify(src, pos)
+    }
+
+    fn new_empty_container() -> Result<Self> {
+        Err(Error::UnpackRef)
     }
 
     fn embedded_variable_unpack(
@@ -364,20 +385,24 @@ impl<'a, T: Packable<'a>> Packable<'a> for &'a T {
 
 macro_rules! scalar_impl {
     ($t:ty) => {
-        impl<'a> Packable<'a> for $t {
+        impl Pack for $t {
             const FIXED_SIZE: u32 = mem::size_of::<Self>() as u32;
             const VARIABLE_SIZE: bool = false;
             fn pack(&self, dest: &mut Vec<u8>) {
                 dest.extend_from_slice(&self.to_le_bytes());
             }
+        }
+        impl<'a> Unpack<'a> for $t {
+            const FIXED_SIZE: u32 = mem::size_of::<Self>() as u32;
+            const VARIABLE_SIZE: bool = false;
             fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
                 Ok(Self::from_le_bytes(read_u8_arr(src, pos)?.into()))
             }
             fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-                if (*pos as u64 + Self::FIXED_SIZE as u64 > src.len() as u64) {
+                if (*pos as u64 + <Self as Unpack>::FIXED_SIZE as u64 > src.len() as u64) {
                     Err(Error::ReadPastEnd)
                 } else {
-                    *pos += Self::FIXED_SIZE;
+                    *pos += <Self as Unpack>::FIXED_SIZE;
                     Ok(())
                 }
             }
@@ -397,16 +422,43 @@ scalar_impl! {u64}
 scalar_impl! {f32}
 scalar_impl! {f64}
 
-macro_rules! ptr_impl {
-    ($ptr:ident) => {
-        impl<'a, T: Packable<'a>> Packable<'a> for $ptr<T> {
+macro_rules! pack_ptr {
+    ($ptr:ident, $to_ref:ident) => {
+        impl<T: Pack> Pack for $ptr<T> {
             const FIXED_SIZE: u32 = T::FIXED_SIZE;
             const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
             const IS_OPTIONAL: bool = T::IS_OPTIONAL;
 
             fn pack(&self, dest: &mut Vec<u8>) {
-                self.as_ref().pack(dest)
+                self.$to_ref().pack(dest)
             }
+
+            fn is_empty_container(&self) -> bool {
+                self.$to_ref().is_empty_container()
+            }
+
+            fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
+                self.$to_ref().embedded_fixed_pack(dest)
+            }
+
+            fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
+                self.$to_ref()
+                    .embedded_fixed_repack(fixed_pos, heap_pos, dest)
+            }
+
+            fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
+                self.$to_ref().embedded_variable_pack(dest)
+            }
+        }
+    };
+}
+
+macro_rules! unpack_ptr {
+    ($ptr:ident) => {
+        impl<'a, T: Unpack<'a>> Unpack<'a> for $ptr<T> {
+            const FIXED_SIZE: u32 = T::FIXED_SIZE;
+            const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
+            const IS_OPTIONAL: bool = T::IS_OPTIONAL;
 
             fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
                 Ok(Self::new(<T>::unpack(src, pos)?))
@@ -416,25 +468,8 @@ macro_rules! ptr_impl {
                 <T>::verify(src, pos)
             }
 
-            fn is_empty_container(&self) -> bool {
-                self.as_ref().is_empty_container()
-            }
-
             fn new_empty_container() -> Result<Self> {
                 Ok(Self::new(<T>::new_empty_container()?))
-            }
-
-            fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-                self.as_ref().embedded_fixed_pack(dest)
-            }
-
-            fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-                self.as_ref()
-                    .embedded_fixed_repack(fixed_pos, heap_pos, dest)
-            }
-
-            fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-                self.as_ref().embedded_variable_pack(dest)
             }
 
             fn embedded_variable_unpack(
@@ -473,11 +508,18 @@ macro_rules! ptr_impl {
         }
     };
 }
-ptr_impl!(Box);
-ptr_impl!(Rc);
-ptr_impl!(Arc);
 
-impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
+pack_ptr!(Box, as_ref);
+pack_ptr!(Rc, as_ref);
+pack_ptr!(Arc, as_ref);
+pack_ptr!(RefCell, borrow);
+
+unpack_ptr!(Box);
+unpack_ptr!(Rc);
+unpack_ptr!(Arc);
+unpack_ptr!(RefCell);
+
+impl<T: Pack> Pack for Option<T> {
     const FIXED_SIZE: u32 = 4;
     const VARIABLE_SIZE: bool = true;
     const IS_OPTIONAL: bool = true;
@@ -488,18 +530,6 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
         let heap_pos = dest.len() as u32;
         Self::embedded_fixed_repack(self, fixed_pos, heap_pos, dest);
         Self::embedded_variable_pack(self, dest);
-    }
-
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        let mut fixed_pos = *pos;
-        *pos += 4;
-        Self::embedded_unpack(src, &mut fixed_pos, pos)
-    }
-
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let mut fixed_pos = *pos;
-        *pos += 4;
-        Self::embedded_verify(src, &mut fixed_pos, pos)
     }
 
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
@@ -531,6 +561,24 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
             }
         }
     }
+}
+
+impl<'a, T: Unpack<'a>> Unpack<'a> for Option<T> {
+    const FIXED_SIZE: u32 = 4;
+    const VARIABLE_SIZE: bool = true;
+    const IS_OPTIONAL: bool = true;
+
+    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
+        let mut fixed_pos = *pos;
+        *pos += 4;
+        Self::embedded_unpack(src, &mut fixed_pos, pos)
+    }
+
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        let mut fixed_pos = *pos;
+        *pos += 4;
+        Self::embedded_verify(src, &mut fixed_pos, pos)
+    }
 
     fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
         let orig_pos = *fixed_pos;
@@ -553,7 +601,7 @@ impl<'a, T: Packable<'a>> Packable<'a> for Option<T> {
         *fixed_pos = orig_pos;
         T::embedded_variable_verify(src, fixed_pos, heap_pos)
     }
-} // impl<T> Packable for Option<T>
+}
 
 trait BytesConversion<'a>: Sized {
     fn fracpack_verify_if_str(bytes: &'a [u8]) -> Result<()>;
@@ -601,7 +649,7 @@ impl<'a> BytesConversion<'a> for &'a [u8] {
 
 macro_rules! bytes_impl {
     ($t:ty) => {
-        impl<'a> Packable<'a> for $t {
+        impl<'a> Pack for $t {
             const FIXED_SIZE: u32 = 4;
             const VARIABLE_SIZE: bool = true;
 
@@ -609,6 +657,15 @@ macro_rules! bytes_impl {
                 dest.extend_from_slice(&(self.len() as u32).to_le_bytes());
                 dest.extend_from_slice(self.fracpack_as_bytes());
             }
+
+            fn is_empty_container(&self) -> bool {
+                self.is_empty()
+            }
+        }
+
+        impl<'a> Unpack<'a> for $t {
+            const FIXED_SIZE: u32 = 4;
+            const VARIABLE_SIZE: bool = true;
 
             fn unpack(src: &'a [u8], pos: &mut u32) -> Result<$t> {
                 let len = u32::unpack(src, pos)?;
@@ -629,14 +686,10 @@ macro_rules! bytes_impl {
                 Ok(())
             }
 
-            fn is_empty_container(&self) -> bool {
-                self.is_empty()
-            }
-
             fn new_empty_container() -> Result<Self> {
                 Ok(Default::default())
             }
-        } // impl Packable for $t
+        }
     };
 } // bytes_impl
 
@@ -644,7 +697,7 @@ bytes_impl! {String}
 bytes_impl! {&'a str}
 bytes_impl! {&'a [u8]}
 
-impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
+impl<T: Pack> Pack for Vec<T> {
     const FIXED_SIZE: u32 = 4;
     const VARIABLE_SIZE: bool = true;
 
@@ -663,6 +716,15 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
             T::embedded_variable_pack(x, dest);
         }
     }
+
+    fn is_empty_container(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+impl<'a, T: Unpack<'a>> Unpack<'a> for Vec<T> {
+    const FIXED_SIZE: u32 = 4;
+    const VARIABLE_SIZE: bool = true;
 
     // TODO: optimize scalar
     fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
@@ -702,16 +764,12 @@ impl<'a, T: Packable<'a>> Packable<'a> for Vec<T> {
         Ok(())
     }
 
-    fn is_empty_container(&self) -> bool {
-        self.is_empty()
-    }
-
     fn new_empty_container() -> Result<Self> {
         Ok(Default::default())
     }
-} // impl<T> Packable for Vec<T>
+}
 
-impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
+impl<T: Pack, const N: usize> Pack for [T; N] {
     const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
     const FIXED_SIZE: u32 = if T::VARIABLE_SIZE {
         4
@@ -730,6 +788,15 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
             item.embedded_variable_pack(dest);
         }
     }
+}
+
+impl<'a, T: Unpack<'a>, const N: usize> Unpack<'a> for [T; N] {
+    const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
+    const FIXED_SIZE: u32 = if T::VARIABLE_SIZE {
+        4
+    } else {
+        T::FIXED_SIZE * N as u32
+    };
 
     fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
         let hp = *pos as u64 + T::FIXED_SIZE as u64 * N as u64;
@@ -771,7 +838,7 @@ impl<'a, T: Packable<'a>, const N: usize> Packable<'a> for [T; N] {
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)*))+) => {
         $(
-            impl<'a, $($name: Packable<'a>),*> Packable<'a> for ($($name,)*)
+            impl<$($name: Pack),*> Pack for ($($name,)*)
             {
                 const VARIABLE_SIZE: bool = true;
                 const FIXED_SIZE: u32 = 4;
@@ -791,6 +858,12 @@ macro_rules! tuple_impls {
                         self.$n.embedded_variable_pack(dest);
                     )*
                 }
+            }
+
+            impl<'a, $($name: Unpack<'a>),*> Unpack<'a> for ($($name,)*)
+            {
+                const VARIABLE_SIZE: bool = true;
+                const FIXED_SIZE: u32 = 4;
 
                 #[allow(non_snake_case,unused_mut)]
                 fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {

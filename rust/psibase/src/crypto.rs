@@ -297,18 +297,18 @@ pub fn sign_transaction(
         .iter()
         .map(|k| crate::Claim {
             service: AccountNumber::new(account_raw!("verifyec-sys")),
-            rawData: fracpack::Packable::packed(&PublicKey::from(
+            rawData: fracpack::Pack::packed(&PublicKey::from(
                 &secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, k),
             )),
         })
         .collect();
-    let transaction = fracpack::Packable::packed(&trx);
+    let transaction = fracpack::Pack::packed(&trx);
     let digest =
         secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(&transaction);
     let proofs = keys
         .iter()
         .map(|k| {
-            fracpack::Packable::packed(&Signature::from(
+            fracpack::Pack::packed(&Signature::from(
                 secp256k1::SECP256K1.sign_ecdsa(&digest, k),
             ))
         })

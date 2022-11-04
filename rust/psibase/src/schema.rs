@@ -2,14 +2,12 @@ use crate::reflect::{
     ArgVisitor, EnumVisitor, MethodsVisitor, NamedVisitor, Reflect, StructVisitor, UnnamedVisitor,
     Visitor,
 };
-use fracpack::Fracpack;
 use psibase_macros::Reflect;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::{any::TypeId, borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Default, Reflect, Serialize, Deserialize)]
 #[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
 pub struct Schema<String>
@@ -19,8 +17,7 @@ where
     pub userTypes: Vec<Definition<String>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Default, Reflect, Serialize, Deserialize)]
 #[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
 pub struct Definition<String>
@@ -48,8 +45,7 @@ where
     pub methods: Option<Vec<Method<String>>>,
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Reflect, Serialize, Deserialize)]
 #[reflect(psibase_mod = "crate")]
 #[allow(non_camel_case_types)]
 pub enum TypeRef<String>
@@ -64,8 +60,7 @@ where
     array(Box<TypeRef<String>>, u32),
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Reflect, Serialize, Deserialize)]
 #[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
 pub struct Field<String>
@@ -76,8 +71,7 @@ where
     ty: TypeRef<String>,
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Reflect, Serialize, Deserialize)]
 #[reflect(psibase_mod = "crate")]
 #[allow(non_snake_case)]
 pub struct Method<String>

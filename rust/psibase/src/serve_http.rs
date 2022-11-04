@@ -115,8 +115,8 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
         type Output = HttpReply;
 
         fn process<
-            Return: Reflect + fracpack::PackableOwned + serde::Serialize + serde::de::DeserializeOwned,
-            ArgStruct: Reflect + fracpack::PackableOwned + serde::Serialize + serde::de::DeserializeOwned,
+            Return: Reflect + serde::Serialize + serde::de::DeserializeOwned,
+            ArgStruct: Reflect + fracpack::Pack + serde::Serialize + serde::de::DeserializeOwned,
         >(
             self,
         ) -> Self::Output {

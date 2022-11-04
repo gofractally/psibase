@@ -110,7 +110,7 @@ fn enum_named<'a>(
                     quote! {#f,}
                 })
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
-            quote! {<#as_tuple_of_ref as #fracpack_mod::Packable>::pack(&(#numbered), dest)}
+            quote! {<#as_tuple_of_ref as #fracpack_mod::Pack>::pack(&(#numbered), dest)}
         },
         unpack: {
             let init = field
@@ -125,7 +125,7 @@ fn enum_named<'a>(
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
             quote! {
                 {
-                    let data = <#as_type as #fracpack_mod::Packable>::unpack(src, pos)?;
+                    let data = <#as_type as #fracpack_mod::Unpack>::unpack(src, pos)?;
                     #enum_name::#field_name{#init}
                 }
             }
@@ -146,9 +146,9 @@ fn enum_single<'a>(
             quote! {#ty}
         },
         selector: quote! {(field_0)},
-        pack: quote! {<#ty as #fracpack_mod::Packable>::pack(field_0, dest)},
+        pack: quote! {<#ty as #fracpack_mod::Pack>::pack(field_0, dest)},
         unpack: quote! {
-            #enum_name::#field_name(<#ty as #fracpack_mod::Packable>::unpack(src, pos)?)
+            #enum_name::#field_name(<#ty as #fracpack_mod::Unpack>::unpack(src, pos)?)
         },
     }
 }
@@ -209,7 +209,7 @@ fn enum_tuple<'a>(
                     quote! {#f,}
                 })
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
-            quote! {<#as_tuple_of_ref as #fracpack_mod::Packable>::pack(&(#numbered), dest)}
+            quote! {<#as_tuple_of_ref as #fracpack_mod::Pack>::pack(&(#numbered), dest)}
         },
         unpack: {
             let numbered = field
@@ -223,7 +223,7 @@ fn enum_tuple<'a>(
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
             quote! {
                 {
-                    let data = <#as_type as #fracpack_mod::Packable>::unpack(src, pos)?;
+                    let data = <#as_type as #fracpack_mod::Unpack>::unpack(src, pos)?;
                     #enum_name::#field_name(#numbered)
                 }
             }
@@ -288,12 +288,13 @@ fn process_struct(
     }
     let name = &input.ident;
     let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let fields = struct_fields(data);
     let fixed_size = fields
         .iter()
         .map(|field| {
             let ty = &field.ty;
-            quote! {<#ty as #fracpack_mod::Packable>::FIXED_SIZE}
+            quote! {<#ty as #fracpack_mod::Pack>::FIXED_SIZE}
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
     let use_heap = if !opts.definition_will_not_change {
@@ -303,7 +304,7 @@ fn process_struct(
             .iter()
             .map(|field| {
                 let ty = &field.ty;
-                quote! {<#ty as #fracpack_mod::Packable>::VARIABLE_SIZE}
+                quote! {<#ty as #fracpack_mod::Pack>::VARIABLE_SIZE}
             })
             .fold(quote! {false}, |acc, new| quote! {#acc || #new})
     };
@@ -316,12 +317,12 @@ fn process_struct(
         })
         .collect();
     let pack_heap = if !opts.definition_will_not_change {
-        quote! { <u16 as #fracpack_mod::Packable>::pack(&(heap as u16), dest); }
+        quote! { <u16 as #fracpack_mod::Pack>::pack(&(heap as u16), dest); }
     } else {
         quote! {}
     };
     let unpack_heap_size = if !opts.definition_will_not_change {
-        quote! { let heap_size = <u16 as #fracpack_mod::Packable>::unpack(src, pos)?; }
+        quote! { let heap_size = <u16 as #fracpack_mod::Unpack>::unpack(src, pos)?; }
     } else {
         quote! { let heap_size = #fixed_size; }
     };
@@ -335,7 +336,7 @@ fn process_struct(
             quote! {
                 #[allow(non_snake_case)]
                 let #pos = dest.len() as u32;
-                <#ty as #fracpack_mod::Packable>::embedded_fixed_pack(&self.#name, dest);
+                <#ty as #fracpack_mod::Pack>::embedded_fixed_pack(&self.#name, dest);
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -347,8 +348,8 @@ fn process_struct(
             let ty = &field.ty;
             let pos = &positions[i];
             quote! {
-                <#ty as #fracpack_mod::Packable>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
-                <#ty as #fracpack_mod::Packable>::embedded_variable_pack(&self.#name, dest);
+                <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
+                <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -358,7 +359,7 @@ fn process_struct(
             let name = &field.name;
             let ty = &field.ty;
             quote! {
-                #name: <#ty as #fracpack_mod::Packable>::embedded_unpack(src, pos, &mut heap_pos)?,
+                #name: <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -368,13 +369,14 @@ fn process_struct(
         .iter()
         .map(|field| {
             let ty = &field.ty;
-            quote! { <#ty as #fracpack_mod::Packable>::embedded_verify(src, pos, &mut heap_pos)?; }
+            quote! { <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?; }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
-        impl<'a> #fracpack_mod::Packable<'a> for #name #generics {
+        impl #impl_generics #fracpack_mod::Pack for #name #ty_generics #where_clause {
             const VARIABLE_SIZE: bool = #use_heap;
-            const FIXED_SIZE: u32 = if Self::VARIABLE_SIZE { 4 } else { #fixed_size };
+            const FIXED_SIZE: u32 =
+                if <Self as #fracpack_mod::Pack>::VARIABLE_SIZE { 4 } else { #fixed_size };
             fn pack(&self, dest: &mut Vec<u8>) {
                 let heap = #fixed_size;
                 assert!(heap as u16 as u32 == heap); // TODO: return error
@@ -382,6 +384,11 @@ fn process_struct(
                 #pack_fixed_members
                 #pack_variable_members
             }
+        }
+        impl<'a> #fracpack_mod::Unpack<'a> for #name #generics {
+            const VARIABLE_SIZE: bool = #use_heap;
+            const FIXED_SIZE: u32 =
+                if <Self as #fracpack_mod::Unpack>::VARIABLE_SIZE { 4 } else { #fixed_size };
             fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
                 #unpack_heap_size
                 let mut heap_pos = *pos + heap_size as u32;
@@ -419,6 +426,7 @@ fn process_struct_unnamed(
     }
     let name = &input.ident;
     let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let ty = if unnamed.unnamed.len() == 1 {
         let ty = &unnamed.unnamed[0].ty;
@@ -430,7 +438,7 @@ fn process_struct_unnamed(
         });
         quote! {(#ty)}
     };
-    let ty = quote! {<#ty as #fracpack_mod::Packable>};
+    let ty = quote! {<#ty as #fracpack_mod::Unpack>};
 
     let ref_ty = if unnamed.unnamed.len() == 1 {
         let ty = &unnamed.unnamed[0].ty;
@@ -442,7 +450,7 @@ fn process_struct_unnamed(
         });
         quote! {(#ty)}
     };
-    let ref_ty = quote! {<#ref_ty as #fracpack_mod::Packable>};
+    let ref_ty = quote! {<#ref_ty as #fracpack_mod::Pack>};
 
     let to_value = if unnamed.unnamed.len() == 1 {
         quote! {let value = &self.0;}
@@ -472,22 +480,25 @@ fn process_struct_unnamed(
         quote! {Self(#from_value)}
     };
 
-    let containers = if unnamed.unnamed.len() == 1 {
-        quote! {
-            fn is_empty_container(&self) -> bool {
-                self.0.is_empty_container()
-            }
-
-            fn new_empty_container() -> #fracpack_mod::Result<Self> {
-                Ok(Self(#ty::new_empty_container()?))
-            }
-        }
+    let (is_empty_container, new_empty_container) = if unnamed.unnamed.len() == 1 {
+        (
+            quote! {
+                fn is_empty_container(&self) -> bool {
+                    self.0.is_empty_container()
+                }
+            },
+            quote! {
+                fn new_empty_container() -> #fracpack_mod::Result<Self> {
+                    Ok(Self(#ty::new_empty_container()?))
+                }
+            },
+        )
     } else {
-        quote! {}
+        (quote! {}, quote! {})
     };
 
     TokenStream::from(quote! {
-        impl<'a> #fracpack_mod::Packable<'a> for #name #generics {
+        impl #impl_generics #fracpack_mod::Pack for #name #ty_generics #where_clause {
             const FIXED_SIZE: u32 = #ty::FIXED_SIZE;
             const VARIABLE_SIZE: bool = #ty::VARIABLE_SIZE;
             const IS_OPTIONAL: bool = #ty::IS_OPTIONAL;
@@ -497,16 +508,7 @@ fn process_struct_unnamed(
                 #ref_ty::pack(&value, dest)
             }
 
-            fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
-                let value = #ty::unpack(src, pos)?;
-                Ok(#from_value)
-            }
-
-            fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
-                #ty::verify(src, pos)
-            }
-
-            #containers
+            #is_empty_container
 
             fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
                 #to_value
@@ -522,6 +524,22 @@ fn process_struct_unnamed(
                 #to_value
                 #ref_ty::embedded_variable_pack(&value, dest)
             }
+        }
+        impl<'a> #fracpack_mod::Unpack<'a> for #name #generics {
+            const FIXED_SIZE: u32 = #ty::FIXED_SIZE;
+            const VARIABLE_SIZE: bool = #ty::VARIABLE_SIZE;
+            const IS_OPTIONAL: bool = #ty::IS_OPTIONAL;
+
+            fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
+                let value = #ty::unpack(src, pos)?;
+                Ok(#from_value)
+            }
+
+            fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
+                #ty::verify(src, pos)
+            }
+
+            #new_empty_container
 
             fn embedded_variable_unpack(
                 src: &'a [u8],
@@ -559,6 +577,7 @@ fn process_enum(
 ) -> TokenStream {
     let name = &input.ident;
     let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let fields = enum_fields(fracpack_mod, name, data);
     // TODO: 128? also check during verify and unpack
     assert!(fields.len() < 256);
@@ -596,12 +615,12 @@ fn process_enum(
             let index = i as u8;
             let as_type = &field.as_type;
             quote! {
-                #index => <#as_type as #fracpack_mod::Packable>::verify(src, pos)?,
+                #index => <#as_type as #fracpack_mod::Unpack>::verify(src, pos)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
     TokenStream::from(quote! {
-        impl<'a> #fracpack_mod::Packable<'a> for #name #generics {
+        impl #impl_generics #fracpack_mod::Pack for #name #ty_generics #where_clause {
             const FIXED_SIZE: u32 = 4;
             const VARIABLE_SIZE: bool = true;
             fn pack(&self, dest: &mut Vec<u8>) {
@@ -612,10 +631,14 @@ fn process_enum(
                 let size = (dest.len() - size_pos - 4) as u32;
                 dest[size_pos..size_pos + 4].copy_from_slice(&size.to_le_bytes());
             }
+        }
+        impl<'a> #fracpack_mod::Unpack<'a> for #name #generics {
+            const FIXED_SIZE: u32 = 4;
+            const VARIABLE_SIZE: bool = true;
             fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
-                let index = <u8 as #fracpack_mod::Packable>::unpack(src, pos)?;
+                let index = <u8 as #fracpack_mod::Unpack>::unpack(src, pos)?;
                 let size_pos = *pos;
-                let size = <u32 as #fracpack_mod::Packable>::unpack(src, pos)?;
+                let size = <u32 as #fracpack_mod::Unpack>::unpack(src, pos)?;
                 let result = match index {
                     #unpack_items
                     _ => return Err(#fracpack_mod::Error::BadEnumIndex),
@@ -627,9 +650,9 @@ fn process_enum(
             }
             // TODO: option to error on unknown index
             fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
-                let index = <u8 as #fracpack_mod::Packable>::unpack(src, pos)?;
+                let index = <u8 as #fracpack_mod::Unpack>::unpack(src, pos)?;
                 let size_pos = *pos;
-                let size = <u32 as #fracpack_mod::Packable>::unpack(src, pos)?;
+                let size = <u32 as #fracpack_mod::Unpack>::unpack(src, pos)?;
                 match index {
                     #verify_items
                     _ => {

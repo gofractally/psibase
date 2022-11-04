@@ -5,7 +5,7 @@ use std::{
 
 use custom_error::custom_error;
 
-use fracpack::PackableOwned;
+use fracpack::{Pack, UnpackOwned};
 
 use crate::{
     get_key_bytes, get_service, kv_get, kv_get_bytes, kv_greater_equal_bytes, kv_less_than_bytes,
@@ -30,7 +30,7 @@ custom_error! {
     DuplicatedKey       = "Duplicated secondary key",
 }
 
-pub trait TableRecord: PackableOwned {
+pub trait TableRecord: Pack + UnpackOwned {
     type PrimaryKey: ToKey;
 
     fn get_primary_key(&self) -> Self::PrimaryKey;
