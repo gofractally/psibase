@@ -1,5 +1,8 @@
 name: ubuntu-2004-builder container
 
+env:
+  GITHUB_OUTPUT: ""
+
 on:
   workflow_dispatch:
   push:
@@ -32,7 +35,7 @@ jobs:
           REGISTRY="ghcr.io"
           IMAGE="${REGISTRY}/${{ github.repository_owner }}/psibase-ubuntu-2004-builder"
           TAGS="${IMAGE}:${{ github.sha }}"
-          echo ::set-output name=tags::${TAGS,,}
+          echo "tags=${TAGS,,}" >> $GITHUB_OUTPUT
 
       - name: Showtag
         id: showtag
