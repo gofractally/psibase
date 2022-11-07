@@ -5,11 +5,13 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 
-trait ToHex:
+pub trait ToHex:
     Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect + ToKey
 {
     fn to_hex(&self) -> String;
 }
+
+pub type HexBytes = Hex<Vec<u8>>;
 
 trait FromHex: ToHex {
     fn from_hex(s: &str) -> Option<Self>;

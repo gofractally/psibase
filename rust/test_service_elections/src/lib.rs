@@ -4,8 +4,9 @@
 #[psibase::service(name = "elections")]
 mod service {
     use psibase::{
-        check, check_none, check_some, get_sender, serve_simple_ui, services::transaction_sys,
-        AccountNumber, Fracpack, HttpReply, HttpRequest, Reflect, Table, TimePointSec, ToKey,
+        check, check_none, check_some, get_sender, get_service, serve_content, serve_simple_ui,
+        services::transaction_sys, store_content, AccountNumber, Fracpack, HexBytes, HttpReply,
+        HttpRequest, Reflect, Table, TimePointSec, ToKey, WebContentRow,
     };
     use serde::{Deserialize, Serialize};
 
@@ -68,6 +69,31 @@ mod service {
         #[primary_key]
         fn by_election_id_voter(&self) -> (u32, AccountNumber) {
             (self.election_id, self.voter)
+        }
+    }
+
+    // TODO: create a macro for external records
+    // #[table(record = WebContentRow, index = 3)]
+    // struct WebContentTable;
+    struct WebContentTable {
+        db_id: psibase::DbId,
+        prefix: Vec<u8>,
+    }
+
+    impl Table<WebContentRow> for WebContentTable {
+        const TABLE_INDEX: u16 = 3;
+        const SECONDARY_KEYS: u8 = 0;
+
+        fn with_prefix(db_id: psibase::DbId, prefix: Vec<u8>) -> Self {
+            WebContentTable { db_id, prefix }
+        }
+
+        fn prefix(&self) -> &[u8] {
+            &self.prefix
+        }
+
+        fn db_id(&self) -> psibase::DbId {
+            self.db_id
         }
     }
 
@@ -296,11 +322,20 @@ mod service {
         CandidatesTable::new().put(&candidate_record).unwrap();
     }
 
+    #[action]
+    #[allow(non_snake_case)]
+    fn storeSys(path: String, contentType: String, content: HexBytes) {
+        check(get_sender() == get_service(), "unauthorized");
+        let table = WebContentTable::new();
+        store_content(path, contentType, content, &table).unwrap();
+    }
+
     // The UI allows us to test things manually
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        serve_simple_ui::<Wrapper>(&request)
+        None.or_else(|| serve_content(&request, &WebContentTable::new()))
+            .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
 

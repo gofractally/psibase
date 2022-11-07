@@ -13,17 +13,6 @@ use crate::{
     RawKey, ToKey,
 };
 
-// TODO: remove helper
-fn _to_hex(bytes: &[u8]) -> String {
-    let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    for byte in bytes {
-        result.push(DIGITS[(byte >> 4) as usize]);
-        result.push(DIGITS[(byte & 0x0f) as usize]);
-    }
-    String::from_utf8(result).unwrap()
-}
-
 custom_error! {
     #[allow(clippy::enum_variant_names)] pub Error
 
@@ -279,7 +268,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         }
         .map(RawKey::new);
         // if front_key.is_some() {
-        //     println!("range2 fc: {}", _to_hex(&front_key.as_ref().unwrap().data));
+        //  println!("range2 fc: {}", &front_key.as_ref().unwrap().data.to_hex());
         // }
 
         let mut back_key = self.prefix.clone();
@@ -299,7 +288,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         }
         .map(RawKey::new);
         // if back_key.is_some() {
-        //     println!("range2 bc: {}", _to_hex(&back_key.as_ref().unwrap().data));
+        //     println!("range2 bc: {}", &back_key.as_ref().unwrap().data.to_hex());
         // }
 
         TableIter {
@@ -412,13 +401,13 @@ impl<'a, Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIter<'a, 
             // if self.front_key.is_some() {
             //     println!(
             //         "iterated from the back bc: {} fc: {}",
-            //         _to_hex(&self.back_key.as_ref().unwrap().data),
-            //         _to_hex(&self.front_key.as_ref().unwrap().data)
+            //         &self.back_key.as_ref().unwrap().data.to_hex(),
+            //         &self.front_key.as_ref().unwrap().data.to_hex()
             //     );
             // } else {
             //     println!(
             //         "iterated from the back bc: {} NO FC",
-            //         _to_hex(&self.back_key.as_ref().unwrap().data)
+            //         &self.back_key.as_ref().unwrap().data.to_hex()
             //     );
             // }
 
