@@ -1,7 +1,8 @@
 use crate::{reflect, ToKey};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::str::FromStr;
 
 trait ToHex:
     Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect + ToKey
@@ -47,6 +48,29 @@ where
 {
     fn from(inner: T) -> Self {
         Self(inner)
+    }
+}
+
+impl<T> Display for Hex<T>
+where
+    T: ToHex,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl<T> FromStr for Hex<T>
+where
+    T: FromHex,
+{
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(v) = T::from_hex(s) {
+            Ok(Self(v))
+        } else {
+            Err("Hex conversion failed")
+        }
     }
 }
 
