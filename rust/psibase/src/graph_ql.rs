@@ -215,6 +215,7 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> ConnectionBuilder<'a, Key
                             break;
                         }
                     }
+                    items.reverse();
                 } else {
                     let n = first.unwrap_or(usize::MAX);
                     while items.len() < n {
@@ -224,7 +225,6 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> ConnectionBuilder<'a, Key
                             break;
                         }
                     }
-                    items.reverse();
                 }
 
                 let mut has_previous_page = false;
@@ -234,9 +234,8 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> ConnectionBuilder<'a, Key
                         .is_some()
                     {
                         let found_key = RawKey::new(get_key_bytes());
-                        has_previous_page = (orig_begin.is_none()
-                            || orig_begin.unwrap() >= found_key)
-                            && (after.is_none() || after.as_ref().unwrap() > &found_key);
+                        has_previous_page =
+                            orig_begin.is_none() || found_key >= orig_begin.unwrap();
                     }
                 }
                 if let Some(item) = items.last() {
@@ -246,8 +245,7 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> ConnectionBuilder<'a, Key
                         .is_some()
                     {
                         let found_key = RawKey::new(get_key_bytes());
-                        has_next_page = (orig_end.is_none() || orig_end.unwrap() < found_key)
-                            && (before.is_none() || before.as_ref().unwrap() < &found_key);
+                        has_next_page = orig_end.is_none() || found_key < orig_end.unwrap();
                     }
                 }
 
