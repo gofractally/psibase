@@ -58,8 +58,8 @@ pub trait Table<Record: TableRecord>: Sized {
         Self::create_table_from_prefix(prefix)
     }
 
-    fn with_service(service: AccountNumber, table_index: u16) -> Self {
-        let prefix = (service, table_index).to_key();
+    fn with_service(service: AccountNumber) -> Self {
+        let prefix = (service, Self::TABLE_INDEX).to_key();
         Self::create_table_from_prefix(prefix)
     }
 

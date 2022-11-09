@@ -13,13 +13,16 @@ use std::ops::RangeBounds;
 /// This allows you to query a [TableIndex] using the
 /// [GraphQL Pagination Spec](https://graphql.org/learn/pagination/).
 ///
-/// [range], [gt], [ge], [lt], [le], [gt_raw], [ge_raw],
-/// [lt_raw], and [le_raw] define a range. The range initially
+/// [range](Self::range), [gt](Self::gt), [ge](Self::ge),
+/// [lt](Self::lt), [le](Self::le), [gt_raw](Self::gt_raw),
+/// [ge_raw](Self::ge_raw), [lt_raw](Self::lt_raw), and
+/// [le_raw](Self::le_raw) define a range. The range initially
 /// covers the entire index; each of these functions shrink it
 /// (set intersection).
 ///
-/// [first], [last], [before], and [after] page through the range.
-/// They conform to the Pagination Spec, except [query] produces an
+/// [first](Self::first), [last](Self::last), [before](Self::before),
+/// and [after](Self::after) page through the range. They conform to
+/// the Pagination Spec, except [query](Self::query) produces an
 /// error if both `first` and `last` are Some.
 pub struct TableQuery<'a, Key: ToKey, Record: TableRecord> {
     index: &'a TableIndex<Key, Record>,
@@ -62,7 +65,8 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> TableQuery<'a, Key, Recor
 
     /// Resume paging. Limits the result to records before `cursor`
     /// (if Some). `cursor` is opaque; get it from a
-    /// previously-returned [Connection].
+    /// previously-returned
+    /// [Connection](async_graphql::connection::Connection).
     ///
     /// This replaces the current value.
     pub fn before(mut self, cursor: Option<String>) -> Self {
@@ -72,7 +76,8 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> TableQuery<'a, Key, Recor
 
     /// Resume paging. Limits the result to records after `cursor`
     /// (if Some). `cursor` is opaque; get it from a
-    /// previously-returned [Connection].
+    /// previously-returned
+    /// [Connection](async_graphql::connection::Connection).
     ///
     /// This replaces the current value.
     pub fn after(mut self, cursor: Option<String>) -> Self {

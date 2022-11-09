@@ -205,6 +205,7 @@ impl<'a> Visitor for ValueGenerator<'a> {
                 "f32" => self.result.push('0'),
                 "f64" => self.result.push('0'),
                 "string" => self.result.push_str("\"\""),
+                "hex" => self.result.push_str("\"\""),
                 _ => self.result.push('?'),
             }
         }
