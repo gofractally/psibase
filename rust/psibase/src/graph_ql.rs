@@ -4,10 +4,24 @@ use crate::{
 };
 use async_graphql::connection::{query_with, Connection, Edge};
 use async_graphql::OutputType;
+use std::cmp::{max, min};
 use std::mem::take;
 use std::ops::RangeBounds;
 
-pub struct ConnectionBuilder<'a, Key: ToKey, Record: TableRecord> {
+/// GraphQL Pagination through TableIndex
+///
+/// This allows you to query a [TableIndex] using the
+/// [GraphQL Pagination Spec](https://graphql.org/learn/pagination/).
+///
+/// [range], [gt], [ge], [lt], [le], [gt_raw], [ge_raw],
+/// [lt_raw], and [le_raw] define a range. The range initially
+/// covers the entire index; each of these functions shrink it
+/// (set intersection).
+///
+/// [first], [last], [before], and [after] page through the range.
+/// They conform to the Pagination Spec, except [query] produces an
+/// error if both `first` and `last` are Some.
+pub struct TableQuery<'a, Key: ToKey, Record: TableRecord> {
     index: &'a TableIndex<Key, Record>,
     first: Option<i32>,
     last: Option<i32>,
@@ -17,7 +31,7 @@ pub struct ConnectionBuilder<'a, Key: ToKey, Record: TableRecord> {
     end: Option<RawKey>,
 }
 
-impl<'a, Key: ToKey, Record: TableRecord + OutputType> ConnectionBuilder<'a, Key, Record> {
+impl<'a, Key: ToKey, Record: TableRecord + OutputType> TableQuery<'a, Key, Record> {
     pub fn new(table_index: &'a TableIndex<Key, Record>) -> Self {
         Self {
             index: table_index,
@@ -30,23 +44,39 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> ConnectionBuilder<'a, Key
         }
     }
 
-    pub fn first(mut self, first: Option<i32>) -> Self {
-        self.first = first;
+    /// Limit the result to the first `n` (if Some) matching records.
+    ///
+    /// This replaces the current value.
+    pub fn first(mut self, n: Option<i32>) -> Self {
+        self.first = n;
         self
     }
 
-    pub fn last(mut self, last: Option<i32>) -> Self {
-        self.last = last;
+    /// Limit the result to the last `n` (if Some) matching records.
+    ///
+    /// This replaces the current value.
+    pub fn last(mut self, n: Option<i32>) -> Self {
+        self.last = n;
         self
     }
 
-    pub fn before(mut self, before: Option<String>) -> Self {
-        self.before = before;
+    /// Resume paging. Limits the result to records before `cursor`
+    /// (if Some). `cursor` is opaque; get it from a
+    /// previously-returned [Connection].
+    ///
+    /// This replaces the current value.
+    pub fn before(mut self, cursor: Option<String>) -> Self {
+        self.before = cursor;
         self
     }
 
-    pub fn after(mut self, after: Option<String>) -> Self {
-        self.after = after;
+    /// Resume paging. Limits the result to records after `cursor`
+    /// (if Some). `cursor` is opaque; get it from a
+    /// previously-returned [Connection].
+    ///
+    /// This replaces the current value.
+    pub fn after(mut self, cursor: Option<String>) -> Self {
+        self.after = cursor;
         self
     }
 
@@ -60,22 +90,39 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> ConnectionBuilder<'a, Key
         }
     }
 
+    /// Limit the result to records with keys greater than `key`.
+    ///
+    /// If `key` is Some then this intersects with the existing range.
     pub fn gt(self, key: Option<&Key>) -> Self {
         self.with_key(key, |this, k| this.gt_raw(k))
     }
 
+    /// Limit the result to records with keys greater than or
+    /// equal to `key`.
+    ///
+    /// If `key` is Some then this intersects with the existing range.
     pub fn ge(self, key: Option<&Key>) -> Self {
         self.with_key(key, |this, k| this.ge_raw(k))
     }
 
+    /// Limit the result to records with keys less than `key`.
+    ///
+    /// If `key` is Some then this intersects with the existing range.
     pub fn lt(self, key: Option<&Key>) -> Self {
         self.with_key(key, |this, k| this.lt_raw(k))
     }
 
+    /// Limit the result to records with keys less than or
+    /// equal to `key`.
+    ///
+    /// If `key` is Some then this intersects with the existing range.
     pub fn le(self, key: Option<&Key>) -> Self {
         self.with_key(key, |this, k| this.le_raw(k))
     }
 
+    /// Limit the result to records with keys within range.
+    ///
+    /// This intersects with the existing range.
     pub fn range(mut self, bounds: impl RangeBounds<Key>) -> Self {
         self = match bounds.start_bound() {
             std::ops::Bound::Included(b) => self.ge(Some(b)),
@@ -89,52 +136,50 @@ impl<'a, Key: ToKey, Record: TableRecord + OutputType> ConnectionBuilder<'a, Key
         }
     }
 
+    /// Limit the result to records with keys greater than `key`.
+    ///
+    /// This intersects with the existing range. `key` must include
+    /// the index's prefix.
+    pub fn gt_raw(self, mut key: RawKey) -> Self {
+        key.data.push(0);
+        self.ge_raw(key)
+    }
+
+    /// Limit the result to records with keys greater than or
+    /// equal to `key`.
+    ///
+    /// This intersects with the existing range. `key` must include
+    /// the index's prefix.
     pub fn ge_raw(mut self, key: RawKey) -> Self {
-        if let Some(front) = &self.begin {
-            if front.data < key.data {
-                self.begin = Some(key);
-            }
+        if let Some(begin) = self.begin {
+            self.begin = Some(max(begin, key));
         } else {
             self.begin = Some(key);
         }
         self
     }
 
-    pub fn gt_raw(mut self, mut key: RawKey) -> Self {
-        if let Some(front) = &self.begin {
-            if front.data <= key.data {
-                key.data.push(0);
-                self.begin = Some(key);
-            }
-        } else {
-            key.data.push(0);
-            self.begin = Some(key);
-        }
-        self
-    }
-
+    /// Limit the result to records with keys less than `key`.
+    ///
+    /// This intersects with the existing range. `key` must include
+    /// the index's prefix.
     pub fn lt_raw(mut self, key: RawKey) -> Self {
-        if let Some(back) = &self.end {
-            if key.data < back.data {
-                self.end = Some(key);
-            }
+        if let Some(end) = self.end {
+            self.end = Some(min(end, key));
         } else {
             self.end = Some(key);
         }
         self
     }
 
-    pub fn le_raw(mut self, mut key: RawKey) -> Self {
-        if let Some(back) = &self.end {
-            if key.data <= back.data {
-                key.data.push(0);
-                self.end = Some(key);
-            }
-        } else {
-            key.data.push(0);
-            self.end = Some(key);
-        }
-        self
+    /// Limit the result to records with keys less than or
+    /// equal to `key`.
+    ///
+    /// This intersects with the existing range. `key` must include
+    /// the index's prefix.
+    pub fn le_raw(self, mut key: RawKey) -> Self {
+        key.data.push(0);
+        self.lt_raw(key)
     }
 
     fn get_value_from_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
