@@ -72,30 +72,8 @@ mod service {
         }
     }
 
-    // TODO: create a macro for external records
-    // #[table(record = WebContentRow, index = 3)]
-    // struct WebContentTable;
-    struct WebContentTable {
-        db_id: psibase::DbId,
-        prefix: Vec<u8>,
-    }
-
-    impl Table<WebContentRow> for WebContentTable {
-        const TABLE_INDEX: u16 = 3;
-        const SECONDARY_KEYS: u8 = 0;
-
-        fn with_prefix(db_id: psibase::DbId, prefix: Vec<u8>) -> Self {
-            WebContentTable { db_id, prefix }
-        }
-
-        fn prefix(&self) -> &[u8] {
-            &self.prefix
-        }
-
-        fn db_id(&self) -> psibase::DbId {
-            self.db_id
-        }
-    }
+    #[table(record = "WebContentRow", index = 3)]
+    struct WebContentTable;
 
     fn get_current_time() -> TimePointSec {
         transaction_sys::Wrapper::call().currentBlock().time
