@@ -216,6 +216,7 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 }
 
+#[derive(Clone)]
 pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub db_id: DbId,
     pub prefix: Vec<u8>,
@@ -226,7 +227,7 @@ pub struct TableIndex<Key: ToKey, Record: TableRecord> {
 
 impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
     /// Instantiate a new Table Index (Primary or Secondary)
-    fn new(db_id: DbId, prefix: Vec<u8>, is_secondary: bool) -> TableIndex<Key, Record> {
+    pub fn new(db_id: DbId, prefix: Vec<u8>, is_secondary: bool) -> TableIndex<Key, Record> {
         TableIndex {
             db_id,
             prefix,

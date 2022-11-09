@@ -24,8 +24,8 @@ use std::ops::RangeBounds;
 /// and [after](Self::after) page through the range. They conform to
 /// the Pagination Spec, except [query](Self::query) produces an
 /// error if both `first` and `last` are Some.
-pub struct TableQuery<'a, Key: ToKey, Record: TableRecord> {
-    index: &'a TableIndex<Key, Record>,
+pub struct TableQuery<Key: ToKey, Record: TableRecord> {
+    index: TableIndex<Key, Record>,
     first: Option<i32>,
     last: Option<i32>,
     before: Option<String>,
@@ -34,10 +34,29 @@ pub struct TableQuery<'a, Key: ToKey, Record: TableRecord> {
     end: Option<RawKey>,
 }
 
-impl<'a, Key: ToKey, Record: TableRecord + OutputType> TableQuery<'a, Key, Record> {
-    pub fn new(table_index: &'a TableIndex<Key, Record>) -> Self {
+impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
+    /// Query a table's index
+    pub fn new(table_index: TableIndex<Key, Record>) -> Self {
         Self {
             index: table_index,
+            first: None,
+            last: None,
+            before: None,
+            after: None,
+            begin: None,
+            end: None,
+        }
+    }
+
+    /// Query a subindex of a table
+    pub fn subindex<RemainingKey: ToKey>(
+        table_index: TableIndex<Key, Record>,
+        subkey: &impl ToKey,
+    ) -> TableQuery<RemainingKey, Record> {
+        let mut prefix = table_index.prefix;
+        subkey.append_key(&mut prefix);
+        TableQuery {
+            index: TableIndex::new(table_index.db_id, prefix, table_index.is_secondary),
             first: None,
             last: None,
             before: None,
