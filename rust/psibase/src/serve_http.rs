@@ -224,6 +224,7 @@ pub struct WebContentRow {
 
 impl TableRecord for WebContentRow {
     type PrimaryKey = String;
+    const SECONDARY_KEYS: u8 = 0;
     fn get_primary_key(&self) -> Self::PrimaryKey {
         self.path.clone()
     }

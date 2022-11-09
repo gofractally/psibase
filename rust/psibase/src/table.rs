@@ -21,6 +21,7 @@ custom_error! {
 
 pub trait TableRecord: Pack + UnpackOwned {
     type PrimaryKey: ToKey;
+    const SECONDARY_KEYS: u8;
 
     fn get_primary_key(&self) -> Self::PrimaryKey;
 
@@ -36,7 +37,6 @@ pub trait TableRecord: Pack + UnpackOwned {
 
 pub trait Table<Record: TableRecord>: Sized {
     const TABLE_INDEX: u16;
-    const SECONDARY_KEYS: u8;
 
     fn with_prefix(db_id: DbId, prefix: Vec<u8>) -> Self;
     fn prefix(&self) -> &[u8];
@@ -44,15 +44,11 @@ pub trait Table<Record: TableRecord>: Sized {
 
     fn new() -> Self {
         let prefix = (get_service(), Self::TABLE_INDEX).to_key();
-        Self::create_table_from_prefix(prefix)
+        Self::with_prefix(DbId::Service, prefix)
     }
 
     fn with_service(service: AccountNumber) -> Self {
         let prefix = (service, Self::TABLE_INDEX).to_key();
-        Self::create_table_from_prefix(prefix)
-    }
-
-    fn create_table_from_prefix(prefix: Vec<u8>) -> Self {
         Self::with_prefix(DbId::Service, prefix)
     }
 
@@ -89,7 +85,7 @@ pub trait Table<Record: TableRecord>: Sized {
     /// The key must be the primary key. If object has secondary keys, this is
     /// equivalent to looking an object up by the key, then calling [remove] if found.
     fn erase(&self, key: &impl ToKey) {
-        if Self::SECONDARY_KEYS > 0 {
+        if Record::SECONDARY_KEYS > 0 {
             if let Some(record) = self.get_index(0).get(key) {
                 self.remove(&record);
             }
@@ -107,7 +103,7 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 
     fn handle_secondary_keys_put(&self, pk: &[u8], value: &Record) -> Result<(), Error> {
-        if Self::SECONDARY_KEYS < 1 {
+        if Record::SECONDARY_KEYS < 1 {
             return Ok(());
         }
 
@@ -123,7 +119,7 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 
     fn handle_secondary_keys_removal(&self, value: &Record) {
-        if Self::SECONDARY_KEYS < 1 {
+        if Record::SECONDARY_KEYS < 1 {
             return;
         }
         let secondary_keys = value.get_secondary_keys();

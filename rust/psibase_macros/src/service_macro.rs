@@ -671,9 +671,6 @@ fn process_service_tables(
     }
     let table_options = table_options.unwrap();
 
-    // TODO: get pk and sks dynamically, right now we are ignoring the table fields
-    // we should read the preset_table_record dynamically and verify the pk and count the sks
-
     if pk_data.is_none() && preset_table_record.is_none() {
         abort!(
             table_record_struct_name,
@@ -716,6 +713,7 @@ fn process_service_tables(
         let table_record_impl = quote! {
             impl #psibase_mod::TableRecord for #table_record_struct_name {
                 type PrimaryKey = #pk_ty;
+                const SECONDARY_KEYS: u8 = #sks_len;
 
                 fn get_primary_key(&self) -> Self::PrimaryKey {
                     self.#pk_call_ident
@@ -755,7 +753,6 @@ fn process_service_tables(
     let table_impl = quote! {
         impl #psibase_mod::Table<#record_name_id> for #table_name_id {
             const TABLE_INDEX: u16 = #table_index;
-            const SECONDARY_KEYS: u8 = #sks_len;
 
             fn with_prefix(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
                 #table_name_id{db_id, prefix}
@@ -789,7 +786,6 @@ fn process_table_attrs(table_struct: &mut ItemStruct, table_options: &mut Option
 
         match TableOptions::from_meta(&attr.parse_meta().unwrap()) {
             Ok(options) => {
-                eprintln!("Table Options >>> {:?}", options);
                 *table_options = Some(options);
             }
             Err(err) => {
