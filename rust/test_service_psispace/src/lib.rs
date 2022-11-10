@@ -159,7 +159,7 @@ mod tests {
             content.clone(),
         );
 
-        let stored_content = ContentTable::with_service(account!("psispace-sys"), 0)
+        let stored_content = ContentTable::with_service(account!("psispace-sys"))
             .get_index_pk()
             .get(&(bob, path.clone()));
 

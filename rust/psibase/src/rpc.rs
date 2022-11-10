@@ -1,4 +1,5 @@
 use anyhow::Context;
+use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -28,8 +29,9 @@ async fn as_json<T: DeserializeOwned>(
     Ok(serde_json::de::from_str(&as_text(builder).await?)?)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, SimpleObject, InputObject)]
 #[serde(rename_all = "camelCase")]
+#[graphql(input_name = "TaposRefBlockInput")]
 pub struct TaposRefBlock {
     pub ref_block_suffix: u32,
     pub ref_block_index: u8,

@@ -1,4 +1,5 @@
 use crate::{reflect, ToKey};
+use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -227,6 +228,24 @@ where
         }
         let mut s = String::new();
         deserializer.deserialize_str(Visitor::<T>(&mut s, PhantomData))
+    }
+}
+
+#[Scalar]
+impl<T> ScalarType for Hex<T>
+where
+    T: FromHex + Send + Sync,
+{
+    fn parse(value: async_graphql::Value) -> InputValueResult<Self> {
+        if let async_graphql::Value::String(value) = &value {
+            Ok(value.parse()?)
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        async_graphql::Value::String(self.to_string())
     }
 }
 
