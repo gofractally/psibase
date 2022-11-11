@@ -13,17 +13,6 @@ use crate::{
     RawKey, ToKey,
 };
 
-// TODO: remove helper
-fn _to_hex(bytes: &[u8]) -> String {
-    let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    for byte in bytes {
-        result.push(DIGITS[(byte >> 4) as usize]);
-        result.push(DIGITS[(byte & 0x0f) as usize]);
-    }
-    String::from_utf8(result).unwrap()
-}
-
 custom_error! {
     #[allow(clippy::enum_variant_names)] pub Error
 
@@ -32,6 +21,7 @@ custom_error! {
 
 pub trait TableRecord: Pack + UnpackOwned {
     type PrimaryKey: ToKey;
+    const SECONDARY_KEYS: u8;
 
     fn get_primary_key(&self) -> Self::PrimaryKey;
 
@@ -47,7 +37,6 @@ pub trait TableRecord: Pack + UnpackOwned {
 
 pub trait Table<Record: TableRecord>: Sized {
     const TABLE_INDEX: u16;
-    const SECONDARY_KEYS: u8;
 
     fn with_prefix(db_id: DbId, prefix: Vec<u8>) -> Self;
     fn prefix(&self) -> &[u8];
@@ -55,15 +44,11 @@ pub trait Table<Record: TableRecord>: Sized {
 
     fn new() -> Self {
         let prefix = (get_service(), Self::TABLE_INDEX).to_key();
-        Self::create_table_from_prefix(prefix)
+        Self::with_prefix(DbId::Service, prefix)
     }
 
     fn with_service(service: AccountNumber) -> Self {
         let prefix = (service, Self::TABLE_INDEX).to_key();
-        Self::create_table_from_prefix(prefix)
-    }
-
-    fn create_table_from_prefix(prefix: Vec<u8>) -> Self {
         Self::with_prefix(DbId::Service, prefix)
     }
 
@@ -100,7 +85,7 @@ pub trait Table<Record: TableRecord>: Sized {
     /// The key must be the primary key. If object has secondary keys, this is
     /// equivalent to looking an object up by the key, then calling [remove] if found.
     fn erase(&self, key: &impl ToKey) {
-        if Self::SECONDARY_KEYS > 0 {
+        if Record::SECONDARY_KEYS > 0 {
             if let Some(record) = self.get_index(0).get(key) {
                 self.remove(&record);
             }
@@ -118,7 +103,7 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 
     fn handle_secondary_keys_put(&self, pk: &[u8], value: &Record) -> Result<(), Error> {
-        if Self::SECONDARY_KEYS < 1 {
+        if Record::SECONDARY_KEYS < 1 {
             return Ok(());
         }
 
@@ -134,7 +119,7 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 
     fn handle_secondary_keys_removal(&self, value: &Record) {
-        if Self::SECONDARY_KEYS < 1 {
+        if Record::SECONDARY_KEYS < 1 {
             return;
         }
         let secondary_keys = value.get_secondary_keys();
@@ -279,7 +264,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         }
         .map(RawKey::new);
         // if front_key.is_some() {
-        //     println!("range2 fc: {}", _to_hex(&front_key.as_ref().unwrap().data));
+        //  println!("range2 fc: {}", Hex(&front_key.as_ref().unwrap().data[..]));
         // }
 
         let mut back_key = self.prefix.clone();
@@ -299,7 +284,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         }
         .map(RawKey::new);
         // if back_key.is_some() {
-        //     println!("range2 bc: {}", _to_hex(&back_key.as_ref().unwrap().data));
+        //     println!("range2 bc: {}", Hex(&back_key.as_ref().unwrap().data[..]));
         // }
 
         TableIter {
@@ -412,13 +397,13 @@ impl<'a, Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIter<'a, 
             // if self.front_key.is_some() {
             //     println!(
             //         "iterated from the back bc: {} fc: {}",
-            //         _to_hex(&self.back_key.as_ref().unwrap().data),
-            //         _to_hex(&self.front_key.as_ref().unwrap().data)
+            //         Hex(&self.back_key.as_ref().unwrap().data[..]),
+            //         Hex(&self.front_key.as_ref().unwrap().data[..])
             //     );
             // } else {
             //     println!(
             //         "iterated from the back bc: {} NO FC",
-            //         _to_hex(&self.back_key.as_ref().unwrap().data)
+            //         Hex(&self.back_key.as_ref().unwrap().data[..])
             //     );
             // }
 

@@ -11,6 +11,8 @@ trait ToHex:
     fn to_hex(&self) -> String;
 }
 
+pub type HexBytes = Hex<Vec<u8>>;
+
 trait FromHex: ToHex {
     fn from_hex(s: &str) -> Option<Self>;
 }

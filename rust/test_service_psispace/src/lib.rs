@@ -6,8 +6,8 @@
 #[psibase::service(name = "psispace-sys")]
 mod service {
     use psibase::{
-        check, get_sender, get_service, serve_action_templates, serve_pack_action, AccountNumber,
-        Fracpack, HttpReply, HttpRequest, Reflect, Table, TableIndex,
+        check, get_sender, get_service, serve_action_templates, serve_graphiql, serve_pack_action,
+        AccountNumber, Fracpack, HexBytes, HttpReply, HttpRequest, Reflect, Table, TableIndex,
     };
     use serde::{Deserialize, Serialize};
 
@@ -19,7 +19,7 @@ mod service {
         pub account: AccountNumber,
         pub path: String,
         pub content_type: String,
-        pub content: Vec<u8>,
+        pub content: HexBytes,
     }
 
     impl ContentRow {
@@ -33,7 +33,7 @@ mod service {
         fn from(content_row: ContentRow) -> Self {
             HttpReply {
                 contentType: content_row.content_type,
-                body: content_row.content.into(),
+                body: content_row.content,
                 headers: Vec::new(),
             }
         }
@@ -42,7 +42,7 @@ mod service {
     /// Store a new file
     #[action]
     #[allow(non_snake_case)]
-    fn storeSys(path: String, contentType: String, content: Vec<u8>) {
+    fn storeSys(path: String, contentType: String, content: HexBytes) {
         check(path.starts_with('/'), "Path doesn't begin with /");
         let new_content = ContentRow {
             account: get_sender(),
@@ -84,6 +84,7 @@ mod service {
         None.or_else(|| serve_action_templates::<Wrapper>(&request))
             .or_else(|| serve_pack_action::<Wrapper>(&request))
             // TODO: add GraphQL
+            .or_else(|| serve_graphiql(&request))
             .or_else(|| handle_content_request(get_service(), request))
     }
 
@@ -143,7 +144,7 @@ mod tests {
         service::{ContentRow, ContentTable},
         Wrapper,
     };
-    use psibase::{account, ChainResult, HttpReply, HttpRequest, Table};
+    use psibase::{account, ChainResult, HexBytes, HttpReply, HttpRequest, Table};
 
     #[psibase::test_case(services("psispace-sys"))]
     fn users_can_store_content(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -152,7 +153,7 @@ mod tests {
 
         let path = "/abc.html".to_owned();
         let content_type = "text/html".to_owned();
-        let content = "<h1>Hello world!</h1>".to_owned().into_bytes();
+        let content: HexBytes = "<h1>Hello world!</h1>".to_owned().into_bytes().into();
         Wrapper::push_from(&chain, bob).storeSys(
             path.clone(),
             content_type.clone(),
@@ -185,7 +186,7 @@ mod tests {
 
         let path = "abc.html".to_owned();
         let content_type = "text/html".to_owned();
-        let content = "<h1>Hello world!</h1>".to_owned().into_bytes();
+        let content: HexBytes = "<h1>Hello world!</h1>".to_owned().into_bytes().into();
         let error = Wrapper::push_from(&chain, bob)
             .storeSys(path.clone(), content_type.clone(), content.clone())
             .trace
@@ -207,7 +208,7 @@ mod tests {
 
         let path = "/articles/index.html".to_owned();
         let content_type = "text/html".to_owned();
-        let content = "<h1>Hello world!</h1>".to_owned().into_bytes();
+        let content: HexBytes = "<h1>Hello world!</h1>".to_owned().into_bytes().into();
         Wrapper::push_from(&chain, bob).storeSys(
             path.clone(),
             content_type.clone(),
@@ -236,9 +237,10 @@ mod tests {
     fn contract_files_are_retrieved(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let index_path = "/index.html".to_owned();
         let index_content_type = "text/html".to_owned();
-        let index_content = "<h1>PsiSpace File Upload Manager</h1>"
+        let index_content: HexBytes = "<h1>PsiSpace File Upload Manager</h1>"
             .to_owned()
-            .into_bytes();
+            .into_bytes()
+            .into();
         Wrapper::push(&chain).storeSys(
             index_path.clone(),
             index_content_type.clone(),
@@ -247,7 +249,10 @@ mod tests {
 
         let style_path = "/assets/styles.css".to_owned();
         let style_content_type = "text/css".to_owned();
-        let style_content = ".container { margin: 20px; }".to_owned().into_bytes();
+        let style_content: HexBytes = ".container { margin: 20px; }"
+            .to_owned()
+            .into_bytes()
+            .into();
         Wrapper::push(&chain).storeSys(
             style_path.clone(),
             style_content_type.clone(),
@@ -271,7 +276,7 @@ mod tests {
     fn default_profile_files_are_retrieved(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let index_path = "/default-profile/default-profile.html".to_owned();
         let index_content_type = "text/html".to_owned();
-        let index_content = "<h1>Default profile!</h1>".to_owned().into_bytes();
+        let index_content: HexBytes = "<h1>Default profile!</h1>".to_owned().into_bytes().into();
         Wrapper::push(&chain).storeSys(
             index_path.clone(),
             index_content_type.clone(),
@@ -280,7 +285,10 @@ mod tests {
 
         let style_path = "/default-profile/styles.css".to_owned();
         let style_content_type = "text/css".to_owned();
-        let style_content = ".container { margin: 20px; }".to_owned().into_bytes();
+        let style_content: HexBytes = ".container { margin: 20px; }"
+            .to_owned()
+            .into_bytes()
+            .into();
         Wrapper::push(&chain).storeSys(
             style_path.clone(),
             style_content_type.clone(),

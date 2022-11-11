@@ -10,9 +10,21 @@ use syn::{
 };
 
 #[derive(Debug, FromMeta)]
+#[darling(default)]
 pub struct TableOptions {
     name: String,
+    record: Option<String>,
     index: u16,
+}
+
+impl Default for TableOptions {
+    fn default() -> Self {
+        TableOptions {
+            name: "".into(),
+            record: None,
+            index: 0,
+        }
+    }
 }
 
 #[derive(Debug, FromMeta)]
@@ -631,12 +643,22 @@ fn process_service_tables(
     let mut secondary_keys = Vec::new();
     let mut table_options: Option<TableOptions> = None;
     let mut table_vis = None;
+    let mut preset_table_record: Option<String> = None;
 
     for idx in table_idxs {
         match &mut items[*idx] {
             Item::Struct(s) => {
                 process_table_attrs(s, &mut table_options);
-                process_table_fields(s, &mut pk_data);
+                preset_table_record = table_options
+                    .as_ref()
+                    .and_then(|opts| opts.record.to_owned());
+                if preset_table_record.is_none() {
+                    process_table_fields(s, &mut pk_data);
+                } else {
+                    let fields_named: syn::FieldsNamed =
+                        parse_quote! {{ db_id: #psibase_mod::DbId, prefix: Vec<u8> }};
+                    s.fields = syn::Fields::Named(fields_named);
+                }
                 table_vis = Some(s.vis.clone());
             }
             Item::Impl(i) => process_table_impls(i, &mut pk_data, &mut secondary_keys),
@@ -644,16 +666,17 @@ fn process_service_tables(
         }
     }
 
-    if pk_data.is_none() {
+    if table_options.is_none() {
+        abort!(table_record_struct_name, "Table name and index not defined");
+    }
+    let table_options = table_options.unwrap();
+
+    if pk_data.is_none() && preset_table_record.is_none() {
         abort!(
             table_record_struct_name,
             "Table record has not defined a primary key"
         );
     }
-
-    let pk_data = pk_data.unwrap();
-    let pk_ty = pk_data.ty;
-    let pk_call_ident = pk_data.call_ident;
 
     secondary_keys.sort_by_key(|sk| sk.idx);
     let mut sks_fns = quote! {};
@@ -682,46 +705,57 @@ fn process_service_tables(
         }
     }
 
-    let table_record_impl = quote! {
-        impl #psibase_mod::TableRecord for #table_record_struct_name {
-            type PrimaryKey = #pk_ty;
+    if preset_table_record.is_none() {
+        let pk_data = pk_data.unwrap();
+        let pk_ty = pk_data.ty;
+        let pk_call_ident = pk_data.call_ident;
 
-            fn get_primary_key(&self) -> Self::PrimaryKey {
-                self.#pk_call_ident
+        let table_record_impl = quote! {
+            impl #psibase_mod::TableRecord for #table_record_struct_name {
+                type PrimaryKey = #pk_ty;
+                const SECONDARY_KEYS: u8 = #sks_len;
+
+                fn get_primary_key(&self) -> Self::PrimaryKey {
+                    self.#pk_call_ident
+                }
+
+                fn get_secondary_keys(&self) -> Vec<#psibase_mod::RawKey> {
+                    vec![#sks]
+                }
             }
-
-            fn get_secondary_keys(&self) -> Vec<#psibase_mod::RawKey> {
-                vec![#sks]
-            }
-        }
-    };
-    items.push(parse_quote! {#table_record_impl});
-    // eprintln!("Table record impls >>> \n{}", table_record_impl);
-
-    if table_options.is_none() {
-        abort!(table_record_struct_name, "Table name and index not defined");
+        };
+        items.push(parse_quote! {#table_record_impl});
     }
-    let table_options = table_options.unwrap();
 
-    let table_name = Ident::new(table_options.name.as_str(), table_record_struct_name.span());
     let table_index = table_options.index;
     let table_index = quote! { #table_index };
 
-    // eprintln!("Table name >>> \n{}", table_name);
-    let table_struct = quote! {
-        #table_vis struct #table_name {
-            db_id: #psibase_mod::DbId,
-            prefix: Vec<u8>,
-        }
+    let (table_name_id, record_name_id) = if let Some(preset_table_record) = preset_table_record {
+        (
+            table_record_struct_name.clone(),
+            Ident::new(
+                preset_table_record.as_str(),
+                table_record_struct_name.span(),
+            ),
+        )
+    } else {
+        let table_name = Ident::new(table_options.name.as_str(), table_record_struct_name.span());
+        let table_struct = quote! {
+            #table_vis struct #table_name {
+                db_id: #psibase_mod::DbId,
+                prefix: Vec<u8>,
+            }
+        };
+        items.push(parse_quote! {#table_struct});
+        (table_name, table_record_struct_name.clone())
     };
 
     let table_impl = quote! {
-        impl #psibase_mod::Table<#table_record_struct_name> for #table_name {
+        impl #psibase_mod::Table<#record_name_id> for #table_name_id {
             const TABLE_INDEX: u16 = #table_index;
-            const SECONDARY_KEYS: u8 = #sks_len;
 
             fn with_prefix(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
-                #table_name{db_id, prefix}
+                #table_name_id{db_id, prefix}
             }
 
             fn prefix(&self) -> &[u8] {
@@ -733,21 +767,13 @@ fn process_service_tables(
             }
         }
     };
+    items.push(parse_quote! {#table_impl});
 
     let table_struct_impl = quote! {
-        impl #table_name {
+        impl #table_name_id {
             #sks_fns
         }
     };
-
-    // eprintln!(
-    //     "Table impl >>>\n{}\n{}\n{}",
-    //     table_struct,
-    //     table_base_impl,
-    //     table_wrapper_impl,
-    // );
-    items.push(parse_quote! {#table_struct});
-    items.push(parse_quote! {#table_impl});
     items.push(parse_quote! {#table_struct_impl});
 
     table_options.index
@@ -760,7 +786,6 @@ fn process_table_attrs(table_struct: &mut ItemStruct, table_options: &mut Option
 
         match TableOptions::from_meta(&attr.parse_meta().unwrap()) {
             Ok(options) => {
-                // eprintln!("Table Options >>> {:?}", options);
                 *table_options = Some(options);
             }
             Err(err) => {
