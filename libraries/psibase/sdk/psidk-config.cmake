@@ -61,7 +61,23 @@ function(add_libs suffix)
     )
 
     add_library(psibase${suffix} INTERFACE)
-    target_include_directories(psibase${suffix} INTERFACE ${psidk_DIR}/psibase/common/include)
+    target_include_directories(psibase${suffix} INTERFACE
+        ${psidk_DIR}/psibase/common/include
+        ${psidk_DIR}/services/system/AccountSys/include
+        ${psidk_DIR}/services/system/AuthAnySys/include
+        ${psidk_DIR}/services/system/AuthEcSys/include
+        ${psidk_DIR}/services/system/ProducerSys/include
+        ${psidk_DIR}/services/system/ProxySys/include
+        ${psidk_DIR}/services/system/SetCodeSys/include
+        ${psidk_DIR}/services/system/TransactionSys/include
+        ${psidk_DIR}/services/system/VerifyEcSys/include
+        ${psidk_DIR}/services/user/CommonSys/include
+        ${psidk_DIR}/services/user/ExploreSys/include
+        ${psidk_DIR}/services/user/NftSys/include
+        ${psidk_DIR}/services/user/PsiSpaceSys/include
+        ${psidk_DIR}/services/user/SymbolSys/include
+        ${psidk_DIR}/services/user/TokenSys/include
+    )
     target_link_libraries(psibase${suffix} INTERFACE
         wasm-base${suffix}
         -lpsibase${suffix}
@@ -128,15 +144,6 @@ function(add_libs suffix)
     target_include_directories(psitestlib${suffix} INTERFACE
         ${psidk_DIR}/psibase/service/include
         ${psidk_DIR}/psibase/tester/include
-        ${psidk_DIR}/services/system/AccountSys/include
-        ${psidk_DIR}/services/system/AuthEcSys/include
-        ${psidk_DIR}/services/system/AuthAnySys/include
-        ${psidk_DIR}/services/system/ProxySys/include
-        ${psidk_DIR}/services/system/RAccountSys/include
-        ${psidk_DIR}/services/system/RAuthEcSys/include
-        ${psidk_DIR}/services/system/SetCodeSys/include
-        ${psidk_DIR}/services/system/TransactionSys/include
-        ${psidk_DIR}/services/system/VerifyEcSys/include
     )
     target_link_options(psitestlib${suffix} INTERFACE
         -Wl,--entry,_start
