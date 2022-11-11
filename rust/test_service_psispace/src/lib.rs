@@ -33,7 +33,7 @@ mod service {
         fn from(content_row: ContentRow) -> Self {
             HttpReply {
                 contentType: content_row.content_type,
-                body: content_row.content.into(),
+                body: content_row.content,
                 headers: Vec::new(),
             }
         }
