@@ -5,16 +5,19 @@
 /// Please don't publish this as the real psispace-sys service.
 #[psibase::service(name = "psispace-sys")]
 mod service {
+    use async_graphql::connection::Connection;
+    use async_graphql::*;
     use psibase::{
-        check, get_sender, get_service, serve_action_templates, serve_graphiql, serve_pack_action,
-        AccountNumber, HexBytes, HttpReply, HttpRequest, Pack, Reflect, Table, TableIndex, Unpack,
+        check, get_sender, get_service, serve_action_templates, serve_graphiql, serve_graphql,
+        serve_pack_action, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack, RawKey, Reflect,
+        Table, TableIndex, TableQuery, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
     type ContentKey = (AccountNumber, String);
 
     #[table(name = "ContentTable", index = 0)]
-    #[derive(Debug, Pack, Unpack, PartialEq, Eq, Reflect, Serialize, Deserialize)]
+    #[derive(Debug, Pack, Unpack, PartialEq, Eq, Reflect, Serialize, Deserialize, SimpleObject)]
     pub struct ContentRow {
         pub account: AccountNumber,
         pub path: String,
@@ -36,6 +39,52 @@ mod service {
                 body: content_row.content,
                 headers: Vec::new(),
             }
+        }
+    }
+
+    // Root query object
+    struct Query;
+
+    #[Object]
+    impl Query {
+        // table_query!("allContent", ContentTable, 0);
+        // table_query!("content", ContentTable, 0, account);
+
+        /// List all the existing files
+        async fn all_content(
+            &self,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, ContentRow>> {
+            let table_idx = ContentTable::new().get_index_pk();
+            TableQuery::new(table_idx)
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+        }
+
+        /// List files content by account
+        async fn content(
+            &self,
+            account: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, ContentRow>> {
+            let table_idx = ContentTable::new().get_index_pk();
+            let sidx = TableQuery::subindex::<String>(table_idx, &account);
+            sidx.first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
         }
     }
 
@@ -83,7 +132,7 @@ mod service {
     fn handle_contract_request(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_action_templates::<Wrapper>(&request))
             .or_else(|| serve_pack_action::<Wrapper>(&request))
-            // TODO: add GraphQL
+            .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
             .or_else(|| handle_content_request(get_service(), request))
     }
@@ -144,7 +193,7 @@ mod tests {
         service::{ContentRow, ContentTable},
         Wrapper,
     };
-    use psibase::{account, ChainResult, HexBytes, HttpReply, HttpRequest, Table};
+    use psibase::{account, AccountNumber, ChainResult, HexBytes, HttpReply, HttpRequest, Table};
 
     #[psibase::test_case(services("psispace-sys"))]
     fn users_can_store_content(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -307,6 +356,65 @@ mod tests {
         let response = push_servesys_request(&chain, "bob", "/default-profile/styles.css").get()?;
         assert!(response.is_some());
         assert_reply(&response.unwrap(), &style_content_type, &style_content);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(services("psispace-sys"))]
+    fn graphql_content_query_retrieves_properly(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let account_prefix = "acc";
+
+        // Create 50 files from 10 accounts
+        for i in 1..=10 {
+            let account = AccountNumber::from(format!("{}{}", account_prefix, i).as_str());
+            chain.new_account(account)?;
+
+            for j in 1..=5 {
+                let path = format!("/articles/blog{}.html", j);
+                let content_type = "text/html".to_owned();
+                let content: HexBytes = format!("<h1>Hello world {}</h1>", j).into_bytes().into();
+                Wrapper::push_from(&chain, account).storeSys(
+                    path.clone(),
+                    content_type.clone(),
+                    content.clone(),
+                );
+            }
+        }
+
+        println!("created accounts and files!");
+
+        let default_page_edges = "
+        {
+            pageInfo { startCursor endCursor hasNextPage hasPreviousPage }
+            edges { node { account path contentType} }
+        }
+        ";
+        let gql = format!(
+            "{{
+                firstContent: allContent(first: 1) {0}
+                lastContent: allContent(last: 1) {0}
+            }}",
+            default_page_edges
+        );
+        let json_query = format!("{{\"query\":\"{}\"}}", gql);
+        println!("submitting jq {}", json_query);
+
+        let response = Wrapper::push(&chain).serveSys(HttpRequest {
+            host: "psispace-sys.testnet.psibase.io".to_string(),
+            rootHost: "testnet.psibase.io".to_string(),
+            target: "/graphql".to_string(),
+            method: "POST".to_string(),
+            contentType: "application/json".to_string(),
+            body: json_query.to_string().into_bytes().into(),
+        });
+
+        println!("gql response trace >>>\n{}", response.trace);
+
+        let response = response.get()?;
+        assert!(response.is_some());
+        println!("gql response >>>\n {:?}", response.unwrap());
 
         Ok(())
     }
