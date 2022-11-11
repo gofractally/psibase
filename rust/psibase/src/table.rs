@@ -264,7 +264,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         }
         .map(RawKey::new);
         // if front_key.is_some() {
-        //  println!("range2 fc: {}", &front_key.as_ref().unwrap().data.to_hex());
+        //  println!("range2 fc: {}", Hex(&front_key.as_ref().unwrap().data[..]));
         // }
 
         let mut back_key = self.prefix.clone();
@@ -284,7 +284,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         }
         .map(RawKey::new);
         // if back_key.is_some() {
-        //     println!("range2 bc: {}", &back_key.as_ref().unwrap().data.to_hex());
+        //     println!("range2 bc: {}", Hex(&back_key.as_ref().unwrap().data[..]));
         // }
 
         TableIter {
@@ -397,13 +397,13 @@ impl<'a, Key: ToKey, Record: TableRecord> DoubleEndedIterator for TableIter<'a, 
             // if self.front_key.is_some() {
             //     println!(
             //         "iterated from the back bc: {} fc: {}",
-            //         &self.back_key.as_ref().unwrap().data.to_hex(),
-            //         &self.front_key.as_ref().unwrap().data.to_hex()
+            //         Hex(&self.back_key.as_ref().unwrap().data[..]),
+            //         Hex(&self.front_key.as_ref().unwrap().data[..])
             //     );
             // } else {
             //     println!(
             //         "iterated from the back bc: {} NO FC",
-            //         &self.back_key.as_ref().unwrap().data.to_hex()
+            //         Hex(&self.back_key.as_ref().unwrap().data[..])
             //     );
             // }
 
