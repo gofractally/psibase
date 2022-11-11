@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 
-pub trait ToHex:
+trait ToHex:
     Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect + ToKey
 {
     fn to_hex(&self) -> String;
