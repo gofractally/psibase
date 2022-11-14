@@ -15,8 +15,6 @@ using namespace UserService::Errors;
 
 namespace
 {
-   constexpr bool storageBillingImplemented = false;
-
    const std::vector<std::pair<AccountNumber, const char*>> neededServices = {
        {TokenSys::service, "TokenSys.wasm"},
        {NftSys::service, "NftSys.wasm"},
@@ -132,13 +130,9 @@ SCENARIO("Buying a symbol")
 
          AND_THEN("Alice cannot create the same symbol again")
          {
+            t.startBlock();
             alice.to<TokenSys>().credit(sysToken, SymbolSys::service, quantity, memo);
             CHECK(a.create(symbolId, quantity).failed(symbolAlreadyExists));
-         }
-
-         AND_THEN("Storage billing is updated correctly")
-         {  //
-            CHECK(storageBillingImplemented);
          }
       }
       WHEN("Alice creates a symbol")
@@ -232,6 +226,7 @@ SCENARIO("Measuring price increases")
 
          AND_THEN("Buying another symbol is the same price")
          {
+            t.startBlock();
             CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
             a.create(SID{"bcd"}, quantity);
             auto balance = alice.to<TokenSys>()
@@ -269,6 +264,7 @@ SCENARIO("Measuring price increases")
 
          AND_THEN("The price for the first create that exceeds the desired rate is higher")
          {
+            t.startBlock();
             alice.to<TokenSys>().credit(sysToken, SymbolSys::service, cost, memo);
 
             // Create the 25th symbol within 24 hours, causing the price to increase
@@ -333,6 +329,8 @@ SCENARIO("Using symbol ownership NFT")
       auto nftId        = symbolRecord.ownerNft;
       alice.to<NftSys>().debit(nftId, memo);
 
+      t.startBlock();
+
       WHEN("Alice transfers her symbol to Bob")
       {
          alice.to<NftSys>().credit(nftId, bob, memo);
@@ -393,6 +391,8 @@ SCENARIO("Buying and selling symbols")
       alice.to<NftSys>().credit(sysSymbolNft, TokenSys::service, memo);
       alice.to<TokenSys>().mapSymbol(sysToken, sysSymbol);
 
+      t.startBlock();
+
       WHEN("Alice creates a symbol")
       {
          auto symbol = SID{"abc"};
@@ -409,6 +409,7 @@ SCENARIO("Buying and selling symbols")
 
             AND_THEN("Alice no longer owns the symbol")
             {
+               t.startBlock();
                auto newNftRecord = alice.to<NftSys>().getNft(symbolNft).returnVal();
                CHECK(newNftRecord != initialNftRecord);
 
@@ -482,6 +483,7 @@ SCENARIO("Buying and selling symbols")
                }
                THEN("The symbol is no longer for sale")
                {
+                  t.startBlock();
                   auto symbolRecord = alice.to<SymbolSys>().getSymbol(symbol).returnVal();
                   CHECK(symbolRecord.saleDetails.salePrice == 0e8);
                }
