@@ -134,46 +134,39 @@ namespace psibase
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       check(status.has_value(), "missing status record");
 
-      // If the producers have changed, update the block header
-      std::vector<Producer> prods;
+      if (status->nextProducers &&
+          std::get<1>(*status->nextProducers) <= status->head->header.commitNum)
       {
-         std::vector key       = psio::convert_to_key(producerConfigTable);
-         auto        prefixLen = key.size();
-         while (auto data = db.kvGreaterEqualRaw(DbId::nativeConstrained, key, prefixLen))
-         {
-            auto prod = psio::convert_from_frac<ProducerConfigRow>(data->value);
-            prods.emplace_back(prod.producerName, prod.producerAuth);
-            // increment key
-            key.clear();
-            key.insert(key.begin(), data->key.pos, data->key.end);
-            key.push_back(0);
-         }
-         // Special case: If no producers are specified, use the producers of the current block
-         if (prods.empty())
-         {
-            prods.emplace_back(current.header.producer, Claim{});
-         }
+         status->producers = std::move(std::get<0>(*status->nextProducers));
+         status->nextProducers.reset();
       }
-      if (status->producers == prods)
+      if (!status->nextProducers)
       {
-         if (status->nextProducers)
+         // If the producers have changed, update the block header
+         std::vector<Producer> prods;
          {
-            status->current.newProducers = current.header.newProducers = prods;
-            status->nextProducers.reset();
+            std::vector key       = psio::convert_to_key(producerConfigTable);
+            auto        prefixLen = key.size();
+            while (auto data = db.kvGreaterEqualRaw(DbId::nativeConstrained, key, prefixLen))
+            {
+               auto prod = psio::convert_from_frac<ProducerConfigRow>(data->value);
+               prods.emplace_back(prod.producerName, prod.producerAuth);
+               // increment key
+               key.clear();
+               key.insert(key.begin(), data->key.pos, data->key.end);
+               key.push_back(0);
+            }
+            // Special case: If no producers are specified, use the producers of the current block
+            if (prods.empty())
+            {
+               prods.emplace_back(current.header.producer, Claim{});
+            }
          }
-      }
-      else
-      {
-         if (!status->nextProducers || std::get<0>(*status->nextProducers) != prods)
+         if (status->producers != prods)
          {
             status->current.newProducers = current.header.newProducers = prods;
             status->nextProducers.emplace(std::move(prods), current.header.blockNum);
          }
-      }
-      if (status->nextProducers && std::get<1>(*status->nextProducers) <= current.header.commitNum)
-      {
-         status->producers = std::move(std::get<0>(*status->nextProducers));
-         status->nextProducers.reset();
       }
 
       status->head = current;  // Also calculates blockId

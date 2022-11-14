@@ -86,7 +86,7 @@ namespace psibase
       BlockInfo info;
       // May be null if the block has not been executed
       ConstRevisionPtr revision;
-      // The producer set for the next block
+      // The producer set for this block
       std::shared_ptr<ProducerSet> producers;
       std::shared_ptr<ProducerSet> nextProducers;
       // Only valid if nextProducers is non-null
@@ -130,6 +130,12 @@ namespace psibase
             nextProducersBlockNum(prev.nextProducersBlockNum)
       {
          // Handling of the producer schedule must match BlockContext::writeRevision
+         // Note: technically we could use this block's commitNum instead of the
+         // previous block's commitNum, but that complicates the producer hand-off.
+         if (nextProducers && prev.info.header.commitNum >= nextProducersBlockNum)
+         {
+            producers = std::move(nextProducers);
+         }
          if (info.header.newProducers)
          {
             nextProducers = std::make_shared<ProducerSet>(*info.header.newProducers);
@@ -138,10 +144,34 @@ namespace psibase
             // Don't both detecting this case here.
             nextProducersBlockNum = info.header.blockNum;
          }
-         if (nextProducers && info.header.commitNum >= nextProducersBlockNum)
+      }
+      // Returns the claim for an immediate successor of this block
+      std::optional<Claim> getNextProducerClaim(AccountNumber producer)
+      {
+         // N.B. The producers that may confirm a block are not necessarily the
+         // same as the producers that may produce a block. In particular,
+         // new joint producers are included in the confirm set, but NOT
+         // in the producer set.
+         if (!nextProducers || info.header.commitNum < nextProducersBlockNum)
          {
-            producers = std::move(nextProducers);
+            if (producers->size() == 0)
+            {
+               assert(blockNum() == 1);
+               return Claim{};
+            }
+            if (auto result = producers->getClaim(producer))
+            {
+               return *result;
+            }
          }
+         if (nextProducers)
+         {
+            if (auto result = nextProducers->getClaim(producer))
+            {
+               return *result;
+            }
+         }
+         return {};
       }
       auto order() const
       {
@@ -171,7 +201,10 @@ namespace psibase
          {
             auto [pos, inserted] = states.try_emplace(info.blockId, *prev, info);
             assert(inserted);
-            byOrderIndex.insert({pos->second.order(), info.blockId});
+            if (byOrderIndex.find(prev->order()) != byOrderIndex.end())
+            {
+               byOrderIndex.insert({pos->second.order(), info.blockId});
+            }
             return true;
          }
          return false;
@@ -261,10 +294,41 @@ namespace psibase
          return Checksum256(*get(id)->block()->header()->previous());
       }
 
-      template <typename F>
-      void async_switch_fork(F&& callback)
+      // If root is non-null, the head block must be a descendant of root
+      void set_subtree(const BlockHeaderState* root)
+      {
+         if (byOrderIndex.find(root->order()) == byOrderIndex.end())
+         {
+            // The new root is not a descendant of the current root.
+            // refill the index with all blocks
+            byOrderIndex.clear();
+            for (const auto& [id, state] : states)
+            {
+               byOrderIndex.insert({state.order(), id});
+            }
+         }
+         // Prune blocks that are not descendants of root
+         std::set<Checksum256> ids;
+         for (auto iter = byOrderIndex.begin(), end = byOrderIndex.end(); iter != end;)
+         {
+            if (iter->second == root->blockId() ||
+                ids.find(states.find(iter->second)->second.info.header.previous) != ids.end())
+            {
+               ++iter;
+               ids.insert(iter->second);
+            }
+            else
+            {
+               iter = byOrderIndex.erase(iter);
+            }
+         }
+      }
+
+      template <typename F, typename Accept>
+      void async_switch_fork(F&& callback, Accept&& on_accept_block)
       {
          // Don't switch if we are currently building a block.
+         // TODO: interrupt the current block if it is better than the block being built.
          if (blockContext)
          {
             switchForkCallback = std::move(callback);
@@ -295,7 +359,7 @@ namespace psibase
                --iter;
                if (iter->second == id)
                {
-                  execute_fork(iter, byBlocknumIndex.end());
+                  execute_fork(iter, byBlocknumIndex.end(), on_accept_block);
                   break;
                }
                assert(iter->first > commitIndex);
@@ -306,7 +370,7 @@ namespace psibase
             callback(&head->info.header);
          }
       }
-      void execute_fork(auto iter, auto end)
+      void execute_fork(auto iter, auto end, auto&& on_accept_block)
       {
          if (iter != end)
          {
@@ -326,12 +390,19 @@ namespace psibase
                   ctx.execAllInBlock();
                   BlockContext verifyBc(*systemContext, state->revision);
                   VerifyProver prover{verifyBc, blockPtr->signature()};
-                  auto [newRevision, id] = ctx.writeRevision(
-                      prover, getProducerClaim(next_state->info.header.producer, state->revision));
+                  auto claim = state->getNextProducerClaim(next_state->info.header.producer);
+                  if (!claim)
+                  {
+                     // TODO: blacklist branch
+                     PSIBASE_LOG(blockLogger, warning) << "Invalid producer for block";
+                     return;
+                  }
+                  auto [newRevision, id] = ctx.writeRevision(prover, *claim);
                   // TODO: verify block id here?
                   // TODO: handle other errors and blacklist the block and its descendants
                   next_state->revision = newRevision;
 
+                  on_accept_block(next_state);
                   PSIBASE_LOG(blockLogger, info) << "Accepted block";
                }
                systemContext->sharedDatabase.setHead(*writer, next_state->revision);
@@ -354,14 +425,7 @@ namespace psibase
       bool is_complete_chain(const id_type& id) { return get_state(id) != nullptr; }
       std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> getProducers()
       {
-         auto iter = byBlocknumIndex.find(commitIndex);
-         // The last committed block is guaranteed to be present
-         assert(iter != byBlocknumIndex.end());
-         auto stateIter = states.find(iter->second);
-         // We'd better have a state for this block
-         assert(stateIter != states.end());
-         assert(stateIter->second.revision);
-         return {stateIter->second.producers, stateIter->second.nextProducers};
+         return {head->producers, head->nextProducers};
       }
       bool commit(BlockNum num)
       {
@@ -383,7 +447,7 @@ namespace psibase
                 (blockNum == commitIndex &&
                  !in_best_chain(ExtendedBlockId{iter->first, blockNum})) ||
                 (blockNum > commitIndex &&
-                 blocks.find(iter->second->block()->header()->previous()) == blocks.end()))
+                 states.find(iter->second->block()->header()->previous()) == states.end()))
             {
                auto state_iter = states.find(iter->first);
                if (state_iter != states.end())
@@ -488,14 +552,18 @@ namespace psibase
             if (switchForkCallback)
             {
                auto callback = std::move(switchForkCallback);
-               async_switch_fork(std::move(callback));
+               // TODO: get rid of this. the caller should handle nullptr and call async_switch_fork instead of calling it here.
+               async_switch_fork(std::move(callback), [](const void*) {});
             }
             return nullptr;
          }
          try
          {
-            auto claim = getProducerClaim(blockContext->current.header.producer, head->revision);
-            auto [revision, id] = blockContext->writeRevision(prover, claim);
+            auto claim = head->getNextProducerClaim(blockContext->current.header.producer);
+            // If we're not a valid producer for the next block, then
+            // we shouldn't have started block production.
+            assert(!!claim);
+            auto [revision, id] = blockContext->writeRevision(prover, *claim);
             systemContext->sharedDatabase.setHead(*writer, revision);
             assert(head->blockId() == blockContext->current.header.previous);
             auto proof     = getBlockProof(revision, blockContext->current.header.blockNum);
@@ -517,21 +585,6 @@ namespace psibase
             blockContext.reset();
             PSIBASE_LOG(logger, error) << e.what() << std::endl;
             return nullptr;
-         }
-      }
-
-      Claim getProducerClaim(AccountNumber producer, ConstRevisionPtr revision)
-      {
-         Database db{systemContext->sharedDatabase, std::move(revision)};
-         auto     session = db.startRead();
-         if (auto row =
-                 db.kvGet<ProducerConfigRow>(DbId::nativeConstrained, producerConfigKey(producer)))
-         {
-            return std::move(row->producerAuth);
-         }
-         else
-         {
-            return {};
          }
       }
 

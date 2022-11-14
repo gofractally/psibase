@@ -136,6 +136,8 @@ namespace psibase::loggers
                return boost::log::sinks::syslog::warning;
             case level::error:
                return boost::log::sinks::syslog::error;
+            case level::critical:
+               return boost::log::sinks::syslog::critical;
          }
          __builtin_unreachable();
       }
@@ -246,6 +248,8 @@ namespace psibase::loggers
                case level::error:
                   os << "\"error\"";
                   break;
+               case level::critical:
+                  os << "\"critical\"";
             }
          }
 
@@ -2749,6 +2753,9 @@ namespace psibase::loggers
          case level::error:
             os << "error";
             break;
+         case level::critical:
+            os << "critical";
+            break;
       }
       return os;
    }
@@ -2776,6 +2783,10 @@ namespace psibase::loggers
          else if (s == "error")
          {
             l = level::error;
+         }
+         else if (s == "critical")
+         {
+            l = level::critical;
          }
          else
          {
