@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Action, Fracpack, Reflect, Hex};
+use crate::{Action, Fracpack, Hex, Reflect};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]

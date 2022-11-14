@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{Fracpack, Reflect, ToKey, Hex};
+use crate::{Fracpack, Hex, Reflect, ToKey};
 use serde::{Deserialize, Serialize};
 
 /// An HTTP header

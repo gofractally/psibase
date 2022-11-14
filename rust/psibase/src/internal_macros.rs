@@ -26,6 +26,8 @@ macro_rules! serialize_as_str {
                 deserializer.deserialize_str(Visitor(&mut s))
             }
         }
+
+        async_graphql::scalar!($ty);
     };
 }
 

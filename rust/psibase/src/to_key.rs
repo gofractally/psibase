@@ -1,3 +1,5 @@
+use crate::Hex;
+use async_graphql::connection::CursorType;
 use std::collections::{BTreeSet, LinkedList, VecDeque};
 
 /// ToKey defines a conversion from a type to a sequence of bytes
@@ -62,6 +64,16 @@ impl RawKey {
 impl ToKey for RawKey {
     fn append_key(&self, key: &mut Vec<u8>) {
         key.extend_from_slice(&self.data[..]);
+    }
+}
+
+impl CursorType for RawKey {
+    type Error = &'static str;
+    fn decode_cursor(s: &str) -> Result<Self, Self::Error> {
+        Ok(Self::new(s.parse::<Hex<Vec<u8>>>()?.0))
+    }
+    fn encode_cursor(&self) -> String {
+        Hex(self.data.as_slice()).to_string()
     }
 }
 

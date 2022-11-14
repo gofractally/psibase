@@ -1,13 +1,17 @@
 use crate::{reflect, ToKey};
-use std::fmt::Debug;
+use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType};
+use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::str::FromStr;
 
 trait ToHex:
     Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect + ToKey
 {
     fn to_hex(&self) -> String;
 }
+
+pub type HexBytes = Hex<Vec<u8>>;
 
 trait FromHex: ToHex {
     fn from_hex(s: &str) -> Option<Self>;
@@ -47,6 +51,29 @@ where
 {
     fn from(inner: T) -> Self {
         Self(inner)
+    }
+}
+
+impl<T> Display for Hex<T>
+where
+    T: ToHex,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl<T> FromStr for Hex<T>
+where
+    T: FromHex,
+{
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(v) = T::from_hex(s) {
+            Ok(Self(v))
+        } else {
+            Err("Hex conversion failed")
+        }
     }
 }
 
@@ -203,6 +230,24 @@ where
         }
         let mut s = String::new();
         deserializer.deserialize_str(Visitor::<T>(&mut s, PhantomData))
+    }
+}
+
+#[Scalar]
+impl<T> ScalarType for Hex<T>
+where
+    T: FromHex + Send + Sync,
+{
+    fn parse(value: async_graphql::Value) -> InputValueResult<Self> {
+        if let async_graphql::Value::String(value) = &value {
+            Ok(value.parse()?)
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        async_graphql::Value::String(self.to_string())
     }
 }
 

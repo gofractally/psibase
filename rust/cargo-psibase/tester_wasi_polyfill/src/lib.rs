@@ -21,9 +21,24 @@ extern "C" {
         fdflags: u16,
         opened_fd: *mut u32,
     ) -> Errno;
+    fn testerFdstatGet(
+        fd: Fd,
+        fs_filetype: *mut u8,
+        fs_flags: *mut u16,
+        fs_rights_base: *mut u64,
+        fs_rights_inheriting: *mut u64,
+    ) -> Errno;
     fn testerReadFile(fd: u32, data: *mut u8, size: Size, bytes_read: *mut Size) -> Errno;
     fn testerWriteFile(fd: u32, content: *const u8, content_len: Size) -> Errno;
     fn testerCloseFile(fd: Fd) -> Errno;
+}
+
+#[repr(C)]
+pub struct Fdstat {
+    pub fs_filetype: u8,
+    pub fs_flags: Fdflags,
+    pub fs_rights_base: Rights,
+    pub fs_rights_inheriting: Rights,
 }
 
 #[no_mangle]
@@ -89,6 +104,18 @@ pub unsafe extern "C" fn fd_prestat_dir_name(fd: Fd, path: *mut u8, path_len: Si
         return 0;
     }
     ERRNO_BADF.raw()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_fdstat_get(fd: Fd, stat: *mut Fdstat) -> Errno {
+    let stat = &mut *stat;
+    return testerFdstatGet(
+        fd,
+        &mut stat.fs_filetype,
+        &mut stat.fs_flags,
+        &mut stat.fs_rights_base,
+        &mut stat.fs_rights_inheriting,
+    );
 }
 
 #[no_mangle]

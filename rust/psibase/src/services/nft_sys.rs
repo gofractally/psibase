@@ -1,6 +1,7 @@
 // TODO: tables
 // TODO: events
 
+use async_graphql::{InputObject, SimpleObject};
 use fracpack::Fracpack;
 use serde::{Deserialize, Serialize};
 
@@ -8,26 +9,35 @@ use crate::{AccountNumber, Reflect};
 
 pub type NID = u32;
 
-#[derive(Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(
+    Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
+#[graphql(input_name = "NftRecordInput")]
 pub struct NftRecord {
     id: NID,
     issuer: AccountNumber,
     owner: AccountNumber,
 }
 
-#[derive(Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(
+    Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
+#[graphql(input_name = "NftHolderRecordInput")]
 pub struct NftHolderRecord {
     account: AccountNumber,
     config: u8, // todo: Implement Bitset
 }
 
-#[derive(Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(
+    Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
+#[graphql(input_name = "CreditRecordInput")]
 pub struct CreditRecord {
     nftId: NID,
     debitor: AccountNumber,

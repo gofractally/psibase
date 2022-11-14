@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{AccountNumber, Fracpack, Hex, MethodNumber, Reflect, TimePointSec, ToKey};
+use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 
 // TODO: move
@@ -16,10 +17,22 @@ pub type BlockNum = u32;
 ///
 /// Transactions also contains actions requested by the
 /// transaction authorizers.
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "ActionInput")]
 pub struct Action {
     /// Account sending the action
     pub sender: AccountNumber,
@@ -91,10 +104,22 @@ pub struct SharedGenesisService<'a> {
     pub code: Hex<&'a [u8]>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "ClaimInput")]
 pub struct Claim {
     pub service: AccountNumber,
     pub rawData: Hex<Vec<u8>>,
@@ -122,10 +147,22 @@ pub struct Claim {
 /// * It references a block that isn't on the current fork, or a block which
 ///   is too old. For best results, use the most-recent irreversible block which
 ///   meets the criteria.
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "TaposInput")]
 pub struct Tapos {
     pub expiration: TimePointSec,
     pub refBlockSuffix: u32,
@@ -138,20 +175,44 @@ impl Tapos {
     pub const VALID_FLAGS: u16 = 0x0001;
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "TransactionInput")]
 pub struct Transaction {
     pub tapos: Tapos,
     pub actions: Vec<Action>,
     pub claims: Vec<Claim>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "SignedTransactionInput")]
 pub struct SignedTransaction {
     // Contains a packed `Transaction`. TODO: shared_view_ptr
     pub transaction: Hex<Vec<u8>>,
@@ -160,19 +221,43 @@ pub struct SignedTransaction {
 
 type TermNum = u32;
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "ProducerInput")]
 pub struct Producer {
     pub name: AccountNumber,
     pub auth: Claim,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "BlockHeaderInput")]
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
@@ -190,29 +275,65 @@ pub struct BlockHeader {
     pub newProducers: Option<Vec<Producer>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "BlockInput")]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
     pub subjectiveData: Vec<Hex<Vec<u8>>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "SignedBlockInput")]
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Fracpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "BlockInfoInput")]
 pub struct BlockInfo {
     pub header: BlockHeader,
     pub blockId: Checksum256,

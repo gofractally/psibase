@@ -1,13 +1,17 @@
 use crate::{Fracpack, Reflect, ToKey};
+use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 
 /// Identify a service and method
 ///
 /// An empty `service` or `method` indicates a wildcard.
-#[derive(Copy, Clone, Debug, Fracpack, Reflect, ToKey, Serialize, Deserialize)]
+#[derive(
+    Copy, Clone, Debug, Fracpack, Reflect, ToKey, Serialize, Deserialize, SimpleObject, InputObject,
+)]
 #[fracpack(fracpack_mod = "crate::fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "ServiceMethodInput")]
 pub struct ServiceMethod {
     pub service: crate::AccountNumber,
     pub method: crate::MethodNumber,

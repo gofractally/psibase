@@ -42,7 +42,7 @@ mod service {
     #[action]
     fn storeMessage(id: u64, to: AccountNumber, content: String) {
         // Open the table. #[table(...)] defined MessageTable.
-        let message_table = MessageTable::open();
+        let message_table = MessageTable::new();
 
         // This will overwrite any messages with the same ID,
         // including messages from other users. It also allows users
@@ -61,7 +61,7 @@ mod service {
     // Get all messages which have ids >= begin and < end
     #[action]
     fn getMessages(begin: u64, end: u64) -> Vec<Message> {
-        let message_table = MessageTable::open();
+        let message_table = MessageTable::new();
 
         // The primary index iterates and searches by primary key
         let index = message_table.get_index_pk();
@@ -120,7 +120,8 @@ fn serveSys(request: HttpRequest) -> Option<HttpReply> {
                 captures[1].parse().unwrap(),
                 captures[2].parse().unwrap(),
             ))
-            .unwrap(),
+            .unwrap()
+            .into(),
             headers: vec![],
         });
     }
@@ -181,7 +182,7 @@ mod service {
 
     // This is not an action; others can't call it.
     fn get_next_message_id() -> u64 {
-        let table = LastUsedTable::open();
+        let table = LastUsedTable::new();
 
         // Get record, or default if doesn't yet exist
         let mut lastUsed =
@@ -196,7 +197,7 @@ mod service {
     // The caller no longer provides an ID; we return it instead.
     #[action]
     fn storeMessage(to: AccountNumber, content: String) -> u64 {
-        let message_table = MessageTable::open();
+        let message_table = MessageTable::new();
         let id = get_next_message_id();
         message_table
             .put(&Message {
@@ -212,7 +213,7 @@ mod service {
     // Same as before
     #[action]
     fn getMessages(begin: u64, end: u64) -> Vec<Message> {
-        let message_table = MessageTable::open();
+        let message_table = MessageTable::new();
         let index = message_table.get_index_pk();
         index.range(begin..end).collect()
     }
@@ -229,7 +230,8 @@ mod service {
                     captures[1].parse().unwrap(),
                     captures[2].parse().unwrap(),
                 ))
-                .unwrap(),
+                .unwrap()
+                .into(),
                 headers: vec![],
             });
         }
@@ -307,7 +309,7 @@ mod service {
 
     // Same as before
     fn get_next_message_id() -> u64 {
-        let table = LastUsedTable::open();
+        let table = LastUsedTable::new();
         let mut lastUsed =
             table.get_index_pk().get(&()).unwrap_or_default();
         lastUsed.lastMessageId += 1;
@@ -318,7 +320,7 @@ mod service {
     // Same as before
     #[action]
     fn storeMessage(to: AccountNumber, content: String) -> u64 {
-        let message_table = MessageTable::open();
+        let message_table = MessageTable::new();
         let id = get_next_message_id();
         message_table
             .put(&Message {
@@ -333,7 +335,7 @@ mod service {
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        let message_table = MessageTable::open();
+        let message_table = MessageTable::new();
 
         let re = regex::Regex::new(
             "^/messages/([a-z]+)/([a-z]+)/([0-9]+)/([0-9]+)$"
@@ -356,7 +358,8 @@ mod service {
                             .range((account, begin)..(account, end))
                             .collect::<Vec<_>>(),
                     )
-                    .unwrap(),
+                    .unwrap()
+                    .into(),
                     headers: vec![],
                 });
             }
@@ -372,7 +375,8 @@ mod service {
                             .range((account, begin)..(account, end))
                             .collect::<Vec<_>>(),
                     )
-                    .unwrap(),
+                    .unwrap()
+                    .into(),
                     headers: vec![],
                 });
             }
@@ -459,9 +463,14 @@ fn test_store_message(chain: psibase::Chain)
         2
     );
 
-    // Verify table content
+    // Verify table content.
+    //
+    // We use `with_service` instead of `new` since `new` uses
+    // `get_service` to look up which account the service is running
+    // on. Since a test case is not a service, get_service() returns
+    // 0. That causes the table to find no rows.
     assert_eq!(
-        MessageTable::open()
+        MessageTable::with_service(SERVICE)
             .get_index_pk()
             .iter()
             .collect::<Vec<_>>(),

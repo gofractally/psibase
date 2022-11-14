@@ -4,8 +4,9 @@
 #[psibase::service(name = "elections")]
 mod service {
     use psibase::{
-        check, check_none, check_some, get_sender, serve_simple_ui, services::transaction_sys,
-        AccountNumber, Fracpack, HttpReply, HttpRequest, Reflect, Table, TimePointSec, ToKey,
+        check, check_none, check_some, get_sender, get_service, serve_content, serve_simple_ui,
+        services::transaction_sys, store_content, AccountNumber, Fracpack, HexBytes, HttpReply,
+        HttpRequest, Reflect, Table, TimePointSec, ToKey, WebContentRow,
     };
     use serde::{Deserialize, Serialize};
 
@@ -70,6 +71,9 @@ mod service {
             (self.election_id, self.voter)
         }
     }
+
+    #[table(record = "WebContentRow", index = 3)]
+    struct WebContentTable;
 
     fn get_current_time() -> TimePointSec {
         transaction_sys::Wrapper::call().currentBlock().time
@@ -296,11 +300,20 @@ mod service {
         CandidatesTable::new().put(&candidate_record).unwrap();
     }
 
+    #[action]
+    #[allow(non_snake_case)]
+    fn storeSys(path: String, contentType: String, content: HexBytes) {
+        check(get_sender() == get_service(), "unauthorized");
+        let table = WebContentTable::new();
+        store_content(path, contentType, content, &table).unwrap();
+    }
+
     // The UI allows us to test things manually
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        serve_simple_ui::<Wrapper>(&request)
+        None.or_else(|| serve_content(&request, &WebContentTable::new()))
+            .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
 

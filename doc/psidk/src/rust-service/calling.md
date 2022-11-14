@@ -86,6 +86,23 @@ services, build the test, and run it.
 cargo psibase test
 ```
 
+## Who called me?
+
+A service may call [get_sender](https://docs.rs/psibase/latest/psibase/fn.get_sender.html)
+to find out which service or user called it. A service also may use
+[get_service](https://docs.rs/psibase/latest/psibase/fn.get_service.html)
+to get the account that the service is running on.
+
+```rust
+#[action]
+fn do_something() {
+    psibase::check(
+        psibase::get_sender() == expectedAccount,
+        "you're not who I expected",
+    );
+}
+```
+
 ## Recursion Safety
 
 By default, Rust services forbid recursive calls. This prevents
