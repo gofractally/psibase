@@ -33,9 +33,6 @@ namespace UserService
       bool            exists(NID nftId);
       bool            getUserConf(psibase::AccountNumber account, psibase::NamedBit flag);
 
-     private:
-      Tables db;
-
      public:
       struct Events
       {

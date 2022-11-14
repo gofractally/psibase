@@ -52,7 +52,7 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable>().getIndex<0>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().getIndex<0>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -60,7 +60,7 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
 void TokenSys::init()
 {
    // Set initialized flag
-   auto initTable = db.open<InitTable>();
+   auto initTable = Tables().open<InitTable>();
    auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
@@ -91,7 +91,7 @@ void TokenSys::init()
 TID TokenSys::create(Precision precision, Quantity maxSupply)
 {
    auto creator    = getSender();
-   auto tokenTable = db.open<TokenTable>();
+   auto tokenTable = Tables().open<TokenTable>();
    auto tokenIdx   = tokenTable.getIndex<0>();
    auto nftService = to<NftSys>();
 
@@ -136,8 +136,8 @@ void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
 
    token.currentSupply += amount;
    balance.balance += amount.value;
-   db.open<TokenTable>().put(token);
-   db.open<BalanceTable>().put(balance);
+   Tables().open<TokenTable>().put(token);
+   Tables().open<BalanceTable>().put(balance);
 }
 
 void TokenSys::burn(TID tokenId, Quantity amount)
@@ -153,16 +153,16 @@ void TokenSys::burn(TID tokenId, Quantity amount)
 
    if (balance.balance == 0)
    {
-      db.open<BalanceTable>().erase(BalanceKey{sender, tokenId});
+      Tables().open<BalanceTable>().erase(BalanceKey{sender, tokenId});
    }
    else
    {
-      db.open<BalanceTable>().put(balance);
+      Tables().open<BalanceTable>().put(balance);
    }
 
    token.lastEvent = emit().history().burned(token.lastEvent, tokenId, sender, amount);
 
-   db.open<TokenTable>().put(token);
+   Tables().open<TokenTable>().put(token);
 }
 
 void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
@@ -174,7 +174,7 @@ void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
    check(not hodler.config.get(flagBit) == enable, redundantUpdate);
 
    hodler.config.set(flagBit, enable);
-   db.open<TokenHolderTable>().put(hodler);
+   Tables().open<TokenHolderTable>().put(hodler);
 
    emit().history().userConfSet(sender, flag, enable);
 }
@@ -194,7 +194,7 @@ void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
        emit().history().tokenConfSet(token.lastEvent, tokenId, getSender(), flag, enable);
 
    token.config.set(flagIndex, enable);
-   db.open<TokenTable>().put(token);
+   Tables().open<TokenTable>().put(token);
 }
 
 void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
@@ -213,7 +213,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    }
 
    balance.balance -= amount.value;
-   db.open<BalanceTable>().put(balance);
+   Tables().open<BalanceTable>().put(balance);
 
    auto manualDebitFlag = TokenHolderConfig::getIndex(userConfig::manualDebit);
    bool manualDebitBit  = getTokenHolder(receiver).config.get(manualDebitFlag);
@@ -221,24 +221,24 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    {
       auto sharedBalance = getSharedBal(tokenId, sender, receiver);
       sharedBalance.balance += amount.value;
-      db.open<SharedBalanceTable>().put(sharedBalance);
+      Tables().open<SharedBalanceTable>().put(sharedBalance);
    }
    else
    {
       auto time    = to<TransactionSys>().currentBlock().time;
       auto balance = getBalance(tokenId, receiver);
       balance.balance += amount.value;
-      db.open<BalanceTable>().put(balance);
+      Tables().open<BalanceTable>().put(balance);
 
       auto senderHolder             = getTokenHolder(sender);
       senderHolder.lastHistoryEvent = emit().history().transferred(
           senderHolder.lastHistoryEvent, tokenId, time, sender, receiver, amount, memo);
-      db.open<TokenHolderTable>().put(senderHolder);
+      Tables().open<TokenHolderTable>().put(senderHolder);
 
       auto receiverHolder             = getTokenHolder(receiver);
       receiverHolder.lastHistoryEvent = emit().history().transferred(
           receiverHolder.lastHistoryEvent, tokenId, time, sender, receiver, amount, memo);
-      db.open<TokenHolderTable>().put(receiverHolder);
+      Tables().open<TokenHolderTable>().put(receiverHolder);
    }
 }
 
@@ -260,13 +260,13 @@ void TokenSys::uncredit(TID                tokenId,
 
    if (sharedBalance.balance == 0)
    {
-      db.open<SharedBalanceTable>().erase(SharedBalanceKey{sender, receiver, tokenId});
+      Tables().open<SharedBalanceTable>().erase(SharedBalanceKey{sender, receiver, tokenId});
    }
    else
    {
-      db.open<SharedBalanceTable>().put(sharedBalance);
+      Tables().open<SharedBalanceTable>().put(sharedBalance);
    }
-   db.open<BalanceTable>().put(creditorBalance);
+   Tables().open<BalanceTable>().put(creditorBalance);
 }
 
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
@@ -284,23 +284,23 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
 
    if (sharedBalance.balance == 0)
    {
-      db.open<SharedBalanceTable>().erase(SharedBalanceKey{sender, receiver, tokenId});
+      Tables().open<SharedBalanceTable>().erase(SharedBalanceKey{sender, receiver, tokenId});
    }
    else
    {
-      db.open<SharedBalanceTable>().put(sharedBalance);
+      Tables().open<SharedBalanceTable>().put(sharedBalance);
    }
-   db.open<BalanceTable>().put(receiverBalance);
+   Tables().open<BalanceTable>().put(receiverBalance);
 
    auto senderHolder             = getTokenHolder(sender);
    senderHolder.lastHistoryEvent = emit().history().transferred(
        senderHolder.lastHistoryEvent, tokenId, time, sender, receiver, amount, memo);
-   db.open<TokenHolderTable>().put(senderHolder);
+   Tables().open<TokenHolderTable>().put(senderHolder);
 
    auto receiverHolder             = getTokenHolder(receiver);
    receiverHolder.lastHistoryEvent = emit().history().transferred(
        receiverHolder.lastHistoryEvent, tokenId, time, sender, receiver, amount, memo);
-   db.open<TokenHolderTable>().put(receiverHolder);
+   Tables().open<TokenHolderTable>().put(receiverHolder);
 }
 
 void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
@@ -319,13 +319,13 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_vi
    // Recall is ultimately a remote burn
    fromBalance.balance -= amount.value;
 
-   auto balanceTable = db.open<BalanceTable>();
+   auto balanceTable = Tables().open<BalanceTable>();
    balanceTable.put(fromBalance);
 
    auto holder = getTokenHolder(from);
    holder.lastHistoryEvent =
        emit().history().recalled(holder.lastHistoryEvent, tokenId, time, from, amount, memo);
-   db.open<TokenHolderTable>().put(holder);
+   Tables().open<TokenHolderTable>().put(holder);
 }
 
 void TokenSys::mapSymbol(TID tokenId, SID symbolId)
@@ -349,7 +349,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 
    // Store mapping
    token.symbolId = symbolId;
-   db.open<TokenTable>().put(token);
+   Tables().open<TokenTable>().put(token);
 
    // Destroy symbol owner NFT, it can never be used or traded again
    nftService.burn(symbol.ownerNft);
@@ -357,7 +357,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 
 TokenRecord TokenSys::getToken(TID tokenId)
 {
-   auto tokenTable = db.open<TokenTable>();
+   auto tokenTable = Tables().open<TokenTable>();
    auto tokenOpt   = tokenTable.get(tokenId);
    psibase::check(tokenOpt.has_value(), tokenDNE);
 
@@ -374,12 +374,12 @@ SID TokenSys::getTokenSymbol(TID tokenId)
 
 bool TokenSys::exists(TID tokenId)
 {
-   return db.open<TokenTable>().get(tokenId).has_value();
+   return Tables().open<TokenTable>().get(tokenId).has_value();
 }
 
 BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
 {
-   auto balanceTable = db.open<BalanceTable>();
+   auto balanceTable = Tables().open<BalanceTable>();
    auto balanceOpt   = balanceTable.get(BalanceKey{account, tokenId});
 
    BalanceRecord record;
@@ -402,7 +402,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
                                            AccountNumber creditor,
                                            AccountNumber debitor)
 {
-   auto             sharedBalanceTable = db.open<SharedBalanceTable>();
+   auto             sharedBalanceTable = Tables().open<SharedBalanceTable>();
    auto             sbIdx              = sharedBalanceTable.getIndex<0>();
    SharedBalanceKey key                = {creditor, debitor, tokenId};
    auto             sbOpt              = sbIdx.get(key);
@@ -427,7 +427,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
 
 TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
 {
-   auto acTable = db.open<TokenHolderTable>();
+   auto acTable = Tables().open<TokenHolderTable>();
    auto acIdx   = acTable.getIndex<0>();
    auto acOpt   = acIdx.get(account);
 
@@ -447,7 +447,7 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
 
 bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
 {
-   auto hodler = db.open<TokenHolderTable>().getIndex<0>().get(account);
+   auto hodler = Tables().open<TokenHolderTable>().getIndex<0>().get(account);
    if (hodler.has_value() == false)
    {
       return false;

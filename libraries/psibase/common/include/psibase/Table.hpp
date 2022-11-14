@@ -719,11 +719,15 @@ namespace psibase
    template <typename... Tables>
    struct ServiceTables
    {
+      /// Default constructor
+      ///
+      /// Assumes the desired service is running on the current action receiver account.
+      ServiceTables() : account(getReceiver()) {}
+
       /// Constructor
       ///
       /// `account` is the account the service runs on.
       explicit constexpr ServiceTables(AccountNumber account) : account(account) {}
-      ServiceTables() : account(getReceiver()) {}
 
       /// Open by table number
       ///

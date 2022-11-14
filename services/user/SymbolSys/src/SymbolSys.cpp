@@ -38,14 +38,14 @@ SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
 
 void SymbolSys::init()
 {
-   auto initTable = db.open<InitTable>();
+   auto initTable = Tables().open<InitTable>();
    auto init      = (initTable.get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
@@ -63,7 +63,7 @@ void SymbolSys::init()
       s.activePrice = s.activePrice * 2 / 3;
       return s;
    };
-   auto       symLengthTable = db.open<SymbolLengthTable>();
+   auto       symLengthTable = Tables().open<SymbolLengthTable>();
    Quantity_t initialPrice   = (Quantity_t)1000e8;
    auto       s              = SymbolLengthRecord{.symbolLength        = 3,
                                                   .targetCreatedPerDay = 24,
@@ -76,7 +76,7 @@ void SymbolSys::init()
    symLengthTable.put(nextSym(s));  // Length 7
 
    // Add initial configuration for Price Adjustment Record
-   auto              priceAdjustmentSingleton = db.open<PriceAdjustmentSingleton>();
+   auto              priceAdjustmentSingleton = Tables().open<PriceAdjustmentSingleton>();
    constexpr uint8_t increasePct              = 5;
    constexpr uint8_t decreasePct              = increasePct;
    priceAdjustmentSingleton.put(PriceAdjustmentRecord{0, increasePct, decreasePct});
@@ -125,8 +125,8 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    symType.createCounter++;
    symType.lastPriceUpdateTime = to<TransactionSys>().headBlockTime();
 
-   db.open<SymbolTable>().put(newSym);
-   db.open<SymbolLengthTable>().put(symType);
+   Tables().open<SymbolTable>().put(newSym);
+   Tables().open<SymbolLengthTable>().put(symType);
 
    emit().ui().symCreated(newSymbol, sender, cost);
 }
@@ -149,7 +149,7 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
    symbolRecord.saleDetails.salePrice = price;
    symbolRecord.saleDetails.seller    = seller;
 
-   db.open<SymbolTable>().put(symbolRecord);
+   Tables().open<SymbolTable>().put(symbolRecord);
 
    emit().ui().symListed(symbol, seller, price);
 }
@@ -173,7 +173,7 @@ void SymbolSys::buySymbol(SID symbol)
    symbolRecord.saleDetails.seller    = AccountNumber{0};
    symbolRecord.saleDetails.salePrice = 0;
 
-   db.open<SymbolTable>().put(symbolRecord);
+   Tables().open<SymbolTable>().put(symbolRecord);
 
    emit().ui().symSold(symbol, buyer, seller, salePrice);
 }
@@ -191,7 +191,7 @@ void SymbolSys::unlistSymbol(SID symbol)
 
    symbolRecord.saleDetails = SaleDetails{};
 
-   db.open<SymbolTable>().put(symbolRecord);
+   Tables().open<SymbolTable>().put(symbolRecord);
 
    emit().ui().symUnlisted(symbol, seller);
 }
@@ -200,7 +200,7 @@ SymbolRecord SymbolSys::getSymbol(SID symbol)
 {
    check(symbol.value != 0, invalidSymbol);
 
-   auto symOpt = db.open<SymbolTable>().get(symbol);
+   auto symOpt = Tables().open<SymbolTable>().get(symbol);
 
    if (symOpt.has_value())
    {
@@ -228,7 +228,7 @@ SymbolLengthRecord SymbolSys::getSymbolType(size_t numChars)
 
    updatePrices();
 
-   auto symbolType = db.open<SymbolLengthTable>().get(key);
+   auto symbolType = Tables().open<SymbolLengthTable>().get(key);
    check(symbolType.has_value(), invalidSymbol);
 
    return *symbolType;
@@ -236,10 +236,10 @@ SymbolLengthRecord SymbolSys::getSymbolType(size_t numChars)
 
 void SymbolSys::updatePrices()
 {
-   auto symLengthTable = db.open<SymbolLengthTable>();
+   auto symLengthTable = Tables().open<SymbolLengthTable>();
    auto symLengthIndex = symLengthTable.getIndex<0>();
 
-   auto priceAdjustmentIdx = db.open<PriceAdjustmentSingleton>().getIndex<0>();
+   auto priceAdjustmentIdx = Tables().open<PriceAdjustmentSingleton>().getIndex<0>();
    auto priceAdjustmentRec = *priceAdjustmentIdx.get(uint8_t{0});
    auto dec                = static_cast<uint64_t>((uint8_t)100 - priceAdjustmentRec.decreasePct);
    auto inc                = static_cast<uint64_t>((uint8_t)100 + priceAdjustmentRec.increasePct);
@@ -275,7 +275,7 @@ void SymbolSys::updatePrices()
 
 bool SymbolSys::exists(SID symbol)
 {
-   return db.open<SymbolTable>().get(symbol).has_value();
+   return Tables().open<SymbolTable>().get(symbol).has_value();
 }
 
 PSIBASE_DISPATCH(UserService::SymbolSys)

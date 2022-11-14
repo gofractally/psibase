@@ -74,8 +74,6 @@ namespace UserService
       bool                getTokenConf(TID tokenId, psibase::NamedBit flag);
 
      private:
-      Tables db{psibase::getReceiver()};
-
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);
 

@@ -14,7 +14,7 @@ namespace UserService
    class SymbolSys : public psibase::Service<SymbolSys>
    {
      public:
-      using tables = psibase::
+      using Tables = psibase::
           ServiceTables<SymbolTable, SymbolLengthTable, PriceAdjustmentSingleton, InitTable>;
       static constexpr auto service        = psibase::AccountNumber("symbol-sys");
       static constexpr auto sysTokenSymbol = SID{"psi"};
@@ -38,10 +38,6 @@ namespace UserService
 
       void updatePrices();
 
-     private:
-      tables db{psibase::getReceiver()};
-
-     public:
       struct Events
       {
          using Account    = psibase::AccountNumber;
