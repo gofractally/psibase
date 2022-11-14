@@ -2,6 +2,7 @@
 
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psibase/check.hpp>
 #include <psio/graphql.hpp>
 #include <psio/to_hex.hpp>
 
@@ -1263,7 +1264,7 @@ namespace psibase
    ///              method(userEvents, user, first, after))
    /// ```
    ///
-   template <typename Tables, typename Events>
+   template <typename Tables, typename Events = void>
    struct QueryableService
    {
       AccountNumber service;

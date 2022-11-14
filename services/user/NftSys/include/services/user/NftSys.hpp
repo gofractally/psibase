@@ -10,7 +10,7 @@ namespace UserService
    class NftSys : public psibase::Service<NftSys>
    {
      public:
-      using tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;
+      using Tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;
 
       static constexpr auto service = psibase::AccountNumber("nft-sys");
 
@@ -34,7 +34,7 @@ namespace UserService
       bool            getUserConf(psibase::AccountNumber account, psibase::NamedBit flag);
 
      private:
-      tables db{psibase::getReceiver()};
+      Tables db;
 
      public:
       struct Events
@@ -64,9 +64,9 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO_REFLECT(NftSys, 
+   PSIO_REFLECT(NftSys,
       method(init),
-      method(mint), 
+      method(mint),
       method(burn, nftId),
       method(credit, nftId, receiver, memo),
       method(uncredit, nftId, memo),
@@ -87,12 +87,12 @@ namespace UserService
       method(userConfSet, account, flag, enable),
    //);
 
-   //PSIBASE_REFLECT_UI_EVENTS(NftSys, 
+   //PSIBASE_REFLECT_UI_EVENTS(NftSys,
       method(credited, nftId, sender, receiver, memo),
       method(uncredited, nftId, sender, receiver, memo),
    //);
 
-   //PSIBASE_REFLECT_MERKLE_EVENTS(NftSys, 
+   //PSIBASE_REFLECT_MERKLE_EVENTS(NftSys,
       method(transferred, nftId, sender, receiver, memo)
    );
    // clang-format on

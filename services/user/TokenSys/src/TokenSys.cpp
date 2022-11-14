@@ -358,8 +358,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 TokenRecord TokenSys::getToken(TID tokenId)
 {
    auto tokenTable = db.open<TokenTable>();
-   auto tokenIdx   = tokenTable.getIndex<0>();
-   auto tokenOpt   = tokenIdx.get(tokenId);
+   auto tokenOpt   = tokenTable.get(tokenId);
    psibase::check(tokenOpt.has_value(), tokenDNE);
 
    return *tokenOpt;
@@ -375,14 +374,13 @@ SID TokenSys::getTokenSymbol(TID tokenId)
 
 bool TokenSys::exists(TID tokenId)
 {
-   return db.open<TokenTable>().getIndex<0>().get(tokenId).has_value();
+   return db.open<TokenTable>().get(tokenId).has_value();
 }
 
 BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
 {
    auto balanceTable = db.open<BalanceTable>();
-   auto balanceIdx   = balanceTable.getIndex<0>();
-   auto balanceOpt   = balanceIdx.get(BalanceKey{account, tokenId});
+   auto balanceOpt   = balanceTable.get(BalanceKey{account, tokenId});
 
    BalanceRecord record;
    if (balanceOpt != std::nullopt)

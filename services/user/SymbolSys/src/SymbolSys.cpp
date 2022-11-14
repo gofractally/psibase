@@ -38,7 +38,7 @@ SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable>().getIndex<0>().get(SingletonKey{});
+      auto initRecord = db.open<InitTable>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -46,7 +46,7 @@ SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
 void SymbolSys::init()
 {
    auto initTable = db.open<InitTable>();
-   auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
+   auto init      = (initTable.get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
@@ -200,7 +200,7 @@ SymbolRecord SymbolSys::getSymbol(SID symbol)
 {
    check(symbol.value != 0, invalidSymbol);
 
-   auto symOpt = db.open<SymbolTable>().getIndex<0>().get(symbol);
+   auto symOpt = db.open<SymbolTable>().get(symbol);
 
    if (symOpt.has_value())
    {
@@ -228,7 +228,7 @@ SymbolLengthRecord SymbolSys::getSymbolType(size_t numChars)
 
    updatePrices();
 
-   auto symbolType = db.open<SymbolLengthTable>().getIndex<0>().get(key);
+   auto symbolType = db.open<SymbolLengthTable>().get(key);
    check(symbolType.has_value(), invalidSymbol);
 
    return *symbolType;
@@ -275,8 +275,7 @@ void SymbolSys::updatePrices()
 
 bool SymbolSys::exists(SID symbol)
 {
-   auto symOpt = db.open<SymbolTable>().getIndex<0>().get(symbol);
-   return symOpt.has_value();
+   return db.open<SymbolTable>().get(symbol).has_value();
 }
 
 PSIBASE_DISPATCH(UserService::SymbolSys)

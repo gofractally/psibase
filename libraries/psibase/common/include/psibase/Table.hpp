@@ -8,12 +8,14 @@
 #include <functional>
 #include <psibase/blob.hpp>
 #include <psibase/nativeFunctions.hpp>
+#include <psibase/serviceState.hpp>
 #include <psio/to_key.hpp>
 #include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
+
 
 namespace psibase
 {
@@ -669,6 +671,11 @@ namespace psibase
          return TableIndex<T, key_type>(db, std::move(index_prefix), Idx > 0);
       }
 
+      /// Look up table object by key using the first table index by default
+      auto get(auto key) const{
+         return getIndex<0>().get(key);
+      }
+
      private:
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
       {
@@ -716,6 +723,7 @@ namespace psibase
       ///
       /// `account` is the account the service runs on.
       explicit constexpr ServiceTables(AccountNumber account) : account(account) {}
+      ServiceTables() : account(getReceiver()) {}
 
       /// Open by table number
       ///

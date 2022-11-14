@@ -17,7 +17,7 @@ NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable>().getIndex<0>().get(SingletonKey{});
+      auto initRecord = db.open<InitTable>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -25,7 +25,7 @@ NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
 void NftSys::init()
 {
    auto initTable = db.open<InitTable>();
-   auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
+   auto init      = (initTable.get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
@@ -149,7 +149,7 @@ void NftSys::setUserConf(psibase::NamedBit flag, bool enable)
 
 NftRecord NftSys::getNft(NID nftId)
 {
-   auto nftRecord = db.open<NftTable>().getIndex<0>().get(nftId);
+   auto nftRecord = db.open<NftTable>().get(nftId);
    bool exists    = nftRecord.has_value();
 
    // Todo
@@ -167,7 +167,7 @@ NftRecord NftSys::getNft(NID nftId)
 
 NftHolderRecord NftSys::getNftHolder(AccountNumber account)
 {
-   auto nftHodler = db.open<NftHolderTable>().getIndex<0>().get(account);
+   auto nftHodler = db.open<NftHolderTable>().get(account);
 
    if (nftHodler.has_value())
    {
@@ -184,7 +184,7 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
 
 CreditRecord NftSys::getCredRecord(NID nftId)
 {
-   auto creditRecord = db.open<CreditTable>().getIndex<0>().get(nftId);
+   auto creditRecord = db.open<CreditTable>().get(nftId);
 
    if (creditRecord.has_value())
    {
@@ -200,12 +200,12 @@ CreditRecord NftSys::getCredRecord(NID nftId)
 
 bool NftSys::exists(NID nftId)
 {
-   return db.open<NftTable>().getIndex<0>().get(nftId).has_value();
+   return db.open<NftTable>().get(nftId).has_value();
 }
 
 bool NftSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
 {
-   auto hodler = db.open<NftHolderTable>().getIndex<0>().get(account);
+   auto hodler = db.open<NftHolderTable>().get(account);
    if (hodler.has_value() == false)
    {
       return false;
