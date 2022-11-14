@@ -33,6 +33,7 @@
   - [JSON](format/json.md)
   - [Schema](format/schema.md)
   - [fracpack](format/fracpack.md)
+- [Consensus Algorithms](consensus.md)
 - [HTTP and Javascript](http.md)
   - [Applets](applet/applets.md)
   - [Inter applet communication](applet/inter-applet-communication.md)
