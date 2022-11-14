@@ -149,12 +149,19 @@ void NftSys::setUserConf(psibase::NamedBit flag, bool enable)
 
 NftRecord NftSys::getNft(NID nftId)
 {
-   auto nftRecord = Tables().open<NftTable>().get(nftId);
+   auto nftIdx = Tables().open<NftTable>().getIndex<0>();
+   auto nftRecord = nftIdx.get(nftId);
    bool exists    = nftRecord.has_value();
 
-   // Todo
-   if (false)  // if (nftId < nextAvailableID()) // Then the NFt definitely existed at one point
+   auto nextAvailableId = [&](){
+      // Todo - replace with table.getNextAvailableKey() when available
+      return (nftIdx.begin() == nftIdx.end()) ? 1 : (*(--nftIdx.end())).id + 1;
+
+   };
+
+   if (nftId < nextAvailableId())
    {
+      // NFT definitely existed at one point
       check(exists, nftBurned);
    }
    else
