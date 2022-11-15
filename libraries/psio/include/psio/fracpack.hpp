@@ -134,7 +134,16 @@ namespace psio
    using offset_ptr = uint32_t;
 
    template <typename T>
-   constexpr uint16_t fracpack_fixed_size();
+   constexpr uint32_t fracpack_fixed_size_impl();
+
+   template <typename T>
+   constexpr uint16_t fracpack_fixed_size()
+   {
+      constexpr auto size = fracpack_fixed_size_impl<T>();
+      if constexpr (size > 0xffff)
+         T::fixed_size_is_too_big();
+      return size;
+   }
 
    /**
      *  A struct can be packed using memcpy if the following properties are true:
@@ -310,9 +319,8 @@ namespace psio
       }
    }
 
-   // TODO: BUG: this can overflow the uint16_t in some cases
    template <typename T>
-   constexpr uint16_t fracpack_fixed_size()
+   constexpr uint32_t fracpack_fixed_size_impl()
    {
       if constexpr (std::is_same_v<bool, T>)
          return 1;
@@ -324,26 +332,26 @@ namespace psio
          }
          else
          {
-            return fracpack_fixed_size<typename is_std_array<T>::value_type>() *
+            return fracpack_fixed_size_impl<typename is_std_array<T>::value_type>() *
                    is_std_array<T>::size;
          }
       }
       else if constexpr (is_std_tuple<T>::value)
       {
-         uint16_t fixed_size = 0;
-         tuple_foreach(T(),
-                       [&](const auto& x)
-                       {
-                          using member_type = std::decay_t<decltype(x)>;
-                          if constexpr (may_use_heap<member_type>())
-                          {
-                             fixed_size += 4;
-                          }
-                          else
-                          {
-                             fixed_size += fracpack_fixed_size<member_type>();
-                          }
-                       });
+         uint32_t fixed_size = 0;
+         tuple_foreach_type((T*)nullptr,
+                            [&](auto* x)
+                            {
+                               using member_type = std::decay_t<decltype(*x)>;
+                               if constexpr (may_use_heap<member_type>())
+                               {
+                                  fixed_size += 4;
+                               }
+                               else
+                               {
+                                  fixed_size += fracpack_fixed_size_impl<member_type>();
+                               }
+                            });
          return fixed_size;
       }
       else if constexpr (is_shared_view_ptr<T>::value)
@@ -368,7 +376,7 @@ namespace psio
       }
       else if constexpr (reflect<T>::is_struct)
       {
-         uint16_t size = 0;
+         uint32_t size = 0;
          reflect<T>::for_each(
              [&](const meta& ref, auto member)
              {
@@ -382,7 +390,7 @@ namespace psio
                    }
                    else
                    {
-                      size += fracpack_fixed_size<member_type>();
+                      size += fracpack_fixed_size_impl<member_type>();
                    }
                 }
              });
@@ -430,26 +438,26 @@ namespace psio
       {
          bool     found_optional = false;
          uint32_t fixed_size     = 0;
-         tuple_foreach(T(),
-                       [&](const auto& x)
-                       {
-                          using member_type = std::decay_t<decltype(x)>;
-                          if constexpr (is_std_optional<member_type>())
-                          {
-                             found_optional = true;
-                          }
-                          if (not found_optional)
-                          {
-                             if constexpr (may_use_heap<member_type>())
-                             {
-                                fixed_size += 4;
-                             }
-                             else
-                             {
-                                fixed_size += fracpack_fixed_size<member_type>();
-                             }
-                          }
-                       });
+         tuple_foreach_type((T*)nullptr,
+                            [&](auto* x)
+                            {
+                               using member_type = std::decay_t<decltype(*x)>;
+                               if constexpr (is_std_optional<member_type>())
+                               {
+                                  found_optional = true;
+                               }
+                               if (not found_optional)
+                               {
+                                  if constexpr (may_use_heap<member_type>())
+                                  {
+                                     fixed_size += 4;
+                                  }
+                                  else
+                                  {
+                                     fixed_size += fracpack_fixed_size<member_type>();
+                                  }
+                               }
+                            });
       }
       return fracpack_fixed_size<T>();
    }
