@@ -359,6 +359,10 @@ namespace psio
              });
          return use_heap;
       }
+      else
+      {
+         T::known_members_may_use_heap_undefined;
+      }
    }
 
    // TODO: BUG: this can overflow the uint16_t in some cases
