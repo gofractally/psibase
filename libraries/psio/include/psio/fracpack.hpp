@@ -267,9 +267,12 @@ namespace psio
              [&](const psio::meta& ref, auto member)
              {
                 using MemPtr = decltype(member(std::declval<T*>()));
-                using member_type =
-                    std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
-                is_flat &= not may_use_heap<member_type>();
+                if constexpr (!std::is_member_function_pointer_v<MemPtr>)
+                {
+                   using member_type =
+                       std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
+                   is_flat &= not may_use_heap<member_type>();
+                }
              });
          return not is_flat;
       }
@@ -715,8 +718,12 @@ namespace psio
 
          /// no need to write start_heap, it is always the same because
          /// the structure is "fixed" and cannot be extended in the future
-         reflect<T>::for_each([&](const meta& ref, auto member)
-                              { fracpack_member(heap, v, member(&v), stream); });
+         reflect<T>::for_each(
+             [&](const meta& ref, auto member)
+             {
+                if constexpr (!std::is_member_function_pointer_v<decltype(member(&v))>)
+                   fracpack_member(heap, v, member(&v), stream);
+             });
 
          if constexpr (not std::is_same_v<size_stream, S>)
             stream.pos = heap;
@@ -956,8 +963,9 @@ namespace psio
          reflect<T>::for_each(
              [&](const meta& ref, auto member)
              {
-                if (stream.pos < heap)
-                   fracunpack_member(v, member(&v), stream);
+                if constexpr (!std::is_member_function_pointer_v<decltype(member(&v))>)
+                   if (stream.pos < heap)
+                      fracunpack_member(v, member(&v), stream);
              });
       }
       else
