@@ -799,6 +799,15 @@ namespace psibase
       return ok;
    }  // gql_query(EventDecoder)
 
+   template <typename T>
+   concept EventType = requires (T events)
+   {
+      typename decltype(events)::History;
+      // Don't require Ui and Merkle for now
+      //typename decltype(events)::Ui;
+      //typename decltype(events)::Merkle;
+   };
+
    /// GraphQL support for decoding multiple events
    ///
    /// If a GraphQL query function returns this type, then the system
@@ -881,7 +890,7 @@ namespace psibase
    ///   }
    /// }
    /// ```
-   template <typename Events>
+   template <EventType Events>
    struct EventQuery
    {
       AccountNumber service;
