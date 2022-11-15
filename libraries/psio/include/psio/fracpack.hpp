@@ -232,64 +232,6 @@ namespace psio
       return false;
    }
 
-   /**
-     *  The number of fields on the struct cannot be extended because
-     *  the struct is definitionWillNotChange(), and all members are 
-     *  either heap allocated or definitionWillNotChange(), .
-     */
-   template <typename T>
-   constexpr bool is_fixed_structure()
-   {
-      if constexpr (is_std_array<T>::value)
-         return true;  /// number of fields is constant
-      if constexpr (is_std_optional<T>::value)
-         return true;  /// always the size of an offset
-      else if constexpr (is_std_variant<T>::value)
-         return false;  /// why isn't this true... type size heap_data[size]
-      else if constexpr (is_std_tuple<T>::value)
-         return false;  /// this type is extensible...
-      else if constexpr (is_shared_view_ptr<T>::value)
-         return is_fixed_structure<typename is_shared_view_ptr<T>::value_type>();
-      else if constexpr (can_memcpy<T>())
-         return true;
-      else if constexpr (std::is_same_v<std::string, T>)
-         return true;
-      else if constexpr (is_std_vector<T>::value)
-         return true;  // size followed by heap
-      else if constexpr (psio::reflect<T>::is_struct)
-      {
-         if (not psio::reflect<T>::definitionWillNotChange)
-         {
-            static_assert(not has_non_optional_after_optional<T>(),
-                          "extendable types must not have non-optional after optional member");
-            return false;
-         }
-         bool is_fixed = true;
-         psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto member)
-             {
-                using MemPtr = decltype(member(std::declval<T*>()));
-                if constexpr (not std::is_member_function_pointer_v<MemPtr>)
-                {
-                   using member_type =
-                       std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
-                   is_fixed &= is_fixed_structure<member_type>();
-                }
-             });
-         return is_fixed;
-      }
-      else
-      {
-         &T::is_fixed_structure;
-      }
-   }
-
-   template <typename T>
-   constexpr bool is_ext_structure()
-   {
-      return !is_fixed_structure<T>();
-   }
-
    /** 
      *  Recursively checks the types for any field which requires dynamic allocation,
      */
@@ -758,7 +700,7 @@ namespace psio
          //       std::cout << "packing struct at: " << stream.consumed() <<"\n";
          //  std::cout << "packing struct: \n";
          uint16_t start_heap = fracpack_fixed_size<T>();
-         if constexpr (not psio::reflect<T>::definitionWillNotChange)  //is_ext_structure<T>())
+         if constexpr (not psio::reflect<T>::definitionWillNotChange)
          {
             //           std::cout << "ext struct heap: " <<start_heap<<"\n";
             stream.write(&start_heap, sizeof(start_heap));
@@ -1002,7 +944,7 @@ namespace psio
       else if constexpr (reflect<T>::is_struct)
       {
          uint16_t start_heap = fracpack_fixed_size<T>();
-         if constexpr (not psio::reflect<T>::definitionWillNotChange)  //is_ext_structure<T>())
+         if constexpr (not psio::reflect<T>::definitionWillNotChange)
          {
             stream.read(&start_heap, sizeof(start_heap));
          }
@@ -1649,8 +1591,6 @@ namespace psio
          constexpr uint32_t offset = psio::get_tuple_offset<idx, tuple_type>::value +
                                      2 * (not psio::reflect<class_type>::definitionWillNotChange);
 
-         //psio::is_ext_structure<class_type>());  // the 2 bytes that point to expected start of heap if it cannot be assumed
-
          auto out_ptr = buffer + offset;
 
          if constexpr (is_std_optional<member_type>::value)
@@ -1658,7 +1598,7 @@ namespace psio
             using opt_type        = typename is_std_optional<member_type>::value_type;
             using const_view_type = const_view<opt_type>;
 
-            if constexpr (is_ext_structure<class_type>())
+            if constexpr (!psio::reflect<class_type>::definitionWillNotChange)
             {
                uint16_t start_heap = *reinterpret_cast<const unaligned_type<uint16_t>*>(buffer);
                if (start_heap < offset + 2)
@@ -1714,7 +1654,7 @@ namespace psio
             using opt_type  = typename is_std_optional<member_type>::value_type;
             using view_type = view<opt_type>;
 
-            if constexpr (is_ext_structure<class_type>())
+            if constexpr (!psio::reflect<class_type>::definitionWillNotChange)
             {
                uint16_t start_heap = *reinterpret_cast<unaligned_type<uint16_t>*>(buffer);
                if (start_heap < offset + 2)
@@ -2595,9 +2535,6 @@ namespace psio
 
    template <typename... Args>
    constexpr auto tuple_remove_view(std::tuple<Args...>) -> std::tuple<remove_view_t<Args>...>;
-
-   /// TODO: remove is_fixed_structure and is_ext_structure they are not being used properly
-   ///       and are likely poorly defined
 
    template <typename T>
    std::vector<char> to_frac(const T& v)
