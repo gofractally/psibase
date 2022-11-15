@@ -513,6 +513,8 @@ namespace psio
                      return;
                   }
                }
+               if constexpr (is_shared_view_ptr<opt_type>::value)
+                  T::undefined_fracpack_member();
                pack_on_heap(*member);
             }
             return;
@@ -758,6 +760,8 @@ namespace psio
             stream.read(&offset, sizeof(offset));
 
             using opt_type = typename is_std_optional<T>::value_type;
+            if constexpr (is_shared_view_ptr<opt_type>::value)
+               T::undefined_fracunpack_member();
 
             if (offset == 0)
             {
@@ -1214,6 +1218,8 @@ namespace psio
                else
                {
                   using opt_member_type = typename is_std_optional<MemberType>::value_type;
+                  if constexpr (is_shared_view_ptr<opt_member_type>::value)
+                     MemberType::undefined_fracvalidate_member();
                   fracvalidate_offset<opt_member_type>(offset, memptr, stream);
                }
             }
