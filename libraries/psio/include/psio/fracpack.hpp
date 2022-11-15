@@ -571,19 +571,14 @@ namespace psio
             }
             return;
          }
-         /** shared views are packed as if there was not a pointer, they are not
-          *  nullable because the view/unpack functions don't have a way to represent
-          *  a null shared view ptr.
-          */
+         // shared_view_ptr<T>, where may_use_heap<T> == true, is
+         // packed as if it was a vector<char> containing a packed
+         // T. It is not nullable.
          else if constexpr (is_shared_view_ptr<T>::value)
          {
             if (member.size() == 0)
             {
                abort_error("shared_view_ptr is not allowed to be null");
-               /*
-               uint32_t offset = 0;
-               stream.write(&offset, sizeof(offset));
-               */
                return;
             }
          }
@@ -618,7 +613,10 @@ namespace psio
    template <typename T, typename S>
    void fracpack(const shared_view_ptr<T>& v, S& stream)
    {
-      stream.write(v.data_with_size_prefix().data(), v.data_with_size_prefix().size());
+      if constexpr (may_use_heap<T>())
+         stream.write(v.data_with_size_prefix().data(), v.data_with_size_prefix().size());
+      else
+         T::fracpack_not_defined();
    }
 
    template <typename S>
@@ -927,6 +925,8 @@ namespace psio
       }
       else if constexpr (is_shared_view_ptr<T>::value)
       {
+         if constexpr (!may_use_heap<typename is_shared_view_ptr<T>::value_type>())
+            T::fracunpack_not_defined;
          v.reset();
          uint32_t size;
          stream.read((char*)&size, sizeof(size));
@@ -1315,13 +1315,17 @@ namespace psio
       }
       else if constexpr (is_shared_view_ptr<T>::value)
       {
+         if constexpr (!may_use_heap<typename is_shared_view_ptr<T>::value_type>())
+            T::fracvalidate_not_defined;
          if ((stream.valid = (stream.end - stream.begin >= 4)))
          {
             std::uint32_t size;
             std::memcpy(&size, stream.begin, sizeof(size));
             stream.pos += sizeof(size) + size;
-            stream.heap = stream.pos;
-            stream.valid = fracvalidate<typename is_shared_view_ptr<T>::value_type>(stream.begin + 4, stream.pos).valid;
+            stream.heap  = stream.pos;
+            stream.valid = fracvalidate<typename is_shared_view_ptr<T>::value_type>(
+                               stream.begin + 4, stream.pos)
+                               .valid;
          }
          return stream;
       }
