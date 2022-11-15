@@ -467,13 +467,6 @@ namespace psio
 
    using char_ptr = char*;
 
-   template <typename T, typename P, typename S>
-   void fracpack_member(char_ptr& heap, const T& member, P ptr, S& stream)
-   {
-      if constexpr (not std::is_member_function_pointer_v<P>)
-         fracpack_member(heap, member.*ptr, stream);
-   }
-
    /**
      *  used to pack a member of a struct or vector
      */
@@ -730,7 +723,7 @@ namespace psio
              [&](const meta& ref, auto member)
              {
                 if constexpr (!std::is_member_function_pointer_v<decltype(member(&v))>)
-                   fracpack_member(heap, v, member(&v), stream);
+                   fracpack_member(heap, v.*member(&v), stream);
              });
 
          if constexpr (not std::is_same_v<size_stream, S>)
@@ -748,13 +741,6 @@ namespace psio
    void fracunpack(T& v, S& stream);
    template <typename T, typename S>
    void fraccheck(S& stream);
-
-   template <typename T, typename P, typename S>
-   void fracunpack_member(T& member, P ptr, S& stream)
-   {
-      if constexpr (not std::is_member_function_pointer_v<P>)
-         fracunpack_member(member.*ptr, stream);
-   }
 
    template <typename S>
    void fracunpack(bool& v, S& stream)
@@ -973,7 +959,7 @@ namespace psio
              {
                 if constexpr (!std::is_member_function_pointer_v<decltype(member(&v))>)
                    if (stream.pos < heap)
-                      fracunpack_member(v, member(&v), stream);
+                      fracunpack_member(v.*member(&v), stream);
              });
       }
       else
