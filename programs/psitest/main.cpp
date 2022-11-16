@@ -184,19 +184,33 @@ struct test_chain
       auto producer = psibase::AccountNumber("firstproducer");
       auto status =
           blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
-      if (status.has_value() && status->current.blockNum > 3)
+      if (status.has_value())
       {
-         // TODO - remove the requirement that blockNum > 3 once block producers can be set in the
-         //  genesis block in DefaultTestChain
-         auto       smallestAcc = psibase::AccountNumber{0};
-         const auto key         = psio::convert_to_key(psibase::producerConfigKey(smallestAcc));
-         size_t     keySize     = sizeof(psibase::NativeTableNum);
-         auto       prodCfg =
-             blockContext->db.kvGreaterEqualRaw(psibase::DbId::nativeConstrained, key, keySize);
-
-         psibase::check(prodCfg.has_value(), "producer has not been set");
-         auto row = psio::convert_from_frac<psibase::ProducerConfigRow>(prodCfg->value);
-         producer = row.producerName;
+         if (status->nextConsensus)
+         {
+            std::visit(
+                [&](const auto& c)
+                {
+                   if (!c.producers.empty())
+                   {
+                      producer = c.producers.front().name;
+                   }
+                },
+                std::get<0>(*status->nextConsensus));
+         }
+         if (!status->nextConsensus ||
+             status->current.commitNum < std::get<1>(*status->nextConsensus))
+         {
+            std::visit(
+                [&](const auto& c)
+                {
+                   if (!c.producers.empty())
+                   {
+                      producer = c.producers.front().name;
+                   }
+                },
+                status->consensus);
+         }
       }
 
       blockContext->start(time, producer);
