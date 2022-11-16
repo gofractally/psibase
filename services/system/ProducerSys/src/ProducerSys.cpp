@@ -47,14 +47,22 @@ namespace SystemService
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
+   std::size_t getThreshold(const CftConsensus& bft)
+   {
+      return bft.producers.size() / 2 + 1;
+   }
+
+   std::size_t getThreshold(const BftConsensus& bft)
+   {
+      return bft.producers.size() * 2 / 3 + 1;
+   }
+
    void ProducerSys::checkAuthSys(uint32_t                    flags,
                                   psibase::AccountNumber      requester,
                                   psibase::Action             action,
                                   std::vector<ServiceMethod>  allowedActions,
                                   std::vector<psibase::Claim> claims)
    {
-      Table<ProducerConfigRow, &ProducerConfigRow::key> t(ProducerConfigRow::db,
-                                                          std::vector<char>{});
       // verify that all claims are valid
 
       // Standard verification for auth type
@@ -72,19 +80,28 @@ namespace SystemService
          abortMessage("unsupported auth type");
 
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
-      //
+
       std::vector<psibase::Claim> expectedClaims;
-      for (auto row : t.getIndex<0>().subindex(producerConfigTable))
-      {
-         expectedClaims.push_back(row.producerAuth);
-      }
+      std::visit(
+          [&](auto& c)
+          {
+             for (const auto& [name, auth] : c.producers)
+             {
+                expectedClaims.push_back(auth);
+             }
+          },
+          status->consensus);
       std::sort(expectedClaims.begin(), expectedClaims.end(), compare_claim);
       std::sort(claims.begin(), claims.end(), compare_claim);
       std::vector<psibase::Claim> relevantClaims;
       std::set_intersection(claims.begin(), claims.end(), expectedClaims.begin(),
                             expectedClaims.end(), std::back_inserter(relevantClaims),
                             compare_claim);
-      auto threshold = expectedClaims.empty() ? 0 : expectedClaims.size() * 2 / 3 + 1;
+
+      auto threshold =
+          expectedClaims.empty()
+              ? 0
+              : std::visit([](const auto& c) { return getThreshold(c); }, status->consensus);
       if (relevantClaims.size() < threshold)
       {
          abortMessage("runAs: have " + std::to_string(relevantClaims.size()) + "/" +
