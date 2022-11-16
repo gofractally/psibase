@@ -530,10 +530,17 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
 using timer_type = boost::asio::system_timer;
 
 template <typename Derived>
-using cft_consensus = basic_cft_consensus<Derived, timer_type>;
+using cft_consensus = basic_cft_consensus<blocknet<Derived, timer_type>, timer_type>;
 
 template <typename Derived>
-using bft_consensus = basic_bft_consensus<Derived, timer_type>;
+using bft_consensus = basic_bft_consensus<blocknet<Derived, timer_type>, timer_type>;
+
+template <typename Derived, typename Timer>
+using basic_consensus =
+    basic_bft_consensus<basic_cft_consensus<blocknet<Derived, Timer>, Timer>, Timer>;
+
+template <typename Derived>
+using consensus = basic_consensus<Derived, timer_type>;
 
 void run(const std::string&              db_path,
          AccountNumber                   producer,
@@ -581,7 +588,7 @@ void run(const std::string&              db_path,
 
    boost::asio::io_context chainContext;
 
-   using node_type = node<peer_manager, direct_routing, cft_consensus, ForkDb>;
+   using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
    node_type node(chainContext, system.get(), std::move(prover));
    node.set_producer_id(producer);
    node.load_producers();

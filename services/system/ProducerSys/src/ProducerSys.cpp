@@ -12,22 +12,39 @@ namespace
 
 namespace SystemService
 {
-
-   void ProducerSys::setProducers(std::vector<psibase::ProducerConfigRow> prods)
+   void ProducerSys::setConsensus(psibase::Consensus consensus)
    {
       check(getSender() == getReceiver(), "sender must match service account");
-      constexpr auto db = ProducerConfigRow::db;
-      // Remove existing producer rows
-      TableIndex<ProducerConfigRow, decltype(prods[0].key())> idx(db, std::vector<char>{}, false);
-      for (auto row : idx.subindex(producerConfigTable))
-      {
-         kvRemove(db, row.key());
-      }
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      std::visit([](const auto& c)
+                 { check(!c.producers.empty(), "There must be at least one producer"); },
+                 consensus);
+      check(!!status, "Missing status row");
+      check(
+          !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
+          "Consensus update pending");
+      status->nextConsensus = std::tuple(std::move(consensus), status->current.blockNum);
+      psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
+   }
 
-      for (const auto& row : prods)
-      {
-         kvPut(db, row.key(), row);
-      }
+   void ProducerSys::setProducers(std::vector<psibase::Producer> prods)
+   {
+      check(getSender() == getReceiver(), "sender must match service account");
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      check(!prods.empty(), "There must be at least one producer");
+      check(!!status, "Missing status row");
+      check(
+          !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
+          "Consensus update pending");
+      status->nextConsensus = std::tuple(std::visit(
+                                             [&](auto old)
+                                             {
+                                                old.producers = std::move(prods);
+                                                return Consensus{std::move(old)};
+                                             },
+                                             status->consensus),
+                                         status->current.blockNum);
+      psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
    void ProducerSys::checkAuthSys(uint32_t                    flags,
@@ -54,6 +71,7 @@ namespace SystemService
       else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
       //
       std::vector<psibase::Claim> expectedClaims;
       for (auto row : t.getIndex<0>().subindex(producerConfigTable))

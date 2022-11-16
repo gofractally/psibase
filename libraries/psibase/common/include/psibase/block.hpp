@@ -119,6 +119,25 @@ namespace psibase
    };
    PSIO_REFLECT(Producer, name, auth);
 
+   struct CftConsensus
+   {
+      std::vector<Producer> producers;
+   };
+   PSIO_REFLECT(CftConsensus, producers);
+
+   struct BftConsensus
+   {
+      std::vector<Producer> producers;
+   };
+   PSIO_REFLECT(BftConsensus, producers);
+
+   using Consensus = std::variant<CftConsensus, BftConsensus>;
+
+   inline auto get_gql_name(Consensus*)
+   {
+      return "Consensus";
+   }
+
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Producer & Rotation
    // TODO: Consensus fields
@@ -134,15 +153,12 @@ namespace psibase
       TermNum       term;
       BlockNum      commitNum;
 
-      // If newProducers is set, activates joint consensus when
-      // this block becomes irreversible.  If joint consensus
-      // was already active, replaces newProducers instead.
-      // Joint consensus exits when either the most recent
-      // block to change producers becomes irreversible or
-      // the newProducers are set to the existing producers.
-      std::optional<std::vector<Producer>> newProducers;
+      // If newConsensus is set, activates joint consensus on
+      // this block. Joint consensus must not be active already.
+      // Joint consensus ends after this block becomes irreversible.
+      std::optional<Consensus> newConsensus;
    };
-   PSIO_REFLECT(BlockHeader, previous, blockNum, time, producer, term, commitNum, newProducers)
+   PSIO_REFLECT(BlockHeader, previous, blockNum, time, producer, term, commitNum, newConsensus)
 
    // TODO: switch fields to shared_view_ptr?
    struct Block

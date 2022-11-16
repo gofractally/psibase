@@ -36,12 +36,29 @@ namespace psibase
    };
    PSIO_REFLECT(ExtendedBlockId, _id, _num)
 
+   enum class ConsensusAlgorithm : std::uint8_t
+   {
+      cft,
+      bft
+   };
+   std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const CftConsensus& c)
+   {
+      return {ConsensusAlgorithm::cft, c.producers};
+   }
+   std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const BftConsensus& c)
+   {
+      return {ConsensusAlgorithm::bft, c.producers};
+   }
+
    struct ProducerSet
    {
+      ConsensusAlgorithm                               algorithm;
       boost::container::flat_map<AccountNumber, Claim> activeProducers;
       ProducerSet() = default;
-      ProducerSet(const std::vector<Producer>& prods)
+      ProducerSet(const Consensus& c)
       {
+         const auto& [alg, prods] = std::visit([](auto& c) { return split(c); }, c);
+         algorithm                = alg;
          decltype(activeProducers)::sequence_type result;
          for (const auto& [name, claim] : prods)
          {
@@ -79,6 +96,18 @@ namespace psibase
       }
       std::size_t size() const { return activeProducers.size(); }
       friend bool operator==(const ProducerSet&, const ProducerSet&) = default;
+      std::size_t threshold() const
+      {
+         if (algorithm == ConsensusAlgorithm::cft)
+         {
+            return activeProducers.size() / 2 + 1;
+         }
+         else
+         {
+            assert(algorithm == ConsensusAlgorithm::bft);
+            return activeProducers.size() * 2 / 3 + 1;
+         }
+      }
    };
 
    struct BlockHeaderState
@@ -111,10 +140,10 @@ namespace psibase
          }
          else
          {
-            producers = std::make_shared<ProducerSet>(status->producers);
-            if (status->nextProducers)
+            producers = std::make_shared<ProducerSet>(status->consensus);
+            if (status->nextConsensus)
             {
-               const auto& [prods, num] = *status->nextProducers;
+               const auto& [prods, num] = *status->nextConsensus;
                nextProducers            = std::make_shared<ProducerSet>(prods);
                nextProducersBlockNum    = num;
             }
@@ -136,9 +165,9 @@ namespace psibase
          {
             producers = std::move(nextProducers);
          }
-         if (info.header.newProducers)
+         if (info.header.newConsensus)
          {
-            nextProducers = std::make_shared<ProducerSet>(*info.header.newProducers);
+            nextProducers = std::make_shared<ProducerSet>(*info.header.newConsensus);
             // N.B. joint consensus with two identical producer sets
             // is functionally indistinguishable from non-joint consensus.
             // Don't both detecting this case here.
@@ -181,6 +210,11 @@ namespace psibase
       const Checksum256& blockId() const { return info.blockId; }
       ExtendedBlockId    xid() const { return ExtendedBlockId{blockId(), blockNum()}; }
    };
+
+   ExtendedBlockId orderToXid(const auto& order)
+   {
+      return ExtendedBlockId{std::get<2>(order), std::get<1>(order)};
+   }
 
    class ForkDb
    {
@@ -322,6 +356,7 @@ namespace psibase
                iter = byOrderIndex.erase(iter);
             }
          }
+         assert(!byOrderIndex.empty());
       }
 
       template <typename F, typename Accept>
@@ -438,7 +473,7 @@ namespace psibase
       }
 
       // removes blocks and states before irreversible
-      void gc()
+      void gc(auto&& f)
       {
          for (auto iter = blocks.begin(), end = blocks.end(); iter != end;)
          {
@@ -449,6 +484,7 @@ namespace psibase
                 (blockNum > commitIndex &&
                  states.find(iter->second->block()->header()->previous()) == states.end()))
             {
+               f(iter->first);
                auto state_iter = states.find(iter->first);
                if (state_iter != states.end())
                {
@@ -462,6 +498,7 @@ namespace psibase
                ++iter;
             }
          }
+         assert(!byOrderIndex.empty());
          byBlocknumIndex.erase(byBlocknumIndex.begin(), byBlocknumIndex.find(commitIndex));
       }
 
@@ -625,6 +662,7 @@ namespace psibase
             states.emplace();
             head = &states.begin()->second;
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
+            byOrderIndex.insert({head->order(), head->blockId()});
             head->revision = systemContext->sharedDatabase.getHead();
          }
          else
