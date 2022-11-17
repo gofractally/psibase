@@ -356,7 +356,7 @@ namespace psio
       }
       else if constexpr (is_shared_view_ptr<T>::value)
       {
-         return fracpack_fixed_size<typename is_shared_view_ptr<T>::value_type>();
+         T::undefined_fracpack_fixed_size();
       }
       else if constexpr (is_std_optional<T>::value)
       {
