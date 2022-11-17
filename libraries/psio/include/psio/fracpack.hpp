@@ -742,6 +742,7 @@ namespace psio
    template <typename T, typename S>
    void fraccheck(S& stream);
 
+   // TODO: does validation check for 0 or 1? Should we drop that restriction?
    template <typename S>
    void fracunpack(bool& v, S& stream)
    {
@@ -764,8 +765,10 @@ namespace psio
             if constexpr (is_shared_view_ptr<opt_type>::value)
                T::undefined_fracunpack_member();
 
+            // TODO: does validation make sure 2,3 aren't used?
             if (offset == 0)
             {
+               // TODO: does validation make sure it's a string, vector, or shared_view_ptr (only may_use_heap)?
                member = opt_type();
             }
             else if (offset >= 4)
@@ -786,6 +789,7 @@ namespace psio
             {
                S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
                fracunpack(member, insubstream);
+               // TODO: Does validation check the inner content or leave it to the caller?
             }
             else
                member.reset();
@@ -796,10 +800,12 @@ namespace psio
             stream.read(&offset, sizeof(offset));
             if (offset >= 4)
             {
+               // TODO: Does validation make sure inner size isn't 0? Should that rule be kept?
                S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
                fracunpack(member, insubstream);
             }
             else
+               // TODO: Does validation make sure 2,3 aren't used?
                member.resize(0);
          }
          else
@@ -870,12 +876,14 @@ namespace psio
          tuple_foreach(v,
                        [&](auto& x)
                        {
+                          // TODO: does validation check that non-optional isn't truncated?
                           if (stream.pos < heap)
                              fracunpack_member(x, stream);
                        });
       }
       else if constexpr (is_shared_view_ptr<T>::value)
       {
+         // TODO: does validation check the inner or leave it to the caller?
          if constexpr (!may_use_heap<typename is_shared_view_ptr<T>::value_type>())
             T::fracunpack_not_defined;
          v.reset();
@@ -899,6 +907,7 @@ namespace psio
          }
          else
          {
+            // TODO: Does validation check size != 0?
             stream.skip(size);
          }
       }
@@ -915,6 +924,7 @@ namespace psio
 
             uint32_t size;
             stream.read((char*)&size, sizeof(size));
+            // TODO: Does validation check (size % fix_size) == 0? Could cause memory overrun.
             uint32_t s = size / fix_size;
             v.resize(s);
             if (s > 0)
@@ -927,6 +937,7 @@ namespace psio
                fix_size = sizeof(offset_ptr);
             uint32_t size;
             stream.read(&size, sizeof(size));
+            // TODO: Does validation check (size % fix_size) == 0? Could cause memory overrun.
             auto elem = size / fix_size;
             v.resize(elem);
             for (auto& e : v)
@@ -951,6 +962,7 @@ namespace psio
          uint16_t start_heap = fracpack_fixed_size<T>();
          if constexpr (not psio::reflect<T>::definitionWillNotChange)
          {
+            // TODO: does validation check this won't overrun?
             stream.read(&start_heap, sizeof(start_heap));
          }
          const char* heap = stream.pos + start_heap;
@@ -1248,6 +1260,8 @@ namespace psio
     * @pre e > b
     */
    // TODO: incorrectly validates PsiBase::PublicKey when variant's size field is smaller than it should be
+   // TODO: fix buffer overruns which happen throughout the validation code
+   // TODO: optional<optional<T>> offset 0 is always invalid, but not checked
    template <typename T>
    check_stream fracvalidate(const char* b, const char* e)
    {
