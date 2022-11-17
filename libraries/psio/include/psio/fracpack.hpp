@@ -2009,8 +2009,8 @@ namespace psio
          }
       }
 
-      inline char*    data() const { return pos; }
-      inline uint32_t data_size() const { return S * fracpack_fixed_size<T>(); }
+      inline char*    bytes() const { return pos; }
+      inline uint32_t bytes_size() const { return S * fracpack_fixed_size<T>(); }
 
       bool valid() const { return pos != nullptr; }
 
@@ -2049,8 +2049,8 @@ namespace psio
          }
       }
 
-      inline const char* data() const { return pos; }
-      inline uint32_t    data_size() const { return S * fracpack_fixed_size<T>(); }
+      inline const char* bytes() const { return pos; }
+      inline uint32_t    bytes_size() const { return S * fracpack_fixed_size<T>(); }
 
       bool valid() const { return pos != nullptr; }
 
