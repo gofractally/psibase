@@ -1871,6 +1871,7 @@ namespace psio
       const char* pos;
    };
 
+   /* Bugged; views don't point at an offset pointer
    template <typename T>
    struct view<shared_view_ptr<T>>
    {
@@ -1929,6 +1930,7 @@ namespace psio
      private:
       const char* pos;
    };
+   */
 
    /// TODO: specialize this based on whether T is memcpyable and ensure
    /// so that data() and data_size() return types that are proper (e.g. unaligned_type<T>*) and factor
