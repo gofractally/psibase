@@ -1564,6 +1564,9 @@ namespace psio
    template <typename T>
    auto get_offset(char* pos)
    {
+      if constexpr (is_std_optional<T>::value)
+         // views mix Option<T> with T; this function mishandles that.
+         T::this_case_is_broken();
       uint32_t off = *reinterpret_cast<unaligned_type<uint32_t>*>(pos);
       if constexpr (std::is_same_v<std::string, T> || is_std_vector<T>::value)
       {
@@ -1577,6 +1580,9 @@ namespace psio
    template <typename T>
    auto get_offset(const char* pos)
    {
+      if constexpr (is_std_optional<T>::value)
+         // views mix Option<T> with T; this function mishandles that.
+         T::this_case_is_broken();
       uint32_t off = *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
       if constexpr (std::is_same_v<std::string, T> || is_std_vector<T>::value)
       {
@@ -2192,6 +2198,8 @@ namespace psio
          {
             if constexpr (is_std_optional<element_type>::value)
             {
+               // views mix Option<T> with T; this function mishandles that.
+               element_type::this_case_is_broken();
                if (i_offset + 4 > start_heap)
                   return view<element_type>(nullptr);
                if (reinterpret_cast<unaligned_type<uint32_t>*>(pos + sizeof(start_heap) + i_offset)
@@ -2231,7 +2239,7 @@ namespace psio
    template <typename... Ts>
    struct const_view<std::tuple<Ts...>>
    {
-      using tuple_type = std::tuple<Ts...>;
+      using tuple_type = std::tuple<typename remove_view<Ts>::type...>;
       const_view(const char* p = nullptr) : pos(p) {}
       const_view(view<std::tuple<Ts...>> v) : pos(v.pos) {}
 
@@ -2247,6 +2255,8 @@ namespace psio
          {
             if constexpr (is_std_optional<element_type>::value)
             {
+               // views mix Option<T> with T; this function mishandles that.
+               element_type::this_case_is_broken();
                if (i_offset + 4 > start_heap)
                   return view<element_type>(nullptr);
                if (reinterpret_cast<unaligned_type<uint32_t>*>(pos + sizeof(start_heap) + i_offset)
