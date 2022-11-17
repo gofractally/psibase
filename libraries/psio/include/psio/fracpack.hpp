@@ -1943,11 +1943,11 @@ namespace psio
          if constexpr (not may_use_heap<T>())
          {
             constexpr uint16_t fix_size = fracpack_fixed_size<T>();
-            return data_size() / fix_size;
+            return bytes_size() / fix_size;
          }
          else
          {
-            return data_size() / 4;
+            return bytes_size() / 4;
          }
       }
 
@@ -1963,8 +1963,9 @@ namespace psio
          }
       }
 
-      inline char*    data() const { return pos + sizeof(uint32_t); }
-      inline uint32_t data_size() const
+      inline char* bytes() const { return pos + sizeof(uint32_t); }
+
+      inline uint32_t bytes_size() const
       {
          return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
       }
@@ -2080,11 +2081,11 @@ namespace psio
          if constexpr (not may_use_heap<T>())
          {
             constexpr uint16_t fix_size = fracpack_fixed_size<T>();
-            return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / fix_size;
+            return bytes_size() / fix_size;
          }
          else
          {
-            return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos) / 4;
+            return bytes_size() / 4;
          }
       }
 
@@ -2100,8 +2101,8 @@ namespace psio
          }
       }
 
-      inline const char* data() const { return pos + sizeof(uint32_t); }
-      inline uint32_t    data_size() const
+      inline const char* bytes() const { return pos + sizeof(uint32_t); }
+      inline uint32_t    bytes_size() const
       {
          return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
       }

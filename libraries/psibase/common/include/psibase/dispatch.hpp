@@ -48,9 +48,9 @@ namespace psibase
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
 
-             auto param_data = act->rawData()->data();
+             auto param_data = act->rawData()->bytes();
              psibase::check(
-                 psio::fracvalidate<param_tuple>(param_data, param_data + act->rawData()->size())
+                 psio::fracvalidate<param_tuple>(param_data, param_data + act->rawData()->bytes_size())
                      .valid,
                  "invalid argument encoding");
              psio::const_view<param_tuple> param_view(param_data);
