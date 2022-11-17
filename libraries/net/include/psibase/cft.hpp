@@ -20,10 +20,9 @@ namespace psibase::net
 {
    // This protocol is based on RAFT, with some simplifications.
    // i.e. the blockchain structure is sufficient to guarantee log matching.
-   template <typename Derived, typename Timer>
-   struct basic_cft_consensus : blocknet<Derived, Timer>
+   template <typename Base, typename Timer>
+   struct basic_cft_consensus : Base
    {
-      using Base      = blocknet<Derived, Timer>;
       using block_num = std::uint32_t;
 
       using Base::_state;
@@ -32,6 +31,7 @@ namespace psibase::net
       using Base::current_term;
       using Base::for_each_key;
       using Base::is_producer;
+      using Base::logger;
       using Base::network;
       using Base::recv;
       using Base::self;
@@ -46,8 +46,6 @@ namespace psibase::net
       template <typename ExecutionContext>
       explicit basic_cft_consensus(ExecutionContext& ctx) : Base(ctx), _election_timer(ctx)
       {
-         logger.add_attribute("Channel",
-                              boost::log::attributes::constant(std::string("consensus")));
       }
 
       producer_id              voted_for = null_producer;
@@ -57,8 +55,6 @@ namespace psibase::net
       std::chrono::milliseconds _timeout = std::chrono::seconds(3);
 
       std::vector<block_num> match_index[2];
-
-      loggers::common_logger logger;
 
       struct append_entries_response
       {
@@ -122,19 +118,43 @@ namespace psibase::net
          }
       };
 
-      using message_type = std::variant<hello_request,
-                                        hello_response,
-                                        append_entries_request,
-                                        append_entries_response,
-                                        request_vote_request,
-                                        request_vote_response>;
+      using message_type = boost::mp11::mp_push_back<typename Base::message_type,
+                                                     append_entries_response,
+                                                     request_vote_request,
+                                                     request_vote_response>;
+
+      void cancel()
+      {
+         _election_timer.cancel();
+         match_index[0].clear();
+         match_index[1].clear();
+         Base::cancel();
+      }
+      bool is_cft() const { return active_producers[0]->algorithm == ConsensusAlgorithm::cft; }
       void set_producers(
           std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> prods)
       {
+         bool start_cft = false;
+         if (prods.first->algorithm != ConsensusAlgorithm::cft)
+         {
+            _election_timer.cancel();
+            return Base::set_producers(std::move(prods));
+         }
+         if (active_producers[0] && active_producers[0]->algorithm != ConsensusAlgorithm::cft)
+         {
+            PSIBASE_LOG(logger, info) << "Switching consensus: CFT";
+            Base::cancel();
+            start_cft = true;
+         }
          if (_state == producer_state::leader)
          {
             // match_index
-            if (*active_producers[0] != *prods.first)
+            if (start_cft)
+            {
+               match_index[0].clear();
+               match_index[0].resize(prods.first->size());
+            }
+            else if (*active_producers[0] != *prods.first)
             {
                if (active_producers[1] && *active_producers[1] == *prods.first)
                {
@@ -152,7 +172,7 @@ namespace psibase::net
             {
                match_index[1].clear();
             }
-            else if (!active_producers[1] || *active_producers[1] != *prods.second)
+            else if (start_cft || !active_producers[1] || *active_producers[1] != *prods.second)
             {
                match_index[1].clear();
                match_index[1].resize(prods.second->size());
@@ -166,6 +186,10 @@ namespace psibase::net
             {
                PSIBASE_LOG(logger, info) << "Node is active producer";
                _state = producer_state::follower;
+               randomize_timer();
+            }
+            else if (_state == producer_state::follower && start_cft)
+            {
                randomize_timer();
             }
          }
@@ -197,7 +221,7 @@ namespace psibase::net
 
       void on_fork_switch(BlockHeader* new_head)
       {
-         if (_state == producer_state::follower && new_head->term == current_term &&
+         if (is_cft() && _state == producer_state::follower && new_head->term == current_term &&
              new_head->blockNum > chain().commit_index())
          {
             for_each_key(
@@ -214,7 +238,10 @@ namespace psibase::net
 
       void on_produce_block(const BlockHeaderState* state)
       {
-         update_match_index(self, state->blockNum());
+         if (is_cft())
+         {
+            update_match_index(self, state->blockNum());
+         }
       }
       // ------------------- Implementation utilities ----- -----------
       void update_match_index(producer_id producer, block_num match)
@@ -244,7 +271,7 @@ namespace psibase::net
             if (!match_index[group].empty())
             {
                std::vector<block_num> match = match_index[group];
-               auto                   mid   = match.size() / 2;
+               auto                   mid   = active_producers[group]->threshold() - 1;
                std::nth_element(match.begin(), match.begin() + mid, match.end());
                return match[mid];
             }
@@ -273,7 +300,7 @@ namespace psibase::net
       void check_votes()
       {
          if (votes_for_me[0].size() > active_producers[0]->size() / 2 &&
-             (!active_producers[1] || votes_for_me[1].size() > active_producers[1]->size() / 2))
+             (!active_producers[1] || votes_for_me[1].size() >= active_producers[1]->threshold()))
          {
             _state = producer_state::leader;
             match_index[0].clear();
@@ -299,13 +326,15 @@ namespace psibase::net
                request_vote();
             }
          }
-         else
+         else if (!active_producers[1] ||
+                  active_producers[1]->algorithm == ConsensusAlgorithm::cft ||
+                  active_producers[0]->isProducer(self))
          {
             _election_timer.expires_after(_timeout, _timeout * 2);
             _election_timer.async_wait(
                 [this](const std::error_code& ec)
                 {
-                   if (!ec &&
+                   if (!ec && is_cft() &&
                        (_state == producer_state::follower || _state == producer_state::candidate))
                    {
                       PSIBASE_LOG(logger, info)
@@ -341,16 +370,25 @@ namespace psibase::net
       // ----------- handling of incoming messages -------------
       void recv(peer_id origin, const append_entries_request& request)
       {
-         auto term = BlockNum{request.block->block()->header()->term()};
-         update_term(term);
-         if (term >= current_term)
+         if (is_cft())
          {
-            _election_timer.restart();
+            auto term = BlockNum{request.block->block()->header()->term()};
+            update_term(term);
+            if (term >= current_term)
+            {
+               _election_timer.restart();
+            }
          }
          Base::recv(origin, request);
       }
       void recv(peer_id, const append_entries_response& response)
       {
+         if (!is_cft())
+         {
+            return;
+         }
+         // TODO: validate against BlockHeaderState instead. Doing so would allow us to distinguish
+         // out-dated messages from invalid messages.
          validate_producer(response.follower_id, response.claim);
          update_term(response.term);
          if (response.term == current_term)
@@ -364,6 +402,10 @@ namespace psibase::net
       }
       void recv(peer_id, const request_vote_request& request)
       {
+         if (!is_cft())
+         {
+            return;
+         }
          validate_producer(request.candidate_id, request.claim);
          update_term(request.term);
          bool vote_granted = false;
@@ -397,6 +439,10 @@ namespace psibase::net
       }
       void recv(peer_id, const request_vote_response& response)
       {
+         if (!is_cft())
+         {
+            return;
+         }
          validate_producer(response.voter_id, response.claim);
          update_term(response.term);
          if (response.candidate_id == self && response.term == current_term &&

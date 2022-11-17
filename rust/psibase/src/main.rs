@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use fracpack::Pack;
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -52,6 +52,10 @@ enum Command {
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
         producer: ExactAccountNumber,
+
+        /// Don't include documentation in the boot image
+        #[clap(long="no-doc",action=ArgAction::SetFalse)]
+        doc: bool,
     },
 
     /// Create or modify an account
@@ -487,12 +491,13 @@ async fn boot(
     client: reqwest::Client,
     key: &Option<PublicKey>,
     producer: ExactAccountNumber,
+    doc: bool,
 ) -> Result<(), anyhow::Error> {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec {
         seconds: now_plus_10secs.timestamp() as u32,
     };
-    let transactions = create_boot_transactions(key, producer.into(), true, true, true, expiration);
+    let transactions = create_boot_transactions(key, producer.into(), true, doc, true, expiration);
     push_boot(args, client, transactions.packed()).await?;
     if !args.suppress_ok {
         println!("Ok");
@@ -608,7 +613,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Command::Boot { key, producer } => boot(&args, client, key, *producer).await?,
+        Command::Boot { key, producer, doc } => boot(&args, client, key, *producer, *doc).await?,
         Command::Create {
             account,
             key,

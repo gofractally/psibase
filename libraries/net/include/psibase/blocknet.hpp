@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <variant>
 #include <vector>
 
 namespace psibase::net
@@ -59,6 +60,8 @@ namespace psibase::net
       template <typename ExecutionContext>
       explicit blocknet(ExecutionContext& ctx) : _block_timer(ctx)
       {
+         logger.add_attribute("Channel",
+                              boost::log::attributes::constant(std::string("consensus")));
       }
 
       struct hello_request
@@ -112,6 +115,8 @@ namespace psibase::net
 
       std::vector<std::unique_ptr<peer_connection>> _peers;
 
+      loggers::common_logger logger;
+
       struct append_entries_request
       {
          static constexpr unsigned          type = 34;
@@ -129,6 +134,8 @@ namespace psibase::net
                    std::to_string(BlockNum{block->block()->header()->commitNum()});
          }
       };
+
+      using message_type = std::variant<hello_request, hello_response, append_entries_request>;
 
       peer_connection& get_connection(peer_id id)
       {
@@ -342,8 +349,9 @@ namespace psibase::net
                    if (auto* b = chain().finish_block())
                    {
                       consensus().on_produce_block(b);
+                      consensus().set_producers(chain().getProducers());
                       consensus().on_fork_switch(&b->info.header);
-                      chain().gc();
+                      do_gc();
                    }
                    // finish_block might convert us to nonvoting
                    if (_state == producer_state::leader)
@@ -416,9 +424,15 @@ namespace psibase::net
             {
                // Note: Checking best_received primarily prevents received blocks
                // from being echoed back to their origin.
-               auto best_received = chain().get_common_ancestor(peer->last_received);
-               auto best_sent     = chain().get_common_ancestor(peer->last_sent);
-               peer->last_sent = best_received.num() > best_sent.num() ? best_received : best_sent;
+               peer->last_sent = chain().get_common_ancestor(peer->last_sent);
+               if (chain().get_state(peer->last_received.id()))
+               {
+                  auto best_received = chain().get_common_ancestor(peer->last_received);
+                  if (best_received.num() > peer->last_sent.num())
+                  {
+                     peer->last_sent = best_received;
+                  }
+               }
                // if the peer is synced, start async_send_fork
                if (!peer->syncing)
                {
@@ -451,19 +465,26 @@ namespace psibase::net
             chain().async_switch_fork(
                 [this](BlockHeader* h)
                 {
-                   if (chain().commit(h->commitNum))
-                   {
-                      consensus().set_producers(chain().getProducers());
-                   }
+                   chain().commit(h->commitNum);
+                   // TODO: only run set_producers when the producers actually changed
+                   consensus().set_producers(chain().getProducers());
                    consensus().on_fork_switch(h);
-                   chain().gc();
+                   do_gc();
                 },
                 [this](BlockHeaderState* state) { consensus().on_accept_block(state); });
          }
       }
 
-      // Default implementation
+      void do_gc()
+      {
+         chain().gc([this](const auto& b) { consensus().on_erase_block(b); });
+      }
+
+      // Default implementations
       void on_accept_block(const BlockHeaderState*) {}
       void post_send_block(peer_id, const Checksum256&) {}
+      void on_erase_block(const Checksum256&) {}
+      void set_producers(const auto&) {}
+      void cancel() {}
    };
 }  // namespace psibase::net

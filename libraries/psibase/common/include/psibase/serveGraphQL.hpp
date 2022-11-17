@@ -652,7 +652,7 @@ namespace psibase
                                 const E&                     error,
                                 std::span<const char* const> field_names)
    {
-      if (input_stream.current_puncuator != '{')
+      if (input_stream.current_punctuator != '{')
          return error("expected {");
       input_stream.skip();
       bool first = true;
@@ -664,7 +664,7 @@ namespace psibase
          auto alias      = input_stream.current_value;
          auto field_name = alias;
          input_stream.skip();
-         if (input_stream.current_puncuator == ':')
+         if (input_stream.current_punctuator == ':')
          {
             input_stream.skip();
             if (input_stream.current_type != psio::gql_stream::name)
@@ -673,30 +673,30 @@ namespace psibase
             input_stream.skip();
          }
 
-         get_event_field(
-             decoder, type, value, field_name, alias, field_names,
-             [&](auto alias, const auto& field_value)
-             {
-                found = true;
-                if (first)
-                {
-                   increase_indent(output_stream);
-                   first = false;
-                }
-                else
-                {
-                   output_stream.write(',');
-                }
-                write_newline(output_stream);
-                to_json(alias, output_stream);
-                write_colon(output_stream);
+         get_event_field(decoder, type, value, field_name, alias, field_names,
+                         [&](auto alias, const auto& field_value)
+                         {
+                            found = true;
+                            if (first)
+                            {
+                               increase_indent(output_stream);
+                               first = false;
+                            }
+                            else
+                            {
+                               output_stream.write(',');
+                            }
+                            write_newline(output_stream);
+                            to_json(alias, output_stream);
+                            write_colon(output_stream);
 
-                // Allow fields to be treated normally or as scalars
-                if (input_stream.current_puncuator == '(' || input_stream.current_puncuator == '{')
-                   ok &= gql_query(field_value, input_stream, output_stream, error);
-                else
-                   to_json(field_value, output_stream);
-             });
+                            // Allow fields to be treated normally or as scalars
+                            if (input_stream.current_punctuator == '(' ||
+                                input_stream.current_punctuator == '{')
+                               ok &= gql_query(field_value, input_stream, output_stream, error);
+                            else
+                               to_json(field_value, output_stream);
+                         });
 
          if (!ok)
             return false;
@@ -708,7 +708,7 @@ namespace psibase
                return false;
          }
       }
-      if (input_stream.current_puncuator != '}')
+      if (input_stream.current_punctuator != '}')
          return error("expected }");
       input_stream.skip();
       if (!first)

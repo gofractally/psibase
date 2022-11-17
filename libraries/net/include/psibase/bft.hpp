@@ -31,16 +31,16 @@ namespace psibase::net
       return lhs;
    }
 
-   template <typename Derived, typename Timer>
-   struct basic_bft_consensus : blocknet<Derived, Timer>
+   template <typename Base, typename Timer>
+   struct basic_bft_consensus : Base
    {
-      using Base = blocknet<Derived, Timer>;
       using Base::_state;
       using Base::active_producers;
       using Base::chain;
       using Base::current_term;
       using Base::for_each_key;
       using Base::is_producer;
+      using Base::logger;
       using Base::network;
       using Base::recv;
       using Base::self;
@@ -114,18 +114,20 @@ namespace psibase::net
          {
          }
          boost::dynamic_bitset<> confirms[2];
-         confirm_result          confirm(std::optional<std::size_t> idx, confirm_type type)
+         confirm_result          confirm(std::optional<std::size_t> idx,
+                                         confirm_type               type,
+                                         std::size_t                threshold)
          {
             auto& c = confirms[static_cast<unsigned>(type)];
             if (idx && !c[*idx])
             {
                c[*idx]    = true;
                auto count = c.count();
-               if (count == threshold())
+               if (count == threshold)
                {
                   return confirm_result::confirmed;
                }
-               else if (count > threshold())
+               else if (count > threshold)
                {
                   return confirm_result::duplicate;
                }
@@ -134,11 +136,11 @@ namespace psibase::net
                   return confirm_result::unconfirmed;
                }
             }
-            return confirmed(type);
+            return confirmed(type, threshold);
          }
-         confirm_result confirmed(confirm_type type)
+         confirm_result confirmed(confirm_type type, std::size_t threshold)
          {
-            if (confirms[static_cast<unsigned>(type)].count() >= threshold())
+            if (confirms[static_cast<unsigned>(type)].count() >= threshold)
             {
                return confirm_result::duplicate;
             }
@@ -147,7 +149,6 @@ namespace psibase::net
                return confirm_result::unconfirmed;
             }
          }
-         std::size_t threshold() const { return confirms[0].size() * 2 / 3 + 1; }
       };
 
       struct block_info
@@ -179,10 +180,14 @@ namespace psibase::net
                              const std::optional<std::size_t>& idx1,
                              confirm_type                      type)
          {
-            auto result = confirmations[0].confirm(idx0, type);
+            auto result = confirmations[0].confirm(idx0, type, producers[0]->threshold());
             if (producers[1])
             {
-               result &= confirmations[1].confirm(idx1, type);
+               if (producers[1]->algorithm == ConsensusAlgorithm::bft ||
+                   type == confirm_type::commit)
+               {
+                  result &= confirmations[1].confirm(idx1, type, producers[1]->threshold());
+               }
             }
             return result == confirm_result::confirmed;
          }
@@ -190,24 +195,21 @@ namespace psibase::net
 
       std::map<Checksum256, block_info> confirmations;
 
-      const BlockHeaderState* best_prepared = nullptr;
-      const BlockHeaderState* best_prepare  = nullptr;
-      const BlockHeaderState* alt_prepare   = nullptr;
+      using BlockOrder = decltype(std::declval<BlockHeaderState>().order());
+
+      BlockOrder best_prepared = {};
+      BlockOrder best_prepare  = {};
+      BlockOrder alt_prepare   = {};
 
       // Stores a record of the last view change seen for each producer
       std::vector<term_id> producer_views;
-      bool                 view_change_pending = false;
 
       Timer                     _new_term_timer;
       std::chrono::milliseconds _timeout = std::chrono::seconds(10);
 
-      loggers::common_logger logger;
-
       template <typename ExecutionContext>
       explicit basic_bft_consensus(ExecutionContext& ctx) : Base(ctx), _new_term_timer(ctx)
       {
-         logger.add_attribute("Channel",
-                              boost::log::attributes::constant(std::string("consensus")));
       }
 
       std::tuple<const std::shared_ptr<ProducerSet>&, const std::shared_ptr<ProducerSet>&>
@@ -271,8 +273,7 @@ namespace psibase::net
 
       void validate_producer(BlockHeaderState* state, AccountNumber producer, const Claim& claim)
       {
-         bool found = false;
-         // FIXME: adjusting to chain().commitIndex seems wrong
+         bool found           = false;
          const auto& [p0, p1] = get_producers(state);
          if (auto claim0 = p0->getClaim(producer))
          {
@@ -303,12 +304,10 @@ namespace psibase::net
          }
       }
 
-      using message_type = std::variant<hello_request,
-                                        hello_response,
-                                        append_entries_request,
-                                        prepare_message,
-                                        commit_message,
-                                        view_change_message>;
+      using message_type = boost::mp11::mp_push_back<typename Base::message_type,
+                                                     prepare_message,
+                                                     commit_message,
+                                                     view_change_message>;
       bool is_leader()
       {
          if (auto idx = active_producers[0]->getIndex(self))
@@ -319,11 +318,28 @@ namespace psibase::net
          return Base::is_sole_producer();
       }
 
+      void cancel()
+      {
+         _new_term_timer.cancel();
+         Base::cancel();
+      }
       void set_producers(
           std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> prods)
       {
+         bool start_bft = false;
+         if (prods.first->algorithm != ConsensusAlgorithm::bft)
+         {
+            _new_term_timer.cancel();
+            return Base::set_producers(std::move(prods));
+         }
+         if (active_producers[0] && active_producers[0]->algorithm != ConsensusAlgorithm::bft)
+         {
+            PSIBASE_LOG(logger, info) << "Switching consensus: BFT";
+            Base::cancel();
+            start_bft = true;
+         }
          if ((_state == producer_state::leader || _state == producer_state::follower) &&
-             *active_producers[0] != *prods.first)
+             (start_bft || *active_producers[0] != *prods.first))
          {
             producer_views.clear();
             producer_views.resize(prods.first->size());
@@ -342,20 +358,18 @@ namespace psibase::net
                PSIBASE_LOG(logger, info) << "Node is active producer";
                _state = producer_state::follower;
                producer_views.resize(active_producers[0]->size());
+               start_timer();
             }
-            if (_state == producer_state::follower)
+            else if (start_bft)
             {
-               if (is_leader())
-               {
-                  _state = producer_state::leader;
-                  start_leader();
-               }
-               else
-               {
-                  start_timer();
-               }
+               start_timer();
             }
-            else if (!is_leader())
+            if (_state == producer_state::follower && is_leader())
+            {
+               _state = producer_state::leader;
+               start_leader();
+            }
+            else if (_state == producer_state::leader && !is_leader())
             {
                stop_leader();
                _state = producer_state::follower;
@@ -375,34 +389,40 @@ namespace psibase::net
 
       void start_timer()
       {
-         if (_state == producer_state::follower && !view_change_pending)
+         if (_state == producer_state::follower || _state == producer_state::leader)
          {
             // TODO: increase timeout if no progress since last timeout
             _new_term_timer.expires_after(_timeout);
             _new_term_timer.async_wait(
-                [this](const std::error_code& ec)
+                [this, old_term = current_term](const std::error_code& ec)
                 {
-                   if (!ec)
+                   if (!ec && old_term == current_term)
                    {
-                      set_view(current_term + 1);
+                      increase_view();
+                      start_timer();
                    }
                 });
          }
       }
 
-      // Starts the view change timer if 2f+1 producers have reached the current view.
-      // If we have never received a view change message for a producer, treat it
-      // as if it were in the current view.
-      // TODO: send view_change on a new connection
-      void maybe_start_timer()
+      void increase_view()
       {
          auto threshold = producer_views.size() * 2 / 3 + 1;
          if (std::count_if(producer_views.begin(), producer_views.end(),
                            [current_term = current_term](auto v)
                            { return v >= current_term || v == 0; }) >= threshold)
          {
-            view_change_pending = false;
-            start_timer();
+            set_view(current_term + 1);
+         }
+         else
+         {
+            // Periodically resend view changes if we're stuck
+            for_each_key(
+                [&](const auto& k)
+                {
+                   network().multicast_producers(
+                       view_change_message{.term = current_term, .producer = self, .claim = k});
+                });
          }
       }
 
@@ -411,9 +431,7 @@ namespace psibase::net
          if (term > current_term)
          {
             bool was_leader = is_leader();
-            _new_term_timer.cancel();
-            view_change_pending = true;
-            current_term        = term;
+            current_term    = term;
             if (is_leader())
             {
                if (_state == producer_state::follower)
@@ -439,34 +457,50 @@ namespace psibase::net
             {
                producer_views[*idx] = term;
             }
-            maybe_start_timer();
          }
       }
 
       // track best committed, best prepared, best prepared on different fork
-      bool can_prepare(const BlockHeader* header)
+      bool can_prepare(const BlockHeaderState* state)
       {
-         //assert(chain().in_best_chain(header));
-         //return is_descendant(best_prepared, header);
+         if (_state != producer_state::leader && _state != producer_state::follower)
+         {
+            return false;
+         }
+         if (state->producers->algorithm != ConsensusAlgorithm::bft)
+         {
+            return false;
+         }
+         if (state->nextProducers && state->nextProducers->algorithm != ConsensusAlgorithm::bft)
+         {
+            return state->producers->isProducer(self);
+         }
          return true;
-         // The fork restriction handled by ForkDb is sufficient
       }
       bool can_commit(const BlockHeaderState* state)
       {
+         if (_state != producer_state::leader && _state != producer_state::follower)
+         {
+            return false;
+         }
+         if (state->producers->algorithm != ConsensusAlgorithm::bft)
+         {
+            return false;
+         }
          // have threshold prepares AND have not prepared a better conflicting block
          if (chain().in_best_chain(state->xid()))
          {
-            return !alt_prepare || state->order() > alt_prepare->order();
+            return state->order() > alt_prepare;
          }
          else
          {
-            return best_prepare && state->order() > best_prepare->order();
+            return state->order() > best_prepare;
          }
          return false;
       }
       void on_fork_switch(BlockHeader* head)
       {
-         if (best_prepare && !chain().in_best_chain(best_prepare->xid()))
+         if (!chain().in_best_chain(orderToXid(best_prepare)))
          {
             alt_prepare = best_prepare;
          }
@@ -477,9 +511,9 @@ namespace psibase::net
          const auto& id = state->blockId();
          if (prepare(state, producer))
          {
-            if (!best_prepared || state->order() > best_prepared->order())
+            if (state->order() > best_prepared)
             {
-               best_prepared = state;
+               best_prepared = state->order();
                chain().set_subtree(state);
             }
             if (can_commit(state))
@@ -492,7 +526,7 @@ namespace psibase::net
       {
          const auto& id = state->blockId();
          assert(chain().in_best_chain(state->xid()));
-         best_prepare = state;
+         best_prepare = state->order();
          on_prepare(state, self);
          for_each_key(
              [&](const auto& key)
@@ -512,7 +546,7 @@ namespace psibase::net
          {
             if (!chain().in_best_chain(state->xid()))
             {
-               if (best_prepared && state->order() < best_prepared->order())
+               if (state->order() < best_prepared)
                {
                   PSIBASE_LOG(logger, critical)
                       << "consensus failure: committing a block that that is not in the best "
@@ -546,15 +580,25 @@ namespace psibase::net
       }
       void on_produce_block(const BlockHeaderState* state)
       {
-         on_accept_block(state);
-      }
-      void on_accept_block(const BlockHeaderState* state)
-      {
-         // if we can confirm the block, send confirmation
-         if (can_prepare(&state->info.header))
+         Base::on_produce_block(state);
+         if (can_prepare(state))
          {
             do_prepare(state);
          }
+      }
+      void on_accept_block(const BlockHeaderState* state)
+      {
+         Base::on_accept_block(state);
+         // if we can confirm the block, send confirmation
+         if (can_prepare(state))
+         {
+            do_prepare(state);
+         }
+      }
+      void on_erase_block(const Checksum256& id)
+      {
+         Base::on_erase_block(id);
+         confirmations.erase(id);
       }
       void post_send_block(peer_id peer, const Checksum256& id)
       {
@@ -614,10 +658,7 @@ namespace psibase::net
                if (view_copy[offset] > current_term)
                {
                   set_view(view_copy[offset]);
-               }
-               else if (view_change_pending)
-               {
-                  maybe_start_timer();
+                  start_timer();
                }
             }
          }

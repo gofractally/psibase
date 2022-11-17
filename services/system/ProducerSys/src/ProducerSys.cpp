@@ -12,22 +12,49 @@ namespace
 
 namespace SystemService
 {
-
-   void ProducerSys::setProducers(std::vector<psibase::ProducerConfigRow> prods)
+   void ProducerSys::setConsensus(psibase::Consensus consensus)
    {
       check(getSender() == getReceiver(), "sender must match service account");
-      constexpr auto db = ProducerConfigRow::db;
-      // Remove existing producer rows
-      TableIndex<ProducerConfigRow, decltype(prods[0].key())> idx(db, std::vector<char>{}, false);
-      for (auto row : idx.subindex(producerConfigTable))
-      {
-         kvRemove(db, row.key());
-      }
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      std::visit([](const auto& c)
+                 { check(!c.producers.empty(), "There must be at least one producer"); },
+                 consensus);
+      check(!!status, "Missing status row");
+      check(
+          !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
+          "Consensus update pending");
+      status->nextConsensus = std::tuple(std::move(consensus), status->current.blockNum);
+      psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
+   }
 
-      for (const auto& row : prods)
-      {
-         kvPut(db, row.key(), row);
-      }
+   void ProducerSys::setProducers(std::vector<psibase::Producer> prods)
+   {
+      check(getSender() == getReceiver(), "sender must match service account");
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      check(!prods.empty(), "There must be at least one producer");
+      check(!!status, "Missing status row");
+      check(
+          !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
+          "Consensus update pending");
+      status->nextConsensus = std::tuple(std::visit(
+                                             [&](auto old)
+                                             {
+                                                old.producers = std::move(prods);
+                                                return Consensus{std::move(old)};
+                                             },
+                                             status->consensus),
+                                         status->current.blockNum);
+      psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
+   }
+
+   std::size_t getThreshold(const CftConsensus& bft)
+   {
+      return bft.producers.size() / 2 + 1;
+   }
+
+   std::size_t getThreshold(const BftConsensus& bft)
+   {
+      return bft.producers.size() * 2 / 3 + 1;
    }
 
    void ProducerSys::checkAuthSys(uint32_t                    flags,
@@ -36,8 +63,6 @@ namespace SystemService
                                   std::vector<ServiceMethod>  allowedActions,
                                   std::vector<psibase::Claim> claims)
    {
-      Table<ProducerConfigRow, &ProducerConfigRow::key> t(ProducerConfigRow::db,
-                                                          std::vector<char>{});
       // verify that all claims are valid
 
       // Standard verification for auth type
@@ -54,19 +79,29 @@ namespace SystemService
       else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
-      //
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+
       std::vector<psibase::Claim> expectedClaims;
-      for (auto row : t.getIndex<0>().subindex(producerConfigTable))
-      {
-         expectedClaims.push_back(row.producerAuth);
-      }
+      std::visit(
+          [&](auto& c)
+          {
+             for (const auto& [name, auth] : c.producers)
+             {
+                expectedClaims.push_back(auth);
+             }
+          },
+          status->consensus);
       std::sort(expectedClaims.begin(), expectedClaims.end(), compare_claim);
       std::sort(claims.begin(), claims.end(), compare_claim);
       std::vector<psibase::Claim> relevantClaims;
       std::set_intersection(claims.begin(), claims.end(), expectedClaims.begin(),
                             expectedClaims.end(), std::back_inserter(relevantClaims),
                             compare_claim);
-      auto threshold = expectedClaims.empty() ? 0 : expectedClaims.size() * 2 / 3 + 1;
+
+      auto threshold =
+          expectedClaims.empty()
+              ? 0
+              : std::visit([](const auto& c) { return getThreshold(c); }, status->consensus);
       if (relevantClaims.size() < threshold)
       {
          abortMessage("runAs: have " + std::to_string(relevantClaims.size()) + "/" +
