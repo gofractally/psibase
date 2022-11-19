@@ -1,8 +1,8 @@
 #pragma once
 
 #include <psibase/Table.hpp>
-#include <psibase/serviceEntry.hpp>
 #include <psibase/check.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
 #include <psio/to_hex.hpp>
 
@@ -800,7 +800,7 @@ namespace psibase
    }  // gql_query(EventDecoder)
 
    template <typename T>
-   concept EventType = requires (T events)
+   concept EventType = requires(T events)
    {
       typename decltype(events)::History;
       // Don't require Ui and Merkle for now
