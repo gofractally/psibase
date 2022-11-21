@@ -2326,6 +2326,9 @@ namespace psio
       {
          if (sizeof...(Rest) + 1 + *pos == sizeof...(Ts))
          {
+            if constexpr (is_std_optional<First>::value)
+               // views mix Option<T> with T; this function mishandles that.
+               First::visit_not_implemented_for_optional();
             v(view<First>(pos + 1 + 4));
          }
          else if constexpr (sizeof...(Rest) > 0)
@@ -2368,6 +2371,9 @@ namespace psio
       {
          if (sizeof...(Rest) + 1 + *pos == sizeof...(Ts))
          {
+            if constexpr (is_std_optional<First>::value)
+               // views mix Option<T> with T; this function mishandles that.
+               First::visit_not_implemented_for_optional();
             v(const_view<First>(pos + 1 + 4));
          }
          else if constexpr (sizeof...(Rest) > 0)
@@ -2545,6 +2551,9 @@ namespace psio
    template <typename T, typename S>
    void from_json(shared_view_ptr<T>& obj, S& stream)
    {
+      if constexpr (std::is_same_v<T, std::string>)
+         // ambiguous case
+         shared_view_ptr<T>::from_json_undefined();
       if (stream.peek_token().get().type == json_token_type::type_string)
       {
          // TODO: avoid copy
