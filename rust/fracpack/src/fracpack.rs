@@ -63,7 +63,6 @@ custom_error! {pub Error
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
     ExtraData           = "Extra data in buffer",
-    UnpackRef           = "Can't unpack a ref"
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -338,48 +337,6 @@ impl<'a, T: Pack> Pack for &'a T {
 
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
         (*self).embedded_variable_pack(dest)
-    }
-}
-
-impl<'a, T: Unpack<'a>> Unpack<'a> for &'a T {
-    const FIXED_SIZE: u32 = T::FIXED_SIZE;
-    const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
-    const IS_OPTIONAL: bool = T::IS_OPTIONAL;
-
-    fn unpack(_src: &'a [u8], _pos: &mut u32) -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        <T>::verify(src, pos)
-    }
-
-    fn new_empty_container() -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn embedded_variable_unpack(
-        _src: &'a [u8],
-        _fixed_pos: &mut u32,
-        _heap_pos: &mut u32,
-    ) -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn embedded_unpack(_src: &'a [u8], _fixed_pos: &mut u32, _heap_pos: &mut u32) -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn embedded_variable_verify(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<()> {
-        <T>::embedded_variable_verify(src, fixed_pos, heap_pos)
-    }
-
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        <T>::embedded_verify(src, fixed_pos, heap_pos)
     }
 }
 
