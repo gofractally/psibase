@@ -1,6 +1,5 @@
 // TODO: fix reading structs and tuples which have unknown fields
 // TODO: option to allow/disallow unknown fields during verify and unpack
-// TODO: rename misnamed "heap_size"
 // TODO: replace 'a with 'de; change macro to look for 'de specifically instead of assuming
 
 //! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
@@ -824,8 +823,8 @@ macro_rules! tuple_impls {
 
                 #[allow(non_snake_case,unused_mut)]
                 fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-                    let heap_size = u16::unpack(src, pos)?;
-                    let mut heap_pos = *pos + heap_size as u32;
+                    let fixed_size = u16::unpack(src, pos)?;
+                    let mut heap_pos = *pos + fixed_size as u32;
                     if heap_pos < *pos {
                         return Err(Error::BadOffset);
                     }
@@ -838,8 +837,8 @@ macro_rules! tuple_impls {
 
                 #[allow(unused_mut)]
                 fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-                    let heap_size = u16::unpack(src, pos)?;
-                    let mut heap_pos = *pos + heap_size as u32;
+                    let fixed_size = u16::unpack(src, pos)?;
+                    let mut heap_pos = *pos + fixed_size as u32;
                     if heap_pos < *pos {
                         return Err(Error::BadOffset);
                     }

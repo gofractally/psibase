@@ -326,9 +326,9 @@ fn process_struct(
         quote! {}
     };
     let unpack_heap_size = if !opts.definition_will_not_change {
-        quote! { let heap_size = <u16 as #fracpack_mod::Unpack>::unpack(src, pos)?; }
+        quote! { let fixed_size = <u16 as #fracpack_mod::Unpack>::unpack(src, pos)?; }
     } else {
-        quote! { let heap_size = #fixed_size; }
+        quote! { let fixed_size = #fixed_size; }
     };
     let pack_fixed_members = fields
         .iter()
@@ -404,7 +404,7 @@ fn process_struct(
                     if <Self as #fracpack_mod::Unpack>::VARIABLE_SIZE { 4 } else { #fixed_size };
                 fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
                     #unpack_heap_size
-                    let mut heap_pos = *pos + heap_size as u32;
+                    let mut heap_pos = *pos + fixed_size as u32;
                     if heap_pos < *pos {
                         return Err(#fracpack_mod::Error::BadOffset);
                     }
@@ -416,7 +416,7 @@ fn process_struct(
                 }
                 fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
                     #unpack_heap_size
-                    let mut heap_pos = *pos + heap_size as u32;
+                    let mut heap_pos = *pos + fixed_size as u32;
                     if heap_pos < *pos {
                         return Err(#fracpack_mod::Error::BadOffset);
                     }
