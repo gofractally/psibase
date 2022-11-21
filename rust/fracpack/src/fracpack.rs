@@ -58,7 +58,6 @@ custom_error! {pub Error
     ReadPastEnd         = "Read past end",
     BadOffset           = "Bad offset",
     BadSize             = "Bad size",
-    BadEmptyEncoding    = "Bad empty encoding",
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
     ExtraData           = "Extra data in buffer",
