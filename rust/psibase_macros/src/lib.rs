@@ -17,9 +17,20 @@ mod service_macro;
 mod test_case_macro;
 mod to_key_macro;
 
+// TODO: remove
 #[proc_macro_derive(Fracpack, attributes(fracpack))]
 pub fn derive_fracpack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input)
+    fracpack_macro_impl(input, true, true)
+}
+
+#[proc_macro_derive(Pack, attributes(fracpack))]
+pub fn derive_pack(input: TokenStream) -> TokenStream {
+    fracpack_macro_impl(input, true, false)
+}
+
+#[proc_macro_derive(Unpack, attributes(fracpack))]
+pub fn derive_unpack(input: TokenStream) -> TokenStream {
+    fracpack_macro_impl(input, false, true)
 }
 
 #[proc_macro_derive(ToKey, attributes(to_key))]

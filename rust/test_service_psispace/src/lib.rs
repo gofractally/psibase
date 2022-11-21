@@ -7,14 +7,14 @@
 mod service {
     use psibase::{
         check, get_sender, get_service, serve_action_templates, serve_graphiql, serve_pack_action,
-        AccountNumber, Fracpack, HexBytes, HttpReply, HttpRequest, Reflect, Table, TableIndex,
+        AccountNumber, HexBytes, HttpReply, HttpRequest, Pack, Reflect, Table, TableIndex, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
     type ContentKey = (AccountNumber, String);
 
     #[table(name = "ContentTable", index = 0)]
-    #[derive(Debug, Fracpack, PartialEq, Eq, Reflect, Serialize, Deserialize)]
+    #[derive(Debug, Pack, Unpack, PartialEq, Eq, Reflect, Serialize, Deserialize)]
     pub struct ContentRow {
         pub account: AccountNumber,
         pub path: String,

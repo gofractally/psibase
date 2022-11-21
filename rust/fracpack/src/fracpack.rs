@@ -16,9 +16,9 @@
 //! # Example use
 //!
 //! ```
-//! use fracpack::{Fracpack, Pack, Unpack, Result};
+//! use fracpack::{Pack, Unpack, Result};
 //!
-//! #[derive(Fracpack, PartialEq, Debug)]
+//! #[derive(Pack, Unpack, PartialEq, Debug)]
 //! #[fracpack(fracpack_mod = "fracpack")]
 //! struct Example {
 //!     a_string: String,
@@ -53,7 +53,7 @@
 use custom_error::custom_error;
 use std::{cell::RefCell, mem, rc::Rc, sync::Arc};
 
-pub use psibase_macros::Fracpack;
+pub use psibase_macros::{Pack, Unpack};
 
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
@@ -83,7 +83,7 @@ impl<T> UnpackOwned for T where T: for<'a> Unpack<'a> {}
 
 /// Convert to fracpack format
 ///
-/// Use [`#[derive(Fracpack)]`](psibase_macros::Fracpack) to implement
+/// Use [`#[derive(Pack)]`](psibase_macros::Pack) to implement
 /// this trait; manually implementing it is unsupported.
 pub trait Pack {
     #[doc(hidden)]
@@ -165,7 +165,7 @@ pub trait Pack {
 
 /// Unpack fracpack data
 ///
-/// Use [`#[derive(Fracpack)]`](psibase_macros::Fracpack) to implement
+/// Use [`#[derive(Unpack)]`](psibase_macros::Unpack) to implement
 /// this trait; manually implementing it is unsupported.
 pub trait Unpack<'a>: Sized {
     #[doc(hidden)]

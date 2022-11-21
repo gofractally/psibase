@@ -1,4 +1,4 @@
-use crate::{serialize_as_str, Fracpack, Reflect, ToKey};
+use crate::{serialize_as_str, Pack, Reflect, ToKey, Unpack};
 use custom_error::custom_error;
 use psibase_names::{method_number_from_str, method_number_to_string};
 use std::{num::ParseIntError, str::FromStr};
@@ -23,7 +23,7 @@ custom_error! { pub MethodNumberError
 /// use psibase::MethodNumber;
 /// let hello = MethodNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Fracpack, Reflect, ToKey)]
+#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Pack, Unpack, Reflect, ToKey)]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate", custom_json = true)]
 #[to_key(psibase_mod = "crate")]

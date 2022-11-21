@@ -1,4 +1,4 @@
-use crate::{Fracpack, Reflect, ToKey};
+use crate::{Pack, Reflect, ToKey, Unpack};
 use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 
@@ -6,7 +6,17 @@ use serde::{Deserialize, Serialize};
 ///
 /// An empty `service` or `method` indicates a wildcard.
 #[derive(
-    Copy, Clone, Debug, Fracpack, Reflect, ToKey, Serialize, Deserialize, SimpleObject, InputObject,
+    Copy,
+    Clone,
+    Debug,
+    Pack,
+    Unpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
 )]
 #[fracpack(fracpack_mod = "crate::fracpack")]
 #[reflect(psibase_mod = "crate")]

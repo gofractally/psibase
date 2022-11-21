@@ -5,8 +5,8 @@
 mod service {
     use psibase::{
         check, check_none, check_some, get_sender, get_service, serve_content, serve_simple_ui,
-        services::transaction_sys, store_content, AccountNumber, Fracpack, HexBytes, HttpReply,
-        HttpRequest, Reflect, Table, TimePointSec, ToKey, WebContentRow,
+        services::transaction_sys, store_content, AccountNumber, HexBytes, HttpReply, HttpRequest,
+        Pack, Reflect, Table, TimePointSec, ToKey, Unpack, WebContentRow,
     };
     use serde::{Deserialize, Serialize};
 
@@ -20,7 +20,7 @@ mod service {
     const MIN_ELECTION_TIME_SECONDS: TimePointSec = TimePointSec { seconds: 60 * 60 };
 
     #[table(name = "ElectionsTable", index = 0)]
-    #[derive(Debug, Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Debug, Pack, Unpack, Reflect, Serialize, Deserialize)]
     pub struct ElectionRecord {
         #[primary_key]
         pub id: u32,
@@ -37,7 +37,7 @@ mod service {
     }
 
     #[table(name = "CandidatesTable", index = 1)]
-    #[derive(Eq, PartialEq, Clone, Debug, Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Eq, PartialEq, Clone, Debug, Pack, Unpack, Reflect, Serialize, Deserialize)]
     pub struct CandidateRecord {
         pub election_id: u32,
         pub candidate: AccountNumber,
@@ -57,7 +57,7 @@ mod service {
     }
 
     #[table(name = "VotesTable", index = 2)]
-    #[derive(Eq, PartialEq, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Eq, PartialEq, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
     struct VotingRecord {
         election_id: u32,
         voter: AccountNumber,

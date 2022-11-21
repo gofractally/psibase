@@ -969,7 +969,7 @@ fn process_action_args(
 
     *new_items = quote! {
         #new_items
-        #[derive(Debug, Clone, #psibase_mod::Fracpack, #psibase_mod::Reflect, serde::Deserialize, serde::Serialize)]
+        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::Reflect, serde::Deserialize, serde::Serialize)]
         #[fracpack(fracpack_mod = #fracpack_mod)]
         #[reflect(psibase_mod = #psibase_mod_str)]
         #[doc = #doc]

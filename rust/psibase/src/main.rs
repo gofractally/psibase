@@ -1,14 +1,14 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{ArgAction, Parser, Subcommand};
-use fracpack::Pack;
+use fracpack::{Pack, Unpack};
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
 use psibase::services::{account_sys, auth_ec_sys, proxy_sys, psispace_sys, setcode_sys};
 use psibase::{
     account, create_boot_transactions, get_tapos_for_head, push_transaction, sign_transaction,
-    AccountNumber, Action, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction,
-    Tapos, TaposRefBlock, TimePointSec, Transaction,
+    AccountNumber, Action, ExactAccountNumber, PrivateKey, PublicKey, SignedTransaction, Tapos,
+    TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -183,7 +183,7 @@ fn to_hex(bytes: &[u8]) -> String {
     String::from_utf8(result).unwrap()
 }
 
-#[derive(Serialize, Deserialize, Fracpack)]
+#[derive(Serialize, Deserialize, Pack, Unpack)]
 struct NewAccountAction {
     account: AccountNumber,
     auth_service: AccountNumber,
@@ -202,7 +202,7 @@ fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) 
     account_sys::Wrapper::pack_from(account).setAuthCntr(auth_service)
 }
 
-#[derive(Serialize, Deserialize, Fracpack)]
+#[derive(Serialize, Deserialize, Pack, Unpack)]
 struct SetCodeAction {
     service: AccountNumber,
     vm_type: i8,

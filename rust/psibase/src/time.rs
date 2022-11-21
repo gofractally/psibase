@@ -1,4 +1,4 @@
-use crate::{Fracpack, Reflect, ToKey};
+use crate::{Pack, Reflect, ToKey, Unpack};
 use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
@@ -12,7 +12,8 @@ use std::ops::{Add, Sub};
     Eq,
     PartialOrd,
     Ord,
-    Fracpack,
+    Pack,
+    Unpack,
     Reflect,
     ToKey,
     Serialize,
