@@ -53,7 +53,7 @@ Followers send confirmation to the leader after the block is successfully applie
 BFT consensus has the following properties:
 - The network will eventually make progress as long as the latency for a message sent at time t is in o(t)
 - Up to f producers can fail in arbitrary ways without disrupting the network. There must be at least 3f+1 producers in the network.
-- If more than f producers fail, the behavior is undefined
+- If more than f producers generate messages that are not permitted by the protocol, the behavior is undefined
 
 ### Block Production
 
