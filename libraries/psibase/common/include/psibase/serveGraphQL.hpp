@@ -1,7 +1,6 @@
 #pragma once
 
 #include <psibase/Table.hpp>
-#include <psibase/check.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
 #include <psio/to_hex.hpp>
