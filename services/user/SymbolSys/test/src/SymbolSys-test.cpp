@@ -415,7 +415,11 @@ SCENARIO("Buying and selling symbols")
 
                // Make sure only owner changed
                newNftRecord.owner = alice.id;
-               CHECK(newNftRecord == initialNftRecord);
+               CHECK((newNftRecord.id == initialNftRecord.id &&          //
+                      newNftRecord.issuer == initialNftRecord.issuer &&  //
+                      newNftRecord.owner == initialNftRecord.owner));
+               //CHECK(newNftRecord == initialNftRecord);
+               // Todo - Use simple comparison if/when eventHeadId is removed from the Nft Record.
             }
          }
          THEN("Alice cannot list it below the floor price")
@@ -479,7 +483,11 @@ SCENARIO("Buying and selling symbols")
                   CHECK(newNftRecord.owner == bob.id);
 
                   newNftRecord.owner = initialNftRecord.owner;
-                  CHECK(newNftRecord == initialNftRecord);
+                  CHECK((newNftRecord.id == initialNftRecord.id &&          //
+                         newNftRecord.issuer == initialNftRecord.issuer &&  //
+                         newNftRecord.owner == initialNftRecord.owner));
+                  //CHECK(newNftRecord == initialNftRecord);
+                  // Todo - Use simple comparison if/when eventHeadId is removed from the Nft Record.
                }
                THEN("The symbol is no longer for sale")
                {
