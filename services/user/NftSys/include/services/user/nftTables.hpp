@@ -26,11 +26,13 @@ namespace UserService
       psibase::AccountNumber account;
       psibase::Bitset<8>     config;
 
+      uint64_t eventHead;
+
       using Configurations = psibase::NamedBits<psibase::NamedBit{"manualDebit"}>;
 
       auto operator<=>(const NftHolderRecord&) const = default;
    };
-   PSIO_REFLECT(NftHolderRecord, account, config);
+   PSIO_REFLECT(NftHolderRecord, account, config, eventHead);
    using NftHolderTable = psibase::Table<NftHolderRecord, &NftHolderRecord::account>;
 
    struct NftRecord
@@ -39,11 +41,13 @@ namespace UserService
       psibase::AccountNumber issuer;
       psibase::AccountNumber owner;
 
+      uint64_t eventHead;
+
       static bool isValidKey(const NID& id) { return id != 0; }
 
       auto operator<=>(const NftRecord&) const = default;
    };
-   PSIO_REFLECT(NftRecord, id, issuer, owner);
+   PSIO_REFLECT(NftRecord, id, issuer, owner, eventHead);
    using NftTable = psibase::Table<NftRecord, &NftRecord::id>;
 
    struct CreditRecord
