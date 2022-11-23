@@ -1,21 +1,23 @@
 #pragma once
 
-#include <compare>
-#include <psibase/Service.hpp>
-#include <psibase/Table.hpp>
+#include <psibase/String.hpp>
+#include <psibase/psibase.hpp>
+
 #include <services/user/symbolErrors.hpp>
 #include <services/user/symbolTables.hpp>
-#include <string_view>
-
-#include "services/user/tokenTypes.hpp"
+#include <services/user/tokenTypes.hpp>
 
 namespace UserService
 {
    class SymbolSys : public psibase::Service<SymbolSys>
    {
      public:
-      using tables = psibase::
-          ServiceTables<SymbolTable, SymbolLengthTable, PriceAdjustmentSingleton, InitTable>;
+      using Tables = psibase::ServiceTables<SymbolTable,
+                                            SymbolLengthTable,
+                                            PriceAdjustmentSingleton,
+                                            InitTable,
+                                            UserEventTable>;
+
       static constexpr auto service        = psibase::AccountNumber("symbol-sys");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 
@@ -31,37 +33,32 @@ namespace UserService
       void buySymbol(SID symbol);
       void unlistSymbol(SID symbol);
 
+      std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
+
       SymbolRecord       getSymbol(SID symbol);
       bool               exists(SID symbol);
-      Quantity           getPrice(size_t numChars);
-      SymbolLengthRecord getSymbolType(size_t numChars);
+      Quantity           getPrice(uint8_t numChars);
+      SymbolLengthRecord getSymbolType(uint8_t numChars);
+      void               updatePrices();
 
-      void updatePrices();
-
-     private:
-      tables db{psibase::getReceiver()};
-
-     public:
+      // clang-format off
       struct Events
       {
          using Account    = psibase::AccountNumber;
-         using StringView = psio::const_view<psibase::String>;
-
-         // clang-format off
-         struct Ui  // History <-- Todo - Change back to History
+         struct History
          {
-            void initialized() {}
-            void symCreated(SID symbol, Account owner, Quantity cost) {}
-            void symListed(SID symbol, Account seller, Quantity cost) {}
-            void symSold(SID symbol, Account buyer, Account seller, Quantity cost) {}
-            void symUnlisted(SID symbol, Account owner) {}
-            //};
+            void symCreated(uint64_t prevEvent, SID symbol, Account owner, Quantity cost) {}
+            void symListed(uint64_t prevEvent, SID symbol, Account seller, Quantity cost) {}
+            void symSold(uint64_t prevEvent, SID symbol, Account buyer, Account seller, Quantity cost) {}
+            void symUnlisted(uint64_t prevEvent, SID symbol, Account owner) {}
 
-            //struct Ui{};
-
-            //struct Merkle{};
+            void newCreatePrice(uint64_t prevEvent, uint8_t symbolLength, psibase::BlockNum blockNum, Quantity newPrice) {}
          };
+         struct Ui{};
+         struct Merkle{};
       };
+      using SymbolEvents = psibase::EventIndex<&SymbolRecord::eventHead, "prevEvent">;
+      using SymbolTypeEvents = psibase::EventIndex<&SymbolLengthRecord::eventHead, "prevEvent">;
       // clang-format on
    };
 
@@ -69,22 +66,27 @@ namespace UserService
    PSIO_REFLECT(SymbolSys,
       method(init),
       method(create, newSymbol, maxDebit),
-      method(buySymbol, symbol),
       method(listSymbol, symbol, price),
+      method(buySymbol, symbol),
       method(unlistSymbol, symbol),
+      method(serveSys, request),
+
       method(getSymbol, symbol),
       method(exists, symbol),
       method(getPrice, numChars),
       method(getSymbolType, numChars),
       method(updatePrices)
    );
-   PSIBASE_REFLECT_UI_EVENTS(SymbolSys,
-      method(initialized),
-      method(symCreated, symbol, owner, cost),
-      method(symListed, symbol, seller, cost),
-      method(symSold, symbol, buyer, seller, cost),
-      method(symUnlisted, symbol, owner)
+   PSIBASE_REFLECT_EVENTS(SymbolSys);
+   PSIBASE_REFLECT_HISTORY_EVENTS(SymbolSys,
+      method(symCreated, prevEvent, symbol, owner, cost),
+      method(symListed, prevEvent, symbol, seller, cost),
+      method(symSold, prevEvent, symbol, buyer, seller, cost),
+      method(symUnlisted, prevEvent, symbol, owner),
+      method(newCreatePrice, prevEvent, symbolLength, blockNum, newPrice)
    );
+   PSIBASE_REFLECT_UI_EVENTS(SymbolSys);
+   PSIBASE_REFLECT_MERKLE_EVENTS(SymbolSys);
    // clang-format on
 
 }  // namespace UserService

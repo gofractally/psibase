@@ -798,6 +798,15 @@ namespace psibase
       return ok;
    }  // gql_query(EventDecoder)
 
+   template <typename T>
+   concept EventType = requires(T events)
+   {
+      typename decltype(events)::History;
+      // Don't require Ui and Merkle for now
+      //typename decltype(events)::Ui;
+      //typename decltype(events)::Merkle;
+   };
+
    /// GraphQL support for decoding multiple events
    ///
    /// If a GraphQL query function returns this type, then the system
@@ -880,7 +889,7 @@ namespace psibase
    ///   }
    /// }
    /// ```
-   template <typename Events>
+   template <EventType Events>
    struct EventQuery
    {
       AccountNumber service;
@@ -1011,7 +1020,7 @@ namespace psibase
    ///       auto     holders = tables.open<TokenHolderTable>().getIndex<0>();
    ///       uint64_t eventId = 0;
    ///       if (auto record = holders.get(holder))
-   ///          eventId = record->lastHistoryEvent;
+   ///          eventId = record->eventHead;
    ///
    ///       // Create the Connection. Each event has a field named "prevEvent"
    ///       // which points to the previous event which affected the user's balance.
@@ -1263,7 +1272,7 @@ namespace psibase
    ///              method(userEvents, user, first, after))
    /// ```
    ///
-   template <typename Tables, typename Events>
+   template <typename Tables, typename Events = void>
    struct QueryableService
    {
       AccountNumber service;

@@ -1,8 +1,9 @@
-#include <psibase/dispatch.hpp>
+#include <services/user/SymbolSys.hpp>
+
 #include <services/system/AccountSys.hpp>
+#include <services/system/ProxySys.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
-#include <services/user/SymbolSys.hpp>
 
 #include "services/user/NftSys.hpp"
 #include "services/user/TokenSys.hpp"
@@ -11,6 +12,9 @@ using namespace UserService;
 using namespace psibase;
 using namespace UserService::Errors;
 using namespace SystemService;
+using std::nullopt;
+using std::optional;
+using std::string;
 using Quantity_t = typename Quantity::Quantity_t;
 
 namespace
@@ -38,15 +42,15 @@ SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()->value().get()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = db.open<InitTable>().getIndex<0>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
 
 void SymbolSys::init()
 {
-   auto initTable = db.open<InitTable>();
-   auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
+   auto initTable = Tables().open<InitTable>();
+   auto init      = (initTable.get(SingletonKey{}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
@@ -63,7 +67,7 @@ void SymbolSys::init()
       s.activePrice = s.activePrice * 2 / 3;
       return s;
    };
-   auto       symLengthTable = db.open<SymbolLengthTable>();
+   auto       symLengthTable = Tables().open<SymbolLengthTable>();
    Quantity_t initialPrice   = (Quantity_t)1000e8;
    auto       s              = SymbolLengthRecord{.symbolLength        = 3,
                                                   .targetCreatedPerDay = 24,
@@ -76,7 +80,7 @@ void SymbolSys::init()
    symLengthTable.put(nextSym(s));  // Length 7
 
    // Add initial configuration for Price Adjustment Record
-   auto              priceAdjustmentSingleton = db.open<PriceAdjustmentSingleton>();
+   auto              priceAdjustmentSingleton = Tables().open<PriceAdjustmentSingleton>();
    constexpr uint8_t increasePct              = 5;
    constexpr uint8_t decreasePct              = increasePct;
    priceAdjustmentSingleton.put(PriceAdjustmentRecord{0, increasePct, decreasePct});
@@ -90,7 +94,8 @@ void SymbolSys::init()
                        "System token symbol ownership nft");
    to<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
 
-   emit().ui().initialized();
+   // Register serveSys handler
+   to<SystemService::ProxySys>().registerServer(SymbolSys::service);
 }
 
 void SymbolSys::create(SID newSymbol, Quantity maxDebit)
@@ -108,7 +113,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
 
    // Debit the sender the cost of the new symbol
    auto debitMemo = "This transfer created the new symbol: " + symString;
-   if (sender != getReceiver())
+   if (sender != getReceiver())  // SymbolSys itself doesn't need to pay
    {
       to<TokenSys>().debit(TokenSys::sysToken, sender, cost, debitMemo);
    }
@@ -125,10 +130,10 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    symType.createCounter++;
    symType.lastPriceUpdateTime = to<TransactionSys>().headBlockTime();
 
-   db.open<SymbolTable>().put(newSym);
-   db.open<SymbolLengthTable>().put(symType);
+   newSym.eventHead = emit().history().symCreated(0, newSymbol, sender, cost);
 
-   emit().ui().symCreated(newSymbol, sender, cost);
+   Tables().open<SymbolTable>().put(newSym);
+   Tables().open<SymbolLengthTable>().put(symType);
 }
 
 void SymbolSys::listSymbol(SID symbol, Quantity price)
@@ -149,9 +154,10 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
    symbolRecord.saleDetails.salePrice = price;
    symbolRecord.saleDetails.seller    = seller;
 
-   db.open<SymbolTable>().put(symbolRecord);
+   symbolRecord.eventHead =
+       emit().history().symListed(symbolRecord.eventHead, symbol, seller, price);
 
-   emit().ui().symListed(symbol, seller, price);
+   Tables().open<SymbolTable>().put(symbolRecord);
 }
 
 void SymbolSys::buySymbol(SID symbol)
@@ -173,9 +179,10 @@ void SymbolSys::buySymbol(SID symbol)
    symbolRecord.saleDetails.seller    = AccountNumber{0};
    symbolRecord.saleDetails.salePrice = 0;
 
-   db.open<SymbolTable>().put(symbolRecord);
+   symbolRecord.eventHead =
+       emit().history().symSold(symbolRecord.eventHead, symbol, buyer, seller, salePrice);
 
-   emit().ui().symSold(symbol, buyer, seller, salePrice);
+   Tables().open<SymbolTable>().put(symbolRecord);
 }
 
 void SymbolSys::unlistSymbol(SID symbol)
@@ -190,17 +197,16 @@ void SymbolSys::unlistSymbol(SID symbol)
    to<NftSys>().credit(symbolRecord.ownerNft, seller, unlistMemo);
 
    symbolRecord.saleDetails = SaleDetails{};
+   symbolRecord.eventHead   = emit().history().symUnlisted(symbolRecord.eventHead, symbol, seller);
 
-   db.open<SymbolTable>().put(symbolRecord);
-
-   emit().ui().symUnlisted(symbol, seller);
+   Tables().open<SymbolTable>().put(symbolRecord);
 }
 
 SymbolRecord SymbolSys::getSymbol(SID symbol)
 {
    check(symbol.value != 0, invalidSymbol);
 
-   auto symOpt = db.open<SymbolTable>().getIndex<0>().get(symbol);
+   auto symOpt = Tables().open<SymbolTable>().get(symbol);
 
    if (symOpt.has_value())
    {
@@ -216,19 +222,16 @@ SymbolRecord SymbolSys::getSymbol(SID symbol)
    }
 }
 
-Quantity SymbolSys::getPrice(size_t numChars)
+Quantity SymbolSys::getPrice(uint8_t numChars)
 {
    return getSymbolType(numChars).activePrice;
 }
 
-SymbolLengthRecord SymbolSys::getSymbolType(size_t numChars)
+SymbolLengthRecord SymbolSys::getSymbolType(uint8_t numChars)
 {
-   check(canCast<uint8_t>(numChars), invalidSymbol);
-   auto key = static_cast<uint8_t>(numChars);
-
    updatePrices();
 
-   auto symbolType = db.open<SymbolLengthTable>().getIndex<0>().get(key);
+   auto symbolType = Tables().open<SymbolLengthTable>().get(numChars);
    check(symbolType.has_value(), invalidSymbol);
 
    return *symbolType;
@@ -236,10 +239,10 @@ SymbolLengthRecord SymbolSys::getSymbolType(size_t numChars)
 
 void SymbolSys::updatePrices()
 {
-   auto symLengthTable = db.open<SymbolLengthTable>();
+   auto symLengthTable = Tables().open<SymbolLengthTable>();
    auto symLengthIndex = symLengthTable.getIndex<0>();
 
-   auto priceAdjustmentIdx = db.open<PriceAdjustmentSingleton>().getIndex<0>();
+   auto priceAdjustmentIdx = Tables().open<PriceAdjustmentSingleton>().getIndex<0>();
    auto priceAdjustmentRec = *priceAdjustmentIdx.get(uint8_t{0});
    auto dec                = static_cast<uint64_t>((uint8_t)100 - priceAdjustmentRec.decreasePct);
    auto inc                = static_cast<uint64_t>((uint8_t)100 + priceAdjustmentRec.increasePct);
@@ -247,12 +250,15 @@ void SymbolSys::updatePrices()
    auto lastBlockTime = to<TransactionSys>().headBlockTime();
    for (auto symbolType : symLengthIndex)
    {
+      bool priceChanged = false;
       if (lastBlockTime.seconds - symbolType.lastPriceUpdateTime.seconds > secondsInDay)
       {  // Decrease price if needed
          if (symbolType.createCounter < symbolType.targetCreatedPerDay)
          {
-            auto newPrice          = static_cast<Quantity_t>(symbolType.activePrice * dec / 100);
-            newPrice               = std::max(newPrice, symbolType.floorPrice.value);
+            auto newPrice = static_cast<Quantity_t>(symbolType.activePrice * dec / 100);
+            newPrice      = std::max(newPrice, symbolType.floorPrice.value);
+            if (newPrice != symbolType.activePrice)
+               priceChanged = true;
             symbolType.activePrice = Quantity{newPrice};
          }
 
@@ -267,6 +273,14 @@ void SymbolSys::updatePrices()
          symbolType.activePrice = Quantity{newPrice};
          symbolType.lastPriceUpdateTime = lastBlockTime;
          symbolType.createCounter       = 0;
+         priceChanged                   = true;
+      }
+
+      if (priceChanged)
+      {
+         auto blockNum        = to<TransactionSys>().currentBlock().blockNum;
+         symbolType.eventHead = emit().history().newCreatePrice(
+             symbolType.eventHead, symbolType.symbolLength, blockNum, symbolType.activePrice);
       }
 
       symLengthTable.put(symbolType);
@@ -275,8 +289,47 @@ void SymbolSys::updatePrices()
 
 bool SymbolSys::exists(SID symbol)
 {
-   auto symOpt = db.open<SymbolTable>().getIndex<0>().get(symbol);
-   return symOpt.has_value();
+   return Tables().open<SymbolTable>().get(symbol).has_value();
+}
+
+auto symbolSys = QueryableService<SymbolSys::Tables, SymbolSys::Events>{SymbolSys::service};
+struct SymbolQuery
+{
+   auto events() const
+   {  //
+      return symbolSys.allEvents();
+   }
+   auto symbolEvents(SID symbolId, optional<uint32_t> first, const optional<string>& after) const
+   {
+      return symbolSys.eventIndex<SymbolSys::SymbolEvents>(symbolId, first, after);
+   }
+   auto lengthEvents(uint8_t length, optional<uint32_t> first, const optional<string>& after) const
+   {
+      return symbolSys.eventIndex<SymbolSys::SymbolTypeEvents>(length, first, after);
+   }
+   auto symbolTypes() const
+   {  //
+      return symbolSys.index<SymbolLengthTable, 0>();
+   }
+   auto symbols() const
+   {  //
+      return symbolSys.index<SymbolTable, 0>();
+   }
+};
+PSIO_REFLECT(SymbolQuery,
+             method(events),
+             method(symbolEvents, symbolId, first, after),
+             method(lengthEvents, length, first, after),
+             method(symbolTypes),
+             method(symbols));
+
+optional<HttpReply> SymbolSys::serveSys(HttpRequest request)
+{
+   if (auto result = servePackAction<SymbolSys>(request))
+      return result;
+   if (auto result = serveGraphQL(request, SymbolQuery{}))
+      return result;
+   return nullopt;
 }
 
 PSIBASE_DISPATCH(UserService::SymbolSys)

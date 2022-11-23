@@ -1,11 +1,7 @@
 #pragma once
 
-#include <psibase/Rpc.hpp>
-#include <psibase/Service.hpp>
 #include <psibase/String.hpp>
-#include <psibase/check.hpp>
-#include <psibase/eventIndex.hpp>
-#include <string>
+#include <psibase/psibase.hpp>
 
 #include <services/user/symbolTables.hpp>
 #include <services/user/tokenErrors.hpp>
@@ -74,8 +70,6 @@ namespace UserService
       bool                getTokenConf(TID tokenId, psibase::NamedBit flag);
 
      private:
-      Tables db{psibase::getReceiver()};
-
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);
 
@@ -88,11 +82,10 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void initialized() {}
-            void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
+            void created(uint64_t prevEvent, TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
             void minted(uint64_t prevEvent, TID tokenId, Account minter, Quantity amount, StringView memo) {}
             void burned(uint64_t prevEvent, TID tokenId, Account burner, Quantity amount) {}
-            void userConfSet(Account account, psibase::NamedBit flag, bool enable) {}
+            void userConfSet(uint64_t prevEvent, Account account, psibase::NamedBit flag, bool enable) {}
             void tokenConfSet(uint64_t prevEvent, TID tokenId, Account setter, psibase::NamedBit flag, bool enable) {}
             void symbolMapped(uint64_t prevEvent, TID tokenId, Account account, SID symbolId) {}
             // TODO: time is redundant with which block the event was written in
@@ -104,8 +97,8 @@ namespace UserService
 
          struct Merkle{};
       };
-      using UserEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, "prevEvent">;
-
+      using UserEvents = psibase::EventIndex<&TokenHolderRecord::eventHead, "prevEvent">;
+      using TokenEvents = psibase::EventIndex<&TokenRecord::eventHead, "prevEvent">;
       // clang-format on
    };
 
@@ -131,13 +124,12 @@ namespace UserService
       method(getTokenConf, tokenId, flag),
       method(mapSymbol, symbolId, tokenId),
     );
-   PSIBASE_REFLECT_EVENTS(TokenSys)
+   PSIBASE_REFLECT_EVENTS(TokenSys);
    PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys,
-      method(initialized),
-      method(created, tokenId, creator, precision, maxSupply),
+      method(created, prevEvent, tokenId, creator, precision, maxSupply),
       method(minted, prevEvent, tokenId, minter, amount, memo),
       method(burned, prevEvent, tokenId, burner, amount),
-      method(userConfSet, account, flag, enable),
+      method(userConfSet, prevEvent, account, flag, enable),
       method(tokenConfSet, prevEvent, tokenId, setter, flag, enable),
       method(symbolMapped, prevEvent, tokenId, account, symbolId),
       method(transferred, prevEvent, tokenId, time, sender, receiver, amount, memo),

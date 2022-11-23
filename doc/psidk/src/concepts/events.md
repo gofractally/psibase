@@ -68,7 +68,7 @@ For example, in the example Token Service, a `Transferred` event is defined, and
   };
 
   // Specify the details needed to create an index of events.
-  using UserEvents = psibase::EventIndex<&TokenHolderRecord::lastHistoryEvent, "prevEvent">;
+  using UserEvents = psibase::EventIndex<&TokenHolderRecord::eventHead, "prevEvent">;
 
   // Reflect the events
   PSIBASE_REFLECT_EVENTS(TokenSys)
@@ -77,9 +77,9 @@ For example, in the example Token Service, a `Transferred` event is defined, and
   );
 ```
 
-The definition of `UserEvents` indicates that the head event ID is stored in the `lastHistoryEvent` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`.
+The definition of `UserEvents` indicates that the head event ID is stored in the `eventHead` field of the `TokenHolderRecord` record, and the field stored in the event that specifies the ID of the previous event is named, `prevEvent`.
 
-When the `transferred` event gets emitted by the service, the ID of the previous transferred event is included (via the `prevEvent` field) in the new event, and the event ID of the new event is saved to state (in the `lastHistoryEvent` field of the sender's `TokenHolderRecord`):
+When the `transferred` event gets emitted by the service, the ID of the previous transferred event is included (via the `prevEvent` field) in the new event, and the event ID of the new event is saved to state (in the `eventHead` field of the sender's `TokenHolderRecord`):
 
 ```cpp
 void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
@@ -87,13 +87,13 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
     // ...
 
     auto senderHolder             = getTokenHolder(sender);
-    senderHolder.lastHistoryEvent = emit().history().transferred(
-        tokenId, senderHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
+    senderHolder.eventHead = emit().history().transferred(
+        tokenId, senderHolder.eventHead, time, sender, receiver, amount, memo);
     db.open<TokenHolderTable>().put(senderHolder);
 
     auto receiverHolder             = getTokenHolder(receiver);
-    receiverHolder.lastHistoryEvent = emit().history().transferred(
-        tokenId, receiverHolder.lastHistoryEvent, time, sender, receiver, amount, memo);
+    receiverHolder.eventHead = emit().history().transferred(
+        tokenId, receiverHolder.eventHead, time, sender, receiver, amount, memo);
     db.open<TokenHolderTable>().put(receiverHolder);
 
     // ...

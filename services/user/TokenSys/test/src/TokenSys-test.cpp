@@ -330,7 +330,9 @@ SCENARIO("Interactions with the Issuer NFT")
          {
             auto newNft = alice.to<NftSys>().getNft(token.ownerNft).returnVal();
             nft.owner   = bob.id;
-            CHECK(newNft == nft);
+            CHECK((newNft.id == nft.id && newNft.issuer == nft.issuer  //
+                   && newNft.owner == nft.owner));
+            // Todo - Use simple comparison once eventHeadId moves out of Nft record.
          }
          THEN("The token record is identical")
          {  //
