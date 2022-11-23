@@ -93,6 +93,18 @@ namespace psio
       tuple_foreach_i<0>(obj, std::forward<S>(s));
    }
 
+   template <typename F>
+   constexpr void tuple_foreach_type(const std::tuple<>* obj, F&& f)
+   {
+   }
+
+   template <typename T, typename... Ts, typename F>
+   constexpr void tuple_foreach_type(const std::tuple<T, Ts...>* obj, F&& f)
+   {
+      f((T*)nullptr);
+      tuple_foreach_type((const std::tuple<Ts...>*)nullptr, std::forward<F>(f));
+   }
+
    template <typename R, typename C, typename... Args>
    R result_of(R (C::*)(Args...) const);
    template <typename R, typename C, typename... Args>

@@ -1,9 +1,9 @@
 use std::fmt;
 
-use crate::{Action, Fracpack, Hex, Reflect};
+use crate::{Action, Hex, Pack, Reflect, Unpack};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,7 @@ impl fmt::Display for ActionTrace {
     }
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
@@ -29,7 +29,7 @@ pub struct EventTrace {
     pub data: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
@@ -37,7 +37,7 @@ pub struct ConsoleTrace {
     pub console: String,
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 pub enum InnerTraceEnum {
@@ -46,7 +46,7 @@ pub enum InnerTraceEnum {
     ActionTrace(ActionTrace),
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
@@ -54,7 +54,7 @@ pub struct InnerTrace {
     pub inner: InnerTraceEnum,
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]

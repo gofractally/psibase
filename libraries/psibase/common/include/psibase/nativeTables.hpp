@@ -14,23 +14,25 @@ namespace psibase
    static constexpr NativeTableNum transactionWasmConfigTable = 5;
    static constexpr NativeTableNum proofWasmConfigTable       = 6;  // Also for first auth
    static constexpr NativeTableNum configTable                = 7;
-   static constexpr NativeTableNum producerConfigTable        = 8;
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
-   inline auto statusKey() { return std::tuple{statusTable, nativeTablePrimaryIndex}; }
+   inline auto statusKey()
+   {
+      return std::tuple{statusTable, nativeTablePrimaryIndex};
+   }
    struct StatusRow
    {
-      Checksum256                                                chainId;
-      BlockHeader                                                current;
-      std::optional<BlockInfo>                                   head;
-      std::vector<Producer>                                      producers;
-      std::optional<std::tuple<std::vector<Producer>, BlockNum>> nextProducers;
+      Checksum256                                    chainId;
+      BlockHeader                                    current;
+      std::optional<BlockInfo>                       head;
+      Consensus                                      consensus;
+      std::optional<std::tuple<Consensus, BlockNum>> nextConsensus;
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(StatusRow, chainId, current, head, producers, nextProducers)
+   PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus)
 
    struct ConfigRow
    {
@@ -77,7 +79,10 @@ namespace psibase
    };
    PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
 
-   inline auto codePrefix() { return std::tuple{codeTable, nativeTablePrimaryIndex}; }
+   inline auto codePrefix()
+   {
+      return std::tuple{codeTable, nativeTablePrimaryIndex};
+   }
    inline auto codeKey(AccountNumber codeNum)
    {
       return std::tuple{codeTable, nativeTablePrimaryIndex, codeNum};
@@ -144,19 +149,5 @@ namespace psibase
       static auto           key() { return databaseStatusKey(); }
    };
    PSIO_REFLECT(DatabaseStatusRow, nextHistoryEventNumber, nextUIEventNumber, nextMerkleEventNumber)
-
-   inline auto producerConfigKey(AccountNumber producer)
-   {
-      return std::tuple(producerConfigTable, producer);
-   }
-
-   struct ProducerConfigRow
-   {
-      AccountNumber         producerName;
-      Claim                 producerAuth;
-      static constexpr auto db = psibase::DbId::nativeConstrained;
-      auto                  key() const { return producerConfigKey(producerName); }
-   };
-   PSIO_REFLECT(ProducerConfigRow, producerName, producerAuth);
 
 }  // namespace psibase

@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{Fracpack, Hex, Reflect, ToKey};
+use crate::{Hex, Pack, Reflect, ToKey, Unpack};
 use serde::{Deserialize, Serialize};
 
 /// An HTTP header
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Note: `proxy-sys` aborts when most services set HTTP headers. It only allows services
 /// it trust to set them in order to enforce security rules.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Fracpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
@@ -28,7 +28,7 @@ pub struct HttpHeader {
 /// its `serve` exported function.
 
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Fracpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
@@ -57,7 +57,7 @@ pub struct HttpRequest {
 ///
 /// Services return this from their [serveSys](crate::server_interface::ServerActions::serveSys) action.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Fracpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]

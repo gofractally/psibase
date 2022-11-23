@@ -2,7 +2,7 @@
 // TODO: events
 
 use async_graphql::{InputObject, SimpleObject};
-use fracpack::Fracpack;
+use fracpack::{Pack, Unpack};
 use serde::{Deserialize, Serialize};
 
 use crate::{AccountNumber, Reflect};
@@ -10,7 +10,7 @@ use crate::{AccountNumber, Reflect};
 pub type NID = u32;
 
 #[derive(
-    Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug, Copy, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
@@ -22,7 +22,7 @@ pub struct NftRecord {
 }
 
 #[derive(
-    Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug, Copy, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
@@ -33,7 +33,7 @@ pub struct NftHolderRecord {
 }
 
 #[derive(
-    Debug, Copy, Clone, Fracpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug, Copy, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]

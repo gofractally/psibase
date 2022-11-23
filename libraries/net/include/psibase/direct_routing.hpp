@@ -25,6 +25,12 @@ namespace psibase::net
    }
 #endif
 
+   template <typename T, typename Derived>
+   concept has_recv = requires(Derived& d, const T& msg)
+   {
+      d.consensus().recv(0, msg);
+   };
+
    // This requires all producers to be peers
    template <typename Derived>
    struct direct_routing
@@ -191,6 +197,12 @@ namespace psibase::net
       {
          using message_type = decltype(get_message_impl());
          static_assert(check_message_uniqueness((message_type*)nullptr));
+         if (msg.empty())
+         {
+            PSIBASE_LOG(peers().logger(peer), warning) << "Invalid message";
+            peers().disconnect(peer);
+            return;
+         }
          recv_impl(peer, msg[0], msg, (message_type*)0);
       }
       void recv(peer_id peer, const init_message& msg)
@@ -207,13 +219,24 @@ namespace psibase::net
          producers.insert({msg.producer, peer});
       }
       template <typename T>
-      void recv(peer_id peer, const SignedMessage<T>& msg)
+      requires(!has_recv<SignedMessage<T>, Derived>) void recv(peer_id                 peer,
+                                                               const SignedMessage<T>& msg)
       {
          auto  raw   = serialize_unsigned_message(msg.data);
          Claim claim = msg.data.signer();
          PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.data.to_string();
          chain().verify({raw.data(), raw.size()}, claim, msg.signature);
          static_cast<Derived*>(this)->consensus().recv(peer, msg.data);
+      }
+      template <typename T>
+      requires has_recv<SignedMessage<T>, Derived>
+      void recv(peer_id peer, const SignedMessage<T>& msg)
+      {
+         auto  raw   = serialize_unsigned_message(msg.data);
+         Claim claim = msg.data.signer();
+         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.data.to_string();
+         chain().verify({raw.data(), raw.size()}, claim, msg.signature);
+         static_cast<Derived*>(this)->consensus().recv(peer, msg);
       }
       void recv(peer_id peer, const auto& msg)
       {

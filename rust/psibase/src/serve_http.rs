@@ -1,7 +1,7 @@
 use crate::{
-    check, create_schema, generate_action_templates, reflect::Reflect, table::Error, Fracpack,
-    HexBytes, HttpReply, HttpRequest, ProcessActionStruct, Reflect, Table, TableIndex, TableRecord,
-    WithActionStruct,
+    check, create_schema, generate_action_templates, reflect::Reflect, table::Error, HexBytes,
+    HttpReply, HttpRequest, Pack, ProcessActionStruct, Reflect, Table, TableIndex, TableRecord,
+    Unpack, WithActionStruct,
 };
 use async_graphql::{
     http::{graphiql_source, receive_body},
@@ -213,7 +213,7 @@ pub fn serve_graphiql(request: &HttpRequest) -> Option<HttpReply> {
     }
 }
 
-#[derive(Debug, Fracpack, PartialEq, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Pack, Unpack, PartialEq, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 pub struct WebContentRow {

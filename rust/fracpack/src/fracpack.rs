@@ -1,6 +1,5 @@
 // TODO: fix reading structs and tuples which have unknown fields
 // TODO: option to allow/disallow unknown fields during verify and unpack
-// TODO: rename misnamed "heap_size"
 // TODO: replace 'a with 'de; change macro to look for 'de specifically instead of assuming
 
 //! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
@@ -16,9 +15,9 @@
 //! # Example use
 //!
 //! ```
-//! use fracpack::{Fracpack, Pack, Unpack, Result};
+//! use fracpack::{Pack, Unpack, Result};
 //!
-//! #[derive(Fracpack, PartialEq, Debug)]
+//! #[derive(Pack, Unpack, PartialEq, Debug)]
 //! #[fracpack(fracpack_mod = "fracpack")]
 //! struct Example {
 //!     a_string: String,
@@ -53,17 +52,15 @@
 use custom_error::custom_error;
 use std::{cell::RefCell, mem, rc::Rc, sync::Arc};
 
-pub use psibase_macros::Fracpack;
+pub use psibase_macros::{Pack, Unpack};
 
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
     BadOffset           = "Bad offset",
     BadSize             = "Bad size",
-    BadEmptyEncoding    = "Bad empty encoding",
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
     ExtraData           = "Extra data in buffer",
-    UnpackRef           = "Can't unpack a ref"
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -83,7 +80,7 @@ impl<T> UnpackOwned for T where T: for<'a> Unpack<'a> {}
 
 /// Convert to fracpack format
 ///
-/// Use [`#[derive(Fracpack)]`](psibase_macros::Fracpack) to implement
+/// Use [`#[derive(Pack)]`](psibase_macros::Pack) to implement
 /// this trait; manually implementing it is unsupported.
 pub trait Pack {
     #[doc(hidden)]
@@ -165,7 +162,7 @@ pub trait Pack {
 
 /// Unpack fracpack data
 ///
-/// Use [`#[derive(Fracpack)]`](psibase_macros::Fracpack) to implement
+/// Use [`#[derive(Unpack)]`](psibase_macros::Unpack) to implement
 /// this trait; manually implementing it is unsupported.
 pub trait Unpack<'a>: Sized {
     #[doc(hidden)]
@@ -338,48 +335,6 @@ impl<'a, T: Pack> Pack for &'a T {
 
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
         (*self).embedded_variable_pack(dest)
-    }
-}
-
-impl<'a, T: Unpack<'a>> Unpack<'a> for &'a T {
-    const FIXED_SIZE: u32 = T::FIXED_SIZE;
-    const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
-    const IS_OPTIONAL: bool = T::IS_OPTIONAL;
-
-    fn unpack(_src: &'a [u8], _pos: &mut u32) -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        <T>::verify(src, pos)
-    }
-
-    fn new_empty_container() -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn embedded_variable_unpack(
-        _src: &'a [u8],
-        _fixed_pos: &mut u32,
-        _heap_pos: &mut u32,
-    ) -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn embedded_unpack(_src: &'a [u8], _fixed_pos: &mut u32, _heap_pos: &mut u32) -> Result<Self> {
-        Err(Error::UnpackRef)
-    }
-
-    fn embedded_variable_verify(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<()> {
-        <T>::embedded_variable_verify(src, fixed_pos, heap_pos)
-    }
-
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        <T>::embedded_verify(src, fixed_pos, heap_pos)
     }
 }
 
@@ -867,8 +822,8 @@ macro_rules! tuple_impls {
 
                 #[allow(non_snake_case,unused_mut)]
                 fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-                    let heap_size = u16::unpack(src, pos)?;
-                    let mut heap_pos = *pos + heap_size as u32;
+                    let fixed_size = u16::unpack(src, pos)?;
+                    let mut heap_pos = *pos + fixed_size as u32;
                     if heap_pos < *pos {
                         return Err(Error::BadOffset);
                     }
@@ -881,8 +836,8 @@ macro_rules! tuple_impls {
 
                 #[allow(unused_mut)]
                 fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-                    let heap_size = u16::unpack(src, pos)?;
-                    let mut heap_pos = *pos + heap_size as u32;
+                    let fixed_size = u16::unpack(src, pos)?;
+                    let mut heap_pos = *pos + fixed_size as u32;
                     if heap_pos < *pos {
                         return Err(Error::BadOffset);
                     }

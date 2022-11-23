@@ -9,6 +9,7 @@
 #include <psio/to_json.hpp>
 #include <set>
 #include <typeindex>
+#include <variant>
 
 namespace psio
 {
@@ -290,6 +291,23 @@ namespace psio
       }
    }
 
+   template <typename... T, typename S>
+   void fill_gql_schema_impl(const std::variant<T...>*,
+                             S&                                          stream,
+                             std::set<std::pair<std::type_index, bool>>& defined_types,
+                             bool                                        is_input,
+                             bool                                        is_query_root)
+   {
+      (fill_gql_schema((T*)nullptr, stream, defined_types, is_input, false), ...);
+      write_str("union ", stream);
+      write_str(generate_gql_partial_name((std::variant<T...>*)nullptr, is_input), stream);
+      write_str(" =", stream);
+      ((write_str("\n  | ", stream),
+        write_str(generate_gql_partial_name((T*)nullptr, is_input), stream)),
+       ...);
+      write_str("\n", stream);
+   }
+
    template <typename T, typename S>
    void fill_gql_schema_impl(const T*,
                              S&                                          stream,
@@ -362,7 +380,7 @@ namespace psio
       input_stream     input;
       token_type       current_type = unstarted;
       std::string_view current_value;
-      char             current_puncuator = 0;
+      char             current_punctuator = 0;
 
       gql_stream(input_stream input) : input{input} { skip(); }
       gql_stream(const gql_stream&)            = default;
@@ -372,8 +390,8 @@ namespace psio
       {
          if (current_type == error)
             return;
-         current_puncuator = 0;
-         current_value     = {};
+         current_punctuator = 0;
+         current_value      = {};
          while (true)
          {
             auto begin = input.pos;
@@ -418,7 +436,7 @@ namespace psio
                case '{':
                case '|':
                case '}':
-                  current_puncuator = input.pos[0];
+                  current_punctuator = input.pos[0];
                   ++input.pos;
                   current_value = {begin, size_t(input.pos - begin)};
                   current_type  = punctuator;
@@ -426,7 +444,7 @@ namespace psio
                case '.':
                   if (input.remaining() >= 3 && input.pos[1] == '.' && input.pos[2] == '.')
                   {
-                     current_puncuator = '.';
+                     current_punctuator = '.';
                      input.pos += 3;
                      current_value = {begin, size_t(input.pos - begin)};
                      current_type  = punctuator;
@@ -552,10 +570,10 @@ namespace psio
    template <typename T, typename E>
    auto gql_parse_arg(std::vector<T>& arg, gql_stream& input_stream, const E& error)
    {
-      if (input_stream.current_puncuator != '[')
+      if (input_stream.current_punctuator != '[')
          return error("expected [");
       input_stream.skip();
-      while (input_stream.current_puncuator != ']')
+      while (input_stream.current_punctuator != ']')
       {
          T v;
          if (!gql_parse_arg(v, input_stream, error))
@@ -570,7 +588,7 @@ namespace psio
    auto gql_parse_arg(T& arg, gql_stream& input_stream, const E& error)
        -> std::enable_if_t<reflect<T>::is_struct && !use_json_string_for_gql((T*)nullptr), bool>
    {
-      if (input_stream.current_puncuator != '{')
+      if (input_stream.current_punctuator != '{')
          return error("expected {");
       input_stream.skip();
       bool ok = true;
@@ -580,7 +598,7 @@ namespace psio
       {
          auto field_name = input_stream.current_value;
          input_stream.skip();
-         if (input_stream.current_puncuator != ':')
+         if (input_stream.current_punctuator != ':')
             return error("expected :");
          input_stream.skip();
 
@@ -594,7 +612,7 @@ namespace psio
          if (!found)
             return error((std::string)field_name + " not found");
       }
-      if (input_stream.current_puncuator != '}')
+      if (input_stream.current_punctuator != '}')
          return error("expected }");
       input_stream.skip();
 
@@ -673,7 +691,7 @@ namespace psio
          if (input_stream.current_value != std::data(arg_names)[i])
             return gql_parse_args<i + 1>(args, filled, found, input_stream, error, arg_names);
          input_stream.skip();
-         if (input_stream.current_puncuator != ':')
+         if (input_stream.current_punctuator != ':')
             return error("expected :");
          if (filled[i])
             return error("duplicate arg");
@@ -713,24 +731,24 @@ namespace psio
    template <typename E>
    bool gql_skip_selection_set(gql_stream& input_stream, const E& error)
    {
-      if (input_stream.current_puncuator != '{')
+      if (input_stream.current_punctuator != '{')
          return true;
       input_stream.skip();
       while (true)
       {
          if (input_stream.current_type == gql_stream::eof)
             return error("expected }");
-         else if (input_stream.current_puncuator == '{')
+         else if (input_stream.current_punctuator == '{')
          {
             if (!gql_skip_selection_set(input_stream, error))
                return false;
          }
-         else if (input_stream.current_puncuator == '}')
+         else if (input_stream.current_punctuator == '}')
          {
             input_stream.skip();
             return true;
          }
-         else if (input_stream.current_puncuator == '(')
+         else if (input_stream.current_punctuator == '(')
          {
             if (!gql_skip_args(input_stream, error))
                return false;
@@ -743,24 +761,24 @@ namespace psio
    template <typename E>
    bool gql_skip_args(gql_stream& input_stream, const E& error)
    {
-      if (input_stream.current_puncuator != '(')
+      if (input_stream.current_punctuator != '(')
          return true;
       input_stream.skip();
       while (true)
       {
          if (input_stream.current_type == gql_stream::eof)
             return error("expected )");
-         else if (input_stream.current_puncuator == '(')
+         else if (input_stream.current_punctuator == '(')
          {
             if (!gql_skip_args(input_stream, error))
                return false;
          }
-         else if (input_stream.current_puncuator == ')')
+         else if (input_stream.current_punctuator == ')')
          {
             input_stream.skip();
             return true;
          }
-         else if (input_stream.current_puncuator == '{')
+         else if (input_stream.current_punctuator == '{')
          {
             if (!gql_skip_selection_set(input_stream, error))
                return false;
@@ -922,10 +940,10 @@ namespace psio
       {
          args_tuple args;
          bool       filled[num_args] = {};
-         if (input_stream.current_puncuator == '(')
+         if (input_stream.current_punctuator == '(')
          {
             input_stream.skip();
-            if (input_stream.current_puncuator == ')')
+            if (input_stream.current_punctuator == ')')
                return error("empty arg list");
             while (input_stream.current_type == gql_stream::name)
             {
@@ -935,7 +953,7 @@ namespace psio
                if (!found)
                   return error("unknown arg '" + (std::string)input_stream.current_value + "'");
             }
-            if (input_stream.current_puncuator != ')')
+            if (input_stream.current_punctuator != ')')
                return error("expected )");
             input_stream.skip();
          }
@@ -953,27 +971,57 @@ namespace psio
       }
    }  // gql_query_fn
 
-   template <typename T, typename OS, typename E>
-   auto gql_query(const T&    value,
-                  gql_stream& input_stream,
-                  OS&         output_stream,
-                  const E&    error,
-                  bool        allow_unknown_members)
-       -> std::enable_if_t<reflect<T>::is_struct and not has_get_gql_name<T>::value, bool>
+   // T is the actual type
+   // ContextT is the type declared in the GraphQL document
+   template <typename ContextT, typename T, typename OS, typename E>
+   auto gql_query_inline(ContextT*,
+                         const T&    value,
+                         gql_stream& input_stream,
+                         OS&         output_stream,
+                         const E&    error,
+                         bool        allow_unknown_members,
+                         bool&       first)
    {
-      if (input_stream.current_puncuator != '{')
+      if (input_stream.current_punctuator != '{')
          return error("expected {");
       input_stream.skip();
-      bool first = true;
-      output_stream.write('{');
-      while (input_stream.current_type == gql_stream::name)
+      while (true)
       {
+         if (input_stream.current_type == gql_stream::punctuator &&
+             input_stream.current_punctuator == '.')
+         {
+            // parse inline fragments
+            input_stream.skip();
+            if (input_stream.current_type != gql_stream::name)
+               return error("expected fragment after ...");
+            if (input_stream.current_value != "on")
+               return error("not implemented: fragments");
+            input_stream.skip();
+            if (input_stream.current_value == generate_gql_partial_name((T*)nullptr, false))
+            {
+               input_stream.skip();
+               if (!gql_query_inline((T*)nullptr, value, input_stream, output_stream, error,
+                                     allow_unknown_members, first))
+                  return false;
+            }
+            else
+            {
+               input_stream.skip();
+               if (!gql_skip_selection_set(input_stream, error))
+                  return false;
+            }
+            continue;
+         }
+         else if (input_stream.current_type != gql_stream::name)
+         {
+            break;
+         }
          bool found      = false;
          bool ok         = true;
          auto alias      = input_stream.current_value;
          auto field_name = alias;
          input_stream.skip();
-         if (input_stream.current_puncuator == ':')
+         if (input_stream.current_punctuator == ':')
          {
             input_stream.skip();
             if (input_stream.current_type != gql_stream::name)
@@ -999,6 +1047,8 @@ namespace psio
                 write_newline(output_stream);
                 to_json(alias, output_stream);
                 write_colon(output_stream);
+
+                // TODO: enforce that member is defined in ContextT
 
                 if constexpr (!MemPtr::isFunction)
                 {
@@ -1026,9 +1076,59 @@ namespace psio
                return false;
          }
       }
-      if (input_stream.current_puncuator != '}')
+      if (input_stream.current_punctuator != '}')
          return error("expected }");
       input_stream.skip();
+      return true;
+   }
+
+   template <typename T, typename OS, typename E>
+   auto gql_query(const T&    value,
+                  gql_stream& input_stream,
+                  OS&         output_stream,
+                  const E&    error,
+                  bool        allow_unknown_members)
+       -> std::enable_if_t<reflect<T>::is_struct and not has_get_gql_name<T>::value, bool>
+   {
+      if (input_stream.current_punctuator != '{')
+         return error("expected {");
+      bool first = true;
+      output_stream.write('{');
+      if (!gql_query_inline((T*)nullptr, value, input_stream, output_stream, error,
+                            allow_unknown_members, first))
+      {
+         return false;
+      }
+      if (!first)
+      {
+         decrease_indent(output_stream);
+         write_newline(output_stream);
+      }
+      output_stream.write('}');
+      return true;
+   }
+
+   template <typename... T, typename OS, typename E>
+   auto gql_query(const std::variant<T...>& value,
+                  gql_stream&               input_stream,
+                  OS&                       output_stream,
+                  const E&                  error,
+                  bool                      allow_unknown_members)
+   {
+      if (input_stream.current_punctuator != '{')
+         return error("expected {");
+      bool first = true;
+      output_stream.write('{');
+      if (!std::visit(
+              [&](const auto& v)
+              {
+                 return gql_query_inline((std::variant<T...>*)nullptr, v, input_stream,
+                                         output_stream, error, allow_unknown_members, first);
+              },
+              value))
+      {
+         return false;
+      }
       if (!first)
       {
          decrease_indent(output_stream);
@@ -1052,9 +1152,9 @@ namespace psio
             input_stream.skip();
             if (input_stream.current_type == gql_stream::name)
                input_stream.skip();
-            if (input_stream.current_puncuator == '(')
+            if (input_stream.current_punctuator == '(')
                return error("variables not supported");
-            if (input_stream.current_puncuator == '@')
+            if (input_stream.current_punctuator == '@')
                return error("directives not supported");
          }
          else if (input_stream.current_value == "subscriptions")

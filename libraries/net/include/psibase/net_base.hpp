@@ -4,6 +4,7 @@
 
 namespace psibase::net
 {
-   using producer_id = AccountNumber;
-   using peer_id     = int;
+   using producer_id                          = AccountNumber;
+   using peer_id                              = int;
+   static constexpr producer_id null_producer = {};
 }  // namespace psibase::net

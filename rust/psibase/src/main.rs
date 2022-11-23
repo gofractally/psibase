@@ -1,14 +1,14 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use clap::{Parser, Subcommand};
-use fracpack::Pack;
+use clap::{ArgAction, Parser, Subcommand};
+use fracpack::{Pack, Unpack};
 use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
 use psibase::services::{account_sys, auth_ec_sys, proxy_sys, psispace_sys, setcode_sys};
 use psibase::{
     account, create_boot_transactions, get_tapos_for_head, push_transaction, sign_transaction,
-    AccountNumber, Action, ExactAccountNumber, Fracpack, PrivateKey, PublicKey, SignedTransaction,
-    Tapos, TaposRefBlock, TimePointSec, Transaction,
+    AccountNumber, Action, ExactAccountNumber, PrivateKey, PublicKey, SignedTransaction, Tapos,
+    TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -52,6 +52,10 @@ enum Command {
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
         producer: ExactAccountNumber,
+
+        /// Don't include documentation in the boot image
+        #[clap(long="no-doc",action=ArgAction::SetFalse)]
+        doc: bool,
     },
 
     /// Create or modify an account
@@ -179,7 +183,7 @@ fn to_hex(bytes: &[u8]) -> String {
     String::from_utf8(result).unwrap()
 }
 
-#[derive(Serialize, Deserialize, Fracpack)]
+#[derive(Serialize, Deserialize, Pack, Unpack)]
 struct NewAccountAction {
     account: AccountNumber,
     auth_service: AccountNumber,
@@ -198,7 +202,7 @@ fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) 
     account_sys::Wrapper::pack_from(account).setAuthCntr(auth_service)
 }
 
-#[derive(Serialize, Deserialize, Fracpack)]
+#[derive(Serialize, Deserialize, Pack, Unpack)]
 struct SetCodeAction {
     service: AccountNumber,
     vm_type: i8,
@@ -487,12 +491,13 @@ async fn boot(
     client: reqwest::Client,
     key: &Option<PublicKey>,
     producer: ExactAccountNumber,
+    doc: bool,
 ) -> Result<(), anyhow::Error> {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec {
         seconds: now_plus_10secs.timestamp() as u32,
     };
-    let transactions = create_boot_transactions(key, producer.into(), true, true, true, expiration);
+    let transactions = create_boot_transactions(key, producer.into(), true, doc, true, expiration);
     push_boot(args, client, transactions.packed()).await?;
     if !args.suppress_ok {
         println!("Ok");
@@ -608,7 +613,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let client = reqwest::Client::new();
     match &args.command {
-        Command::Boot { key, producer } => boot(&args, client, key, *producer).await?,
+        Command::Boot { key, producer, doc } => boot(&args, client, key, *producer, *doc).await?,
         Command::Create {
             account,
             key,

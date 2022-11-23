@@ -1,6 +1,7 @@
 #include <psibase/ConfigFile.hpp>
 #include <psibase/EcdsaProver.hpp>
 #include <psibase/TransactionContext.hpp>
+#include <psibase/bft.hpp>
 #include <psibase/cft.hpp>
 #include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
@@ -529,7 +530,17 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
 using timer_type = boost::asio::system_timer;
 
 template <typename Derived>
-using cft_consensus = basic_cft_consensus<Derived, timer_type>;
+using cft_consensus = basic_cft_consensus<blocknet<Derived, timer_type>, timer_type>;
+
+template <typename Derived>
+using bft_consensus = basic_bft_consensus<blocknet<Derived, timer_type>, timer_type>;
+
+template <typename Derived, typename Timer>
+using basic_consensus =
+    basic_bft_consensus<basic_cft_consensus<blocknet<Derived, Timer>, Timer>, Timer>;
+
+template <typename Derived>
+using consensus = basic_consensus<Derived, timer_type>;
 
 void run(const std::string&              db_path,
          AccountNumber                   producer,
@@ -577,7 +588,7 @@ void run(const std::string&              db_path,
 
    boost::asio::io_context chainContext;
 
-   using node_type = node<peer_manager, direct_routing, cft_consensus, ForkDb>;
+   using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
    node_type node(chainContext, system.get(), std::move(prover));
    node.set_producer_id(producer);
    node.load_producers();
@@ -607,24 +618,20 @@ void run(const std::string&              db_path,
       http_config->admin = admin;
 
       // TODO: speculative execution on non-producers
-      if (producer != AccountNumber{})
+      http_config->push_boot_async =
+          [queue](std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
       {
-         http_config->push_boot_async = [queue](std::vector<char>        packed_signed_transactions,
-                                                http::push_boot_callback callback)
-         {
-            std::scoped_lock lock{queue->mutex};
-            queue->entries.push_back(
-                {true, std::move(packed_signed_transactions), std::move(callback), {}});
-         };
+         std::scoped_lock lock{queue->mutex};
+         queue->entries.push_back(
+             {true, std::move(packed_signed_transactions), std::move(callback), {}});
+      };
 
-         http_config->push_transaction_async =
-             [queue](std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
-         {
-            std::scoped_lock lock{queue->mutex};
-            queue->entries.push_back(
-                {false, std::move(packed_signed_trx), {}, std::move(callback)});
-         };
-      }
+      http_config->push_transaction_async =
+          [queue](std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
+      {
+         std::scoped_lock lock{queue->mutex};
+         queue->entries.push_back({false, std::move(packed_signed_trx), {}, std::move(callback)});
+      };
 
       // TODO: The websocket uses the http server's io_context, but does not
       // do anything to keep it alive. Stopping the server doesn't close the
@@ -825,8 +832,10 @@ void run(const std::string&              db_path,
              [&node, &info](BlockHeader* h)
              {
                 node.consensus().on_fork_switch(h);
+                // TODO: is it correct to assume the the input block log is irreversible?
                 node.chain().commit(info.header.blockNum);
-             });
+             },
+             [](const void*) {});
       }
    }
 

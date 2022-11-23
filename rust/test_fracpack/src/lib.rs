@@ -6,10 +6,10 @@
 
 pub mod bridge;
 
-use psibase_macros::Fracpack;
+use psibase_macros::{Pack, Unpack};
 
 // TODO: test reading variant with future index
-#[derive(Fracpack, PartialEq, Eq, Debug)]
+#[derive(Pack, Unpack, PartialEq, Eq, Debug)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum Variant {
     ItemU32(u32),
@@ -17,7 +17,7 @@ pub enum Variant {
     // ItemOptStr(Option<String>),  TODO: broken in C++
 }
 
-#[derive(Fracpack, PartialEq, Debug)]
+#[derive(Pack, Unpack, PartialEq, Debug)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct DefWontChangeInnerStruct {
@@ -37,7 +37,7 @@ pub struct DefWontChangeInnerStruct {
     pub field_i32: i32,
 }
 
-#[derive(Fracpack, PartialEq, Eq, Debug)]
+#[derive(Pack, Unpack, PartialEq, Eq, Debug)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct InnerStruct {
     pub inner_u32: u32,
@@ -48,7 +48,7 @@ pub struct InnerStruct {
     pub inner_o_vec_o_u16: Option<Vec<Option<u16>>>,
 }
 
-#[derive(Fracpack, PartialEq, Debug)]
+#[derive(Pack, Unpack, PartialEq, Debug)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct OuterStruct {
     pub field_u8: u8,
@@ -86,7 +86,7 @@ pub struct OuterStruct {
     pub field_o_o_inner: Option<Option<InnerStruct>>,
 }
 
-#[derive(Fracpack, Debug, PartialEq)]
+#[derive(Pack, Unpack, Debug, PartialEq)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct SimpleWithNoString {
@@ -96,7 +96,7 @@ pub struct SimpleWithNoString {
     pub f: f32,
 }
 
-#[derive(Fracpack, Debug, PartialEq)]
+#[derive(Pack, Unpack, Debug, PartialEq)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct SimpleWithString {
@@ -107,7 +107,7 @@ pub struct SimpleWithString {
     pub f: f32,
 }
 
-#[derive(Fracpack, Debug, PartialEq)]
+#[derive(Pack, Unpack, Debug, PartialEq)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ParentStruct {
     pub oa: u32,
@@ -121,7 +121,7 @@ pub struct ParentStruct {
     pub s: String,
 }
 
-#[derive(Fracpack, Debug, PartialEq, Eq)]
+#[derive(Pack, Unpack, Debug, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct OuterSimpleArray {
     pub oa: u32,
@@ -136,7 +136,7 @@ pub struct OuterSimpleArray {
 
 // TODO: check arrays, tuples, bool, char,
 
-#[derive(Fracpack, Debug, PartialEq)]
+#[derive(Pack, Unpack, Debug, PartialEq)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct UnextensibleWithOptions {
@@ -152,7 +152,7 @@ pub struct UnextensibleWithOptions {
     pub opt_f: Option<f32>,
 }
 
-#[derive(Fracpack, Debug, PartialEq, Eq)]
+#[derive(Pack, Unpack, Debug, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct ThreeElementsFixedStruct {

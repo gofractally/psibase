@@ -29,6 +29,7 @@ namespace psibase
          notice,
          warning,
          error,
+         critical,
       };
       std::ostream& operator<<(std::ostream&, const level&);
       std::istream& operator>>(std::istream& is, level& l);

@@ -9,6 +9,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <deque>
+#include <memory>
 #include <psibase/log.hpp>
 #include <psibase/peer_manager.hpp>
 #include <sstream>
@@ -19,7 +20,7 @@
 
 namespace psibase::net
 {
-   struct websocket_connection : connection_base
+   struct websocket_connection : connection_base, std::enable_shared_from_this<websocket_connection>
    {
       explicit websocket_connection(
           boost::beast::websocket::stream<boost::beast::tcp_stream>&& stream)
@@ -62,36 +63,43 @@ namespace psibase::net
       }
       void async_write(std::vector<char>&& data, write_handler f) override
       {
-         outbox.emplace_back(
-             psibase::net::websocket_connection::message{std::move(data), std::move(f)});
-         if (outbox.size() == 1)
-         {
-            async_write_loop();
-         }
+         boost::asio::dispatch(
+             stream.get_executor(),
+             [self = shared_from_this(), data = std::move(data), f = std::move(f)]() mutable
+             {
+                self->outbox.emplace_back(
+                    psibase::net::websocket_connection::message{std::move(data), std::move(f)});
+                if (self->outbox.size() == 1)
+                {
+                   auto p = self.get();
+                   p->async_write_loop(std::move(self));
+                }
+             });
       }
-      void async_write_loop()
+      void async_write_loop(std::shared_ptr<websocket_connection> self)
       {
          stream.binary(true);
          stream.async_write(boost::asio::buffer(outbox.front().data),
-                            [this](const std::error_code& ec, std::size_t sz)
+                            [self = std::move(self)](const std::error_code& ec, std::size_t sz)
                             {
                                if (!ec)
                                {
-                                  outbox.front().callback(ec);
-                                  outbox.pop_front();
-                                  if (!outbox.empty())
+                                  self->outbox.front().callback(ec);
+                                  self->outbox.pop_front();
+                                  if (!self->outbox.empty())
                                   {
-                                     async_write_loop();
+                                     auto p = self.get();
+                                     p->async_write_loop(std::move(self));
                                   }
                                }
                                else
                                {
-                                  log_error(ec);
-                                  for (auto& m : outbox)
+                                  self->log_error(ec);
+                                  for (auto& m : self->outbox)
                                   {
                                      m.callback(ec);
                                   }
-                                  outbox.clear();
+                                  self->outbox.clear();
                                }
                             });
       }

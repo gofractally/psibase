@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    AccountNumber, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Fracpack, Producer,
-    Reflect,
+    AccountNumber, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Pack, Producer,
+    Reflect, Unpack,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +24,7 @@ pub fn status_key() -> (NativeTable, NativeIndex) {
     (STATUS_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 pub struct StatusRow {
@@ -43,7 +43,7 @@ impl StatusRow {
     }
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 pub struct ConfigRow {
@@ -63,7 +63,7 @@ pub fn producer_config_key(producer: AccountNumber) -> (NativeTable, AccountNumb
     (PRODUCER_CONFIG_TABLE, producer)
 }
 
-#[derive(Debug, Clone, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 pub struct ProducerConfigRow {

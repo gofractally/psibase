@@ -323,9 +323,9 @@ TEST_CASE("fracpack")
    // TODO: REQUIRE(psio::can_memcpy<simple>() == true);
    // TODO: REQUIRE(psio::can_memcpy<simple>() == true);
    REQUIRE(psio::can_memcpy<simple_with_string>() == false);
-   REQUIRE(psio::is_fixed_structure<simple>() == true);
-   REQUIRE(psio::is_fixed_structure<not_final_simple>() == false);
-   REQUIRE(psio::is_fixed_structure<ext_simple_with_string>() == false);
+   REQUIRE(psio::may_use_heap<simple>() == false);
+   REQUIRE(psio::may_use_heap<not_final_simple>() == true);
+   REQUIRE(psio::may_use_heap<ext_simple_with_string>() == true);
 
    REQUIRE(psio::can_memcpy<mixed_simple>() == false);
    REQUIRE(sizeof(req_align_simple) == 16);

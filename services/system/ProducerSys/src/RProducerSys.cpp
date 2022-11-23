@@ -17,10 +17,12 @@ using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 struct ProducerQuery
 {
-   auto producers() const
+   std::vector<Producer> producers() const
    {
-      return TableIndex<ProducerConfigRow, AccountNumber>(
-          ProducerConfigRow::db, psio::convert_to_key(producerConfigTable), false);
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      if (!status)
+         return {};
+      return std::visit([](const auto& c) { return c.producers; }, status->consensus);
    }
 };
 PSIO_REFLECT(ProducerQuery, method(producers))

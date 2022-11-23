@@ -27,6 +27,7 @@
     - [Console Logger](#console-logger)
     - [File Logger](#file-logger)
     - [Local Socket Logger](#local-socket-logger)
+    - [Pipe Logger](#pipe-logger)
     - [Websocket Logger](#websocket-logger)
 
 
@@ -495,6 +496,7 @@ Example:
 - [Console Logger](#console-logger)
 - [File Logger](#file-logger)
 - [Local Socket Logger](#local-socket-logger)
+- [Pipe Logger](#pipe-logger)
 - [Websocket Logger](#websocket-logger)
 
 The `loggers` field of `/native/admin/config` controls the server's logging configuration.
@@ -576,6 +578,35 @@ Example:
 }
 ```
 
+
+### Pipe logger
+
+The pipe logger sends log messages to the `stdin` of a subprocess. The format MUST include any necessary framing.
+
+| Field     | Type   | Description                                                                                                |
+|-----------|--------|------------------------------------------------------------------------------------------------------------|
+| `command` | String | The command will be run as if by `popen(3)` with the working directory set to the server's root directory. |
+|           |        |                                                                                                            |
+
+The command SHOULD exit after receiving EOF. If it fails to do so, a configuration change that updates the command may terminate the previous command with a signal.
+
+Examples:
+```json
+{
+    "syslog": {
+        "type": "pipe",
+        "filter": "Severity >= info",
+        "format": "{FrameDec:{Syslog:rfc5424}{Message}}",
+        "command": "nc --send-only --ssl-verify --ssl-cert logcert.pem --ssl-key logkey.pem logs.psibase.io 6154"
+    },
+    "alert": {
+        "type": "pipe",
+        "filter": "Severity >= error",
+        "format": "notify-send -a {Process} -i /usr/share/psibase/icons/psibase.svg '{Process} {Channel}' \"{Escape:$`\\\":{Message}}\"\n",
+        "command": "/bin/sh"
+    }
+}
+```
 
 ### Websocket logger
 

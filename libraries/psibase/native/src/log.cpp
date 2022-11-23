@@ -7,6 +7,7 @@
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/local/datagram_protocol.hpp>
+#include <boost/asio/write.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/log/attributes/current_process_id.hpp>
 #include <boost/log/attributes/current_process_name.hpp>
@@ -15,6 +16,9 @@
 #include <boost/log/sinks/syslog_constants.hpp>
 #include <boost/log/sinks/text_file_backend.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
+#include <boost/process/child.hpp>
+#include <boost/process/io.hpp>
+#include <boost/process/start_dir.hpp>
 #include <charconv>
 #include <chrono>
 #include <ctime>
@@ -136,6 +140,8 @@ namespace psibase::loggers
                return boost::log::sinks::syslog::warning;
             case level::error:
                return boost::log::sinks::syslog::error;
+            case level::critical:
+               return boost::log::sinks::syslog::critical;
          }
          __builtin_unreachable();
       }
@@ -246,6 +252,8 @@ namespace psibase::loggers
                case level::error:
                   os << "\"error\"";
                   break;
+               case level::critical:
+                  os << "\"critical\"";
             }
          }
 
@@ -613,7 +621,7 @@ namespace psibase::loggers
       };
 
       boost::log::filter    parse_filter(std::string_view filter);
-      boost::log::formatter parse_formatter(std::string_view formatter);
+      boost::log::formatter parse_formatter(std::string_view formatter, bool in_expansion = false);
 
       bool is_known_channel(std::string_view name)
       {
@@ -1268,6 +1276,75 @@ namespace psibase::loggers
          psio::to_json(obj.path.native(), stream);
       }
 
+      struct PipeBackend
+          : public boost::log::sinks::
+                basic_formatted_sink_backend<char, boost::log::sinks::synchronized_feeding>
+      {
+         explicit PipeBackend() {}
+         void consume(const boost::log::record_view&, const string_type& message)
+         {
+            pipe << message;
+            pipe.flush();
+         }
+         boost::process::opstream pipe;
+         boost::process::child    active_child;
+      };
+
+      struct PipeSinkConfig
+      {
+         using backend_type = PipeBackend;
+         explicit PipeSinkConfig(const sink_args_type& args)
+         {
+            auto as_string = [](const auto& value) -> const std::string&
+            {
+               if (auto* result = std::get_if<std::string>(&value.value()))
+               {
+                  return *result;
+               }
+               else
+               {
+                  throw std::runtime_error("Expected string");
+               }
+            };
+            auto iter = args.find("command");
+            if (iter == args.end())
+            {
+               throw std::runtime_error("Missing command");
+            }
+            command = as_string(iter->second);
+         }
+         static void init(PipeBackend&) {}
+         void        apply(PipeBackend& backend) const
+         {
+            if (newCommand)
+            {
+               backend.pipe.close();
+               backend.pipe = boost::process::opstream{};
+               if (backend.active_child)
+               {
+                  if (!backend.active_child.wait_for(std::chrono::milliseconds(100)))
+                  {
+                     backend.active_child.terminate();
+                  }
+               }
+               backend.active_child = boost::process::child(
+                   "/bin/sh", "-c", command, boost::process::std_in = backend.pipe,
+                   boost::process::start_dir = log_file_path.native());
+            }
+         }
+         void        setPrevious(PipeSinkConfig&& prev) { newCommand = (prev.command != command); }
+         std::string command;
+         bool        newCommand = true;
+      };
+
+      void to_json(const PipeSinkConfig& obj, auto& stream)
+      {
+         stream.write(',');
+         to_json("command", stream);
+         stream.write(':');
+         to_json(obj.command, stream);
+      }
+
       struct sink_config
       {
          boost::log::formatter format;
@@ -1276,7 +1353,8 @@ namespace psibase::loggers
          std::string           filter_str;
          std::string           type;
          //
-         std::variant<ConsoleSinkConfig, FileSinkConfig, LocalSocketSinkConfig> backend;
+         std::variant<ConsoleSinkConfig, FileSinkConfig, LocalSocketSinkConfig, PipeSinkConfig>
+             backend;
       };
 
       void from_json(sink_config& obj, auto& stream)
@@ -1319,6 +1397,10 @@ namespace psibase::loggers
          if (obj.type == "local")
          {
             obj.backend.emplace<LocalSocketSinkConfig>(args);
+         }
+         if (obj.type == "pipe")
+         {
+            obj.backend.emplace<PipeSinkConfig>(args);
          }
       }
 
@@ -1945,7 +2027,21 @@ namespace psibase::loggers
                {
                   auto name_end = begin;
                   ++begin;
-                  begin = std::find(begin, end, '}');
+                  std::size_t count = 1;
+                  for (; begin != end; ++begin)
+                  {
+                     if (*begin == '}')
+                     {
+                        if (--count == 0)
+                        {
+                           break;
+                        }
+                     }
+                     else if (*begin == '{')
+                     {
+                        ++count;
+                     }
+                  }
                   if (begin == end)
                   {
                      return false;
@@ -2098,10 +2194,10 @@ namespace psibase::loggers
          return std::move(parser.result[0]);
       }
 
-      boost::log::formatter parse_formatter(std::string_view formatter)
+      boost::log::formatter parse_formatter(std::string_view formatter, bool in_expansion)
       {
          formatter_parser parser{formatter.begin(), formatter.end()};
-         if (!parser.parse())
+         if (!parser.parse(in_expansion))
          {
             throw std::runtime_error("Invalid formatter");
          }
@@ -2245,6 +2341,35 @@ namespace psibase::loggers
       }
 
       template <>
+      auto make_simple_formatter_factory<level>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec) -> boost::log::formatter
+         {
+            if (spec == "d")
+            {
+               return [name](auto& rec, auto& stream)
+               {
+                  if (auto attr = boost::log::extract<level>(name, rec))
+                  {
+                     stream << to_syslog(*attr);
+                  }
+               };
+            }
+            else if (!spec.empty() && spec != "s")
+            {
+               throw std::runtime_error("std::format not supported yet");
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<level>(name, rec))
+               {
+                  stream << *attr;
+               }
+            };
+         };
+      }
+
+      template <>
       auto make_simple_formatter_factory<std::chrono::system_clock::time_point>()
       {
          return [](boost::log::attribute_name name, std::string_view spec)
@@ -2357,6 +2482,47 @@ namespace psibase::loggers
                                                          std::forward<F>(f));
       }
 
+      auto make_escape_formatter = [](auto name, std::string_view spec)
+      {
+         auto pos = spec.find(':');
+         if (pos == std::string_view::npos)
+         {
+            throw std::runtime_error("Escape: missing format");
+         }
+         std::string chars{spec.substr(0, pos)};
+         auto        nested = parse_formatter(spec.substr(pos + 1), true);
+         return [chars = std::move(chars), nested = std::move(nested)](
+                    const boost::log::record_view& rec, boost::log::formatting_ostream& os) mutable
+         {
+            std::string data;
+            {
+               boost::log::formatting_ostream nested_os{data};
+               nested(rec, nested_os);
+            }
+            for (auto ch : data)
+            {
+               if (chars.find(ch) != std::string::npos)
+                  os << '\\';
+               os << ch;
+            }
+         };
+      };
+
+      auto make_frame_dec_formatter = [](auto name, std::string_view spec)
+      {
+         auto nested = parse_formatter(spec, true);
+         return [nested = std::move(nested)](const boost::log::record_view&  rec,
+                                             boost::log::formatting_ostream& os) mutable
+         {
+            std::string data;
+            {
+               boost::log::formatting_ostream nested_os{data};
+               nested(rec, nested_os);
+            }
+            os << data.size() << ' ' << data;
+         };
+      };
+
       void do_init()
       {
          auto core = boost::log::core::get();
@@ -2406,6 +2572,8 @@ namespace psibase::loggers
                                 return json_formatter;
                              });
          add_compound_format("Syslog", make_syslog_formatter);
+         add_compound_format("Escape", make_escape_formatter);
+         add_compound_format("FrameDec", make_frame_dec_formatter);
       }
 
       struct log_config
@@ -2439,6 +2607,10 @@ namespace psibase::loggers
                if (current_config.type == "local")
                {
                   current_config.backend.emplace<LocalSocketSinkConfig>(current_args);
+               }
+               if (current_config.type == "pipe")
+               {
+                  current_config.backend.emplace<PipeSinkConfig>(current_args);
                }
                auto sink = make_sink(current_config);
                sinks.try_emplace(std::string(current_name), std::move(current_config), sink);
@@ -2715,6 +2887,11 @@ namespace psibase::loggers
       file.set(section, "path", obj.path.native(), "");
    }
 
+   void to_config_impl(const std::string& section, const PipeSinkConfig& obj, ConfigFile& file)
+   {
+      file.set(section, "command", obj.command, "");
+   }
+
    void to_config(const Config& obj, ConfigFile& file)
    {
       if (obj.impl)
@@ -2749,6 +2926,9 @@ namespace psibase::loggers
          case level::error:
             os << "error";
             break;
+         case level::critical:
+            os << "critical";
+            break;
       }
       return os;
    }
@@ -2776,6 +2956,10 @@ namespace psibase::loggers
          else if (s == "error")
          {
             l = level::error;
+         }
+         else if (s == "critical")
+         {
+            l = level::critical;
          }
          else
          {

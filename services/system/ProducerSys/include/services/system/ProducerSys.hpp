@@ -14,7 +14,8 @@ namespace SystemService
       static constexpr auto service      = psibase::AccountNumber("producer-sys");
       static constexpr auto serviceFlags = psibase::CodeRow::allowWriteNative;
 
-      void setProducers(std::vector<psibase::ProducerConfigRow> prods);
+      void setConsensus(psibase::Consensus consensus);
+      void setProducers(std::vector<psibase::Producer> prods);
 
       // Allows this service to be used as an auth service.
       // Passes if more than 2/3 of the active producers have signed the transaction
@@ -25,6 +26,7 @@ namespace SystemService
                         std::vector<psibase::Claim> claims);
    };
    PSIO_REFLECT(ProducerSys,
+                method(setConsensus, consensus),
                 method(setProducers, producers),
                 method(checkAuthSys, flags, requester, action, allowedActions, claims))
 }  // namespace SystemService
