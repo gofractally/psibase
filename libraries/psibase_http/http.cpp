@@ -1055,7 +1055,7 @@ namespace psibase::http
                 }
                 else
                 {
-                   PSIBASE_LOG(logger, info) << "timeout";
+                   PSIBASE_LOG(logger, info) << "Idle connection closed";
                    return do_close();
                 }
              });
