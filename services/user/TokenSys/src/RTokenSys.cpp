@@ -52,7 +52,7 @@ struct TokenQuery
       return tokenSys.index<SharedBalanceTable, 0>();
    }
 
-   auto tokenTypes() const
+   auto tokens() const
    {  //
       return tokenSys.index<TokenTable, 0>();
    }
@@ -73,15 +73,21 @@ struct TokenQuery
    {
       return tokenSys.eventIndex<TokenSys::UserEvents>(user, first, after);
    }
+
+   auto tokenEvents(TID tokenId, optional<uint32_t> first, const optional<string>& after) const
+   {
+      return tokenSys.eventIndex<TokenSys::TokenEvents>(tokenId, first, after);
+   }
 };
 PSIO_REFLECT(TokenQuery,
              method(allBalances),
              method(userBalances, user),
              method(sharedBalances),
-             method(tokenTypes),
+             method(tokens),
              method(userConf, user, flag),
              method(events),
-             method(userEvents, user, first, after))
+             method(userEvents, user, first, after),
+             method(tokenEvents, tokenId, first, after))
 
 optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 {

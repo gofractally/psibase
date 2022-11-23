@@ -1020,7 +1020,7 @@ namespace psibase
    ///       auto     holders = tables.open<TokenHolderTable>().getIndex<0>();
    ///       uint64_t eventId = 0;
    ///       if (auto record = holders.get(holder))
-   ///          eventId = record->lastHistoryEvent;
+   ///          eventId = record->eventHead;
    ///
    ///       // Create the Connection. Each event has a field named "prevEvent"
    ///       // which points to the previous event which affected the user's balance.

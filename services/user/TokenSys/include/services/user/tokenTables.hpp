@@ -49,7 +49,8 @@ namespace UserService
       Quantity           currentSupply;
       Quantity           maxSupply;
       SID                symbolId;
-      uint64_t           lastEvent;
+
+      uint64_t eventHead;
 
       using Configurations =
           psibase::NamedBits<psibase::NamedBit{"unrecallable"}, psibase::NamedBit{"untradeable"}>;
@@ -76,7 +77,7 @@ namespace UserService
                 currentSupply,
                 maxSupply,
                 symbolId,
-                lastEvent);
+                eventHead);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
    // Todo - add symbolId as secondary index when possible
 
@@ -124,13 +125,13 @@ namespace UserService
    {
       psibase::AccountNumber account;
       psibase::Bitset<8>     config;
-      uint64_t               lastHistoryEvent = 0;
+      uint64_t               eventHead = 0;
 
       using Configurations = psibase::NamedBits<psibase::NamedBit{"manualDebit"}>;
 
       auto operator<=>(const TokenHolderRecord&) const = default;
    };
-   PSIO_REFLECT(TokenHolderRecord, account, config, lastHistoryEvent);
+   PSIO_REFLECT(TokenHolderRecord, account, config, eventHead);
    using TokenHolderTable = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
 
 }  // namespace UserService
