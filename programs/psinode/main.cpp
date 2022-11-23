@@ -541,14 +541,12 @@ std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 struct ConnectRequest
 {
    std::string url;
-   bool        persist = false;
 };
 PSIO_REFLECT(ConnectRequest, url);
 
 struct DisconnectRequest
 {
    peer_id id;
-   bool    persist = false;
 };
 PSIO_REFLECT(DisconnectRequest, id);
 
@@ -623,7 +621,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    // because it's probably a bad idea to reveal the
    // private keys.
    file.keep("", "sign");
-   file.keep("", "peer");
    file.keep("", "leeway");
    //
    to_config(config.loggers, file);
