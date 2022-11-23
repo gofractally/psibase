@@ -77,6 +77,62 @@ std::string to_string(const native_service& obj)
    return obj.host + ":" + obj.root.native();
 }
 
+struct autoconnect_t
+{
+   static constexpr std::size_t max   = std::numeric_limits<std::size_t>::max();
+   std::size_t                  value = max;
+};
+
+void to_json(const autoconnect_t& obj, auto& stream)
+{
+   if (obj.value == autoconnect_t::max)
+   {
+      to_json(true, stream);
+   }
+   else
+   {
+      to_json(obj.value, stream);
+   }
+}
+
+void from_json(autoconnect_t& obj, auto& stream)
+{
+   auto t = stream.peek_token();
+   if (t.get().type == psio::json_token_type::type_bool)
+   {
+      if (stream.get_bool())
+      {
+         obj.value = autoconnect_t::max;
+      }
+      else
+      {
+         obj.value = 0;
+      }
+   }
+   else
+   {
+      from_json(obj.value, stream);
+   }
+}
+
+void validate(boost::any& v, const std::vector<std::string>& values, autoconnect_t*, int)
+{
+   boost::program_options::validators::check_first_occurrence(v);
+   auto s = boost::program_options::validators::get_single_string(values);
+   if (s == "on" || s == "true")
+   {
+      v = autoconnect_t{};
+   }
+   else if (s == "off" || s == "false")
+   {
+      v = autoconnect_t{0};
+   }
+   else
+   {
+      v = autoconnect_t{boost::lexical_cast<std::size_t>(s)};
+   }
+}
+
 std::filesystem::path get_prefix()
 {
    auto prefix = std::filesystem::read_symlink("/proc/self/exe").parent_path();
@@ -449,10 +505,18 @@ std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view pe
    {
       peer = peer.substr(5);
    }
+   if (peer.starts_with("http://"))
+   {
+      peer = peer.substr(7);
+   }
+   if (peer.ends_with('/'))
+   {
+      peer = peer.substr(0, peer.size() - 1);
+   }
    auto pos = peer.find(':');
    if (pos == std::string_view::npos)
    {
-      return {peer, "8080"};
+      return {peer, "80"};
    }
    else
    {
@@ -460,21 +524,39 @@ std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view pe
    }
 }
 
+std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
+{
+   for (auto& url : urls)
+   {
+      if (!url.starts_with("http:") && !url.starts_with("ws:"))
+      {
+         url = "http://" + url + "/";
+      }
+   }
+   return urls;
+}
+
+// connect,disconnect
+
 struct ConnectRequest
 {
    std::string url;
+   bool        persist = false;
 };
 PSIO_REFLECT(ConnectRequest, url);
 
 struct DisconnectRequest
 {
    peer_id id;
+   bool    persist = false;
 };
 PSIO_REFLECT(DisconnectRequest, id);
 
 struct PsinodeConfig
 {
    bool                        p2p = false;
+   std::vector<std::string>    peers;
+   autoconnect_t               autoconnect;
    AccountNumber               producer;
    std::string                 host;
    std::uint16_t               port = 8080;
@@ -482,11 +564,31 @@ struct PsinodeConfig
    http::admin_service         admin;
    psibase::loggers::Config    loggers;
 };
-PSIO_REFLECT(PsinodeConfig, p2p, producer, host, port, services, admin, loggers);
+PSIO_REFLECT(PsinodeConfig,
+             p2p,
+             peers,
+             autoconnect,
+             producer,
+             host,
+             port,
+             services,
+             admin,
+             loggers);
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
 {
    file.set("", "p2p", config.p2p ? "on" : "off", "Whether to accept incoming P2P connections");
+   if (!config.peers.empty())
+   {
+      file.set(
+          "", "peer", config.peers, [](std::string_view text) { return std::string(text); },
+          "Peer URL's");
+   }
+   if (config.autoconnect.value != autoconnect_t::max)
+   {
+      file.set("", "autoconnect", std::to_string(config.autoconnect.value),
+               "The preferred number of outgoing peer connections.");
+   }
    if (config.producer != AccountNumber())
    {
       file.set("", "producer", config.producer.str(), "The name to use for block production");
@@ -546,6 +648,7 @@ void run(const std::string&              db_path,
          AccountNumber                   producer,
          std::shared_ptr<Prover>         prover,
          const std::vector<std::string>& peers,
+         autoconnect_t                   autoconnect,
          bool                            enable_incoming_p2p,
          std::string                     host,
          unsigned short                  port,
@@ -595,6 +698,16 @@ void run(const std::string&              db_path,
 
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
+
+   auto connect_one = [&resolver, &node, &chainContext](const std::string& peer, auto&& f)
+   {
+      auto [host, service]  = parse_endpoint(peer);
+      auto result           = std::make_shared<websocket_connection>(chainContext);
+      result->url           = peer;
+      result->on_disconnect = f;
+      async_connect(std::move(result), resolver, host, service,
+                    [&node](auto&& conn) { node.add_connection(std::move(conn)); });
+   };
 
    auto http_config = std::make_shared<http::http_config>();
    if (!host.empty() || !services.empty())
@@ -647,29 +760,26 @@ void run(const std::string&              db_path,
                               http::get_peers_result result;
                               for (const auto& [id, conn] : node.peers().connections())
                               {
-                                 result.push_back({id, conn->endpoint()});
+                                 result.push_back({id, conn->endpoint(), conn->url});
                               }
                               callback(std::move(result));
                            });
       };
 
-      http_config->connect =
-          [&chainContext, &node, &resolver](std::vector<char> peer, http::connect_callback callback)
+      http_config->connect = [&chainContext, &node, &resolver, &connect_one](
+                                 std::vector<char> peer, http::connect_callback callback)
       {
          peer.push_back('\0');
          psio::json_token_stream stream(peer.data());
 
-         boost::asio::post(
-             chainContext,
-             [&chainContext, &node, &resolver, peer = psio::from_json<ConnectRequest>(stream),
-              callback = std::move(callback)]() mutable
-             {
-                auto [host, service] = parse_endpoint({peer.url.data(), peer.url.size()});
-                async_connect(std::make_shared<websocket_connection>(chainContext), resolver, host,
-                              service,
-                              [&node](auto&& conn) { node.add_connection(std::move(conn)); });
-                callback(std::nullopt);
-             });
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, &resolver, &connect_one,
+                            peer     = psio::from_json<ConnectRequest>(stream),
+                            callback = std::move(callback)]() mutable
+                           {
+                              node.peers().connect(peer.url, connect_one);
+                              callback(std::nullopt);
+                           });
       };
 
       http_config->disconnect =
@@ -694,15 +804,16 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->set_config = [&chainContext, &node, &db_path, &http_config, &host, &port, &admin,
-                                 &services](std::vector<char> json, http::connect_callback callback)
+      http_config->set_config =
+          [&chainContext, &node, &db_path, &http_config, &host, &port, &admin, &services,
+           &connect_one](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
 
          boost::asio::post(chainContext,
                            [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
-                            &db_path, &http_config, &host, &port, &services, &admin,
+                            &db_path, &http_config, &host, &port, &services, &admin, &connect_one,
                             callback = std::move(callback)]() mutable
                            {
                               std::optional<http::services_t> new_services;
@@ -716,10 +827,12 @@ void run(const std::string&              db_path,
                               }
                               node.set_producer_id(config.producer);
                               http_config->enable_p2p = config.p2p;
-                              host                    = config.host;
-                              port                    = config.port;
-                              services                = config.services;
-                              admin                   = config.admin;
+                              node.autoconnect(std::vector(config.peers), config.autoconnect.value,
+                                               connect_one);
+                              host     = config.host;
+                              port     = config.port;
+                              services = config.services;
+                              admin    = config.admin;
                               loggers::configure(config.loggers);
                               {
                                  std::shared_lock l{http_config->mutex};
@@ -758,7 +871,8 @@ void run(const std::string&              db_path,
                             callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
-                              result.p2p      = http_config->enable_p2p;
+                              result.p2p = http_config->enable_p2p;
+                              std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
                               result.producer = node.producer_name();
                               result.host     = host;
                               result.port     = port;
@@ -850,13 +964,7 @@ void run(const std::string&              db_path,
 
    bool showedBootMsg = false;
 
-   for (const std::string& peer : peers)
-   {
-      auto [host, service] = parse_endpoint(peer);
-      //node.async_connect(peer.substr(0, pos), peer.substr(pos + 1));
-      async_connect(std::make_shared<websocket_connection>(chainContext), resolver, host, service,
-                    [&node](auto&& conn) { node.add_connection(std::move(conn)); });
-   }
+   node.autoconnect(translate_endpoints(peers), autoconnect.value, connect_one);
 
    if (!save_blocks.empty())
    {
@@ -953,6 +1061,7 @@ int main(int argc, char* argv[])
    unsigned short              port      = 8080;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
+   autoconnect_t               autoconnect;
    bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
    http::admin_service         admin;
@@ -967,6 +1076,7 @@ int main(int argc, char* argv[])
    opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
    opt("sign,s", po::value(&keys), "Sign with this key");
    opt("peer", po::value(&peers), "Peer endpoint");
+   opt("autoconnect", po::value(&autoconnect), "Preferred number of peers");
    opt("p2p", po::bool_switch(&enable_incoming_p2p),
        "Enable incoming p2p connections; requires --host");
    opt("host,o", po::value<std::string>(&host)->value_name("name"), "Host http server");
@@ -1047,8 +1157,8 @@ int main(int argc, char* argv[])
          prover->provers.push_back(
              std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"}, key));
       }
-      run(db_path, AccountNumber{producer}, prover, peers, enable_incoming_p2p, host, port,
-          services, admin, leeway_us, replay_blocks, save_blocks);
+      run(db_path, AccountNumber{producer}, prover, peers, autoconnect, enable_incoming_p2p, host,
+          port, services, admin, leeway_us, replay_blocks, save_blocks);
       return 0;
    }
    catch (std::exception& e)

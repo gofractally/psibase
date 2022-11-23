@@ -25,10 +25,11 @@ namespace psibase::http
 
    struct peer_info
    {
-      int         id;
-      std::string endpoint;
+      int                        id;
+      std::string                endpoint;
+      std::optional<std::string> url;
    };
-   PSIO_REFLECT(peer_info, id, endpoint);
+   PSIO_REFLECT(peer_info, id, endpoint, url);
    using get_peers_result   = std::vector<peer_info>;
    using get_peers_callback = std::function<void(get_peers_result)>;
    using get_peers_t        = std::function<void(get_peers_callback)>;

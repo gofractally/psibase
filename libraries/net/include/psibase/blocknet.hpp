@@ -154,7 +154,7 @@ namespace psibase::net
          auto pos =
              std::find_if(_peers.begin(), _peers.end(), [&](const auto& p) { return p->id == id; });
          assert(pos != _peers.end());
-         if ((*pos)->syncing)
+         if ((*pos)->syncing || !(*pos)->peer_ready)
          {
             (*pos)->closed = true;
          }
@@ -199,6 +199,12 @@ namespace psibase::net
          network().async_send_block(connection.id, connection.hello,
                                     [this, &connection](const std::error_code& ec)
                                     {
+                                       if (ec || connection.closed)
+                                       {
+                                          connection.peer_ready = true;
+                                          disconnect(connection.id);
+                                          return;
+                                       }
                                        if (!connection.peer_ready)
                                        {
                                           // TODO: rate limit hellos, delay second hello until we have received the first peer hello

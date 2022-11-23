@@ -23,10 +23,25 @@ import {
 type Peer = {
     id: number;
     endpoint: string;
+    url?: string;
 };
 
 type ConnectInputs = {
     url: string;
+};
+
+type PeerState = "transient" | "backup" | "persistent" | "disabled";
+
+type PeerSpec = {
+    endpoint: string;
+    url: string;
+    id: number;
+    state: PeerState;
+};
+
+type AddConnectionInputs = {
+    url: string;
+    state: PeerState;
 };
 
 type LogFilterInputs = {
@@ -99,6 +114,7 @@ type ServiceConfig = {
 
 type PsinodeConfig = {
     p2p: boolean;
+    peers: string[];
     producer: string;
     host: string;
     port: number;
@@ -155,6 +171,39 @@ function pollJson<R>(
             }
         },
     ];
+}
+
+function combinePeers(configured: string[], connected: Peer[]): PeerSpec[] {
+    let configMap: { [index: string]: boolean } = {};
+    for (const url of configured) {
+        configMap[url] = true;
+    }
+    let connectMap: { [index: string]: Peer } = {};
+    for (const peer of connected) {
+        if (peer.url) {
+            connectMap[peer.url] = peer;
+        }
+    }
+    let result1 = configured.map((url) => {
+        if (url in connectMap) {
+            return {
+                state: "persistent" as PeerState,
+                url: url,
+                ...connectMap[url],
+            };
+        } else {
+            return {
+                state: "backup" as PeerState,
+                url: url,
+                endpoint: "",
+                id: 0,
+            };
+        }
+    });
+    let result2 = connected
+        .filter((peer) => !peer.url || !(peer.url in configMap))
+        .map((peer) => ({ state: "transient" as PeerState, url: "", ...peer }));
+    return [...result1, ...result2];
 }
 
 function mergeServices(
@@ -336,6 +385,20 @@ function defaultService(root: string) {
     }
 }
 
+function writeConfig(input: PsinodeConfig) {
+    return {
+        ...input,
+        services: input.services
+            .filter((s) => !emptyService(s))
+            .map((s) => ({
+                host: s.host,
+                root: s.root,
+            })),
+        admin: input.admin != "" ? input.admin : null,
+        loggers: writeLoggers(input.loggers),
+    };
+}
+
 function App() {
     const [peers, peersError, refetchPeers] = pollJson<Peer[]>(
         "/native/admin/peers"
@@ -356,9 +419,10 @@ function App() {
         formState: { errors },
         setError,
         reset,
-    } = useForm<ConnectInputs>({
+    } = useForm<AddConnectionInputs>({
         defaultValues: {
             url: "",
+            state: "transient",
         },
     });
     const onConnect: SubmitHandler<ConnectInputs> = async (
@@ -458,17 +522,10 @@ function App() {
                     service.host = defaultService(service.root);
                 }
             }
-            const result = await putJson("/native/admin/config", {
-                ...input,
-                services: input.services
-                    .filter((s) => !emptyService(s))
-                    .map((s) => ({
-                        host: s.host,
-                        root: s.root,
-                    })),
-                admin: input.admin != "" ? input.admin : null,
-                loggers: writeLoggers(input.loggers),
-            });
+            const result = await putJson(
+                "/native/admin/config",
+                writeConfig(input)
+            );
             if (result.ok) {
                 configForm.reset(input);
             } else {
@@ -477,6 +534,24 @@ function App() {
         } catch (e) {
             console.error("error", e);
             setConfigPutError("Failed to write /native/admin/config");
+        }
+    };
+
+    const [configPeersError, setConfigPeersError] = useState<string>();
+    const setConfigPeers = async (input: PsinodeConfig) => {
+        try {
+            setConfigPeersError(undefined);
+            const result = await putJson(
+                "/native/admin/config",
+                writeConfig(input)
+            );
+            if (result.ok) {
+                configForm.resetField("peers", { defaultValue: input.peers });
+            } else {
+                setConfigPeersError(await result.text());
+            }
+        } catch (e) {
+            setConfigPeersError("Failed to write /native/admin/config");
         }
     };
 
@@ -570,6 +645,103 @@ function App() {
         }
     });
 
+    let modifyPeer = (
+        id: number,
+        url: string,
+        oldState: PeerState,
+        state: PeerState
+    ) => {
+        const isConfigured = (s: PeerState) =>
+            s == "persistent" || s == "backup";
+        const isConnected = (s: PeerState) =>
+            s == "transient" || s == "persistent";
+        if (!isConfigured(oldState) && isConfigured(state)) {
+            const oldConfig = configForm.formState
+                .defaultValues as PsinodeConfig;
+            setConfigPeers({ ...oldConfig, peers: [...oldConfig.peers, url] });
+        } else if (isConfigured(oldState) && !isConfigured(state)) {
+            const oldConfig = configForm.formState
+                .defaultValues as PsinodeConfig;
+            setConfigPeers({
+                ...oldConfig,
+                peers: oldConfig.peers.filter((p) => p != url),
+            });
+        }
+
+        if (!isConnected(oldState) && isConnected(state)) {
+            onConnect({ url: url });
+        } else if (isConnected(oldState) && !isConnected(state)) {
+            onDisconnect(id);
+        }
+    };
+
+    const onAddConnection = (input: AddConnectionInputs) => {
+        modifyPeer(0, input.url, "disabled", input.state);
+    };
+
+    const peerControl = (id: number, url: string, state: PeerState) => {
+        //const update = (e: any)=>modifyPeer(id, url, state, e.target.value);
+        const setState = (newState: PeerState) =>
+            modifyPeer(id, url, state, newState);
+        if (state == "persistent") {
+            return (
+                <>
+                    <Button onClick={() => setState("backup")}>
+                        Disconnect
+                    </Button>
+                    <Button onClick={() => setState("transient")}>
+                        Disable auto-connect
+                    </Button>
+                    <Button onClick={() => setState("disabled")}>Remove</Button>
+                </>
+            );
+            /*
+            return (<select onChange={update}>
+                <option selected value="persistent">Connected+</option>
+                <option value="backup">Disconnect</option>
+                <option value="transient">Disable auto-connect</option>
+                <option value="disabled">Remove</option>
+                </select>); */
+        } else if (state == "transient") {
+            return (
+                <>
+                    <Button onClick={() => setState("disabled")}>
+                        Disconnect
+                    </Button>
+                    <Button onClick={() => setState("persistent")}>
+                        Enable auto-connect
+                    </Button>
+                </>
+            );
+            /*
+            return (<select onChange={update}>
+                <option selected value="transient">Connected</option>
+                <option value="disabled">Disconnect</option>
+                <option value="persistent" disabled={!url}>Enable auto-connect</option>
+                </select>); */
+        } else if (state == "backup") {
+            return (
+                <>
+                    <Button onClick={() => setState("persistent")}>
+                        Connect
+                    </Button>
+                    <Button onClick={() => setState("disabled")}>Remove</Button>
+                </>
+            );
+            /*
+            return (<select onChange={update}>
+                <option selected value="backup">Not Connected</option>
+                <option value="persistent">Connect</option>
+                <option value="disabled">Remove</option>
+                </select>); */
+        }
+    };
+
+    const combinedPeers = combinePeers(
+        configForm.watch("peers") || [],
+        peers || []
+    );
+
     const [status, statusError, fetchStatus] = pollJson<string[]>(
         "/native/admin/status"
     );
@@ -610,28 +782,28 @@ function App() {
             <table>
                 <thead>
                     <tr>
-                        <td>Remote Endpoint</td>
+                        <th>URL</th>
+                        <th>Address</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {peers?.map((peer) => (
+                    {combinedPeers.map((peer) => (
                         <tr>
+                            <td>{peer.url}</td>
                             <td>{peer.endpoint}</td>
                             <td>
-                                <Button onClick={() => onDisconnect(peer.id)}>
-                                    Disconnect
-                                </Button>
+                                {peerControl(peer.id, peer.url, peer.state)}
                             </td>
                         </tr>
                     ))}
                     <tr>
                         <td>
                             <form
-                                onSubmit={handleSubmit(onConnect)}
+                                onSubmit={handleSubmit(onAddConnection)}
                                 id="new-connection"
                             >
                                 <Form.Input
-                                    placeholder="host:port"
+                                    autoComplete="url"
                                     {...register("url", {
                                         required: "This field is required",
                                     })}
@@ -640,13 +812,25 @@ function App() {
                             </form>
                         </td>
                         <td>
+                            <Form.Select {...register("state")}>
+                                <option value="transient">Connect now</option>
+                                <option value="persistent">
+                                    Remember this connection
+                                </option>
+                                <option value="backup">
+                                    Connect automatically
+                                </option>
+                            </Form.Select>
+                        </td>
+                        <td>
                             <Button isSubmit form="new-connection">
-                                Connect
+                                Add Connection
                             </Button>
                         </td>
                     </tr>
                 </tbody>
             </table>
+            {configPeersError && <div>{configPeersError}</div>}
             <h1>Configuration</h1>
             <form onSubmit={configForm.handleSubmit(onConfig)}>
                 <Form.Checkbox

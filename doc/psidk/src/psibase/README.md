@@ -21,10 +21,11 @@ If you don't give it any other options, psinode will just sit there with nothing
 - `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on address `0.0.0.0` (TODO). The port defaults to 8080 but can be configured with `--port`. The http interface also accepts p2p websocket connections from other nodes (see `--peer`).
 - `-s` or `--sign` tells psinode a private key with which to sign blocks. It must match the producer's public key.  If the producer has no key set, then it may be omitted.
 
-Three more options are important for connecting multiple nodes together in a network:
+Four more options are important for connecting multiple nodes together in a network:
 
 - `--port` tells psinode the TCP port for the http interface. The default port is 8080.
 - `--peer` tells psinode a peer to sync with. The argument should have the form `host:port`. This argument can appear any number of times.
+- `--autoconnect` limits the number of out-going peer connections. If it is less than the number of `--peer` options, the later peers will be tried after a connection to an earlier peer fails.
 - `--p2p` tells psinode to allow external nodes to peer to it over its http interface at `/native/p2p`.
 
 psinode does not include https hosting; use a [reverse proxy](https.md) to add that when hosting a public node.

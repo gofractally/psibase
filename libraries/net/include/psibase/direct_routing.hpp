@@ -37,14 +37,19 @@ namespace psibase::net
    {
       auto& peers() { return static_cast<Derived*>(this)->peers(); }
       auto& chain() { return static_cast<Derived*>(this)->chain(); }
-      explicit direct_routing(boost::asio::io_context& ctx) {}
+      explicit direct_routing(boost::asio::io_context& ctx)
+      {
+         std::random_device rng;
+         nodeId = std::uniform_int_distribution<NodeId>()(rng);
+      }
       static const std::uint32_t protocol_version = 0;
       struct init_message
       {
          static constexpr unsigned type    = 1;
          std::uint32_t             version = protocol_version;
+         NodeId                    id;
          std::string to_string() const { return "init: version=" + std::to_string(version); }
-         PSIO_REFLECT_INLINE(init_message, version);
+         PSIO_REFLECT_INLINE(init_message, version, id);
       };
       struct producer_message
       {
@@ -103,7 +108,7 @@ namespace psibase::net
       struct connection;
       void connect(peer_id id)
       {
-         async_send_block(id, init_message{}, [](const std::error_code&) {});
+         async_send_block(id, init_message{.id = nodeId}, [](const std::error_code&) {});
          if (auto producer = static_cast<Derived*>(this)->consensus().producer_name();
              producer != AccountNumber())
          {
@@ -211,6 +216,11 @@ namespace psibase::net
          if (msg.version != protocol_version)
          {
             peers().disconnect(peer);
+            return;
+         }
+         if (msg.id)
+         {
+            peers().set_node_id(peer, msg.id);
          }
       }
       void recv(peer_id peer, const producer_message& msg)
@@ -244,6 +254,7 @@ namespace psibase::net
          static_cast<Derived*>(this)->consensus().recv(peer, msg);
       }
       std::multimap<producer_id, peer_id> producers;
+      NodeId                              nodeId = 0;
    };
 
 }  // namespace psibase::net

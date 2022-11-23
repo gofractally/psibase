@@ -103,12 +103,21 @@ namespace psibase::net
                                }
                             });
       }
-      bool is_open() const { return stream.is_open(); }
+      bool is_open() const { return !closed; }
       void close()
       {
-         if (stream.is_open())
+         if (!closed)
          {
-            stream.close(boost::beast::websocket::close_code::none);
+            closed = true;
+            boost::asio::dispatch(
+                stream.get_executor(),
+                [self = shared_from_this()]() mutable
+                {
+                   auto p = self.get();
+                   p->stream.async_close(
+                       boost::beast::websocket::close_code::none,
+                       [self = std::move(self)](const std::error_code& ec) mutable {});
+                });
          }
       }
       std::string endpoint() const
@@ -129,6 +138,8 @@ namespace psibase::net
       std::vector<char>                                         inbox;
       // Grrrr...
       std::optional<boost::asio::dynamic_vector_buffer<char, std::allocator<char>>> buffer;
+      // Avoid calling close more than once
+      bool closed = false;
    };
 
    template <typename F>

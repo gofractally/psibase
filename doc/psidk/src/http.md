@@ -423,19 +423,19 @@ Each peer has the following fields:
 |------------|--------|---------------------------------------------|
 | `id`       | Number | A unique integer identifying the connection |
 | `endpoint` | String | The remote endpoint in the form `host:port` |
+| `url`      | String | (optional) The peer's URL if it is known    |
 
-`/native/admin/connect` creates a new p2p connection to another node.
+`/native/admin/connect` creates a new p2p connection to another node. To set up a peer that will automatically connect whenever the server is running, use the [`peers` config field](#server-configuration).
 
 | Field | Type   | Description                                  |
 |-------|--------|----------------------------------------------|
-| `url` | String | The remote server, e.g. `"ws://psibase.io/"` |
+| `url` | String | The remote server, e.g. `"http://psibase.io/"` |
 
-`/native/admin/disconnect` closes an existing p2p connection.
+`/native/admin/disconnect` closes an existing p2p connection. Note that if the server drops below its preferred number of connections, it will attempt to establish a new connection, possibly restoring the same connection that was just disconnected.
 
 | Field | Type   | Description                       |
 |-------|--------|-----------------------------------|
 | `id`  | Number | The id of the connection to close |
-
 
 ### Server configuration
 
@@ -444,6 +444,8 @@ Each peer has the following fields:
 | Field      | Type    | Description                                                                                                                                                                                               |
 |------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `p2p`      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                                             |
+| `peers` | Array | A list of peer URLs that the server may connect to. To manage the active connections, see [peer management](#peer-management) |
+| `autoconnect` | Number or Boolean | The target number of out-going connections. If set to true, the server will try to connect to all configured peers. |
 | `producer` | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
 | `host`     | String  | The server's hostname.                                                                                                                                                                                    |
 | `port`     | Number  | The port that the server runs on. Changes to the port will take effect the next time the server starts.                                                                                                   |
@@ -455,6 +457,7 @@ Example:
 ```json
 {
     "p2p": true,
+    "peers": ["http://psibase.io/"],
     "producer": "prod",
     "host": "127.0.0.1.sslip.io",
     "port": 8080,
