@@ -245,15 +245,6 @@ namespace psibase
       }
       BlockHeader*            get_head() const { return &head->info.header; }
       const BlockHeaderState* get_head_state() const { return head; }
-      static BlockNum         idToNum(const Checksum256& id)
-      {
-         BlockNum result;
-         auto*    dest = (char*)&result + sizeof(result);
-         auto*    src  = id.data();
-         while (dest != (const char*)&result)
-            *--dest = *src++;
-         return result;
-      }
       psio::shared_view_ptr<SignedBlock> get(const id_type& id) const
       {
          auto pos = blocks.find(id);
@@ -265,7 +256,7 @@ namespace psibase
          {
             Database db{systemContext->sharedDatabase, head->revision};
             auto     session  = db.startRead();
-            auto     blockNum = idToNum(id);
+            auto     blockNum = getBlockNum(id);
             if (auto block = db.kvGet<Block>(DbId::blockLog, blockNum))
             {
                if (BlockInfo{*block}.blockId == id)
