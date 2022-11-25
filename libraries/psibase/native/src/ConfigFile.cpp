@@ -35,11 +35,60 @@ namespace
 
    constexpr std::string_view ws(" \t\r\n");
 
+   bool needsQuote(std::string_view s)
+   {
+      if (!s.empty())
+      {
+         // If the string has leading or trailing whitespace, quotes are
+         // necessary to prevent trimming
+         if (ws.find(s.front()) != std::string::npos)
+            return true;
+         if (ws.find(s.back()) != std::string::npos)
+            return true;
+         // - \n would end the line
+         // - unquoted # would be a comment
+         // - A single double quoted string would be unquoted
+         bool quoted         = false;
+         bool isQuotedString = s.starts_with('"');
+         for (std::size_t i = 0; i < s.size(); ++i)
+         {
+            auto ch = s[i];
+            if (ch == '"')
+            {
+               if (quoted && i + 1 != s.size())
+               {
+                  isQuotedString = false;
+               }
+               quoted = !quoted;
+            }
+            else if (ch == '#')
+            {
+               if (!quoted)
+               {
+                  return true;
+               }
+            }
+            else if (ch == '\n')
+            {
+               return true;
+            }
+            else if (ch == '\\')
+            {
+               ++i;
+               if (i == s.size())
+               {
+                  return false;
+               }
+            }
+         }
+         return !quoted && isQuotedString;
+      }
+      return false;
+   }
+
    std::string maybeQuoteValue(std::string_view s)
    {
-      if (s.find_first_of("\n\\\"#") == std::string::npos &&
-          (s.empty() ||
-           (ws.find(s.front()) == std::string::npos && ws.find(s.back()) == std::string::npos)))
+      if (!needsQuote(s))
       {
          return std::string(s);
       }
@@ -68,17 +117,29 @@ namespace
       return result;
    }
 
+   // If s is a single double quoted string, removes the quotes and processes escape sequences
+   // This is the inverse of maybeQuoteValue
    std::string unquoteValue(std::string_view s, const std::string& filename, std::size_t line)
    {
       std::string result;
-      bool        quoted = false;
-      for (std::size_t i = 0; i < s.size(); ++i)
+      if (!s.starts_with('"'))
+      {
+         return std::string(s);
+      }
+      for (std::size_t i = 1; i < s.size(); ++i)
       {
          if (s[i] == '"')
          {
-            quoted = !quoted;
+            if (i + 1 == s.size())
+            {
+               return result;
+            }
+            else
+            {
+               break;
+            }
          }
-         else if (quoted && s[i] == '\\')
+         else if (s[i] == '\\')
          {
             ++i;
             if (i == s.size())
@@ -99,11 +160,7 @@ namespace
             result.push_back(s[i]);
          }
       }
-      if (quoted)
-      {
-         throw std::runtime_error(filename + ":" + std::to_string(line) + ": Unterminated \"");
-      }
-      return result;
+      return std::string(s);
    }
 
    std::string editLine(std::string_view key, std::string_view value, std::string_view comment)
@@ -338,9 +395,12 @@ void ConfigFile::postProcess()
    }
 }
 
-void ConfigFile::write(std::ostream& out)
+void ConfigFile::write(std::ostream& out, bool preserve)
 {
-   postProcess();
+   if (!preserve)
+   {
+      postProcess();
+   }
    for (std::size_t i = 0; i < lines.size(); ++i)
    {
       if (auto iter = insertions.find(i); iter != insertions.end())

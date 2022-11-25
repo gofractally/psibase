@@ -54,6 +54,13 @@ namespace psibase
    };
    PSIO_REFLECT(Claim, service, rawData)
 
+   struct ClaimKey
+   {
+      AccountNumber     service;
+      std::vector<char> rawData;
+   };
+   PSIO_REFLECT(ClaimKey, service, rawData)
+
    // Rules for TAPOS:
    // * Reference block's number must be either:
    //    * One of the most-recent 128 blocks. For this case, refBlockIndex = blockNum & 0x7f

@@ -38,7 +38,7 @@ namespace psibase
       // Preserves the existing values of the key.  This can be used
       // for properties that should not be modified using the HTTP API.
       void keep(std::string_view section, std::string_view key);
-      void write(std::ostream& out);
+      void write(std::ostream& out, bool preserve = false);
 
      private:
       struct KeyInfo

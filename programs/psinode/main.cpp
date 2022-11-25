@@ -252,6 +252,32 @@ namespace psibase
       v = privateKeyFromString(boost::program_options::validators::get_single_string(values));
    }
 
+   void validate(boost::any&                     v,
+                 const std::vector<std::string>& values,
+                 std::shared_ptr<Prover>*,
+                 int)
+   {
+      boost::program_options::validators::check_first_occurrence(v);
+      const auto& s = boost::program_options::validators::get_single_string(values);
+      if (s.starts_with('{'))
+      {
+         auto key = psio::convert_from_json<ClaimKey>(s);
+         if (key.service.str() != "verifyec-sys")
+         {
+            throw std::runtime_error("Not implemented: keys from service " + key.service.str());
+         }
+         auto result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
+             key.service, psio::convert_from_frac<PrivateKey>(key.rawData));
+         v = std::shared_ptr<Prover>(std::move(result));
+      }
+      else
+      {
+         auto result = std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"},
+                                                                    privateKeyFromString(s));
+         v           = std::shared_ptr<Prover>(std::move(result));
+      }
+   }
+
    namespace http
    {
       void validate(boost::any& v, const std::vector<std::string>& values, admin_service*, int)
@@ -550,6 +576,13 @@ struct DisconnectRequest
 };
 PSIO_REFLECT(DisconnectRequest, id);
 
+struct NewKeyRequest
+{
+   AccountNumber                    service;
+   std::optional<std::vector<char>> rawData;
+};
+PSIO_REFLECT(NewKeyRequest, service, rawData);
+
 struct PsinodeConfig
 {
    bool                        p2p = false;
@@ -620,7 +653,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
-   file.keep("", "sign");
+   file.keep("", "key");
    file.keep("", "leeway");
    //
    to_config(config.loggers, file);
@@ -643,7 +676,7 @@ using consensus = basic_consensus<Derived, timer_type>;
 
 void run(const std::string&              db_path,
          AccountNumber                   producer,
-         std::shared_ptr<Prover>         prover,
+         std::shared_ptr<CompoundProver> prover,
          const std::vector<std::string>& peers,
          autoconnect_t                   autoconnect,
          bool                            enable_incoming_p2p,
@@ -689,7 +722,7 @@ void run(const std::string&              db_path,
    boost::asio::io_context chainContext;
 
    using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
-   node_type node(chainContext, system.get(), std::move(prover));
+   node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
    node.load_producers();
 
@@ -887,6 +920,94 @@ void run(const std::string&              db_path,
                            });
       };
 
+      http_config->get_keys = [&chainContext, &prover](auto callback)
+      {
+         boost::asio::post(chainContext,
+                           [&prover, callback = std::move(callback)]()
+                           {
+                              std::vector<Claim> result;
+                              prover->get(result);
+                              callback(
+                                  [result = std::move(result)]() mutable
+                                  {
+                                     std::vector<char>   json;
+                                     psio::vector_stream stream(json);
+                                     to_json(result, stream);
+                                     return json;
+                                  });
+                           });
+      };
+
+      http_config->new_key =
+          [&chainContext, &prover, &db_path](std::vector<char> json, auto callback)
+      {
+         json.push_back('\0');
+         psio::json_token_stream stream(json.data());
+         auto                    key = psio::from_json<NewKeyRequest>(stream);
+         if (key.service.str() != "verifyec-sys")
+         {
+            throw std::runtime_error("Not implemented for native signing: " + key.service.str());
+         }
+         boost::asio::post(
+             chainContext,
+             [&prover, &db_path, callback = std::move(callback), key = std::move(key)]() mutable
+             {
+                try
+                {
+                   std::shared_ptr<EcdsaSecp256K1Sha256Prover> result;
+                   if (key.rawData)
+                   {
+                      result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
+                          key.service, psio::convert_from_frac<PrivateKey>(*key.rawData));
+                   }
+                   else
+                   {
+                      result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
+                   }
+                   std::vector<Claim> existing;
+                   prover->get(existing);
+                   auto claim = result->get();
+                   if (std::find(existing.begin(), existing.end(), claim) == existing.end())
+                   {
+                      prover->add(std::move(result));
+
+                      auto       path = std::filesystem::path(db_path) / "config";
+                      ConfigFile file;
+                      {
+                         std::ifstream in(path);
+                         file.parse(in);
+                      }
+                      std::vector<ClaimKey> allKeys;
+                      prover->get(allKeys);
+                      std::vector<std::string> stringKeys;
+                      for (const auto& k : allKeys)
+                      {
+                         stringKeys.push_back(psio::convert_to_json(k));
+                      }
+                      file.set(
+                          "", "key", stringKeys, [](std::string_view s) { return std::string(s); },
+                          "");
+                      {
+                         std::ofstream out(path);
+                         file.write(out, true);
+                      }
+                   }
+                   callback(
+                       [result = std::move(claim)]() mutable
+                       {
+                          std::vector<char>   json;
+                          psio::vector_stream stream(json);
+                          to_json(result, stream);
+                          return json;
+                       });
+                }
+                catch (std::exception& e)
+                {
+                   callback(e.what());
+                }
+             });
+      };
+
       auto server = http::server::create(http_config, sharedState);
    }
 
@@ -1052,8 +1173,8 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 int main(int argc, char* argv[])
 {
    std::string                 db_path;
-   std::string                 producer = {};
-   std::vector<PrivateKey>     keys;
+   std::string                 producer  = {};
+   auto                        keys      = std::make_shared<CompoundProver>();
    std::string                 host      = {};
    unsigned short              port      = 8080;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
@@ -1071,7 +1192,7 @@ int main(int argc, char* argv[])
    po::options_description common_opts("psinode");
    auto                    opt = common_opts.add_options();
    opt("producer,p", po::value<std::string>(&producer), "Name of this producer");
-   opt("sign,s", po::value(&keys), "Sign with this key");
+   opt("key,k", po::value(&keys->provers), "A private key to use for block production");
    opt("peer", po::value(&peers), "Peer endpoint");
    opt("autoconnect", po::value(&autoconnect), "Preferred number of peers");
    opt("p2p", po::bool_switch(&enable_incoming_p2p),
@@ -1148,13 +1269,7 @@ int main(int argc, char* argv[])
    {
       psibase::loggers::set_path(db_path);
       psibase::loggers::configure(vm);
-      auto prover = std::make_shared<CompoundProver>();
-      for (const auto& key : keys)
-      {
-         prover->provers.push_back(
-             std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"}, key));
-      }
-      run(db_path, AccountNumber{producer}, prover, peers, autoconnect, enable_incoming_p2p, host,
+      run(db_path, AccountNumber{producer}, keys, peers, autoconnect, enable_incoming_p2p, host,
           port, services, admin, leeway_us, replay_blocks, save_blocks);
       return 0;
    }

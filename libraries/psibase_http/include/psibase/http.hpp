@@ -42,6 +42,10 @@ namespace psibase::http
    using get_config_callback = std::function<void(get_config_result)>;
    using get_config_t        = std::function<void(get_config_callback)>;
 
+   using generic_json_result   = std::variant<std::string, std::function<std::vector<char>()>>;
+   using generic_json_callback = std::function<void(generic_json_result)>;
+   using generic_json_t        = std::function<void(std::vector<char>, generic_json_callback)>;
+
    struct http_status
    {
       unsigned slow : 1;
@@ -161,6 +165,8 @@ namespace psibase::http
       connect_t                 disconnect             = {};
       get_config_t              get_config             = {};
       connect_t                 set_config             = {};
+      get_config_t              get_keys               = {};
+      generic_json_t            new_key                = {};
       admin_service             admin                  = {};
       services_t                services;
       std::atomic<bool>         enable_p2p;

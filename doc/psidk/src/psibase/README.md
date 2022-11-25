@@ -19,7 +19,7 @@ If you don't give it any other options, psinode will just sit there with nothing
 
 - `-p` or `--producer` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below). Its argument is a name for the producer. psinode will only produce blocks when it is this producer's turn according to consensus. Multiple distinct nodes must not use the same producer name.
 - `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on address `0.0.0.0` (TODO). The port defaults to 8080 but can be configured with `--port`. The http interface also accepts p2p websocket connections from other nodes (see `--peer`).
-- `-s` or `--sign` tells psinode a private key with which to sign blocks. It must match the producer's public key.  If the producer has no key set, then it may be omitted.
+- `-k` or `--key` tells psinode a private key with which to sign blocks. It must match the producer's public key.  If the producer has no key set, then it may be omitted.
 
 Four more options are important for connecting multiple nodes together in a network:
 

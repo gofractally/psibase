@@ -22,6 +22,7 @@
 - [Node administrator services](#node-administrator-services)
   - [Server status](#server-status)
   - [Peer management](#peer-management)
+  - [Key ring](#key-ring)
   - [Server configuration](#server-configuration)
   - [Logging](#logging)
     - [Console Logger](#console-logger)
@@ -400,6 +401,8 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `GET`  | `/native/admin/peers`      | Returns a JSON array of all the peers that the node is currently connected to |
 | `POST` | `/native/admin/connect`    | Connects to another node                                                      |
 | `POST` | `/native/admin/disconnect` | Disconnects an existing peer connection                                       |
+| `GET` | `/native/admin/keys` | Returns a JSON array of the public keys that the server can sign for |
+| `POST` | `/native/admin/keys` | Creates or imports a key pair |
 | `GET`  | `/native/admin/config`     | Returns the current [server configuration](#server-configuration)             |
 | `PUT`  | `/native/admin/config`     | Sets the [server configuration](#server-configuration)                        |
 | `GET`  | `/native/admin/log`        | Websocket that provides access to [live server logs](#websocket-logger)       |
@@ -436,6 +439,22 @@ Each peer has the following fields:
 | Field | Type   | Description                       |
 |-------|--------|-----------------------------------|
 | `id`  | Number | The id of the connection to close |
+
+### Key ring
+
+`GET` on `/native/admin/keys` lists the public keys that the server can sign for.
+
+| Field     | Type   | Description                                                                                     |
+|-----------|--------|-------------------------------------------------------------------------------------------------|
+| `service` | String | The name of the service that verifies signatures made with this key                            |
+| `rawData` | String | A hex string containing public key information. The interpretation depends on the verify service. |
+
+`POST` to `/native/admin/keys` creates or uploads a new key pair. It returns the corresponding public key.
+
+| Field     | Type   | Description                                                                                                                                                         |
+|-----------|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `service` | String | The name of the verify service                                                                                                                                      |
+| `rawData` | String | A hex string containing private key information. The interpretation depends on the verify service. If `rawData` is not present, the server will generate a new key. |
 
 ### Server configuration
 

@@ -90,6 +90,9 @@ struct assert_exception : std::exception
 struct NullProver : psibase::Prover
 {
    std::vector<char> prove(std::span<const char>, const psibase::Claim&) const { return {}; }
+   bool              remove(const psibase::Claim&) { return false; }
+   void              get(std::vector<psibase::Claim>&) const {}
+   void              get(std::vector<psibase::ClaimKey>&) const {}
 };
 
 struct file;

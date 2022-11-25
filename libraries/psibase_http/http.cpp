@@ -822,6 +822,44 @@ namespace psibase::http
             }
             return;
          }
+         else if (req.target() == "/native/admin/keys")
+         {
+            if (req.method() == bhttp::verb::get)
+            {
+               run_native_handler(server.http_config->get_keys,
+                                  [ok, session = send.self.derived_session().shared_from_this()](
+                                      auto&& make_result)
+                                  { session->queue_(ok(make_result(), "application/json")); });
+            }
+            else if (req.method() == bhttp::verb::post)
+            {
+               if (req[bhttp::field::content_type] != "application/json")
+               {
+                  return send(error(bhttp::status::unsupported_media_type,
+                                    "Content-Type must be application/json\n"));
+               }
+
+               run_native_handler(
+                   server.http_config->new_key,
+                   [error, ok,
+                    session = send.self.derived_session().shared_from_this()](auto&& result)
+                   {
+                      if (auto err = std::get_if<std::string>(&result))
+                      {
+                         session->queue_(error(bhttp::status::internal_server_error, *err));
+                      }
+                      else
+                      {
+                         session->queue_(ok(std::get<1>(result)(), "application/json"));
+                      }
+                   });
+            }
+            else
+            {
+               send(method_not_allowed(req.target(), req.method_string(), "GET, POST"));
+            }
+            return;
+         }
          else
          {
             return send(error(bhttp::status::not_found,
