@@ -120,6 +120,9 @@ namespace psibase
       std::shared_ptr<ProducerSet> nextProducers;
       // Only valid if nextProducers is non-null
       BlockNum nextProducersBlockNum;
+      // TODO: track setcode of contracts used to verify producer signatures
+      // in the BlockHeader. To make this work, we probably need to forbid
+      // calls to other contracts.
       BlockHeaderState() : info()
       {
          info.header.blockNum = 1;
@@ -243,8 +246,8 @@ namespace psibase
          }
          return false;
       }
-      BlockHeader*            get_head() const { return &head->info.header; }
-      const BlockHeaderState* get_head_state() const { return head; }
+      BlockHeader*                       get_head() const { return &head->info.header; }
+      const BlockHeaderState*            get_head_state() const { return head; }
       psio::shared_view_ptr<SignedBlock> get(const id_type& id) const
       {
          auto pos = blocks.find(id);
@@ -396,6 +399,68 @@ namespace psibase
             callback(&head->info.header);
          }
       }
+      Claim validateBlockSignature(BlockHeaderState* prev, const BlockInfo& info, const auto& sig)
+      {
+         BlockContext verifyBc(*systemContext, prev->revision);
+         VerifyProver prover{verifyBc, sig};
+         auto         claim = prev->getNextProducerClaim(info.header.producer);
+         if (!claim)
+         {
+            throw std::runtime_error("Invalid producer for block");
+         }
+         prover.prove(BlockSignatureInfo(info), *claim);
+         return std::move(*claim);
+      }
+      // \pre the state of prev has been set
+      bool execute_block(BlockHeaderState* prev, BlockHeaderState* state)
+      {
+         std::error_code ec{};
+         if (!state->revision)
+         {
+            BlockContext ctx(*systemContext, prev->revision, writer, true);
+            auto         blockPtr = get(state->blockId());
+            PSIBASE_LOG_CONTEXT_BLOCK(state->info.header, state->blockId());
+            try
+            {
+               auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
+               ctx.start(Block(blockPtr->block()));
+               ctx.callStartBlock();
+               ctx.execAllInBlock();
+               auto [newRevision, id] =
+                   ctx.writeRevision(FixedProver(blockPtr->signature().get()), claim);
+               // TODO: diff header fields
+               check(id == state->blockId(), "blockId does not match");
+               state->revision = newRevision;
+
+               PSIBASE_LOG(blockLogger, info) << "Accepted block";
+            }
+            catch (std::exception& e)
+            {
+               PSIBASE_LOG(blockLogger, warning) << e.what();
+               return false;
+            }
+         }
+         return true;
+      }
+      // TODO: run this in a separate thread and make it interruptable
+      void async_execute_fork(BlockHeaderState* prev, auto iter, auto end, auto&& on_accept_block)
+      {
+         if (iter != end)
+         {
+            for (; iter != end; ++iter)
+            {
+               BlockHeaderState* nextState = get_state(iter->second);
+               if (!execute_block(prev, nextState))
+               {
+                  // TODO: blacklist block and its descendants
+                  return;
+               }
+               on_accept_block(nextState);
+               systemContext->sharedDatabase.setHead(*writer, nextState->revision);
+               prev = nextState;
+            }
+         }
+      }
       void execute_fork(auto iter, auto end, auto&& on_accept_block)
       {
          if (iter != end)
@@ -403,37 +468,7 @@ namespace psibase
             auto* state = get_state(iter->second);
             assert(state->revision);
             ++iter;
-            for (; iter != end; ++iter)
-            {
-               auto* next_state = get_state(iter->second);
-               if (!next_state->revision)
-               {
-                  BlockContext ctx(*systemContext, state->revision, writer, true);
-                  auto         blockPtr = get(next_state->blockId());
-                  PSIBASE_LOG_CONTEXT_BLOCK(next_state->info.header, next_state->blockId());
-                  ctx.start(Block(blockPtr->block()));
-                  ctx.callStartBlock();
-                  ctx.execAllInBlock();
-                  BlockContext verifyBc(*systemContext, state->revision);
-                  VerifyProver prover{verifyBc, blockPtr->signature()};
-                  auto claim = state->getNextProducerClaim(next_state->info.header.producer);
-                  if (!claim)
-                  {
-                     // TODO: blacklist branch
-                     PSIBASE_LOG(blockLogger, warning) << "Invalid producer for block";
-                     return;
-                  }
-                  auto [newRevision, id] = ctx.writeRevision(prover, *claim);
-                  // TODO: verify block id here?
-                  // TODO: handle other errors and blacklist the block and its descendants
-                  next_state->revision = newRevision;
-
-                  on_accept_block(next_state);
-                  PSIBASE_LOG(blockLogger, info) << "Accepted block";
-               }
-               systemContext->sharedDatabase.setHead(*writer, next_state->revision);
-               state = next_state;
-            }
+            async_execute_fork(state, iter, end, std::move(on_accept_block));
          }
       }
       BlockHeaderState* get_state(const id_type& id)

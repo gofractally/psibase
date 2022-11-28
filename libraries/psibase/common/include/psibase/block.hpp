@@ -202,4 +202,20 @@ namespace psibase
       }
    };
    PSIO_REFLECT(BlockInfo, header, blockId)
+
+   struct BlockSignatureInfo
+   {
+      BlockSignatureInfo(const BlockInfo& info)
+      {
+         data[0] = 0x00;
+         data[1] = 0xce;
+         data[2] = 0xa8;
+         data[3] = 'B';
+         std::memcpy(data + 4, info.blockId.data(), info.blockId.size());
+      }
+      operator std::span<const char>() const { return data; }
+      static_assert(decltype(BlockInfo::blockId){}.size() != 0);
+      char data[4 + decltype(BlockInfo::blockId){}.size()];
+   };
+
 }  // namespace psibase

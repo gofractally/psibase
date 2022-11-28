@@ -173,9 +173,7 @@ namespace psibase
       // TODO: avoid repacking
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
       db.kvPut(DbId::blockProof, current.header.blockNum,
-               prover.prove({reinterpret_cast<const char*>(status->head->blockId.data()),
-                             status->head->blockId.size()},
-                            claim));
+               prover.prove(BlockSignatureInfo(*status->head), claim));
 
       return {session.writeRevision(status->head->blockId), status->head->blockId};
    }

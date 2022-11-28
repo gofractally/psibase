@@ -47,6 +47,18 @@ namespace psibase
       }
    }
 
+   FixedProver::FixedProver(const std::vector<char>& proof) : proof(proof) {}
+   std::vector<char> FixedProver::prove(std::span<const char>, const Claim&) const
+   {
+      return proof;
+   }
+   bool FixedProver::remove(const Claim&)
+   {
+      return false;
+   }
+   void FixedProver::get(std::vector<Claim>&) const {}
+   void FixedProver::get(std::vector<ClaimKey>&) const {}
+
    std::vector<char> CheckedProver::prove(std::span<const char> data, const Claim& claim) const
    {
       auto result = next->prove(data, claim);

@@ -28,6 +28,16 @@ namespace psibase
       std::vector<std::shared_ptr<Prover>> provers;
    };
 
+   struct FixedProver : Prover
+   {
+      explicit FixedProver(const std::vector<char>& proof);
+      std::vector<char>        prove(std::span<const char> data, const Claim& claim) const;
+      bool                     remove(const Claim&);
+      void                     get(std::vector<Claim>&) const;
+      void                     get(std::vector<ClaimKey>&) const;
+      const std::vector<char>& proof;
+   };
+
    /// Throws if it cannot produce a valid signature
    struct CheckedProver : Prover
    {
