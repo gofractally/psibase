@@ -162,11 +162,11 @@ namespace psibase
       {
          auto ca = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
          check(ca.has_value(), "unknown service account");
-         check(ca->codeHash != Checksum256{}, "account has no code");
+         check(ca->codeHash != Checksum256{}, "service account has no code");
          code   = std::move(*ca);
          auto c = database.kvGet<CodeByHashRow>(
              CodeByHashRow::db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
-         check(c.has_value(), "code record is missing");
+         check(c.has_value(), "service code record is missing");
          check(c->vmType == 0, "vmType is not 0");
          check(c->vmVersion == 0, "vmVersion is not 0");
          rethrowVMExcept(
