@@ -46,9 +46,6 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
-      using typename Base::append_entries_request;
-      using typename Base::hello_request;
-      using typename Base::hello_response;
       using typename Base::producer_state;
       using typename Base::term_id;
       enum class confirm_type
@@ -57,7 +54,7 @@ namespace psibase::net
          commit
       };
 
-      struct prepare_message
+      struct PrepareMessage
       {
          static constexpr unsigned type = 38;
          Checksum256               block_id;
@@ -65,14 +62,14 @@ namespace psibase::net
          Claim                     claim;
 
          auto signer() const { return claim; }
-         PSIO_REFLECT_INLINE(prepare_message, block_id, producer, claim)
+         PSIO_REFLECT_INLINE(PrepareMessage, block_id, producer, claim)
          std::string to_string() const
          {
             return "prepare: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
          }
       };
 
-      struct commit_message
+      struct CommitMessage
       {
          static constexpr unsigned type = 39;
          Checksum256               block_id;
@@ -80,14 +77,14 @@ namespace psibase::net
          Claim                     claim;
 
          auto signer() const { return claim; }
-         PSIO_REFLECT_INLINE(commit_message, block_id, producer, claim)
+         PSIO_REFLECT_INLINE(CommitMessage, block_id, producer, claim)
          std::string to_string() const
          {
             return "commit: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
          }
       };
 
-      struct view_change_message
+      struct ViewChangeMessage
       {
          static constexpr unsigned type = 40;
          term_id                   term;
@@ -95,10 +92,10 @@ namespace psibase::net
          Claim                     claim;
 
          auto signer() const { return claim; }
-         PSIO_REFLECT_INLINE(view_change_message, term, producer, claim)
+         PSIO_REFLECT_INLINE(ViewChangeMessage, term, producer, claim)
          std::string to_string() const
          {
-            return "view_change: view=" + std::to_string(term) + " producer=" + producer.str();
+            return "view change: term=" + std::to_string(term) + " producer=" + producer.str();
          }
       };
 
@@ -170,12 +167,12 @@ namespace psibase::net
          }
          block_confirm_data           confirmations[2];
          std::shared_ptr<ProducerSet> producers[2];
-         std::vector<prepare_message> prepares;
-         std::vector<commit_message>  commits;
-         void        add_message(const prepare_message& msg) { prepares.push_back(msg); }
-         void        add_message(const commit_message& msg) { commits.push_back(msg); }
-         static void get_type(const prepare_message&) { return confirm_type::prepare; }
-         static void get_type(const commit_message&) { return confirm_type::commit; }
+         std::vector<PrepareMessage>  prepares;
+         std::vector<CommitMessage>   commits;
+         void        add_message(const PrepareMessage& msg) { prepares.push_back(msg); }
+         void        add_message(const CommitMessage& msg) { commits.push_back(msg); }
+         static void get_type(const PrepareMessage&) { return confirm_type::prepare; }
+         static void get_type(const CommitMessage&) { return confirm_type::commit; }
          bool        confirm(const std::optional<std::size_t>& idx0,
                              const std::optional<std::size_t>& idx1,
                              confirm_type                      type)
@@ -305,9 +302,9 @@ namespace psibase::net
       }
 
       using message_type = boost::mp11::mp_push_back<typename Base::message_type,
-                                                     prepare_message,
-                                                     commit_message,
-                                                     view_change_message>;
+                                                     PrepareMessage,
+                                                     CommitMessage,
+                                                     ViewChangeMessage>;
       bool is_leader()
       {
          if (auto idx = active_producers[0]->getIndex(self))
@@ -421,7 +418,7 @@ namespace psibase::net
                 [&](const auto& k)
                 {
                    network().multicast_producers(
-                       view_change_message{.term = current_term, .producer = self, .claim = k});
+                       ViewChangeMessage{.term = current_term, .producer = self, .claim = k});
                 });
          }
       }
@@ -451,7 +448,7 @@ namespace psibase::net
                 [&](const auto& k)
                 {
                    network().multicast_producers(
-                       view_change_message{.term = current_term, .producer = self, .claim = k});
+                       ViewChangeMessage{.term = current_term, .producer = self, .claim = k});
                 });
             if (auto idx = active_producers[0]->getIndex(self))
             {
@@ -531,7 +528,7 @@ namespace psibase::net
          for_each_key(
              [&](const auto& key)
              {
-                auto message = prepare_message{.block_id = id, .producer = self, .claim = key};
+                auto message = PrepareMessage{.block_id = id, .producer = self, .claim = key};
                 network().multicast_producers(message);
                 if (auto iter = confirmations.find(state->blockId()); iter != confirmations.end())
                 {
@@ -570,7 +567,7 @@ namespace psibase::net
          for_each_key(
              [&](const auto& key)
              {
-                auto message = commit_message{.block_id = id, .producer = self, .claim = key};
+                auto message = CommitMessage{.block_id = id, .producer = self, .claim = key};
                 network().multicast_producers(message);
                 if (auto iter = confirmations.find(state->blockId()); iter != confirmations.end())
                 {
@@ -614,7 +611,7 @@ namespace psibase::net
             }
          }
       }
-      void recv(peer_id peer, const prepare_message& msg)
+      void recv(peer_id peer, const PrepareMessage& msg)
       {
          auto* state = chain().get_state(msg.block_id);
          if (!state)
@@ -625,7 +622,7 @@ namespace psibase::net
          // TODO: should we update the sender's view here? same for commit.
          on_prepare(state, msg.producer);
       }
-      void recv(peer_id peer, const commit_message& msg)
+      void recv(peer_id peer, const CommitMessage& msg)
       {
          auto* state = chain().get_state(msg.block_id);
          if (!state)
@@ -636,7 +633,7 @@ namespace psibase::net
          on_commit(state, msg.producer);
       }
 
-      void recv(peer_id peer, const view_change_message& msg)
+      void recv(peer_id peer, const ViewChangeMessage& msg)
       {
          if (producer_views.empty())
          {

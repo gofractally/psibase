@@ -43,27 +43,27 @@ namespace psibase::net
          nodeId = std::uniform_int_distribution<NodeId>()(rng);
       }
       static const std::uint32_t protocol_version = 0;
-      struct init_message
+      struct InitMessage
       {
          static constexpr unsigned type    = 1;
          std::uint32_t             version = protocol_version;
          NodeId                    id;
          std::string to_string() const { return "init: version=" + std::to_string(version); }
-         PSIO_REFLECT_INLINE(init_message, version, id);
+         PSIO_REFLECT_INLINE(InitMessage, version, id);
       };
-      struct producer_message
+      struct ProducerMessage
       {
          static constexpr unsigned type = 2;
          producer_id               producer;
          std::string               to_string() const { return "producer: " + producer.str(); }
-         PSIO_REFLECT_INLINE(producer_message, producer)
+         PSIO_REFLECT_INLINE(ProducerMessage, producer)
       };
       auto get_message_impl()
       {
          return boost::mp11::mp_push_back<
              typename std::remove_cvref_t<
                  decltype(static_cast<Derived*>(this)->consensus())>::message_type,
-             init_message, producer_message>{};
+             InitMessage, ProducerMessage>{};
       }
       template <typename Msg, typename F>
       void async_send_block(peer_id id, const Msg& msg, F&& f)
@@ -108,11 +108,11 @@ namespace psibase::net
       struct connection;
       void connect(peer_id id)
       {
-         async_send_block(id, init_message{.id = nodeId}, [](const std::error_code&) {});
+         async_send_block(id, InitMessage{.id = nodeId}, [](const std::error_code&) {});
          if (auto producer = static_cast<Derived*>(this)->consensus().producer_name();
              producer != AccountNumber())
          {
-            async_send_block(id, producer_message{producer}, [](const std::error_code&) {});
+            async_send_block(id, ProducerMessage{producer}, [](const std::error_code&) {});
          }
          static_cast<Derived*>(this)->consensus().connect(id);
       }
@@ -210,7 +210,7 @@ namespace psibase::net
          }
          recv_impl(peer, msg[0], msg, (message_type*)0);
       }
-      void recv(peer_id peer, const init_message& msg)
+      void recv(peer_id peer, const InitMessage& msg)
       {
          PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
          if (msg.version != protocol_version)
@@ -223,7 +223,7 @@ namespace psibase::net
             peers().set_node_id(peer, msg.id);
          }
       }
-      void recv(peer_id peer, const producer_message& msg)
+      void recv(peer_id peer, const ProducerMessage& msg)
       {
          PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
          producers.insert({msg.producer, peer});

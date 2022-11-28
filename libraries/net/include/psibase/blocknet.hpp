@@ -64,7 +64,7 @@ namespace psibase::net
                               boost::log::attributes::constant(std::string("consensus")));
       }
 
-      struct hello_request
+      struct HelloRequest
       {
          static constexpr unsigned type = 32;
          ExtendedBlockId           xid;
@@ -73,15 +73,15 @@ namespace psibase::net
             return "hello: id=" + loggers::to_string(xid.id()) +
                    " blocknum=" + std::to_string(xid.num());
          }
-         PSIO_REFLECT_INLINE(hello_request, xid)
+         PSIO_REFLECT_INLINE(HelloRequest, xid)
       };
 
-      struct hello_response
+      struct HelloResponse
       {
          static constexpr unsigned type  = 33;
          char                      dummy = 0;
          std::string               to_string() const { return "hello response"; }
-         PSIO_REFLECT_INLINE(hello_response, dummy)
+         PSIO_REFLECT_INLINE(HelloResponse, dummy)
       };
 
       struct peer_connection
@@ -94,13 +94,13 @@ namespace psibase::net
          peer_id         id;
          bool            ready  = false;
          bool            closed = false;
-         // True once we have received a hello_response from the peer
+         // True once we have received a HelloResponse from the peer
          bool peer_ready = false;
          // TODO: we may be able to save some space, because last_received is
          // not meaningful until we're finished with hello.
          // The most recent hello message sent or the next queued hello message
-         hello_request hello;
-         bool          hello_sent;
+         HelloRequest hello;
+         bool         hello_sent;
       };
 
       producer_id                  self = null_producer;
@@ -117,16 +117,15 @@ namespace psibase::net
 
       loggers::common_logger logger;
 
-      struct append_entries_request
+      struct BlockMessage
       {
          static constexpr unsigned          type = 34;
          psio::shared_view_ptr<SignedBlock> block;
-         PSIO_REFLECT_INLINE(append_entries_request, block)
+         PSIO_REFLECT_INLINE(BlockMessage, block)
          std::string to_string() const
          {
             BlockInfo info{*block->block()};
-            return "append_entries: term=" +
-                   std::to_string(term_id{block->block()->header()->term()}) +
+            return "block: term=" + std::to_string(term_id{block->block()->header()->term()}) +
                    " leader=" + AccountNumber{block->block()->header()->producer()}.str() +
                    " id=" + loggers::to_string(info.blockId) +
                    " blocknum=" + std::to_string(BlockNum{block->block()->header()->blockNum()}) +
@@ -135,7 +134,7 @@ namespace psibase::net
          }
       };
 
-      using message_type = std::variant<hello_request, hello_response, append_entries_request>;
+      using message_type = std::variant<HelloRequest, HelloResponse, BlockMessage>;
 
       peer_connection& get_connection(peer_id id)
       {
@@ -212,7 +211,7 @@ namespace psibase::net
                                        }
                                     });
       }
-      void recv(peer_id origin, const hello_request& request)
+      void recv(peer_id origin, const HelloRequest& request)
       {
          auto& connection = get_connection(origin);
          if (connection.ready)
@@ -259,11 +258,11 @@ namespace psibase::net
          //std::cout << "ready: received=" << to_string(connection.last_received.id())
          //          << " common=" << to_string(connection.last_sent.id()) << std::endl;
          // FIXME: blocks and hellos need to be sequenced correctly
-         network().async_send_block(connection.id, hello_response{},
+         network().async_send_block(connection.id, HelloResponse{},
                                     [this, &connection](const std::error_code&)
                                     { async_send_fork(connection); });
       }
-      void recv(peer_id origin, const hello_response&)
+      void recv(peer_id origin, const HelloResponse&)
       {
          auto& connection      = get_connection(origin);
          connection.peer_ready = true;
@@ -396,7 +395,7 @@ namespace psibase::net
             peer.last_sent     = {next_block_id, peer.last_sent.num() + 1};
             auto next_block    = chain().get(next_block_id);
 
-            network().async_send_block(peer.id, append_entries_request{next_block},
+            network().async_send_block(peer.id, BlockMessage{next_block},
                                        [this, &peer](const std::error_code& e)
                                        { async_send_fork(peer); });
             consensus().post_send_block(peer.id, peer.last_sent.id());
@@ -459,7 +458,7 @@ namespace psibase::net
          }
       }
 
-      void recv(peer_id origin, const append_entries_request& request)
+      void recv(peer_id origin, const BlockMessage& request)
       {
          // TODO: should the leader ever accept a block from another source?
          if (chain().insert(request.block))

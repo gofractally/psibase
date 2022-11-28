@@ -43,10 +43,10 @@ Followers send confirmation to the leader after the block is successfully applie
 
 ### Messages
 
-`append_entries_request`
-`append_entries_response`
-`request_vote_request`
-`request_vote_response`
+`BlockMessage`
+`ConfirmMessage`
+`RequestVoteRequest`
+`RequestVoteResponse`
 
 ## BFT
 
@@ -77,10 +77,10 @@ Each producer maintains a view change timer to detect failure in the leader. The
 
 ### Messages
 
-`append_entries_request`
-`prepare_message`
-`commit_message`
-`view_change_message`
+`BlockMessage`
+`PrepareMessage`
+`CommitMessage`
+`ViewChangeMessage`
 
 ## Joint Consensus
 

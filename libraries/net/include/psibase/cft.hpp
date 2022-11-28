@@ -37,9 +37,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
-      using typename Base::append_entries_request;
-      using typename Base::hello_request;
-      using typename Base::hello_response;
+      using typename Base::BlockMessage;
       using typename Base::producer_state;
       using typename Base::term_id;
 
@@ -56,7 +54,7 @@ namespace psibase::net
 
       std::vector<block_num> match_index[2];
 
-      struct append_entries_response
+      struct ConfirmMessage
       {
          static constexpr unsigned type = 35;
          term_id                   term;
@@ -65,15 +63,15 @@ namespace psibase::net
          Claim                     claim;
 
          Claim signer() const { return claim; }
-         PSIO_REFLECT_INLINE(append_entries_response, term, follower_id, head_num, claim);
+         PSIO_REFLECT_INLINE(ConfirmMessage, term, follower_id, head_num, claim);
          std::string to_string() const
          {
-            return "append_entries response: term=" + std::to_string(term) +
-                   " follower=" + follower_id.str() + " blocknum=" + std::to_string(head_num);
+            return "confirm: term=" + std::to_string(term) + " follower=" + follower_id.str() +
+                   " blocknum=" + std::to_string(head_num);
          }
       };
 
-      struct request_vote_request
+      struct RequestVoteRequest
       {
          static constexpr unsigned type = 36;
          term_id                   term;
@@ -83,7 +81,7 @@ namespace psibase::net
          Claim                     claim;
 
          Claim signer() const { return claim; }
-         PSIO_REFLECT_INLINE(request_vote_request,
+         PSIO_REFLECT_INLINE(RequestVoteRequest,
                              term,
                              candidate_id,
                              last_log_index,
@@ -91,11 +89,11 @@ namespace psibase::net
                              claim)
          std::string to_string() const
          {
-            return "request_vote: term=" + std::to_string(term) +
+            return "request vote: term=" + std::to_string(term) +
                    " candidate=" + candidate_id.str();
          }
       };
-      struct request_vote_response
+      struct RequestVoteResponse
       {
          static constexpr unsigned type = 37;
          term_id                   term;
@@ -105,12 +103,7 @@ namespace psibase::net
          Claim                     claim;
 
          Claim signer() const { return claim; }
-         PSIO_REFLECT_INLINE(request_vote_response,
-                             term,
-                             candidate_id,
-                             voter_id,
-                             vote_granted,
-                             claim)
+         PSIO_REFLECT_INLINE(RequestVoteResponse, term, candidate_id, voter_id, vote_granted, claim)
          std::string to_string() const
          {
             return "vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str() +
@@ -119,9 +112,9 @@ namespace psibase::net
       };
 
       using message_type = boost::mp11::mp_push_back<typename Base::message_type,
-                                                     append_entries_response,
-                                                     request_vote_request,
-                                                     request_vote_response>;
+                                                     ConfirmMessage,
+                                                     RequestVoteRequest,
+                                                     RequestVoteResponse>;
 
       void cancel()
       {
@@ -227,9 +220,8 @@ namespace psibase::net
             for_each_key(
                 [&](const auto& k)
                 {
-                   network().sendto(
-                       new_head->producer,
-                       append_entries_response{current_term, self, new_head->blockNum, k});
+                   network().sendto(new_head->producer,
+                                    ConfirmMessage{current_term, self, new_head->blockNum, k});
                 });
          }
          Base::on_fork_switch(new_head);
@@ -362,13 +354,13 @@ namespace psibase::net
          for_each_key(
              [&](const auto& k)
              {
-                network().multicast_producers(request_vote_request{
+                network().multicast_producers(RequestVoteRequest{
                     current_term, self, chain().get_head()->blockNum, chain().get_head()->term, k});
              });
          check_votes();
       }
       // ----------- handling of incoming messages -------------
-      void recv(peer_id origin, const append_entries_request& request)
+      void recv(peer_id origin, const BlockMessage& request)
       {
          if (is_cft())
          {
@@ -381,7 +373,7 @@ namespace psibase::net
          }
          Base::recv(origin, request);
       }
-      void recv(peer_id, const append_entries_response& response)
+      void recv(peer_id, const ConfirmMessage& response)
       {
          if (!is_cft())
          {
@@ -400,7 +392,7 @@ namespace psibase::net
          }
          // otherwise ignore out-dated response
       }
-      void recv(peer_id, const request_vote_request& request)
+      void recv(peer_id, const RequestVoteRequest& request)
       {
          if (!is_cft())
          {
@@ -429,15 +421,15 @@ namespace psibase::net
                 [&](const auto& k)
                 {
                    network().sendto(request.candidate_id,
-                                    request_vote_response{.term         = current_term,
-                                                          .candidate_id = request.candidate_id,
-                                                          .voter_id     = self,
-                                                          .vote_granted = vote_granted,
-                                                          .claim        = k});
+                                    RequestVoteResponse{.term         = current_term,
+                                                        .candidate_id = request.candidate_id,
+                                                        .voter_id     = self,
+                                                        .vote_granted = vote_granted,
+                                                        .claim        = k});
                 });
          }
       }
-      void recv(peer_id, const request_vote_response& response)
+      void recv(peer_id, const RequestVoteResponse& response)
       {
          if (!is_cft())
          {
