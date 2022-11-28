@@ -367,14 +367,18 @@ namespace psibase
       {
          assert(!root->invalid);
          root->invalid = true;
-         for (auto iter = byOrderIndex.find(root->order()), end = byOrderIndex.end(); iter != end;
-              ++iter)
+         for (auto iter = byOrderIndex.find(root->order()), end = byOrderIndex.end(); iter != end;)
          {
             auto current = states.find(iter->second);
             auto prev    = states.find(current->second.info.header.previous);
             if (prev != states.end() && prev->second.invalid)
             {
                current->second.invalid = true;
+               iter                    = byOrderIndex.erase(iter);
+            }
+            else
+            {
+               ++iter;
             }
          }
       }
