@@ -27,8 +27,15 @@ namespace psibase::net
           : stream(std::move(stream))
       {
          logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(endpoint()));
+         need_close_msg = true;
       }
-      ~websocket_connection() { PSIBASE_LOG(logger, info) << "Connection closed"; }
+      ~websocket_connection()
+      {
+         if (need_close_msg)
+         {
+            PSIBASE_LOG(logger, info) << "Connection closed";
+         }
+      }
       explicit websocket_connection(boost::asio::io_context& ctx) : stream(ctx) {}
       void async_read(read_handler f) override
       {
@@ -140,6 +147,8 @@ namespace psibase::net
       std::optional<boost::asio::dynamic_vector_buffer<char, std::allocator<char>>> buffer;
       // Avoid calling close more than once
       bool closed = false;
+      //
+      bool need_close_msg = false;
    };
 
    template <typename F>
@@ -183,6 +192,7 @@ namespace psibase::net
                                                        }
                                                        else
                                                        {
+                                                          conn->need_close_msg = true;
                                                           f(std::move(conn));
                                                        }
                                                     });
