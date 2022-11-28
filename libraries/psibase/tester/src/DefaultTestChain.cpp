@@ -53,6 +53,7 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
            pushTransaction(      //
                makeTransaction(  //
                    {             //
+                    // TODO: set sender,service,method in a way that's helpful to block explorers
                     Action{
                         .sender  = AccountNumber{"foo"},  // ignored
                         .service = AccountNumber{"bar"},  // ignored

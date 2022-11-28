@@ -151,34 +151,13 @@ namespace psibase
 
    void TransactionContext::execVerifyProof(size_t i)
    {
-      auto& db         = blockContext.db;
-      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
-      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
-                                                          WasmConfigRow::key(proofWasmConfigTable));
-      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
-
       // TODO: fracpack validation, allowing new fields in inner transaction. Might be redundant elsewhere?
       auto trxView    = *signedTransaction.transaction;
       auto claimsView = *trxView.claims();
       check(signedTransaction.proofs.size() == claimsView.size(),
             "proofs and claims must have same size");
-      auto  id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());
-      auto& proof = signedTransaction.proofs[i];
-      VerifyArgs data{
-          .transactionHash = id,
-          .claim           = claimsView[i],
-          .proof           = proof,
-      };
-      Action action{
-          .sender  = {},
-          .service = data.claim.service,
-          .rawData = psio::convert_to_frac(data),
-      };
-      auto& atrace     = transactionTrace.actionTraces.emplace_back();
-      atrace.action    = action;
-      ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.service);
-      ec.execVerify(ac);
+      auto id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());
+      execVerifyProof(id, claimsView[i], signedTransaction.proofs[i]);
    }
 
    void TransactionContext::execVerifyProof(const Checksum256& id,
