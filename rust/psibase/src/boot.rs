@@ -180,6 +180,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
     };
 
     let actions = vec![Action {
+        // TODO: set sender,service,method in a way that's helpful to block explorers
         sender: AccountNumber { value: 0 },
         service: AccountNumber { value: 0 },
         method: method!("boot"),
