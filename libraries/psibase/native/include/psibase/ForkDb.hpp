@@ -120,6 +120,8 @@ namespace psibase
       std::shared_ptr<ProducerSet> nextProducers;
       // Only valid if nextProducers is non-null
       BlockNum nextProducersBlockNum;
+      // Set to true if this block or an ancestor failed validation
+      bool invalid = false;
       // TODO: track setcode of contracts used to verify producer signatures
       // in the BlockHeader. To make this work, we probably need to forbid
       // calls to other contracts.
@@ -238,7 +240,11 @@ namespace psibase
          {
             auto [pos, inserted] = states.try_emplace(info.blockId, *prev, info);
             assert(inserted);
-            if (byOrderIndex.find(prev->order()) != byOrderIndex.end())
+            if (prev->invalid)
+            {
+               pos->second.invalid = true;
+            }
+            else if (byOrderIndex.find(prev->order()) != byOrderIndex.end())
             {
                byOrderIndex.insert({pos->second.order(), info.blockId});
             }
@@ -332,7 +338,10 @@ namespace psibase
             byOrderIndex.clear();
             for (const auto& [id, state] : states)
             {
-               byOrderIndex.insert({state.order(), id});
+               if (!state.invalid)
+               {
+                  byOrderIndex.insert({state.order(), id});
+               }
             }
          }
          // Prune blocks that are not descendants of root
@@ -351,6 +360,23 @@ namespace psibase
             }
          }
          assert(!byOrderIndex.empty());
+      }
+
+      // \pre root is in byOrderIndex
+      void blacklist_subtree(BlockHeaderState* root)
+      {
+         assert(!root->invalid);
+         root->invalid = true;
+         for (auto iter = byOrderIndex.find(root->order()), end = byOrderIndex.end(); iter != end;
+              ++iter)
+         {
+            auto current = states.find(iter->second);
+            auto prev    = states.find(current->second.info.header.previous);
+            if (prev != states.end() && prev->second.invalid)
+            {
+               current->second.invalid = true;
+            }
+         }
       }
 
       template <typename F, typename Accept>
@@ -388,8 +414,19 @@ namespace psibase
                --iter;
                if (iter->second == id)
                {
-                  execute_fork(iter, byBlocknumIndex.end(), on_accept_block);
-                  break;
+                  if (execute_fork(iter, byBlocknumIndex.end(), on_accept_block))
+                  {
+                     break;
+                  }
+                  else
+                  {
+                     // If execute fork fails, the trial head block and possibly
+                     // others are removed from byOrderIndex and byBlocknumIndex.
+                     // Start over.
+                     return async_switch_fork(
+                         static_cast<decltype(callback)>(callback),
+                         static_cast<decltype(on_accept_block)>(on_accept_block));
+                  }
                }
                assert(iter->first > commitIndex);
                iter->second = id;
@@ -443,33 +480,28 @@ namespace psibase
          return true;
       }
       // TODO: run this in a separate thread and make it interruptable
-      void async_execute_fork(BlockHeaderState* prev, auto iter, auto end, auto&& on_accept_block)
+      bool execute_fork(auto iter, auto end, auto&& on_accept_block)
       {
          if (iter != end)
          {
+            auto* prev = get_state(iter->second);
+            assert(prev->revision);
+            ++iter;
             for (; iter != end; ++iter)
             {
                BlockHeaderState* nextState = get_state(iter->second);
                if (!execute_block(prev, nextState))
                {
-                  // TODO: blacklist block and its descendants
-                  return;
+                  byBlocknumIndex.erase(iter, end);
+                  blacklist_subtree(nextState);
+                  return false;
                }
                on_accept_block(nextState);
                systemContext->sharedDatabase.setHead(*writer, nextState->revision);
                prev = nextState;
             }
          }
-      }
-      void execute_fork(auto iter, auto end, auto&& on_accept_block)
-      {
-         if (iter != end)
-         {
-            auto* state = get_state(iter->second);
-            assert(state->revision);
-            ++iter;
-            async_execute_fork(state, iter, end, std::move(on_accept_block));
-         }
+         return true;
       }
       BlockHeaderState* get_state(const id_type& id)
       {
