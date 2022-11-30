@@ -178,7 +178,6 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
                 headers: vec![],
             })
         } else {
-            println!("receiving graphql post...");
             let request_result = receive_body(
                 Some(&request.contentType),
                 request.body.as_ref(),
@@ -190,10 +189,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
                 check(false, &format!("err parsing graphql query {}", err));
             }
 
-            let request = request_result.unwrap();
-            println!("received gql post!!! {:?}", request);
-
-            let res = schema.execute(request).await;
+            let res = schema.execute(request_result.unwrap()).await;
             Some(HttpReply {
                 contentType: "application/json".into(),
                 body: serde_json::to_vec(&res).unwrap().into(),

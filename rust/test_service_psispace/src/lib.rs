@@ -5,12 +5,11 @@
 /// Please don't publish this as the real psispace-sys service.
 #[psibase::service(name = "psispace-sys")]
 mod service {
-    use async_graphql::connection::Connection;
     use async_graphql::*;
     use psibase::{
-        check, get_sender, get_service, serve_action_templates, serve_graphiql, serve_graphql,
-        serve_pack_action, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack, RawKey, Reflect,
-        Table, TableIndex, TableQuery, Unpack,
+        check, get_sender, get_service, queries, serve_action_templates, serve_graphiql,
+        serve_graphql, serve_pack_action, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack,
+        Reflect, Table, TableIndex, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
@@ -42,50 +41,13 @@ mod service {
         }
     }
 
-    // Root query object
-    struct Query;
-
-    #[Object]
-    impl Query {
-        // table_query!("allContent", ContentTable, 0);
-        // table_query!("content", ContentTable, 0, account);
-
+    #[queries]
+    impl Queries {
         /// List all the existing files
-        async fn all_content(
-            &self,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, ContentRow>> {
-            let table_idx = ContentTable::new().get_index_pk();
-            TableQuery::new(table_idx)
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-                .await
-        }
+        table_query!(all_content, ContentTable, get_index_pk);
 
         /// List files content by account
-        async fn content(
-            &self,
-            account: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, ContentRow>> {
-            let table_idx = ContentTable::new().get_index_pk();
-            let sidx = TableQuery::subindex::<String>(table_idx, &account);
-            sidx.first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-                .await
-        }
+        table_query!(content, ContentTable, get_index_pk, account, AccountNumber);
     }
 
     /// Store a new file
@@ -194,6 +156,7 @@ mod tests {
         Wrapper,
     };
     use psibase::{account, AccountNumber, ChainResult, HexBytes, HttpReply, HttpRequest, Table};
+    use serde_json::{json, Value};
 
     #[psibase::test_case(services("psispace-sys"))]
     fn users_can_store_content(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -383,23 +346,24 @@ mod tests {
             }
         }
 
-        println!("created accounts and files!");
+        let gql ="
+            fragment contentSummaryFragment on ContentRowConnection {
+                pageInfo { startCursor endCursor hasNextPage hasPreviousPage }
+                edges { node { account path contentType} }
+            }
 
-        let default_page_edges = "
-        {
-            pageInfo { startCursor endCursor hasNextPage hasPreviousPage }
-            edges { node { account path contentType} }
-        }
+            {
+                firstContent: allContent(first: 1) {...contentSummaryFragment}
+                lastContent: allContent(last: 1) {...contentSummaryFragment}
+                first20Contents: allContent(first: 20) {...contentSummaryFragment}
+                last20Contents: allContent(last: 20) {...contentSummaryFragment}
+                acc3FirstContent: content(account: \\\"acc3\\\", first: 1) {...contentSummaryFragment}
+                acc5LastContent: content(account: \\\"acc5\\\", last: 1) {...contentSummaryFragment}
+                acc4First99Contents: content(account: \\\"acc4\\\", first: 99) {...contentSummaryFragment}
+                acc6Last99Contents: content(account: \\\"acc6\\\", last: 99) {...contentSummaryFragment}
+            }
         ";
-        let gql = format!(
-            "{{
-                firstContent: allContent(first: 1) {0}
-                lastContent: allContent(last: 1) {0}
-            }}",
-            default_page_edges
-        );
-        let json_query = format!("{{\"query\":\"{}\"}}", gql);
-        println!("submitting jq {}", json_query);
+        let json_query = format!("{{\"query\":\"{}\"}}", gql).replace('\n', "");
 
         let response = Wrapper::push(&chain).serveSys(HttpRequest {
             host: "psispace-sys.testnet.psibase.io".to_string(),
@@ -410,11 +374,88 @@ mod tests {
             body: json_query.to_string().into_bytes().into(),
         });
 
-        println!("gql response trace >>>\n{}", response.trace);
-
         let response = response.get()?;
         assert!(response.is_some());
-        println!("gql response >>>\n {:?}", response.unwrap());
+
+        let json_response: Value = serde_json::from_slice(response.unwrap().body.0.as_ref())?;
+
+        let first_content_edges = json_response["data"]["firstContent"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(first_content_edges.len(), 1);
+
+        let first_content = &first_content_edges[0]["node"];
+        let expected_first_content = json!({
+            "account": "acc9",
+            "contentType": "text/html",
+            "path": "/articles/blog1.html",
+        });
+        assert_eq!(first_content, &expected_first_content);
+
+        let last_content_edges = json_response["data"]["lastContent"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(last_content_edges.len(), 1);
+
+        let last_content = &last_content_edges[0]["node"];
+        let expected_last_content = json!({
+            "account": "acc10",
+            "contentType": "text/html",
+            "path": "/articles/blog5.html",
+        });
+        assert_eq!(last_content, &expected_last_content);
+
+        let first_20_edges = json_response["data"]["first20Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(first_20_edges.len(), 20);
+        assert_eq!(&first_20_edges[0]["node"], first_content);
+
+        let last_20_edges = json_response["data"]["last20Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(last_20_edges.len(), 20);
+        assert_eq!(&last_20_edges[19]["node"], last_content);
+
+        let acc3_first_content = &json_response["data"]["acc3FirstContent"]["edges"][0]["node"];
+        assert_eq!(acc3_first_content["account"].as_str().unwrap(), "acc3");
+        assert_eq!(
+            acc3_first_content["path"].as_str().unwrap(),
+            "/articles/blog1.html"
+        );
+
+        let acc5_last_content = &json_response["data"]["acc5LastContent"]["edges"][0]["node"];
+        assert_eq!(acc5_last_content["account"].as_str().unwrap(), "acc5");
+        assert_eq!(
+            acc5_last_content["path"].as_str().unwrap(),
+            "/articles/blog5.html"
+        );
+
+        let acc4_first_99_edges = json_response["data"]["acc4First99Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(acc4_first_99_edges.len(), 5);
+        assert_eq!(
+            acc4_first_99_edges[0]["node"]["account"].as_str().unwrap(),
+            "acc4"
+        );
+        assert_eq!(
+            acc4_first_99_edges[0]["node"]["path"].as_str().unwrap(),
+            "/articles/blog1.html"
+        );
+
+        let acc6_last_99_edges = json_response["data"]["acc6Last99Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(acc6_last_99_edges.len(), 5);
+        assert_eq!(
+            acc6_last_99_edges[4]["node"]["account"].as_str().unwrap(),
+            "acc6"
+        );
+        assert_eq!(
+            acc6_last_99_edges[4]["node"]["path"].as_str().unwrap(),
+            "/articles/blog5.html"
+        );
 
         Ok(())
     }

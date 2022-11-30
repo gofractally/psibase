@@ -750,6 +750,15 @@ fn process_service_tables(
         (table_name, table_record_struct_name.clone())
     };
 
+    let table_record_type_id = Ident::new(
+        format!("{}Record", table_name_id).as_str(),
+        table_record_struct_name.span(),
+    );
+    let table_record_type_impl = quote! {
+        type #table_record_type_id = #record_name_id;
+    };
+    items.push(parse_quote! {#table_record_type_impl});
+
     let table_impl = quote! {
         impl #psibase_mod::Table<#record_name_id> for #table_name_id {
             const TABLE_INDEX: u16 = #table_index;
