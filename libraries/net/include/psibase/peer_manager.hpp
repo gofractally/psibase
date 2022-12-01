@@ -43,7 +43,7 @@ namespace psibase::net
       std::function<void()>      on_disconnect;
    };
 
-   struct connection_manager
+   struct connection_manager : std::enable_shared_from_this<connection_manager>
    {
       static constexpr std::chrono::seconds timeout_base{30};
       static constexpr std::chrono::seconds timeout_delta{30};
@@ -118,7 +118,14 @@ namespace psibase::net
       }
       void do_connect(const std::string& url, peer_info& peer, auto now)
       {
-         peer.connect(url, [this, url] { disconnect(url); });
+         peer.connect(url,
+                      [weak = weak_from_this(), url]
+                      {
+                         if (auto self = weak.lock())
+                         {
+                            self->disconnect(url);
+                         }
+                      });
          peer.retry_time = now + peer.current_timeout;
          peer.connected  = true;
          ++count;
@@ -145,19 +152,26 @@ namespace psibase::net
             nodeIds.try_emplace(iter->second, id);
             if (conn->url)
             {
-               conn->on_disconnect = [this, url = *conn->url, id, weak = std::weak_ptr{conn}]()
+               conn->on_disconnect =
+                   [self = weak_from_this(), url = *conn->url, id, weak = std::weak_ptr{conn}]()
                {
-                  disconnect(url);
-                  nodes.erase(id);
-                  nodeIds.erase(weak);
+                  if (auto shared = self.lock())
+                  {
+                     shared->disconnect(url);
+                     shared->nodes.erase(id);
+                     shared->nodeIds.erase(weak);
+                  }
                };
             }
             else
             {
-               conn->on_disconnect = [this, id, weak = std::weak_ptr{conn}]()
+               conn->on_disconnect = [self = weak_from_this(), id, weak = std::weak_ptr{conn}]()
                {
-                  nodes.erase(id);
-                  nodeIds.erase(weak);
+                  if (auto shared = self.lock())
+                  {
+                     shared->nodes.erase(id);
+                     shared->nodeIds.erase(weak);
+                  }
                };
             }
          }
@@ -170,12 +184,15 @@ namespace psibase::net
                   if (!shared->url)
                   {
                      shared->url           = conn->url;
-                     shared->on_disconnect = [this, url = *shared->url,
+                     shared->on_disconnect = [self = weak_from_this(), url = *shared->url,
                                               weak = std::weak_ptr{shared}, id = iter->first]()
                      {
-                        disconnect(url);
-                        nodes.erase(id);
-                        nodeIds.erase(weak);
+                        if (auto shared = self.lock())
+                        {
+                           shared->disconnect(url);
+                           shared->nodes.erase(id);
+                           shared->nodeIds.erase(weak);
+                        }
                      };
                      conn->on_disconnect = nullptr;
                   }
@@ -226,7 +243,8 @@ namespace psibase::net
    struct peer_manager
    {
       auto& network() { return static_cast<Derived*>(this)->network(); }
-      explicit peer_manager(boost::asio::io_context& ctx) : _ctx(ctx), autoconnector(ctx)
+      explicit peer_manager(boost::asio::io_context& ctx)
+          : _ctx(ctx), autoconnector(std::make_shared<connection_manager>(ctx))
       {
          default_logger.add_attribute("Channel",
                                       boost::log::attributes::constant(std::string("p2p")));
@@ -299,7 +317,7 @@ namespace psibase::net
       {
          if (auto pos = _connections.find(peer); pos != _connections.end())
          {
-            if (!autoconnector.postconnect(id, pos->second))
+            if (!autoconnector->postconnect(id, pos->second))
             {
                PSIBASE_LOG(pos->second->logger, info) << "Duplicate peer";
                disconnect(peer);
@@ -310,15 +328,15 @@ namespace psibase::net
       template <typename F>
       void connect(const std::string& url, F&& connect)
       {
-         autoconnector.connect(url, std::forward<F>(connect));
+         autoconnector->connect(url, std::forward<F>(connect));
       }
       template <typename F>
       void autoconnect(std::vector<std::string>&& peers, std::size_t target, F&& connect)
       {
-         autoconnector.set(std::move(peers), target, std::forward<F>(connect));
+         autoconnector->set(std::move(peers), target, std::forward<F>(connect));
       }
 
-      auto autoconnect() const { return autoconnector.get(); }
+      auto autoconnect() const { return autoconnector->get(); }
 
       loggers::common_logger& logger(peer_id id)
       {
@@ -338,7 +356,7 @@ namespace psibase::net
       peer_id                                             next_peer_id = 0;
       boost::asio::io_context&                            _ctx;
       std::map<peer_id, std::shared_ptr<connection_base>> _connections;
-      connection_manager                                  autoconnector;
+      std::shared_ptr<connection_manager>                 autoconnector;
 
       loggers::common_logger default_logger;
    };
