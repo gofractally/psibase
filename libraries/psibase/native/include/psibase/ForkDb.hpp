@@ -397,8 +397,8 @@ namespace psibase
             if (iter->second == root->blockId() ||
                 ids.find(states.find(iter->second)->second.info.header.previous) != ids.end())
             {
-               ++iter;
                ids.insert(iter->second);
+               ++iter;
             }
             else
             {
