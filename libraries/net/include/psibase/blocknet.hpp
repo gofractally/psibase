@@ -198,11 +198,15 @@ namespace psibase::net
          network().async_send_block(connection.id, connection.hello,
                                     [this, &connection](const std::error_code& ec)
                                     {
-                                       if (ec || connection.closed)
+                                       if (connection.closed)
                                        {
                                           connection.peer_ready = true;
                                           disconnect(connection.id);
                                           return;
+                                       }
+                                       else if (ec)
+                                       {
+                                          connection.peer_ready = true;
                                        }
                                        if (!connection.peer_ready)
                                        {
