@@ -230,9 +230,18 @@ namespace psibase::net
 
       void on_produce_block(const BlockHeaderState* state)
       {
+         Base::on_produce_block(state);
          if (is_cft())
          {
             update_match_index(self, state->blockNum());
+         }
+      }
+      void on_accept_block(const BlockHeaderState* state)
+      {
+         Base::on_accept_block(state);
+         if (state->producers->algorithm == ConsensusAlgorithm::cft)
+         {
+            chain().commit(state->info.header.commitNum);
          }
       }
       // ------------------- Implementation utilities ----- -----------

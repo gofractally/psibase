@@ -351,7 +351,8 @@ namespace psibase::net
                 }
                 else if (_state == producer_state::leader)
                 {
-                   if (auto* b = chain().finish_block())
+                   if (auto* b = chain().finish_block([this](const BlockHeaderState* state)
+                                                      { return consensus().makeBlockData(state); }))
                    {
                       consensus().on_produce_block(b);
                       consensus().set_producers(chain().getProducers());
@@ -362,6 +363,10 @@ namespace psibase::net
                    if (_state == producer_state::leader)
                    {
                       start_leader();
+                   }
+                   else
+                   {
+                      PSIBASE_LOG(consensus().logger, info) << "Stopping block production";
                    }
                 }
              });
@@ -467,17 +472,22 @@ namespace psibase::net
             BlockInfo       info{*request.block->block()};
             ExtendedBlockId xid = {info.blockId, info.header.blockNum};
             update_last_received(connection, xid);
-            chain().async_switch_fork(
-                [this](BlockHeader* h)
-                {
-                   chain().commit(h->commitNum);
-                   // TODO: only run set_producers when the producers actually changed
-                   consensus().set_producers(chain().getProducers());
-                   consensus().on_fork_switch(h);
-                   do_gc();
-                },
-                [this](BlockHeaderState* state) { consensus().on_accept_block(state); });
+            switch_fork();
          }
+      }
+
+      // This should be called after any operation that might change the head block.
+      void switch_fork()
+      {
+         chain().async_switch_fork(
+             [this](BlockHeader* h)
+             {
+                // TODO: only run set_producers when the producers actually changed
+                consensus().set_producers(chain().getProducers());
+                consensus().on_fork_switch(h);
+                do_gc();
+             },
+             [this](BlockHeaderState* state) { consensus().on_accept_block(state); });
       }
 
       void do_gc()
@@ -486,10 +496,12 @@ namespace psibase::net
       }
 
       // Default implementations
-      void on_accept_block(const BlockHeaderState*) {}
-      void post_send_block(peer_id, const Checksum256&) {}
-      void on_erase_block(const Checksum256&) {}
-      void set_producers(const auto&) {}
-      void cancel() {}
+      std::optional<std::vector<char>> makeBlockData(const BlockHeaderState*) { return {}; }
+      void                             on_produce_block(const BlockHeaderState*) {}
+      void                             on_accept_block(const BlockHeaderState*) {}
+      void                             post_send_block(peer_id, const Checksum256&) {}
+      void                             on_erase_block(const Checksum256&) {}
+      void                             set_producers(const auto&) {}
+      void                             cancel() {}
    };
 }  // namespace psibase::net

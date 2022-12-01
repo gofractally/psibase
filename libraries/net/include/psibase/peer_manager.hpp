@@ -238,8 +238,8 @@ namespace psibase::net
          PSIBASE_LOG(conn->logger, info) << "Connected";
          auto [iter, inserted] = _connections.try_emplace(id, conn);
          assert(inserted);
-         async_recv(id, std::move(conn));
          static_cast<Derived*>(this)->network().connect(id);
+         async_recv(id, std::move(conn));
       }
       template <typename F>
       void async_send(peer_id id, const std::vector<char>& msg, F&& f)

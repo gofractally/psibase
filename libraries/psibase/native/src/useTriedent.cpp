@@ -15,6 +15,7 @@ namespace psibase
 {
    static constexpr uint8_t revisionHeadPrefix = 0;
    static constexpr uint8_t revisionByIdPrefix = 1;
+   static constexpr uint8_t blockDataPrefix    = 2;
 
    static const char revisionHeadKey[] = {revisionHeadPrefix};
 
@@ -315,6 +316,34 @@ namespace psibase
 
       writer.set_top_root(topRoot);
    }  // removeRevisions
+
+   void SharedDatabase::setBlockData(Writer&               writer,
+                                     const Checksum256&    blockId,
+                                     std::span<const char> key,
+                                     std::span<const char> value)
+   {
+      auto              topRoot = writer.get_top_root();
+      std::vector<char> fullKey;
+      fullKey.reserve(1 + blockId.size() + key.size());
+      fullKey.push_back(blockDataPrefix);
+      fullKey.insert(fullKey.end(), blockId.begin(), blockId.end());
+      fullKey.insert(fullKey.end(), key.begin(), key.end());
+      writer.upsert(topRoot, fullKey, value);
+      writer.set_top_root(topRoot);
+   }
+
+   std::optional<std::vector<char>> SharedDatabase::getBlockData(Writer&               reader,
+                                                                 const Checksum256&    blockId,
+                                                                 std::span<const char> key)
+   {
+      auto              topRoot = reader.get_top_root();
+      std::vector<char> fullKey;
+      fullKey.reserve(1 + blockId.size() + key.size());
+      fullKey.push_back(blockDataPrefix);
+      fullKey.insert(fullKey.end(), blockId.begin(), blockId.end());
+      fullKey.insert(fullKey.end(), key.begin(), key.end());
+      return reader.get(topRoot, fullKey);
+   }
 
    bool SharedDatabase::isSlow() const
    {

@@ -43,6 +43,7 @@ namespace psibase::net
          nodeId = std::uniform_int_distribution<NodeId>()(rng);
       }
       static const std::uint32_t protocol_version = 0;
+      // message type 0 is reserved
       struct InitMessage
       {
          static constexpr unsigned type    = 1;
@@ -157,14 +158,19 @@ namespace psibase::net
          psio::fracpack(msg, s);
          return result;
       }
+      template <NeedsSignature Msg>
+      SignedMessage<Msg> sign_message(const Msg& msg)
+      {
+         auto  raw   = serialize_unsigned_message(msg);
+         Claim claim = msg.signer();
+         auto  sig   = chain().sign({raw.data(), raw.size()}, claim);
+         return {msg, sig};
+      }
       template <typename Msg>
       std::vector<char> serialize_signed_message(const Msg& msg)
       {
          // TODO: avoid serializing the message twice
-         auto  raw   = serialize_unsigned_message(msg);
-         Claim claim = msg.signer();
-         auto  sig   = chain().sign({raw.data(), raw.size()}, claim);
-         return serialize_unsigned_message(SignedMessage<Msg>{msg, sig});
+         return serialize_unsigned_message(sign_message(msg));
       }
       template <typename Msg>
       auto serialize_message(const Msg& msg)

@@ -181,8 +181,10 @@ namespace psibase
    {
       Block             block;  // TODO: shared_view_ptr?
       std::vector<char> signature;
+      // Contains additional signatures if required by the consensus algorithm
+      std::optional<std::vector<char>> auxConsensusData;
    };
-   PSIO_REFLECT(SignedBlock, block, signature)
+   PSIO_REFLECT(SignedBlock, block, signature, auxConsensusData)
 
    struct BlockInfo
    {

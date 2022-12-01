@@ -82,6 +82,18 @@ namespace psibase
             return {};
          }
       }
+      std::optional<std::size_t> getIndex(AccountNumber producer, const Claim& claim) const
+      {
+         auto iter = activeProducers.find(producer);
+         if (iter != activeProducers.end() && iter->second == claim)
+         {
+            return iter - activeProducers.begin();
+         }
+         else
+         {
+            return {};
+         }
+      }
       std::optional<Claim> getClaim(AccountNumber producer) const
       {
          auto iter = activeProducers.find(producer);
@@ -124,7 +136,7 @@ namespace psibase
       bool invalid = false;
       // TODO: track setcode of contracts used to verify producer signatures
       // in the BlockHeader. To make this work, we probably need to forbid
-      // calls to other contracts.
+      // calls to other contracts and access to state.
       BlockHeaderState() : info()
       {
          info.header.blockNum = 1;
@@ -207,6 +219,28 @@ namespace psibase
          }
          return {};
       }
+      // The block that finalizes a swap to a new producer set needs to
+      // contain proof that the block that started the switch is irreversible.
+      bool needsIrreversibleSignature() const
+      {
+         return nextProducers && info.header.commitNum >= nextProducersBlockNum;
+      }
+      bool singleProducer() const
+      {
+         if (producers->size() == 1)
+         {
+            return !nextProducers;
+         }
+         else if (producers->size() == 0)
+         {
+            if (!nextProducers)
+            {
+               return true;
+            }
+            return nextProducers->size() == 1 && nextProducers->isProducer(info.header.producer);
+         }
+         return false;
+      }
       auto order() const
       {
          return std::tuple(info.header.term, info.header.blockNum, info.blockId);
@@ -228,12 +262,15 @@ namespace psibase
       bool insert(const psio::shared_view_ptr<SignedBlock>& b)
       {
          BlockInfo info(*b->block());
+         PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
          if (info.header.blockNum <= commitIndex)
          {
+            PSIBASE_LOG(logger, debug) << "Block ignored because it is before commitIndex";
             return false;
          }
          if (!blocks.try_emplace(info.blockId, b).second)
          {
+            PSIBASE_LOG(logger, debug) << "Block skipped because it is already known";
             return false;
          }
          if (auto* prev = get_state(info.header.previous))
@@ -242,13 +279,22 @@ namespace psibase
             assert(inserted);
             if (prev->invalid)
             {
+               PSIBASE_LOG(logger, debug) << "Block parent is invalid";
                pos->second.invalid = true;
             }
             else if (byOrderIndex.find(prev->order()) != byOrderIndex.end())
             {
                byOrderIndex.insert({pos->second.order(), info.blockId});
             }
+            else
+            {
+               PSIBASE_LOG(logger, debug) << "Block is outside current tree";
+            }
             return true;
+         }
+         else
+         {
+            PSIBASE_LOG(logger, debug) << "Block dropped because its parent is missing";
          }
          return false;
       }
@@ -272,7 +318,7 @@ namespace psibase
                {
                   auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum);
                   return psio::shared_view_ptr<SignedBlock>(
-                      SignedBlock{*block, proof ? *proof : std::vector<char>()});
+                      SignedBlock{*block, proof ? *proof : std::vector<char>(), getBlockData(id)});
                }
             }
             return nullptr;
@@ -440,6 +486,8 @@ namespace psibase
             callback(&head->info.header);
          }
       }
+      // TODO: somehow prevent poisoning the cache if a malicious peer
+      // sends a correct block with the wrong signature.
       Claim validateBlockSignature(BlockHeaderState* prev, const BlockInfo& info, const auto& sig)
       {
          BlockContext verifyBc(*systemContext, prev->revision);
@@ -453,7 +501,7 @@ namespace psibase
          return std::move(*claim);
       }
       // \pre the state of prev has been set
-      bool execute_block(BlockHeaderState* prev, BlockHeaderState* state)
+      bool execute_block(BlockHeaderState* prev, BlockHeaderState* state, auto&& on_accept_block)
       {
          std::error_code ec{};
          if (!state->revision)
@@ -473,6 +521,7 @@ namespace psibase
                check(id == state->blockId(), "blockId does not match");
                state->revision = newRevision;
 
+               on_accept_block(state);
                PSIBASE_LOG(blockLogger, info) << "Accepted block";
             }
             catch (std::exception& e)
@@ -494,13 +543,12 @@ namespace psibase
             for (; iter != end; ++iter)
             {
                BlockHeaderState* nextState = get_state(iter->second);
-               if (!execute_block(prev, nextState))
+               if (!execute_block(prev, nextState, on_accept_block))
                {
                   byBlocknumIndex.erase(iter, end);
                   blacklist_subtree(nextState);
                   return false;
                }
-               on_accept_block(nextState);
                systemContext->sharedDatabase.setHead(*writer, nextState->revision);
                prev = nextState;
             }
@@ -522,7 +570,14 @@ namespace psibase
       bool is_complete_chain(const id_type& id) { return get_state(id) != nullptr; }
       std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> getProducers()
       {
-         return {head->producers, head->nextProducers};
+         if (head->nextProducers && head->info.header.commitNum >= head->nextProducersBlockNum)
+         {
+            return {head->nextProducers, nullptr};
+         }
+         else
+         {
+            return {head->producers, head->nextProducers};
+         }
       }
       bool commit(BlockNum num)
       {
@@ -532,6 +587,18 @@ namespace psibase
          systemContext->sharedDatabase.removeRevisions(*writer,
                                                        byBlocknumIndex.find(commitIndex)->second);
          return result;
+      }
+
+      void setBlockData(const Checksum256& id, std::vector<char>&& data)
+      {
+         char key[] = {0};
+         systemContext->sharedDatabase.setBlockData(*writer, id, key, data);
+      }
+
+      std::optional<std::vector<char>> getBlockData(const Checksum256& id) const
+      {
+         char key[] = {0};
+         return systemContext->sharedDatabase.getBlockData(*writer, id, key);
       }
 
       // removes blocks and states before irreversible
@@ -619,11 +686,15 @@ namespace psibase
             }
          }
       }
-      template <typename T>
-      bool in_best_chain(const T& t)
+      bool in_best_chain(const ExtendedBlockId& t)
       {
          auto iter = byBlocknumIndex.find(t.num());
          return iter != byBlocknumIndex.end() && iter->second == t.id();
+      }
+
+      bool in_best_chain(const Checksum256& id)
+      {
+         return in_best_chain(ExtendedBlockId{id, getBlockNum(id)});
       }
 
       // Block production:
@@ -640,7 +711,7 @@ namespace psibase
          assert(!!blockContext);
          blockContext.reset();
       }
-      BlockHeaderState* finish_block()
+      BlockHeaderState* finish_block(auto&& makeData)
       {
          assert(!!blockContext);
          if (blockContext->needGenesisAction)
@@ -665,15 +736,15 @@ namespace psibase
             auto [revision, id] = blockContext->writeRevision(prover, *claim);
             systemContext->sharedDatabase.setHead(*writer, revision);
             assert(head->blockId() == blockContext->current.header.previous);
-            auto proof     = getBlockProof(revision, blockContext->current.header.blockNum);
-            auto [iter, _] = blocks.try_emplace(id, SignedBlock{blockContext->current, proof});
-            // TODO: don't recompute sha
-            BlockInfo info{*iter->second->block()};
-            assert(info.blockId == iter->first);
-            auto [state_iter, ins2] = states.try_emplace(iter->first, *head, info, revision);
+            BlockInfo info;
+            info.header             = blockContext->current.header;
+            info.blockId            = id;
+            auto [state_iter, ins2] = states.try_emplace(id, *head, info, revision);
             byOrderIndex.insert({state_iter->second.order(), id});
             head = &state_iter->second;
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
+            auto proof = getBlockProof(revision, blockContext->current.header.blockNum);
+            blocks.try_emplace(id, SignedBlock{blockContext->current, proof, makeData(head)});
             PSIBASE_LOG_CONTEXT_BLOCK(blockContext->current.header, id);
             PSIBASE_LOG(blockLogger, info) << "Produced block";
             blockContext.reset();
@@ -758,8 +829,13 @@ namespace psibase
                if (!head)
                {
                   head = &state_iter->second;
+                  PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
+                  PSIBASE_LOG(logger, debug) << "Read head block";
                }
             } while (blockNum--);
+            const auto& info = states.begin()->second.info;
+            PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
+            PSIBASE_LOG(logger, debug) << "Read last committed block";
          }
          // TODO: if this doesn't exist, the database is corrupt
          assert(!byBlocknumIndex.empty());
@@ -793,6 +869,16 @@ namespace psibase
          assert(stateIter != states.end());
          assert(stateIter->second.revision);
          BlockContext verifyBc(*systemContext, stateIter->second.revision);
+         VerifyProver prover{verifyBc, signature};
+         prover.prove(data, claim);
+      }
+
+      void verify(ConstRevisionPtr         revision,
+                  std::span<char>          data,
+                  const Claim&             claim,
+                  const std::vector<char>& signature)
+      {
+         BlockContext verifyBc(*systemContext, std::move(revision));
          VerifyProver prover{verifyBc, signature};
          prover.prove(data, claim);
       }

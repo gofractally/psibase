@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/ForkDb.hpp>
+#include <psibase/SignedMessage.hpp>
 #include <psibase/blocknet.hpp>
 
 #include <boost/dynamic_bitset/dynamic_bitset.hpp>
@@ -77,7 +78,9 @@ namespace psibase::net
          Claim                     claim;
 
          auto signer() const { return claim; }
-         PSIO_REFLECT_INLINE(CommitMessage, block_id, producer, claim)
+         // To save space, we're picking this apart and reconstituting it, while
+         // assuming that the signature remains valid.
+         PSIO_REFLECT_INLINE(CommitMessage, definitionWillNotChange(), block_id, producer, claim)
          std::string to_string() const
          {
             return "commit: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
@@ -98,6 +101,57 @@ namespace psibase::net
             return "view change: term=" + std::to_string(term) + " producer=" + producer.str();
          }
       };
+
+      struct ProducerConfirm
+      {
+         AccountNumber     producer;
+         std::vector<char> signature;
+         PSIO_REFLECT_INLINE(ProducerConfirm, producer, signature)
+      };
+
+      // TODO: consider using a multiparty signature scheme to save space
+      struct BlockConfirm
+      {
+         BlockNum                                    blockNum;
+         std::vector<ProducerConfirm>                commits;
+         std::optional<std::vector<ProducerConfirm>> nextCommits;
+         PSIO_REFLECT_INLINE(BlockConfirm, blockNum, commits, nextCommits)
+      };
+
+      void verifyMsig(const auto&        revision,
+                      const Checksum256& id,
+                      const auto&        commits,
+                      const ProducerSet& prods)
+      {
+         AccountNumber prevAccount{};
+         check(commits.size() >= prods.threshold(), "Not enough commits");
+         for (const auto& [prod, sig] : commits)
+         {
+            // mostly to guarantee that the producers are unique
+            check(prevAccount < prod, "Commits must be ordered by producer");
+            auto claim = prods.getClaim(prod);
+            check(!!claim, "Not a valid producer");
+            CommitMessage originalCommit{id, prod, *claim};
+            auto          msg = network().serialize_unsigned_message(originalCommit);
+            chain().verify(revision, {msg.data(), msg.size()}, *claim, sig);
+         }
+      }
+
+      void verifyIrreversibleSignature(const auto&             revision,
+                                       const BlockConfirm&     commits,
+                                       const BlockHeaderState* state)
+      {
+         verifyMsig(revision, state->blockId(), commits.commits, *state->producers);
+         if (state->nextProducers)
+         {
+            check(!!commits.nextCommits, "nextCommits required during joint consensus");
+            verifyMsig(revision, state->blockId(), *commits.nextCommits, *state->nextProducers);
+         }
+         else
+         {
+            check(!commits.nextCommits, "Unexpected nextCommits outside joint consensus");
+         }
+      }
 
       struct block_confirm_data
       {
@@ -135,7 +189,7 @@ namespace psibase::net
             }
             return confirmed(type, threshold);
          }
-         confirm_result confirmed(confirm_type type, std::size_t threshold)
+         confirm_result confirmed(confirm_type type, std::size_t threshold) const
          {
             if (confirms[static_cast<unsigned>(type)].count() >= threshold)
             {
@@ -165,18 +219,24 @@ namespace psibase::net
                producers{std::move(p0), std::move(p1)}
          {
          }
-         block_confirm_data           confirmations[2];
-         std::shared_ptr<ProducerSet> producers[2];
-         std::vector<PrepareMessage>  prepares;
-         std::vector<CommitMessage>   commits;
-         void        add_message(const PrepareMessage& msg) { prepares.push_back(msg); }
-         void        add_message(const CommitMessage& msg) { commits.push_back(msg); }
+         block_confirm_data                         confirmations[2];
+         std::shared_ptr<ProducerSet>               producers[2];
+         std::vector<SignedMessage<PrepareMessage>> prepares;
+         std::vector<SignedMessage<CommitMessage>>  commits;
+         void add_message(const SignedMessage<PrepareMessage>& msg) { prepares.push_back(msg); }
+         void add_message(const SignedMessage<CommitMessage>& msg) { commits.push_back(msg); }
          static void get_type(const PrepareMessage&) { return confirm_type::prepare; }
          static void get_type(const CommitMessage&) { return confirm_type::commit; }
          bool        confirm(const std::optional<std::size_t>& idx0,
                              const std::optional<std::size_t>& idx1,
-                             confirm_type                      type)
+                             confirm_type                      type,
+                             const auto&                       msg)
          {
+            if (idx0 && !confirmations[0].confirms[static_cast<unsigned>(type)][*idx0] ||
+                idx1 && !confirmations[1].confirms[static_cast<unsigned>(type)][*idx1])
+            {
+               add_message(msg);
+            }
             auto result = confirmations[0].confirm(idx0, type, producers[0]->threshold());
             if (producers[1])
             {
@@ -187,6 +247,19 @@ namespace psibase::net
                }
             }
             return result == confirm_result::confirmed;
+         }
+         bool confirmed(confirm_type type) const
+         {
+            auto result = confirmations[0].confirmed(type, producers[0]->threshold());
+            if (producers[1])
+            {
+               if (producers[1]->algorithm == ConsensusAlgorithm::bft ||
+                   type == confirm_type::commit)
+               {
+                  result &= confirmations[1].confirmed(type, producers[1]->threshold());
+               }
+            }
+            return result != confirm_result::unconfirmed;
          }
       };
 
@@ -234,21 +307,24 @@ namespace psibase::net
          return {state->producers, state->nextProducers};
       }
 
-      bool confirm(const BlockHeaderState* state, AccountNumber producer, confirm_type type)
+      // TODO: reduce code bloat by passing msg through as const void*
+      bool confirm(const BlockHeaderState* state,
+                   AccountNumber           producer,
+                   confirm_type            type,
+                   const auto&             msg)
       {
          const auto& [p0, p1] = get_producers(state);
          if (p0->size() == 0)
          {
             return true;
          }
-         // TODO: also match key
-         auto idx0 = p0->getIndex(producer);
-         auto idx1 = p1 ? p1->getIndex(producer) : std::optional<std::size_t>();
+         auto idx0 = p0->getIndex(producer, msg.data.claim);
+         auto idx1 = p1 ? p1->getIndex(producer, msg.data.claim) : std::optional<std::size_t>();
          if (idx0 || idx1)
          {
             auto [iter, inserted] =
                 confirmations.try_emplace(state->blockId(), std::move(p0), std::move(p1));
-            return iter->second.confirm(idx0, idx1, type);
+            return iter->second.confirm(idx0, idx1, type, msg);
          }
          else
          {
@@ -258,14 +334,20 @@ namespace psibase::net
          }
       }
 
-      bool prepare(const BlockHeaderState* state, AccountNumber producer)
+      bool prepare(const BlockHeaderState* state, AccountNumber producer, const auto& msg)
       {
-         return confirm(state, producer, confirm_type::prepare);
+         return confirm(state, producer, confirm_type::prepare, msg);
       }
 
-      bool commit(const BlockHeaderState* state, AccountNumber producer)
+      bool commit(const BlockHeaderState* state, AccountNumber producer, const auto& msg)
       {
-         return confirm(state, producer, confirm_type::commit);
+         return confirm(state, producer, confirm_type::commit, msg);
+      }
+
+      bool isCommitted(const BlockHeaderState* state)
+      {
+         auto pos = confirmations.find(state->blockId());
+         return pos != confirmations.end() && pos->second.confirmed(confirm_type::commit);
       }
 
       void validate_producer(BlockHeaderState* state, AccountNumber producer, const Claim& claim)
@@ -315,6 +397,16 @@ namespace psibase::net
          return Base::is_sole_producer();
       }
 
+      static bool is_leader(const ProducerSet& producers, term_id term, AccountNumber prod)
+      {
+         auto num_producers = producers.size();
+         if (auto idx = producers.getIndex(prod))
+         {
+            return *idx == term % num_producers;
+         }
+         return num_producers == 0;
+      }
+
       void cancel()
       {
          _new_term_timer.cancel();
@@ -340,6 +432,7 @@ namespace psibase::net
          {
             producer_views.clear();
             producer_views.resize(prods.first->size());
+            set_producer_view(current_term, self);
          }
          if (!active_producers[0] || *active_producers[0] != *prods.first)
          {
@@ -355,6 +448,7 @@ namespace psibase::net
                PSIBASE_LOG(logger, info) << "Node is active producer";
                _state = producer_state::follower;
                producer_views.resize(active_producers[0]->size());
+               set_producer_view(current_term, self);
                start_timer();
             }
             else if (start_bft)
@@ -407,7 +501,7 @@ namespace psibase::net
          auto threshold = producer_views.size() * 2 / 3 + 1;
          if (std::count_if(producer_views.begin(), producer_views.end(),
                            [current_term = current_term](auto v)
-                           { return v >= current_term || v == 0; }) >= threshold)
+                           { return v >= current_term; }) >= threshold)
          {
             set_view(current_term + 1);
          }
@@ -427,6 +521,7 @@ namespace psibase::net
       {
          if (term > current_term)
          {
+            PSIBASE_LOG(logger, info) << "view change: " << term;
             bool was_leader = is_leader();
             current_term    = term;
             if (is_leader())
@@ -442,6 +537,7 @@ namespace psibase::net
                if (_state == producer_state::leader)
                {
                   stop_leader();
+                  _state = producer_state::follower;
                }
             }
             for_each_key(
@@ -450,10 +546,15 @@ namespace psibase::net
                    network().multicast_producers(
                        ViewChangeMessage{.term = current_term, .producer = self, .claim = k});
                 });
-            if (auto idx = active_producers[0]->getIndex(self))
-            {
-               producer_views[*idx] = term;
-            }
+            set_producer_view(term, self);
+         }
+      }
+
+      void set_producer_view(term_id term, AccountNumber prod)
+      {
+         if (auto idx = active_producers[0]->getIndex(prod))
+         {
+            producer_views[*idx] = std::max(term, producer_views[*idx]);
          }
       }
 
@@ -503,10 +604,10 @@ namespace psibase::net
          }
          Base::on_fork_switch(head);
       }
-      void on_prepare(const BlockHeaderState* state, AccountNumber producer)
+      void on_prepare(const BlockHeaderState* state, AccountNumber producer, const auto& msg)
       {
          const auto& id = state->blockId();
-         if (prepare(state, producer))
+         if (prepare(state, producer, msg))
          {
             if (state->order() > best_prepared)
             {
@@ -524,23 +625,57 @@ namespace psibase::net
          const auto& id = state->blockId();
          assert(chain().in_best_chain(state->xid()));
          best_prepare = state->order();
-         on_prepare(state, self);
          for_each_key(
              [&](const auto& key)
              {
-                auto message = PrepareMessage{.block_id = id, .producer = self, .claim = key};
+                auto message = network().sign_message(
+                    PrepareMessage{.block_id = id, .producer = self, .claim = key});
+                on_prepare(state, self, message);
                 network().multicast_producers(message);
-                if (auto iter = confirmations.find(state->blockId()); iter != confirmations.end())
-                {
-                   iter->second.add_message(message);
-                }
              });
       }
-      void on_commit(const BlockHeaderState* state, AccountNumber producer)
+      void save_commit_data(const BlockHeaderState* state)
+      {
+         auto iter = confirmations.find(state->blockId());
+         assert(iter != confirmations.end());
+         BlockConfirm result{state->blockNum()};
+         if (state->nextProducers)
+         {
+            result.nextCommits.emplace();
+         }
+         for (const auto& msg : iter->second.commits)
+         {
+            if (auto expected = state->producers->getClaim(msg.data.producer);
+                expected && expected == msg.data.claim)
+            {
+               result.commits.push_back({msg.data.producer, msg.signature});
+            }
+            if (state->nextProducers)
+            {
+               if (auto expected = state->nextProducers->getClaim(msg.data.producer);
+                   expected && expected == msg.data.claim)
+               {
+                  result.nextCommits->push_back({msg.data.producer, msg.signature});
+               }
+            }
+         }
+         auto compareProducer = [](const auto& lhs, const auto& rhs)
+         { return lhs.producer < rhs.producer; };
+         std::sort(result.commits.begin(), result.commits.end(), compareProducer);
+         if (result.nextCommits)
+         {
+            std::sort(result.nextCommits->begin(), result.nextCommits->end(), compareProducer);
+         }
+         chain().setBlockData(state->blockId(), psio::convert_to_frac(result));
+      }
+      void on_commit(const BlockHeaderState*             state,
+                     AccountNumber                       producer,
+                     const SignedMessage<CommitMessage>& msg)
       {
          const auto& id = state->blockId();
-         if (commit(state, producer))
+         if (commit(state, producer, msg))
          {
+            save_commit_data(state);
             if (!chain().in_best_chain(state->xid()))
             {
                if (state->order() < best_prepared)
@@ -552,28 +687,36 @@ namespace psibase::net
                }
                // This is possible if we receive the commits before the corresponding prepares
                chain().set_subtree(state);
+               Base::switch_fork();
             }
-            if (chain().commit(state->blockNum()))
+            else if (chain().commit(state->blockNum()))
             {
                start_timer();
             }
-            set_producers(chain().getProducers());
          }
       }
       void do_commit(const BlockHeaderState* state, AccountNumber producer)
       {
          const auto& id = state->blockId();
-         on_commit(state, self);
          for_each_key(
              [&](const auto& key)
              {
-                auto message = CommitMessage{.block_id = id, .producer = self, .claim = key};
+                auto message = network().sign_message(
+                    CommitMessage{.block_id = id, .producer = self, .claim = key});
+                on_commit(state, self, message);
                 network().multicast_producers(message);
-                if (auto iter = confirmations.find(state->blockId()); iter != confirmations.end())
-                {
-                   iter->second.add_message(message);
-                }
              });
+      }
+      std::optional<std::vector<char>> makeBlockData(const BlockHeaderState* state)
+      {
+         if (state->producers->algorithm == ConsensusAlgorithm::bft)
+         {
+            return chain().getBlockData(chain().get_block_id(state->info.header.commitNum));
+         }
+         else
+         {
+            return Base::makeBlockData(state);
+         }
       }
       void on_produce_block(const BlockHeaderState* state)
       {
@@ -586,6 +729,53 @@ namespace psibase::net
       void on_accept_block(const BlockHeaderState* state)
       {
          Base::on_accept_block(state);
+         if (state->producers->algorithm == ConsensusAlgorithm::bft)
+         {
+            // TODO: these checks should really happen before the block is processed or
+            // perhaps even concurrently.
+            check(
+                is_leader(*state->producers, state->info.header.term, state->info.header.producer),
+                "Wrong producer");
+            auto block = chain().get(state->blockId());
+            if (auto aux = block->auxConsensusData().get(); aux.valid())
+            {
+               auto data = psio::convert_from_frac<BlockConfirm>(*aux);
+               check(data.blockNum >= state->info.header.commitNum &&
+                         data.blockNum <= state->blockNum(),
+                     "blockNum out of range");
+               if (auto prev = chain().get_state(chain().get_block_id(data.blockNum - 1)))
+               {
+                  auto id = chain().get_block_id(data.blockNum);
+                  verifyIrreversibleSignature(prev->revision, data, chain().get_state(id));
+                  chain().setBlockData(id, std::move(*aux));
+                  chain().commit(data.blockNum);
+               }
+               else
+               {
+                  // TODO: We can't validate the proof that we received,
+                  // but that's okay because it's proving something that
+                  // we already know. For outgoing blocks, replace the
+                  // proof with the proof we have.
+               }
+            }
+            else if (state->singleProducer())
+            {
+               chain().commit(state->info.header.commitNum);
+            }
+            else
+            {
+               // Allow most signatures to be pruned, but don't advance
+               // irreversibility until we receive a valid set of signatures
+               check(!state->needsIrreversibleSignature(), "Missing irreversibility proof");
+            }
+            // When a block outside the current best chain is committed, we
+            // can't commit it immediately, because the best committed block
+            // is tracked by blockNum rather than blockId. Commit it here instead.
+            if (isCommitted(state))
+            {
+               chain().commit(state->blockNum());
+            }
+         }
          // if we can confirm the block, send confirmation
          if (can_prepare(state))
          {
@@ -611,26 +801,26 @@ namespace psibase::net
             }
          }
       }
-      void recv(peer_id peer, const PrepareMessage& msg)
+      void recv(peer_id peer, const SignedMessage<PrepareMessage>& msg)
       {
-         auto* state = chain().get_state(msg.block_id);
+         auto* state = chain().get_state(msg.data.block_id);
          if (!state)
          {
             return;
          }
-         validate_producer(state, msg.producer, msg.claim);
+         validate_producer(state, msg.data.producer, msg.data.claim);
          // TODO: should we update the sender's view here? same for commit.
-         on_prepare(state, msg.producer);
+         on_prepare(state, msg.data.producer, msg);
       }
-      void recv(peer_id peer, const CommitMessage& msg)
+      void recv(peer_id peer, const SignedMessage<CommitMessage>& msg)
       {
-         auto* state = chain().get_state(msg.block_id);
+         auto* state = chain().get_state(msg.data.block_id);
          if (!state)
          {
             return;
          }
-         validate_producer(state, msg.producer, msg.claim);
-         on_commit(state, msg.producer);
+         validate_producer(state, msg.data.producer, msg.data.claim);
+         on_commit(state, msg.data.producer, msg);
       }
 
       void recv(peer_id peer, const ViewChangeMessage& msg)
@@ -646,10 +836,9 @@ namespace psibase::net
          {
             if (*expected == msg.claim)
             {
-               auto idx             = active_producers[0]->getIndex(msg.producer);
-               producer_views[*idx] = std::max(producer_views[*idx], msg.term);
-               auto view_copy       = producer_views;
-               auto offset          = active_producers[0]->size() * 2 / 3;
+               set_producer_view(msg.term, msg.producer);
+               auto view_copy = producer_views;
+               auto offset    = active_producers[0]->size() * 2 / 3;
                // if > 1/3 are ahead of current view trigger view change
                std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
                if (view_copy[offset] > current_term)
