@@ -506,7 +506,7 @@ namespace psibase
          std::error_code ec{};
          if (!state->revision)
          {
-            BlockContext ctx(*systemContext, prev->revision, writer, true);
+            BlockContext ctx(*systemContext, prev->revision, writer, false);
             auto         blockPtr = get(state->blockId());
             PSIBASE_LOG_CONTEXT_BLOCK(state->info.header, state->blockId());
             try
