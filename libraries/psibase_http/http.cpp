@@ -1141,7 +1141,7 @@ namespace psibase::http
                     boost::log::attributes::constant{std::string(req.target())}),
                 boost::log::add_scoped_logger_attribute(
                     logger, "RequestHost",
-                    boost::log::attributes::constant{std::string(req.at(bhttp::field::host))})});
+                    boost::log::attributes::constant{std::string(req[bhttp::field::host])})});
             PSIBASE_LOG(logger, debug) << "Received HTTP request";
          }
 
