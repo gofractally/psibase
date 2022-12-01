@@ -415,26 +415,26 @@ namespace psibase::net
       void set_producers(
           std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> prods)
       {
-         bool start_bft = false;
          if (prods.first->algorithm != ConsensusAlgorithm::bft)
          {
             _new_term_timer.cancel();
             return Base::set_producers(std::move(prods));
          }
-         if (active_producers[0] && active_producers[0]->algorithm != ConsensusAlgorithm::bft)
+         bool start_bft =
+             active_producers[0] && active_producers[0]->algorithm != ConsensusAlgorithm::bft;
+         if (start_bft)
          {
             PSIBASE_LOG(logger, info) << "Switching consensus: BFT";
             Base::cancel();
-            start_bft = true;
          }
+         bool new_producers = !active_producers[0] || *active_producers[0] != *prods.first;
          if ((_state == producer_state::leader || _state == producer_state::follower) &&
-             (start_bft || *active_producers[0] != *prods.first))
+             (start_bft || new_producers))
          {
             producer_views.clear();
             producer_views.resize(prods.first->size());
-            set_producer_view(current_term, self);
          }
-         if (!active_producers[0] || *active_producers[0] != *prods.first)
+         if (new_producers)
          {
             PSIBASE_LOG(logger, info) << "New producers: " << prods.first->size() << ", "
                                       << (prods.second ? prods.second->size() : 0);
@@ -448,23 +448,17 @@ namespace psibase::net
                PSIBASE_LOG(logger, info) << "Node is active producer";
                _state = producer_state::follower;
                producer_views.resize(active_producers[0]->size());
-               set_producer_view(current_term, self);
                start_timer();
             }
             else if (start_bft)
             {
                start_timer();
             }
-            if (_state == producer_state::follower && is_leader())
+            if (start_bft || new_producers)
             {
-               _state = producer_state::leader;
-               start_leader();
+               broadcast_current_term();
             }
-            else if (_state == producer_state::leader && !is_leader())
-            {
-               stop_leader();
-               _state = producer_state::follower;
-            }
+            set_producer_view(current_term, self);
          }
          else
          {
@@ -496,6 +490,25 @@ namespace psibase::net
          }
       }
 
+      // returns true if a quorum of producers are believed to be in the current term.
+      bool is_term_ready() const
+      {
+         auto threshold = producer_views.size() * 2 / 3 + 1;
+         return std::count_if(producer_views.begin(), producer_views.end(),
+                              [current_term = current_term](auto v)
+                              { return v >= current_term; }) == threshold;
+      }
+
+      void broadcast_current_term()
+      {
+         for_each_key(
+             [&](const auto& k)
+             {
+                network().multicast_producers(
+                    ViewChangeMessage{.term = current_term, .producer = self, .claim = k});
+             });
+      }
+
       void increase_view()
       {
          auto threshold = producer_views.size() * 2 / 3 + 1;
@@ -508,12 +521,9 @@ namespace psibase::net
          else
          {
             // Periodically resend view changes if we're stuck
-            for_each_key(
-                [&](const auto& k)
-                {
-                   network().multicast_producers(
-                       ViewChangeMessage{.term = current_term, .producer = self, .claim = k});
-                });
+            // TODO: I don't think this is actually necessary, now that view changes
+            // are reliably kept up-to-date.
+            broadcast_current_term();
          }
       }
 
@@ -524,28 +534,7 @@ namespace psibase::net
             PSIBASE_LOG(logger, info) << "view change: " << term;
             bool was_leader = is_leader();
             current_term    = term;
-            if (is_leader())
-            {
-               if (_state == producer_state::follower)
-               {
-                  _state = producer_state::leader;
-                  start_leader();
-               }
-            }
-            else
-            {
-               if (_state == producer_state::leader)
-               {
-                  stop_leader();
-                  _state = producer_state::follower;
-               }
-            }
-            for_each_key(
-                [&](const auto& k)
-                {
-                   network().multicast_producers(
-                       ViewChangeMessage{.term = current_term, .producer = self, .claim = k});
-                });
+            broadcast_current_term();
             set_producer_view(term, self);
          }
       }
@@ -555,6 +544,22 @@ namespace psibase::net
          if (auto idx = active_producers[0]->getIndex(prod))
          {
             producer_views[*idx] = std::max(term, producer_views[*idx]);
+            if (_state == producer_state::follower)
+            {
+               if (is_leader() && is_term_ready())
+               {
+                  _state = producer_state::leader;
+                  start_leader();
+               }
+            }
+            else if (_state == producer_state::leader)
+            {
+               if (!is_leader() || !is_term_ready())
+               {
+                  stop_leader();
+                  _state = producer_state::follower;
+               }
+            }
          }
       }
 
@@ -801,6 +806,21 @@ namespace psibase::net
             }
          }
       }
+
+      void connect(peer_id peer)
+      {
+         Base::connect(peer);
+         if (active_producers[0]->algorithm == ConsensusAlgorithm::bft)
+         {
+            if (auto claim = active_producers[0]->getClaim(self))
+            {
+               network().async_send_block(
+                   peer, ViewChangeMessage{.term = current_term, .producer = self, .claim = *claim},
+                   [](const std::error_code&) {});
+            }
+         }
+      }
+
       void recv(peer_id peer, const SignedMessage<PrepareMessage>& msg)
       {
          auto* state = chain().get_state(msg.data.block_id);
