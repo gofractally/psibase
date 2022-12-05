@@ -779,8 +779,12 @@ void run(const std::string&              db_path,
       // TODO: The websocket uses the http server's io_context, but does not
       // do anything to keep it alive. Stopping the server doesn't close the
       // websocket either.
-      http_config->accept_p2p_websocket = [&node](auto&& stream)
-      { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); };
+      http_config->accept_p2p_websocket = [&chainContext, &node](auto&& stream)
+      {
+         boost::asio::post(
+             chainContext, [&node, stream = std::move(stream)]() mutable
+             { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); });
+      };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {

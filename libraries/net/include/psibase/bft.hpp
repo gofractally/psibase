@@ -223,6 +223,7 @@ namespace psibase::net
          std::shared_ptr<ProducerSet>               producers[2];
          std::vector<SignedMessage<PrepareMessage>> prepares;
          std::vector<SignedMessage<CommitMessage>>  commits;
+         bool                                       committedByBlock = false;
          void add_message(const SignedMessage<PrepareMessage>& msg) { prepares.push_back(msg); }
          void add_message(const SignedMessage<CommitMessage>& msg) { commits.push_back(msg); }
          static void get_type(const PrepareMessage&) { return confirm_type::prepare; }
@@ -347,7 +348,8 @@ namespace psibase::net
       bool isCommitted(const BlockHeaderState* state)
       {
          auto pos = confirmations.find(state->blockId());
-         return pos != confirmations.end() && pos->second.confirmed(confirm_type::commit);
+         return pos != confirmations.end() &&
+                (pos->second.confirmed(confirm_type::commit) || pos->second.committedByBlock);
       }
 
       void validate_producer(BlockHeaderState* state, AccountNumber producer, const Claim& claim)
@@ -431,6 +433,8 @@ namespace psibase::net
          if ((_state == producer_state::leader || _state == producer_state::follower) &&
              (start_bft || new_producers))
          {
+            // TODO: start tracking views of joint producers early. Not necessary for safety,
+            // but will help reduce unnecessary delays on a producer change.
             producer_views.clear();
             producer_views.resize(prods.first->size());
          }
@@ -496,7 +500,7 @@ namespace psibase::net
          auto threshold = producer_views.size() * 2 / 3 + 1;
          return std::count_if(producer_views.begin(), producer_views.end(),
                               [current_term = current_term](auto v)
-                              { return v >= current_term; }) == threshold;
+                              { return v == current_term; }) >= threshold;
       }
 
       void broadcast_current_term()
@@ -520,9 +524,10 @@ namespace psibase::net
          }
          else
          {
-            // Periodically resend view changes if we're stuck
-            // TODO: I don't think this is actually necessary, now that view changes
-            // are reliably kept up-to-date.
+            // Periodically resend view changes if we're stuck. This is
+            // required because peers might drop the regular view change
+            // message for a new producer schedule if they receive it before
+            // they're ready for it.
             broadcast_current_term();
          }
       }
@@ -532,8 +537,8 @@ namespace psibase::net
          if (term > current_term)
          {
             PSIBASE_LOG(logger, info) << "view change: " << term;
-            bool was_leader = is_leader();
-            current_term    = term;
+            current_term = term;
+            chain().setTerm(current_term);
             broadcast_current_term();
             set_producer_view(term, self);
          }
@@ -549,6 +554,9 @@ namespace psibase::net
                if (is_leader() && is_term_ready())
                {
                   _state = producer_state::leader;
+
+                  PSIBASE_LOG(logger, info) << "Starting block production for term " << current_term
+                                            << " as " << self.str();
                   start_leader();
                }
             }
@@ -673,6 +681,19 @@ namespace psibase::net
          }
          chain().setBlockData(state->blockId(), psio::convert_to_frac(result));
       }
+      //
+      void verify_commit(const BlockHeaderState* state)
+      {
+         if (state->order() < best_prepared)
+         {
+            PSIBASE_LOG(logger, critical)
+                << "Consensus failure: committing a block that that is not in the best "
+                   "chain. This means that either there is a severe bug in the software, or "
+                   "the maximum number of byzantine faults was exceeded.";
+            // TODO: Now what?  Trigger shutdown? Halt block production, but
+            // leave the server running at the last valid state?
+         }
+      }
       void on_commit(const BlockHeaderState*             state,
                      AccountNumber                       producer,
                      const SignedMessage<CommitMessage>& msg)
@@ -683,13 +704,7 @@ namespace psibase::net
             save_commit_data(state);
             if (!chain().in_best_chain(state->xid()))
             {
-               if (state->order() < best_prepared)
-               {
-                  PSIBASE_LOG(logger, critical)
-                      << "consensus failure: committing a block that that is not in the best "
-                         "chain. This means that either there is a severe bug in the software, or "
-                         "the maximum number of byzantine faults was exceeded.";
-               }
+               verify_commit(state);
                // This is possible if we receive the commits before the corresponding prepares
                chain().set_subtree(state);
                Base::switch_fork();
@@ -736,42 +751,9 @@ namespace psibase::net
          Base::on_accept_block(state);
          if (state->producers->algorithm == ConsensusAlgorithm::bft)
          {
-            // TODO: these checks should really happen before the block is processed or
-            // perhaps even concurrently.
-            check(
-                is_leader(*state->producers, state->info.header.term, state->info.header.producer),
-                "Wrong producer");
-            auto block = chain().get(state->blockId());
-            if (auto aux = block->auxConsensusData().get(); aux.valid())
-            {
-               auto data = psio::convert_from_frac<BlockConfirm>(*aux);
-               check(data.blockNum >= state->info.header.commitNum &&
-                         data.blockNum <= state->blockNum(),
-                     "blockNum out of range");
-               if (auto prev = chain().get_state(chain().get_block_id(data.blockNum - 1)))
-               {
-                  auto id = chain().get_block_id(data.blockNum);
-                  verifyIrreversibleSignature(prev->revision, data, chain().get_state(id));
-                  chain().setBlockData(id, std::move(*aux));
-                  chain().commit(data.blockNum);
-               }
-               else
-               {
-                  // TODO: We can't validate the proof that we received,
-                  // but that's okay because it's proving something that
-                  // we already know. For outgoing blocks, replace the
-                  // proof with the proof we have.
-               }
-            }
-            else if (state->singleProducer())
+            if (state->singleProducer())
             {
                chain().commit(state->info.header.commitNum);
-            }
-            else
-            {
-               // Allow most signatures to be pruned, but don't advance
-               // irreversibility until we receive a valid set of signatures
-               check(!state->needsIrreversibleSignature(), "Missing irreversibility proof");
             }
             // When a block outside the current best chain is committed, we
             // can't commit it immediately, because the best committed block
@@ -805,6 +787,66 @@ namespace psibase::net
                network().async_send_block(peer, msg, [](const std::error_code&) {});
             }
          }
+      }
+
+      void on_accept_block_header(const BlockHeaderState* state)
+      {
+         if (state->producers->algorithm == ConsensusAlgorithm::bft)
+         {
+            check(
+                is_leader(*state->producers, state->info.header.term, state->info.header.producer),
+                "Wrong producer");
+            auto block = chain().get(state->blockId());
+            if (auto aux = block->auxConsensusData().get(); aux.valid())
+            {
+               auto data   = psio::convert_from_frac<BlockConfirm>(*aux);
+               auto header = block->block()->header().get();
+               check(data.blockNum >= header->commitNum().get() &&
+                         data.blockNum <= header->blockNum().get(),
+                     "blockNum out of range");
+               auto committed = state;
+               while (committed->blockNum() > data.blockNum)
+               {
+                  committed = chain().get_state(committed->info.header.previous);
+                  if (!committed)
+                  {
+                     // TODO: We can't verify the signatures, but that's okay because
+                     // they're proving somthing that we already know. We just
+                     // need to remove or replace them for outgoing blocks.
+                     return;
+                  }
+               }
+               // TODO: Signature validation should depend on header state only
+               // once we track the verify service code in the block headers.
+               auto verifyState = chain().get_state(chain().get_block_id(chain().commit_index()));
+               verifyIrreversibleSignature(verifyState->revision, data, committed);
+               // Ensure that the committed block is a candidate for the best block
+               set_view(committed->info.header.term);
+               if (!chain().in_best_chain(committed->xid()))
+               {
+                  verify_commit(committed);
+                  chain().set_subtree(committed);
+                  // fork switch will be handled by the caller
+                  auto [iter, _] = confirmations.try_emplace(committed->blockId(), state->producers,
+                                                             state->nextProducers);
+                  // Signal to on_accept_block that it should commit this block
+                  // as soon as it is applied.
+                  iter->second.committedByBlock = true;
+               }
+               else if (chain().commit(data.blockNum))
+               {
+                  start_timer();
+               }
+            }
+            else
+            {
+               // Allow most signatures to be pruned, but don't advance
+               // irreversibility until we receive a valid set of signatures
+               check(state->singleProducer() || !state->needsIrreversibleSignature(),
+                     "Missing irreversibility proof");
+            }
+         }
+         return Base::on_accept_block_header(state);
       }
 
       void connect(peer_id peer)

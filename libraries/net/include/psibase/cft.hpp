@@ -228,6 +228,19 @@ namespace psibase::net
       }
       // ---------------- block production loop --------------------------
 
+      void on_accept_block_header(const BlockHeaderState* state)
+      {
+         if (state->producers->algorithm == ConsensusAlgorithm::cft)
+         {
+            auto term = state->info.header.term;
+            update_term(term);
+            if (term >= current_term)
+            {
+               _election_timer.restart();
+            }
+         }
+         return Base::on_accept_block_header(state);
+      }
       void on_produce_block(const BlockHeaderState* state)
       {
          Base::on_produce_block(state);
@@ -294,8 +307,9 @@ namespace psibase::net
             votes_for_me[0].clear();
             votes_for_me[1].clear();
             current_term = term;
-            voted_for    = null_producer;
-            _state       = producer_state::follower;
+            chain().setTerm(current_term);
+            voted_for = null_producer;
+            _state    = producer_state::follower;
          }
       }
       void check_votes()
@@ -348,6 +362,7 @@ namespace psibase::net
       void request_vote()
       {
          ++current_term;
+         chain().setTerm(current_term);
          voted_for = self;
          votes_for_me[0].clear();
          if (active_producers[0]->isProducer(self) || active_producers[0]->size() == 0)
@@ -369,19 +384,6 @@ namespace psibase::net
          check_votes();
       }
       // ----------- handling of incoming messages -------------
-      void recv(peer_id origin, const BlockMessage& request)
-      {
-         if (is_cft())
-         {
-            auto term = BlockNum{request.block->block()->header()->term()};
-            update_term(term);
-            if (term >= current_term)
-            {
-               _election_timer.restart();
-            }
-         }
-         Base::recv(origin, request);
-      }
       void recv(peer_id, const ConfirmMessage& response)
       {
          if (!is_cft())

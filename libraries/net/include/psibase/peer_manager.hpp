@@ -267,7 +267,10 @@ namespace psibase::net
          {
             throw std::runtime_error("unknown peer");
          }
-         iter->second->async_write(std::vector<char>(msg), std::forward<F>(f));
+         iter->second->async_write(
+             std::vector<char>(msg),
+             [this, f = std::forward<F>(f)](const std::error_code& ec) mutable
+             { boost::asio::dispatch(_ctx, [this, f = std::move(f), ec]() mutable { f(ec); }); });
       }
       void async_recv(peer_id id, std::shared_ptr<connection_base>&& c)
       {
@@ -282,11 +285,14 @@ namespace psibase::net
                 }
                 else
                 {
-                   if (c->is_open())
-                   {
-                      boost::asio::dispatch(_ctx, [this, id, buf = std::move(buf)]() mutable
-                                            { network().recv(id, buf); });
-                   }
+                   boost::asio::dispatch(_ctx,
+                                         [this, c, id, buf = std::move(buf)]() mutable
+                                         {
+                                            if (c->is_open())
+                                            {
+                                               network().recv(id, buf);
+                                            }
+                                         });
                    async_recv(id, std::move(c));
                 }
              });

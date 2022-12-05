@@ -348,7 +348,7 @@ namespace psibase::net
          _block_timer.async_wait(
              [this](const std::error_code& ec)
              {
-                if (ec)
+                if (ec || _state != producer_state::leader)
                 {
                    PSIBASE_LOG(consensus().logger, info) << "Stopping block production";
                    chain().abort_block();
@@ -470,12 +470,21 @@ namespace psibase::net
       void recv(peer_id origin, const BlockMessage& request)
       {
          // TODO: should the leader ever accept a block from another source?
-         if (chain().insert(request.block))
+         if (auto state = chain().insert(request.block))
          {
-            auto&           connection = get_connection(origin);
-            BlockInfo       info{*request.block->block()};
-            ExtendedBlockId xid = {info.blockId, info.header.blockNum};
-            update_last_received(connection, xid);
+            try
+            {
+               consensus().on_accept_block_header(state);
+            }
+            catch (...)
+            {
+               chain().erase(state);
+               throw;
+            }
+            // TODO: update_last_received should run even if the block
+            // is already known.
+            auto& connection = get_connection(origin);
+            update_last_received(connection, state->xid());
             switch_fork();
          }
       }
@@ -501,6 +510,7 @@ namespace psibase::net
 
       // Default implementations
       std::optional<std::vector<char>> makeBlockData(const BlockHeaderState*) { return {}; }
+      void                             on_accept_block_header(const BlockHeaderState*) {}
       void                             on_produce_block(const BlockHeaderState*) {}
       void                             on_accept_block(const BlockHeaderState*) {}
       void                             post_send_block(peer_id, const Checksum256&) {}

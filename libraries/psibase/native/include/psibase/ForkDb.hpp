@@ -259,19 +259,20 @@ namespace psibase
    {
      public:
       using id_type = Checksum256;
-      bool insert(const psio::shared_view_ptr<SignedBlock>& b)
+      const BlockHeaderState* insert(const psio::shared_view_ptr<SignedBlock>& b)
       {
          BlockInfo info(*b->block());
          PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
          if (info.header.blockNum <= commitIndex)
          {
-            PSIBASE_LOG(logger, debug) << "Block ignored because it is before commitIndex";
-            return false;
+            PSIBASE_LOG(blockLogger, debug) << "Block ignored because it is before commitIndex";
+            return nullptr;
          }
-         if (!blocks.try_emplace(info.blockId, b).second)
+         auto [iter, inserted] = blocks.try_emplace(info.blockId, b);
+         if (!inserted)
          {
-            PSIBASE_LOG(logger, debug) << "Block skipped because it is already known";
-            return false;
+            PSIBASE_LOG(blockLogger, debug) << "Block skipped because it is already known";
+            return nullptr;
          }
          if (auto* prev = get_state(info.header.previous))
          {
@@ -279,7 +280,7 @@ namespace psibase
             assert(inserted);
             if (prev->invalid)
             {
-               PSIBASE_LOG(logger, debug) << "Block parent is invalid";
+               PSIBASE_LOG(blockLogger, debug) << "Block parent is invalid";
                pos->second.invalid = true;
             }
             else if (byOrderIndex.find(prev->order()) != byOrderIndex.end())
@@ -288,15 +289,23 @@ namespace psibase
             }
             else
             {
-               PSIBASE_LOG(logger, debug) << "Block is outside current tree";
+               PSIBASE_LOG(blockLogger, debug) << "Block is outside current tree";
             }
-            return true;
+            return &pos->second;
          }
          else
          {
-            PSIBASE_LOG(logger, debug) << "Block dropped because its parent is missing";
+            blocks.erase(iter);
+            PSIBASE_LOG(blockLogger, debug) << "Block dropped because its parent is missing";
          }
-         return false;
+         return nullptr;
+      }
+      void erase(const BlockHeaderState* state)
+      {
+         assert(!in_best_chain(state->xid()));
+         byOrderIndex.erase(state->order());
+         blocks.erase(state->blockId());
+         states.erase(state->blockId());
       }
       BlockHeader*                       get_head() const { return &head->info.header; }
       const BlockHeaderState*            get_head_state() const { return head; }
@@ -374,6 +383,8 @@ namespace psibase
          return Checksum256(*get(id)->block()->header()->previous());
       }
 
+      void setTerm(TermNum term) { currentTerm = term; }
+
       // If root is non-null, the head block must be a descendant of root
       void set_subtree(const BlockHeaderState* root)
       {
@@ -439,7 +450,8 @@ namespace psibase
             switchForkCallback = std::move(callback);
             return;
          }
-         auto pos = byOrderIndex.end();
+         auto pos =
+             byOrderIndex.lower_bound(std::tuple(currentTerm + 1, BlockNum(0), Checksum256{}));
          --pos;
          auto new_head = get_state(pos->second);
          if (head != new_head)
@@ -584,8 +596,6 @@ namespace psibase
          auto newCommitIndex = std::max(std::min(num, head->blockNum()), commitIndex);
          auto result         = newCommitIndex != commitIndex;
          commitIndex         = newCommitIndex;
-         systemContext->sharedDatabase.removeRevisions(*writer,
-                                                       byBlocknumIndex.find(commitIndex)->second);
          return result;
       }
 
@@ -629,6 +639,9 @@ namespace psibase
          }
          assert(!byOrderIndex.empty());
          byBlocknumIndex.erase(byBlocknumIndex.begin(), byBlocknumIndex.find(commitIndex));
+
+         systemContext->sharedDatabase.removeRevisions(*writer,
+                                                       byBlocknumIndex.find(commitIndex)->second);
       }
 
       template <typename T>
@@ -814,7 +827,14 @@ namespace psibase
                auto      revision = sc->sharedDatabase.getRevision(*this->writer, info.blockId);
                if (!revision)
                {
-                  break;
+                  if (blocks.empty())
+                  {
+                     revision = sc->sharedDatabase.getHead();
+                  }
+                  else
+                  {
+                     break;
+                  }
                }
                auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum);
                if (!proof)
@@ -840,6 +860,7 @@ namespace psibase
          // TODO: if this doesn't exist, the database is corrupt
          assert(!byBlocknumIndex.empty());
          commitIndex = byBlocknumIndex.begin()->first;
+         currentTerm = head->info.header.term;
       }
       BlockContext* getBlockContext()
       {
@@ -890,6 +911,7 @@ namespace psibase
       WriterPtr                                                 writer;
       CheckedProver                                             prover;
       BlockNum                                                  commitIndex = 1;
+      TermNum                                                   currentTerm = 1;
       BlockHeaderState*                                         head        = nullptr;
       std::map<Checksum256, psio::shared_view_ptr<SignedBlock>> blocks;
       std::map<Checksum256, BlockHeaderState>                   states;
