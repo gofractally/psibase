@@ -177,6 +177,7 @@ namespace psibase::net
                        if (ec)
                        {
                           PSIBASE_LOG(conn->logger, warning) << ec.message();
+                          f(ec, std::move(conn));
                        }
                        else
                        {
@@ -189,11 +190,12 @@ namespace psibase::net
                                                        {
                                                           PSIBASE_LOG(conn->logger, warning)
                                                               << ec.message();
+                                                          f(ec, std::move(conn));
                                                        }
                                                        else
                                                        {
                                                           conn->need_close_msg = true;
-                                                          f(std::move(conn));
+                                                          f(ec, std::move(conn));
                                                        }
                                                     });
                        }
@@ -202,6 +204,7 @@ namespace psibase::net
              else
              {
                 PSIBASE_LOG(conn->logger, warning) << ec.message();
+                f(ec, std::move(conn));
              }
           });
    }

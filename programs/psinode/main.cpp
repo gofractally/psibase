@@ -731,12 +731,18 @@ void run(const std::string&              db_path,
 
    auto connect_one = [&resolver, &node, &chainContext](const std::string& peer, auto&& f)
    {
-      auto [host, service]  = parse_endpoint(peer);
-      auto result           = std::make_shared<websocket_connection>(chainContext);
-      result->url           = peer;
-      result->on_disconnect = f;
+      auto [host, service] = parse_endpoint(peer);
+      auto result          = std::make_shared<websocket_connection>(chainContext);
+      result->url          = peer;
       async_connect(std::move(result), resolver, host, service,
-                    [&node](auto&& conn) { node.add_connection(std::move(conn)); });
+                    [&node, f = static_cast<decltype(f)>(f)](const std::error_code& ec, auto&& conn)
+                    {
+                       if (!ec)
+                       {
+                          node.add_connection(std::move(conn));
+                       }
+                       f(ec);
+                    });
    };
 
    auto http_config = std::make_shared<http::http_config>();
@@ -811,6 +817,10 @@ void run(const std::string&              db_path,
                             peer     = psio::from_json<ConnectRequest>(stream),
                             callback = std::move(callback)]() mutable
                            {
+                              // TODO: This is currently fire-and-forget, do we want
+                              // to try to report errors establishing the connection?
+                              // If so, when do we consider it successful? TCP connection?
+                              // websocket handshake? Initial sync negotiation?
                               node.peers().connect(peer.url, connect_one);
                               callback(std::nullopt);
                            });

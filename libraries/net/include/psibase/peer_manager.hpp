@@ -22,13 +22,6 @@ namespace psibase::net
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
       }
-      ~connection_base()
-      {
-         if (on_disconnect)
-         {
-            on_disconnect();
-         }
-      }
       using read_handler  = std::function<void(const std::error_code&, std::vector<char>&&)>;
       using write_handler = std::function<void(const std::error_code&)>;
       virtual void async_write(std::vector<char>&&, write_handler) = 0;
@@ -40,7 +33,7 @@ namespace psibase::net
       //
       loggers::common_logger     logger;
       std::optional<std::string> url;
-      std::function<void()>      on_disconnect;
+      std::optional<NodeId>      id;
    };
 
    struct connection_manager : std::enable_shared_from_this<connection_manager>
@@ -58,10 +51,11 @@ namespace psibase::net
                connect(std::forward<F>(f))
          {
          }
-         bool                                                           connected;
-         std::chrono::seconds                                           current_timeout;
-         std::chrono::steady_clock::time_point                          retry_time;
-         std::function<void(const std::string&, std::function<void()>)> connect;
+         bool                                  connected;
+         std::chrono::seconds                  current_timeout;
+         std::chrono::steady_clock::time_point retry_time;
+         using connect_callback = std::function<void(const std::error_code&)>;
+         std::function<void(const std::string&, connect_callback)> connect;
       };
       std::vector<std::string> peers;
       std::size_t              idx    = 0;
@@ -72,10 +66,8 @@ namespace psibase::net
       // is disconnected.
       std::map<std::string, peer_info> info;
       // connection reports identity, which is used to de-duplicate
-      std::map<NodeId, std::weak_ptr<connection_base>> nodes;
-      // inverse of nodes
-      std::map<std::weak_ptr<connection_base>, NodeId, std::owner_less<>> nodeIds;
-      boost::asio::steady_timer                                           _timer;
+      std::map<NodeId, std::shared_ptr<connection_base>> nodes;
+      boost::asio::steady_timer                          _timer;
       template <typename ExecutionContext>
       explicit connection_manager(ExecutionContext& ctx) : _timer(ctx)
       {
@@ -118,12 +110,26 @@ namespace psibase::net
       }
       void do_connect(const std::string& url, peer_info& peer, auto now)
       {
+         // possible connection lifecycles:
+         // - postconnect -> disconnect: no URL
+         // - postconnect -> duplicate -> disconnect: okay, receives ownership of URL
+         // - postconnect(duplicate) -> disconnect: no URL
+         // - disconnect: no URL
+         // - connect(ok) -> postconnect -> disconnect: okay
+         // - connect(ok) -> postconnect(duplicate) -> disconnect: okay, transfers ownership of URL
+         // - connect(ok) -> disconnect: okay
+         // - connect(error): okay
+         //
+         // required invariants:
+         // - If connect is successful, then disconnect will be called on connection close
+         // - A connection owns its url iff either it has no known NodeId or its
+         //   NodeId is associated with itself in the nodes map.
          peer.connect(url,
-                      [weak = weak_from_this(), url]
+                      [this, url](const std::error_code& ec)
                       {
-                         if (auto self = weak.lock())
+                         if (ec)
                          {
-                            self->disconnect(url);
+                            disconnect(url);
                          }
                       });
          peer.retry_time = now + peer.current_timeout;
@@ -145,59 +151,13 @@ namespace psibase::net
       }
       bool postconnect(const NodeId& id, const std::shared_ptr<connection_base>& conn)
       {
-         std::weak_ptr weak{conn};
-         auto [iter, inserted] = nodes.try_emplace(id, std::move(weak));
-         if (inserted)
+         auto [iter, inserted] = nodes.try_emplace(id, conn);
+         conn->id              = id;
+         if (!inserted && conn->url && !iter->second->url)
          {
-            nodeIds.try_emplace(iter->second, id);
-            if (conn->url)
-            {
-               conn->on_disconnect =
-                   [self = weak_from_this(), url = *conn->url, id, weak = std::weak_ptr{conn}]()
-               {
-                  if (auto shared = self.lock())
-                  {
-                     shared->disconnect(url);
-                     shared->nodes.erase(id);
-                     shared->nodeIds.erase(weak);
-                  }
-               };
-            }
-            else
-            {
-               conn->on_disconnect = [self = weak_from_this(), id, weak = std::weak_ptr{conn}]()
-               {
-                  if (auto shared = self.lock())
-                  {
-                     shared->nodes.erase(id);
-                     shared->nodeIds.erase(weak);
-                  }
-               };
-            }
-         }
-         else
-         {
-            if (conn->url)
-            {
-               if (auto shared = iter->second.lock())
-               {
-                  if (!shared->url)
-                  {
-                     shared->url           = conn->url;
-                     shared->on_disconnect = [self = weak_from_this(), url = *shared->url,
-                                              weak = std::weak_ptr{shared}, id = iter->first]()
-                     {
-                        if (auto shared = self.lock())
-                        {
-                           shared->disconnect(url);
-                           shared->nodes.erase(id);
-                           shared->nodeIds.erase(weak);
-                        }
-                     };
-                     conn->on_disconnect = nullptr;
-                  }
-               }
-            }
+            // TODO: how should we handle nodes that are reachable through
+            // multiple configured URLs?
+            iter->second->url = conn->url;
          }
          return inserted;
       }
@@ -216,6 +176,26 @@ namespace psibase::net
             }
          }
          maybe_connect_some();
+      }
+      void disconnect(const std::shared_ptr<connection_base>& conn)
+      {
+         bool is_primary = true;
+         if (conn->id)
+         {
+            auto pos = nodes.find(*conn->id);
+            if (pos != nodes.end() && pos->second == conn)
+            {
+               nodes.erase(pos);
+            }
+            else
+            {
+               is_primary = false;
+            }
+         }
+         if (conn->url && is_primary)
+         {
+            disconnect(*conn->url);
+         }
       }
       template <typename F>
       void set(std::vector<std::string>&& peers, std::size_t target, F&& connect)
@@ -303,6 +283,7 @@ namespace psibase::net
          {
             static_cast<Derived*>(this)->network().disconnect(id);
             conn->close();
+            autoconnector->disconnect(conn);
          }
          _connections.clear();
       }
@@ -313,6 +294,7 @@ namespace psibase::net
          {
             static_cast<Derived*>(this)->network().disconnect(id);
             iter->second->close();
+            autoconnector->disconnect(iter->second);
             _connections.erase(iter);
             return true;
          }
