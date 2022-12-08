@@ -265,15 +265,16 @@ namespace psibase::net
                 }
                 else
                 {
-                   boost::asio::dispatch(_ctx,
-                                         [this, c, id, buf = std::move(buf)]() mutable
-                                         {
-                                            if (c->is_open())
-                                            {
-                                               network().recv(id, buf);
-                                            }
-                                         });
-                   async_recv(id, std::move(c));
+                   boost::asio::dispatch(
+                       _ctx,
+                       [this, c = std::move(c), id, buf = std::move(buf)]() mutable
+                       {
+                          if (c->is_open())
+                          {
+                             network().recv(id, buf);
+                          }
+                          async_recv(id, std::move(c));
+                       });
                 }
              });
       }

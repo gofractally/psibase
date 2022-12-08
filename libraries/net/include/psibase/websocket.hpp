@@ -39,17 +39,22 @@ namespace psibase::net
       explicit websocket_connection(boost::asio::io_context& ctx) : stream(ctx) {}
       void async_read(read_handler f) override
       {
-         inbox.clear();
-         buffer.emplace(inbox);
-         stream.async_read(*buffer,
-                           [this, f = std::move(f)](const std::error_code& ec, std::size_t)
-                           {
-                              if (ec)
-                              {
-                                 log_error(ec);
-                              }
-                              f(ec, std::move(inbox));
-                           });
+         boost::asio::dispatch(
+             stream.get_executor(),
+             [this, f = std::move(f)]() mutable
+             {
+                inbox.clear();
+                buffer.emplace(inbox);
+                stream.async_read(*buffer,
+                                  [this, f = std::move(f)](const std::error_code& ec, std::size_t)
+                                  {
+                                     if (ec)
+                                     {
+                                        log_error(ec);
+                                     }
+                                     f(ec, std::move(inbox));
+                                  });
+             });
       }
       void log_error(const std::error_code& ec)
       {
