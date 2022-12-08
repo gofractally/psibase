@@ -16,20 +16,31 @@
 
 namespace psibase::net
 {
-#ifndef PSIO_REFLECT_INLINE
-#define PSIO_REFLECT_INLINE(name, ...)                      \
-   PSIO_REFLECT(name, __VA_ARGS__)                          \
-   friend reflect_impl_##name get_reflect_impl(const name&) \
-   {                                                        \
-      return {};                                            \
-   }
-#endif
-
    template <typename T, typename Derived>
    concept has_recv = requires(Derived& d, const T& msg)
    {
       d.consensus().recv(0, msg);
    };
+
+   // message type 0 is reserved to ensure that message signatures
+   // are disjoint from block signatures.
+   // message types 1-31 are used for routing messages
+   // message types 32-63 are used for consensus messages
+   struct InitMessage
+   {
+      static constexpr unsigned type = 1;
+      std::uint32_t             version;
+      NodeId                    id;
+      std::string to_string() const { return "init: version=" + std::to_string(version); }
+   };
+   PSIO_REFLECT(InitMessage, version, id);
+   struct ProducerMessage
+   {
+      static constexpr unsigned type = 2;
+      producer_id               producer;
+      std::string               to_string() const { return "producer: " + producer.str(); }
+   };
+   PSIO_REFLECT(ProducerMessage, producer)
 
    // This requires all producers to be peers
    template <typename Derived>
@@ -43,23 +54,7 @@ namespace psibase::net
          nodeId = std::uniform_int_distribution<NodeId>()(rng);
       }
       static const std::uint32_t protocol_version = 0;
-      // message type 0 is reserved
-      struct InitMessage
-      {
-         static constexpr unsigned type    = 1;
-         std::uint32_t             version = protocol_version;
-         NodeId                    id;
-         std::string to_string() const { return "init: version=" + std::to_string(version); }
-         PSIO_REFLECT_INLINE(InitMessage, version, id);
-      };
-      struct ProducerMessage
-      {
-         static constexpr unsigned type = 2;
-         producer_id               producer;
-         std::string               to_string() const { return "producer: " + producer.str(); }
-         PSIO_REFLECT_INLINE(ProducerMessage, producer)
-      };
-      auto get_message_impl()
+      auto                       get_message_impl()
       {
          return boost::mp11::mp_push_back<
              typename std::remove_cvref_t<
@@ -109,7 +104,8 @@ namespace psibase::net
       struct connection;
       void connect(peer_id id)
       {
-         async_send_block(id, InitMessage{.id = nodeId}, [](const std::error_code&) {});
+         async_send_block(id, InitMessage{.version = protocol_version, .id = nodeId},
+                          [](const std::error_code&) {});
          if (auto producer = static_cast<Derived*>(this)->consensus().producer_name();
              producer != AccountNumber())
          {

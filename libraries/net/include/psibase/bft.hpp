@@ -32,6 +32,69 @@ namespace psibase::net
       return lhs;
    }
 
+   struct PrepareMessage
+   {
+      static constexpr unsigned type = 38;
+      Checksum256               block_id;
+      AccountNumber             producer;
+      Claim                     claim;
+
+      auto        signer() const { return claim; }
+      std::string to_string() const
+      {
+         return "prepare: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
+      }
+   };
+   PSIO_REFLECT(PrepareMessage, block_id, producer, claim)
+
+   struct CommitMessage
+   {
+      static constexpr unsigned type = 39;
+      Checksum256               block_id;
+      AccountNumber             producer;
+      Claim                     claim;
+
+      auto        signer() const { return claim; }
+      std::string to_string() const
+      {
+         return "commit: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
+      }
+   };
+   // To save space, we're picking this apart and reconstituting it, while
+   // assuming that the signature remains valid.
+   PSIO_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, claim)
+
+   struct ViewChangeMessage
+   {
+      static constexpr unsigned type = 40;
+      TermNum                   term;
+      AccountNumber             producer;
+      Claim                     claim;
+
+      auto        signer() const { return claim; }
+      std::string to_string() const
+      {
+         return "view change: term=" + std::to_string(term) + " producer=" + producer.str();
+      }
+   };
+   PSIO_REFLECT(ViewChangeMessage, term, producer, claim)
+
+   struct ProducerConfirm
+   {
+      AccountNumber     producer;
+      std::vector<char> signature;
+   };
+   PSIO_REFLECT(ProducerConfirm, producer, signature)
+
+   // TODO: consider using a multiparty signature scheme to save space
+   struct BlockConfirm
+   {
+      BlockNum                                    blockNum;
+      std::vector<ProducerConfirm>                commits;
+      std::optional<std::vector<ProducerConfirm>> nextCommits;
+   };
+   PSIO_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
+
    template <typename Base, typename Timer>
    struct basic_bft_consensus : Base
    {
@@ -48,74 +111,10 @@ namespace psibase::net
       using Base::start_leader;
       using Base::stop_leader;
       using typename Base::producer_state;
-      using typename Base::term_id;
       enum class confirm_type
       {
          prepare,
          commit
-      };
-
-      struct PrepareMessage
-      {
-         static constexpr unsigned type = 38;
-         Checksum256               block_id;
-         AccountNumber             producer;
-         Claim                     claim;
-
-         auto signer() const { return claim; }
-         PSIO_REFLECT_INLINE(PrepareMessage, block_id, producer, claim)
-         std::string to_string() const
-         {
-            return "prepare: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
-         }
-      };
-
-      struct CommitMessage
-      {
-         static constexpr unsigned type = 39;
-         Checksum256               block_id;
-         AccountNumber             producer;
-         Claim                     claim;
-
-         auto signer() const { return claim; }
-         // To save space, we're picking this apart and reconstituting it, while
-         // assuming that the signature remains valid.
-         PSIO_REFLECT_INLINE(CommitMessage, definitionWillNotChange(), block_id, producer, claim)
-         std::string to_string() const
-         {
-            return "commit: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
-         }
-      };
-
-      struct ViewChangeMessage
-      {
-         static constexpr unsigned type = 40;
-         term_id                   term;
-         AccountNumber             producer;
-         Claim                     claim;
-
-         auto signer() const { return claim; }
-         PSIO_REFLECT_INLINE(ViewChangeMessage, term, producer, claim)
-         std::string to_string() const
-         {
-            return "view change: term=" + std::to_string(term) + " producer=" + producer.str();
-         }
-      };
-
-      struct ProducerConfirm
-      {
-         AccountNumber     producer;
-         std::vector<char> signature;
-         PSIO_REFLECT_INLINE(ProducerConfirm, producer, signature)
-      };
-
-      // TODO: consider using a multiparty signature scheme to save space
-      struct BlockConfirm
-      {
-         BlockNum                                    blockNum;
-         std::vector<ProducerConfirm>                commits;
-         std::optional<std::vector<ProducerConfirm>> nextCommits;
-         PSIO_REFLECT_INLINE(BlockConfirm, blockNum, commits, nextCommits)
       };
 
       void verifyMsig(const auto&        revision,
@@ -273,7 +272,7 @@ namespace psibase::net
       BlockOrder alt_prepare   = {};
 
       // Stores a record of the last view change seen for each producer
-      std::vector<term_id> producer_views;
+      std::vector<TermNum> producer_views;
 
       Timer                     _new_term_timer;
       std::chrono::milliseconds _timeout = std::chrono::seconds(10);
@@ -399,7 +398,7 @@ namespace psibase::net
          return Base::is_sole_producer();
       }
 
-      static bool is_leader(const ProducerSet& producers, term_id term, AccountNumber prod)
+      static bool is_leader(const ProducerSet& producers, TermNum term, AccountNumber prod)
       {
          auto num_producers = producers.size();
          if (auto idx = producers.getIndex(prod))
@@ -532,7 +531,7 @@ namespace psibase::net
          }
       }
 
-      void set_view(term_id term)
+      void set_view(TermNum term)
       {
          if (term > current_term)
          {
@@ -544,7 +543,7 @@ namespace psibase::net
          }
       }
 
-      void set_producer_view(term_id term, AccountNumber prod)
+      void set_producer_view(TermNum term, AccountNumber prod)
       {
          if (auto idx = active_producers[0]->getIndex(prod))
          {

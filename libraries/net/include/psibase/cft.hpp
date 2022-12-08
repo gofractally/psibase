@@ -18,6 +18,58 @@
 
 namespace psibase::net
 {
+
+   struct ConfirmMessage
+   {
+      static constexpr unsigned type = 35;
+      TermNum                   term;
+      producer_id               follower_id;
+      BlockNum                  head_num;
+      Claim                     claim;
+
+      Claim       signer() const { return claim; }
+      std::string to_string() const
+      {
+         return "confirm: term=" + std::to_string(term) + " follower=" + follower_id.str() +
+                " blocknum=" + std::to_string(head_num);
+      }
+   };
+   PSIO_REFLECT(ConfirmMessage, term, follower_id, head_num, claim);
+
+   struct RequestVoteRequest
+   {
+      static constexpr unsigned type = 36;
+      TermNum                   term;
+      producer_id               candidate_id;
+      BlockNum                  last_log_index;
+      TermNum                   last_log_term;
+      Claim                     claim;
+
+      Claim       signer() const { return claim; }
+      std::string to_string() const
+      {
+         return "request vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str();
+      }
+   };
+   PSIO_REFLECT(RequestVoteRequest, term, candidate_id, last_log_index, last_log_term, claim)
+   struct RequestVoteResponse
+   {
+      static constexpr unsigned type = 37;
+      TermNum                   term;
+      producer_id               candidate_id;
+      producer_id               voter_id;
+      bool                      vote_granted;
+      Claim                     claim;
+
+      Claim       signer() const { return claim; }
+      std::string to_string() const
+      {
+         return "vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str() +
+                " voter=" + voter_id.str() + " vote granted=" + std::to_string(vote_granted);
+      }
+   };
+   PSIO_REFLECT(RequestVoteResponse, term, candidate_id, voter_id, vote_granted, claim)
+
    // This protocol is based on RAFT, with some simplifications.
    // i.e. the blockchain structure is sufficient to guarantee log matching.
    template <typename Base, typename Timer>
@@ -37,9 +89,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
-      using typename Base::BlockMessage;
       using typename Base::producer_state;
-      using typename Base::term_id;
 
       template <typename ExecutionContext>
       explicit basic_cft_consensus(ExecutionContext& ctx) : Base(ctx), _election_timer(ctx)
@@ -53,63 +103,6 @@ namespace psibase::net
       std::chrono::milliseconds _timeout = std::chrono::seconds(3);
 
       std::vector<block_num> match_index[2];
-
-      struct ConfirmMessage
-      {
-         static constexpr unsigned type = 35;
-         term_id                   term;
-         producer_id               follower_id;
-         BlockNum                  head_num;
-         Claim                     claim;
-
-         Claim signer() const { return claim; }
-         PSIO_REFLECT_INLINE(ConfirmMessage, term, follower_id, head_num, claim);
-         std::string to_string() const
-         {
-            return "confirm: term=" + std::to_string(term) + " follower=" + follower_id.str() +
-                   " blocknum=" + std::to_string(head_num);
-         }
-      };
-
-      struct RequestVoteRequest
-      {
-         static constexpr unsigned type = 36;
-         term_id                   term;
-         producer_id               candidate_id;
-         block_num                 last_log_index;
-         term_id                   last_log_term;
-         Claim                     claim;
-
-         Claim signer() const { return claim; }
-         PSIO_REFLECT_INLINE(RequestVoteRequest,
-                             term,
-                             candidate_id,
-                             last_log_index,
-                             last_log_term,
-                             claim)
-         std::string to_string() const
-         {
-            return "request vote: term=" + std::to_string(term) +
-                   " candidate=" + candidate_id.str();
-         }
-      };
-      struct RequestVoteResponse
-      {
-         static constexpr unsigned type = 37;
-         term_id                   term;
-         producer_id               candidate_id;
-         producer_id               voter_id;
-         bool                      vote_granted;
-         Claim                     claim;
-
-         Claim signer() const { return claim; }
-         PSIO_REFLECT_INLINE(RequestVoteResponse, term, candidate_id, voter_id, vote_granted, claim)
-         std::string to_string() const
-         {
-            return "vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str() +
-                   " voter=" + voter_id.str() + " vote granted=" + std::to_string(vote_granted);
-         }
-      };
 
       using message_type = boost::mp11::mp_push_back<typename Base::message_type,
                                                      ConfirmMessage,
@@ -293,7 +286,7 @@ namespace psibase::net
          return std::numeric_limits<BlockNum>::max();
       }
       // This should always run first when handling any message
-      void update_term(term_id term)
+      void update_term(TermNum term)
       {
          if (term > current_term)
          {

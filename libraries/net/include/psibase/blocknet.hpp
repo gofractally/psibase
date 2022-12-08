@@ -14,15 +14,6 @@
 
 namespace psibase::net
 {
-#ifndef PSIO_REFLECT_INLINE
-#define PSIO_REFLECT_INLINE(name, ...)                      \
-   PSIO_REFLECT(name, __VA_ARGS__)                          \
-   friend reflect_impl_##name get_reflect_impl(const name&) \
-   {                                                        \
-      return {};                                            \
-   }
-#endif
-
    // round tp to the nearest multiple of d towards negative infinity
    template <typename Clock, typename Duration1, typename Duration2>
    std::chrono::time_point<Clock, Duration1> floor2(std::chrono::time_point<Clock, Duration1> tp,
@@ -37,13 +28,47 @@ namespace psibase::net
       return tp - rem;
    }
 
+   struct HelloRequest
+   {
+      static constexpr unsigned type = 32;
+      ExtendedBlockId           xid;
+      std::string               to_string() const
+      {
+         return "hello: id=" + loggers::to_string(xid.id()) +
+                " blocknum=" + std::to_string(xid.num());
+      }
+   };
+   PSIO_REFLECT(HelloRequest, xid)
+
+   struct HelloResponse
+   {
+      static constexpr unsigned type  = 33;
+      char                      dummy = 0;
+      std::string               to_string() const { return "hello response"; }
+   };
+   PSIO_REFLECT(HelloResponse, dummy)
+
+   struct BlockMessage
+   {
+      static constexpr unsigned          type = 34;
+      psio::shared_view_ptr<SignedBlock> block;
+      std::string                        to_string() const
+      {
+         BlockInfo info{*block->block()};
+         return "block: term=" + std::to_string(TermNum{block->block()->header()->term()}) +
+                " leader=" + AccountNumber{block->block()->header()->producer()}.str() +
+                " id=" + loggers::to_string(info.blockId) +
+                " blocknum=" + std::to_string(BlockNum{block->block()->header()->blockNum()}) +
+                " irreversible=" + std::to_string(BlockNum{block->block()->header()->commitNum()});
+      }
+   };
+   PSIO_REFLECT(BlockMessage, block)
+
    // This class manages production and distribution of blocks
    // The consensus algorithm is provided by the derived class
    template <typename Derived, typename Timer>
    struct blocknet
    {
-      using term_id = std::uint64_t;
-
       auto& network() { return static_cast<Derived*>(this)->network(); }
       auto& consensus() { return static_cast<Derived*>(this)->consensus(); }
       auto& chain() { return static_cast<Derived*>(this)->chain(); }
@@ -63,26 +88,6 @@ namespace psibase::net
          logger.add_attribute("Channel",
                               boost::log::attributes::constant(std::string("consensus")));
       }
-
-      struct HelloRequest
-      {
-         static constexpr unsigned type = 32;
-         ExtendedBlockId           xid;
-         std::string               to_string() const
-         {
-            return "hello: id=" + loggers::to_string(xid.id()) +
-                   " blocknum=" + std::to_string(xid.num());
-         }
-         PSIO_REFLECT_INLINE(HelloRequest, xid)
-      };
-
-      struct HelloResponse
-      {
-         static constexpr unsigned type  = 33;
-         char                      dummy = 0;
-         std::string               to_string() const { return "hello response"; }
-         PSIO_REFLECT_INLINE(HelloResponse, dummy)
-      };
 
       struct peer_connection
       {
@@ -105,7 +110,7 @@ namespace psibase::net
 
       producer_id                  self = null_producer;
       std::shared_ptr<ProducerSet> active_producers[2];
-      term_id                      current_term = 0;
+      TermNum                      current_term = 0;
 
       producer_state _state = producer_state::unknown;
 
@@ -116,23 +121,6 @@ namespace psibase::net
       std::vector<std::unique_ptr<peer_connection>> _peers;
 
       loggers::common_logger logger;
-
-      struct BlockMessage
-      {
-         static constexpr unsigned          type = 34;
-         psio::shared_view_ptr<SignedBlock> block;
-         PSIO_REFLECT_INLINE(BlockMessage, block)
-         std::string to_string() const
-         {
-            BlockInfo info{*block->block()};
-            return "block: term=" + std::to_string(term_id{block->block()->header()->term()}) +
-                   " leader=" + AccountNumber{block->block()->header()->producer()}.str() +
-                   " id=" + loggers::to_string(info.blockId) +
-                   " blocknum=" + std::to_string(BlockNum{block->block()->header()->blockNum()}) +
-                   " irreversible=" +
-                   std::to_string(BlockNum{block->block()->header()->commitNum()});
-         }
-      };
 
       using message_type = std::variant<HelloRequest, HelloResponse, BlockMessage>;
 

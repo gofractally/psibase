@@ -572,7 +572,7 @@ namespace psibase
    template <typename Events>
    auto get_gql_name(EventDecoder<Events>*)
    {
-      return get_type_name((Events*)nullptr);
+      return psio::get_type_name<Events>();
    }
 
    template <typename Events, typename S>
@@ -979,7 +979,7 @@ namespace psibase
       };  // Reflect
 
       friend Reflect get_reflect_impl(const EventQuery&);
-      friend auto    get_type_name(EventQuery*) { return get_type_name((Events*)nullptr); }
+      friend auto    get_type_name(EventQuery*) { return psio::get_type_name<Events>(); }
    };  // EventQuery
 
    /// GraphQL support for a linked list of events

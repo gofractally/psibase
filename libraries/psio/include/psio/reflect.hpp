@@ -191,6 +191,16 @@ namespace psio
    reflect_undefined<QueryClass> get_reflect_impl(const QueryClass&);
 
    template <typename QueryClass>
+   concept ReflectedAsMember = requires(QueryClass& v)
+   {
+      v.get_reflect_impl(v);
+   };
+
+   template <ReflectedAsMember QueryClass>
+   auto get_reflect_impl(const QueryClass& v)
+       -> decltype(std::declval<QueryClass>().get_reflect_impl(v));
+
+   template <typename QueryClass>
    using reflect = std::decay_t<decltype(get_reflect_impl(std::declval<QueryClass>()))>;
 
    template <typename>
@@ -428,6 +438,19 @@ namespace psio
       (g((remove_cvref_t<Args>*)nullptr), ...);
    }
 
+   template <typename T>
+   concept Reflected = reflect<T>::is_defined;
+
+   template <Reflected T>
+   struct is_reflected<T> : std::true_type
+   {
+   };
+
+   template <typename T>
+   requires(is_reflected<T>::value) constexpr const char* get_type_name(const T*)
+   {
+      return reflect<T>::name.c_str();
+   }
 }  // namespace psio
 
 // TODO: not legal to add new definitions to std namespace
@@ -676,7 +699,6 @@ namespace std
  *    * numbered(int, ident)           non-static data member with field number
  */
 #define PSIO_REFLECT(STRUCT, ...)                                                                 \
-   PSIO_REFLECT_TYPENAME(STRUCT)                                                                  \
    struct reflect_impl_##STRUCT                                                                   \
    {                                                                                              \
       static constexpr bool is_defined = true;                                                    \
