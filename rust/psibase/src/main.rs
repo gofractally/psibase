@@ -19,12 +19,12 @@ use std::fs::{metadata, read_dir};
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    // TODO: load default from environment variable
     /// API Endpoint
     #[clap(
         short = 'a',
         long,
         value_name = "URL",
+        env = "PSINODE_URL",
         default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
     )]
     api: Url,
