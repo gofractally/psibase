@@ -200,7 +200,7 @@ namespace psibase
          // in the producer set.
          if (!nextProducers || info.header.commitNum < nextProducersBlockNum)
          {
-            if (producers->size() == 0)
+            if (producers->size() == 0 && !nextProducers)
             {
                assert(blockNum() == 1);
                return Claim{};
