@@ -25,6 +25,30 @@ namespace psibase
    {
    }
 
+   static bool singleProducer(const StatusRow& status, AccountNumber producer)
+   {
+      auto getProducers = [](auto& consensus) -> auto&
+      {
+         return std::visit(
+             [](auto& c) -> auto& { return c.producers; }, consensus);
+      };
+      auto& prods = getProducers(status.consensus);
+      if (prods.size() == 1)
+      {
+         return !status.nextConsensus;
+      }
+      else if (prods.size() == 0)
+      {
+         if (!status.nextConsensus)
+         {
+            return true;
+         }
+         auto& nextProds = getProducers(std::get<0>(*status.nextConsensus));
+         return nextProds.size() == 1 && nextProds.front().name == producer;
+      }
+      return false;
+   }
+
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold
    StatusRow BlockContext::start(std::optional<TimePointSec> time,
                                  AccountNumber               producer,
@@ -45,9 +69,8 @@ namespace psibase
       }
       databaseStatus = *dbStatus;
 
-      current.header.producer  = producer;
-      current.header.term      = term;
-      current.header.commitNum = irreversible;
+      current.header.producer = producer;
+      current.header.term     = term;
       if (status->head)
       {
          current.header.previous = status->head->blockId;
@@ -75,6 +98,16 @@ namespace psibase
       {
          status->consensus = std::move(std::get<0>(*status->nextConsensus));
          status->nextConsensus.reset();
+      }
+      if (singleProducer(*status, producer))
+      {
+         // This will be updated to the current block in writeRevision unless
+         // the block sets new producers.
+         current.header.commitNum = current.header.blockNum - 1;
+      }
+      else
+      {
+         current.header.commitNum = irreversible;
       }
       if (!status->head)
       {
@@ -156,6 +189,16 @@ namespace psibase
          }
 
          status->current.newConsensus = current.header.newConsensus = nextConsensus;
+      }
+
+      if (singleProducer(*status, current.header.producer))
+      {
+         // If singleProducer is true here, then it must have been true at the start of
+         // the block as well, unless an existing newConsensus was modified, which is
+         // not permitted.
+         check(current.header.commitNum == current.header.blockNum - 1,
+               "Forbidden consensus update");
+         status->current.commitNum = current.header.commitNum = current.header.blockNum;
       }
 
       status->head = current;  // Also calculates blockId
