@@ -684,9 +684,7 @@ void run(const std::string&              db_path,
          unsigned short                  port,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
-         uint32_t                        leeway_us,
-         const std::string&              replay_blocks,
-         const std::string&              save_blocks)
+         uint32_t                        leeway_us)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -1025,66 +1023,6 @@ void run(const std::string&              db_path,
       auto server = http::server::create(http_config, sharedState);
    }
 
-   if (!replay_blocks.empty())
-   {
-      PSIBASE_LOG(node.chain().getLogger(), info) << "Replaying blocks from " << replay_blocks;
-      std::fstream file(replay_blocks, std::ios_base::binary | std::ios_base::in);
-      if (!file.is_open())
-         throw std::runtime_error("failed to open " + replay_blocks);
-
-      Database                db{system->sharedDatabase, system->sharedDatabase.getHead()};
-      auto                    session = db.startRead();
-      std::optional<BlockNum> skipping;
-      std::vector<char>       raw;
-      while (true)
-      {
-         uint64_t size;
-         if (!file.read((char*)&size, sizeof(size)))
-            break;
-         raw.resize(size);
-         if (!file.read(raw.data(), raw.size()))
-            break;
-         SignedBlock sb;
-         sb.block = psio::convert_from_frac<Block>(raw);
-         BlockInfo info{sb.block};
-
-         bool foundExisting = node.chain().get_state(info.blockId);
-         if (!foundExisting)
-            if (auto existing = db.kvGet<Block>(DbId::blockLog, info.header.blockNum))
-               if (info.blockId == BlockInfo{*existing}.blockId)
-                  foundExisting = true;
-
-         if (foundExisting)
-         {
-            if (!skipping)
-            {
-               PSIBASE_LOG(node.chain().getLogger(), info) << "Skipping existing blocks";
-               skipping = info.header.blockNum;
-            }
-            continue;
-         }
-         if (skipping)
-         {
-            PSIBASE_LOG(node.chain().getLogger(), info) << "Skipped existing blocks " << *skipping
-                                                        << "-" << info.header.blockNum - 1 << "\n";
-            skipping = std::nullopt;
-         }
-
-         if (!node.chain().insert(sb))
-            throw std::runtime_error(
-                "Block " + psio::convert_to_json(info.blockId) +
-                " failed to link; most likely it tries to fork out an irreversible block");
-         node.chain().async_switch_fork(
-             [&node, &info](BlockHeader* h)
-             {
-                node.consensus().on_fork_switch(h);
-                // TODO: is it correct to assume the the input block log is irreversible?
-                node.chain().commit(info.header.blockNum);
-             },
-             [](const void*) {});
-      }
-   }
-
    node.set_producer_id(producer);
    http_config->enable_p2p = enable_incoming_p2p;
    {
@@ -1097,33 +1035,6 @@ void run(const std::string&              db_path,
    bool showedBootMsg = false;
 
    node.autoconnect(translate_endpoints(peers), autoconnect.value, connect_one);
-
-   if (!save_blocks.empty())
-   {
-      PSIBASE_LOG(node.chain().getLogger(), info) << "Saving blocks to " << save_blocks;
-      std::fstream file(save_blocks,
-                        std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
-      if (!file.is_open())
-         throw std::runtime_error("failed to open " + save_blocks);
-
-      Database db{system->sharedDatabase, system->sharedDatabase.getHead()};
-      auto     session    = db.startRead();
-      BlockNum num        = 2;
-      int      numWritten = 0;
-      while (auto block = db.kvGetRaw(DbId::blockLog, psio::convert_to_key(num)))
-      {
-         if (num == 2 || !(num % 10000))
-            PSIBASE_LOG(node.chain().getLogger(), info)
-                << "writing block " << num << " to " << save_blocks;
-         uint64_t size = block->remaining();
-         file.write((char*)&size, sizeof(size));
-         file.write(block->pos, block->remaining());
-         ++num;
-         ++numWritten;
-      }
-      PSIBASE_LOG(node.chain().getLogger(), info)
-          << "wrote " << numWritten << " blocks to " << save_blocks;
-   }
 
    timer_type timer(chainContext);
 
@@ -1197,8 +1108,6 @@ int main(int argc, char* argv[])
    bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
    http::admin_service         admin;
-   std::string                 replay_blocks = {};
-   std::string                 save_blocks   = {};
 
    namespace po = boost::program_options;
 
@@ -1222,10 +1131,6 @@ int main(int argc, char* argv[])
    // Options that can only be specified on the command line
    opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
        "Path to database");
-   opt("replay-blocks", po::value<std::string>(&replay_blocks)->value_name("file"),
-       "Replay blocks from file");
-   opt("save-blocks", po::value<std::string>(&save_blocks)->value_name("file"),
-       "Save blocks to file");
    opt("help,h", "Show this message");
 
    po::positional_options_description p;
@@ -1284,7 +1189,7 @@ int main(int argc, char* argv[])
       psibase::loggers::set_path(db_path);
       psibase::loggers::configure(vm);
       run(db_path, AccountNumber{producer}, keys, peers, autoconnect, enable_incoming_p2p, host,
-          port, services, admin, leeway_us, replay_blocks, save_blocks);
+          port, services, admin, leeway_us);
       return 0;
    }
    catch (std::exception& e)
