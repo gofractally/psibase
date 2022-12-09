@@ -25,16 +25,15 @@ namespace psibase::net
       TermNum                   term;
       producer_id               follower_id;
       BlockNum                  head_num;
-      Claim                     claim;
+      Claim                     signer;
 
-      Claim       signer() const { return claim; }
       std::string to_string() const
       {
          return "confirm: term=" + std::to_string(term) + " follower=" + follower_id.str() +
                 " blocknum=" + std::to_string(head_num);
       }
    };
-   PSIO_REFLECT(ConfirmMessage, term, follower_id, head_num, claim);
+   PSIO_REFLECT(ConfirmMessage, term, follower_id, head_num, signer);
 
    struct RequestVoteRequest
    {
@@ -43,15 +42,14 @@ namespace psibase::net
       producer_id               candidate_id;
       BlockNum                  last_log_index;
       TermNum                   last_log_term;
-      Claim                     claim;
+      Claim                     signer;
 
-      Claim       signer() const { return claim; }
       std::string to_string() const
       {
          return "request vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str();
       }
    };
-   PSIO_REFLECT(RequestVoteRequest, term, candidate_id, last_log_index, last_log_term, claim)
+   PSIO_REFLECT(RequestVoteRequest, term, candidate_id, last_log_index, last_log_term, signer)
    struct RequestVoteResponse
    {
       static constexpr unsigned type = 37;
@@ -59,16 +57,15 @@ namespace psibase::net
       producer_id               candidate_id;
       producer_id               voter_id;
       bool                      vote_granted;
-      Claim                     claim;
+      Claim                     signer;
 
-      Claim       signer() const { return claim; }
       std::string to_string() const
       {
          return "vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str() +
                 " voter=" + voter_id.str() + " vote granted=" + std::to_string(vote_granted);
       }
    };
-   PSIO_REFLECT(RequestVoteResponse, term, candidate_id, voter_id, vote_granted, claim)
+   PSIO_REFLECT(RequestVoteResponse, term, candidate_id, voter_id, vote_granted, signer)
 
    // This protocol is based on RAFT, with some simplifications.
    // i.e. the blockchain structure is sufficient to guarantee log matching.
@@ -385,7 +382,7 @@ namespace psibase::net
          }
          // TODO: validate against BlockHeaderState instead. Doing so would allow us to distinguish
          // out-dated messages from invalid messages.
-         validate_producer(response.follower_id, response.claim);
+         validate_producer(response.follower_id, response.signer);
          update_term(response.term);
          if (response.term == current_term)
          {
@@ -402,7 +399,7 @@ namespace psibase::net
          {
             return;
          }
-         validate_producer(request.candidate_id, request.claim);
+         validate_producer(request.candidate_id, request.signer);
          update_term(request.term);
          bool vote_granted = false;
          // Can we vote for this candidate?
@@ -429,7 +426,7 @@ namespace psibase::net
                                                         .candidate_id = request.candidate_id,
                                                         .voter_id     = self,
                                                         .vote_granted = vote_granted,
-                                                        .claim        = k});
+                                                        .signer       = k});
                 });
          }
       }
@@ -439,7 +436,7 @@ namespace psibase::net
          {
             return;
          }
-         validate_producer(response.voter_id, response.claim);
+         validate_producer(response.voter_id, response.signer);
          update_term(response.term);
          if (response.candidate_id == self && response.term == current_term &&
              response.vote_granted && _state == producer_state::candidate)

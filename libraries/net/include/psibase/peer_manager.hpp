@@ -271,7 +271,7 @@ namespace psibase::net
                        {
                           if (c->is_open())
                           {
-                             network().recv(id, buf);
+                             network().recv(id, std::move(buf));
                           }
                           async_recv(id, std::move(c));
                        });

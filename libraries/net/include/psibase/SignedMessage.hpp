@@ -10,18 +10,16 @@ namespace psibase::net
    {
       static constexpr auto type = Msg::type;
 
-      Msg data;
+      psio::shared_view_ptr<Msg> data;
 
       std::vector<char> signature;
       PSIO_REFLECT(SignedMessage, definitionWillNotChange(), data, signature)
-      std::string to_string() const { return data.to_string(); }
+      std::string to_string() const { return data.unpack().to_string(); }
    };
 
    template <typename T>
    concept NeedsSignature = requires(const T& t)
    {
-      {
-         t.signer()
-         } -> std::same_as<Claim>;
+      t.signer;
    };
 }  // namespace psibase::net

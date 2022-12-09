@@ -158,7 +158,7 @@ namespace psibase::net
       SignedMessage<Msg> sign_message(const Msg& msg)
       {
          auto  raw   = serialize_unsigned_message(msg);
-         Claim claim = msg.signer();
+         Claim claim = msg.signer;
          auto  sig   = chain().sign({raw.data(), raw.size()}, claim);
          return {msg, sig};
       }
@@ -183,10 +183,9 @@ namespace psibase::net
       {
          try
          {
-            return recv(
-                peer,
-                psio::convert_from_frac<std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>>(
-                    s));
+            using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
+            check(psio::fracvalidate<message_type>(s.pos, s.end).valid, "Invalid message");
+            return recv(peer, psio::convert_from_frac<message_type>(s));
          }
          catch (std::exception& e)
          {
@@ -195,12 +194,12 @@ namespace psibase::net
          }
       }
       template <template <typename...> class L, typename... T>
-      void recv_impl(peer_id peer, int key, const std::vector<char>& msg, L<T...>*)
+      void recv_impl(peer_id peer, int key, std::vector<char>&& msg, L<T...>*)
       {
          psio::input_stream s(msg.data() + 1, msg.size() - 1);
          ((key == T::type ? try_recv_impl<T>(peer, s) : (void)0), ...);
       }
-      void recv(peer_id peer, const std::vector<char>& msg)
+      void recv(peer_id peer, std::vector<char>&& msg)
       {
          using message_type = decltype(get_message_impl());
          static_assert(check_message_uniqueness((message_type*)nullptr));
@@ -210,7 +209,7 @@ namespace psibase::net
             peers().disconnect(peer);
             return;
          }
-         recv_impl(peer, msg[0], msg, (message_type*)0);
+         recv_impl(peer, msg[0], std::move(msg), (message_type*)0);
       }
       void recv(peer_id peer, const InitMessage& msg)
       {
@@ -231,24 +230,23 @@ namespace psibase::net
          producers.insert({msg.producer, peer});
       }
       template <typename T>
-      requires(!has_recv<SignedMessage<T>, Derived>) void recv(peer_id                 peer,
-                                                               const SignedMessage<T>& msg)
-      {
-         auto  raw   = serialize_unsigned_message(msg.data);
-         Claim claim = msg.data.signer();
-         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.data.to_string();
-         chain().verify({raw.data(), raw.size()}, claim, msg.signature);
-         static_cast<Derived*>(this)->consensus().recv(peer, msg.data);
-      }
-      template <typename T>
-      requires has_recv<SignedMessage<T>, Derived>
       void recv(peer_id peer, const SignedMessage<T>& msg)
       {
-         auto  raw   = serialize_unsigned_message(msg.data);
-         Claim claim = msg.data.signer();
-         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.data.to_string();
+         std::vector<char> raw;
+         raw.reserve(msg.data.size() + 1);
+         raw.push_back(T::type);
+         raw.insert(raw.end(), msg.data.data(), msg.data.data() + msg.data.size());
+         Claim claim = msg.data->signer();
+         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
          chain().verify({raw.data(), raw.size()}, claim, msg.signature);
-         static_cast<Derived*>(this)->consensus().recv(peer, msg);
+         if constexpr (has_recv<SignedMessage<T>, Derived>)
+         {
+            static_cast<Derived*>(this)->consensus().recv(peer, msg);
+         }
+         else
+         {
+            static_cast<Derived*>(this)->consensus().recv(peer, msg.data.unpack());
+         }
       }
       void recv(peer_id peer, const auto& msg)
       {

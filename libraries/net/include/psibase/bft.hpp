@@ -37,24 +37,22 @@ namespace psibase::net
       static constexpr unsigned type = 38;
       Checksum256               block_id;
       AccountNumber             producer;
-      Claim                     claim;
+      Claim                     signer;
 
-      auto        signer() const { return claim; }
       std::string to_string() const
       {
          return "prepare: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
       }
    };
-   PSIO_REFLECT(PrepareMessage, block_id, producer, claim)
+   PSIO_REFLECT(PrepareMessage, block_id, producer, signer)
 
    struct CommitMessage
    {
       static constexpr unsigned type = 39;
       Checksum256               block_id;
       AccountNumber             producer;
-      Claim                     claim;
+      Claim                     signer;
 
-      auto        signer() const { return claim; }
       std::string to_string() const
       {
          return "commit: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
@@ -62,22 +60,21 @@ namespace psibase::net
    };
    // To save space, we're picking this apart and reconstituting it, while
    // assuming that the signature remains valid.
-   PSIO_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, claim)
+   PSIO_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
 
    struct ViewChangeMessage
    {
       static constexpr unsigned type = 40;
       TermNum                   term;
       AccountNumber             producer;
-      Claim                     claim;
+      Claim                     signer;
 
-      auto        signer() const { return claim; }
       std::string to_string() const
       {
          return "view change: term=" + std::to_string(term) + " producer=" + producer.str();
       }
    };
-   PSIO_REFLECT(ViewChangeMessage, term, producer, claim)
+   PSIO_REFLECT(ViewChangeMessage, term, producer, signer)
 
    struct ProducerConfirm
    {
@@ -318,8 +315,8 @@ namespace psibase::net
          {
             return true;
          }
-         auto idx0 = p0->getIndex(producer, msg.data.claim);
-         auto idx1 = p1 ? p1->getIndex(producer, msg.data.claim) : std::optional<std::size_t>();
+         auto idx0 = p0->getIndex(producer, msg.data->signer());
+         auto idx1 = p1 ? p1->getIndex(producer, msg.data->signer()) : std::optional<std::size_t>();
          if (idx0 || idx1)
          {
             auto [iter, inserted] =
@@ -508,7 +505,7 @@ namespace psibase::net
              [&](const auto& k)
              {
                 network().multicast_producers(
-                    ViewChangeMessage{.term = current_term, .producer = self, .claim = k});
+                    ViewChangeMessage{.term = current_term, .producer = self, .signer = k});
              });
       }
 
@@ -641,7 +638,7 @@ namespace psibase::net
              [&](const auto& key)
              {
                 auto message = network().sign_message(
-                    PrepareMessage{.block_id = id, .producer = self, .claim = key});
+                    PrepareMessage{.block_id = id, .producer = self, .signer = key});
                 on_prepare(state, self, message);
                 network().multicast_producers(message);
              });
@@ -657,17 +654,17 @@ namespace psibase::net
          }
          for (const auto& msg : iter->second.commits)
          {
-            if (auto expected = state->producers->getClaim(msg.data.producer);
-                expected && expected == msg.data.claim)
+            if (auto expected = state->producers->getClaim(msg.data->producer());
+                expected && expected == msg.data->signer())
             {
-               result.commits.push_back({msg.data.producer, msg.signature});
+               result.commits.push_back({msg.data->producer(), msg.signature});
             }
             if (state->nextProducers)
             {
-               if (auto expected = state->nextProducers->getClaim(msg.data.producer);
-                   expected && expected == msg.data.claim)
+               if (auto expected = state->nextProducers->getClaim(msg.data->producer());
+                   expected && expected == msg.data->signer())
                {
-                  result.nextCommits->push_back({msg.data.producer, msg.signature});
+                  result.nextCommits->push_back({msg.data->producer(), msg.signature});
                }
             }
          }
@@ -721,7 +718,7 @@ namespace psibase::net
              [&](const auto& key)
              {
                 auto message = network().sign_message(
-                    CommitMessage{.block_id = id, .producer = self, .claim = key});
+                    CommitMessage{.block_id = id, .producer = self, .signer = key});
                 on_commit(state, self, message);
                 network().multicast_producers(message);
              });
@@ -856,7 +853,8 @@ namespace psibase::net
             if (auto claim = active_producers[0]->getClaim(self))
             {
                network().async_send_block(
-                   peer, ViewChangeMessage{.term = current_term, .producer = self, .claim = *claim},
+                   peer,
+                   ViewChangeMessage{.term = current_term, .producer = self, .signer = *claim},
                    [](const std::error_code&) {});
             }
          }
@@ -864,24 +862,24 @@ namespace psibase::net
 
       void recv(peer_id peer, const SignedMessage<PrepareMessage>& msg)
       {
-         auto* state = chain().get_state(msg.data.block_id);
+         auto* state = chain().get_state(msg.data->block_id());
          if (!state)
          {
             return;
          }
-         validate_producer(state, msg.data.producer, msg.data.claim);
+         validate_producer(state, msg.data->producer(), msg.data->signer());
          // TODO: should we update the sender's view here? same for commit.
-         on_prepare(state, msg.data.producer, msg);
+         on_prepare(state, msg.data->producer(), msg);
       }
       void recv(peer_id peer, const SignedMessage<CommitMessage>& msg)
       {
-         auto* state = chain().get_state(msg.data.block_id);
+         auto* state = chain().get_state(msg.data->block_id());
          if (!state)
          {
             return;
          }
-         validate_producer(state, msg.data.producer, msg.data.claim);
-         on_commit(state, msg.data.producer, msg);
+         validate_producer(state, msg.data->producer(), msg.data->signer());
+         on_commit(state, msg.data->producer(), msg);
       }
 
       void recv(peer_id peer, const ViewChangeMessage& msg)
@@ -895,7 +893,7 @@ namespace psibase::net
          // view change due to being ahead or behind other nodes.
          if (auto expected = active_producers[0]->getClaim(msg.producer))
          {
-            if (*expected == msg.claim)
+            if (*expected == msg.signer)
             {
                set_producer_view(msg.term, msg.producer);
                auto view_copy = producer_views;
