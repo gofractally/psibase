@@ -275,7 +275,7 @@ namespace psibase::net
             if (!match_index[group].empty())
             {
                std::vector<block_num> match = match_index[group];
-               auto                   mid   = active_producers[group]->threshold() - 1;
+               auto mid = active_producers[group]->size() - active_producers[group]->threshold();
                std::nth_element(match.begin(), match.begin() + mid, match.end());
                return match[mid];
             }
