@@ -76,6 +76,10 @@ namespace psibase
          status->consensus = std::move(std::get<0>(*status->nextConsensus));
          status->nextConsensus.reset();
       }
+      if (!status->head)
+      {
+         status->nextConsensus.emplace(Consensus{}, current.header.blockNum);
+      }
       status->current = current.header;
       if (!isReadOnly)
          db.kvPut(StatusRow::db, status->key(), *status);
