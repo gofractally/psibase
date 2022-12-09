@@ -18,6 +18,9 @@ target_link_options(wasm-base-debug INTERFACE -ggdb)
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${psidk_DIR}/boost)
 
+add_library(catch2 INTERFACE)
+target_include_directories(catch2 INTERFACE ${psidk_DIR}/catch2/include)
+
 function(add_libs suffix)
     add_library(simdjson${suffix} INTERFACE)
     target_include_directories(simdjson${suffix} INTERFACE
