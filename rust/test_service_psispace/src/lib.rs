@@ -9,7 +9,7 @@ mod service {
     use psibase::{
         check, get_sender, get_service, queries, serve_action_templates, serve_graphiql,
         serve_graphql, serve_pack_action, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack,
-        Reflect, Table, TableIndex, Unpack,
+        Reflect, Table, TableIndex, ToKey, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
@@ -41,13 +41,38 @@ mod service {
         }
     }
 
+    // TODO: create a macro for unnamed field keys (eg as seen in tuples keys),
+    // so that we can support these type of tables GQL queries.
+    #[derive(ToKey, InputObject)]
+    pub struct ContentKeyNamed {
+        pub account: AccountNumber,
+        pub path: String,
+    }
+
+    impl ContentKeyNamed {
+        pub fn new(account: AccountNumber, path: String) -> Self {
+            Self { account, path }
+        }
+    }
+
+    impl From<ContentKeyNamed> for ContentKey {
+        fn from(key: ContentKeyNamed) -> Self {
+            (key.account, key.path)
+        }
+    }
+
     #[queries]
     impl Queries {
         /// List all the existing files
-        table_query!(all_content, ContentTable, get_index_pk);
+        table_query!(content, ContentTable, get_index_pk: ContentKeyNamed);
 
-        /// List files content by account
-        table_query!(content, ContentTable, get_index_pk, account, AccountNumber);
+        /// List files content by account subindex
+        table_query_subindex!(
+            content_by_account,
+            ContentTable,
+            get_index_pk,
+            account: AccountNumber
+        );
     }
 
     /// Store a new file
@@ -353,14 +378,16 @@ mod tests {
             }
 
             {
-                firstContent: allContent(first: 1) {...contentSummaryFragment}
-                lastContent: allContent(last: 1) {...contentSummaryFragment}
-                first20Contents: allContent(first: 20) {...contentSummaryFragment}
-                last20Contents: allContent(last: 20) {...contentSummaryFragment}
-                acc3FirstContent: content(account: \\\"acc3\\\", first: 1) {...contentSummaryFragment}
-                acc5LastContent: content(account: \\\"acc5\\\", last: 1) {...contentSummaryFragment}
-                acc4First99Contents: content(account: \\\"acc4\\\", first: 99) {...contentSummaryFragment}
-                acc6Last99Contents: content(account: \\\"acc6\\\", last: 99) {...contentSummaryFragment}
+                firstContent: content(first: 1) {...contentSummaryFragment}
+                lastContent: content(last: 1) {...contentSummaryFragment}
+                first20Contents: content(first: 20) {...contentSummaryFragment}
+                last20Contents: content(last: 20) {...contentSummaryFragment}
+                acc3FirstContent: contentByAccount(account: \\\"acc3\\\", first: 1) {...contentSummaryFragment}
+                acc5LastContent: contentByAccount(account: \\\"acc5\\\", last: 1) {...contentSummaryFragment}
+                acc4First99Contents: contentByAccount(account: \\\"acc4\\\", first: 99) {...contentSummaryFragment}
+                acc6Last99Contents: contentByAccount(account: \\\"acc6\\\", last: 99) {...contentSummaryFragment}
+                altAcc3FirstContent: content(ge: {account: \\\"acc3\\\", path: \\\"/\\\"}, le: {account: \\\"acc3\\\", path: \\\"0\\\"}, first: 1) {...contentSummaryFragment}
+                altAcc3First99Contents: content(ge: {account: \\\"acc3\\\", path: \\\"/\\\"}, le: {account: \\\"acc3\\\", path: \\\"0\\\"}, first: 99) {...contentSummaryFragment}
             }
         ";
         let json_query = format!("{{\"query\":\"{}\"}}", gql).replace('\n', "");
@@ -455,6 +482,34 @@ mod tests {
         assert_eq!(
             acc6_last_99_edges[4]["node"]["path"].as_str().unwrap(),
             "/articles/blog5.html"
+        );
+
+        let alt_acc3_first_edges = json_response["data"]["altAcc3FirstContent"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(alt_acc3_first_edges.len(), 1);
+        assert_eq!(
+            alt_acc3_first_edges[0]["node"]["account"].as_str().unwrap(),
+            "acc3"
+        );
+        assert_eq!(
+            alt_acc3_first_edges[0]["node"]["path"].as_str().unwrap(),
+            "/articles/blog1.html"
+        );
+
+        let alt_acc3_first_99_edges = json_response["data"]["altAcc3First99Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(alt_acc3_first_99_edges.len(), 5);
+        assert_eq!(
+            alt_acc3_first_99_edges[0]["node"]["account"]
+                .as_str()
+                .unwrap(),
+            "acc3"
+        );
+        assert_eq!(
+            alt_acc3_first_99_edges[0]["node"]["path"].as_str().unwrap(),
+            "/articles/blog1.html"
         );
 
         Ok(())

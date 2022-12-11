@@ -2,7 +2,7 @@
 //! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
 
 use fracpack_macro::fracpack_macro_impl;
-use graphql_macro::{queries_macro_impl, table_query_macro_impl};
+use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
 use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
@@ -422,4 +422,10 @@ pub fn queries(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn table_query(item: TokenStream) -> TokenStream {
     table_query_macro_impl(item)
+}
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn table_query_subindex(item: TokenStream) -> TokenStream {
+    table_query_subindex_macro_impl(item)
 }
