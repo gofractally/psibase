@@ -42,7 +42,7 @@ mod service {
     }
 
     // TODO: create a macro for unnamed field keys (eg as seen in tuples keys),
-    // so that we can support these type of tables GQL queries.
+    // so that we can support these types of tables in GQL queries.
     #[derive(ToKey, InputObject)]
     pub struct ContentKeyNamed {
         pub account: AccountNumber,
