@@ -512,6 +512,20 @@ namespace psibase
          prover.prove(BlockSignatureInfo(info), *claim);
          return std::move(*claim);
       }
+      // TODO: this can run concurrently.
+      void validateTransactionSignatures(const Block& b, const ConstRevisionPtr& revision)
+      {
+         BlockContext verifyBc(*systemContext, revision);
+         verifyBc.start(b.header.time);
+         for (const auto& trx : b.transactions)
+         {
+            for (std::size_t i = 0; i < trx.proofs.size(); ++i)
+            {
+               TransactionTrace trace;
+               verifyBc.verifyProof(trx, trace, i, std::nullopt);
+            }
+         }
+      }
       // \pre the state of prev has been set
       bool execute_block(BlockHeaderState* prev, BlockHeaderState* state, auto&& on_accept_block)
       {
@@ -525,6 +539,7 @@ namespace psibase
             {
                auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
                ctx.start(Block(blockPtr->block()));
+               validateTransactionSignatures(ctx.current, prev->revision);
                ctx.callStartBlock();
                ctx.execAllInBlock();
                auto [newRevision, id] =
