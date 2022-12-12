@@ -20,12 +20,21 @@ struct Args {
 
 impl Parse for Args {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut vars = Punctuated::<TypeParam, Token![,]>::parse_terminated(input)?.into_iter();
+        let query_name = input.parse().expect("Query name not present");
+        input.parse::<Token![,]>().expect("expected ,");
 
-        let query_name = vars.next().expect("Query name not present").ident;
-        let table = vars.next().expect("Table name not present").ident;
-        let key_fn = vars.next().expect("Table key function not present");
-        let subindex_params = vars.collect();
+        let table = input.parse().expect("Table name not present");
+        input.parse::<Token![,]>().expect("expected ,");
+
+        let key_fn = input.parse().expect("Table key function not present");
+
+        let subindex_params = if input.parse::<Token![,]>().is_ok() {
+            Punctuated::<TypeParam, Token![,]>::parse_terminated(input)?
+                .into_iter()
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         Ok(Args {
             query_name,
@@ -95,7 +104,10 @@ pub fn table_query_macro_impl(item: TokenStream) -> TokenStream {
 
     let query_name = args.query_name;
     let table = args.table;
+
+    // TODO: This specific naming convention is a bit of a hack. Figure out a way of using an associated type
     let record = Ident::new(format!("{}Record", table).as_str(), table.span());
+
     let key_fn = args.key_fn.ident;
     let key_ty = args.key_fn.bounds.to_token_stream();
 
@@ -135,7 +147,10 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
 
     let query_name = args.query_name;
     let table = args.table;
+
+    // TODO: This specific naming convention is a bit of a hack. Figure out a way of using an associated type
     let record = Ident::new(format!("{}Record", table).as_str(), table.span());
+
     let key_fn = args.key_fn.ident;
     let subindex_params = args.subindex_params;
 
@@ -147,7 +162,7 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
     }
 
     let mut params = quote! {};
-    let mut subindex_args = quote! {};
+    let mut subkey_data = quote! {};
 
     // TODO: Should string be accepted as a default rest type of any subindex?
     let mut subindex_rest_ty = quote! { String };
@@ -163,9 +178,9 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
                 #param_name: #param_type,
             };
 
-            subindex_args = quote! {
-                #subindex_args
-                &#param_name,
+            subkey_data = quote! {
+                #subkey_data
+                #param_name.append_key(&mut subkey_data);
             };
         }
     }
@@ -180,7 +195,10 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
             after: Option<String>,
         ) -> async_graphql::Result<async_graphql::connection::Connection<psibase::RawKey, #record>> {
             let table_idx = #table::new().#key_fn ();
-            let sidx = psibase::TableQuery::subindex::<#subindex_rest_ty>(table_idx, #subindex_args);
+            let mut subkey_data: Vec<u8> = Vec::new();
+            #subkey_data
+            let subkey = psibase::RawKey::new(subkey_data);
+            let sidx = psibase::TableQuery::subindex::<#subindex_rest_ty>(table_idx, &subkey);
             sidx
                 .first(first)
                 .last(last)

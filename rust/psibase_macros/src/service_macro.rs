@@ -750,10 +750,12 @@ fn process_service_tables(
         (table_name, table_record_struct_name.clone())
     };
 
+    // TODO: This specific naming convention is a bit of a hack. Figure out a way of using an associated type
     let table_record_type_id = Ident::new(
         format!("{}Record", table_name_id).as_str(),
         table_record_struct_name.span(),
     );
+
     let table_record_type_impl = quote! {
         type #table_record_type_id = #record_name_id;
     };
