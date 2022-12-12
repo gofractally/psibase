@@ -124,14 +124,14 @@ namespace psibase
    // TODO: (or elsewhere) check block signature
    void BlockContext::start(Block&& src)
    {
-      auto status = start(src.header.time);
-      active      = false;
+      auto status =
+          start(src.header.time, src.header.producer, src.header.term, src.header.commitNum);
+      active = false;
       check(src.header.previous == current.header.previous,
             "block previous does not match expected");
       check(src.header.blockNum == current.header.blockNum, "block num does not match expected");
-      current        = std::move(src);
-      status.current = current.header;
-      // TODO: zero out header fields that are filled at the end of the block
+      current.transactions   = std::move(src.transactions);
+      current.subjectiveData = std::move(src.subjectiveData);
       db.kvPut(StatusRow::db, status.key(), status);
       active = true;
    }
