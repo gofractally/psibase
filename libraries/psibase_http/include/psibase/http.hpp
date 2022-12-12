@@ -20,6 +20,8 @@ namespace psibase::http
    using push_transaction_t =
        std::function<void(std::vector<char> packed_signed_trx, push_transaction_callback)>;
 
+   using shutdown_t = std::function<void()>;
+
    using accept_p2p_websocket_result = boost::beast::websocket::stream<boost::beast::tcp_stream>;
    using accept_p2p_websocket_t      = std::function<void(accept_p2p_websocket_result&&)>;
 
@@ -160,6 +162,7 @@ namespace psibase::http
       push_boot_t               push_boot_async        = {};
       push_transaction_t        push_transaction_async = {};
       accept_p2p_websocket_t    accept_p2p_websocket   = {};
+      shutdown_t                shutdown               = {};
       get_peers_t               get_peers              = {};
       connect_t                 connect                = {};
       connect_t                 disconnect             = {};
@@ -176,14 +179,19 @@ namespace psibase::http
       mutable std::shared_mutex mutex;
    };
 
-   struct server
+   struct server_impl;
+   class server_service : public boost::asio::execution_context::service
    {
-      virtual ~server() {}
+     public:
+      using key_type = server_service;
+      explicit server_service(boost::asio::execution_context& ctx);
+      server_service(boost::asio::execution_context&           ctx,
+                     const std::shared_ptr<const http_config>& http_config,
+                     const std::shared_ptr<SharedState>&       sharedState);
 
-      static std::shared_ptr<server> create(const std::shared_ptr<const http_config>& http_config,
-                                            const std::shared_ptr<SharedState>&       sharedState);
-
-      virtual void stop() = 0;
+     private:
+      void                         shutdown() noexcept override;
+      std::shared_ptr<server_impl> impl;
    };
 
 }  // namespace psibase::http

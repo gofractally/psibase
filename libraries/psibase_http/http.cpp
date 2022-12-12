@@ -57,7 +57,7 @@ namespace psibase::http
       PSIBASE_LOG(logger, warning) << what << ": " << ec.message();
    }
 
-   struct server_impl : server, std::enable_shared_from_this<server_impl>
+   struct server_impl
    {
       net::io_service                          ioc;
       std::shared_ptr<const http::http_config> http_config = {};
@@ -70,23 +70,28 @@ namespace psibase::http
       {
       }
 
-      virtual ~server_impl()
-      {
-         // TODO: BUG: refcount fell to 0, but threads haven't stopped
-         //            yet. A thread may try to bump it back up.
-         stop();
-      }
+      ~server_impl() { stop(); }
 
       bool start();
 
-      virtual void stop() override
+      void stop()
       {
          ioc.stop();
          for (auto& t : threads)
             t.join();
          threads.clear();
+         http_config.reset();
+         sharedState.reset();
       }
    };  // server_impl
+
+   void server_service::shutdown() noexcept
+   {
+      if (impl)
+      {
+         impl->stop();
+      }
+   }
 
    template <typename T>
    constexpr std::size_t function_arg_count = 0;
@@ -356,8 +361,7 @@ namespace psibase::http
          send.pause_read = true;
          auto post_back_to_http =
              [callback = static_cast<decltype(callback)>(callback),
-              session  = send.self.derived_session().shared_from_this(),
-              server   = send.self.server.shared_from_this()](auto&& result) mutable
+              session  = send.self.derived_session().shared_from_this()](auto&& result) mutable
          {
             auto* p = session.get();
             net::post(p->stream.socket().get_executor(),
@@ -517,17 +521,13 @@ namespace psibase::http
 
             server.http_config->push_boot_async(
                 std::move(req.body()),
-                [error, ok, session = send.self.derived_session().shared_from_this(),
-                 server = send.self.server.shared_from_this()](push_boot_result result)
+                [error, ok,
+                 session = send.self.derived_session().shared_from_this()](push_boot_result result)
                 {
-                   // inside foreign thread; the server capture above keeps ioc alive.
                    net::post(
                        session->stream.socket().get_executor(),
                        [error, ok, session = std::move(session), result = std::move(result)]
                        {
-                          // inside http thread pool. If we reached here, then the server
-                          // and ioc are still alive. This lambda doesn't capture server since
-                          // that would leak memory (circular) if the ioc threads were shut down.
                           try
                           {
                              session->queue_.pause_read = false;
@@ -578,40 +578,35 @@ namespace psibase::http
             //       read and doesn't close the socket.
             server.http_config->push_transaction_async(
                 std::move(req.body()),
-                [error, ok, session = send.self.derived_session().shared_from_this(),
-                 server = send.self.server.shared_from_this()](push_transaction_result result)
+                [error, ok, session = send.self.derived_session().shared_from_this()](
+                    push_transaction_result result)
                 {
-                   // inside foreign thread; the server capture above keeps ioc alive.
-                   net::post(
-                       session->stream.socket().get_executor(),
-                       [error, ok, session = std::move(session), result = std::move(result)]
-                       {
-                          // inside http thread pool. If we reached here, then the server
-                          // and ioc are still alive. This lambda doesn't capture server since
-                          // that would leak memory (circular) if the ioc threads were shut down.
-                          try
-                          {
-                             session->queue_.pause_read = false;
-                             if (auto* trace = std::get_if<TransactionTrace>(&result))
+                   net::post(session->stream.socket().get_executor(),
+                             [error, ok, session = std::move(session), result = std::move(result)]
                              {
-                                std::vector<char>   data;
-                                psio::vector_stream stream{data};
-                                psio::to_json(*trace, stream);
-                                session->queue_(ok(std::move(data), "application/json"));
-                             }
-                             else
-                             {
-                                session->queue_(error(bhttp::status::internal_server_error,
-                                                      std::get<std::string>(result)));
-                             }
-                             if (session->queue_.can_read())
-                                session->do_read();
-                          }
-                          catch (...)
-                          {
-                             session->do_close();
-                          }
-                       });
+                                try
+                                {
+                                   session->queue_.pause_read = false;
+                                   if (auto* trace = std::get_if<TransactionTrace>(&result))
+                                   {
+                                      std::vector<char>   data;
+                                      psio::vector_stream stream{data};
+                                      psio::to_json(*trace, stream);
+                                      session->queue_(ok(std::move(data), "application/json"));
+                                   }
+                                   else
+                                   {
+                                      session->queue_(error(bhttp::status::internal_server_error,
+                                                            std::get<std::string>(result)));
+                                   }
+                                   if (session->queue_.can_read())
+                                      session->do_read();
+                                }
+                                catch (...)
+                                {
+                                   session->do_close();
+                                }
+                             });
                 });
             send.pause_read = true;
             return;
@@ -646,6 +641,26 @@ namespace psibase::http
                send(method_not_allowed(req.target(), req.method_string(), "GET"));
             }
          }
+         else if (req.target() == "/native/admin/shutdown")
+         {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
+            }
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               return send(error(bhttp::status::unsupported_media_type,
+                                 "Content-Type must be application/json\n"));
+            }
+            // TODO: Close all connections with an approprate error
+            // (e.g. websocket::close_code::going_away/service_restart)
+            server.http_config->shutdown();
+            return send(ok_no_content());
+         }
          else if (req.target() == "/native/admin/peers" && server.http_config->get_peers)
          {
             if (!is_admin(*server.http_config, req))
@@ -660,8 +675,8 @@ namespace psibase::http
             // returns json list of {id:int,endpoint:string}
             send.pause_read = true;
             server.http_config->get_peers(
-                [ok, session = send.self.derived_session().shared_from_this(),
-                 server = send.self.server.shared_from_this()](get_peers_result result)
+                [ok,
+                 session = send.self.derived_session().shared_from_this()](get_peers_result result)
                 {
                    net::post(session->stream.socket().get_executor(),
                              [ok, session = std::move(session), result = std::move(result)]()
@@ -698,8 +713,8 @@ namespace psibase::http
             send.pause_read = true;
             server.http_config->connect(
                 req.body(),
-                [ok_no_content, error, session = send.self.derived_session().shared_from_this(),
-                 server = send.self.server.shared_from_this()](connect_result result)
+                [ok_no_content, error,
+                 session = send.self.derived_session().shared_from_this()](connect_result result)
                 {
                    net::post(
                        session->stream.socket().get_executor(),
@@ -742,8 +757,8 @@ namespace psibase::http
             send.pause_read = true;
             server.http_config->disconnect(
                 req.body(),
-                [ok_no_content, error, session = send.self.derived_session().shared_from_this(),
-                 server = send.self.server.shared_from_this()](connect_result result)
+                [ok_no_content, error,
+                 session = send.self.derived_session().shared_from_this()](connect_result result)
                 {
                    net::post(
                        session->stream.socket().get_executor(),
@@ -773,7 +788,7 @@ namespace psibase::http
                return;
             send.pause_read = true;
             send(websocket_upgrade{}, std::move(req),
-                 [&server](auto&& stream)
+                 [](auto&& stream)
                  {
                     using stream_type = std::decay_t<decltype(stream)>;
                     auto session =
@@ -999,7 +1014,7 @@ namespace psibase::http
                          std::move(next)});
 
                   auto p = ptr.get();
-                  // Capture server, not self, because after returning, there is
+                  // Capture only the stream, not self, because after returning, there is
                   // no longer anything keeping the session alive
                   p->stream.async_accept(
                       p->request,
@@ -1376,19 +1391,20 @@ namespace psibase::http
 
       threads.reserve(http_config->num_threads);
       for (unsigned i = 0; i < http_config->num_threads; ++i)
-         threads.emplace_back([self = shared_from_this()] { self->ioc.run(); });
+         threads.emplace_back([this] { ioc.run(); });
       return true;
    }
 
-   std::shared_ptr<server> server::create(const std::shared_ptr<const http_config>& http_config,
-                                          const std::shared_ptr<SharedState>&       sharedState)
+   server_service::server_service(boost::asio::execution_context& ctx) : service(ctx) {}
+   server_service::server_service(net::execution_context&                   ctx,
+                                  const std::shared_ptr<const http_config>& http_config,
+                                  const std::shared_ptr<SharedState>&       sharedState)
+       : service(ctx)
    {
       check(http_config->num_threads > 0, "too few threads");
       auto server = std::make_shared<server_impl>(http_config, sharedState);
       if (server->start())
-         return server;
-      else
-         return nullptr;
+         impl = std::move(server);
    }
 
 }  // namespace psibase::http

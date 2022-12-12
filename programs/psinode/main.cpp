@@ -717,6 +717,10 @@ void run(const std::string&              db_path,
       }
    }
 
+   // http_config must live until server shutdown which happens when chainContext
+   // is destroyed.
+   auto http_config = std::make_shared<http::http_config>();
+
    boost::asio::io_context chainContext;
 
    using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
@@ -743,7 +747,6 @@ void run(const std::string&              db_path,
                     });
    };
 
-   auto http_config = std::make_shared<http::http_config>();
    if (!host.empty() || !services.empty())
    {
       // TODO: command-line options
@@ -780,15 +783,14 @@ void run(const std::string&              db_path,
          queue->entries.push_back({false, std::move(packed_signed_trx), {}, std::move(callback)});
       };
 
-      // TODO: The websocket uses the http server's io_context, but does not
-      // do anything to keep it alive. Stopping the server doesn't close the
-      // websocket either.
       http_config->accept_p2p_websocket = [&chainContext, &node](auto&& stream)
       {
          boost::asio::post(
              chainContext, [&node, stream = std::move(stream)]() mutable
              { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); });
       };
+
+      http_config->shutdown = [&chainContext]() { chainContext.stop(); };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {
@@ -1020,7 +1022,7 @@ void run(const std::string&              db_path,
              });
       };
 
-      auto server = http::server::create(http_config, sharedState);
+      boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
    }
 
    node.set_producer_id(producer);
