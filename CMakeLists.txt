@@ -131,7 +131,7 @@ endif()
 
 option(BUILD_RUST "Build rust" ON)
 if(BUILD_RUST)
-    set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image)
+    set(BOOT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/boot-image/contents/)
     set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
     set(THIRD_SRC ${COMMON_SYS}/common/thirdParty/src)
     set(THIRD_DEST ${BOOT_IMAGE}/CommonSys/common/thirdParty)
@@ -140,7 +140,7 @@ if(BUILD_RUST)
         DEPENDS wasm ${DOC_DEP} ${JS_DEPS}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND   rm -rf ${BOOT_IMAGE}/*
+        BUILD_COMMAND   rm -rf ${BOOT_IMAGE}
         COMMAND         mkdir -p ${BOOT_IMAGE}/CommonSys/common ${BOOT_IMAGE}/CommonSys/common/fonts ${BOOT_IMAGE}/CommonSys/ui/vanilla
         COMMAND         mkdir -p ${BOOT_IMAGE}/AccountSys/ui ${BOOT_IMAGE}/ExploreSys/ui
         COMMAND         mkdir -p ${BOOT_IMAGE}/AuthEcSys ${BOOT_IMAGE}/TokenSys/ui ${BOOT_IMAGE}/PsiSpaceSys/ui
