@@ -1,0 +1,42 @@
+{
+	"Create table": {
+		"scope": "cpp",
+		"prefix": "psi-table",
+		"body": [
+			"struct ${1:TableName}",
+			"{",
+			"   AccountNumber account;",
+			"};",
+			"PSIO_REFLECT($1, account);",
+			"using $1Table = Table<$1, &$1::account>;"
+		],
+		"description": "Create psibase service table skeleton"
+	},
+
+	"Create store/serve actions": {
+		"prefix": "psi-storeserve",
+		"body": [
+		  "auto serveSys(HttpRequest request) -> optional<HttpReply>",
+		  "{",
+		  "   if (auto result = servePackAction<${1:ServiceName}>(request))",
+		  "      return result;",
+		  "",
+		  "   if (auto result = serveContent(request, ${2:Db}{}))",
+		  "      return result;",
+		  "",
+		  "   if (auto result = serveGraphQL(request, ${3:Queries}{}))",
+		  "      return result;",
+		  "",
+		  "   return nullopt;",
+		  "}",
+		  "",
+		  "void storeSys(string path, string contentType, vector<char> content)",
+		  "{",
+		  "   check(getSender() == getReceiver(), \"wrong sender\");",
+		  "   storeContent(move(path), move(contentType), move(content), $2());",
+		  "}"
+		],
+		"description": "Creates default store/serve actions for storing UIs, packing actions, and serving UIs & Db tables."
+	  }
+
+}
