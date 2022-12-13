@@ -1,0 +1,400 @@
+#pragma once
+
+#include <psio/reflect.hpp>
+
+namespace psio
+{
+   template <typename T>
+   struct is_packable : std::bool_constant<false>
+   {
+   };
+
+   template <typename T>
+   concept Packable = is_packable<T>::value;
+
+   // If a type T supports the expressions `clio_unwrap_packable(T&)`,
+   // which returns a `T2&`, and `clio_unwrap_packable(const T&)`, which
+   // returns `const T2&`, then packing or unpacking T packs or unpacks
+   // the returned reference instead.
+   template <typename T>
+   concept PackableWrapper = requires(T& x, const T& cx)
+   {
+      clio_unwrap_packable(x);
+      clio_unwrap_packable(cx);
+   };
+
+   template <typename T>
+   concept PackableNumeric =            //
+       std::is_same_v<T, std::byte> ||  //
+       std::is_same_v<T, bool> ||       //
+       std::is_same_v<T, uint8_t> ||    //
+       std::is_same_v<T, uint16_t> ||   //
+       std::is_same_v<T, uint32_t> ||   //
+       std::is_same_v<T, uint64_t> ||   //
+       std::is_same_v<T, int8_t> ||     //
+       std::is_same_v<T, int16_t> ||    //
+       std::is_same_v<T, int32_t> ||    //
+       std::is_same_v<T, int64_t> ||    //
+       std::is_same_v<T, float> ||      //
+       std::is_same_v<T, double>;
+
+   template <bool Unpack, bool Verify, PackableNumeric T>
+   bool unpack_numeric(T*          value,
+                       bool&       has_unknown,
+                       const char* src,
+                       uint32_t&   pos,
+                       uint32_t    end_pos);
+
+   template <typename T>
+   struct is_packable_memcpy : std::bool_constant<false>
+   {
+   };
+
+   template <typename T>
+   concept PackableMemcpy = is_packable_memcpy<T>::value;
+
+   template <PackableNumeric T>
+   struct is_packable_memcpy<T> : std::bool_constant<true>
+   {
+   };
+
+   template <PackableMemcpy T, int N>
+   struct is_packable_memcpy<std::array<T, N>> : std::bool_constant<true>
+   {
+      static_assert(sizeof(std::array<T, N>) == N * sizeof(T));
+   };
+
+   template <>
+   struct is_packable<std::string>;
+
+   template <>
+   struct is_packable<std::string_view>;
+
+   template <typename T>
+   requires(is_packable_memcpy<T>::value) struct is_packable<std::span<T>>;
+
+   template <Packable T>
+   struct is_packable<std::vector<T>>;
+
+   template <typename T, int N>
+   requires Packable<T> &&(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>;
+
+   template <Packable T>
+   struct is_packable<std::optional<T>>;
+
+   template <typename T, typename Derived>
+   struct default_packable_impl : std::bool_constant<true>
+   {
+      // template <typename S>
+      // static void pack(const T& value, S& stream);
+
+      static bool is_empty_container(const T& value) { return false; }
+
+      template <typename S>
+      static void embedded_fixed_pack(const T& value, S& stream)
+      {
+         if constexpr (Derived::is_variable_size)
+            stream.write_raw(uint32_t(0));
+         else
+            Derived::pack(value, stream);
+      }
+
+      template <typename S>
+      static void embedded_fixed_repack(const T& value,
+                                        uint32_t fixed_pos,
+                                        uint32_t heap_pos,
+                                        S&       stream)
+      {
+         if (Derived::is_variable_size && !Derived::is_empty_container(value))
+            stream.rewrite_raw(fixed_pos, heap_pos - fixed_pos);
+      }
+
+      template <typename S>
+      static void embedded_variable_pack(const T& value, S& stream)
+      {
+         if (Derived::is_variable_size && !Derived::is_empty_container(value))
+            Derived::pack(value, stream);
+      }
+
+      // template <bool Unpack, bool Verify>
+      // static bool unpack(T*          value,
+      //                    bool&       has_unknown,
+      //                    const char* src,
+      //                    uint32_t&   pos,
+      //                    uint32_t    end_pos);
+
+      template <bool Unpack, bool Verify>
+      static bool embedded_variable_unpack(T*          value,
+                                           bool&       has_unknown,
+                                           const char* src,
+                                           uint32_t&   fixed_pos,
+                                           uint32_t    end_fixed_pos,
+                                           uint32_t&   heap_pos,
+                                           uint32_t    end_heap_pos)
+      {
+         uint32_t orig_pos = fixed_pos;
+         uint32_t offset;
+         if (!unpack_numeric<true, Verify>(&offset, has_unknown, src, fixed_pos, end_fixed_pos))
+            return false;
+         if constexpr (Derived::supports_0_offset)
+         {
+            if (offset == 0)
+            {
+               if constexpr (Unpack)
+                  value->clear();
+               return true;
+            }
+         }
+         uint32_t new_heap_pos = orig_pos + offset;
+         if constexpr (Verify)
+         {
+            if (offset < 4 || new_heap_pos < heap_pos || new_heap_pos > end_heap_pos)
+               return false;
+            if (new_heap_pos != heap_pos && !has_unknown)
+               return false;
+         }
+         heap_pos = new_heap_pos;
+         Derived::unpack<Unpack, Verify>(value, has_unknown, src, heap_pos, end_heap_pos);
+      }
+
+      template <bool Unpack, bool Verify>
+      static bool embedded_unpack(T*          value,
+                                  bool&       has_unknown,
+                                  const char* src,
+                                  uint32_t&   fixed_pos,
+                                  uint32_t    end_fixed_pos,
+                                  uint32_t&   heap_pos,
+                                  uint32_t    end_heap_pos)
+      {
+         if constexpr (Derived::is_variable_size)
+            return Derived::embedded_variable_unpack<Unpack, Verify>(
+                value, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_heap_pos);
+         else
+            return Derived::unpack<Unpack, Verify>(value, has_unknown, src, fixed_pos,
+                                                   end_fixed_pos);
+      }
+   };
+
+   template <PackableMemcpy T>
+   struct is_packable<T> : default_packable_impl<T, is_packable<T>>
+   {
+      static constexpr uint32_t fixed_size        = sizeof(T);
+      static constexpr bool     is_variable_size  = false;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const T& value, S& stream)
+      {
+         stream.write_raw(value);
+      }
+
+      template <bool Unpack, bool Verify>
+      static bool unpack(T*          value,
+                         bool&       has_unknown,
+                         const char* src,
+                         uint32_t&   pos,
+                         uint32_t    end_pos)
+      {
+         if constexpr (Verify)
+            if (end_pos - pos < sizeof(T))
+               return false;
+         if constexpr (Unpack)
+            memcpy(value, src + pos, sizeof(T));
+         pos += sizeof(T);
+         return true;
+      }
+   };
+
+   template <bool Unpack, bool Verify, PackableNumeric T>
+   bool unpack_numeric(T*          value,
+                       bool&       has_unknown,
+                       const char* src,
+                       uint32_t&   pos,
+                       uint32_t    end_pos)
+   {
+      return is_packable<T>::unpack<Unpack, Verify>(value, has_unknown, src, pos, end_pos);
+   }
+
+   template <PackableWrapper T>
+   struct is_packable<T> : std::bool_constant<true>
+   {
+      using inner = std::remove_cvref_t<decltype(clio_unwrap_packable(std::declval<T&>()))>;
+      using is_p  = is_packable<inner>;
+
+      static constexpr uint32_t fixed_size        = is_p::fixed_size;
+      static constexpr bool     is_variable_size  = is_p::is_variable_size;
+      static constexpr bool     is_optional       = is_p::is_optional;
+      static constexpr bool     supports_0_offset = is_p::supports_0_offset;
+
+      template <bool Unpack>
+      inner* ptr(T* value)
+      {
+         if constexpr (Unpack)
+            return &clio_unwrap_packable(*value);
+         else
+            return nullptr;
+      }
+
+      template <typename S>
+      static void pack(const T& value, S& stream)
+      {
+         return is_p::pack(clio_unwrap_packable(value), stream);
+      }
+
+      static bool is_empty_container(const T& value)
+      {
+         return is_p::is_empty_container(clio_unwrap_packable(value));
+      }
+
+      template <typename S>
+      static void embedded_fixed_pack(const T& value, S& stream)
+      {
+         return is_p::embedded_fixed_pack(clio_unwrap_packable(value), stream);
+      }
+
+      template <typename S>
+      static void embedded_fixed_repack(const T& value,
+                                        uint32_t fixed_pos,
+                                        uint32_t heap_pos,
+                                        S&       stream)
+      {
+         return is_p::embedded_fixed_repack(clio_unwrap_packable(value), fixed_pos, heap_pos,
+                                            stream);
+      }
+
+      template <typename S>
+      static void embedded_variable_pack(const T& value, S& stream)
+      {
+         return is_p::embedded_variable_pack(clio_unwrap_packable(value), stream);
+      }
+
+      template <bool Unpack, bool Verify>
+      static bool unpack(T*          value,
+                         bool&       has_unknown,
+                         const char* src,
+                         uint32_t&   pos,
+                         uint32_t    end_pos)
+      {
+         return is_p::unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src, pos, end_pos);
+      }
+
+      template <bool Unpack, bool Verify>
+      static bool embedded_variable_unpack(T*          value,
+                                           bool&       has_unknown,
+                                           const char* src,
+                                           uint32_t&   fixed_pos,
+                                           uint32_t    end_fixed_pos,
+                                           uint32_t&   heap_pos,
+                                           uint32_t    end_heap_pos)
+      {
+         return is_p::embedded_variable_unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src,
+                                                               fixed_pos, end_fixed_pos, heap_pos,
+                                                               end_heap_pos);
+      }
+
+      template <bool Unpack, bool Verify>
+      static bool embedded_unpack(T*          value,
+                                  bool&       has_unknown,
+                                  const char* src,
+                                  uint32_t&   fixed_pos,
+                                  uint32_t    end_fixed_pos,
+                                  uint32_t&   heap_pos,
+                                  uint32_t    end_heap_pos)
+      {
+         return is_p::embedded_unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src,
+                                                      fixed_pos, end_fixed_pos, heap_pos,
+                                                      end_heap_pos);
+      }
+   };
+
+   template <typename T, typename Derived>
+   struct packable_container_memcpy_impl : default_packable_impl<T, Derived>
+   {
+      static constexpr uint32_t fixed_size        = 4;
+      static constexpr bool     is_variable_size  = true;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = true;
+
+      template <typename S>
+      static void pack(const T& value, S& stream)
+      {
+         is_packable<uint32_t>::pack(value.size(), stream);
+         stream.write(value.data(), value.size() * sizeof(T::value_type));
+      }
+
+      static bool is_empty_container(const T& value) { return value.empty(); }
+
+      template <bool Unpack, bool Verify>
+      static bool unpack(T*          value,
+                         bool&       has_unknown,
+                         const char* src,
+                         uint32_t&   pos,
+                         uint32_t    end_pos)
+      {
+         uint32_t fixed_size;
+         if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
+            return false;
+         uint32_t size    = fixed_size / sizeof(T::value_type);
+         uint32_t new_pos = pos + fixed_size;
+         if constexpr (Verify)
+         {
+            if ((fixed_size % sizeof(T::value_type)) || new_pos < pos || new_pos > end_pos)
+               return false;
+         }
+         if constexpr (Unpack)
+         {
+            value->resize(size);
+            if (size)
+               memcpy(value->data(), src + pos, fixed_size);
+         }
+         pos = new_pos;
+         return true;
+      }
+   };
+
+   template <>
+   struct is_packable<std::string>
+       : packable_container_memcpy_impl<std::string, is_packable<std::string>>
+   {
+   };
+
+   template <>
+   struct is_packable<std::string_view>
+       : packable_container_memcpy_impl<std::string_view, is_packable<std::string_view>>
+   {
+   };
+
+   template <typename T>
+   requires(is_packable_memcpy<T>::value) struct is_packable<std::span<T>>
+       : packable_container_memcpy_impl<std::span<T>, is_packable<std::span<T>>>
+   {
+   };
+
+   template <Packable T>
+   requires(is_packable_memcpy<T>::value) struct is_packable<std::vector<T>>
+       : packable_container_memcpy_impl<std::vector<T>, is_packable<std::vector<T>>>
+   {
+   };
+
+   template <Packable T>
+   requires(!is_packable_memcpy<T>::value) struct is_packable<std::vector<T>>
+       : default_packable_impl<std::vector<T>, is_packable<std::vector<T>>>
+   {
+      // TODO
+   };
+
+   template <typename T, int N>
+   requires Packable<T> &&(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>
+       : default_packable_impl<std::array<T, N>, is_packable<std::array<T, N>>>
+   {
+      // TODO
+   };
+
+   template <Packable T>
+   struct is_packable<std::optional<T>>
+       : default_packable_impl<std::optional<T>, is_packable<std::optional<T>>>
+   {
+      // TODO
+   };
+}  // namespace psio
