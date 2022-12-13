@@ -55,7 +55,7 @@ macro_rules! sgc {
             flags: $flags,
             vmType: 0,
             vmVersion: 0,
-            code: include_bytes!(concat!("../boot-image/", $wasm)).into(),
+            code: include_bytes!(concat!("../boot-image/contents/", $wasm)).into(),
         }
     };
 }
@@ -67,7 +67,7 @@ macro_rules! store {
             account!($acc),
             $dest,
             $ty,
-            include_bytes!(concat!("../boot-image/", $src)),
+            include_bytes!(concat!("../boot-image/contents/", $src)),
         )
     };
 }
@@ -309,7 +309,7 @@ pub fn create_boot_transactions(
         ];
 
         fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/CommonSys/ui/dist"),
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/CommonSys/ui/dist"),
             &mut common_sys_files,
             common_sys::SERVICE,
             common_sys::SERVICE,
@@ -343,7 +343,7 @@ pub fn create_boot_transactions(
             // ),
         ];
         fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/AccountSys/ui/dist"),
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/AccountSys/ui/dist"),
             &mut account_sys_files,
             account!("r-account-sys"),
             account!("r-account-sys"),
@@ -363,7 +363,7 @@ pub fn create_boot_transactions(
             // ),
         ];
         fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/ExploreSys/ui/dist"),
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/ExploreSys/ui/dist"),
             &mut explore_sys_files,
             account!("explore-sys"),
             account!("explore-sys"),
@@ -384,7 +384,7 @@ pub fn create_boot_transactions(
             // ),
         ];
         fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/TokenSys/ui/dist"),
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/TokenSys/ui/dist"),
             &mut token_sys_files,
             account!("r-tok-sys"),
             account!("r-tok-sys"),
@@ -392,7 +392,7 @@ pub fn create_boot_transactions(
 
         let mut psispace_sys_files = vec![];
         fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/PsiSpaceSys/ui/dist"),
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/PsiSpaceSys/ui/dist"),
             &mut psispace_sys_files,
             psispace_sys::SERVICE,
             psispace_sys::SERVICE,
@@ -413,7 +413,7 @@ pub fn create_boot_transactions(
             new_account_action(account_sys::SERVICE, account!("doc-sys")), //
         ];
         fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/doc"),
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc"),
             &mut doc_actions,
             account!("doc-sys"),
             psispace_sys::SERVICE,
