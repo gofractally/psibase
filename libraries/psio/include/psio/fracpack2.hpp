@@ -4,14 +4,6 @@
 
 namespace psio
 {
-   template <typename T>
-   struct is_packable : std::bool_constant<false>
-   {
-   };
-
-   template <typename T>
-   concept Packable = is_packable<T>::value;
-
    // If a type T supports the expressions `clio_unwrap_packable(T&)`,
    // which returns a `T2&`, and `clio_unwrap_packable(const T&)`, which
    // returns `const T2&`, then packing or unpacking T packs or unpacks
@@ -22,6 +14,25 @@ namespace psio
       clio_unwrap_packable(x);
       clio_unwrap_packable(cx);
    };
+
+   template <typename T, bool Reflected>
+   struct is_packable_reflected;
+
+   template <typename T>
+   struct is_packable_reflected<T, false> : std::bool_constant<false>
+   {
+   };
+
+   template <typename T>
+   struct is_packable_reflected<T, true>;
+
+   template <typename T>
+   struct is_packable : is_packable_reflected<T, ReflectedAsMember<T>>
+   {
+   };
+
+   template <typename T>
+   concept Packable = is_packable<T>::value;
 
    template <typename T>
    concept PackableNumeric =            //
@@ -635,4 +646,199 @@ namespace psio
              &**value, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_heap_pos);
       }
    };  // is_packable<std::optional<T>>
+
+   template <typename T>
+   struct is_packable_reflected<T, true> : base_packable_impl<T, is_packable<T>>
+   {
+      static constexpr uint32_t get_fixed_size()
+      {
+         if (is_variable_size)
+            return 4;
+         uint32_t size = 0;
+         reflect<T>::for_each(
+             [&](const meta& ref, auto member)
+             {
+                using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                if constexpr (!m::isFunction)
+                   size += is_packable<typename m::ValueType>::fixed_size;
+             });
+         return size;
+      }
+
+      static constexpr bool get_is_var_size()
+      {
+         if (!reflect<T>::definitionWillNotChange)
+            return true;
+         bool is_var = false;
+         reflect<T>::for_each(
+             [&](const meta& ref, auto member)
+             {
+                using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                if constexpr (!m::isFunction)
+                   is_var |= is_packable<typename m::ValueType>::is_variable_size;
+             });
+         return is_var;
+      }
+
+      static constexpr uint32_t fixed_size        = get_fixed_size();
+      static constexpr bool     is_variable_size  = get_is_var_size();
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const T& value, S& stream)
+      {
+         if constexpr (is_variable_size)
+         {
+            int num_present = 0;
+            int i           = 0;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      ++i;
+                      if constexpr (is_packable<typename m::ValueType>::is_optional)
+                      {
+                         if ((value->*member(&value)).has_value())
+                            num_present = i;
+                      }
+                      else
+                      {
+                         num_present = i;
+                      }
+                   }
+                });
+            uint16_t fixed_size = 0;
+            i                   = 0;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      if (i < num_present)
+                         fixed_size += is_packable<typename m::ValueType>::fixed_size;
+                      ++i;
+                   }
+                });
+            is_packable<uint16_t>::pack(fixed_size, stream);
+            uint32_t fixed_pos = stream.consumed();
+            i                  = 0;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      if (i < num_present)
+                         is_packable<typename m::ValueType>::embedded_fixed_pack(
+                             value->*member(&value), stream);
+                      ++i;
+                   }
+                });
+            i = 0;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      if (i < num_present)
+                      {
+                         using is_p = is_packable<typename m::ValueType>;
+                         is_p::embedded_fixed_repack(value->*member(&value), fixed_pos,
+                                                     stream.consumed(), stream);
+                         is_p::embedded_variable_pack(value->*member(&value), stream);
+                         fixed_pos += is_p::fixed_size;
+                      }
+                      ++i;
+                   }
+                });
+         }  // is_variable_size
+         else
+         {
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                      is_packable<typename m::ValueType>::pack(value->*member(&value), stream);
+                });
+         }
+      }  // pack
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(T*          value,
+                                       bool&       has_unknown,
+                                       const char* src,
+                                       uint32_t&   pos,
+                                       uint32_t    end_pos)
+      {
+         if constexpr (is_variable_size)
+         {
+            uint16_t fixed_size;
+            if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
+               return false;
+            uint32_t fixed_pos     = pos;
+            uint32_t heap_pos      = pos + fixed_size;
+            uint32_t end_fixed_pos = heap_pos;
+            if constexpr (Verify)
+            {
+               if (heap_pos < pos || heap_pos > end_pos)
+                  return false;
+            }
+            bool ok = true;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      using is_p = is_packable<typename m::ValueType>;
+                      if (fixed_pos < end_fixed_pos || !is_p::is_optional)
+                      {
+                         if constexpr (Unpack)
+                            ok &=
+                                is_p::embedded_unpack(&value->*member(&value), has_unknown, src,
+                                                      fixed_pos, end_fixed_pos, heap_pos, end_pos);
+                         else
+                            ok &= is_p::embedded_unpack(nullptr, has_unknown, src, fixed_pos,
+                                                        end_fixed_pos, heap_pos, end_pos);
+                      }
+                   }
+                });
+            if (!ok)
+               return false;
+            if constexpr (Verify)
+            {
+               if (fixed_pos < end_fixed_pos)
+                  has_unknown = true;
+            }
+            pos = heap_pos;
+         }  // is_variable_size
+         else
+         {
+            bool ok = true;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m    = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   using is_p = is_packable<typename m::ValueType>;
+                   if constexpr (!m::isFunction)
+                   {
+                      if constexpr (Unpack)
+                         ok &= is_p::unpack<Unpack, Verify>(&(value->*member(&value)), has_unknown,
+                                                            src, pos, end_pos);
+                      else
+                         ok &=
+                             is_p::unpack<Unpack, Verify>(nullptr, has_unknown, src, pos, end_pos);
+                   }
+                });
+            return ok;
+         }
+      }  // unpack
+   };    // is_packable_reflected
+
 }  // namespace psio
