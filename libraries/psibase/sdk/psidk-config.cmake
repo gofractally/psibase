@@ -142,6 +142,7 @@ function(add_libs suffix)
         -lc++
         -lc++abi
         -lc
+        -lpsitestlib${suffix}
         ${LIBCLANG_RT_BUILTINS}
         ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
     )

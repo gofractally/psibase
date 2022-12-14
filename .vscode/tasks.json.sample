@@ -1,74 +1,67 @@
 {
     "version": "2.0.0",
-    "inputs": [
-        {
-            "id": "testsuite",
-            "type": "promptString",
-            "default": "[mytestsuite]",
-            "description": "Enter test suite key (Example: \"[MyTestSuite]\""
-        }
-    ],
     "tasks": [
         {
-            "label": "make",
+            "label": "Full Build",
             "type": "shell",
-            "command": "cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc)",
+            "command": "mkdir -p build && cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc)",
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
             "options": {
                 "statusbar": {
-                    "label": "$(diff-insert) Full Build",
-                    "tooltip": "Build with cmake"
+                    "label": "$(tools) Full build"
                 }
             }
         },
         {
-            "label": "buildcpp",
+            "label": "Build Services",
             "type": "shell",
-            "command": "cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=no -DBUILD_JS=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc)",
+            "command": "mkdir -p build && cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=no -DBUILD_JS=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc)",
             "group": {
-                "kind": "build",
-                "isDefault": true
+                "kind": "build"
             },
             "options": {
                 "statusbar": {
-                    "label": "$(diff-insert) Build services",
-                    "tooltip": "Build cpp/rust only"
+                    "label": "$(tools) Build services"
                 }
             }
         },
         {
             "label": "testnet",
             "type": "shell",
-            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc) && ./psitest launchTestChain-test-debug.wasm -s -r compact",
+            "command": "mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc) && ./psitest launchTestChain-test-debug.wasm -s -r compact",
             "group": {
                 "kind": "build",
-                "isDefault": true
             },
             "options": {
                 "statusbar": {
-                    "label": "$(diff-insert) Build & Launch local testnet",
-                    "tooltip": "Build with cmake & invoke psitest on the testchain wasm"
+                    "label": "$(rocket) Build & Launch local testnet",
                 }
             }
         },
         {
-            "label": "testspecific",
+            "label": "Test Token",
             "type": "shell",
-            "command": "cd build && ./psitest TokenSys-test-debug.wasm -s -r compact",
-            "args": [],
+            "command": "cd build && psitest TokenSys-test-debug.wasm -s -r compact",
             "group": {
-                "kind": "build",
+                "kind": "test",
                 "isDefault": true
             },
             "options": {
                 "statusbar": {
-                    "label": "$(diff-insert) Test Token",
-                    "tooltip": "Invoke psitest on the system token service"
+                    "label": "$(beaker) Test Token"
                 }
             }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "testsuite",
+            "type": "promptString",
+            "default": "[mytestsuite]",
+            "description": "Enter test suite key (Example: \"[MyTestSuite]\""
         }
     ]
 }
