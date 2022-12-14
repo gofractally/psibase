@@ -26,7 +26,6 @@ namespace psio
    template <typename T>
    concept PackableNumeric =            //
        std::is_same_v<T, std::byte> ||  //
-       std::is_same_v<T, bool> ||       //
        std::is_same_v<T, uint8_t> ||    //
        std::is_same_v<T, uint16_t> ||   //
        std::is_same_v<T, uint32_t> ||   //
@@ -83,7 +82,7 @@ namespace psio
    struct is_packable<std::optional<T>>;
 
    template <typename T, typename Derived>
-   struct default_packable_impl : std::bool_constant<true>
+   struct base_packable_impl : std::bool_constant<true>
    {
       // template <typename S>
       // static void pack(const T& value, S& stream);
@@ -176,7 +175,7 @@ namespace psio
    };
 
    template <PackableMemcpy T>
-   struct is_packable<T> : default_packable_impl<T, is_packable<T>>
+   struct is_packable<T> : base_packable_impl<T, is_packable<T>>
    {
       static constexpr uint32_t fixed_size        = sizeof(T);
       static constexpr bool     is_variable_size  = false;
@@ -215,6 +214,37 @@ namespace psio
    {
       return is_packable<T>::unpack<Unpack, Verify>(value, has_unknown, src, pos, end_pos);
    }
+
+   template <>
+   struct is_packable<bool> : base_packable_impl<bool, is_packable<bool>>
+   {
+      static constexpr uint32_t fixed_size        = 1;
+      static constexpr bool     is_variable_size  = false;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const bool& value, S& stream)
+      {
+         stream.write_raw(value);
+      }
+
+      template <bool Unpack, bool Verify>
+      static bool unpack(bool*       value,
+                         bool&       has_unknown,
+                         const char* src,
+                         uint32_t&   pos,
+                         uint32_t    end_pos)
+      {
+         if constexpr (Verify)
+            if (end_pos - pos < 1 || src[pos] > 1)
+               return false;
+         if constexpr (Unpack)
+            *value = src[pos] != 0;
+         pos += 1;
+         return true;
+      }
+   };
 
    template <PackableWrapper T>
    struct is_packable<T> : std::bool_constant<true>
@@ -309,7 +339,7 @@ namespace psio
    };
 
    template <typename T, typename Derived>
-   struct packable_container_memcpy_impl : default_packable_impl<T, Derived>
+   struct packable_container_memcpy_impl : base_packable_impl<T, Derived>
    {
       static constexpr uint32_t fixed_size        = 4;
       static constexpr bool     is_variable_size  = true;
@@ -379,21 +409,21 @@ namespace psio
 
    template <Packable T>
    requires(!is_packable_memcpy<T>::value) struct is_packable<std::vector<T>>
-       : default_packable_impl<std::vector<T>, is_packable<std::vector<T>>>
+       : base_packable_impl<std::vector<T>, is_packable<std::vector<T>>>
    {
       // TODO
    };
 
    template <typename T, int N>
    requires Packable<T> &&(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>
-       : default_packable_impl<std::array<T, N>, is_packable<std::array<T, N>>>
+       : base_packable_impl<std::array<T, N>, is_packable<std::array<T, N>>>
    {
       // TODO
    };
 
    template <Packable T>
    struct is_packable<std::optional<T>>
-       : default_packable_impl<std::optional<T>, is_packable<std::optional<T>>>
+       : base_packable_impl<std::optional<T>, is_packable<std::optional<T>>>
    {
       // TODO
    };
