@@ -18,6 +18,19 @@ namespace psibase::net
 
    struct connection_base
    {
+      enum close_code
+      {
+         // The connection was closed as a result of server configuration
+         normal,
+         // There was another connection to the same peer
+         duplicate,
+         // The connection was closed because the peer sent an invalid message
+         error,
+         // The server is shutting down
+         shutdown,
+         // The server is restarting
+         restart
+      };
       connection_base()
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
@@ -27,7 +40,7 @@ namespace psibase::net
       virtual void async_write(std::vector<char>&&, write_handler) = 0;
       virtual void async_read(read_handler)                        = 0;
       virtual bool is_open() const                                 = 0;
-      virtual void close()                                         = 0;
+      virtual void close(close_code)                               = 0;
       // Information for display
       virtual std::string endpoint() const { return ""; }
       //
@@ -75,7 +88,10 @@ namespace psibase::net
       void maybe_connect_some()
       {
          if (count >= target || info.empty())
+         {
+            _timer.cancel();
             return;
+         }
          // find url that is not connected AND did not recently fail
          std::size_t original_idx = idx;
          auto        now          = std::chrono::steady_clock::now();
@@ -106,6 +122,10 @@ namespace psibase::net
                       maybe_connect_some();
                    }
                 });
+         }
+         else
+         {
+            _timer.cancel();
          }
       }
       void do_connect(const std::string& url, peer_info& peer, auto now)
@@ -261,7 +281,8 @@ namespace psibase::net
              {
                 if (ec)
                 {
-                   boost::asio::dispatch(_ctx, [this, id]() mutable { disconnect(id); });
+                   boost::asio::dispatch(_ctx, [this, id]() mutable
+                                         { disconnect(id, connection_base::close_code::normal); });
                 }
                 else
                 {
@@ -278,23 +299,25 @@ namespace psibase::net
                 }
              });
       }
-      void disconnect_all()
+      void disconnect_all(bool restart)
       {
          for (auto& [id, conn] : _connections)
          {
             static_cast<Derived*>(this)->network().disconnect(id);
-            conn->close();
+            conn->close(restart ? connection_base::close_code::restart
+                                : connection_base::close_code::shutdown);
             autoconnector->disconnect(conn);
          }
          _connections.clear();
       }
-      bool disconnect(peer_id id)
+      bool disconnect(peer_id                     id,
+                      connection_base::close_code code = connection_base::close_code::error)
       {
          auto iter = _connections.find(id);
          if (iter != _connections.end())
          {
             static_cast<Derived*>(this)->network().disconnect(id);
-            iter->second->close();
+            iter->second->close(code);
             autoconnector->disconnect(iter->second);
             _connections.erase(iter);
             return true;
@@ -309,7 +332,7 @@ namespace psibase::net
             if (!autoconnector->postconnect(id, pos->second))
             {
                PSIBASE_LOG(pos->second->logger, info) << "Duplicate peer";
-               disconnect(peer);
+               disconnect(peer, connection_base::close_code::duplicate);
             }
          }
       }

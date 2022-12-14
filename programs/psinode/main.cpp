@@ -395,9 +395,9 @@ void loop(Timer& timer, F&& f)
    timer.async_wait(
        [&timer, f](const std::error_code& e)
        {
+          f(e);
           if (!e)
           {
-             f();
              loop(timer, f);
           }
        });
@@ -562,6 +562,13 @@ std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
    return urls;
 }
 
+struct ShutdownRequest
+{
+   bool restart = false;
+   bool force   = false;
+};
+PSIO_REFLECT(ShutdownRequest, restart, force);
+
 // connect,disconnect
 
 struct ConnectRequest
@@ -582,6 +589,12 @@ struct NewKeyRequest
    std::optional<std::vector<char>> rawData;
 };
 PSIO_REFLECT(NewKeyRequest, service, rawData);
+
+struct RestartInfo
+{
+   bool shouldRestart = false;
+};
+PSIO_REFLECT(RestartInfo, shouldRestart);
 
 struct PsinodeConfig
 {
@@ -723,6 +736,8 @@ void run(const std::string&              db_path,
 
    boost::asio::io_context chainContext;
 
+   auto server_work = boost::asio::make_work_guard(chainContext);
+
    using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
@@ -731,21 +746,35 @@ void run(const std::string&              db_path,
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
 
-   auto connect_one = [&resolver, &node, &chainContext](const std::string& peer, auto&& f)
+   RestartInfo runResult;
+
+   auto connect_one = [&resolver, &node, &chainContext, &http_config, &runResult](
+                          const std::string& peer, auto&& f)
    {
       auto [host, service] = parse_endpoint(peer);
       auto result          = std::make_shared<websocket_connection>(chainContext);
       result->url          = peer;
       async_connect(std::move(result), resolver, host, service,
-                    [&node, f = static_cast<decltype(f)>(f)](const std::error_code& ec, auto&& conn)
+                    [&node, &http_config, &runResult, f = static_cast<decltype(f)>(f)](
+                        const std::error_code& ec, auto&& conn)
                     {
                        if (!ec)
                        {
+                          if (http_config->status.load().shutdown)
+                          {
+                             conn->close(runResult.shouldRestart
+                                             ? connection_base::close_code::restart
+                                             : connection_base::close_code::shutdown);
+                             f(make_error_code(boost::asio::error::operation_aborted));
+                             return;
+                          }
                           node.add_connection(std::move(conn));
                        }
                        f(ec);
                     });
    };
+
+   timer_type timer(chainContext);
 
    if (!host.empty() || !services.empty())
    {
@@ -790,7 +819,41 @@ void run(const std::string&              db_path,
              { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); });
       };
 
-      http_config->shutdown = [&chainContext]() { chainContext.stop(); };
+      http_config->shutdown = [&chainContext, &node, &http_config, &connect_one, &timer, &runResult,
+                               &server_work](std::vector<char> data)
+      {
+         data.push_back('\0');
+         psio::json_token_stream stream(data.data());
+         auto [restart, force] = psio::from_json<ShutdownRequest>(stream);
+         if (force)
+         {
+            chainContext.stop();
+         }
+         else
+         {
+            boost::asio::post(chainContext,
+                              [&chainContext, &node, &connect_one, &http_config, &timer, &runResult,
+                               &server_work, restart]()
+                              {
+                                 auto status     = http_config->status.load();
+                                 status.shutdown = true;
+                                 http_config->status.store(status);
+                                 runResult.shouldRestart = restart;
+                                 boost::asio::use_service<http::server_service>(
+                                     static_cast<boost::asio::execution_context&>(chainContext))
+                                     .async_close(restart,
+                                                  [&chainContext, &server_work]() {
+                                                     boost::asio::post(chainContext,
+                                                                       [&server_work]()
+                                                                       { server_work.reset(); });
+                                                  });
+                                 timer.cancel();
+                                 node.consensus().async_shutdown();
+                                 node.peers().autoconnect({}, 0, connect_one);
+                                 node.peers().disconnect_all(restart);
+                              });
+         }
+      };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {
@@ -837,7 +900,7 @@ void run(const std::string&              db_path,
              [&chainContext, &node, &resolver, peer = psio::from_json<DisconnectRequest>(stream),
               callback = std::move(callback)]() mutable
              {
-                if (!node.peers().disconnect(peer.id))
+                if (!node.peers().disconnect(peer.id, connection_base::close_code::normal))
                 {
                    callback("Unknown peer");
                 }
@@ -871,8 +934,11 @@ void run(const std::string&              db_path,
                               }
                               node.set_producer_id(config.producer);
                               http_config->enable_p2p = config.p2p;
-                              node.autoconnect(std::vector(config.peers), config.autoconnect.value,
-                                               connect_one);
+                              if (!http_config->status.load().shutdown)
+                              {
+                                 node.autoconnect(std::vector(config.peers),
+                                                  config.autoconnect.value, connect_one);
+                              }
                               host     = config.host;
                               port     = config.port;
                               services = config.services;
@@ -1024,6 +1090,10 @@ void run(const std::string&              db_path,
 
       boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
    }
+   else
+   {
+      server_work.reset();
+   }
 
    node.set_producer_id(producer);
    http_config->enable_p2p = enable_incoming_p2p;
@@ -1038,17 +1108,34 @@ void run(const std::string&              db_path,
 
    node.autoconnect(translate_endpoints(peers), autoconnect.value, connect_one);
 
-   timer_type timer(chainContext);
-
    // TODO: post the transactions to chainContext rather than batching them at fixed intervals.
-   auto process_transactions = [&]()
+   auto process_transactions = [&](const std::error_code& ec)
    {
       std::vector<transaction_queue::entry> entries;
       {
          std::scoped_lock lock{queue->mutex};
          std::swap(entries, queue->entries);
       }
-      if (auto bc = node.chain().getBlockContext())
+      auto fail_all = [&](const std::string& message)
+      {
+         for (auto& entry : entries)
+         {
+            if (entry.callback)
+            {
+               entry.callback(message);
+            }
+            else if (entry.boot_callback)
+            {
+               entry.boot_callback(message);
+            }
+         }
+      };
+      if (ec)
+      {
+         // TODO: 503
+         fail_all("The server is shutting down");
+      }
+      else if (auto bc = node.chain().getBlockContext())
       {
          auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
@@ -1076,18 +1163,7 @@ void run(const std::string&              db_path,
       }
       else
       {
-         for (auto& entry : entries)
-         {
-            std::string message = "Only the current leader accepts transactions";
-            if (entry.callback)
-            {
-               entry.callback(message);
-            }
-            else if (entry.boot_callback)
-            {
-               entry.boot_callback(message);
-            }
-         }
+         fail_all("Only the current leader accepts transactions");
       }
    };
    loop(timer, process_transactions);

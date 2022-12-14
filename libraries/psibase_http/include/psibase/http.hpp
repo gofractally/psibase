@@ -20,7 +20,7 @@ namespace psibase::http
    using push_transaction_t =
        std::function<void(std::vector<char> packed_signed_trx, push_transaction_callback)>;
 
-   using shutdown_t = std::function<void()>;
+   using shutdown_t = std::function<void(std::vector<char>)>;
 
    using accept_p2p_websocket_result = boost::beast::websocket::stream<boost::beast::tcp_stream>;
    using accept_p2p_websocket_t      = std::function<void(accept_p2p_websocket_result&&)>;
@@ -52,6 +52,7 @@ namespace psibase::http
    {
       unsigned slow : 1;
       unsigned startup : 1;
+      unsigned shutdown : 1;
    };
    template <typename S>
    void to_json(http_status obj, S& stream)
@@ -78,6 +79,11 @@ namespace psibase::http
       {
          maybe_comma();
          to_json("startup", stream);
+      }
+      if (obj.shutdown)
+      {
+         maybe_comma();
+         to_json("shutdown", stream);
       }
       stream.write(']');
    }
@@ -188,6 +194,7 @@ namespace psibase::http
       server_service(boost::asio::execution_context&           ctx,
                      const std::shared_ptr<const http_config>& http_config,
                      const std::shared_ptr<SharedState>&       sharedState);
+      void async_close(bool restart, std::function<void()>);
 
      private:
       void                         shutdown() noexcept override;

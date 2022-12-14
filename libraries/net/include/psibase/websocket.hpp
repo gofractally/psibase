@@ -115,19 +115,37 @@ namespace psibase::net
                                }
                             });
       }
-      bool is_open() const { return !closed; }
-      void close()
+      bool        is_open() const { return !closed; }
+      static auto translate_close_code(close_code code)
+      {
+         namespace websocket = boost::beast::websocket;
+         switch (code)
+         {
+            case close_code::normal:
+               return websocket::close_code::normal;
+            case close_code::duplicate:
+               return websocket::close_code::policy_error;
+            case close_code::error:
+               return websocket::close_code::policy_error;
+            case close_code::shutdown:
+               return websocket::close_code::going_away;
+            case close_code::restart:
+               return websocket::close_code::service_restart;
+         }
+         __builtin_unreachable();
+      }
+      void close(close_code code)
       {
          if (!closed)
          {
             closed = true;
             boost::asio::dispatch(
                 stream.get_executor(),
-                [self = shared_from_this()]() mutable
+                [self = shared_from_this(), code]() mutable
                 {
                    auto p = self.get();
                    p->stream.async_close(
-                       boost::beast::websocket::close_code::none,
+                       translate_close_code(code),
                        [self = std::move(self)](const std::error_code& ec) mutable {});
                 });
          }
