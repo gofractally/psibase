@@ -92,6 +92,9 @@ namespace psio
    template <Packable T>
    struct is_packable<std::optional<T>>;
 
+   template <Packable... Ts>
+   struct is_packable<std::tuple<Ts...>>;
+
    // Default implementations for is_packable<T>
    template <typename T, typename Derived>
    struct base_packable_impl : std::bool_constant<true>
@@ -646,6 +649,129 @@ namespace psio
              &**value, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_heap_pos);
       }
    };  // is_packable<std::optional<T>>
+
+   template <Packable... Ts>
+   struct is_packable<std::tuple<Ts...>>
+       : base_packable_impl<std::tuple<Ts...>, is_packable<std::tuple<Ts...>>>
+   {
+      static constexpr uint32_t fixed_size        = 4;
+      static constexpr bool     is_variable_size  = true;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const std::tuple<Ts...>& value, S& stream)
+      {
+         int num_present = 0;
+         int i           = 0;
+         tuple_foreach(  //
+             value,
+             [&](const auto& x)
+             {
+                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                ++i;
+                if constexpr (is_p::is_optional)
+                {
+                   if (x.has_value())
+                      num_present = i;
+                }
+                else
+                {
+                   num_present = i;
+                }
+             });
+         uint16_t fixed_size = 0;
+         i                   = 0;
+         tuple_foreach(  //
+             value,
+             [&](const auto& x)
+             {
+                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                if (i < num_present)
+                   fixed_size += is_p::fixed_size;
+                ++i;
+             });
+         is_packable<uint16_t>::pack(fixed_size, stream);
+         uint32_t fixed_pos = stream.consumed();
+         i                  = 0;
+         tuple_foreach(  //
+             value,
+             [&](const auto& x)
+             {
+                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                if (i < num_present)
+                   is_p::embedded_fixed_pack(x, stream);
+                ++i;
+             });
+         i = 0;
+         tuple_foreach(  //
+             value,
+             [&](const auto& x)
+             {
+                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                if (i < num_present)
+                {
+                   is_p::embedded_fixed_repack(x, fixed_pos, stream.consumed(), stream);
+                   is_p::embedded_variable_pack(x, stream);
+                   fixed_pos += is_p::fixed_size;
+                }
+                ++i;
+             });
+      }  // pack
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(std::tuple<Ts...>* value,
+                                       bool&              has_unknown,
+                                       const char*        src,
+                                       uint32_t&          pos,
+                                       uint32_t           end_pos)
+      {
+         uint16_t fixed_size;
+         if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
+            return false;
+         uint32_t fixed_pos     = pos;
+         uint32_t heap_pos      = pos + fixed_size;
+         uint32_t end_fixed_pos = heap_pos;
+         if constexpr (Verify)
+         {
+            if (heap_pos < pos || heap_pos > end_pos)
+               return false;
+         }
+         bool ok = true;
+         if constexpr (Unpack)
+         {
+            tuple_foreach(  //
+                *value,
+                [&](const auto& x)
+                {
+                   using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                   if (fixed_pos < end_fixed_pos || !is_p::is_optional)
+                      ok &= is_p::embedded_unpack<Unpack, Verify>(x, has_unknown, src, fixed_pos,
+                                                                  end_fixed_pos, heap_pos, end_pos);
+                });
+         }
+         else
+         {
+            tuple_foreach_type(  //
+                (std::tuple<Ts...>*)nullptr,
+                [&](auto* p)
+                {
+                   using is_p = is_packable<std::remove_cvref_t<decltype(*p)>>;
+                   if (fixed_pos < end_fixed_pos || !is_p::is_optional)
+                      ok &= is_p::embedded_unpack<Unpack, Verify>(
+                          nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos);
+                });
+         }
+         if (!ok)
+            return false;
+         if constexpr (Verify)
+         {
+            if (fixed_pos < end_fixed_pos)
+               has_unknown = true;
+         }
+         pos = heap_pos;
+      }  // unpack
+   };
 
    template <typename T>
    struct is_packable_reflected<T, true> : base_packable_impl<T, is_packable<T>>
