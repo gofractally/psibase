@@ -111,7 +111,7 @@ namespace psio
 
       // Pack either:
       // * Object content if T is fixed size
-      // * Space for offset if T is variable size. Must be 0 if is_empty_container().
+      // * Space for offset if T is variable size. Must write 0 if is_empty_container().
       template <typename S>
       static void embedded_fixed_pack(const T& value, S& stream)
       {
@@ -132,7 +132,7 @@ namespace psio
             stream.rewrite_raw(fixed_pos, heap_pos - fixed_pos);
       }
 
-      // Pack object content it T is variable size
+      // Pack object content if T is variable size
       template <typename S>
       static void embedded_variable_pack(const T& value, S& stream)
       {
@@ -952,7 +952,8 @@ namespace psio
                       ++i;
                    }
                 });
-            is_packable<uint16_t>::pack(fixed_size, stream);
+            if constexpr (!reflect<T>::definitionWillNotChange)
+               is_packable<uint16_t>::pack(fixed_size, stream);
             uint32_t fixed_pos = stream.written();
             i                  = 0;
             reflect<T>::for_each(
@@ -1008,7 +1009,9 @@ namespace psio
          if constexpr (is_variable_size)
          {
             uint16_t fixed_size;
-            if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
+            if constexpr (reflect<T>::definitionWillNotChange)
+               fixed_size = is_packable<T>::fixed_size;
+            else if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
                return false;
             uint32_t fixed_pos     = pos;
             uint32_t heap_pos      = pos + fixed_size;
