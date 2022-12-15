@@ -269,25 +269,25 @@ namespace psibase::net
          }
          iter->second->async_write(
              std::vector<char>(msg),
-             [this, f = std::forward<F>(f)](const std::error_code& ec) mutable
-             { boost::asio::dispatch(_ctx, [this, f = std::move(f), ec]() mutable { f(ec); }); });
+             [this, &ctx = _ctx, f = std::forward<F>(f)](const std::error_code& ec) mutable
+             { boost::asio::dispatch(ctx, [this, f = std::move(f), ec]() mutable { f(ec); }); });
       }
       void async_recv(peer_id id, std::shared_ptr<connection_base>&& c)
       {
          auto p = c.get();
          p->async_read(
-             [this, c = std::move(c), id](const std::error_code& ec,
-                                          std::vector<char>&&    buf) mutable
+             [this, &ctx = _ctx, c = std::move(c), id](const std::error_code& ec,
+                                                       std::vector<char>&&    buf) mutable
              {
                 if (ec)
                 {
-                   boost::asio::dispatch(_ctx, [this, id]() mutable
+                   boost::asio::dispatch(ctx, [this, id]() mutable
                                          { disconnect(id, connection_base::close_code::normal); });
                 }
                 else
                 {
                    boost::asio::dispatch(
-                       _ctx,
+                       ctx,
                        [this, c = std::move(c), id, buf = std::move(buf)]() mutable
                        {
                           if (c->is_open())
