@@ -80,14 +80,14 @@ namespace psio
    template <>
    struct is_packable<std::string_view>;
 
-   template <typename T>
-   requires(is_packable_memcpy<T>::value) struct is_packable<std::span<T>>;
+   template <PackableMemcpy T>
+   struct is_packable<std::span<T>>;
 
    template <Packable T>
    struct is_packable<std::vector<T>>;
 
-   template <typename T, int N>
-   requires Packable<T> &&(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>;
+   template <Packable T, int N>
+   requires(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>;
 
    template <Packable T>
    struct is_packable<std::optional<T>>;
@@ -422,8 +422,8 @@ namespace psio
    {
    };
 
-   template <typename T>
-   requires(is_packable_memcpy<T>::value) struct is_packable<std::span<T>>
+   template <PackableMemcpy T>
+   struct is_packable<std::span<T>>
        : packable_container_memcpy_impl<std::span<T>, is_packable<std::span<T>>>
    {
    };
@@ -502,8 +502,8 @@ namespace psio
       }  // unpack
    };    // is_packable<std::vector<T>> (!memcpy)
 
-   template <typename T, int N>
-   requires Packable<T> &&(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>
+   template <Packable T, int N>
+   requires(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>
        : base_packable_impl<std::array<T, N>, is_packable<std::array<T, N>>>
    {
       static constexpr uint32_t fixed_size =
@@ -771,7 +771,7 @@ namespace psio
          }
          pos = heap_pos;
       }  // unpack
-   };
+   };    // is_packable<std::tuple<Ts...>>
 
    template <typename T>
    struct is_packable_reflected<T, true> : base_packable_impl<T, is_packable<T>>
