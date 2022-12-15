@@ -398,11 +398,12 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | Method | URL                        | Description                                                                   |
 |--------|----------------------------|-------------------------------------------------------------------------------|
 | `GET`  | `/native/admin/status`     | Returns status conditions currently affecting the server                      |
+| `POST` | `/native/admin/shutdown`   | Stops or restarts the server                                                  |
 | `GET`  | `/native/admin/peers`      | Returns a JSON array of all the peers that the node is currently connected to |
 | `POST` | `/native/admin/connect`    | Connects to another node                                                      |
 | `POST` | `/native/admin/disconnect` | Disconnects an existing peer connection                                       |
-| `GET` | `/native/admin/keys` | Returns a JSON array of the public keys that the server can sign for |
-| `POST` | `/native/admin/keys` | Creates or imports a key pair |
+| `GET`  | `/native/admin/keys`       | Returns a JSON array of the public keys that the server can sign for          |
+| `POST` | `/native/admin/keys`       | Creates or imports a key pair                                                 |
 | `GET`  | `/native/admin/config`     | Returns the current [server configuration](#server-configuration)             |
 | `PUT`  | `/native/admin/config`     | Sets the [server configuration](#server-configuration)                        |
 | `GET`  | `/native/admin/log`        | Websocket that provides access to [live server logs](#websocket-logger)       |
@@ -411,10 +412,19 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 
 `/native/admin/status` returns an array of strings identifying conditions that affect the server.
 
-| Status      | Description                                                                                                                                                                                                                                                                                                                                                                  |
-|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `"slow"`    | `psinode` was unable to lock its database cache in memory. This may result in reduced performance. This condition can be caused either by insufficient physical RAM on the host machine, or by a lack of permissions. In the latter case, the command `sudo prlimit --memlock=-1 --pid $$` can be run before lauching `psinode` to increase the limits of the current shell. |
-| `"startup"` | `psinode` is still initializing. Some functionality may be unavailable.                                                                                                                                                                                                                                                                                                      |
+| Status       | Description                                                                                                                                                                                                                                                                                                                                                                  |
+|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `"slow"`     | `psinode` was unable to lock its database cache in memory. This may result in reduced performance. This condition can be caused either by insufficient physical RAM on the host machine, or by a lack of permissions. In the latter case, the command `sudo prlimit --memlock=-1 --pid $$` can be run before lauching `psinode` to increase the limits of the current shell. |
+| `"startup"`  | `psinode` is still initializing. Some functionality may be unavailable.                                                                                                                                                                                                                                                                                                      |
+| `"shutdown"` | `psinode` is shutting down. Some functionality may be unavailable.                                                                                                                                                                                                                                                                                                           |
+
+`POST` to `/native/admin/shutdown` stops or restarts the server. The `POST` data should be JSON with any of the following options:
+
+| Field     | Type    | Description                                                                                                                                                                                                                     |
+|-----------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `restart` | Boolean | If set to `true`, the server will be restarted                                                                                                                                                                                  |
+| `force`   | Boolean | If set to `true`, the server will close all connections immediately without notifying the remote endpoint. Since this includes the connection used to send the shutdown, a request with `force` set may not receive a response. |
+| `soft`    | Boolean | Applies to restarts only. If set to `true`, `psinode` will keep the current process image.                                                                                                                                      |
 
 ### Peer management
 

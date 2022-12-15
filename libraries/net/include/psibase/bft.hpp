@@ -460,7 +460,7 @@ namespace psibase::net
             }
             set_producer_view(current_term, self);
          }
-         else
+         else if (_state != producer_state::shutdown)
          {
             if (_state != producer_state::nonvoting)
             {
