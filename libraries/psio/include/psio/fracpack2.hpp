@@ -879,10 +879,8 @@ namespace psio
    template <typename T>
    struct is_packable_reflected<T, true> : base_packable_impl<T, is_packable<T>>
    {
-      static constexpr uint32_t get_fixed_size()
+      static constexpr uint32_t get_members_fixed_size()
       {
-         if (is_variable_size)
-            return 4;
          uint32_t size = 0;
          reflect<T>::for_each(
              [&](const meta& ref, auto member)
@@ -909,10 +907,11 @@ namespace psio
          return is_var;
       }
 
-      static constexpr uint32_t fixed_size        = get_fixed_size();
-      static constexpr bool     is_variable_size  = get_is_var_size();
-      static constexpr bool     is_optional       = false;
-      static constexpr bool     supports_0_offset = false;
+      static constexpr uint32_t members_fixed_size = get_members_fixed_size();
+      static constexpr bool     is_variable_size   = get_is_var_size();
+      static constexpr uint32_t fixed_size         = is_variable_size ? 4 : members_fixed_size;
+      static constexpr bool     is_optional        = false;
+      static constexpr bool     supports_0_offset  = false;
 
       template <typename S>
       static void pack(const T& value, S& stream)
@@ -1010,7 +1009,7 @@ namespace psio
          {
             uint16_t fixed_size;
             if constexpr (reflect<T>::definitionWillNotChange)
-               fixed_size = is_packable<T>::fixed_size;
+               fixed_size = members_fixed_size;
             else if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
                return false;
             uint32_t fixed_pos     = pos;
