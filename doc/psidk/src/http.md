@@ -423,7 +423,7 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 |-----------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `restart` | Boolean | If set to `true`, the server will be restarted                                                                                                                                                                                  |
 | `force`   | Boolean | If set to `true`, the server will close all connections immediately without notifying the remote endpoint. Since this includes the connection used to send the shutdown, a request with `force` set may not receive a response. |
-|           |         |                                                                                                                                                                                                                                 |
+| `soft`    | Boolean | Applies to restarts only. If set to `true`, `psinode` will keep the current process image.                                                                                                                                      |
 
 ### Peer management
 
