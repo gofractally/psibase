@@ -95,6 +95,9 @@ namespace psio
    template <Packable... Ts>
    struct is_packable<std::tuple<Ts...>>;
 
+   template <Packable... Ts>
+   struct is_packable<std::variant<Ts...>>;
+
    // Default implementations for is_packable<T>
    template <typename T, typename Derived>
    struct base_packable_impl : std::bool_constant<true>
@@ -772,6 +775,106 @@ namespace psio
          pos = heap_pos;
       }  // unpack
    };    // is_packable<std::tuple<Ts...>>
+
+   template <bool Unpack, bool Verify, size_t I, typename... Ts>
+   [[nodiscard]] bool unpack_variant_impl(size_t               tag,
+                                          std::variant<Ts...>* value,
+                                          bool&                has_unknown,
+                                          const char*          src,
+                                          uint32_t&            pos,
+                                          uint32_t             end_pos)
+   {
+      if constexpr (I < sizeof...(Ts))
+      {
+         using is_p = is_packable<std::variant_alternative_t<I, std::variant<Ts...>>>;
+         if (tag == I)
+         {
+            if constexpr (Unpack)
+            {
+               value->template emplace<I>();
+               return is_p::unpack(&std::get<I>(*value), has_unknown, src, pos, end_pos);
+            }
+            else
+            {
+               return is_p::unpack(nullptr, has_unknown, src, pos, end_pos);
+            }
+         }
+         else
+         {
+            return unpack_variant_impl<Unpack, Verify, I + 1>(tag, value, has_unknown, src, pos,
+                                                              end_pos);
+         }
+      }
+      else
+      {
+         if constexpr (Unpack)
+            return false;
+         if constexpr (Verify)
+            has_unknown = true;
+         return true;
+      }
+   }
+
+   template <Packable... Ts>
+   struct is_packable<std::variant<Ts...>>
+       : base_packable_impl<std::variant<Ts...>, is_packable<std::variant<Ts...>>>
+   {
+      static_assert(sizeof...(Ts) < 128);
+
+      static constexpr uint32_t fixed_size        = 4;
+      static constexpr bool     is_variable_size  = true;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const std::variant<Ts...>& value, S& stream)
+      {
+         is_packable<uint8_t>::pack(value.index(), stream);
+         uint32_t size_pos = stream.consumed();
+         is_packable<uint32_t>::pack(0, stream);
+         uint32_t content_pos = stream.consumed();
+         std::visit([&](const auto& x)
+                    { is_packable<std::remove_cvref_t<decltype(x)>>::pack(x, stream); },
+                    value);
+         stream.rewrite_raw(size_pos, stream.consumed() - content_pos);
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(std::variant<Ts...>* value,
+                                       bool&                has_unknown,
+                                       const char*          src,
+                                       uint32_t&            pos,
+                                       uint32_t             end_pos)
+      {
+         uint8_t tag;
+         if (!unpack_numeric<true, Verify>(&tag, has_unknown, src, pos, end_pos))
+            return false;
+         if constexpr (Verify)
+            if (tag & 0x80)
+               return false;
+         uint32_t size;
+         if (!unpack_numeric<true, Verify>(&size, has_unknown, src, pos, end_pos))
+            return false;
+         uint32_t content_pos = pos;
+         uint32_t content_end = pos + size;
+         if constexpr (Verify)
+            if (content_end < content_pos || content_end > end_pos)
+               return false;
+         bool inner_unknown = false;
+         if (!unpack_variant_impl<Unpack, Verify, 0>(tag, value, inner_unknown, src, content_pos,
+                                                     content_end))
+            return false;
+         if constexpr (Verify)
+         {
+            if (inner_unknown)
+               has_unknown = true;
+            else if (content_pos != content_end)
+               return false;
+         }
+         pos = content_end;
+         return true;
+      }
+   };  // is_packable<std::variant<Ts...>>
 
    template <typename T>
    struct is_packable_reflected<T, true> : base_packable_impl<T, is_packable<T>>
