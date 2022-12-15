@@ -452,13 +452,13 @@ namespace psio
          uint32_t num_bytes = value.size() * is_packable<T>::fixed_size;
          assert(num_bytes == value.size() * is_packable<T>::fixed_size);
          is_packable<uint32_t>::pack(num_bytes, stream);
-         stream.reserve(num_bytes);
-         uint32_t fixed_pos = stream.consumed();
+         stream.about_to_write(num_bytes);
+         uint32_t fixed_pos = stream.written();
          for (const auto& x : value)
             is_packable<T>::embedded_fixed_pack(x, stream);
          for (const auto& x : value)
          {
-            is_packable<T>::embedded_fixed_repack(x, fixed_pos, stream.consumed(), stream);
+            is_packable<T>::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
             is_packable<T>::embedded_variable_pack(x, stream);
             fixed_pos += is_packable<T>::fixed_size;
          }
@@ -518,13 +518,13 @@ namespace psio
       template <typename S>
       static void pack(const T& value, S& stream)
       {
-         stream.reserve(is_packable<T>::fixed_size * N);
-         uint32_t fixed_pos = stream.consumed();
+         stream.about_to_write(is_packable<T>::fixed_size * N);
+         uint32_t fixed_pos = stream.written();
          for (const auto& x : value)
             is_packable<T>::embedded_fixed_pack(x, stream);
          for (const auto& x : value)
          {
-            is_packable<T>::embedded_fixed_repack(x, fixed_pos, stream.consumed(), stream);
+            is_packable<T>::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
             is_packable<T>::embedded_variable_pack(x, stream);
             fixed_pos += is_packable<T>::fixed_size;
          }
@@ -576,9 +576,9 @@ namespace psio
       template <typename S>
       static void pack(const std::optional<T>& value, S& stream)
       {
-         uint32_t fixed_pos = stream.consumed();
+         uint32_t fixed_pos = stream.written();
          embedded_fixed_pack(value, stream);
-         uint32_t heap_pos = stream.consumed();
+         uint32_t heap_pos = stream.written();
          embedded_fixed_repack(value, fixed_pos, heap_pos, stream);
          embedded_variable_pack(value, stream);
       }
@@ -695,7 +695,7 @@ namespace psio
                 ++i;
              });
          is_packable<uint16_t>::pack(fixed_size, stream);
-         uint32_t fixed_pos = stream.consumed();
+         uint32_t fixed_pos = stream.written();
          i                  = 0;
          tuple_foreach(  //
              value,
@@ -714,7 +714,7 @@ namespace psio
                 using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
                 if (i < num_present)
                 {
-                   is_p::embedded_fixed_repack(x, fixed_pos, stream.consumed(), stream);
+                   is_p::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
                    is_p::embedded_variable_pack(x, stream);
                    fixed_pos += is_p::fixed_size;
                 }
@@ -830,13 +830,13 @@ namespace psio
       static void pack(const std::variant<Ts...>& value, S& stream)
       {
          is_packable<uint8_t>::pack(value.index(), stream);
-         uint32_t size_pos = stream.consumed();
+         uint32_t size_pos = stream.written();
          is_packable<uint32_t>::pack(0, stream);
-         uint32_t content_pos = stream.consumed();
+         uint32_t content_pos = stream.written();
          std::visit([&](const auto& x)
                     { is_packable<std::remove_cvref_t<decltype(x)>>::pack(x, stream); },
                     value);
-         stream.rewrite_raw(size_pos, stream.consumed() - content_pos);
+         stream.rewrite_raw(size_pos, stream.written() - content_pos);
       }
 
       template <bool Unpack, bool Verify>
@@ -953,7 +953,7 @@ namespace psio
                    }
                 });
             is_packable<uint16_t>::pack(fixed_size, stream);
-            uint32_t fixed_pos = stream.consumed();
+            uint32_t fixed_pos = stream.written();
             i                  = 0;
             reflect<T>::for_each(
                 [&](const meta& ref, auto member)
@@ -978,7 +978,7 @@ namespace psio
                       {
                          using is_p = is_packable<typename m::ValueType>;
                          is_p::embedded_fixed_repack(value->*member(&value), fixed_pos,
-                                                     stream.consumed(), stream);
+                                                     stream.written(), stream);
                          is_p::embedded_variable_pack(value->*member(&value), stream);
                          fixed_pos += is_p::fixed_size;
                       }
