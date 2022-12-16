@@ -843,7 +843,7 @@ namespace psio
          std::visit([&](const auto& x)
                     { is_packable<std::remove_cvref_t<decltype(x)>>::pack(x, stream); },
                     value);
-         stream.rewrite_raw(size_pos, stream.written() - content_pos);
+         stream.rewrite_raw(size_pos, uint32_t(stream.written() - content_pos));
       }
 
       template <bool Unpack, bool Verify>
@@ -1064,10 +1064,10 @@ namespace psio
             reflect<T>::for_each(
                 [&](const meta& ref, auto member)
                 {
-                   using m    = MemberPtrType<decltype(member(std::declval<T*>()))>;
-                   using is_p = is_packable<typename m::ValueType>;
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
                    if constexpr (!m::isFunction)
                    {
+                      using is_p = is_packable<typename m::ValueType>;
                       if constexpr (Unpack)
                          ok &= is_p::unpack<Unpack, Verify>(&(value->*member(&value)), has_unknown,
                                                             src, pos, end_pos);
