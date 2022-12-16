@@ -3,6 +3,8 @@
 
 #include <bit>
 
+#include <pthread.h>
+
 namespace triedent
 {
    managed_ring::header::header(uint64_t s)
@@ -116,6 +118,7 @@ namespace triedent
           [this]()
           {
              thread_name("swap");
+             pthread_setname_np(pthread_self(), "swap");
              swap_loop();
           });
    }

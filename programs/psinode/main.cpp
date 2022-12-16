@@ -604,6 +604,121 @@ struct RestartInfo
 };
 PSIO_REFLECT(RestartInfo, shouldRestart);
 
+struct ThreadInfo
+{
+   pid_t        id;
+   std::string  group;
+   std::int64_t user;
+   std::int64_t system;
+   std::int64_t pageFaults;
+   std::int64_t read;
+   std::int64_t written;
+};
+PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
+
+struct Perf
+{
+   std::int64_t            timestamp;
+   std::vector<ThreadInfo> tasks;
+};
+PSIO_REFLECT(Perf, timestamp, tasks)
+
+std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
+{
+   std::int64_t value;
+   is >> value;
+   return value / clk_tck * 1000000 + (value % clk_tck) * 1000000 / clk_tck;
+}
+
+ThreadInfo getThreadInfo(const std::filesystem::path& name, long clk_tck)
+{
+   ThreadInfo result = {};
+   {
+      std::ifstream in(name / "stat");
+      in >> result.id;
+      std::string tmp;
+      for (int i = 0; i < 10; ++i)
+      {
+         in >> tmp;
+      }
+      // (12) majflt
+      in >> result.pageFaults;
+      in >> tmp;
+      // (14) utime
+      result.user = read_as_microseconds(in, clk_tck);
+      // (15) stime
+      result.system = read_as_microseconds(in, clk_tck);
+   }
+   if (result.id == getpid())
+   {
+      result.group = "chain";
+   }
+   else
+   {
+      std::ifstream in(name / "comm");
+      char          buf[17] = {};
+      in.read(buf, 16);
+      std::string_view thread_name(buf);
+      if (thread_name.starts_with("http"))
+      {
+         result.group = "http";
+      }
+      else if (thread_name.starts_with("swap"))
+      {
+         result.group = "database";
+      }
+   }
+   {
+      std::ifstream in(name / "io");
+      std::string   line;
+      auto          split = [](std::string_view line)
+      {
+         auto pos = line.find(": ");
+         if (pos == std::string_view::npos)
+         {
+            return std::pair{std::string_view{}, std::string_view{}};
+         }
+         else
+         {
+            return std::pair{line.substr(0, pos), line.substr(pos + 2)};
+         }
+      };
+      auto parse_int = [](std::string_view s)
+      {
+         std::int64_t result = 0;
+         std::from_chars(s.begin(), s.end(), result);
+         return result;
+      };
+      while (std::getline(in, line))
+      {
+         auto [key, value] = split(line);
+         if (key == "read_bytes")
+         {
+            result.read = parse_int(value);
+         }
+         else if (key == "write_bytes")
+         {
+            result.written = parse_int(value);
+         }
+      }
+   }
+   return result;
+}
+
+Perf get_perf()
+{
+   long clk_tck = ::sysconf(_SC_CLK_TCK);
+   Perf result;
+   result.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
+   for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
+   {
+      result.tasks.push_back(getThreadInfo(entry, clk_tck));
+   }
+   return result;
+}
+
 struct PsinodeConfig
 {
    bool                        p2p = false;
@@ -866,6 +981,18 @@ void run(const std::string&              db_path,
                                  node.peers().disconnect_all(restart);
                               });
          }
+      };
+
+      http_config->get_perf = [](auto callback)
+      {
+         callback(
+             [result = get_perf()]() mutable
+             {
+                std::vector<char>   json;
+                psio::vector_stream stream(json);
+                to_json(result, stream);
+                return json;
+             });
       };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)

@@ -406,6 +406,7 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `POST` | `/native/admin/keys`       | Creates or imports a key pair                                                 |
 | `GET`  | `/native/admin/config`     | Returns the current [server configuration](#server-configuration)             |
 | `PUT`  | `/native/admin/config`     | Sets the [server configuration](#server-configuration)                        |
+| `GET`  | `/native/admin/perf`       | Returns [performance monitoring](#performance-monitoring) data                |
 | `GET`  | `/native/admin/log`        | Websocket that provides access to [live server logs](#websocket-logger)       |
 
 ### Server status
@@ -520,6 +521,63 @@ Example:
             "path": "/dev/log"
         }
     }
+}
+```
+
+### Performance monitoring
+
+`/native/admin/perf`
+
+| Field       | Type   | Description                                                                                                                                                       |
+|-------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp` | Number | The time in microseconds since an unspecified epoch. The epoch shall be not change during the lifetime of the server. Restarting the server may change the epoch. |
+| `tasks`     | Array  |                                                                                                                                                                   |
+
+| Field        | Type   | Description                                                            |
+|--------------|--------|------------------------------------------------------------------------|
+| `id`         | Number | The thread id                                                          |
+| `group`      | String | Identifies the thread pool that that thread is part of                 |
+| `user`       | Number | The accumulated user time of the thread in microseconds                |
+| `system`     | Number | The accumulated system time of the thread in microseconds              |
+| `pageFaults` | Number | The number of page faults                                              |
+| `read`       | Number | The total number of bytes sent to the storage layer by the thread      |
+| `written`    | Number | The total number of bytes fetched from the storage layer by the thread |
+
+Caveats:
+The precision of time measurements may be less than representation in microseconds might imply. Statistics that are unavailable may be reported as 0.
+
+```json
+{
+  "timestamp": "36999617055",
+  "tasks": [
+    {
+      "id": 16367,
+      "group": "chain",
+      "user": "850000",
+      "system": "190000",
+      "pageFaults": "1",
+      "read": "0",
+      "written": "589824"
+    },
+    {
+      "id": 16368,
+      "group": "database",
+      "user": "6370000",
+      "system": "5750000",
+      "pageFaults": "0",
+      "read": "0",
+      "written": "0"
+    },
+    {
+      "id": 16369,
+      "group": "http",
+      "user": "120000",
+      "system": "30000",
+      "pageFaults": "0",
+      "read": "0",
+      "written": "0"
+    }
+  ]
 }
 ```
 
