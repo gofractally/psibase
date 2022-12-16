@@ -164,26 +164,21 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
     let mut params = quote! {};
     let mut subkey_data = quote! {};
 
-    // TODO: Should string be accepted as a default rest type of any subindex?
-    let mut subindex_rest_ty = quote! { String };
-
     for param in subindex_params {
         let param_name = param.ident;
         let param_type = param.bounds.to_token_stream();
-        if param_name == "subindex_rest_ty" {
-            subindex_rest_ty = quote! { #param_type };
-        } else {
-            params = quote! {
-                #params
-                #param_name: #param_type,
-            };
-
-            subkey_data = quote! {
-                #subkey_data
-                #param_name.append_key(&mut subkey_data);
-            };
-        }
+        params = quote! {
+            #params
+            #param_name: #param_type,
+        };
+        subkey_data = quote! {
+            #subkey_data
+            #param_name.append_key(&mut subkey_data);
+        };
     }
+
+    // TODO: Implement subindex remaining key to support subkey ranges
+    let subindex_remaining_key_ty = quote! { Vec<u8> };
 
     let query = quote! {
         async fn #query_name(
@@ -198,7 +193,7 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
             let mut subkey_data: Vec<u8> = Vec::new();
             #subkey_data
             let subkey = psibase::RawKey::new(subkey_data);
-            let sidx = psibase::TableQuery::subindex::<#subindex_rest_ty>(table_idx, &subkey);
+            let sidx = psibase::TableQuery::subindex::<#subindex_remaining_key_ty>(table_idx, &subkey);
             sidx
                 .first(first)
                 .last(last)
