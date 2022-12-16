@@ -1,3 +1,9 @@
+// TODO: The interaction between checking for no extra data (no gaps)
+//       and the possible presence of unknown fields and variant tags
+//       has some unsolved border cases. It might be best to only check
+//       for gaps when in a mode which prohibits unknown fields and skip
+//       checking for gaps when in a mode which allows unknown fields.
+
 #pragma once
 
 #include <psio/reflect.hpp>
@@ -622,7 +628,7 @@ namespace psio
                                        uint32_t          end_pos)
       {
          uint32_t fixed_pos = pos;
-         pos += 4;
+         pos += 4;  // TODO: out-of-range check
          uint32_t end_fixed_pos = pos;
          return embedded_unpack<Unpack, Verify>(value, has_unknown, src, fixed_pos, end_fixed_pos,
                                                 pos, end_pos);
@@ -665,6 +671,7 @@ namespace psio
       template <typename S>
       static void pack(const std::tuple<Ts...>& value, S& stream)
       {
+         // TODO: verify fixed_size doesn't overflow
          int num_present = 0;
          int i           = 0;
          tuple_foreach(  //
