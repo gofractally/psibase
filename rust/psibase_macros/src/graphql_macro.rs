@@ -5,9 +5,7 @@ use proc_macro_error::abort;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input,
-    punctuated::Punctuated,
-    AttrStyle, ImplItem, Item, Result, Token, TypeParam,
+    parse_macro_input, AttrStyle, ImplItem, Item, Result, Token, TypeParam, TypeParamBound,
 };
 
 #[derive(Debug)]
@@ -16,6 +14,7 @@ struct Args {
     table: Ident,
     key_fn: TypeParam,
     subindex_params: Vec<TypeParam>,
+    subindex_remaining_key_ty: Option<TypeParamBound>,
 }
 
 impl Parse for Args {
@@ -28,19 +27,44 @@ impl Parse for Args {
 
         let key_fn = input.parse().expect("Table key function not present");
 
-        let subindex_params = if input.parse::<Token![,]>().is_ok() {
-            Punctuated::<TypeParam, Token![,]>::parse_terminated(input)?
-                .into_iter()
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let mut subindex_params = Vec::new();
+        let mut subindex_remaining_key_ty: Option<TypeParamBound> = None;
+
+        if input.parse::<Token![,]>().is_ok() {
+            loop {
+                if input.is_empty() {
+                    break;
+                } else if input.peek(Token![,]) {
+                    input.parse::<Token![,]>().expect("expected ,");
+
+                // Every param has a colon to define it's type
+                } else if input.peek2(Token![:]) {
+                    let param = input
+                        .parse::<TypeParam>()
+                        .expect("unable to parse subindex param type");
+                    subindex_params.push(param);
+
+                // This is the last param, it should always be the remaining key TypeParamBound
+                } else {
+                    let ty = input
+                        .parse::<TypeParamBound>()
+                        .expect("unable to parse subindex remaining key type");
+                    subindex_remaining_key_ty = Some(ty);
+                }
+            }
+        }
+
+        eprintln!(
+            "subindex_params: {:?}\n\n subindex_remaining_key_ty: {:?}",
+            subindex_params, subindex_remaining_key_ty
+        );
 
         Ok(Args {
             query_name,
             table,
             key_fn,
             subindex_params,
+            subindex_remaining_key_ty,
         })
     }
 }
@@ -177,8 +201,12 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
         };
     }
 
-    // TODO: Implement subindex remaining key to support subkey ranges
-    let subindex_remaining_key_ty = quote! { Vec<u8> };
+    let subindex_remaining_key_ty = if let Some(remaining_key_ty) = args.subindex_remaining_key_ty {
+        let ty = remaining_key_ty.to_token_stream();
+        quote! { #ty }
+    } else {
+        quote! { Vec<u8> }
+    };
 
     let query = quote! {
         async fn #query_name(
@@ -188,6 +216,10 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
+            gt: Option<#subindex_remaining_key_ty>,
+            ge: Option<#subindex_remaining_key_ty>,
+            lt: Option<#subindex_remaining_key_ty>,
+            le: Option<#subindex_remaining_key_ty>,
         ) -> async_graphql::Result<async_graphql::connection::Connection<psibase::RawKey, #record>> {
             let table_idx = #table::new().#key_fn ();
             let mut subkey_data: Vec<u8> = Vec::new();
@@ -199,6 +231,10 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
                 .last(last)
                 .before(before)
                 .after(after)
+                .gt(gt.as_ref())
+                .ge(ge.as_ref())
+                .lt(lt.as_ref())
+                .le(le.as_ref())
                 .query()
                 .await
         }
