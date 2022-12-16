@@ -512,7 +512,7 @@ namespace psio
       static constexpr uint32_t fixed_size =
           is_packable<T>::is_variable_size ? 4 : is_packable<T>::fixed_size * N;
       static constexpr bool is_variable_size  = is_packable<T>::is_variable_size;
-      static constexpr bool is_optional       = true;
+      static constexpr bool is_optional       = false;
       static constexpr bool supports_0_offset = false;
 
       template <typename S>
@@ -912,6 +912,8 @@ namespace psio
       static constexpr uint32_t fixed_size         = is_variable_size ? 4 : members_fixed_size;
       static constexpr bool     is_optional        = false;
       static constexpr bool     supports_0_offset  = false;
+
+      static_assert(members_fixed_size <= 0xffff);
 
       template <typename S>
       static void pack(const T& value, S& stream)
