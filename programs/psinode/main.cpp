@@ -616,12 +616,24 @@ struct ThreadInfo
 };
 PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 
+struct MemStats
+{
+   std::size_t database;
+   std::size_t code;
+   std::size_t data;
+   std::size_t wasmMemory;
+   std::size_t wasmCode;
+   std::size_t unclassified;
+};
+PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
+
 struct Perf
 {
    std::int64_t            timestamp;
+   MemStats                memory;
    std::vector<ThreadInfo> tasks;
 };
-PSIO_REFLECT(Perf, timestamp, tasks)
+PSIO_REFLECT(Perf, timestamp, memory, tasks)
 
 std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
 {
@@ -705,13 +717,191 @@ ThreadInfo getThreadInfo(const std::filesystem::path& name, long clk_tck)
    return result;
 }
 
-Perf get_perf()
+struct MappingInfo
+{
+   std::uintptr_t begin;
+   std::uintptr_t end;
+   std::size_t    rss;
+   bool           executable;
+   bool           anonymous;
+   bool           special;
+};
+
+bool parse_map_line(const char* begin, const char* end, MappingInfo& mapping)
+{
+   auto res = std::from_chars(begin, end, mapping.begin, 16);
+   if (res.ec != std::errc())
+      return false;
+   begin = res.ptr;
+   if (begin == end || *begin != '-')
+      return false;
+   ++begin;
+   res = std::from_chars(begin, end, mapping.end, 16);
+   if (res.ec != std::errc())
+      return false;
+   begin = res.ptr;
+
+   auto read_field = [&]
+   {
+      while (begin != end && *begin == ' ')
+      {
+         ++begin;
+      }
+      const char* start = begin;
+      while (begin != end && *begin != ' ')
+      {
+         ++begin;
+      }
+      return std::string_view{start, begin};
+   };
+   auto flags         = read_field();
+   mapping.executable = flags.find('x') != std::string_view::npos;
+   auto offset        = read_field();
+   auto dev           = read_field();
+   auto inode         = read_field();
+   auto pathname      = read_field();
+   mapping.anonymous  = pathname == "";
+   mapping.special    = pathname.starts_with('[') && pathname.ends_with(']');
+   return true;
+}
+
+bool parse_mapping_field(std::string_view line, std::size_t& value)
+{
+   auto pos = line.find(':');
+   if (pos == std::string_view::npos)
+      return false;
+   pos      = line.find_first_not_of(' ', pos + 1);
+   auto res = std::from_chars(line.begin() + pos, line.end(), value);
+   if (res.ec != std::errc())
+      return false;
+   if (std::string_view(res.ptr, line.end()) != " kB")
+      return false;
+   value *= 1024;
+   return true;
+}
+
+std::istream& operator>>(std::istream& is, MappingInfo& info)
+{
+   std::string line;
+   if (!std::getline(is, line))
+      return is;
+   if (!parse_map_line(line.data(), line.data() + line.size(), info))
+      throw std::runtime_error("Failed to parse mapping");
+   info.rss = 0;
+   while (std::getline(is, line))
+   {
+      if (line.starts_with("VmFlags:"))
+         break;
+      else if (line.starts_with("Rss:"))
+      {
+         if (!parse_mapping_field(line, info.rss))
+            throw std::runtime_error("Failed to parse Rss");
+      }
+   }
+   return is;
+}
+
+enum class RegionGroup
+{
+   unknown,
+   database,
+   wasmMemory,
+   wasmCode,
+};
+
+struct RegionInfo
+{
+   struct Region
+   {
+      std::uintptr_t begin;
+      std::uintptr_t end;
+      RegionGroup    group;
+   };
+   // Returns the first region that intersects the given range
+   RegionGroup get(std::uintptr_t begin, std::uintptr_t end)
+   {
+      auto pos = std::partition_point(regions.begin(), regions.end(),
+                                      [begin](const auto& r) { return r.end <= begin; });
+      if (pos != regions.end() && pos->begin < end)
+         return pos->group;
+      return RegionGroup::unknown;
+   }
+   void add(std::span<const char> range, RegionGroup group)
+   {
+      regions.push_back({reinterpret_cast<std::uintptr_t>(range.data()),
+                         reinterpret_cast<std::uintptr_t>(range.data() + range.size()), group});
+   }
+   void prepare()
+   {
+      std::sort(regions.begin(), regions.end(),
+                [](const auto& lhs, const auto& rhs) { return lhs.begin < rhs.begin; });
+   }
+   std::vector<Region> regions;
+};
+
+MemStats getMemStats(const SharedState& state)
+{
+   RegionInfo regions;
+   for (auto span : state.dbSpan())
+   {
+      regions.add(span, RegionGroup::database);
+   }
+   for (auto span : state.codeSpan())
+   {
+      regions.add(span, RegionGroup::wasmCode);
+   }
+   for (auto span : state.linearMemorySpan())
+   {
+      regions.add(span, RegionGroup::wasmMemory);
+   }
+   regions.prepare();
+   MemStats result = {};
+   {
+      std::ifstream in("/proc/self/smaps");
+      MappingInfo   info;
+      while (in >> info)
+      {
+         switch (regions.get(info.begin, info.end))
+         {
+            case RegionGroup::database:
+               result.database += info.rss;
+               break;
+            case RegionGroup::wasmCode:
+               result.wasmCode += info.rss;
+               break;
+            case RegionGroup::wasmMemory:
+               result.wasmMemory += info.rss;
+               break;
+            default:
+            {
+               if (info.executable)
+               {
+                  result.code += info.rss;
+               }
+               else if (!info.anonymous && !info.special)
+               {
+                  result.data += info.rss;
+               }
+               else
+               {
+                  result.unclassified += info.rss;
+               }
+               break;
+            }
+         }
+      }
+   }
+   return result;
+}
+
+Perf get_perf(const SharedState& state)
 {
    long clk_tck = ::sysconf(_SC_CLK_TCK);
    Perf result;
    result.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                           std::chrono::steady_clock::now().time_since_epoch())
                           .count();
+   result.memory = getMemStats(state);
    for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
    {
       result.tasks.push_back(getThreadInfo(entry, clk_tck));
@@ -983,10 +1173,10 @@ void run(const std::string&              db_path,
          }
       };
 
-      http_config->get_perf = [](auto callback)
+      http_config->get_perf = [sharedState](auto callback)
       {
          callback(
-             [result = get_perf()]() mutable
+             [result = get_perf(*sharedState)]() mutable
              {
                 std::vector<char>   json;
                 psio::vector_stream stream(json);

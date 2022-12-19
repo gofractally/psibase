@@ -528,10 +528,24 @@ Example:
 
 `/native/admin/perf`
 
-| Field       | Type   | Description                                                                                                                                                       |
-|-------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `timestamp` | Number | The time in microseconds since an unspecified epoch. The epoch shall be not change during the lifetime of the server. Restarting the server may change the epoch. |
-| `tasks`     | Array  |                                                                                                                                                                   |
+| Field       | Type   | Description                                                                                                                                                    |
+|-------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp` | Number | The time in microseconds since an unspecified epoch. The epoch shall not change during the lifetime of the server. Restarting the server may change the epoch. |
+| `memory`    | Object | Categorized list of resident memory in bytes.                                                                                                                  |
+| `tasks`     | Array  | Per-thread statistics                                                                                                                                          |
+
+The `memory` field holds a breakdown of resident memory usage.
+
+| Field          | Type   | Description                                          |
+|----------------|--------|------------------------------------------------------|
+| `database`     | Number | Memory used by the database cache                    |
+| `code`         | Number | Native executable code                               |
+| `data`         | Number | Static data                                          |
+| `wasmMemory`   | Number | WASM linear memory                                   |
+| `wasmCode`     | Number | Memory used to store compiled WASM modules           |
+| `unclassified` | Number | Everything that doesn't fall under another category. |
+
+The `tasks` array holds per-thread statistics.
 
 | Field        | Type   | Description                                                            |
 |--------------|--------|------------------------------------------------------------------------|
@@ -540,8 +554,8 @@ Example:
 | `user`       | Number | The accumulated user time of the thread in microseconds                |
 | `system`     | Number | The accumulated system time of the thread in microseconds              |
 | `pageFaults` | Number | The number of page faults                                              |
-| `read`       | Number | The total number of bytes sent to the storage layer by the thread      |
-| `written`    | Number | The total number of bytes fetched from the storage layer by the thread |
+| `read`       | Number | The total number of bytes fetched from the storage layer by the thread |
+| `written`    | Number | The total number of bytes sent to the storage layer by the thread      |
 
 Caveats:
 The precision of time measurements may be less than representation in microseconds might imply. Statistics that are unavailable may be reported as 0.
@@ -549,6 +563,13 @@ The precision of time measurements may be less than representation in microsecon
 ```json
 {
   "timestamp": "36999617055",
+  "memory": {
+    "database": "12914688",
+    "code": "10002432",
+    "wasmMemory": "7143424",
+    "wasmCode": "7860224",
+    "unclassified": "9269248"
+  },
   "tasks": [
     {
       "id": 16367,

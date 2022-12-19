@@ -29,6 +29,10 @@ namespace psibase
       SharedState(SharedDatabase db, psibase::WasmCache wasmCache);
       ~SharedState();
 
+      std::vector<std::span<const char>> dbSpan() const;
+      std::vector<std::span<const char>> codeSpan() const;
+      std::vector<std::span<const char>> linearMemorySpan() const;
+
       std::unique_ptr<SystemContext> getSystemContext();
       void                           addSystemContext(std::unique_ptr<SystemContext> context);
    };
