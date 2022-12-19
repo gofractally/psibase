@@ -526,13 +526,24 @@ Example:
 
 ### Performance monitoring
 
-`/native/admin/perf`
+`/native/admin/perf` reports an assortment of performance related statistics.
 
-| Field       | Type   | Description                                                                                                                                                    |
-|-------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `timestamp` | Number | The time in microseconds since an unspecified epoch. The epoch shall not change during the lifetime of the server. Restarting the server may change the epoch. |
-| `memory`    | Object | Categorized list of resident memory in bytes.                                                                                                                  |
-| `tasks`     | Array  | Per-thread statistics                                                                                                                                          |
+| Field          | Type   | Description                                                                                                                                                    |
+|----------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp`    | Number | The time in microseconds since an unspecified epoch. The epoch shall not change during the lifetime of the server. Restarting the server may change the epoch. |
+| `transactions` | Object | Transaction statistics                                                                                                                                         |
+| `memory`       | Object | Categorized list of resident memory in bytes                                                                                                                   |
+| `tasks`        | Array  | Per-thread statistics                                                                                                                                          |
+
+The `transactions` field holds transaction statistics. It does not include transactions that were only seen in blocks.
+
+| Field         | Type   | Description                                                                                                                      |
+|---------------|--------|----------------------------------------------------------------------------------------------------------------------------------|
+| `total`       | Number | The total number of transactions received                                                                                        |
+| `unprocessed` | Number | The current transaction queue depth                                                                                              |
+| `succeeded`   | Number | The number of transactions that succeeded                                                                                        |
+| `failed`      | Number | The number of transactions that failed                                                                                           |
+| `skipped`     | Number | The number of transactions skipped. This currently means that the node flushed its queue when it was not accepting transactions. |
 
 The `memory` field holds a breakdown of resident memory usage.
 
@@ -598,7 +609,14 @@ The precision of time measurements may be less than representation in microsecon
       "read": "0",
       "written": "0"
     }
-  ]
+  ],
+  "transactions": {
+    "unprocessed": "0",
+    "total": "6",
+    "failed": "2",
+    "succeeded": "3",
+    "skipped": "1"
+  }
 }
 ```
 

@@ -404,7 +404,7 @@ void loop(Timer& timer, F&& f)
        });
 }
 
-void pushTransaction(psibase::SharedState&                  sharedState,
+bool pushTransaction(psibase::SharedState&                  sharedState,
                      const std::shared_ptr<const Revision>& revisionAtBlockStart,
                      BlockContext&                          bc,
                      SystemContext&                         proofSystem,
@@ -500,6 +500,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
       try
       {
          entry.callback(std::move(trace));
+         return !trace.error;
       }
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
@@ -523,6 +524,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
    }
+   return false;
 }  // pushTransaction
 
 std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view peer)
@@ -627,13 +629,25 @@ struct MemStats
 };
 PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
 
+// TODO: this will need to be reworked when we have more complete transaction tracking
+struct TransactionStats
+{
+   std::uint64_t unprocessed;
+   std::uint64_t total;
+   std::uint64_t failed;
+   std::uint64_t succeeded;
+   std::uint64_t skipped;
+};
+PSIO_REFLECT(TransactionStats, unprocessed, total, failed, succeeded, skipped)
+
 struct Perf
 {
    std::int64_t            timestamp;
    MemStats                memory;
    std::vector<ThreadInfo> tasks;
+   TransactionStats        transactions;
 };
-PSIO_REFLECT(Perf, timestamp, memory, tasks)
+PSIO_REFLECT(Perf, timestamp, memory, tasks, transactions)
 
 std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
 {
@@ -894,14 +908,15 @@ MemStats getMemStats(const SharedState& state)
    return result;
 }
 
-Perf get_perf(const SharedState& state)
+Perf get_perf(const SharedState& state, const TransactionStats& transactions)
 {
    long clk_tck = ::sysconf(_SC_CLK_TCK);
    Perf result;
    result.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                           std::chrono::steady_clock::now().time_since_epoch())
                           .count();
-   result.memory = getMemStats(state);
+   result.memory       = getMemStats(state);
+   result.transactions = transactions;
    for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
    {
       result.tasks.push_back(getThreadInfo(entry, clk_tck));
@@ -1021,6 +1036,9 @@ void run(const std::string&              db_path,
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
    auto queue       = std::make_shared<transaction_queue>();
+   //
+   TransactionStats transactionStats = {};
+   std::mutex       transactionStatsMutex;
 
    if (system->sharedDatabase.isSlow())
    {
@@ -1110,16 +1128,28 @@ void run(const std::string&              db_path,
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =
-          [queue](std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
+          [queue, &transactionStats, &transactionStatsMutex](
+              std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
       {
+         {
+            std::lock_guard l{transactionStatsMutex};
+            ++transactionStats.total;
+            ++transactionStats.unprocessed;
+         }
          std::scoped_lock lock{queue->mutex};
          queue->entries.push_back(
              {true, std::move(packed_signed_transactions), std::move(callback), {}});
       };
 
       http_config->push_transaction_async =
-          [queue](std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
+          [queue, &transactionStats, &transactionStatsMutex](
+              std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
       {
+         {
+            std::lock_guard l{transactionStatsMutex};
+            ++transactionStats.total;
+            ++transactionStats.unprocessed;
+         }
          std::scoped_lock lock{queue->mutex};
          queue->entries.push_back({false, std::move(packed_signed_trx), {}, std::move(callback)});
       };
@@ -1173,10 +1203,16 @@ void run(const std::string&              db_path,
          }
       };
 
-      http_config->get_perf = [sharedState](auto callback)
+      http_config->get_perf =
+          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
       {
+         TransactionStats trx;
+         {
+            std::lock_guard lock{transactionStatsMutex};
+            trx = transactionStats;
+         }
          callback(
-             [result = get_perf(*sharedState)]() mutable
+             [result = get_perf(*sharedState, trx)]() mutable
              {
                 std::vector<char>   json;
                 psio::vector_stream stream(json);
@@ -1451,6 +1487,11 @@ void run(const std::string&              db_path,
       }
       auto fail_all = [&](const std::string& message)
       {
+         {
+            std::lock_guard lock{transactionStatsMutex};
+            transactionStats.unprocessed -= entries.size();
+            transactionStats.skipped += entries.size();
+         }
          for (auto& entry : entries)
          {
             if (entry.callback)
@@ -1473,13 +1514,26 @@ void run(const std::string&              db_path,
          auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
          {
+            bool res;
             if (entry.is_boot)
-               push_boot(*bc, entry);
+               res = push_boot(*bc, entry);
             else
-               pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
-                               std::chrono::microseconds(leeway_us),  // TODO
-                               std::chrono::microseconds(leeway_us),  // TODO
-                               std::chrono::microseconds(leeway_us));
+               res = pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
+                                     std::chrono::microseconds(leeway_us),  // TODO
+                                     std::chrono::microseconds(leeway_us),  // TODO
+                                     std::chrono::microseconds(leeway_us));
+            {
+               std::lock_guard lock{transactionStatsMutex};
+               --transactionStats.unprocessed;
+               if (res)
+               {
+                  ++transactionStats.succeeded;
+               }
+               else
+               {
+                  ++transactionStats.failed;
+               }
+            }
          }
 
          // TODO: this should go in the leader's production loop
