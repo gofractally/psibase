@@ -59,20 +59,16 @@ SCENARIO("Minting & burning nfts")
       }
       WHEN("Alice mints an NFT")
       {
-         t.startBlock();
-         auto mint = a.mint();
-         t.startBlock();
+         auto mint  = a.mint();
          auto mint2 = a.mint();
          auto nft1  = a.getNft(mint.returnVal()).returnVal();
 
-         t.startBlock();
          THEN("Alice can burn the NFT")
          {  //
             CHECK(a.burn(nft1.id).succeeded());
 
             AND_THEN("The NFT no longer exists")
             {  //
-               t.startBlock();
                CHECK(a.getNft(nft1.id).failed(nftBurned));
             }
          }
@@ -87,7 +83,6 @@ SCENARIO("Minting & burning nfts")
          AND_WHEN("Alice mints a second NFT")
          {
             auto mint3 = a.mint();
-            t.startBlock();
 
             THEN("The NFT is identical in every way, except the ID is incremented")
             {
@@ -226,7 +221,6 @@ SCENARIO("Transferring NFTs")
                   }
                   THEN("Bob may not debit the NFT again")
                   {
-                     t.startBlock();
                      CHECK(b.debit(nft.id, "memo").failed(debitRequiresCredit));
                   }
                }
@@ -236,7 +230,6 @@ SCENARIO("Transferring NFTs")
 
                   THEN("No one can debit or uncredit the NFT")
                   {
-                     t.startBlock();
                      CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
                      CHECK(b.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
                      CHECK(c.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
@@ -247,7 +240,6 @@ SCENARIO("Transferring NFTs")
                   }
                   THEN("Alice may credit the NFT again")
                   {
-                     t.startBlock();
                      CHECK(a.credit(nft.id, bob, "memo").succeeded());
                   }
                }

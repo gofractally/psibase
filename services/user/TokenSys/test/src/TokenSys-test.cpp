@@ -133,8 +133,6 @@ SCENARIO("Creating a token")
 
          THEN("Alice may create a second token")
          {
-            t.startBlock();
-
             auto create = a.create(8, 1'000'000'000e8);
             CHECK(create.succeeded());
 
@@ -249,7 +247,6 @@ SCENARIO("Recalling tokens")
       {
          CHECK(a.setTokenConf(tokenId, unrecallable, true).succeeded());
 
-         t.startBlock();
          uint8_t unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
          CHECK(a.getToken(tokenId).returnVal().config.get(unrecallableBit));
 
@@ -279,7 +276,6 @@ SCENARIO("Interactions with the Issuer NFT")
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto nft     = alice.to<NftSys>().getNft(token.ownerNft).returnVal();
-      t.startBlock();
 
       THEN("The Issuer NFT is owned by Alice")
       {
@@ -328,7 +324,6 @@ SCENARIO("Interactions with the Issuer NFT")
          a.mint(tokenId, quantity, memo);
          a.credit(tokenId, bob, quantity, memo);
          alice.to<NftSys>().burn(nft.id);
-         t.startBlock();
 
          THEN("Alice may not mint new tokens")
          {
@@ -461,7 +456,6 @@ SCENARIO("Toggling manual-debit")
       WHEN("Alice enabled manual-debit")
       {
          a.setUserConf(manualDebit, true);
-         t.startBlock();
 
          THEN("Alice has manual-debit enabled")
          {  //
@@ -515,17 +509,14 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
 
       THEN("Alice may not credit Bob 101 tokens")
       {
-         t.startBlock();
          CHECK(a.credit(tokenId, bob, 101e8, memo).failed(insufficientBalance));
       }
       THEN("Alice may credit Bob 100 tokens")
       {
-         t.startBlock();
          CHECK(a.credit(tokenId, bob, 100e8, memo).succeeded());
       }
       WHEN("Alice credits Bob 100 tokens")
       {
-         t.startBlock();
          a.credit(tokenId, bob, 100e8, memo);
 
          THEN("Bob immediately has 200 tokens")
@@ -634,7 +625,6 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
             {
                CHECK(50e8 == b.getBalance(tokenId, bob).returnVal().balance);
                CHECK(b.uncredit(tokenId, alice, 51e8, memo).succeeded());
-               t.startBlock();
                CHECK(100e8 == b.getBalance(tokenId, bob).returnVal().balance);
             }
             THEN("Bob may uncredit 25 tokens")
@@ -643,7 +633,6 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 
                AND_THEN("Bob may uncredit 25 tokens")
                {
-                  t.startBlock();
                   CHECK(b.uncredit(tokenId, alice, 25e8, memo).succeeded());
                   AND_THEN("Bob owns 0 tokens in his shared balance with Alice")
                   {
@@ -721,7 +710,6 @@ SCENARIO("Mapping a symbol to a token")
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
-      t.startBlock();
       auto newToken = a.create(8, userBalance).returnVal();
       a.mint(newToken, userBalance, memo);
 
@@ -778,7 +766,6 @@ SCENARIO("Mapping a symbol to a token")
       }
       WHEN("Alice maps the symbol to the token")
       {
-         t.startBlock();
          alice.to<NftSys>().credit(nftId, TokenSys::service, memo);
          a.mapSymbol(newToken, symbolId);
 

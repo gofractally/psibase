@@ -48,8 +48,6 @@ SCENARIO("Buying a symbol")
       sysIssuer.credit(sysToken, alice, 10'000e8, memo);
       sysIssuer.credit(sysToken, bob, 10'000e8, memo);
 
-      t.startBlock();
-
       THEN("Alice cannot create a symbol with numbers")
       {
          Quantity quantity{SymbolPricing::initialPrice};
@@ -120,7 +118,6 @@ SCENARIO("Buying a symbol")
 
          AND_THEN("Alice cannot create the same symbol again")
          {
-            t.startBlock();
             alice.to<TokenSys>().credit(sysToken, SymbolSys::service, quantity, memo);
             CHECK(a.create(symbolId, quantity).failed(symbolAlreadyExists));
          }
@@ -144,7 +141,6 @@ SCENARIO("Buying a symbol")
          }
          THEN("Alice cannot create the same symbol")
          {
-            t.startBlock();
             auto create = a.create(SID{"abc"}, quantity);
             CHECK(create.failed(symbolAlreadyExists));
          }
@@ -174,8 +170,6 @@ SCENARIO("Measuring price increases")
       sysIssuer.setTokenConf(sysToken, untradeable, false);
       sysIssuer.mint(sysToken, aliceBalance, memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
-
-      t.startBlock();
 
       std::vector<SID> tickers{
           // 25 tickers
@@ -211,7 +205,6 @@ SCENARIO("Measuring price increases")
 
          AND_THEN("Buying another symbol is the same price")
          {
-            t.startBlock();
             CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
             a.create(SID{"bcd"}, quantity);
             auto balance = alice.to<TokenSys>()
@@ -240,8 +233,6 @@ SCENARIO("Measuring price increases")
          for (int i = 0; i < numSymbols && costConstant; ++i)
          {
             a.create(tickers[i], cost);
-            t.startBlock();
-
             costConstant = (a.getPrice(3).returnVal() == cost);
          }
          CHECK(costConstant);
@@ -249,15 +240,12 @@ SCENARIO("Measuring price increases")
 
          AND_THEN("The price for the first create that exceeds the desired rate is higher")
          {
-            t.startBlock();
             alice.to<TokenSys>().credit(sysToken, SymbolSys::service, cost, memo);
 
             // Create the 25th symbol within 24 hours, causing the price to increase
             CHECK(a.getSymbolType(3).returnVal().createCounter == 24);
             auto create = a.create(tickers[24], cost);
             CHECK(create.succeeded());
-            t.startBlock();
-
             CHECK(a.getSymbolType(3).returnVal().createCounter == 0);
 
             auto nextPrice = incrementPrice(cost);
@@ -308,8 +296,6 @@ SCENARIO("Using symbol ownership NFT")
       auto symbolRecord = a.getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
       alice.to<NftSys>().debit(nftId, memo);
-
-      t.startBlock();
 
       WHEN("Alice transfers her symbol to Bob")
       {
@@ -366,8 +352,6 @@ SCENARIO("Buying and selling symbols")
       alice.to<NftSys>().credit(sysSymbolNft, TokenSys::service, memo);
       alice.to<TokenSys>().mapSymbol(sysToken, sysSymbol);
 
-      t.startBlock();
-
       WHEN("Alice creates a symbol")
       {
          auto symbol = SID{"abc"};
@@ -384,7 +368,6 @@ SCENARIO("Buying and selling symbols")
 
             AND_THEN("Alice no longer owns the symbol")
             {
-               t.startBlock();
                auto newNftRecord = alice.to<NftSys>().getNft(symbolNft).returnVal();
                CHECK(newNftRecord != initialNftRecord);
 
@@ -404,7 +387,6 @@ SCENARIO("Buying and selling symbols")
          }
          WHEN("The symbol is mapped to a token")
          {
-            t.startBlock();
             auto newToken = alice.to<TokenSys>().create(8, userBalance).returnVal();
             alice.to<TokenSys>().mint(newToken, userBalance, memo);
             auto newTokenId = alice.to<TokenSys>().getToken(newToken).returnVal().id;
@@ -466,7 +448,6 @@ SCENARIO("Buying and selling symbols")
                }
                THEN("The symbol is no longer for sale")
                {
-                  t.startBlock();
                   auto symbolRecord = alice.to<SymbolSys>().getSymbol(symbol).returnVal();
                   CHECK(symbolRecord.saleDetails.salePrice == 0e8);
                }

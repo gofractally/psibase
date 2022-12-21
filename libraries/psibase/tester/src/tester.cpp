@@ -215,6 +215,11 @@ std::string psibase::TestChain::getPath()
    return result;
 }
 
+void psibase::TestChain::setManualBlockControl(bool manual)
+{
+   isManualBlockControl = manual;
+}
+
 void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 {
    auto time = status ? status->current.time : TimePointSec{};
