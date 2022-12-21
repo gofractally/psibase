@@ -6,7 +6,9 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#ifdef PSIBASE_ENABLE_SSL
 #include <boost/beast/ssl.hpp>
+#endif
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <deque>
@@ -184,6 +186,7 @@ namespace psibase::net
       f(std::error_code{}, std::move(conn));
    }
 
+#ifdef PSIBASE_ENABLE_SSL
    template <typename Stream, typename F>
    void maybe_async_ssl_handshake(
        std::shared_ptr<websocket_connection<boost::beast::ssl_stream<Stream>>>&& conn,
@@ -194,6 +197,7 @@ namespace psibase::net
                           [conn = std::move(conn), f = std::forward<F>(f)](
                               const std::error_code& ec) { f(ec, std::move(conn)); });
    }
+#endif
 
    template <typename Stream, typename F>
    void async_connect(std::shared_ptr<websocket_connection<Stream>>&& conn,

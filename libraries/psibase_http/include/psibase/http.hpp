@@ -3,7 +3,9 @@
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/asio/ssl/context.hpp>
 #include <boost/beast/core/tcp_stream.hpp>
+#ifdef PSIBASE_ENABLE_SSL
 #include <boost/beast/ssl.hpp>
+#endif
 #include <boost/beast/websocket/stream_fwd.hpp>
 #include <boost/type_erasure/any.hpp>
 #include <boost/type_erasure/callable.hpp>
@@ -28,8 +30,10 @@ namespace psibase::http
    using shutdown_t = std::function<void(std::vector<char>)>;
 
    using accept_p2p_websocket1 = boost::beast::websocket::stream<boost::beast::tcp_stream>;
+#ifdef PSIBASE_ENABLE_SSL
    using accept_p2p_websocket2 =
        boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>;
+#endif
    using accept_p2p_websocket3 = boost::beast::websocket::stream<
        boost::beast::basic_stream<boost::asio::local::stream_protocol>>;
 
@@ -37,7 +41,9 @@ namespace psibase::http
        boost::mpl::vector<boost::type_erasure::relaxed,
                           boost::type_erasure::copy_constructible<>,
                           boost::type_erasure::callable<void(accept_p2p_websocket1&&)>,
+#ifdef PSIBASE_ENABLE_SSL
                           boost::type_erasure::callable<void(accept_p2p_websocket2&&)>,
+#endif
                           boost::type_erasure::callable<void(accept_p2p_websocket3&&)>>>;
 
    struct peer_info
@@ -170,36 +176,40 @@ namespace psibase::http
       }
    }
 
+#ifdef PSIBASE_ENABLE_SSL
    using tls_context_ptr = std::shared_ptr<boost::asio::ssl::context>;
+#endif
 
    struct http_config
    {
-      uint32_t                  num_threads            = {};
-      uint32_t                  max_request_size       = {};
-      std::chrono::milliseconds idle_timeout_ms        = {};
-      std::string               allow_origin           = {};
-      std::string               address                = {};
-      unsigned short            port                   = {};
-      unsigned short            https_port             = {};
-      std::string               unix_path              = {};  // TODO: remove? rename?
-      std::string               host                   = {};
-      tls_context_ptr           tls_context            = {};
-      push_boot_t               push_boot_async        = {};
-      push_transaction_t        push_transaction_async = {};
-      accept_p2p_websocket_t    accept_p2p_websocket   = {};
-      shutdown_t                shutdown               = {};
-      get_peers_t               get_peers              = {};
-      connect_t                 connect                = {};
-      connect_t                 disconnect             = {};
-      get_config_t              get_config             = {};
-      connect_t                 set_config             = {};
-      get_config_t              get_keys               = {};
-      generic_json_t            new_key                = {};
-      admin_service             admin                  = {};
-      services_t                services;
-      std::atomic<bool>         enable_p2p;
-      std::atomic<bool>         enable_transactions;
-      std::atomic<http_status>  status;
+      uint32_t                  num_threads      = {};
+      uint32_t                  max_request_size = {};
+      std::chrono::milliseconds idle_timeout_ms  = {};
+      std::string               allow_origin     = {};
+      std::string               address          = {};
+      unsigned short            port             = {};
+      unsigned short            https_port       = {};
+      std::string               unix_path        = {};  // TODO: remove? rename?
+      std::string               host             = {};
+#ifdef PSIBASE_ENABLE_SSL
+      tls_context_ptr tls_context = {};
+#endif
+      push_boot_t              push_boot_async        = {};
+      push_transaction_t       push_transaction_async = {};
+      accept_p2p_websocket_t   accept_p2p_websocket   = {};
+      shutdown_t               shutdown               = {};
+      get_peers_t              get_peers              = {};
+      connect_t                connect                = {};
+      connect_t                disconnect             = {};
+      get_config_t             get_config             = {};
+      connect_t                set_config             = {};
+      get_config_t             get_keys               = {};
+      generic_json_t           new_key                = {};
+      admin_service            admin                  = {};
+      services_t               services;
+      std::atomic<bool>        enable_p2p;
+      std::atomic<bool>        enable_transactions;
+      std::atomic<http_status> status;
 
       mutable std::shared_mutex mutex;
    };

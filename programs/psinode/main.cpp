@@ -764,6 +764,7 @@ void run(const std::string&              db_path,
 
    auto server_work = boost::asio::make_work_guard(chainContext);
 
+#ifdef PSIBASE_ENABLE_SSL
    http_config->tls_context =
        std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tlsv13);
    boost::asio::ssl::context& sslContext(*http_config->tls_context);
@@ -783,6 +784,7 @@ void run(const std::string&              db_path,
       sslContext.use_certificate_chain_file(tls_cert);
       sslContext.use_private_key_file(tls_key, boost::asio::ssl::context::pem);
    }
+#endif
 
    using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
    node_type node(chainContext, system.get(), prover);
@@ -792,7 +794,7 @@ void run(const std::string&              db_path,
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
 
-   auto connect_one = [&resolver, &node, &chainContext, &sslContext, &http_config, &runResult](
+   auto connect_one = [&resolver, &node, &chainContext, &http_config, &runResult](
                           const std::string& peer, auto&& f)
    {
       auto [secure, host, service] = parse_endpoint(peer);
@@ -820,13 +822,21 @@ void run(const std::string&              db_path,
       };
       if (secure)
       {
+#if PSIBASE_ENABLE_SSL
          auto conn = std::make_shared<
-             websocket_connection<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(chainContext,
-                                                                                       sslContext);
+             websocket_connection<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(
+             chainContext, *http_config->tls_context);
          conn->stream.next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
          conn->stream.next_layer().set_verify_callback(
              boost::asio::ssl::host_name_verification(std::string(host)));
          do_connect(std::move(conn));
+#else
+         PSIBASE_LOG(psibase::loggers::generic::get(), warning)
+             << "Connection to " << peer
+             << " not attempted because psinode was built without TLS support";
+         boost::asio::post(chainContext, [f = static_cast<decltype(f)>(f)]
+                           { f(std::error_code(EPROTONOSUPPORT, std::generic_category())); });
+#endif
       }
       else
       {
@@ -1270,7 +1280,7 @@ int main(int argc, char* argv[])
    namespace po = boost::program_options;
 
    po::options_description desc("psinode");
-   po::options_description common_opts("psinode");
+   po::options_description common_opts;
    auto                    opt = common_opts.add_options();
    opt("producer,p", po::value<std::string>(&producer)->default_value(""), "Name of this producer");
    opt("key,k", po::value(&keys->provers)->default_value({}, ""),
@@ -1283,14 +1293,17 @@ int main(int argc, char* argv[])
    opt("host,o", po::value<std::string>(&host)->value_name("name")->default_value(""),
        "Host http server");
    opt("port", po::value(&port)->default_value(8080), "http server port");
-   opt("https-port", po::value(&https_port)->default_value(0, ""), "HTTPS server port");
    opt("service", po::value(&services)->default_value({}, ""), "Static content");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
-   opt("tls-trustfile", po::value(&root_ca),
+#ifdef PSIBASE_ENABLE_SSL
+   opt("https-port", po::value(&https_port)->default_value(0, ""), "HTTPS server port");
+   opt("ssl-trustfile", po::value(&root_ca)->default_value({}, ""),
        "A list of trusted Certification Authorities in PEM format");
-   opt("tls-cert", po::value(&tls_cert), "The file containing the server's certificate");
-   opt("tls-key", po::value(&tls_key), "The file containing the private key");
+   opt("ssl-cert", po::value(&tls_cert)->default_value(""),
+       "The file containing the server's certificate");
+   opt("ssl-key", po::value(&tls_key)->default_value(""), "The file containing the private key");
+#endif
    opt("leeway,l", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in us. Defaults to 200000.");
    desc.add(common_opts);

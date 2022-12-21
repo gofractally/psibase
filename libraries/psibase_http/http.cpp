@@ -17,7 +17,9 @@
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#ifdef PSIBASE_ENABLE_SSL
 #include <boost/beast/ssl.hpp>
+#endif
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/make_unique.hpp>
@@ -1315,6 +1317,7 @@ namespace psibase::http
       beast::tcp_stream stream;
    };
 
+#ifdef PSIBASE_ENABLE_SSL
    struct tls_http_session : public http_session<tls_http_session>,
                              public std::enable_shared_from_this<tls_http_session>
    {
@@ -1349,6 +1352,7 @@ namespace psibase::http
       tls_context_ptr                             context;
       boost::beast::ssl_stream<beast::tcp_stream> stream;
    };
+#endif
 
    struct unix_http_session : public http_session<unix_http_session>,
                               public std::enable_shared_from_this<unix_http_session>
@@ -1373,9 +1377,11 @@ namespace psibase::http
    // Accepts incoming connections and launches the sessions
    class listener : public std::enable_shared_from_this<listener>
    {
-      server_impl&    server;
-      tcp::acceptor   tcp_acceptor;
-      tcp::acceptor   tls_acceptor;
+      server_impl&  server;
+      tcp::acceptor tcp_acceptor;
+#ifdef PSIBASE_ENABLE_SSL
+      tcp::acceptor tls_acceptor;
+#endif
       unixs::acceptor unix_acceptor;
       bool            acceptor_ready = false;
 
@@ -1385,7 +1391,9 @@ namespace psibase::http
       listener(server_impl& server)
           : server(server),
             tcp_acceptor(net::make_strand(server.ioc)),
+#ifdef PSIBASE_ENABLE_SSL
             tls_acceptor(net::make_strand(server.ioc)),
+#endif
             unix_acceptor(net::make_strand(server.ioc))
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
@@ -1405,7 +1413,11 @@ namespace psibase::http
             start_listen(tcp_acceptor, tcp::endpoint{a, server.http_config->port});
             if (server.http_config->https_port)
             {
+#ifdef PSIBASE_ENABLE_SSL
                start_listen(tls_acceptor, tcp::endpoint{a, server.http_config->https_port});
+#else
+               throw std::runtime_error("TLS not supported");
+#endif
             }
          }
 
@@ -1450,6 +1462,7 @@ namespace psibase::http
                                      self->tcp_acceptor.cancel();
                                   }
                                });
+#ifdef PSIBASE_ENABLE_SSL
          boost::asio::dispatch(self->tls_acceptor.get_executor(),
                                [self]
                                {
@@ -1458,6 +1471,7 @@ namespace psibase::http
                                      self->tls_acceptor.cancel();
                                   }
                                });
+#endif
          boost::asio::dispatch(self->unix_acceptor.get_executor(),
                                [self]
                                {
@@ -1468,7 +1482,10 @@ namespace psibase::http
                                });
       }
 
-      void listen_fail() { throw std::runtime_error("unable to open listen socket"); }
+      void listen_fail()
+      {
+         throw std::runtime_error("unable to open listen socket");
+      }
 
       template <typename Acceptor, typename Endpoint>
       void start_listen(Acceptor& acceptor, const Endpoint& endpoint)
@@ -1505,8 +1522,10 @@ namespace psibase::http
          server.register_connection(shared_from_this());
          if (tcp_acceptor.is_open())
             do_accept<tcp_http_session>(tcp_acceptor);
+#ifdef PSINODE_ENABLE_SSL
          if (tls_acceptor.is_open())
             do_accept<tls_http_session>(tls_acceptor);
+#endif
          if (unix_acceptor.is_open())
             do_accept<unix_http_session>(unix_acceptor);
          return acceptor_ready;

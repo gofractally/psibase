@@ -4,6 +4,7 @@ project(wasm)
 enable_testing()
 
 set(IS_WASM YES)
+set(BUILD_STATIC ON)
 get_filename_component(ROOT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/.. ABSOLUTE)
 get_filename_component(ROOT_BINARY_DIR ${CMAKE_BINARY_DIR}/.. ABSOLUTE)
 
