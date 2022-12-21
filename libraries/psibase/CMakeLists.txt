@@ -137,7 +137,10 @@ function(add suffix)
             ../../services/system/VerifyEcSys/include
             ../../services/user/CommonSys/include
             ../../services/user/ExploreSys/include
+            ../../services/user/NftSys/include
             ../../services/user/PsiSpaceSys/include
+            ../../services/user/SymbolSys/include
+            ../../services/user/TokenSys/include
         )
         target_include_directories(psitestlib${suffix} PRIVATE
             ../../services/system/VerifyEcSys/include

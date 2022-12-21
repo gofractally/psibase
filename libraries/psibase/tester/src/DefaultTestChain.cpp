@@ -15,7 +15,10 @@
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
 #include <services/user/ExploreSys.hpp>
+#include <services/user/NftSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
+#include <services/user/SymbolSys.hpp>
+#include <services/user/TokenSys.hpp>
 #include <utility>
 #include <vector>
 
@@ -39,6 +42,11 @@ DefaultTestChain::DefaultTestChain(
    createSysServiceAccounts();
    setBlockProducers();
    registerSysRpc();
+
+   auto alice = from(add_account("alice"_a));
+   alice.to<UserService::NftSys>().init();
+   alice.to<UserService::TokenSys>().init();
+   alice.to<UserService::SymbolSys>().init();
 
    for (const auto& c : additionalServices)
    {
@@ -64,24 +72,23 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                     .services =
                                         {
                                             {
-                                                .service = SystemService::TransactionSys::service,
-                                                .flags =
-                                                    SystemService::TransactionSys::serviceFlags,
-                                                .code = readWholeFile("TransactionSys.wasm"),
+                                                .service = TransactionSys::service,
+                                                .flags   = TransactionSys::serviceFlags,
+                                                .code    = readWholeFile("TransactionSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::SetCodeSys::service,
-                                                .flags   = SystemService::SetCodeSys::serviceFlags,
+                                                .service = SetCodeSys::service,
+                                                .flags   = SetCodeSys::serviceFlags,
                                                 .code    = readWholeFile("SetCodeSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::AccountSys::service,
+                                                .service = AccountSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("AccountSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::ProducerSys::service,
-                                                .flags   = SystemService::ProducerSys::serviceFlags,
+                                                .service = ProducerSys::service,
+                                                .flags   = ProducerSys::serviceFlags,
                                                 .code    = readWholeFile("ProducerSys.wasm"),
                                             },
                                             {
@@ -90,17 +97,17 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .code    = readWholeFile("ProxySys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::AuthAnySys::service,
+                                                .service = AuthAnySys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("AuthAnySys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::AuthEcSys::service,
+                                                .service = AuthEcSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("AuthEcSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::VerifyEcSys::service,
+                                                .service = VerifyEcSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("VerifyEcSys.wasm"),
                                             },
@@ -138,6 +145,21 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .service = PsiSpaceSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("PsiSpaceSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::TokenSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("TokenSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::NftSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("NftSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::SymbolSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("SymbolSys.wasm"),
                                             },
                                         },
                                 }),

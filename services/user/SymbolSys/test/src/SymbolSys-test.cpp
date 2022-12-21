@@ -15,11 +15,6 @@ using namespace UserService::Errors;
 
 namespace
 {
-   const std::vector<std::pair<AccountNumber, const char*>> neededServices = {
-       {TokenSys::service, "TokenSys.wasm"},
-       {NftSys::service, "NftSys.wasm"},
-       {SymbolSys::service, "SymbolSys.wasm"}};
-
    const String   memo{"memo"};
    const TID      sysToken{TokenSys::sysToken};
    constexpr auto untradeable = "untradeable"_m;
@@ -40,17 +35,12 @@ SCENARIO("Buying a symbol")
 {
    GIVEN("An standard setup chain")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<SymbolSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<SymbolSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto sysIssuer = t.from(SymbolSys::service).to<TokenSys>();
       sysIssuer.setTokenConf(sysToken, untradeable, false);
@@ -174,15 +164,10 @@ SCENARIO("Measuring price increases")
 {
    GIVEN("Alice has a lot of money")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<SymbolSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto aliceBalance = 1'000'000e8;
       auto sysIssuer    = t.from(SymbolSys::service).to<TokenSys>();
@@ -302,16 +287,11 @@ SCENARIO("Using symbol ownership NFT")
 {
    GIVEN("Alice has created a symbol")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto bob   = t.from(t.add_account("bob"_a));
       auto a     = alice.to<SymbolSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       // Mint token used for purchasing symbols
       auto aliceBalance = 1'000'000e8;
@@ -360,16 +340,11 @@ SCENARIO("Buying and selling symbols")
 {
    GIVEN("A chain with a system token")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
       // Add a couple accounts
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto bob   = t.from(t.add_account("bob"_a));
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       // Fund Alice and Bob with the system token
       auto userBalance = 1'000'000e8;

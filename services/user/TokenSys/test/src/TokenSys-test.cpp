@@ -22,19 +22,7 @@ namespace
    constexpr bool eventEmissionTestingSupported = false;
    constexpr bool customTokensSupported         = false;
 
-   struct DiskUsage_TokenRecord
-   {
-      static constexpr int64_t firstEmplace      = 100;
-      static constexpr int64_t subsequentEmplace = 100;
-      static constexpr int64_t update            = 100;
-   };
-
    const psibase::String memo{"memo"};
-
-   const std::vector<std::pair<AccountNumber, const char*>> neededServices = {
-       {TokenSys::service, "TokenSys.wasm"},
-       {NftSys::service, "NftSys.wasm"},
-       {SymbolSys::service, "SymbolSys.wasm"}};
 
    constexpr auto manualDebit  = "manualDebit"_m;
    constexpr auto unrecallable = "unrecallable"_m;
@@ -46,16 +34,11 @@ SCENARIO("Using system token")
 {
    GIVEN("An empty chain with user Alice")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto sysIssuer   = t.from(SymbolSys::service).to<TokenSys>();
       auto userBalance = 1'000'000e8;
@@ -99,16 +82,11 @@ SCENARIO("Creating a token")
 {
    GIVEN("An empty chain with user Alice")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       THEN("Alice may create a token")
       {
@@ -179,17 +157,12 @@ SCENARIO("Minting tokens")
 {
    GIVEN("Alice created a token")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
 
@@ -241,17 +214,12 @@ SCENARIO("Recalling tokens")
 {
    GIVEN("Alice created a new token and issued some to Bob")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -301,17 +269,12 @@ SCENARIO("Interactions with the Issuer NFT")
 {
    GIVEN("Alice created and distributed a token")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -395,17 +358,12 @@ SCENARIO("Burning tokens")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -479,17 +437,12 @@ SCENARIO("Toggling manual-debit")
 {
    GIVEN("A chain with users Alice and Bob")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       THEN("Alice and Bob both have manualDebit disabled")
       {
@@ -548,17 +501,12 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -625,17 +573,12 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -762,17 +705,12 @@ SCENARIO("Mapping a symbol to a token")
 {
    GIVEN("Alice has created a token and created a symbol")
    {
-      DefaultTestChain t(neededServices);
+      DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from("alice"_a);
       auto bob   = t.from(t.add_account("bob"_a));
       auto a     = alice.to<TokenSys>();
       auto b     = bob.to<TokenSys>();
-
-      // Initialize user services
-      alice.to<NftSys>().init();
-      alice.to<TokenSys>().init();
-      alice.to<SymbolSys>().init();
 
       // Issue system tokens
       auto sysIssuer   = t.from(SymbolSys::service).to<TokenSys>();
