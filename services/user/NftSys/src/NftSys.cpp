@@ -14,6 +14,14 @@ using std::optional;
 using std::string;
 using SystemService::AccountSys;
 
+namespace
+{
+   namespace userConfig
+   {
+      constexpr auto manualDebit = psibase::NamedBit{"manualDebit"};
+   }
+}  // namespace
+
 NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
 {
    MethodNumber m{action->method()->value().get()};
@@ -31,8 +39,8 @@ void NftSys::init()
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
-   // TODO
-   // Turn on manualDebit for this and tokens
+   // Configure manual debit for self on Token and NFT
+   to<NftSys>().setUserConf(userConfig::manualDebit, true);
 
    // Register serveSys handler
    to<SystemService::ProxySys>().registerServer(NftSys::service);

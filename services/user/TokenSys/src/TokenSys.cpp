@@ -13,6 +13,7 @@ using namespace UserService::Errors;
 using namespace psibase;
 using psio::const_view;
 using SystemService::AccountSys;
+using SystemService::ServiceMethod;
 using SystemService::TransactionSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
@@ -67,9 +68,17 @@ void TokenSys::init()
    auto tokService = to<TokenSys>();
    auto nftService = to<NftSys>();
 
-   // Configure manual debit for self and NFT
+   // Configure manual debit for self on Token and NFT
    tokService.setUserConf(userConfig::manualDebit, true);
    nftService.setUserConf(userConfig::manualDebit, true);
+
+   // Configure manual debit for Nft on Token
+   std::tuple<NamedBit, bool> params{userConfig::manualDebit, true};
+   Action                     setUsrConf{.sender  = NftSys::service,
+                                         .service = TokenSys::service,
+                                         .method  = "setUserConf"_m,
+                                         .rawData = psio::convert_to_frac(params)};
+   to<TransactionSys>().runAs(std::move(setUsrConf), std::vector<ServiceMethod>{});
 
    // Create system token
    auto tid = tokService.create(Precision{8}, Quantity{1'000'000'000e8});
