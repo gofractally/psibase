@@ -34,15 +34,17 @@ impl Parse for Args {
             loop {
                 if input.is_empty() {
                     break;
-                } else if input.peek(Token![,]) {
-                    input.parse::<Token![,]>().expect("expected ,");
 
-                // Every param has a colon to define it's type
+                // Every param has a colon to define its type
                 } else if input.peek2(Token![:]) {
                     let param = input
                         .parse::<TypeParam>()
                         .expect("unable to parse subindex param type");
                     subindex_params.push(param);
+                    if input.is_empty() {
+                        break;
+                    }
+                    input.parse::<Token![,]>().expect("expected ,");
 
                 // This is the last param, it should always be the remaining key TypeParamBound
                 } else {
@@ -53,11 +55,6 @@ impl Parse for Args {
                 }
             }
         }
-
-        eprintln!(
-            "subindex_params: {:?}\n\n subindex_remaining_key_ty: {:?}",
-            subindex_params, subindex_remaining_key_ty
-        );
 
         Ok(Args {
             query_name,

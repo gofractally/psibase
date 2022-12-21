@@ -71,7 +71,7 @@ mod service {
             content_by_account,
             ContentTable,
             get_index_pk,
-            account: AccountNumber
+            account: AccountNumber,
         );
     }
 
