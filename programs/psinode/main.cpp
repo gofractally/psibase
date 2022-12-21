@@ -20,6 +20,7 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 
+#include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/asio/system_timer.hpp>
 
 #include <charconv>
@@ -525,16 +526,27 @@ void pushTransaction(psibase::SharedState&                  sharedState,
    }
 }  // pushTransaction
 
-std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view peer)
+std::tuple<bool, std::string_view, std::string_view> parse_endpoint(std::string_view peer)
 {
    // TODO: handle ipv6 addresses [addr]:port
+   bool secure = false;
    if (peer.starts_with("ws://"))
    {
       peer = peer.substr(5);
    }
-   if (peer.starts_with("http://"))
+   else if (peer.starts_with("http://"))
    {
       peer = peer.substr(7);
+   }
+   else if (peer.starts_with("wss://"))
+   {
+      secure = true;
+      peer   = peer.substr(6);
+   }
+   else if (peer.starts_with("https://"))
+   {
+      secure = true;
+      peer   = peer.substr(8);
    }
    if (peer.ends_with('/'))
    {
@@ -543,11 +555,11 @@ std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view pe
    auto pos = peer.find(':');
    if (pos == std::string_view::npos)
    {
-      return {peer, "80"};
+      return {secure, peer, secure ? "443" : "80"};
    }
    else
    {
-      return {peer.substr(0, pos), peer.substr(pos + 1)};
+      return {secure, peer.substr(0, pos), peer.substr(pos + 1)};
    }
 }
 
@@ -555,7 +567,8 @@ std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 {
    for (auto& url : urls)
    {
-      if (!url.starts_with("http:") && !url.starts_with("ws:"))
+      if (!url.starts_with("http:") && !url.starts_with("ws:") && !url.starts_with("https") &&
+          !url.starts_with("wss:"))
       {
          url = "http://" + url + "/";
       }
@@ -703,8 +716,12 @@ void run(const std::string&              db_path,
          bool                            enable_incoming_p2p,
          std::string                     host,
          unsigned short                  port,
+         unsigned short                  https_port,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
+         const std::vector<std::string>& root_ca,
+         const std::string&              tls_cert,
+         const std::string&              tls_key,
          uint32_t                        leeway_us,
          RestartInfo&                    runResult)
 {
@@ -747,6 +764,26 @@ void run(const std::string&              db_path,
 
    auto server_work = boost::asio::make_work_guard(chainContext);
 
+   http_config->tls_context =
+       std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tlsv13);
+   boost::asio::ssl::context& sslContext(*http_config->tls_context);
+   if (root_ca.empty())
+   {
+      sslContext.set_default_verify_paths();
+   }
+   else
+   {
+      for (const auto& ca : root_ca)
+      {
+         sslContext.load_verify_file(ca);
+      }
+   }
+   if (!tls_cert.empty())
+   {
+      sslContext.use_certificate_chain_file(tls_cert);
+      sslContext.use_private_key_file(tls_key, boost::asio::ssl::context::pem);
+   }
+
    using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
@@ -755,30 +792,46 @@ void run(const std::string&              db_path,
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
 
-   auto connect_one = [&resolver, &node, &chainContext, &http_config, &runResult](
+   auto connect_one = [&resolver, &node, &chainContext, &sslContext, &http_config, &runResult](
                           const std::string& peer, auto&& f)
    {
-      auto [host, service] = parse_endpoint(peer);
-      auto result          = std::make_shared<websocket_connection>(chainContext);
-      result->url          = peer;
-      async_connect(std::move(result), resolver, host, service,
-                    [&node, &http_config, &runResult, f = static_cast<decltype(f)>(f)](
-                        const std::error_code& ec, auto&& conn)
-                    {
-                       if (!ec)
+      auto [secure, host, service] = parse_endpoint(peer);
+      auto do_connect              = [&](auto&& conn)
+      {
+         conn->url = peer;
+         async_connect(std::move(conn), resolver, host, service,
+                       [&node, &http_config, &runResult, f = static_cast<decltype(f)>(f)](
+                           const std::error_code& ec, auto&& conn)
                        {
-                          if (http_config->status.load().shutdown)
+                          if (!ec)
                           {
-                             conn->close(runResult.shouldRestart
-                                             ? connection_base::close_code::restart
-                                             : connection_base::close_code::shutdown);
-                             f(make_error_code(boost::asio::error::operation_aborted));
-                             return;
+                             if (http_config->status.load().shutdown)
+                             {
+                                conn->close(runResult.shouldRestart
+                                                ? connection_base::close_code::restart
+                                                : connection_base::close_code::shutdown);
+                                f(make_error_code(boost::asio::error::operation_aborted));
+                                return;
+                             }
+                             node.add_connection(std::move(conn));
                           }
-                          node.add_connection(std::move(conn));
-                       }
-                       f(ec);
-                    });
+                          f(ec);
+                       });
+      };
+      if (secure)
+      {
+         auto conn = std::make_shared<
+             websocket_connection<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(chainContext,
+                                                                                       sslContext);
+         conn->stream.next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
+         conn->stream.next_layer().set_verify_callback(
+             boost::asio::ssl::host_name_verification(std::string(host)));
+         do_connect(std::move(conn));
+      }
+      else
+      {
+         do_connect(std::make_shared<websocket_connection<boost::beast::tcp_stream>>(chainContext));
+      }
    };
 
    timer_type timer(chainContext);
@@ -792,6 +845,7 @@ void run(const std::string&              db_path,
       http_config->allow_origin        = "*";
       http_config->address             = "0.0.0.0";
       http_config->port                = port;
+      http_config->https_port          = https_port;
       http_config->host                = host;
       http_config->enable_transactions = !host.empty();
       http_config->status =
@@ -822,8 +876,14 @@ void run(const std::string&              db_path,
       http_config->accept_p2p_websocket = [&chainContext, &node](auto&& stream)
       {
          boost::asio::post(
-             chainContext, [&node, stream = std::move(stream)]() mutable
-             { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); });
+             chainContext,
+             [&node, stream = std::move(stream)]() mutable
+             {
+                node.add_connection(
+                    std::make_shared<websocket_connection<
+                        typename std::remove_cv_t<decltype(stream)>::next_layer_type>>(
+                        std::move(stream)));
+             });
       };
 
       http_config->shutdown = [&chainContext, &node, &http_config, &connect_one, &timer, &runResult,
@@ -1192,16 +1252,20 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 int main(int argc, char* argv[])
 {
    std::string                 db_path;
-   std::string                 producer  = {};
-   auto                        keys      = std::make_shared<CompoundProver>();
-   std::string                 host      = {};
-   unsigned short              port      = 8080;
-   uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
+   std::string                 producer   = {};
+   auto                        keys       = std::make_shared<CompoundProver>();
+   std::string                 host       = {};
+   unsigned short              port       = 8080;
+   unsigned short              https_port = 0;
+   uint32_t                    leeway_us  = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
    bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
    http::admin_service         admin;
+   std::vector<std::string>    root_ca;
+   std::string                 tls_cert;
+   std::string                 tls_key;
 
    namespace po = boost::program_options;
 
@@ -1219,9 +1283,14 @@ int main(int argc, char* argv[])
    opt("host,o", po::value<std::string>(&host)->value_name("name")->default_value(""),
        "Host http server");
    opt("port", po::value(&port)->default_value(8080), "http server port");
+   opt("https-port", po::value(&https_port)->default_value(0, ""), "HTTPS server port");
    opt("service", po::value(&services)->default_value({}, ""), "Static content");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
+   opt("tls-trustfile", po::value(&root_ca),
+       "A list of trusted Certification Authorities in PEM format");
+   opt("tls-cert", po::value(&tls_cert), "The file containing the server's certificate");
+   opt("tls-key", po::value(&tls_key), "The file containing the private key");
    opt("leeway,l", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in us. Defaults to 200000.");
    desc.add(common_opts);
@@ -1299,7 +1368,7 @@ int main(int argc, char* argv[])
          restart.shouldRestart     = true;
          restart.soft              = true;
          run(db_path, AccountNumber{producer}, keys, peers, autoconnect, enable_incoming_p2p, host,
-             port, services, admin, leeway_us, restart);
+             port, https_port, services, admin, root_ca, tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

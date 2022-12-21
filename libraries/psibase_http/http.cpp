@@ -17,11 +17,13 @@
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/beast/ssl.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/make_unique.hpp>
 #include <boost/optional.hpp>
 #include <boost/signals2/signal.hpp>
+#include <boost/type_erasure/is_empty.hpp>
 
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
@@ -462,7 +464,7 @@ namespace psibase::http
               session  = send.self.derived_session().shared_from_this()](auto&& result) mutable
          {
             auto* p = session.get();
-            net::post(p->stream.socket().get_executor(),
+            net::post(p->stream.get_executor(),
                       [callback = std::move(callback), session = std::move(session),
                        result = static_cast<decltype(result)>(result)]()
                       {
@@ -622,7 +624,7 @@ namespace psibase::http
                 [error, ok,
                  session = send.self.derived_session().shared_from_this()](push_boot_result result)
                 {
-                   net::post(session->stream.socket().get_executor(),
+                   net::post(session->stream.get_executor(),
                              [error, ok, session = std::move(session), result = std::move(result)]
                              {
                                 try
@@ -678,7 +680,7 @@ namespace psibase::http
                 [error, ok, session = send.self.derived_session().shared_from_this()](
                     push_transaction_result result)
                 {
-                   net::post(session->stream.socket().get_executor(),
+                   net::post(session->stream.get_executor(),
                              [error, ok, session = std::move(session), result = std::move(result)]
                              {
                                 try
@@ -709,7 +711,8 @@ namespace psibase::http
             return;
          }  // push_transaction
          else if (req.target() == "/native/p2p" && websocket::is_upgrade(req) &&
-                  server.http_config->accept_p2p_websocket && server.http_config->enable_p2p)
+                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
+                  server.http_config->enable_p2p)
          {
             if (forbid_cross_origin())
                return;
@@ -773,7 +776,7 @@ namespace psibase::http
                 [ok,
                  session = send.self.derived_session().shared_from_this()](get_peers_result result)
                 {
-                   net::post(session->stream.socket().get_executor(),
+                   net::post(session->stream.get_executor(),
                              [ok, session = std::move(session), result = std::move(result)]()
                              {
                                 session->queue_.pause_read = false;
@@ -812,7 +815,7 @@ namespace psibase::http
                  session = send.self.derived_session().shared_from_this()](connect_result result)
                 {
                    net::post(
-                       session->stream.socket().get_executor(),
+                       session->stream.get_executor(),
                        [ok_no_content, error, session = std::move(session),
                         result = std::move(result)]()
                        {
@@ -856,7 +859,7 @@ namespace psibase::http
                  session = send.self.derived_session().shared_from_this()](connect_result result)
                 {
                    net::post(
-                       session->stream.socket().get_executor(),
+                       session->stream.get_executor(),
                        [ok_no_content, error, session = std::move(session),
                         result = std::move(result)]()
                        {
@@ -1112,20 +1115,14 @@ namespace psibase::http
                   auto p = ptr.get();
                   // Capture only the stream, not self, because after returning, there is
                   // no longer anything keeping the session alive
-                  p->stream.async_accept(
-                      p->request,
-                      [ptr = std::move(ptr)](const std::error_code& ec)
-                      {
-                         if (!ec)
-                         {
-                            // FIXME: handle local sockets
-                            if constexpr (std::is_same_v<decltype(self.derived_session().stream),
-                                                         beast::tcp_stream>)
-                            {
-                               ptr->next(std::move(ptr->stream));
-                            }
-                         }
-                      });
+                  p->stream.async_accept(p->request,
+                                         [ptr = std::move(ptr)](const std::error_code& ec)
+                                         {
+                                            if (!ec)
+                                            {
+                                               ptr->next(std::move(ptr->stream));
+                                            }
+                                         });
                }
             };
 
@@ -1177,8 +1174,7 @@ namespace psibase::http
       void run()
       {
          PSIBASE_LOG(logger, debug) << "Accepted connection";
-         _timer.reset(
-             new boost::asio::steady_timer(derived_session().stream.socket().get_executor()));
+         _timer.reset(new boost::asio::steady_timer(derived_session().stream.get_executor()));
          last_activity_timepoint = steady_clock::now();
          start_socket_timer();
          do_read();
@@ -1293,10 +1289,14 @@ namespace psibase::http
       void do_close()
       {
          // Send a TCP shutdown
-         beast::error_code ec;
-         derived_session().stream.socket().shutdown(tcp::socket::shutdown_send, ec);
+         derived_session().do_shutdown();
          _timer->cancel();  // cancel connection timer.
          // At this point the connection is closed gracefully
+      }
+      void do_shutdown()
+      {
+         beast::error_code ec;
+         derived_session().stream.socket().shutdown(tcp::socket::shutdown_send, ec);
       }
    };  // http_session
 
@@ -1313,6 +1313,41 @@ namespace psibase::http
       }
 
       beast::tcp_stream stream;
+   };
+
+   struct tls_http_session : public http_session<tls_http_session>,
+                             public std::enable_shared_from_this<tls_http_session>
+   {
+      tls_http_session(server_impl& server, tcp::socket&& socket)
+          : http_session<tls_http_session>(server),
+            context(server.http_config->tls_context),
+            stream(std::move(socket), *context)
+      {
+         std::ostringstream ss;
+         ss << stream.next_layer().socket().remote_endpoint();
+         logger.add_attribute("RemoteEndpoint",
+                              boost::log::attributes::constant<std::string>(ss.str()));
+      }
+
+      void do_shutdown()
+      {
+         stream.async_shutdown([self = shared_from_this()](const std::error_code& ec) {});
+      }
+
+      void run()
+      {
+         stream.async_handshake(boost::asio::ssl::stream_base::server,
+                                [self = shared_from_this()](const std::error_code& ec)
+                                {
+                                   if (!ec)
+                                   {
+                                      self->http_session<tls_http_session>::run();
+                                   }
+                                });
+      }
+
+      tls_context_ptr                             context;
+      boost::beast::ssl_stream<beast::tcp_stream> stream;
    };
 
    struct unix_http_session : public http_session<unix_http_session>,
@@ -1340,6 +1375,7 @@ namespace psibase::http
    {
       server_impl&    server;
       tcp::acceptor   tcp_acceptor;
+      tcp::acceptor   tls_acceptor;
       unixs::acceptor unix_acceptor;
       bool            acceptor_ready = false;
 
@@ -1349,6 +1385,7 @@ namespace psibase::http
       listener(server_impl& server)
           : server(server),
             tcp_acceptor(net::make_strand(server.ioc)),
+            tls_acceptor(net::make_strand(server.ioc)),
             unix_acceptor(net::make_strand(server.ioc))
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
@@ -1366,6 +1403,10 @@ namespace psibase::http
             }
 
             start_listen(tcp_acceptor, tcp::endpoint{a, server.http_config->port});
+            if (server.http_config->https_port)
+            {
+               start_listen(tls_acceptor, tcp::endpoint{a, server.http_config->https_port});
+            }
          }
 
          if (server.http_config->unix_path.size())
@@ -1407,6 +1448,14 @@ namespace psibase::http
                                   if (self->tcp_acceptor.is_open())
                                   {
                                      self->tcp_acceptor.cancel();
+                                  }
+                               });
+         boost::asio::dispatch(self->tls_acceptor.get_executor(),
+                               [self]
+                               {
+                                  if (self->tls_acceptor.is_open())
+                                  {
+                                     self->tls_acceptor.cancel();
                                   }
                                });
          boost::asio::dispatch(self->unix_acceptor.get_executor(),
@@ -1455,14 +1504,16 @@ namespace psibase::http
             return acceptor_ready;
          server.register_connection(shared_from_this());
          if (tcp_acceptor.is_open())
-            do_accept(tcp_acceptor);
+            do_accept<tcp_http_session>(tcp_acceptor);
+         if (tls_acceptor.is_open())
+            do_accept<tls_http_session>(tls_acceptor);
          if (unix_acceptor.is_open())
-            do_accept(unix_acceptor);
+            do_accept<unix_http_session>(unix_acceptor);
          return acceptor_ready;
       }
 
      private:
-      template <typename Acceptor>
+      template <typename Session, typename Acceptor>
       void do_accept(Acceptor& acceptor)
       {
          // The new connection gets its own strand
@@ -1482,25 +1533,13 @@ namespace psibase::http
                     else
                     {
                        // Create the http session and run it
-                       if constexpr (std::is_same_v<Acceptor, tcp::acceptor>)
-                       {
-                          boost::system::error_code ec;
-                          std::make_shared<tcp_http_session>(self->server, std::move(socket))
-                              ->run();
-                       }
-                       else if constexpr (std::is_same_v<Acceptor, unixs::acceptor>)
-                       {
-                          boost::system::error_code ec;
-                          auto                      rep = socket.remote_endpoint(ec);
-                          std::make_shared<unix_http_session>(self->server, std::move(socket))
-                              ->run();
-                       }
+                       std::make_shared<Session>(self->server, std::move(socket))->run();
                     }
 
                     // Accept another connection
                     if (ec != boost::asio::error::operation_aborted)
                     {
-                       do_accept(acceptor);
+                       do_accept<Session>(acceptor);
                     }
                     else
                     {

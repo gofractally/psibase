@@ -1,3 +1,5 @@
+find_package(OpenSSL REQUIRED SSL)
+
 add_executable(psinode main.cpp)
 
 if(APPLE)
@@ -8,7 +10,8 @@ if(APPLE)
         psibase_net
     )
 elseif(UNIX)
-    target_link_libraries(psinode
+  target_link_libraries(psinode
+        OpenSSL::SSL
         services_system
         psibase_http
         debug_eos_vm

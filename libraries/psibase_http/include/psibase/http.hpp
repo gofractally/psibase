@@ -1,7 +1,12 @@
 #pragma once
 
+#include <boost/asio/local/stream_protocol.hpp>
+#include <boost/asio/ssl/context.hpp>
 #include <boost/beast/core/tcp_stream.hpp>
+#include <boost/beast/ssl.hpp>
 #include <boost/beast/websocket/stream_fwd.hpp>
+#include <boost/type_erasure/any.hpp>
+#include <boost/type_erasure/callable.hpp>
 #include <chrono>
 #include <filesystem>
 #include <psibase/SystemContext.hpp>
@@ -22,8 +27,18 @@ namespace psibase::http
 
    using shutdown_t = std::function<void(std::vector<char>)>;
 
-   using accept_p2p_websocket_result = boost::beast::websocket::stream<boost::beast::tcp_stream>;
-   using accept_p2p_websocket_t      = std::function<void(accept_p2p_websocket_result&&)>;
+   using accept_p2p_websocket1 = boost::beast::websocket::stream<boost::beast::tcp_stream>;
+   using accept_p2p_websocket2 =
+       boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>;
+   using accept_p2p_websocket3 = boost::beast::websocket::stream<
+       boost::beast::basic_stream<boost::asio::local::stream_protocol>>;
+
+   using accept_p2p_websocket_t = boost::type_erasure::any<
+       boost::mpl::vector<boost::type_erasure::relaxed,
+                          boost::type_erasure::copy_constructible<>,
+                          boost::type_erasure::callable<void(accept_p2p_websocket1&&)>,
+                          boost::type_erasure::callable<void(accept_p2p_websocket2&&)>,
+                          boost::type_erasure::callable<void(accept_p2p_websocket3&&)>>>;
 
    struct peer_info
    {
@@ -155,6 +170,8 @@ namespace psibase::http
       }
    }
 
+   using tls_context_ptr = std::shared_ptr<boost::asio::ssl::context>;
+
    struct http_config
    {
       uint32_t                  num_threads            = {};
@@ -163,8 +180,10 @@ namespace psibase::http
       std::string               allow_origin           = {};
       std::string               address                = {};
       unsigned short            port                   = {};
+      unsigned short            https_port             = {};
       std::string               unix_path              = {};  // TODO: remove? rename?
       std::string               host                   = {};
+      tls_context_ptr           tls_context            = {};
       push_boot_t               push_boot_async        = {};
       push_transaction_t        push_transaction_async = {};
       accept_p2p_websocket_t    accept_p2p_websocket   = {};

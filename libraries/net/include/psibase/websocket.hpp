@@ -6,6 +6,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/beast/ssl.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <deque>
@@ -20,10 +21,11 @@
 
 namespace psibase::net
 {
-   struct websocket_connection : connection_base, std::enable_shared_from_this<websocket_connection>
+   template <typename Stream>
+   struct websocket_connection : connection_base,
+                                 std::enable_shared_from_this<websocket_connection<Stream>>
    {
-      explicit websocket_connection(
-          boost::beast::websocket::stream<boost::beast::tcp_stream>&& stream)
+      explicit websocket_connection(boost::beast::websocket::stream<Stream>&& stream)
           : stream(std::move(stream))
       {
          logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(endpoint()));
@@ -36,7 +38,10 @@ namespace psibase::net
             PSIBASE_LOG(logger, info) << "Connection closed";
          }
       }
-      explicit websocket_connection(boost::asio::io_context& ctx) : stream(ctx) {}
+      explicit websocket_connection(boost::asio::io_context& ctx, auto&&... args)
+          : stream(ctx, static_cast<decltype(args)>(args)...)
+      {
+      }
       void async_read(read_handler f) override
       {
          boost::asio::dispatch(
@@ -77,10 +82,9 @@ namespace psibase::net
       {
          boost::asio::dispatch(
              stream.get_executor(),
-             [self = shared_from_this(), data = std::move(data), f = std::move(f)]() mutable
+             [self = this->shared_from_this(), data = std::move(data), f = std::move(f)]() mutable
              {
-                self->outbox.emplace_back(
-                    psibase::net::websocket_connection::message{std::move(data), std::move(f)});
+                self->outbox.emplace_back(message{std::move(data), std::move(f)});
                 if (self->outbox.size() == 1)
                 {
                    auto p = self.get();
@@ -141,7 +145,7 @@ namespace psibase::net
             closed = true;
             boost::asio::dispatch(
                 stream.get_executor(),
-                [self = shared_from_this(), code]() mutable
+                [self = this->shared_from_this(), code]() mutable
                 {
                    auto p = self.get();
                    p->stream.async_close(
@@ -162,10 +166,10 @@ namespace psibase::net
          std::vector<char>                           data;
          std::function<void(const std::error_code&)> callback;
       };
-      boost::beast::websocket::stream<boost::beast::tcp_stream> stream;
-      std::string                                               host;
-      std::deque<message>                                       outbox;
-      std::vector<char>                                         inbox;
+      boost::beast::websocket::stream<Stream> stream;
+      std::string                             host;
+      std::deque<message>                     outbox;
+      std::vector<char>                       inbox;
       // Grrrr...
       std::optional<boost::asio::dynamic_vector_buffer<char, std::allocator<char>>> buffer;
       // Avoid calling close more than once
@@ -174,12 +178,29 @@ namespace psibase::net
       bool need_close_msg = false;
    };
 
-   template <typename F>
-   void async_connect(std::shared_ptr<websocket_connection>&& conn,
-                      boost::asio::ip::tcp::resolver&         resolver,
-                      std::string_view                        host,
-                      std::string_view                        service,
-                      F&&                                     f)
+   template <typename Stream, typename F>
+   void maybe_async_ssl_handshake(std::shared_ptr<websocket_connection<Stream>>&& conn, F&& f)
+   {
+      f(std::error_code{}, std::move(conn));
+   }
+
+   template <typename Stream, typename F>
+   void maybe_async_ssl_handshake(
+       std::shared_ptr<websocket_connection<boost::beast::ssl_stream<Stream>>>&& conn,
+       F&&                                                                       f)
+   {
+      auto& ssl = conn->stream.next_layer();
+      ssl.async_handshake(boost::asio::ssl::stream_base::client,
+                          [conn = std::move(conn), f = std::forward<F>(f)](
+                              const std::error_code& ec) { f(ec, std::move(conn)); });
+   }
+
+   template <typename Stream, typename F>
+   void async_connect(std::shared_ptr<websocket_connection<Stream>>&& conn,
+                      boost::asio::ip::tcp::resolver&                 resolver,
+                      std::string_view                                host,
+                      std::string_view                                service,
+                      F&&                                             f)
    {
       conn->host = host;
       conn->logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(
@@ -204,23 +225,36 @@ namespace psibase::net
                        }
                        else
                        {
-                          auto* p = conn.get();
-                          p->stream.async_handshake(p->host, "/native/p2p",
-                                                    [conn = std::move(conn), f = std::move(f)](
-                                                        const std::error_code& ec) mutable
-                                                    {
-                                                       if (ec)
-                                                       {
-                                                          PSIBASE_LOG(conn->logger, warning)
-                                                              << ec.message();
-                                                          f(ec, std::move(conn));
-                                                       }
-                                                       else
-                                                       {
-                                                          conn->need_close_msg = true;
-                                                          f(ec, std::move(conn));
-                                                       }
-                                                    });
+                          maybe_async_ssl_handshake(
+                              std::move(conn),
+                              [f = std::move(f)](const std::error_code& ec, auto&& conn)
+                              {
+                                 if (ec)
+                                 {
+                                    PSIBASE_LOG(conn->logger, warning) << ec.message();
+                                    f(ec, std::move(conn));
+                                 }
+                                 else
+                                 {
+                                    auto* p = conn.get();
+                                    p->stream.async_handshake(
+                                        p->host, "/native/p2p",
+                                        [conn = std::move(conn),
+                                         f    = std::move(f)](const std::error_code& ec) mutable
+                                        {
+                                           if (ec)
+                                           {
+                                              PSIBASE_LOG(conn->logger, warning) << ec.message();
+                                              f(ec, std::move(conn));
+                                           }
+                                           else
+                                           {
+                                              conn->need_close_msg = true;
+                                              f(ec, std::move(conn));
+                                           }
+                                        });
+                                 }
+                              });
                        }
                     });
              }
