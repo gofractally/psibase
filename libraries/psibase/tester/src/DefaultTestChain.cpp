@@ -17,6 +17,7 @@
 #include <services/user/ExploreSys.hpp>
 #include <services/user/NftSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
+#include <services/user/RTokenSys.hpp>
 #include <services/user/SymbolSys.hpp>
 #include <services/user/TokenSys.hpp>
 #include <utility>
@@ -150,6 +151,11 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .service = UserService::TokenSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("TokenSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::RTokenSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("RTokenSys.wasm"),
                                             },
                                             {
                                                 .service = UserService::NftSys::service,
