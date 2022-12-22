@@ -31,6 +31,7 @@
 #include <psio/to_json.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
@@ -1375,120 +1376,37 @@ namespace psibase::http
    };
 
    // Accepts incoming connections and launches the sessions
-   class listener : public std::enable_shared_from_this<listener>
+   template <typename Acceptor>
+   class listener : public std::enable_shared_from_this<listener<Acceptor>>
    {
-      server_impl&  server;
-      tcp::acceptor tcp_acceptor;
-#ifdef PSIBASE_ENABLE_SSL
-      tcp::acceptor tls_acceptor;
-#endif
-      unixs::acceptor unix_acceptor;
-      bool            acceptor_ready = false;
-
+      server_impl&                    server;
+      Acceptor                        acceptor;
       psibase::loggers::common_logger logger;
 
      public:
-      listener(server_impl& server)
-          : server(server),
-            tcp_acceptor(net::make_strand(server.ioc)),
-#ifdef PSIBASE_ENABLE_SSL
-            tls_acceptor(net::make_strand(server.ioc)),
-#endif
-            unix_acceptor(net::make_strand(server.ioc))
+      listener(server_impl& server, const typename Acceptor::endpoint_type& endpoint)
+          : server(server), acceptor(net::make_strand(server.ioc))
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
-         if (server.http_config->address.size())
-         {
-            boost::asio::ip::address a;
-            try
-            {
-               a = net::ip::make_address(server.http_config->address);
-            }
-            catch (std::exception& e)
-            {
-               throw std::runtime_error("make_address(): "s + server.http_config->address + ": " +
-                                        e.what());
-            }
-
-            start_listen(tcp_acceptor, tcp::endpoint{a, server.http_config->port});
-            if (server.http_config->https_port)
-            {
-#ifdef PSIBASE_ENABLE_SSL
-               start_listen(tls_acceptor, tcp::endpoint{a, server.http_config->https_port});
-#else
-               throw std::runtime_error("TLS not supported");
-#endif
-            }
-         }
-
-         if (server.http_config->unix_path.size())
-         {
-            //take a sniff and see if anything is already listening at the given socket path, or if the socket path exists
-            // but nothing is listening
-            boost::system::error_code test_ec;
-            unixs::socket             test_socket(server.ioc);
-            test_socket.connect(server.http_config->unix_path.c_str(), test_ec);
-
-            //looks like a service is already running on that socket, don't touch it... fail out
-            if (test_ec == boost::system::errc::success)
-            {
-               PSIBASE_LOG(logger, error) << "http unix socket is in use";
-               listen_fail();
-            }
-            //socket exists but no one home, go ahead and remove it and continue on
-            else if (test_ec == boost::system::errc::connection_refused)
-               ::unlink(server.http_config->unix_path.c_str());
-            else if (test_ec != boost::system::errc::no_such_file_or_directory)
-            {
-               PSIBASE_LOG(logger, error)
-                   << "unexpected failure when probing existing http unix socket: "
-                   << test_ec.message();
-               listen_fail();
-            }
-
-            start_listen(unix_acceptor, unixs::endpoint(server.http_config->unix_path));
-         }
-
-         acceptor_ready = true;
+         start_listen(endpoint);
       }
 
       static void close(std::shared_ptr<listener>&& self, bool)
       {
-         boost::asio::dispatch(self->tcp_acceptor.get_executor(),
+         boost::asio::dispatch(self->acceptor.get_executor(),
                                [self]
                                {
-                                  if (self->tcp_acceptor.is_open())
+                                  if (self->acceptor.is_open())
                                   {
-                                     self->tcp_acceptor.cancel();
-                                  }
-                               });
-#ifdef PSIBASE_ENABLE_SSL
-         boost::asio::dispatch(self->tls_acceptor.get_executor(),
-                               [self]
-                               {
-                                  if (self->tls_acceptor.is_open())
-                                  {
-                                     self->tls_acceptor.cancel();
-                                  }
-                               });
-#endif
-         boost::asio::dispatch(self->unix_acceptor.get_executor(),
-                               [self]
-                               {
-                                  if (self->unix_acceptor.is_open())
-                                  {
-                                     self->unix_acceptor.cancel();
+                                     self->acceptor.cancel();
                                   }
                                });
       }
 
-      void listen_fail()
-      {
-         throw std::runtime_error("unable to open listen socket");
-      }
+      void listen_fail() { throw std::runtime_error("unable to open listen socket"); }
 
-      template <typename Acceptor, typename Endpoint>
-      void start_listen(Acceptor& acceptor, const Endpoint& endpoint)
+      template <typename Endpoint>
+      void start_listen(const Endpoint& endpoint)
       {
          beast::error_code ec;
 
@@ -1515,32 +1433,23 @@ namespace psibase::http
       }
 
       // Start accepting incoming connections
+      template <typename Session>
       bool run()
       {
-         if (!acceptor_ready)
-            return acceptor_ready;
-         server.register_connection(shared_from_this());
-         if (tcp_acceptor.is_open())
-            do_accept<tcp_http_session>(tcp_acceptor);
-#ifdef PSINODE_ENABLE_SSL
-         if (tls_acceptor.is_open())
-            do_accept<tls_http_session>(tls_acceptor);
-#endif
-         if (unix_acceptor.is_open())
-            do_accept<unix_http_session>(unix_acceptor);
-         return acceptor_ready;
+         server.register_connection(this->shared_from_this());
+         do_accept<Session>();
+         return true;
       }
 
      private:
-      template <typename Session, typename Acceptor>
-      void do_accept(Acceptor& acceptor)
+      template <typename Session>
+      void do_accept()
       {
          // The new connection gets its own strand
          acceptor.async_accept(
              net::make_strand(server.ioc),
              beast::bind_front_handler(
-                 [&acceptor, self = shared_from_this(), this](beast::error_code ec,
-                                                              auto              socket) mutable
+                 [self = this->shared_from_this(), this](beast::error_code ec, auto socket) mutable
                  {
                     if (ec)
                     {
@@ -1558,7 +1467,7 @@ namespace psibase::http
                     // Accept another connection
                     if (ec != boost::asio::error::operation_aborted)
                     {
-                       do_accept<Session>(acceptor);
+                       do_accept<Session>();
                     }
                     else
                     {
@@ -1571,11 +1480,167 @@ namespace psibase::http
       }
    };  // listener
 
+   listen_spec parse_listen(const std::string& s)
+   {
+      auto parse_host = [](std::string_view s, bool secure) -> listen_spec
+      {
+         if (s.ends_with('/'))
+         {
+            s = s.substr(s.size() - 1);
+         }
+         auto           pos     = s.find(':');
+         auto           address = net::ip::make_address(std::string(s.substr(0, pos)));
+         unsigned short port;
+         if (pos == std::string_view::npos)
+         {
+            port = secure ? 443 : 80;
+         }
+         else
+         {
+            auto res = std::from_chars(s.data() + pos + 1, s.data() + s.size(), port);
+            if (res.ec != std::errc())
+            {
+               throw std::runtime_error("Invalid port");
+            }
+         }
+         if (secure)
+         {
+            return tcp_listen_spec<true>{{address, port}};
+         }
+         else
+         {
+            return tcp_listen_spec<false>{{address, port}};
+         }
+      };
+      if (s.starts_with("http://"))
+      {
+         return parse_host(s.substr(7), false);
+      }
+      else if (s.starts_with("https://"))
+      {
+#ifdef PSIBASE_ENABLE_SSL
+         return parse_host(s.substr(8), true);
+#else
+         throw std::runtime_error("Cannot listen on " + s +
+                                  " because psinode was compiled without TLS support");
+#endif
+      }
+      else if (s.find('/') != std::string_view::npos)
+      {
+         return local_listen_spec(s);
+      }
+      else
+      {
+         throw std::runtime_error("Don't know how to listen on " + s);
+      }
+   }
+
+   template <bool Secure>
+   tcp_listen_spec<Secure> parse_listen_tcp(const std::string& s)
+   {
+      auto check = [&](bool b)
+      {
+         if (!b)
+            throw std::runtime_error("Invalid endpoint: " + s);
+      };
+      net::ip::address addr;
+      unsigned short   port = Secure ? 443 : 80;
+      if (s.starts_with('['))
+      {
+         auto end = s.find(']');
+         check(end != std::string::npos);
+         addr = net::ip::make_address_v6(s.substr(1, end));
+         if (end + 1 != s.size())
+         {
+            check(s[end + 1] == ':');
+            auto res = std::from_chars(s.data(), s.data() + s.size(), port);
+            check(res.ec == std::errc{} && res.ptr == s.data() + s.size());
+         }
+      }
+      else
+      {
+         boost::system::error_code ec;
+         addr = net::ip::make_address(s, ec);
+         if (ec)
+         {
+            auto pos = s.rfind(':');
+            if (pos == std::string::npos)
+            {
+               addr = net::ip::make_address("0.0.0.0");
+               pos  = 0;
+            }
+            else
+            {
+               addr = net::ip::make_address_v4(s.substr(0, pos));
+               pos  = pos + 1;
+            }
+            auto res = std::from_chars(s.data() + pos, s.data() + s.size(), port);
+            check(res.ec == std::errc{} && res.ptr == s.data() + s.size());
+         }
+      }
+      return {{addr, port}};
+   }
+   local_listen_spec parse_listen_local(const std::string& s)
+   {
+      return local_listen_spec(s);
+   }
+
+   template <bool Secure>
+   bool make_listener(server_impl& server, const tcp_listen_spec<Secure>& spec)
+   {
+      auto l = std::make_shared<listener<net::ip::tcp::acceptor>>(server, spec.endpoint);
+      if constexpr (Secure)
+      {
+#if PSIBASE_ENABLE_SSL
+         return l->template run<tls_http_session>();
+#else
+         return false;
+#endif
+      }
+      else
+      {
+         return l->template run<tcp_http_session>();
+      }
+   }
+
+   bool make_listener(server_impl& server, const local_listen_spec& spec)
+   {
+      //take a sniff and see if anything is already listening at the given socket path, or if the socket path exists
+      // but nothing is listening
+      boost::system::error_code test_ec;
+      unixs::socket             test_socket(server.ioc);
+      test_socket.connect(spec, test_ec);
+
+      //looks like a service is already running on that socket, don't touch it... fail out
+      if (test_ec == boost::system::errc::success)
+      {
+         PSIBASE_LOG(loggers::generic::get(), error) << "http unix socket is in use";
+         return false;
+      }
+      //socket exists but no one home, go ahead and remove it and continue on
+      else if (test_ec == boost::system::errc::connection_refused)
+         ::unlink(spec.path().c_str());
+      else if (test_ec != boost::system::errc::no_such_file_or_directory)
+      {
+         PSIBASE_LOG(loggers::generic::get(), error)
+             << "unexpected failure when probing existing http unix socket: " << test_ec.message();
+         return false;
+      }
+      return std::make_shared<listener<unixs::acceptor>>(server, spec)->run<unix_http_session>();
+   }
+
    bool server_impl::start()
    {
-      auto l = std::make_shared<listener>(*this);
-      if (!l->run())
+      bool has_listener = false;
+      for (const auto& spec : http_config->listen)
+      {
+         has_listener |=
+             std::visit([&](const auto& spec) { return make_listener(*this, spec); }, spec);
+      }
+      if (!has_listener)
+      {
          return false;
+      }
 
       threads.reserve(http_config->num_threads);
       for (unsigned i = 0; i < http_config->num_threads; ++i)

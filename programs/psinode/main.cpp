@@ -288,6 +288,12 @@ namespace psibase
          const auto& s = boost::program_options::validators::get_single_string(values);
          v             = admin_service_from_string(s);
       }
+
+      void validate(boost::any& v, const std::vector<std::string>& values, listen_spec*, int)
+      {
+         boost::program_options::validators::check_first_occurrence(v);
+         v = parse_listen(boost::program_options::validators::get_single_string(values));
+      }
    }  // namespace http
 }  // namespace psibase
 
@@ -708,22 +714,21 @@ using basic_consensus =
 template <typename Derived>
 using consensus = basic_consensus<Derived, timer_type>;
 
-void run(const std::string&              db_path,
-         AccountNumber                   producer,
-         std::shared_ptr<CompoundProver> prover,
-         const std::vector<std::string>& peers,
-         autoconnect_t                   autoconnect,
-         bool                            enable_incoming_p2p,
-         std::string                     host,
-         unsigned short                  port,
-         unsigned short                  https_port,
-         std::vector<native_service>&    services,
-         http::admin_service&            admin,
-         const std::vector<std::string>& root_ca,
-         const std::string&              tls_cert,
-         const std::string&              tls_key,
-         uint32_t                        leeway_us,
-         RestartInfo&                    runResult)
+void run(const std::string&                    db_path,
+         AccountNumber                         producer,
+         std::shared_ptr<CompoundProver>       prover,
+         const std::vector<std::string>&       peers,
+         autoconnect_t                         autoconnect,
+         bool                                  enable_incoming_p2p,
+         std::string                           host,
+         const std::vector<http::listen_spec>& listen,
+         std::vector<native_service>&          services,
+         http::admin_service&                  admin,
+         const std::vector<std::string>&       root_ca,
+         const std::string&                    tls_cert,
+         const std::string&                    tls_key,
+         uint32_t                              leeway_us,
+         RestartInfo&                          runResult)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -846,16 +851,14 @@ void run(const std::string&              db_path,
 
    timer_type timer(chainContext);
 
-   if (!host.empty() || !services.empty())
+   if (!listen.empty())
    {
       // TODO: command-line options
       http_config->num_threads         = 4;
       http_config->max_request_size    = 20 * 1024 * 1024;
       http_config->idle_timeout_ms     = std::chrono::milliseconds{4000};
       http_config->allow_origin        = "*";
-      http_config->address             = "0.0.0.0";
-      http_config->port                = port;
-      http_config->https_port          = https_port;
+      http_config->listen              = listen;
       http_config->host                = host;
       http_config->enable_transactions = !host.empty();
       http_config->status =
@@ -995,7 +998,7 @@ void run(const std::string&              db_path,
       };
 
       http_config->set_config =
-          [&chainContext, &node, &db_path, &runResult, &http_config, &host, &port, &admin,
+          [&chainContext, &node, &db_path, &runResult, &http_config, &host, &listen, &admin,
            &services, &connect_one](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
@@ -1003,7 +1006,7 @@ void run(const std::string&              db_path,
 
          boost::asio::post(chainContext,
                            [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
-                            &db_path, &runResult, &http_config, &host, &port, &services, &admin,
+                            &db_path, &runResult, &http_config, &host, &listen, &services, &admin,
                             &connect_one, callback = std::move(callback)]() mutable
                            {
                               std::optional<http::services_t> new_services;
@@ -1022,8 +1025,9 @@ void run(const std::string&              db_path,
                                  node.autoconnect(std::vector(config.peers),
                                                   config.autoconnect.value, connect_one);
                               }
-                              host     = config.host;
-                              port     = config.port;
+                              host = config.host;
+                              // TODO:
+                              //port     = config.port;
                               services = config.services;
                               admin    = config.admin;
                               loggers::configure(config.loggers);
@@ -1057,11 +1061,11 @@ void run(const std::string&              db_path,
                            });
       };
 
-      http_config->get_config = [&chainContext, &node, &http_config, &host, &port, &admin,
+      http_config->get_config = [&chainContext, &node, &http_config, &host, &listen, &admin,
                                  &services](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
-                           [&chainContext, &node, &http_config, &host, &port, &services, &admin,
+                           [&chainContext, &node, &http_config, &host, &listen, &services, &admin,
                             callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
@@ -1069,7 +1073,8 @@ void run(const std::string&              db_path,
                               std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
                               result.producer = node.producer_name();
                               result.host     = host;
-                              result.port     = port;
+                              // TODO:
+                              //result.port     = port;
                               result.services = services;
                               result.admin    = admin;
                               result.loggers  = loggers::Config::get();
@@ -1261,13 +1266,12 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 
 int main(int argc, char* argv[])
 {
-   std::string                 db_path;
-   std::string                 producer   = {};
-   auto                        keys       = std::make_shared<CompoundProver>();
-   std::string                 host       = {};
-   unsigned short              port       = 8080;
-   unsigned short              https_port = 0;
-   uint32_t                    leeway_us  = 200000;  // TODO: real value once resources are in place
+   std::string                    db_path;
+   std::string                    producer = {};
+   auto                           keys     = std::make_shared<CompoundProver>();
+   std::string                    host     = {};
+   std::vector<http::listen_spec> listen;
+   uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
    bool                        enable_incoming_p2p = false;
@@ -1292,12 +1296,11 @@ int main(int argc, char* argv[])
        "Enable incoming p2p connections; requires --host");
    opt("host,o", po::value<std::string>(&host)->value_name("name")->default_value(""),
        "Host http server");
-   opt("port", po::value(&port)->default_value(8080), "http server port");
+   opt("listen,l", po::value(&listen)->default_value({}, ""), "Interface and port to listen on.");
    opt("service", po::value(&services)->default_value({}, ""), "Static content");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
 #ifdef PSIBASE_ENABLE_SSL
-   opt("https-port", po::value(&https_port)->default_value(0, ""), "HTTPS server port");
    opt("ssl-trustfile", po::value(&root_ca)->default_value({}, ""),
        "A list of trusted Certification Authorities in PEM format");
    opt("ssl-cert", po::value(&tls_cert)->default_value(""),
@@ -1381,7 +1384,7 @@ int main(int argc, char* argv[])
          restart.shouldRestart     = true;
          restart.soft              = true;
          run(db_path, AccountNumber{producer}, keys, peers, autoconnect, enable_incoming_p2p, host,
-             port, https_port, services, admin, root_ca, tls_cert, tls_key, leeway_us, restart);
+             listen, services, admin, root_ca, tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

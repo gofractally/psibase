@@ -109,6 +109,19 @@ namespace psibase::http
       stream.write(']');
    }
 
+   template <bool Secure>
+   struct tcp_listen_spec
+   {
+      boost::asio::ip::tcp::endpoint endpoint;
+   };
+   using local_listen_spec = boost::asio::local::stream_protocol::endpoint;
+   using listen_spec =
+       std::variant<tcp_listen_spec<false>, tcp_listen_spec<true>, local_listen_spec>;
+   listen_spec parse_listen(const std::string& s);
+   template <bool Secure>
+   tcp_listen_spec<Secure> parse_listen_tcp(const std::string&);
+   local_listen_spec       parse_listen_local(const std::string&);
+
    struct native_content
    {
       std::filesystem::path path;
@@ -186,10 +199,7 @@ namespace psibase::http
       uint32_t                  max_request_size = {};
       std::chrono::milliseconds idle_timeout_ms  = {};
       std::string               allow_origin     = {};
-      std::string               address          = {};
-      unsigned short            port             = {};
-      unsigned short            https_port       = {};
-      std::string               unix_path        = {};  // TODO: remove? rename?
+      std::vector<listen_spec>  listen           = {};
       std::string               host             = {};
 #ifdef PSIBASE_ENABLE_SSL
       tls_context_ptr tls_context = {};
