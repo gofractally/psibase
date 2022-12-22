@@ -1531,7 +1531,7 @@ namespace psibase::http
       }
       else
       {
-         throw std::runtime_error("Don't know how to listen on " + s);
+         return parse_listen_tcp<false>(s);
       }
    }
 
@@ -1549,11 +1549,11 @@ namespace psibase::http
       {
          auto end = s.find(']');
          check(end != std::string::npos);
-         addr = net::ip::make_address_v6(s.substr(1, end));
+         addr = net::ip::make_address_v6(s.substr(1, end - 1));
          if (end + 1 != s.size())
          {
             check(s[end + 1] == ':');
-            auto res = std::from_chars(s.data(), s.data() + s.size(), port);
+            auto res = std::from_chars(s.data() + end + 2, s.data() + s.size(), port);
             check(res.ec == std::errc{} && res.ptr == s.data() + s.size());
          }
       }
