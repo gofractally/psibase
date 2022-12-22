@@ -1290,32 +1290,35 @@ int main(int argc, char* argv[])
    namespace po = boost::program_options;
 
    po::options_description desc("psinode");
-   po::options_description common_opts;
+   po::options_description common_opts("Options");
    auto                    opt = common_opts.add_options();
-   opt("producer,p", po::value<std::string>(&producer)->default_value(""), "Name of this producer");
+   opt("producer,p", po::value<std::string>(&producer)->default_value("")->value_name("name"),
+       "Name of this producer");
    opt("key,k", po::value(&keys->provers)->default_value({}, ""),
        "A private key to use for block production");
-   opt("peer", po::value(&peers)->default_value({}, ""), "Peer endpoint");
-   opt("autoconnect", po::value(&autoconnect)->default_value({}, "unlimited"),
-       "Preferred number of peers");
-   opt("p2p", po::bool_switch(&enable_incoming_p2p)->default_value(false, "off"),
-       "Enable incoming p2p connections; requires --host");
    opt("host,o", po::value<std::string>(&host)->value_name("name")->default_value(""),
-       "Host http server");
-   opt("listen,l", po::value(&listen)->default_value({}, ""),
+       "Root host name for the http server");
+   opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
        "TCP or local socket endpoint on which the server accepts connections");
-   opt("service", po::value(&services)->default_value({}, ""), "Static content");
+   opt("p2p", po::bool_switch(&enable_incoming_p2p)->default_value(false, "off"),
+       "Enable incoming p2p connections");
+   opt("peer", po::value(&peers)->default_value({}, "")->value_name("URL"), "Peer endpoint");
+   opt("autoconnect", po::value(&autoconnect)->default_value({}, "")->value_name("num"),
+       "Limits the number of peers to be connected automatically");
+   opt("service", po::value(&services)->default_value({}, "")->value_name("host:directory"),
+       "Serve static content from directory using the specified virtual host name");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
 #ifdef PSIBASE_ENABLE_SSL
-   opt("ssl-trustfile", po::value(&root_ca)->default_value({}, ""),
+   opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
        "A list of trusted Certification Authorities in PEM format");
-   opt("ssl-cert", po::value(&tls_cert)->default_value(""),
-       "The file containing the server's certificate");
-   opt("ssl-key", po::value(&tls_key)->default_value(""), "The file containing the private key");
+   opt("tls-cert", po::value(&tls_cert)->default_value("")->value_name("path"),
+       "The file containing the server's certificate in PEM format");
+   opt("tls-key", po::value(&tls_key)->default_value("")->value_name("path"),
+       "The file containing the private key corresponding to --tls-cert in PEM format");
 #endif
-   opt("leeway,l", po::value<uint32_t>(&leeway_us)->default_value(200000),
-       "Transaction leeway, in us. Defaults to 200000.");
+   opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
+       "Transaction leeway, in µs.");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
@@ -1376,7 +1379,7 @@ int main(int argc, char* argv[])
    if (vm.count("help"))
    {
       std::cerr << usage << "\n\n";
-      std::cerr << desc << "\n";
+      std::cerr << common_opts << "\n";
       return 1;
    }
 
