@@ -15,27 +15,35 @@ psinode [OPTIONS] <DATABASE>
 
 `<DATABASE>`, which is required, is a path to the psibase database. psinode creates it if it does not already exist.
 
-If you don't give it any other options, psinode will just sit there with nothing to do. There are three important options for creating and running a local test chain:
+If you don't give it any other options, psinode will find that it has nothing to do and immediately shut down. There are four important options for creating and running a local test chain:
 
+- `--listen` tells psinode an interface and TCP port to listen on. If this argument is not provided, the HTTP server will not run. The argument can be any of the following
+  - A port number: Listens on `0.0.0.0` with the specified port
+  - An IP address: Listen on port 80 on the given interface
+  - An IP address and port separated by a colon: `ipv4:port` or `[ipv6]:port`
+  - An `http` or `https` URL: The host component must be an IP address. All components other than the host and port must be empty. `https` requires `--tls-cert` and `--tls-key` to be provided.
+  - A filesystem path: Listens on a local socket
 - `-p` or `--producer` tells psinode to produce blocks. It will not start production on an empty chain until you boot the chain (below). Its argument is a name for the producer. psinode will only produce blocks when it is this producer's turn according to consensus. Multiple distinct nodes must not use the same producer name.
-- `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. Right now it always hosts on address `0.0.0.0` (TODO). The port defaults to 8080 but can be configured with `--port`. The http interface also accepts p2p websocket connections from other nodes (see `--peer`).
-- `-k` or `--key` tells psinode a private key with which to sign blocks. It must match the producer's public key.  If the producer has no key set, then it may be omitted.
+- `-o` or `--host` tells psinode to host the http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. This argument allows on-chain services to handle HTTP requests and also allows the node to accept transactions.
+- `-k` or `--key` tells psinode a private key with which to sign blocks. Any number of keys may be provided, but only the one that matches the public key corresponding to the producer name will be used. If the correct key is not provided, then `psinode` will be unable to produce blocks.
 
-Four more options are important for connecting multiple nodes together in a network:
+Three more options are important for connecting multiple nodes together in a network:
 
-- `--port` tells psinode the TCP port for the http interface. The default port is 8080.
+- `--p2p` tells psinode to allow external nodes to peer to it over its http interface at `/native/p2p`.
 - `--peer` tells psinode a peer to sync with. The argument should have the form `host:port`. This argument can appear any number of times.
 - `--autoconnect` limits the number of out-going peer connections. If it is less than the number of `--peer` options, the later peers will be tried after a connection to an earlier peer fails.
-- `--p2p` tells psinode to allow external nodes to peer to it over its http interface at `/native/p2p`.
-
-psinode does not include https hosting; use a [reverse proxy](https.md) to add that when hosting a public node.
 
 Options controlling native content (enabled in new nodes by default):
 
 - `--service` *host*:*path*: tells psinode to host static content from *path*.
 - `--admin` `'builtin:*'` | `'*'` | *service*: tells psinode to enable the [admin API](../http.md#node-administrator-services)
 
-Options can also be specified in a configuration file loaded from `<DATABASE>/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, it will be initialized with a default configuration file that hosts the [administrator service](../system-service/admin-sys.md) on [http://localhost:8080/](http://localhost:8080/).
+Options controlling TLS:
+- `--tls-cert` *file*: A file containing the certificate chain that the server will use. The key must be specified as well using `--tls-key`. This certificate will be used both as a server certificate for incoming https connections and as a client certificate for outing p2p connections using https. The certificate should be a wildcard certificate, valid for both *host* and \*.*host*.
+- `--tls-key` *file*: The private key corresponding to `--tls-cert`
+- `--tls-trustfile` *file*: This file should contain trusted root certification authorities used to verify certificates. If it is not provided a system dependent default will be used.
+
+Options can also be specified in a configuration file loaded from `<DATABASE>/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, it will be initialized with a default configuration file that includes the [administrator service](../system-service/admin-sys.md).
 
 The configuration file also controls [logging](logging.md).
 
@@ -43,7 +51,7 @@ Example:
 ```ini
 producer = prod
 host     = 127.0.0.1.sslip.io
-port     = 8080
+listen   = 8080
 service  = localhost:$PREFIX/share/psibase/services/admin-sys
 admin    = builtin:*
 
@@ -68,7 +76,7 @@ A chain doesn't exist until it's booted. This procedure boots a chain suitable f
 ### Start psinode
 
 ```
-psinode -p prod -o psibase.127.0.0.1.sslip.io my_psinode_db
+psinode -p prod -o psibase.127.0.0.1.sslip.io my_psinode_db --listen 8080
 ```
 
 This will:
@@ -103,6 +111,7 @@ You may now interact with the chain using:
 ```
 psinode \
     --peer some_domain_or_ip:8080 \
+    --listen 8080                 \
     -o psibase.127.0.0.1.sslip.io \
     my_psinode_db
 ```
@@ -114,31 +123,6 @@ This will:
 - Connect to a peer at `some_domain_or_ip:8080`. The peer option may be repeated multiple times to connect to multiple peers.
 
 If the database is currently empty, or if the database is on the same chain as the peers, this will grab blocks from the peers and replay them. Any peers must have their `--p2p` option enabled.
-
-## Be kind; please rewind
-
-If you're starting a new node on an existing chain, it's polite to replay from a block file instead of fetching the entire chain from peer nodes.
-
-```
-psinode
-    --replay-blocks filename \
-    -o psibase.127.0.0.1.sslip.io \
-    my_psinode_db
-```
-
-This will:
-
-- Open a database named `my_psinode_db` in the current directory; it will create it if it does not already exist.
-- Host a web UI and an RPC interface at [http://psibase.127.0.0.1.sslip.io:8080/](http://psibase.127.0.0.1.sslip.io:8080/).
-- Replay the blocks from `filename`. The RPC interface is available during replay; this allows you to use the UI to monitor progress.
-
-If you combine both the `--replay-blocks` and the `--peer` options, then psinode will connect to peers after it has finished replaying from the block file. If you use both the `--replay-blocks` and the `--p2p` option, the node will accept incoming p2p requests after it has finished. TODO: allow p2p during replay to allow outgoing blocks; don't allow incoming ones until finished.
-
-If your database isn't empty and is on the same chain that's stored in the block file, then psinode will replay the blocks that it hasn't already processed. This can be used to quickly catch a node up which has been offline a while.
-
-## Creating a block file
-
-The `--save-blocks file` option will save all blocks to a file. You can use this to bootstrap other nodes.
 
 ## Cloning a node
 
