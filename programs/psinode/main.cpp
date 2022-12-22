@@ -33,6 +33,8 @@
 using namespace psibase;
 using namespace psibase::net;
 
+using http::listen_spec;
+
 struct native_service
 {
    std::string           host;
@@ -630,7 +632,7 @@ struct PsinodeConfig
    autoconnect_t               autoconnect;
    AccountNumber               producer;
    std::string                 host;
-   std::uint16_t               port = 8080;
+   std::vector<listen_spec>    listen;
    std::vector<native_service> services;
    http::admin_service         admin;
    psibase::loggers::Config    loggers;
@@ -641,7 +643,7 @@ PSIO_REFLECT(PsinodeConfig,
              autoconnect,
              producer,
              host,
-             port,
+             listen,
              services,
              admin,
              loggers);
@@ -668,10 +670,16 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    {
       file.set("", "host", config.host, "The HTTP server's host name");
    }
-   if (!config.host.empty() || !config.services.empty())
+   if (!config.listen.empty())
    {
-      file.set("", "port", std::to_string(config.port),
-               "The TCP port that the HTTP server listens on");
+      std::vector<std::string> listen;
+      for (const auto& l : config.listen)
+      {
+         listen.push_back(to_string(l));
+      }
+      file.set(
+          "", "listen", listen, [](std::string_view text) { return std::string(text); },
+          "TCP or local socket endpoint on which the server accepts connections");
    }
    if (!config.services.empty())
    {
@@ -714,21 +722,21 @@ using basic_consensus =
 template <typename Derived>
 using consensus = basic_consensus<Derived, timer_type>;
 
-void run(const std::string&                    db_path,
-         AccountNumber                         producer,
-         std::shared_ptr<CompoundProver>       prover,
-         const std::vector<std::string>&       peers,
-         autoconnect_t                         autoconnect,
-         bool                                  enable_incoming_p2p,
-         std::string                           host,
-         const std::vector<http::listen_spec>& listen,
-         std::vector<native_service>&          services,
-         http::admin_service&                  admin,
-         const std::vector<std::string>&       root_ca,
-         const std::string&                    tls_cert,
-         const std::string&                    tls_key,
-         uint32_t                              leeway_us,
-         RestartInfo&                          runResult)
+void run(const std::string&              db_path,
+         AccountNumber                   producer,
+         std::shared_ptr<CompoundProver> prover,
+         const std::vector<std::string>& peers,
+         autoconnect_t                   autoconnect,
+         bool                            enable_incoming_p2p,
+         std::string                     host,
+         std::vector<listen_spec>        listen,
+         std::vector<native_service>&    services,
+         http::admin_service&            admin,
+         const std::vector<std::string>& root_ca,
+         const std::string&              tls_cert,
+         const std::string&              tls_key,
+         uint32_t                        leeway_us,
+         RestartInfo&                    runResult)
 {
    ExecutionContext::registerHostFunctions();
 
@@ -998,15 +1006,15 @@ void run(const std::string&                    db_path,
       };
 
       http_config->set_config =
-          [&chainContext, &node, &db_path, &runResult, &http_config, &host, &listen, &admin,
-           &services, &connect_one](std::vector<char> json, http::connect_callback callback)
+          [&chainContext, &node, &db_path, &runResult, &http_config, &host, &admin, &services,
+           &connect_one](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
 
          boost::asio::post(chainContext,
                            [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
-                            &db_path, &runResult, &http_config, &host, &listen, &services, &admin,
+                            &db_path, &runResult, &http_config, &host, &services, &admin,
                             &connect_one, callback = std::move(callback)]() mutable
                            {
                               std::optional<http::services_t> new_services;
@@ -1025,15 +1033,14 @@ void run(const std::string&                    db_path,
                                  node.autoconnect(std::vector(config.peers),
                                                   config.autoconnect.value, connect_one);
                               }
-                              host = config.host;
-                              // TODO:
-                              //port     = config.port;
+                              host     = config.host;
                               services = config.services;
                               admin    = config.admin;
                               loggers::configure(config.loggers);
                               {
                                  std::shared_lock l{http_config->mutex};
                                  http_config->host                = host;
+                                 http_config->listen              = config.listen;
                                  http_config->admin               = admin;
                                  http_config->enable_transactions = !host.empty();
                                  if (new_services)
@@ -1061,11 +1068,11 @@ void run(const std::string&                    db_path,
                            });
       };
 
-      http_config->get_config = [&chainContext, &node, &http_config, &host, &listen, &admin,
+      http_config->get_config = [&chainContext, &node, &http_config, &host, &admin,
                                  &services](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
-                           [&chainContext, &node, &http_config, &host, &listen, &services, &admin,
+                           [&chainContext, &node, &http_config, &host, &services, &admin,
                             callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
@@ -1073,8 +1080,7 @@ void run(const std::string&                    db_path,
                               std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
                               result.producer = node.producer_name();
                               result.host     = host;
-                              // TODO:
-                              //result.port     = port;
+                              result.listen   = http_config->listen;
                               result.services = services;
                               result.admin    = admin;
                               result.loggers  = loggers::Config::get();
@@ -1266,11 +1272,11 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 
 int main(int argc, char* argv[])
 {
-   std::string                    db_path;
-   std::string                    producer = {};
-   auto                           keys     = std::make_shared<CompoundProver>();
-   std::string                    host     = {};
-   std::vector<http::listen_spec> listen;
+   std::string                 db_path;
+   std::string                 producer = {};
+   auto                        keys     = std::make_shared<CompoundProver>();
+   std::string                 host     = {};
+   std::vector<listen_spec>    listen;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
@@ -1296,7 +1302,8 @@ int main(int argc, char* argv[])
        "Enable incoming p2p connections; requires --host");
    opt("host,o", po::value<std::string>(&host)->value_name("name")->default_value(""),
        "Host http server");
-   opt("listen,l", po::value(&listen)->default_value({}, ""), "Interface and port to listen on.");
+   opt("listen,l", po::value(&listen)->default_value({}, ""),
+       "TCP or local socket endpoint on which the server accepts connections");
    opt("service", po::value(&services)->default_value({}, ""), "Static content");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");

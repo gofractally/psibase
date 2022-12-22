@@ -122,6 +122,85 @@ namespace psibase::http
    tcp_listen_spec<Secure> parse_listen_tcp(const std::string&);
    local_listen_spec       parse_listen_local(const std::string&);
 
+   struct any_listen_spec
+   {
+      std::string                   protocol;
+      std::optional<std::string>    path;
+      std::optional<std::string>    address;
+      std::optional<unsigned short> port;
+   };
+   PSIO_REFLECT(any_listen_spec, protocol, path, address, port)
+
+   template <bool Secure, typename S>
+   void to_json(const tcp_listen_spec<Secure>& obj, S& stream)
+   {
+      stream.write('{');
+      if constexpr (Secure)
+      {
+         to_json("protocol", stream);
+         stream.write(':');
+         to_json("https", stream);
+      }
+      else
+      {
+         to_json("protocol", stream);
+         stream.write(':');
+         to_json("http", stream);
+      }
+      stream.write(',');
+      to_json("address", stream);
+      stream.write(':');
+      to_json(obj.endpoint.address().to_string(), stream);
+      stream.write(',');
+      to_json("port", stream);
+      stream.write(':');
+      to_json(obj.endpoint.port(), stream);
+      stream.write('}');
+   }
+
+   void to_json(const local_listen_spec& obj, auto& stream)
+   {
+      stream.write('{');
+      to_json("protocol", stream);
+      stream.write(':');
+      to_json("local", stream);
+      stream.write(',');
+      to_json("path", stream);
+      stream.write(':');
+      to_json(obj.path(), stream);
+      stream.write('}');
+   }
+
+   void to_json(const listen_spec& obj, auto& stream)
+   {
+      std::visit([&](const auto& obj) { to_json(obj, stream); }, obj);
+   }
+
+   void from_json(listen_spec& obj, auto& stream)
+   {
+      any_listen_spec tmp;
+      from_json(tmp, stream);
+      if (tmp.protocol == "http")
+      {
+         check(!!tmp.address, "Address expected");
+         check(!!tmp.port, "Port expected");
+         obj = tcp_listen_spec<false>{{boost::asio::ip::make_address(*tmp.address), *tmp.port}};
+      }
+      else if (tmp.protocol == "https")
+      {
+         check(!!tmp.address, "Address expected");
+         check(!!tmp.port, "Port expected");
+         obj = tcp_listen_spec<true>{{boost::asio::ip::make_address(*tmp.address), *tmp.port}};
+      }
+      else if (tmp.protocol == "local")
+      {
+         check(!!tmp.path, "Address expected");
+         obj = local_listen_spec{*tmp.path};
+      }
+   }
+
+   std::string to_string(const listen_spec&);
+
    struct native_content
    {
       std::filesystem::path path;

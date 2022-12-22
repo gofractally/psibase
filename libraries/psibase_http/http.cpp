@@ -1486,7 +1486,7 @@ namespace psibase::http
       {
          if (s.ends_with('/'))
          {
-            s = s.substr(s.size() - 1);
+            s = s.substr(0, s.size() - 1);
          }
          auto           pos     = s.find(':');
          auto           address = net::ip::make_address(std::string(s.substr(0, pos)));
@@ -1583,6 +1583,36 @@ namespace psibase::http
    local_listen_spec parse_listen_local(const std::string& s)
    {
       return local_listen_spec(s);
+   }
+
+   template <bool Secure>
+   std::string to_string(const tcp_listen_spec<Secure>& spec)
+   {
+      std::ostringstream ss;
+      ss << spec.endpoint;
+      if constexpr (Secure)
+      {
+         return "https://" + ss.str();
+      }
+      else
+      {
+         return ss.str();
+      }
+   }
+
+   std::string to_string(const local_listen_spec& spec)
+   {
+      auto result = spec.path();
+      if (result.find('/') == std::string::npos)
+      {
+         result = "./" + result;
+      }
+      return result;
+   }
+
+   std::string to_string(const listen_spec& spec)
+   {
+      return std::visit([](const auto& spec) { return to_string(spec); }, spec);
    }
 
    template <bool Secure>
