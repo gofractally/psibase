@@ -1362,7 +1362,7 @@ namespace psibase::http
           : http_session<unix_http_session>(server), stream(std::move(socket))
       {
          logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
-                                                    socket.remote_endpoint().path()));
+                                                    stream.socket().remote_endpoint().path()));
       }
 
       beast::basic_stream<unixs,
