@@ -26,7 +26,7 @@ THE SOFTWARE.
  Data Compression With Arithmetic Coding
  by Mark Nelson
  published at:
-http://marknelson.us/2014/10/19/data-compression-with-arithmetic-coding
+https://marknelson.us/posts/2014/10/19/data-compression-with-arithmetic-coding.html
 
  It has been modified by Daniel Larimer for the specific purpose of compressing
  short names and the encoder has been updated to use precomputed tables that
