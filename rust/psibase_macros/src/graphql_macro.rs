@@ -19,7 +19,7 @@ struct Args {
 
 impl Parse for Args {
     fn parse(input: ParseStream) -> Result<Self> {
-        let query_name = input.parse().expect("Query name not present");
+        let query_name: Ident = input.parse().expect("Query name not present");
         input.parse::<Token![,]>().expect("expected ,");
 
         let table = input.parse().expect("Table name not present");
@@ -52,6 +52,19 @@ impl Parse for Args {
                         .parse::<TypeParamBound>()
                         .expect("unable to parse subindex remaining key type");
                     subindex_remaining_key_ty = Some(ty);
+
+                    // Accepts an optional comma
+                    if !input.is_empty() {
+                        input.parse::<Token![,]>().expect("expected ,");
+
+                        // If there's more input, it's an error
+                        if !input.is_empty() {
+                            abort!(
+                                subindex_remaining_key_ty,
+                                "subindex remaining key type must be the last param"
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -206,6 +219,7 @@ pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
     };
 
     let query = quote! {
+        #[allow(clippy::too_many_arguments)]
         async fn #query_name(
             &self,
             #params
