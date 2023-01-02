@@ -404,7 +404,7 @@ void loop(Timer& timer, F&& f)
        });
 }
 
-void pushTransaction(psibase::SharedState&                  sharedState,
+bool pushTransaction(psibase::SharedState&                  sharedState,
                      const std::shared_ptr<const Revision>& revisionAtBlockStart,
                      BlockContext&                          bc,
                      SystemContext&                         proofSystem,
@@ -500,6 +500,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
       try
       {
          entry.callback(std::move(trace));
+         return !trace.error;
       }
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
@@ -523,6 +524,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
    }
+   return false;
 }  // pushTransaction
 
 std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view peer)
@@ -603,6 +605,324 @@ struct RestartInfo
    bool              configChanged     = false;
 };
 PSIO_REFLECT(RestartInfo, shouldRestart);
+
+struct ThreadInfo
+{
+   pid_t        id;
+   std::string  group;
+   std::int64_t user;
+   std::int64_t system;
+   std::int64_t pageFaults;
+   std::int64_t read;
+   std::int64_t written;
+};
+PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
+
+struct MemStats
+{
+   std::size_t database;
+   std::size_t code;
+   std::size_t data;
+   std::size_t wasmMemory;
+   std::size_t wasmCode;
+   std::size_t unclassified;
+};
+PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
+
+// TODO: this will need to be reworked when we have more complete transaction tracking
+struct TransactionStats
+{
+   std::uint64_t unprocessed;
+   std::uint64_t total;
+   std::uint64_t failed;
+   std::uint64_t succeeded;
+   std::uint64_t skipped;
+};
+PSIO_REFLECT(TransactionStats, unprocessed, total, failed, succeeded, skipped)
+
+struct Perf
+{
+   std::int64_t            timestamp;
+   MemStats                memory;
+   std::vector<ThreadInfo> tasks;
+   TransactionStats        transactions;
+};
+PSIO_REFLECT(Perf, timestamp, memory, tasks, transactions)
+
+std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
+{
+   std::int64_t value;
+   is >> value;
+   return value / clk_tck * 1000000 + (value % clk_tck) * 1000000 / clk_tck;
+}
+
+ThreadInfo getThreadInfo(const std::filesystem::path& name, long clk_tck)
+{
+   ThreadInfo result = {};
+   {
+      std::ifstream in(name / "stat");
+      in >> result.id;
+      std::string tmp;
+      for (int i = 0; i < 10; ++i)
+      {
+         in >> tmp;
+      }
+      // (12) majflt
+      in >> result.pageFaults;
+      in >> tmp;
+      // (14) utime
+      result.user = read_as_microseconds(in, clk_tck);
+      // (15) stime
+      result.system = read_as_microseconds(in, clk_tck);
+   }
+   if (result.id == getpid())
+   {
+      result.group = "chain";
+   }
+   else
+   {
+      std::ifstream in(name / "comm");
+      char          buf[17] = {};
+      in.read(buf, 16);
+      std::string_view thread_name(buf);
+      if (thread_name.starts_with("http"))
+      {
+         result.group = "http";
+      }
+      else if (thread_name.starts_with("swap"))
+      {
+         result.group = "database";
+      }
+   }
+   {
+      std::ifstream in(name / "io");
+      std::string   line;
+      auto          split = [](std::string_view line)
+      {
+         auto pos = line.find(": ");
+         if (pos == std::string_view::npos)
+         {
+            return std::pair{std::string_view{}, std::string_view{}};
+         }
+         else
+         {
+            return std::pair{line.substr(0, pos), line.substr(pos + 2)};
+         }
+      };
+      auto parse_int = [](std::string_view s)
+      {
+         std::int64_t result = 0;
+         std::from_chars(s.begin(), s.end(), result);
+         return result;
+      };
+      while (std::getline(in, line))
+      {
+         auto [key, value] = split(line);
+         if (key == "read_bytes")
+         {
+            result.read = parse_int(value);
+         }
+         else if (key == "write_bytes")
+         {
+            result.written = parse_int(value);
+         }
+      }
+   }
+   return result;
+}
+
+struct MappingInfo
+{
+   std::uintptr_t begin;
+   std::uintptr_t end;
+   std::size_t    rss;
+   bool           executable;
+   bool           anonymous;
+   bool           special;
+};
+
+bool parse_map_line(const char* begin, const char* end, MappingInfo& mapping)
+{
+   auto res = std::from_chars(begin, end, mapping.begin, 16);
+   if (res.ec != std::errc())
+      return false;
+   begin = res.ptr;
+   if (begin == end || *begin != '-')
+      return false;
+   ++begin;
+   res = std::from_chars(begin, end, mapping.end, 16);
+   if (res.ec != std::errc())
+      return false;
+   begin = res.ptr;
+
+   auto read_field = [&]
+   {
+      while (begin != end && *begin == ' ')
+      {
+         ++begin;
+      }
+      const char* start = begin;
+      while (begin != end && *begin != ' ')
+      {
+         ++begin;
+      }
+      return std::string_view{start, begin};
+   };
+   auto flags         = read_field();
+   mapping.executable = flags.find('x') != std::string_view::npos;
+   auto offset        = read_field();
+   auto dev           = read_field();
+   auto inode         = read_field();
+   auto pathname      = read_field();
+   mapping.anonymous  = pathname == "";
+   mapping.special    = pathname.starts_with('[') && pathname.ends_with(']');
+   return true;
+}
+
+bool parse_mapping_field(std::string_view line, std::size_t& value)
+{
+   auto pos = line.find(':');
+   if (pos == std::string_view::npos)
+      return false;
+   pos      = line.find_first_not_of(' ', pos + 1);
+   auto res = std::from_chars(line.begin() + pos, line.end(), value);
+   if (res.ec != std::errc())
+      return false;
+   if (std::string_view(res.ptr, line.end()) != " kB")
+      return false;
+   value *= 1024;
+   return true;
+}
+
+std::istream& operator>>(std::istream& is, MappingInfo& info)
+{
+   std::string line;
+   if (!std::getline(is, line))
+      return is;
+   if (!parse_map_line(line.data(), line.data() + line.size(), info))
+      throw std::runtime_error("Failed to parse mapping");
+   info.rss = 0;
+   while (std::getline(is, line))
+   {
+      if (line.starts_with("VmFlags:"))
+         break;
+      else if (line.starts_with("Rss:"))
+      {
+         if (!parse_mapping_field(line, info.rss))
+            throw std::runtime_error("Failed to parse Rss");
+      }
+   }
+   return is;
+}
+
+enum class RegionGroup
+{
+   unknown,
+   database,
+   wasmMemory,
+   wasmCode,
+};
+
+struct RegionInfo
+{
+   struct Region
+   {
+      std::uintptr_t begin;
+      std::uintptr_t end;
+      RegionGroup    group;
+   };
+   // Returns the first region that intersects the given range
+   RegionGroup get(std::uintptr_t begin, std::uintptr_t end)
+   {
+      auto pos = std::partition_point(regions.begin(), regions.end(),
+                                      [begin](const auto& r) { return r.end <= begin; });
+      if (pos != regions.end() && pos->begin < end)
+         return pos->group;
+      return RegionGroup::unknown;
+   }
+   void add(std::span<const char> range, RegionGroup group)
+   {
+      regions.push_back({reinterpret_cast<std::uintptr_t>(range.data()),
+                         reinterpret_cast<std::uintptr_t>(range.data() + range.size()), group});
+   }
+   void prepare()
+   {
+      std::sort(regions.begin(), regions.end(),
+                [](const auto& lhs, const auto& rhs) { return lhs.begin < rhs.begin; });
+   }
+   std::vector<Region> regions;
+};
+
+MemStats getMemStats(const SharedState& state)
+{
+   RegionInfo regions;
+   for (auto span : state.dbSpan())
+   {
+      regions.add(span, RegionGroup::database);
+   }
+   for (auto span : state.codeSpan())
+   {
+      regions.add(span, RegionGroup::wasmCode);
+   }
+   for (auto span : state.linearMemorySpan())
+   {
+      regions.add(span, RegionGroup::wasmMemory);
+   }
+   regions.prepare();
+   MemStats result = {};
+   {
+      std::ifstream in("/proc/self/smaps");
+      MappingInfo   info;
+      while (in >> info)
+      {
+         switch (regions.get(info.begin, info.end))
+         {
+            case RegionGroup::database:
+               result.database += info.rss;
+               break;
+            case RegionGroup::wasmCode:
+               result.wasmCode += info.rss;
+               break;
+            case RegionGroup::wasmMemory:
+               result.wasmMemory += info.rss;
+               break;
+            default:
+            {
+               if (info.executable)
+               {
+                  result.code += info.rss;
+               }
+               else if (!info.anonymous && !info.special)
+               {
+                  result.data += info.rss;
+               }
+               else
+               {
+                  result.unclassified += info.rss;
+               }
+               break;
+            }
+         }
+      }
+   }
+   return result;
+}
+
+Perf get_perf(const SharedState& state, const TransactionStats& transactions)
+{
+   long clk_tck = ::sysconf(_SC_CLK_TCK);
+   Perf result;
+   result.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
+   result.memory       = getMemStats(state);
+   result.transactions = transactions;
+   for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
+   {
+      result.tasks.push_back(getThreadInfo(entry, clk_tck));
+   }
+   return result;
+}
 
 struct PsinodeConfig
 {
@@ -716,6 +1036,9 @@ void run(const std::string&              db_path,
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
    auto queue       = std::make_shared<transaction_queue>();
+   //
+   TransactionStats transactionStats = {};
+   std::mutex       transactionStatsMutex;
 
    if (system->sharedDatabase.isSlow())
    {
@@ -805,16 +1128,28 @@ void run(const std::string&              db_path,
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =
-          [queue](std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
+          [queue, &transactionStats, &transactionStatsMutex](
+              std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
       {
+         {
+            std::lock_guard l{transactionStatsMutex};
+            ++transactionStats.total;
+            ++transactionStats.unprocessed;
+         }
          std::scoped_lock lock{queue->mutex};
          queue->entries.push_back(
              {true, std::move(packed_signed_transactions), std::move(callback), {}});
       };
 
       http_config->push_transaction_async =
-          [queue](std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
+          [queue, &transactionStats, &transactionStatsMutex](
+              std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
       {
+         {
+            std::lock_guard l{transactionStatsMutex};
+            ++transactionStats.total;
+            ++transactionStats.unprocessed;
+         }
          std::scoped_lock lock{queue->mutex};
          queue->entries.push_back({false, std::move(packed_signed_trx), {}, std::move(callback)});
       };
@@ -866,6 +1201,24 @@ void run(const std::string&              db_path,
                                  node.peers().disconnect_all(restart);
                               });
          }
+      };
+
+      http_config->get_perf =
+          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
+      {
+         TransactionStats trx;
+         {
+            std::lock_guard lock{transactionStatsMutex};
+            trx = transactionStats;
+         }
+         callback(
+             [result = get_perf(*sharedState, trx)]() mutable
+             {
+                std::vector<char>   json;
+                psio::vector_stream stream(json);
+                to_json(result, stream);
+                return json;
+             });
       };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
@@ -1134,6 +1487,11 @@ void run(const std::string&              db_path,
       }
       auto fail_all = [&](const std::string& message)
       {
+         {
+            std::lock_guard lock{transactionStatsMutex};
+            transactionStats.unprocessed -= entries.size();
+            transactionStats.skipped += entries.size();
+         }
          for (auto& entry : entries)
          {
             if (entry.callback)
@@ -1156,13 +1514,26 @@ void run(const std::string&              db_path,
          auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
          {
+            bool res;
             if (entry.is_boot)
-               push_boot(*bc, entry);
+               res = push_boot(*bc, entry);
             else
-               pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
-                               std::chrono::microseconds(leeway_us),  // TODO
-                               std::chrono::microseconds(leeway_us),  // TODO
-                               std::chrono::microseconds(leeway_us));
+               res = pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
+                                     std::chrono::microseconds(leeway_us),  // TODO
+                                     std::chrono::microseconds(leeway_us),  // TODO
+                                     std::chrono::microseconds(leeway_us));
+            {
+               std::lock_guard lock{transactionStatsMutex};
+               --transactionStats.unprocessed;
+               if (res)
+               {
+                  ++transactionStats.succeeded;
+               }
+               else
+               {
+                  ++transactionStats.failed;
+               }
+            }
          }
 
          // TODO: this should go in the leader's production loop
