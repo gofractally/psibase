@@ -42,6 +42,8 @@
 #include <thread>
 #include <vector>
 
+#include <pthread.h>
+
 namespace beast     = boost::beast;  // from <boost/beast.hpp>
 namespace websocket = beast::websocket;
 namespace bhttp     = beast::http;                  // from <boost/beast/http.hpp>
@@ -761,6 +763,21 @@ namespace psibase::http
             }
             server.http_config->shutdown(std::move(req.body()));
             return send(accepted());
+         }
+         else if (req.target() == "/native/admin/perf" && server.http_config->get_perf)
+         {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() != bhttp::verb::get)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+            run_native_handler(
+                server.http_config->get_perf,
+                [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
+                { session->queue_(ok(make_result(), "application/json")); });
          }
          else if (req.target() == "/native/admin/peers" && server.http_config->get_peers)
          {
@@ -1674,7 +1691,14 @@ namespace psibase::http
 
       threads.reserve(http_config->num_threads);
       for (unsigned i = 0; i < http_config->num_threads; ++i)
-         threads.emplace_back([this, _ = std::unique_lock{thread_count}]() mutable { ioc.run(); });
+      {
+         threads.emplace_back(
+             [this, i, _ = std::unique_lock{thread_count}]() mutable
+             {
+                pthread_setname_np(pthread_self(), ("http-" + std::to_string(i)).c_str());
+                ioc.run();
+             });
+      }
       return true;
    }
 

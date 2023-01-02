@@ -1,8 +1,10 @@
 #pragma once
+#include <array>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <chrono>
 #include <functional>
 #include <optional>
+#include <span>
 #include <thread>
 #include <triedent/object_db.hpp>
 
@@ -92,6 +94,8 @@ namespace triedent
       void validate(id i) { _obj_ids->validate(i); }
 
       bool is_slow() const;
+
+      std::array<std::span<const char>, 4> span() const;
 
      private:
       uint64_t wait_on_free_space(managed_ring& ring, uint64_t used_size);
@@ -231,6 +235,7 @@ namespace triedent
          // ++_head->cache_hits;  // TODO: remove from release
          return reinterpret_cast<object_header*>(begin_pos() + offset);
       }
+      std::span<const char> span() const { return {(const char*)_begin, (const char*)_end}; }
 
       ring_allocator::cache_level_type level;
 
@@ -495,6 +500,11 @@ namespace triedent
    inline bool ring_allocator::is_slow() const
    {
       return hot()._slow || warm()._slow || cool()._slow || cold()._slow;
+   }
+
+   inline std::array<std::span<const char>, 4> ring_allocator::span() const
+   {
+      return {hot().span(), warm().span(), cool().span(), cold().span()};
    }
 
 }  // namespace triedent

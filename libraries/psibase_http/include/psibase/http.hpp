@@ -287,6 +287,7 @@ namespace psibase::http
       push_transaction_t       push_transaction_async = {};
       accept_p2p_websocket_t   accept_p2p_websocket   = {};
       shutdown_t               shutdown               = {};
+      get_config_t             get_perf               = {};
       get_peers_t              get_peers              = {};
       connect_t                connect                = {};
       connect_t                disconnect             = {};
