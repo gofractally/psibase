@@ -1,7 +1,14 @@
 #pragma once
 
+#include <boost/asio/local/stream_protocol.hpp>
+#include <boost/asio/ssl/context.hpp>
 #include <boost/beast/core/tcp_stream.hpp>
+#ifdef PSIBASE_ENABLE_SSL
+#include <boost/beast/ssl.hpp>
+#endif
 #include <boost/beast/websocket/stream_fwd.hpp>
+#include <boost/type_erasure/any.hpp>
+#include <boost/type_erasure/callable.hpp>
 #include <chrono>
 #include <filesystem>
 #include <psibase/SystemContext.hpp>
@@ -22,8 +29,22 @@ namespace psibase::http
 
    using shutdown_t = std::function<void(std::vector<char>)>;
 
-   using accept_p2p_websocket_result = boost::beast::websocket::stream<boost::beast::tcp_stream>;
-   using accept_p2p_websocket_t      = std::function<void(accept_p2p_websocket_result&&)>;
+   using accept_p2p_websocket1 = boost::beast::websocket::stream<boost::beast::tcp_stream>;
+#ifdef PSIBASE_ENABLE_SSL
+   using accept_p2p_websocket2 =
+       boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>;
+#endif
+   using accept_p2p_websocket3 = boost::beast::websocket::stream<
+       boost::beast::basic_stream<boost::asio::local::stream_protocol>>;
+
+   using accept_p2p_websocket_t = boost::type_erasure::any<
+       boost::mpl::vector<boost::type_erasure::relaxed,
+                          boost::type_erasure::copy_constructible<>,
+                          boost::type_erasure::callable<void(accept_p2p_websocket1&&)>,
+#ifdef PSIBASE_ENABLE_SSL
+                          boost::type_erasure::callable<void(accept_p2p_websocket2&&)>,
+#endif
+                          boost::type_erasure::callable<void(accept_p2p_websocket3&&)>>>;
 
    struct peer_info
    {
@@ -87,6 +108,98 @@ namespace psibase::http
       }
       stream.write(']');
    }
+
+   template <bool Secure>
+   struct tcp_listen_spec
+   {
+      boost::asio::ip::tcp::endpoint endpoint;
+   };
+   using local_listen_spec = boost::asio::local::stream_protocol::endpoint;
+   using listen_spec =
+       std::variant<tcp_listen_spec<false>, tcp_listen_spec<true>, local_listen_spec>;
+   listen_spec parse_listen(const std::string& s);
+   template <bool Secure>
+   tcp_listen_spec<Secure> parse_listen_tcp(const std::string&);
+   local_listen_spec       parse_listen_local(const std::string&);
+
+   struct any_listen_spec
+   {
+      std::string                   protocol;
+      std::optional<std::string>    path;
+      std::optional<std::string>    address;
+      std::optional<unsigned short> port;
+   };
+   PSIO_REFLECT(any_listen_spec, protocol, path, address, port)
+
+   template <bool Secure, typename S>
+   void to_json(const tcp_listen_spec<Secure>& obj, S& stream)
+   {
+      stream.write('{');
+      if constexpr (Secure)
+      {
+         to_json("protocol", stream);
+         stream.write(':');
+         to_json("https", stream);
+      }
+      else
+      {
+         to_json("protocol", stream);
+         stream.write(':');
+         to_json("http", stream);
+      }
+      stream.write(',');
+      to_json("address", stream);
+      stream.write(':');
+      to_json(obj.endpoint.address().to_string(), stream);
+      stream.write(',');
+      to_json("port", stream);
+      stream.write(':');
+      to_json(obj.endpoint.port(), stream);
+      stream.write('}');
+   }
+
+   void to_json(const local_listen_spec& obj, auto& stream)
+   {
+      stream.write('{');
+      to_json("protocol", stream);
+      stream.write(':');
+      to_json("local", stream);
+      stream.write(',');
+      to_json("path", stream);
+      stream.write(':');
+      to_json(obj.path(), stream);
+      stream.write('}');
+   }
+
+   void to_json(const listen_spec& obj, auto& stream)
+   {
+      std::visit([&](const auto& obj) { to_json(obj, stream); }, obj);
+   }
+
+   void from_json(listen_spec& obj, auto& stream)
+   {
+      any_listen_spec tmp;
+      from_json(tmp, stream);
+      if (tmp.protocol == "http")
+      {
+         check(!!tmp.address, "Address expected");
+         check(!!tmp.port, "Port expected");
+         obj = tcp_listen_spec<false>{{boost::asio::ip::make_address(*tmp.address), *tmp.port}};
+      }
+      else if (tmp.protocol == "https")
+      {
+         check(!!tmp.address, "Address expected");
+         check(!!tmp.port, "Port expected");
+         obj = tcp_listen_spec<true>{{boost::asio::ip::make_address(*tmp.address), *tmp.port}};
+      }
+      else if (tmp.protocol == "local")
+      {
+         check(!!tmp.path, "Address expected");
+         obj = local_listen_spec{*tmp.path};
+      }
+   }
+
+   std::string to_string(const listen_spec&);
 
    struct native_content
    {
@@ -155,33 +268,38 @@ namespace psibase::http
       }
    }
 
+#ifdef PSIBASE_ENABLE_SSL
+   using tls_context_ptr = std::shared_ptr<boost::asio::ssl::context>;
+#endif
+
    struct http_config
    {
-      uint32_t                  num_threads            = {};
-      uint32_t                  max_request_size       = {};
-      std::chrono::milliseconds idle_timeout_ms        = {};
-      std::string               allow_origin           = {};
-      std::string               address                = {};
-      unsigned short            port                   = {};
-      std::string               unix_path              = {};  // TODO: remove? rename?
-      std::string               host                   = {};
-      push_boot_t               push_boot_async        = {};
-      push_transaction_t        push_transaction_async = {};
-      accept_p2p_websocket_t    accept_p2p_websocket   = {};
-      shutdown_t                shutdown               = {};
-      get_config_t              get_perf               = {};
-      get_peers_t               get_peers              = {};
-      connect_t                 connect                = {};
-      connect_t                 disconnect             = {};
-      get_config_t              get_config             = {};
-      connect_t                 set_config             = {};
-      get_config_t              get_keys               = {};
-      generic_json_t            new_key                = {};
-      admin_service             admin                  = {};
-      services_t                services;
-      std::atomic<bool>         enable_p2p;
-      std::atomic<bool>         enable_transactions;
-      std::atomic<http_status>  status;
+      uint32_t                  num_threads      = {};
+      uint32_t                  max_request_size = {};
+      std::chrono::milliseconds idle_timeout_ms  = {};
+      std::string               allow_origin     = {};
+      std::vector<listen_spec>  listen           = {};
+      std::string               host             = {};
+#ifdef PSIBASE_ENABLE_SSL
+      tls_context_ptr tls_context = {};
+#endif
+      push_boot_t              push_boot_async        = {};
+      push_transaction_t       push_transaction_async = {};
+      accept_p2p_websocket_t   accept_p2p_websocket   = {};
+      shutdown_t               shutdown               = {};
+      get_config_t             get_perf               = {};
+      get_peers_t              get_peers              = {};
+      connect_t                connect                = {};
+      connect_t                disconnect             = {};
+      get_config_t             get_config             = {};
+      connect_t                set_config             = {};
+      get_config_t             get_keys               = {};
+      generic_json_t           new_key                = {};
+      admin_service            admin                  = {};
+      services_t               services;
+      std::atomic<bool>        enable_p2p;
+      std::atomic<bool>        enable_transactions;
+      std::atomic<http_status> status;
 
       mutable std::shared_mutex mutex;
    };

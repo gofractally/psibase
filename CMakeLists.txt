@@ -24,6 +24,9 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
 option(CLIO_ONLY "Only build clio" OFF)
 
+option(BUILD_STATIC "Build static binaries" OFF)
+option(ENABLE_SSL "Build psinode with TLS support" ON)
+
 option(BUILD_NATIVE "Build native code" ON)
 if(BUILD_NATIVE)
     add_subdirectory(native)

@@ -1,4 +1,6 @@
-set(OPENSSL_USE_STATIC_LIBS TRUE)
+if(BUILD_STATIC)
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
+endif()
 find_package(OpenSSL REQUIRED Crypto)
 
 function(add suffix)
@@ -149,10 +151,9 @@ function(add suffix)
     endif()
 
     if(DEFINED IS_NATIVE)
-        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem log_setup log)
+        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem log)
 
-        # FindBoost.cmake gets the library order wrong for Boost.Log
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 -Wl,--start-group ${Boost_LIBRARIES} -Wl,--end-group)
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 Boost::filesystem Boost::log)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
