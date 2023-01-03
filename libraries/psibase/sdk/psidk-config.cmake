@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.16.3)
 project(psidk)
 
 if(NOT (CMAKE_BUILD_TYPE STREQUAL "Mixed" OR CMAKE_BUILD_TYPE STREQUAL ""))
@@ -7,10 +7,7 @@ if(NOT (CMAKE_BUILD_TYPE STREQUAL "Mixed" OR CMAKE_BUILD_TYPE STREQUAL ""))
     message(FATAL_ERROR "CMAKE_BUILD_TYPE should be empty or set to \"Mixed\"")
 endif()
 
-cmake_path(GET CMAKE_CURRENT_LIST_FILE PARENT_PATH root)
-cmake_path(GET root PARENT_PATH root)
-cmake_path(GET root PARENT_PATH root)
-cmake_path(GET root PARENT_PATH root)
+get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../../.. REALPATH)
 
 add_library(wasm-base INTERFACE)
 target_compile_options(wasm-base INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)

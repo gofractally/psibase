@@ -24,9 +24,7 @@ set(CMAKE_RANLIB ${WASI_SDK_PREFIX}/bin/llvm-ranlib)
 set(CMAKE_C_COMPILER_TARGET ${triple})
 set(CMAKE_CXX_COMPILER_TARGET ${triple})
 
-cmake_path(GET CMAKE_CURRENT_LIST_FILE PARENT_PATH root)
-cmake_path(GET root PARENT_PATH root)
-cmake_path(GET root PARENT_PATH root)
+get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../.. REALPATH)
 
 set(CMAKE_FIND_ROOT_PATH ${root}/wasi-sysroot)
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
