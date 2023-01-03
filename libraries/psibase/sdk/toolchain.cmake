@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.0)
+cmake_minimum_required(VERSION 3.6.0)
 
 if(NOT DEFINED WASI_SDK_PREFIX AND DEFINED ENV{WASI_SDK_PREFIX})
     set(WASI_SDK_PREFIX $ENV{WASI_SDK_PREFIX})
@@ -24,9 +24,16 @@ set(CMAKE_RANLIB ${WASI_SDK_PREFIX}/bin/llvm-ranlib)
 set(CMAKE_C_COMPILER_TARGET ${triple})
 set(CMAKE_CXX_COMPILER_TARGET ${triple})
 
-get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../.. REALPATH)
+set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES WASI_SDK_PREFIX)
 
-set(CMAKE_FIND_ROOT_PATH ${root}/wasi-sysroot)
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/../../wasi-sysroot)
+    # Installed psidk
+    get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../.. REALPATH)
+    set(CMAKE_FIND_ROOT_PATH ${root}/wasi-sysroot)
+elseif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/wasm/deps)
+    # Build directory
+    set(CMAKE_FIND_ROOT_PATH ${CMAKE_CURRENT_LIST_DIR})
+endif()
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
