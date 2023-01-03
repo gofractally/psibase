@@ -1505,28 +1505,13 @@ namespace psibase::http
          {
             s = s.substr(0, s.size() - 1);
          }
-         auto           pos     = s.find(':');
-         auto           address = net::ip::make_address(std::string(s.substr(0, pos)));
-         unsigned short port;
-         if (pos == std::string_view::npos)
-         {
-            port = secure ? 443 : 80;
-         }
-         else
-         {
-            auto res = std::from_chars(s.data() + pos + 1, s.data() + s.size(), port);
-            if (res.ec != std::errc())
-            {
-               throw std::runtime_error("Invalid port");
-            }
-         }
          if (secure)
          {
-            return tcp_listen_spec<true>{{address, port}};
+            return parse_listen_tcp<true>(std::string(s));
          }
          else
          {
-            return tcp_listen_spec<false>{{address, port}};
+            return parse_listen_tcp<false>(std::string(s));
          }
       };
       if (s.starts_with("http://"))
