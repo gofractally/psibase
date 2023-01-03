@@ -471,17 +471,25 @@ Each peer has the following fields:
 
 `/native/admin/config` provides `GET` and `PUT` access to the server's configuration. Changes made using this API are persistent across server restarts. New versions of psibase may add fields at any time. Clients that wish to set the configuration should `GET` the configuration first and return unknown fields to the server unchanged.
 
-| Field      | Type    | Description                                                                                                                                                                                               |
-|------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `p2p`      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                                             |
-| `peers` | Array | A list of peer URLs that the server may connect to. To manage the active connections, see [peer management](#peer-management) |
-| `autoconnect` | Number or Boolean | The target number of out-going connections. If set to true, the server will try to connect to all configured peers. |
-| `producer` | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
-| `host`     | String  | The server's hostname.                                                                                                                                                                                    |
-| `port`     | Number  | The port that the server runs on. Changes to the port will take effect the next time the server starts.                                                                                                   |
-| `services` | Array   | A list of built in services. `host` is the virtual hostname for the service. If `host` ends with `.` the global `host` will be appended to it. `root` is a directory containing the content to be served. |
-| `admin`    | String  | Controls service access to the admin API. `*` allows access for all services.  `static:*` allows access for builtin services. The name of a service allows access for that service.                       |
-| `loggers`  | Object  | A description of the [destinations for log records](#logging)                                                                                                                                             |
+| Field                | Type              | Description                                                                                                                                                                                               |
+|----------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `p2p`                | Boolean           | Controls whether the server accepts incoming P2P connections.                                                                                                                                             |
+| `peers`              | Array             | A list of peer URLs that the server may connect to. To manage the active connections, see [peer management](#peer-management)                                                                             |
+| `autoconnect`        | Number or Boolean | The target number of out-going connections. If set to true, the server will try to connect to all configured peers.                                                                                       |
+| `producer`           | String            | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
+| `host`               | String            | The server's hostname.                                                                                                                                                                                    |
+| `listen`             | Array             | Interfaces that the server will listen on. Changes to the set of interfaces will take effect the next time the server starts.                                                                             |
+| `listen[n].protocol` | String            | One of `http`, `https`, or `local`                                                                                                                                                                        |
+| `listen[n].address`  | String            | (`http` or `https`) An IP address that refers to a local interface                                                                                                                                        |
+| `listen[n].port`     | Number            | (`http` or `https`) The TCP port number                                                                                                                                                                   |
+| `listen[n].path`     | String            | (`local` only) A path to a local socket                                                                                                                                                                   |
+| `tls`                | Object            | The TLS context. Changes to the TLS context will take effect the next time the server starts.                                                                                                             |
+| `tls.certificate`    | String            | The path to the server's certificate chain in PEM format                                                                                                                                                  |
+| `tls.key`            | String            | The path to the file containing the private key for the server's certificate in PEM format                                                                                                                |
+| `tls.trustfiles`     | Array             | A list of files containing trusted root CAs in PEM format.                                                                                                                                                |
+| `services`           | Array             | A list of built in services. `host` is the virtual hostname for the service. If `host` ends with `.` the global `host` will be appended to it. `root` is a directory containing the content to be served. |
+| `admin`              | String            | Controls service access to the admin API. `*` allows access for all services.  `static:*` allows access for builtin services. The name of a service allows access for that service.                       |
+| `loggers`            | Object            | A description of the [destinations for log records](#logging)                                                                                                                                             |
 
 Example:
 ```json
@@ -490,7 +498,18 @@ Example:
     "peers": ["http://psibase.io/"],
     "producer": "prod",
     "host": "127.0.0.1.sslip.io",
-    "port": 8080,
+    "listen": [
+        {
+            "protocol": "http",
+            "address": "0.0.0.0",
+            "port": 8080
+        }
+    ],
+    "tls": {
+        "certificate": "psibase.cert",
+        "key": "psibase.key",
+        "trustfiles": []
+    },
     "services": [
         {
             "host": "localhost",
