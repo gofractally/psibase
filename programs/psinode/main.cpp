@@ -945,6 +945,14 @@ Perf get_perf(const SharedState& state, const TransactionStats& transactions)
    return result;
 }
 
+struct TLSConfig
+{
+   std::string              certificate;
+   std::string              key;
+   std::vector<std::string> trustfiles;
+};
+PSIO_REFLECT(TLSConfig, certificate, key, trustfiles)
+
 struct PsinodeConfig
 {
    bool                        p2p = false;
@@ -953,6 +961,7 @@ struct PsinodeConfig
    AccountNumber               producer;
    std::string                 host;
    std::vector<listen_spec>    listen;
+   TLSConfig                   tls;
    std::vector<native_service> services;
    http::admin_service         admin;
    psibase::loggers::Config    loggers;
@@ -964,6 +973,9 @@ PSIO_REFLECT(PsinodeConfig,
              producer,
              host,
              listen,
+#ifdef PSIBASE_ENABLE_SSL
+             tls,
+#endif
              services,
              admin,
              loggers);
@@ -1001,6 +1013,25 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
           "", "listen", listen, [](std::string_view text) { return std::string(text); },
           "TCP or local socket endpoint on which the server accepts connections");
    }
+#ifdef PSIBASE_ENABLE_SSL
+   if (!config.tls.certificate.empty())
+   {
+      file.set("", "tls-cert", config.tls.certificate,
+               "A file containing the server's certificate chain");
+   }
+   if (!config.tls.key.empty())
+   {
+      file.set("", "tls-key", config.tls.key,
+               "A file containing the key corresponding to tls-cert");
+   }
+   if (!config.tls.trustfiles.empty())
+   {
+      file.set(
+          "", "tls-trustfile", config.tls.trustfiles,
+          [](std::string_view text) { return std::string(text); },
+          "A file containing trusted certificate authorities");
+   }
+#endif
    if (!config.services.empty())
    {
       std::vector<std::string> services;
@@ -1052,9 +1083,9 @@ void run(const std::string&              db_path,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
-         const std::vector<std::string>& root_ca,
-         const std::string&              tls_cert,
-         const std::string&              tls_key,
+         std::vector<std::string>        root_ca,
+         std::string                     tls_cert,
+         std::string                     tls_key,
          uint32_t                        leeway_us,
          RestartInfo&                    runResult)
 {
@@ -1358,75 +1389,81 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->set_config =
-          [&chainContext, &node, &db_path, &runResult, &http_config, &host, &admin, &services,
-           &connect_one](std::vector<char> json, http::connect_callback callback)
+      http_config->set_config = [&chainContext, &node, &db_path, &runResult, &http_config, &host,
+                                 &admin, &services, &tls_cert, &tls_key, &root_ca, &connect_one](
+                                    std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
 
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
-                            &db_path, &runResult, &http_config, &host, &services, &admin,
-                            &connect_one, callback = std::move(callback)]() mutable
-                           {
-                              std::optional<http::services_t> new_services;
-                              if (services != config.services || host != config.host)
-                              {
-                                 new_services.emplace();
-                                 for (const auto& entry : config.services)
-                                 {
-                                    load_service(entry, *new_services, config.host);
-                                 }
-                              }
-                              node.set_producer_id(config.producer);
-                              http_config->enable_p2p = config.p2p;
-                              if (!http_config->status.load().shutdown)
-                              {
-                                 node.autoconnect(std::vector(config.peers),
-                                                  config.autoconnect.value, connect_one);
-                              }
-                              host     = config.host;
-                              services = config.services;
-                              admin    = config.admin;
-                              loggers::configure(config.loggers);
-                              {
-                                 std::shared_lock l{http_config->mutex};
-                                 http_config->host                = host;
-                                 http_config->listen              = config.listen;
-                                 http_config->admin               = admin;
-                                 http_config->enable_transactions = !host.empty();
-                                 if (new_services)
-                                 {
-                                    // Use swap instead of move to delay freeing the old
-                                    // services until after releasing the mutex
-                                    http_config->services.swap(*new_services);
-                                 }
-                              }
-                              {
-                                 auto       path = std::filesystem::path(db_path) / "config";
-                                 ConfigFile file;
-                                 {
-                                    std::ifstream in(path);
-                                    file.parse(in);
-                                 }
-                                 to_config(config, file);
-                                 {
-                                    std::ofstream out(path);
-                                    file.write(out);
-                                 }
-                                 runResult.configChanged = true;
-                              }
-                              callback(std::nullopt);
-                           });
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
+              &runResult, &http_config, &host, &services, &admin, &tls_cert, &tls_key, &root_ca,
+              &connect_one, callback = std::move(callback)]() mutable
+             {
+                std::optional<http::services_t> new_services;
+                if (services != config.services || host != config.host)
+                {
+                   new_services.emplace();
+                   for (const auto& entry : config.services)
+                   {
+                      load_service(entry, *new_services, config.host);
+                   }
+                }
+                node.set_producer_id(config.producer);
+                http_config->enable_p2p = config.p2p;
+                if (!http_config->status.load().shutdown)
+                {
+                   node.autoconnect(std::vector(config.peers), config.autoconnect.value,
+                                    connect_one);
+                }
+                host     = config.host;
+                services = config.services;
+                admin    = config.admin;
+#ifdef PSIBASE_ENABLE_SSL
+                tls_cert = config.tls.certificate;
+                tls_key  = config.tls.key;
+                root_ca  = config.tls.trustfiles;
+#endif
+                loggers::configure(config.loggers);
+                {
+                   std::shared_lock l{http_config->mutex};
+                   http_config->host                = host;
+                   http_config->listen              = config.listen;
+                   http_config->admin               = admin;
+                   http_config->enable_transactions = !host.empty();
+                   if (new_services)
+                   {
+                      // Use swap instead of move to delay freeing the old
+                      // services until after releasing the mutex
+                      http_config->services.swap(*new_services);
+                   }
+                }
+                {
+                   auto       path = std::filesystem::path(db_path) / "config";
+                   ConfigFile file;
+                   {
+                      std::ifstream in(path);
+                      file.parse(in);
+                   }
+                   to_config(config, file);
+                   {
+                      std::ofstream out(path);
+                      file.write(out);
+                   }
+                   runResult.configChanged = true;
+                }
+                callback(std::nullopt);
+             });
       };
 
-      http_config->get_config = [&chainContext, &node, &http_config, &host, &admin,
-                                 &services](http::get_config_callback callback)
+      http_config->get_config = [&chainContext, &node, &http_config, &host, &admin, &tls_cert,
+                                 &tls_key, &root_ca, &services](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
-                           [&chainContext, &node, &http_config, &host, &services, &admin,
-                            callback = std::move(callback)]() mutable
+                           [&chainContext, &node, &http_config, &host, &services, &admin, &tls_cert,
+                            &tls_key, &root_ca, callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
                               result.p2p = http_config->enable_p2p;
@@ -1434,6 +1471,11 @@ void run(const std::string&              db_path,
                               result.producer = node.producer_name();
                               result.host     = host;
                               result.listen   = http_config->listen;
+#ifdef PSIBASE_ENABLE_SSL
+                              result.tls.certificate = tls_cert;
+                              result.tls.key         = tls_key;
+                              result.tls.trustfiles  = root_ca;
+#endif
                               result.services = services;
                               result.admin    = admin;
                               result.loggers  = loggers::Config::get();
