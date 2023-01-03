@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 3.20)
 project(psibase)
 include(ExternalProject)
 
@@ -36,6 +36,8 @@ endif()
 option(BUILD_RELEASE_WASM "Build release wasms" ON)
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
+include(GNUInstallDirs)
+
 if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
@@ -59,9 +61,13 @@ if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
             -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
             -DCMAKE_FIND_ROOT_PATH=${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
             -DCMAKE_PREFIX_PATH=/
+            -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+            -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
+            -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
+    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} --install ${CMAKE_CURRENT_BINARY_DIR}/wasm --prefix \${CMAKE_INSTALL_PREFIX})")
 else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
@@ -129,7 +135,11 @@ if(BUILD_JS)
     endfunction()
 
     psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-    psinode_files(psinode-psidk-share ${CMAKE_CURRENT_BINARY_DIR}/psidk)
+
+    include(GNUInstallDirs)
+    install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys)
+    install(DIRECTORY services/user/CommonSys/common/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin/sys/common)
+    install(FILES services/user/CommonSys/common/rpc.mjs services/user/CommonSys/common/keyConversions.mjs DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin/sys/common)
 endif()
 
 option(BUILD_RUST "Build rust" ON)
@@ -193,15 +203,21 @@ if(BUILD_RUST)
 
         COMMAND         touch ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase/src/boot.rs
         COMMAND         cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-
-        INSTALL_COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
-        COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${CMAKE_CURRENT_BINARY_DIR}/psidk/bin
+        INSTALL_COMMAND ""
     )
+    install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN)
 endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
     add_subdirectory(doc/psidk/src/cpp-service doc-examples)
 endif()
+
+set(CPACK_PACKAGE_NAME psidk)
+set(CPACK_PACKAGE_VENDOR "Fractally, LLC")
+set(CPACK_PACKAGE_DESCRIPTION)
+set(CPACK_PACKAGE_HOMEPAGE_URL https://about.psibase.io)
+set(CPACK_GENERATOR TGZ)
+include(CPack)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

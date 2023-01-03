@@ -5,7 +5,7 @@ if(NOT DEFINED WASI_SDK_PREFIX AND DEFINED ENV{WASI_SDK_PREFIX})
 endif()
 
 if(NOT DEFINED WASI_SDK_PREFIX)
-    message(FATAL_ERROR WASI_SDK_PREFIX is not defined)
+    message(FATAL_ERROR "WASI_SDK_PREFIX is not defined")
 endif()
 
 set(CMAKE_SYSTEM_NAME WASI)
@@ -15,6 +15,8 @@ set(triple wasm32-wasi)
 set(CMAKE_EXECUTABLE_SUFFIX_C .wasm)
 set(CMAKE_EXECUTABLE_SUFFIX_CXX .wasm)
 
+set(CMAKE_SYSROOT ${WASI_SDK_PREFIX}/share/wasi-sysroot)
+
 set(CMAKE_C_COMPILER ${WASI_SDK_PREFIX}/bin/clang)
 set(CMAKE_CXX_COMPILER ${WASI_SDK_PREFIX}/bin/clang++)
 set(CMAKE_AR ${WASI_SDK_PREFIX}/bin/llvm-ar)
@@ -22,6 +24,11 @@ set(CMAKE_RANLIB ${WASI_SDK_PREFIX}/bin/llvm-ranlib)
 set(CMAKE_C_COMPILER_TARGET ${triple})
 set(CMAKE_CXX_COMPILER_TARGET ${triple})
 
+cmake_path(GET CMAKE_CURRENT_LIST_FILE PARENT_PATH root)
+cmake_path(GET root PARENT_PATH root)
+cmake_path(GET root PARENT_PATH root)
+
+set(CMAKE_FIND_ROOT_PATH ${root}/wasi-sysroot)
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)

@@ -36,6 +36,10 @@ function(native_and_wasm_test N)
     )
 endfunction()
 
+function(target_mapped_include_directories target type)
+    target_include_directories(${target} ${type} ${ARGN})
+endfunction()
+
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.72 REQUIRED COMPONENTS program_options)
 add_library(boost INTERFACE)

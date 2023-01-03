@@ -27,7 +27,7 @@ target_include_directories(psinode PUBLIC
     ../../libraries/psibase/service/include
     ../../services/psibase_tests)
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
-add_custom_command(TARGET psinode POST_BUILD
-    COMMAND mkdir -p ${ROOT_BINARY_DIR}/psidk/bin
-    COMMAND cp -a $<TARGET_FILE:psinode> ${ROOT_BINARY_DIR}/psidk/bin
-)
+
+include(GNUInstallDirs)
+install(FILES config.in DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase)
+install(TARGETS psinode RUNTIME)
