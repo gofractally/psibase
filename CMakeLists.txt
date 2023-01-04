@@ -125,12 +125,19 @@ set(JS_DIRS
 option(BUILD_JS "Build JS" ON)
 if(BUILD_JS)
     list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
+    file(GLOB_RECURSE common ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
     foreach(ENTRY ${JS_DIRS})
         string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
         string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
+        file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
+        add_custom_command(
+            OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
+            DEPENDS ${sources} ${common}
+            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
+        )
         add_custom_target(
             ${DEP}
-            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
         )
     endforeach()
 endif()
