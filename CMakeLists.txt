@@ -108,7 +108,7 @@ if(BUILD_DOC)
         DEPENDS             gen-cpp-doc
         SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk
         CONFIGURE_COMMAND   ""
-        BUILD_COMMAND       export WASI_SDK_PREFIX=${WASI_SDK_PREFIX} && cd ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk && rm -rf ${CMAKE_CURRENT_BINARY_DIR}/book && mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk
+        BUILD_COMMAND       cd ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk && rm -rf ${CMAKE_CURRENT_BINARY_DIR}/book && mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk
         INSTALL_COMMAND     ""
     )
 endif()
