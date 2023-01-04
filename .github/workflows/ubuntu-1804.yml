@@ -72,7 +72,7 @@ jobs:
           echo =====
           ${DOCKER} sccache -s
           echo =====
-          bash -c "cd build && cpack -G TGZ -DCPACK_PACKAGE_FILE_NAME=psidk-linux"
+          ${DOCKER} bash -c "cd build && cpack -G TGZ -DCPACK_PACKAGE_FILE_NAME=psidk-linux"
           echo =====
           ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
       - name: Upload psidk-linux
