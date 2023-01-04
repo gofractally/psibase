@@ -43,9 +43,11 @@ set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES WASI_SDK_PREFIX)
 if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/../../wasi-sysroot)
     # Installed psidk
     get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../.. REALPATH)
+    list(APPEND CMAKE_MODULE_PATH ${root}/wasi-sysroot/share/cmake/Modules)
     set(CMAKE_FIND_ROOT_PATH ${root}/wasi-sysroot)
 elseif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/wasm/deps)
     # Build directory
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
     set(CMAKE_FIND_ROOT_PATH ${CMAKE_CURRENT_LIST_DIR})
 endif()
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)

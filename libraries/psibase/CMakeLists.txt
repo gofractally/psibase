@@ -189,8 +189,10 @@ if(IS_WASM)
         psibase-debug psibase-service-base-debug psibase-service-wasi-polyfill-debug psitestlib-debug
         ARCHIVE)
     install(FILES sdk/toolchain.cmake DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/cmake)
+    install(FILES sdk/WASI.cmake DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/share/cmake/Modules/Platform)
 
     configure_file(sdk/psidk-config.cmake.build ${ROOT_BINARY_DIR}/psidk-config.cmake @ONLY)
     configure_file(sdk/psidk-cmake-args.build ${ROOT_BINARY_DIR}/psidk-cmake-args @ONLY)
     configure_file(sdk/toolchain.cmake ${ROOT_BINARY_DIR}/toolchain.cmake COPYONLY)
+    configure_file(sdk/WASI.cmake ${ROOT_BINARY_DIR}/cmake/Platform/WASI.cmake COPYONLY)
 endif()
