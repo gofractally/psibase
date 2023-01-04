@@ -4,6 +4,20 @@ if(NOT DEFINED WASI_SDK_PREFIX AND DEFINED ENV{WASI_SDK_PREFIX})
     set(WASI_SDK_PREFIX $ENV{WASI_SDK_PREFIX})
 endif()
 
+if(NOT DEFINED WASI_SDK_PREFIX AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/../../wasi-sysroot)
+    find_program(clang-location
+        NAME clang++
+        PATHS ${CMAKE_CURRENT_LIST_DIR}/../../../bin /opt/wasi-sdk/bin
+        NO_CACHE
+        NO_DEFAULT_PATH
+    )
+    if(clang-location)
+        get_filename_component(wasi-bin ${clang-location} DIRECTORY)
+        get_filename_component(WASI_SDK_PREFIX ${wasi-bin}/.. REALPATH)
+        set(WASI_SDK_PREFIX ${WASI_SDK_PREFIX} CACHE PATH "The location of the WASI SDK")
+    endif()
+endif()
+
 if(NOT DEFINED WASI_SDK_PREFIX)
     message(FATAL_ERROR "WASI_SDK_PREFIX is not defined")
 endif()
