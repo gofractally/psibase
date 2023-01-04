@@ -38,9 +38,27 @@ option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
 include(GNUInstallDirs)
 
+if(NOT DEFINED WASI_SDK_PREFIX AND ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
+    ExternalProject_Add(wasi-sdk
+        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz
+        URL_HASH SHA256=8c8ebb7f71dcccbb8b1ab384499a53913b0b6d1b7b3281c3d70165e0f002e821
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ""
+    )
+    ExternalProject_Get_Property(wasi-sdk SOURCE_DIR)
+    set(WASI_SDK_PREFIX ${SOURCE_DIR})
+    set(wasm-deps wasi-sdk)
+endif()
+
+if(DEFINED WASI_SDK_PREFIX)
+    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI)
+endif()
+
 if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
+        DEPENDS ${wasm-deps}
         BINARY_DIR wasm
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
@@ -67,7 +85,7 @@ if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
-    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} --install ${CMAKE_CURRENT_BINARY_DIR}/wasm --prefix \${CMAKE_INSTALL_PREFIX})")
+    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} --install ${CMAKE_CURRENT_BINARY_DIR}/wasm --prefix \${CMAKE_INSTALL_PREFIX})" COMPONENT libpsibase)
 else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
@@ -137,9 +155,9 @@ if(BUILD_JS)
     psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
 
     include(GNUInstallDirs)
-    install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys)
-    install(DIRECTORY services/user/CommonSys/common/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin/sys/common)
-    install(FILES services/user/CommonSys/common/rpc.mjs services/user/CommonSys/common/keyConversions.mjs DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin/sys/common)
+    install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
+    install(DIRECTORY services/user/CommonSys/common/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin/sys/common COMPONENT ServerData)
+    install(FILES services/user/CommonSys/common/rpc.mjs services/user/CommonSys/common/keyConversions.mjs DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin/sys/common COMPONENT ServerData)
 endif()
 
 option(BUILD_RUST "Build rust" ON)
@@ -205,13 +223,23 @@ if(BUILD_RUST)
         COMMAND         cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
         INSTALL_COMMAND ""
     )
-    install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN)
+    install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
 endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
     add_subdirectory(doc/psidk/src/cpp-service doc-examples)
 endif()
+
+include(CPackComponent)
+cpack_add_component_group(Server DESCRIPTION "The psinode server")
+cpack_add_component(ServerBin GROUP Server HIDDEN)
+cpack_add_component(ServerData GROUP Server HIDDEN)
+cpack_add_component(Client DESCRIPTION "The psibase client")
+cpack_add_component_group(SDK DESCRIPTION "SDK for developing psibase services")
+cpack_add_component(Tester GROUP SDK)
+cpack_add_component(WASI GROUP SDK)
+cpack_add_component(libpsibase GROUP SDK)
 
 set(CPACK_PACKAGE_NAME psidk)
 set(CPACK_PACKAGE_VENDOR "Fractally, LLC")

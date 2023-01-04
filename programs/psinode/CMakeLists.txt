@@ -29,5 +29,5 @@ target_include_directories(psinode PUBLIC
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
 include(GNUInstallDirs)
-install(FILES config.in DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase)
-install(TARGETS psinode RUNTIME)
+install(FILES config.in DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase COMPONENT ServerData)
+install(TARGETS psinode RUNTIME COMPONENT ServerBin)

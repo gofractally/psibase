@@ -20,7 +20,7 @@ endif()
 
 set_target_properties(psitest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
-install(TARGETS psitest RUNTIME)
+install(TARGETS psitest RUNTIME COMPONENT Tester)
 
 # TODO: find out why this is necessary. Without this,
 # psitest, when compiled with gcc, produces
