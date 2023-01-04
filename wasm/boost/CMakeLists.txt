@@ -37,5 +37,5 @@ add_library(boost INTERFACE)
 target_mapped_include_directories(boost INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
 include(GNUInstallDirs)
-install(DIRECTORY ${BOOST_BOOST} TYPE INCLUDE)
-install(FILES ${BOOST_EXTRACTED}/LICENSE_1_0.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.boost)
+install(DIRECTORY ${BOOST_BOOST} TYPE INCLUDE COMPONENT libpsibase)
+install(FILES ${BOOST_EXTRACTED}/LICENSE_1_0.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.boost COMPONENT libpsibase)

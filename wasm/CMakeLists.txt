@@ -69,7 +69,7 @@ macro(conditional_add)
 endmacro()
 
 include(GNUInstallDirs)
-install(FILES ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses)
+install(FILES ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses COMPONENT libpsibase)
 
 add_library(wasm-base INTERFACE)
 target_compile_options(wasm-base INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)

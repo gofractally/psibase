@@ -9,8 +9,8 @@ add_library(rapidjson INTERFACE)
 target_mapped_include_directories(rapidjson INTERFACE rapidjson/include )
 
 if(IS_WASM)
-    install(DIRECTORY rapidjson/include/rapidjson TYPE INCLUDE)
-    install(FILES rapidjson/license.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.rapidjson)
+    install(DIRECTORY rapidjson/include/rapidjson TYPE INCLUDE COMPONENT libpsibase)
+    install(FILES rapidjson/license.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.rapidjson COMPONENT libpsibase)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -79,13 +79,13 @@ add_dependencies(catch2 catch2-ext)
 
 if(IS_WASM)
     target_compile_options(catch2 INTERFACE -DCATCH_CONFIG_NO_POSIX_SIGNALS -DCATCH_CONFIG_DISABLE_EXCEPTIONS)
-    install(DIRECTORY ${CMAKE_BINARY_DIR}/catch2/include/ TYPE INCLUDE)
-    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2)
+    install(DIRECTORY ${CMAKE_BINARY_DIR}/catch2/include/ TYPE INCLUDE COMPONENT libpsibase)
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     # TODO: copy simdjson license to clsdk/licenses
     # TODO: debug vs release builds
-    install(DIRECTORY simdjson/include/ TYPE INCLUDE)
-    install(TARGETS simdjson ARCHIVE)
+    install(DIRECTORY simdjson/include/ TYPE INCLUDE COMPONENT libpsibase)
+    install(TARGETS simdjson ARCHIVE COMPONENT libpsibase)
 endif()
 
 if(NOT IS_WASM)
