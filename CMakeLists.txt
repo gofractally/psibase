@@ -124,6 +124,7 @@ if(BUILD_DOC)
         external/rapidjson/include
         external/simdjson/include
     )
+    target_compile_options(doc-cpp-dep PRIVATE -w)
     target_link_libraries(doc-cpp-dep PUBLIC services_system)
     add_custom_command(
         OUTPUT doc/psidk/book/index.html
