@@ -153,7 +153,7 @@ namespace psibase
    struct Connection
    {
       using NodeType = Node;
-      using Edge     = Edge<Node, EdgeName>;
+      using Edge     = psibase::Edge<Node, EdgeName>;
 
       std::vector<Edge> edges;
       PageInfo          pageInfo;
