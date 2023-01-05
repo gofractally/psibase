@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
+cmake_policy(VERSION 3.16.3...3.25.1)
 project(psibase)
 include(ExternalProject)
 
@@ -151,7 +152,6 @@ if(BUILD_JS)
     list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
     file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
     file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
-    message("common files: ${common-fonts}")
     foreach(ENTRY ${JS_DIRS})
         string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
         string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})

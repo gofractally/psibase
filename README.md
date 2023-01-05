@@ -24,12 +24,13 @@ Set the `WASI_SDK_PREFIX` environment variable before building. Alternatively, u
 ```sh
 git submodule update --init --recursive
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -Wno-dev ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/psidk ..
 make -j $(nproc)
 ctest -j $(nproc)
+make install
 ```
 
-The built product lives in `build/psidk`.
+The built product lives in `/opt/psidk`.
 
 To build documentation, use `-DBUILD_DOC=yes`
 
