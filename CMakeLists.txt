@@ -149,14 +149,16 @@ set(JS_DIRS
 option(BUILD_JS "Build JS" ON)
 if(BUILD_JS)
     list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
-    file(GLOB_RECURSE common ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
+    file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
+    file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
+    message("common files: ${common-fonts}")
     foreach(ENTRY ${JS_DIRS})
         string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
         string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
         file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
         add_custom_command(
             OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
-            DEPENDS ${sources} ${common}
+            DEPENDS ${sources} ${common} ${common-fonts}
             COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
         )
         add_custom_target(
