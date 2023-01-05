@@ -1,21 +1,19 @@
 cmake_minimum_required(VERSION 3.16.3)
 project(psidk)
 
-if(NOT (CMAKE_BUILD_TYPE STREQUAL "Mixed" OR CMAKE_BUILD_TYPE STREQUAL ""))
-    # CMAKE_BUILD_TYPE doesn't work well when a single build mixes debug
-    # and non-debug targets.
-    message(FATAL_ERROR "CMAKE_BUILD_TYPE should be empty or set to \"Mixed\"")
-endif()
-
 get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../../.. REALPATH)
 
+separate_arguments(release-cxx-flags NATIVE_COMMAND ${CMAKE_CXX_FLAGS_RELEASE})
+separate_arguments(release-link-flags NATIVE_COMMAND ${CMAKE_EXE_LINKER_FLAGS_RELEASE})
 add_library(wasm-base INTERFACE)
-target_compile_options(wasm-base INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
-target_link_options(wasm-base INTERFACE -Wl,--strip-all -O3)
+target_compile_options(wasm-base INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single $<$<CONFIG:Mixed>:${release-cxx-flags}>)
+target_link_options(wasm-base INTERFACE $<$<CONFIG:Mixed>:${release-link-flags}>)
 
+separate_arguments(debug-cxx-flags NATIVE_COMMAND ${CMAKE_CXX_FLAGS_DEBUG})
+separate_arguments(debug-link-flags NATIVE_COMMAND ${CMAKE_EXE_LINKER_FLAGS_DEBUG})
 add_library(wasm-base-debug INTERFACE)
-target_compile_options(wasm-base-debug INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
-target_link_options(wasm-base-debug INTERFACE -ggdb)
+target_compile_options(wasm-base-debug INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single $<$<CONFIG:Mixed>:${debug-cxx-flags}>)
+target_link_options(wasm-base-debug INTERFACE $<$<CONFIG:Mixed>:${debug-link-flags}>)
 
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${root}/include)
@@ -25,6 +23,12 @@ target_include_directories(catch2 INTERFACE ${root}/include)
 target_compile_options(catch2 INTERFACE -DCATCH_CONFIG_NO_POSIX_SIGNALS -DCATCH_CONFIG_DISABLE_EXCEPTIONS)
 
 function(add_libs suffix)
+
+    if(suffix)
+        set(lib-suffix ${suffix})
+    else()
+        set(lib-suffix $<$<CONFIG:Debug>:-debug>)
+    endif()
 
     add_library(simdjson${suffix} INTERFACE)
     target_include_directories(simdjson${suffix} INTERFACE ${root}/include)
@@ -46,7 +50,7 @@ function(add_libs suffix)
     target_link_libraries(psibase${suffix} INTERFACE
         -L${root}/lib
         wasm-base${suffix}
-        -lpsibase${suffix}
+        -lpsibase${lib-suffix}
         psio${suffix}
         boost
     )
@@ -56,7 +60,7 @@ function(add_libs suffix)
     target_link_libraries(psibase-service-base${suffix} INTERFACE
         -L${root}/lib
         psibase${suffix}
-        -lpsibase-service-base${suffix}
+        -lpsibase-service-base${lib-suffix}
     )
     target_compile_options(psibase-service-base${suffix} INTERFACE -DCOMPILING_SERVICE)
     target_link_options(psibase-service-base${suffix} INTERFACE
@@ -76,9 +80,9 @@ function(add_libs suffix)
         -L${root}/lib
         psibase-service-base${suffix}
         -lc++
-        -lc++abi-replacements${suffix}
-        -lc-simple-malloc${suffix}
-        -lpsibase-service-wasi-polyfill${suffix}
+        -lc++abi-replacements${lib-suffix}
+        -lc-simple-malloc${lib-suffix}
+        -lpsibase-service-wasi-polyfill${lib-suffix}
         ${LIBCLANG_RT_BUILTINS}
     )
 
@@ -88,9 +92,9 @@ function(add_libs suffix)
         -L${root}/lib
         psibase-service-base${suffix}
         -lc++
-        -lc++abi-replacements${suffix}
+        -lc++abi-replacements${lib-suffix}
         -lc
-        -lpsibase-service-wasi-polyfill${suffix}
+        -lpsibase-service-wasi-polyfill${lib-suffix}
         ${LIBCLANG_RT_BUILTINS}
     )
 
@@ -104,7 +108,7 @@ function(add_libs suffix)
         -lc++
         -lc++abi
         -lc
-        -lpsitestlib${suffix}
+        -lpsitestlib${lib-suffix}
         ${LIBCLANG_RT_BUILTINS}
         ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
     )

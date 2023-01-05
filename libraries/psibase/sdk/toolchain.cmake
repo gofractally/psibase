@@ -40,6 +40,17 @@ set(CMAKE_CXX_COMPILER_TARGET ${triple})
 
 set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES WASI_SDK_PREFIX)
 
+if(NOT __psibase_toolchain_included)
+    set(__psibase_toolchain_included 1)
+    string(APPEND CMAKE_C_FLAGS_DEBUG_INIT " -ggdb")
+    string(APPEND CMAKE_CXX_FLAGS_DEBUG_INIT " -ggdb")
+    string(APPEND CMAKE_C_FLAGS_RELWITHDEBINFO_INIT " -ggdb")
+    string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT " -ggdb")
+    string(APPEND CMAKE_EXE_LINKER_FLAGS_RELEASE_INIT "-Wl,--strip-all -O3")
+    string(APPEND CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO_INIT "-O3")
+    string(APPEND CMAKE_EXE_LINKER_FLAGS_MINSIZEREL_INIT "-Wl,--strip-all -Os")
+endif()
+
 if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/../../wasi-sysroot)
     # Installed psidk
     get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../.. REALPATH)
