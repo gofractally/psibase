@@ -75,8 +75,8 @@ function(add_libs suffix)
     file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
 
     # Service with simple malloc/free
-    add_library(psibase-service-simple-malloc${suffix} INTERFACE)
-    target_link_libraries(psibase-service-simple-malloc${suffix} INTERFACE
+    add_library(Psibase::service-simple-malloc${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Psibase::service-simple-malloc${suffix} INTERFACE
         -L${root}/lib
         psibase-service-base${suffix}
         -lc++
@@ -87,8 +87,8 @@ function(add_libs suffix)
     )
 
     # Service with full malloc/free
-    add_library(psibase-service${suffix} INTERFACE)
-    target_link_libraries(psibase-service${suffix} INTERFACE
+    add_library(Psibase::service-full-malloc${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Psibase::service-full-malloc${suffix} INTERFACE
         -L${root}/lib
         psibase-service-base${suffix}
         -lc++
@@ -98,9 +98,11 @@ function(add_libs suffix)
         ${LIBCLANG_RT_BUILTINS}
     )
 
-    add_library(psitestlib${suffix} INTERFACE)
-    target_compile_options(psitestlib${suffix} INTERFACE -DCOMPILING_TESTS)
-    target_link_libraries(psitestlib${suffix} INTERFACE
+    add_library(Psibase::service ALIAS Psibase::service-simple-malloc)
+
+    add_library(Psibase::test${suffix} INTERFACE IMPORTED)
+    target_compile_options(Psibase::test${suffix} INTERFACE -DCOMPILING_TESTS)
+    target_link_libraries(Psibase::test${suffix} INTERFACE
         -L${root}/lib
         psibase${suffix}
         catch2
@@ -112,7 +114,7 @@ function(add_libs suffix)
         ${LIBCLANG_RT_BUILTINS}
         ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
     )
-    target_link_options(psitestlib${suffix} INTERFACE
+    target_link_options(Psibase::test${suffix} INTERFACE
         -Wl,--entry,_start
         -nostdlib
     )

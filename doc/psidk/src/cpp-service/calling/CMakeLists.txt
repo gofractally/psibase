@@ -10,15 +10,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Libraries for building services and tests
-find_package(psidk REQUIRED)
+find_package(psibase REQUIRED)
 
 # Build arithmetic.wasm service
 add_executable(arithmetic arithmetic.cpp)
-target_link_libraries(arithmetic psibase-service-simple-malloc)
+target_link_libraries(arithmetic Psibase::service)
 
 # Build caller.wasm service
 add_executable(caller caller.cpp)
-target_link_libraries(caller psibase-service-simple-malloc)
+target_link_libraries(caller Psibase::service)
 
 # These symlinks help vscode
 execute_process(COMMAND ln -sfT ${psidk_DIR} ${CMAKE_CURRENT_BINARY_DIR}/psidk)
