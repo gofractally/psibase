@@ -44,6 +44,7 @@ function(add_libs suffix)
         simdjson${suffix}
         wasm-base${suffix}
     )
+    target_compile_features(psio${suffix} INTERFACE cxx_std_20)
 
     add_library(psibase${suffix} INTERFACE)
     target_include_directories(psibase${suffix} INTERFACE ${root}/include)
