@@ -110,26 +110,11 @@ if(BUILD_DOC)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid-init.js)
     file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/cpp-service/*.cpp)
     file(GLOB_RECURSE doc-cmake doc/src/cpp-service/*/CMakeLists.txt)
-    # Both IMPLICIT_DEPENDS and DEPFILE only work for some generators.
-    set(CMAKE_CXX_STANDARD 20)
-    set(CMAKE_CXX_EXTENSIONS ON)
-    add_library(doc-cpp-dep OBJECT doc/psidk/src/doc-root.cpp)
-    target_include_directories(doc-cpp-dep PUBLIC
-        libraries/psibase/common/include
-        ${CMAKE_CURRENT_BINARY_DIR}/wasm/boost
-        ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/include
-        libraries/psio/include
-        libraries/psio/consthash/include
-        services/user/CommonSys/include
-        services/user/PsiSpaceSys/include
-        external/rapidjson/include
-        external/simdjson/include
-    )
-    target_compile_options(doc-cpp-dep PRIVATE -w)
-    target_link_libraries(doc-cpp-dep PUBLIC services_system)
+    file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
+    file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
     add_custom_command(
         OUTPUT doc/psidk/book/index.html
-        DEPENDS gen-cpp-doc ${doc-src} ${doc-cpp} ${doc-cmake} $<TARGET_OBJECTS:doc-cpp-dep>
+        DEPENDS gen-cpp-doc ${doc-src} ${doc-cpp} ${doc-cmake} ${doc-headers} ${doc-service-headers}
         COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk && rm -rf ${CMAKE_CURRENT_BINARY_DIR}/book && mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk
     )
     add_custom_target(
