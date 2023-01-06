@@ -16,15 +16,33 @@ function(add suffix)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
         target_mapped_include_directories(psibase${suffix} PUBLIC common/include)
 
+        # wasi-sdk-16+ uses -mbulk-memory which we do not support
+        add_library(cstring-objects${suffix} OBJECT service/src/memcpy.c service/src/memmove.c service/src/memset.c)
+        target_link_libraries(cstring-objects${suffix} PUBLIC wasm-base${suffix})
+        set(cstring-remove memcpy.o memmove.o memset.o)
+        set(cstring-add $<TARGET_OBJECTS:cstring-objects${suffix}>)
+        set(cstring-target cstring-objects${suffix})
+
         add_library(simple-malloc-objects${suffix} OBJECT service/src/simple_malloc.cpp)
         target_link_libraries(simple-malloc-objects${suffix} PUBLIC wasm-base${suffix})
         add_custom_target(c-simple-malloc${suffix} ALL DEPENDS libc-simple-malloc${suffix}.a)
         add_custom_command(
             OUTPUT libc-simple-malloc${suffix}.a
-            DEPENDS simple-malloc-objects${suffix}
+            DEPENDS simple-malloc-objects${suffix} ${cstring-target}
             COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/libc.a libc-simple-malloc${suffix}.a
-            COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc-simple-malloc${suffix}.a dlmalloc.o
-            COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar rs libc-simple-malloc${suffix}.a $<TARGET_OBJECTS:simple-malloc-objects${suffix}>
+            COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc-simple-malloc${suffix}.a dlmalloc.o ${cstring-remove}
+            COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar rs libc-simple-malloc${suffix}.a $<TARGET_OBJECTS:simple-malloc-objects${suffix}> ${cstring-add}
+            COMMAND_EXPAND_LISTS
+        )
+
+        add_custom_target(c-replacement${suffix} ALL DEPENDS libc${suffix}.a)
+        add_custom_command(
+            OUTPUT libc${suffix}.a
+            DEPENDS ${cstring-target}
+            COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/libc.a libc${suffix}.a
+            COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc${suffix}.a ${cstring-remove}
+            COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar rs libc${suffix}.a ${cstring-add}
+            COMMAND_EXPAND_LISTS
         )
 
         add_library(c++abi-objects${suffix} OBJECT service/src/abort_message.cpp)
@@ -120,6 +138,7 @@ function(add suffix)
             -lsecp256k1
             -lc++
             -lc++abi
+            -L${CMAKE_CURRENT_BINARY_DIR}
             -lc
             ${LIBCLANG_RT_BUILTINS}
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
@@ -185,6 +204,7 @@ if(IS_WASM)
     install(FILES sdk/psibase-config.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/psidk COMPONENT libpsibase)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements.a ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements-debug.a TYPE LIB COMPONENT libpsibase)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libc-simple-malloc.a ${CMAKE_CURRENT_BINARY_DIR}/libc-simple-malloc-debug.a TYPE LIB COMPONENT libpsibase)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libc.a ${CMAKE_CURRENT_BINARY_DIR}/libc-debug.a TYPE LIB COMPONENT libpsibase)
     install(TARGETS psibase psibase-service-base psibase-service-wasi-polyfill psitestlib
         psibase-debug psibase-service-base-debug psibase-service-wasi-polyfill-debug psitestlib-debug
         ARCHIVE COMPONENT libpsibase)

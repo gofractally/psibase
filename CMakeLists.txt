@@ -40,11 +40,11 @@ option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 include(GNUInstallDirs)
 
 if(DEFINED WASI_SDK_PREFIX)
-    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
+    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL FILES_MATCHING PATTERN libc.a EXCLUDE)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     ExternalProject_Add(wasi-sdk
-        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz
-        URL_HASH SHA256=8c8ebb7f71dcccbb8b1ab384499a53913b0b6d1b7b3281c3d70165e0f002e821
+        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-17/wasi-sdk-17.0-linux.tar.gz
+        URL_HASH SHA256=8778a476af7898a51db9b78395687cc9c8b69702850da77a763711e832614dac
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
         INSTALL_COMMAND ""
@@ -52,7 +52,7 @@ elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     ExternalProject_Get_Property(wasi-sdk SOURCE_DIR)
     set(WASI_SDK_PREFIX ${SOURCE_DIR})
     set(wasm-deps wasi-sdk)
-    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI)
+    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI FILES_MATCHING PATTERN libc.a EXCLUDE)
 endif()
 
 if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)

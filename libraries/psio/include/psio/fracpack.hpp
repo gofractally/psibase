@@ -1082,7 +1082,7 @@ namespace psio
    template <typename T>
    check_stream fracvalidate(const std::span<const char>& v)
    {
-      return fracvalidate<T>(v.begin(), v.end());
+      return fracvalidate<T>(v.data(), v.data() + v.size());
    }
 
    template <typename T>
