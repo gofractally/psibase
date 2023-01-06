@@ -1,4 +1,4 @@
 #!/bin/bash
 SDK=$(realpath -e `dirname "$0"`/..)
 
-echo -DCMAKE_TOOLCHAIN_FILE=$SDK/share/psibase/cmake/toolchain.cmake -DCMAKE_BUILD_TYPE=Mixed
+echo -DCMAKE_TOOLCHAIN_FILE=$SDK/share/psibase/cmake/toolchain.cmake
