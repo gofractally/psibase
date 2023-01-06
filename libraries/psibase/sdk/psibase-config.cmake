@@ -98,7 +98,8 @@ function(add_libs suffix)
         ${LIBCLANG_RT_BUILTINS}
     )
 
-    add_library(Psibase::service ALIAS Psibase::service-simple-malloc)
+    add_library(Psibase::service${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Psibase::service${suffix} INTERFACE Psibase::service-simple-malloc${suffix})
 
     add_library(Psibase::test${suffix} INTERFACE IMPORTED)
     target_compile_options(Psibase::test${suffix} INTERFACE -DCOMPILING_TESTS)
