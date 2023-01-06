@@ -34,7 +34,8 @@ if(NOT EXISTS ${BOOST_BOOST})
 endif()
 
 add_library(boost INTERFACE)
-target_include_directories(boost INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+target_mapped_include_directories(boost INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
-file(COPY ${BOOST_BOOST} DESTINATION ${ROOT_BINARY_DIR}/psidk/boost)
-configure_file(${BOOST_EXTRACTED}/LICENSE_1_0.txt ${ROOT_BINARY_DIR}/psidk/licenses/LICENSE.boost COPYONLY)
+include(GNUInstallDirs)
+install(DIRECTORY ${BOOST_BOOST} TYPE INCLUDE COMPONENT libpsibase)
+install(FILES ${BOOST_EXTRACTED}/LICENSE_1_0.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.boost COMPONENT libpsibase)

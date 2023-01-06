@@ -68,7 +68,8 @@ macro(conditional_add)
     endif()
 endmacro()
 
-file(COPY ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${ROOT_BINARY_DIR}/psidk/licenses)
+include(GNUInstallDirs)
+install(FILES ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses COMPONENT libpsibase)
 
 add_library(wasm-base INTERFACE)
 target_compile_options(wasm-base INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
@@ -78,21 +79,13 @@ add_library(wasm-base-debug INTERFACE)
 target_compile_options(wasm-base-debug INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
 target_link_options(wasm-base-debug INTERFACE -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
-# -psidk variant of build targets need paths converted
-function(add_psidk_base_lib suffix)
-    add_library(wasm-base${suffix}-psidk INTERFACE)
-    target_link_libraries(wasm-base${suffix}-psidk INTERFACE wasm-base${suffix})
-    target_compile_options(wasm-base${suffix}-psidk INTERFACE
-            -ffile-prefix-map=${ROOT_BINARY_DIR}/wasm/boost/=psidk:/boost/
-            -ffile-prefix-map=${ROOT_BINARY_DIR}/wasm/catch2/=psidk:/catch2/
-            -ffile-prefix-map=${ROOT_SOURCE_DIR}/services/=psidk:/services/
-            -ffile-prefix-map=${ROOT_SOURCE_DIR}/external/=psidk:/
-            -ffile-prefix-map=${ROOT_SOURCE_DIR}/libraries/=psidk:/
-            -ffile-prefix-map=${WASI_SDK_PREFIX}/=psidk-wasi-sdk:/
-    )
+function(target_mapped_include_directories target type)
+    target_include_directories(${target} ${type} ${ARGN})
+    foreach(dir IN LISTS ARGN)
+        get_filename_component(full_path ${dir} ABSOLUTE)
+        target_compile_options(${target} ${type} -ffile-prefix-map=${full_path}=${CMAKE_INSTALL_FULL_INCLUDEDIR})
+    endforeach()
 endfunction()
-add_psidk_base_lib("")
-add_psidk_base_lib("-debug")
 
 set(DEP_URL https://github.com/eoscommunity/Eden/releases/download/deps)
 set(GMP_ARCHIVE gmp-6.2.1.tar.zst)
@@ -211,7 +204,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libsecp256k1.a)
 endif()
 
 add_subdirectory(../external external)
+add_subdirectory(boost)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../services services)
 add_subdirectory(../programs programs)
-add_subdirectory(boost)
