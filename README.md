@@ -77,11 +77,8 @@ wget https://nodejs.org/dist/v16.17.0/node-v16.17.0-linux-x64.tar.xz
 tar xf node-v16.17.0-linux-x64.tar.xz
 npm i -g npm yarn
 
-# TODO: switch back to release after 1.65 is stable
 cd ~/work
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup toolchain install beta
-rustup default beta
 rustup target add wasm32-wasi
 cargo install mdbook mdbook-linkcheck mdbook-mermaid
 ```
