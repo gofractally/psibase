@@ -87,23 +87,24 @@ function(target_mapped_include_directories target type)
     endforeach()
 endfunction()
 
-set(DEP_URL https://github.com/eoscommunity/Eden/releases/download/deps)
+set(DEP_URL https://github.com/gofractally/psibase/releases/download/deps)
 set(GMP_ARCHIVE gmp-6.2.1.tar.zst)
 set(GMP_EXTRACTED gmp-6.2.1)
-set(OPENSSL_ARCHIVE openssl-1.1.1k.tar.gz)
-set(OPENSSL_EXTRACTED openssl-1.1.1k)
-set(ZLIB_ARCHIVE zlib-1.2.11.tar.gz)
-set(ZLIB_EXTRACTED zlib-1.2.11)
-set(FLAT_BUFFERS_URL https://github.com/google/flatbuffers/archive/refs/tags )
-set(FLAT_BUFFERS_ARCHIVE v2.0.0.tar.gz )
-set(FLAT_BUFFERS_EXTRACTED flatbuffers )
+set(GMP_SHA256 8a0c3596c09855450eb67f6e81c5fb6a10babfc4a803d012a877b54c430ea66b)
+set(OPENSSL_ARCHIVE openssl-3.0.7.tar.gz)
+set(OPENSSL_EXTRACTED openssl-3.0.7)
+set(OPENSSL_SHA256 83049d042a260e696f62406ac5c08bf706fd84383f945cf21bd61e9ed95c396e)
+set(ZLIB_ARCHIVE zlib-1.2.13.tar.gz)
+set(ZLIB_EXTRACTED zlib-1.2.13)
+set(ZLIB_SHA256 b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30)
 set(DEP_PREFIX ${CMAKE_BINARY_DIR}/deps)
 
-function(download url archive)
+function(download url archive hash)
     if(NOT EXISTS ${archive})
         message("Downloading ${url}")
         file(DOWNLOAD ${url} ${archive}
             STATUS download_status
+            EXPECTED_HASH SHA256=${hash}
             TIMEOUT 600
             SHOW_PROGRESS
             TLS_VERIFY ON)
@@ -117,7 +118,7 @@ endfunction()
 
 # These builds are done at generation time so cmake's find_* commands can find them
 if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
-    download(${DEP_URL}/${ZLIB_ARCHIVE} ${DEP_PREFIX}/${ZLIB_ARCHIVE})
+    download(${DEP_URL}/${ZLIB_ARCHIVE} ${DEP_PREFIX}/${ZLIB_ARCHIVE} ${ZLIB_SHA256})
     message("building zlib")
     execute_process(
         WORKING_DIRECTORY ${DEP_PREFIX}
@@ -138,7 +139,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
 endif()
 
 if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
-    download(${DEP_URL}/${GMP_ARCHIVE} ${DEP_PREFIX}/${GMP_ARCHIVE})
+    download(${DEP_URL}/${GMP_ARCHIVE} ${DEP_PREFIX}/${GMP_ARCHIVE} ${GMP_SHA256})
     message("building gmp")
     execute_process(
         WORKING_DIRECTORY ${DEP_PREFIX}
@@ -160,7 +161,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
 endif()
 
 if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
-    download(${DEP_URL}/${OPENSSL_ARCHIVE} ${DEP_PREFIX}/${OPENSSL_ARCHIVE})
+    download(${DEP_URL}/${OPENSSL_ARCHIVE} ${DEP_PREFIX}/${OPENSSL_ARCHIVE} ${OPENSSL_SHA256})
     message("building openssl")
     set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY")
     execute_process(

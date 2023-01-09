@@ -58,6 +58,7 @@ function(add suffix)
         add_library(psibase-service-wasi-polyfill${suffix})
         target_link_libraries(psibase-service-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
         target_sources(psibase-service-wasi-polyfill${suffix} PRIVATE
+            service/src/ossl.c
             service/src/wasi-polyfill/__wasi_fd_fdstat_get.cpp
             service/src/wasi-polyfill/__wasi_fd_close.cpp
             service/src/wasi-polyfill/__wasi_fd_seek.cpp
@@ -113,6 +114,7 @@ function(add suffix)
             tester/src/DefaultTestChain.cpp
             tester/src/testUtils.cpp
             service/src/intrinsic.cpp
+            service/src/ossl.c
             tester/src/tester_intrinsics.cpp
             tester/src/wasi_polyfill/__wasi_args_get.cpp
             tester/src/wasi_polyfill/__wasi_args_sizes_get.cpp
