@@ -57,6 +57,11 @@ namespace SystemService
                    action.service.str() + "::" + action.method.str());
    }
 
+   void AuthEcSys::checkUserSys(psibase::AccountNumber user)
+   {
+      // Anyone may use AuthEcSys
+   }
+
    void AuthEcSys::newAccount(psibase::AccountNumber account, psibase::PublicKey payload)
    {
       check(false, "Not supported yet");

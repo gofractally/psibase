@@ -99,6 +99,9 @@ namespace SystemService
       auto   accountIndex = accountTable.getIndex<0>();
       auto   account      = accountIndex.get((getSender()));
       check(account.has_value(), "account does not exist");
+
+      to<AuthInterface>(authService).checkUserSys(getSender());
+
       account->authService = authService;
       accountTable.put(*account);
    }
@@ -111,12 +114,18 @@ namespace SystemService
       return accountIndex.get(num) != std::nullopt;
    }
 
-   void AccountSys::setCreator(psibase::AccountNumber creator)
+   void AccountSys::setCreator(psibase::AccountNumber name)
    {
-      check(false, "Feature not yet supported.");
+      Tables tables{getReceiver()};
+      auto   creatorTable = tables.open<CreatorTable>();
+      auto   creator      = creatorTable.getIndex<0>().get(SingletonKey{});
+      if (creator.has_value())
+      {
+         check(getSender() == creator->accountCreator,
+               "Only current creator can change the creator");
+      }
 
-      Tables{getReceiver()}.open<CreatorTable>().put(
-          CreatorRecord{.key = SingletonKey{}, .accountCreator = creator});
+      creatorTable.put(CreatorRecord{.key = SingletonKey{}, .accountCreator = name});
    }
 
 }  // namespace SystemService

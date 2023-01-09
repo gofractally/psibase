@@ -109,6 +109,11 @@ namespace SystemService
       }
    }
 
+   void ProducerSys::checkUserSys(psibase::AccountNumber user)
+   {
+      // noop
+   }
+
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::ProducerSys)

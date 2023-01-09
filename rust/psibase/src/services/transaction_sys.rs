@@ -141,6 +141,19 @@ pub mod auth_interface {
     ) {
         unimplemented!()
     }
+
+    /// Verify that a particular user is allowed to use a
+    /// particular auth service. Allows auth services to use user
+    /// whitelists.
+    ///
+    /// Called by AccountSys.
+    ///
+    /// * `user`:  The user being checked
+    #[action]
+    fn checkUserSys(user: crate::AccountNumber) {
+        unimplemented!()
+    }
+
 }
 
 /// All transactions enter the chain through this service

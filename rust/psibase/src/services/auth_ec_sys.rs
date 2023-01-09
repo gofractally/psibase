@@ -19,6 +19,11 @@ mod service {
     }
 
     #[action]
+    fn checkUserSys(user: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
     fn setKey(key: PublicKey) {
         unimplemented!()
     }
