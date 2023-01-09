@@ -179,7 +179,7 @@ void DefaultTestChain::setBlockProducers(bool show /* = false*/)
 {
    transactor<SystemService::ProducerSys> psys{SystemService::ProducerSys::service,
                                                SystemService::ProducerSys::service};
-   std::vector<Producer>                  producerConfig = {{"testchain"_a, {}}};
+   std::vector<Producer>                  producerConfig = {{"firstproducer"_a, {}}};
    auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
    check(psibase::show(show, trace) == "", "Failed to set producers");
 }
