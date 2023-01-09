@@ -23,7 +23,7 @@ if(DEFINED IS_WASM)
 #        flat_views.cpp
         benchmark.cpp
     )
-    target_link_libraries(psio-tests psio catch2 boost psitestlib )
+    target_link_libraries(psio-tests psio catch2 boost psitestlib-debug )
 endif()
 
 set_target_properties(psio-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
