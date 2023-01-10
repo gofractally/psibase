@@ -21,7 +21,7 @@ function(add suffix)
         target_link_libraries(cstring-objects${suffix} PUBLIC wasm-base${suffix})
         set(cstring-remove memcpy.o memmove.o memset.o)
         set(cstring-add $<TARGET_OBJECTS:cstring-objects${suffix}>)
-        set(cstring-target $<TARGET_OBJECTS:cstring-objects${suffix}>)
+        set(cstring-target cstring-objects${suffix} $<TARGET_OBJECTS:cstring-objects${suffix}>)
 
         add_library(simple-malloc-objects${suffix} OBJECT service/src/simple_malloc.cpp)
         target_link_libraries(simple-malloc-objects${suffix} PUBLIC wasm-base${suffix})
