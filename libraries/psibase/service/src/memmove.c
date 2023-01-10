@@ -10,7 +10,6 @@ void * memmove(void* dest, const void* src, size_t n)
       {
          *d = *s;
       }
-      return d;
    }
    else
    {
@@ -19,6 +18,6 @@ void * memmove(void* dest, const void* src, size_t n)
          --n;
          d[n] = s[n];
       }
-      return dest;
    }
+   return dest;
 }

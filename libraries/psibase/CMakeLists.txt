@@ -124,11 +124,14 @@ function(add suffix)
             tester/src/wasi_polyfill/__wasi_fd_close.cpp
             tester/src/wasi_polyfill/__wasi_fd_fdstat_get.cpp
             tester/src/wasi_polyfill/__wasi_fd_fdstat_set_flags.cpp
+            tester/src/wasi_polyfill/__wasi_fd_filestat_get.cpp
             tester/src/wasi_polyfill/__wasi_fd_prestat_dir_name.cpp
             tester/src/wasi_polyfill/__wasi_fd_prestat_get.cpp
             tester/src/wasi_polyfill/__wasi_fd_read.cpp
+            tester/src/wasi_polyfill/__wasi_fd_readdir.cpp
             tester/src/wasi_polyfill/__wasi_fd_seek.cpp
             tester/src/wasi_polyfill/__wasi_fd_write.cpp
+            tester/src/wasi_polyfill/__wasi_path_filestat_get.cpp
             tester/src/wasi_polyfill/__wasi_path_open.cpp
             tester/src/wasi_polyfill/__wasi_proc_exit.cpp
         )
@@ -145,6 +148,7 @@ function(add suffix)
             ${LIBCLANG_RT_BUILTINS}
             ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
         )
+        add_dependencies(psitestlib${suffix} c-replacement)
         target_mapped_include_directories(psitestlib${suffix} PUBLIC
             service/include
             tester/include
