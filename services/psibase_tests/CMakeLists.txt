@@ -3,7 +3,7 @@ enable_testing()
 function(service name suffix)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC include)
-    target_link_libraries(${name}${suffix} services_system${suffix} psibase-service-simple-malloc )
+    target_link_libraries(${name}${suffix} services_system${suffix} psibase-service-simple-malloc${suffix} )
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 
@@ -14,7 +14,7 @@ function(add suffix)
 
     add_executable(psibase-tests${suffix} test.cpp test-ec.cpp)
     target_include_directories(psibase-tests${suffix} PUBLIC include)
-    target_link_libraries(psibase-tests${suffix} services_system${suffix} psitestlib )
+    target_link_libraries(psibase-tests${suffix} services_system${suffix} psitestlib${suffix} )
     set_target_properties(psibase-tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add)
 
