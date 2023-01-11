@@ -250,7 +250,7 @@ void psibase::TestChain::finishBlock()
    producing = false;
 }
 
-void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec)
+void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
 {
    t.tapos.expiration.seconds = (status ? status->current.time.seconds : 0) + expire_sec;
    auto [index, suffix]       = SystemService::headTapos();
@@ -258,7 +258,7 @@ void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec)
    t.tapos.refBlockSuffix     = suffix;
 }
 
-psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions)
+psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions) const
 {
    Transaction t;
    fillTapos(t);

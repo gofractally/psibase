@@ -192,12 +192,12 @@ namespace psibase
       /*
        * Set the reference block of the transaction to the head block.
        */
-      void fillTapos(Transaction& t, uint32_t expire_sec = 2);
+      void fillTapos(Transaction& t, uint32_t expire_sec = 2) const;
 
       /*
        * Creates a transaction.
        */
-      Transaction makeTransaction(std::vector<Action>&& actions = {});
+      Transaction makeTransaction(std::vector<Action>&& actions = {}) const;
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.

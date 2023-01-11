@@ -10,6 +10,11 @@ static constexpr bool enable_print = false;
 
 using namespace psibase;
 
+namespace
+{
+   constexpr std::string_view systemSuffix{"sys"};
+}
+
 namespace SystemService
 {
    void AccountSys::init()
@@ -43,8 +48,6 @@ namespace SystemService
       statusTable.put({.totalAccounts = totalAccounts});
    }
 
-   // TODO: limit who can use -sys suffix
-   // TODO: verify name round-trips through strings
    void AccountSys::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
    {
       Tables tables{getReceiver()};
@@ -58,11 +61,21 @@ namespace SystemService
 
       auto creatorTable = tables.open<CreatorTable>();
       auto creator      = creatorTable.getIndex<0>().get(SingletonKey{});
-      if (creator.has_value())
+
+      auto senderName = getSender().str();
+      bool fromSysAcc = senderName.ends_with(systemSuffix);
+      if (!fromSysAcc)
       {
-         check(
-             (*creator).accountCreator == getSender(),
-             "Only " + (*creator).accountCreator.str() + " is authorized to create new accounts.");
+         if (creator.has_value())
+         {
+            check((*creator).accountCreator == getSender(),
+                  "Only " + (*creator).accountCreator.str() +
+                      " is authorized to create new accounts.");
+         }
+         bool        newSysAcc = name.str().ends_with(systemSuffix);
+         std::string err       = "Only a system account can create an account with the suffix: ";
+         err += systemSuffix;
+         check(!newSysAcc, err.c_str());
       }
 
       if (enable_print)
@@ -74,6 +87,10 @@ namespace SystemService
       }
 
       check(name.value, "invalid account name");
+
+      // Check compression roundtrip
+      check(AccountNumber{name.str()}.value, "invalid account name");
+
       if (accountIndex.get(name))
       {
          if (requireNew)
@@ -123,6 +140,13 @@ namespace SystemService
       {
          check(getSender() == creator->accountCreator,
                "Only current creator can change the creator");
+      }
+      else
+      {
+         // Any system account may be used to turn on account creation restrictions
+         auto senderName = getSender().str();
+         check(senderName.ends_with(systemSuffix),
+               "A system account must be used to set the initial account creator");
       }
 
       creatorTable.put(CreatorRecord{.key = SingletonKey{}, .accountCreator = name});

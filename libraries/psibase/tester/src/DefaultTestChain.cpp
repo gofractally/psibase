@@ -14,7 +14,9 @@
 #include <services/system/SetCodeSys.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
+#include <services/user/AuthInviteSys.hpp>
 #include <services/user/ExploreSys.hpp>
+#include <services/user/InviteSys.hpp>
 #include <services/user/NftSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
 #include <services/user/RTokenSys.hpp>
@@ -44,10 +46,12 @@ DefaultTestChain::DefaultTestChain(
    setBlockProducers();
    registerSysRpc();
 
+   from(UserService::NftSys::service).to<UserService::NftSys>().init();
+   from(UserService::TokenSys::service).to<UserService::TokenSys>().init();
+   from(UserService::SymbolSys::service).to<UserService::SymbolSys>().init();
+   from(UserService::Invite::InviteSys::service).to<UserService::Invite::InviteSys>().init();
+
    auto alice = from(add_account("alice"_a));
-   alice.to<UserService::NftSys>().init();
-   alice.to<UserService::TokenSys>().init();
-   alice.to<UserService::SymbolSys>().init();
 
    for (const auto& c : additionalServices)
    {
@@ -166,6 +170,16 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .service = UserService::SymbolSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("SymbolSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::Invite::InviteSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("InviteSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::AuthInviteSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("AuthInviteSys.wasm"),
                                             },
                                         },
                                 }),
