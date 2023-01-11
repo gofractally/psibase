@@ -3,6 +3,7 @@
 #include <psibase/String.hpp>
 #include <psibase/psibase.hpp>
 
+#include <services/system/CommonTables.hpp>
 #include <services/user/nftErrors.hpp>
 #include <services/user/nftTables.hpp>
 

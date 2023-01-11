@@ -781,4 +781,12 @@ namespace psibase
 
       AccountNumber account;  ///< the service runs on this account
    };
+
+   // An empty key that can be used for any singleton table
+   struct SingletonKey
+   {
+   };
+   PSIO_REFLECT(SingletonKey);
+
+
 }  // namespace psibase

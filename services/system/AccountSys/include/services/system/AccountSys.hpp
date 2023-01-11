@@ -26,13 +26,9 @@ namespace SystemService
    PSIO_REFLECT(Account, accountNum, authService)
    using AccountTable = psibase::Table<Account, &Account::key>;
 
-   struct SingletonKey
-   {
-   };
-   PSIO_REFLECT(SingletonKey);
    struct CreatorRecord
    {
-      SingletonKey           key;
+      psibase::SingletonKey  key;
       psibase::AccountNumber accountCreator;
    };
    PSIO_REFLECT(CreatorRecord, key, accountCreator);
