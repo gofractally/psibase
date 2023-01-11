@@ -357,7 +357,7 @@ namespace psibase::http
          res.set(bhttp::field::content_type, "text/html");
          set_cors(res);
          set_keep_alive(res);
-         res.body() = why.to_string();
+         res.body() = std::string(why);
          res.prepare_payload();
          return res;
       };
@@ -373,8 +373,8 @@ namespace psibase::http
          res.set(bhttp::field::allow, allowed_methods);
          set_cors(res);
          set_keep_alive(res);
-         res.body() = "The resource '" + target.to_string() + "' does not accept the method " +
-                      method.to_string() + ".";
+         res.body() = "The resource '" + std::string(target) + "' does not accept the method " +
+                      std::string(method) + ".";
          res.prepare_payload();
          return res;
       };
@@ -388,7 +388,7 @@ namespace psibase::http
          res.set(bhttp::field::content_type, "text/html");
          set_cors(res);
          set_keep_alive(res);
-         res.body() = "The resource '" + target.to_string() + "' was not found.";
+         res.body() = "The resource '" + std::string(target) + "' was not found.";
          res.prepare_payload();
          return res;
       };
@@ -403,7 +403,7 @@ namespace psibase::http
          res.set(bhttp::field::content_type, content_type);
          set_cors(res);
          set_keep_alive(res);
-         res.body() = why.to_string();
+         res.body() = std::string(why);
          res.prepare_payload();
          return res;
       };
@@ -546,7 +546,7 @@ namespace psibase::http
                    method_not_allowed(req.target(), req.method_string(), "GET, POST, OPTIONS"));
             data.host        = {host.begin(), host.size()};
             data.rootHost    = server.http_config->host;
-            data.target      = req.target().to_string();
+            data.target      = std::string(req.target());
             data.contentType = (std::string)req[bhttp::field::content_type];
             data.body        = std::move(req.body());
 
@@ -597,7 +597,7 @@ namespace psibase::http
             if (!result)
                return send(
                    error(bhttp::status::not_found,
-                         "The resource '" + req.target().to_string() + "' was not found.\n"));
+                         "The resource '" + std::string(req.target()) + "' was not found.\n"));
             return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
          }  // !native
          else if (req.target() == "/native/push_boot" && server.http_config->push_boot_async)
@@ -997,7 +997,7 @@ namespace psibase::http
          else
          {
             return send(error(bhttp::status::not_found,
-                              "The resource '" + req.target().to_string() + "' was not found.\n"));
+                              "The resource '" + std::string(req.target()) + "' was not found.\n"));
          }
       }
       catch (const std::exception& e)
