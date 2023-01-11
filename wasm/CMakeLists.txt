@@ -172,7 +172,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
             && cd ${OPENSSL_EXTRACTED}                                                      \
             && ./Configure linux-generic32                                                  \
                 --prefix=${DEP_PREFIX}                                                      \
-                no-afalgeng no-asm no-dso no-shared no-sock no-tests no-threads no-ui       \
+                no-afalgeng no-asm no-autoalginit no-autoerrinit no-autoload-config no-dso no-async no-shared no-sock no-tests no-threads no-ui       \
                 CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"                     \
                 CXX=\"${CMAKE_CXX_COMPILER_LAUNCHER} ${CMAKE_CXX_COMPILER}\"                \
                 AR=${CMAKE_AR}                                                              \

@@ -59,10 +59,22 @@ function(add suffix)
         target_link_libraries(psibase-service-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
         target_sources(psibase-service-wasi-polyfill${suffix} PRIVATE
             service/src/ossl.c
+            service/src/wasi-polyfill/__wasi_clock_time_get.cpp
+            service/src/wasi-polyfill/__wasi_environ_get.cpp
+            service/src/wasi-polyfill/__wasi_environ_sizes_get.cpp
             service/src/wasi-polyfill/__wasi_fd_fdstat_get.cpp
+            service/src/wasi-polyfill/__wasi_fd_fdstat_set_flags.cpp
+            service/src/wasi-polyfill/__wasi_fd_filestat_get.cpp
+            service/src/wasi-polyfill/__wasi_fd_prestat_get.cpp
+            service/src/wasi-polyfill/__wasi_fd_prestat_dir_name.cpp
             service/src/wasi-polyfill/__wasi_fd_close.cpp
+            service/src/wasi-polyfill/__wasi_fd_read.cpp
+            service/src/wasi-polyfill/__wasi_fd_readdir.cpp
             service/src/wasi-polyfill/__wasi_fd_seek.cpp
             service/src/wasi-polyfill/__wasi_fd_write.cpp
+            service/src/wasi-polyfill/__wasi_path_filestat_get.cpp
+            service/src/wasi-polyfill/__wasi_path_open.cpp
+            service/src/wasi-polyfill/__wasi_proc_exit.cpp
         )
 
         add_library(psibase-service-base${suffix})
