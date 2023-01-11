@@ -467,6 +467,7 @@ namespace triedent
       void print_stats(bool detail = false);
 
       bool is_slow() const { return _ring->is_slow(); }
+      auto span() const { return _ring->span(); }
 
      private:
       inline void release(id);

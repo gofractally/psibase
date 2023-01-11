@@ -1,6 +1,6 @@
 # admin-sys
 
-The adminstrator service is hosted at [http://localhost:8080/](http://localhost:8080/) as a [Builtin Service](#builtin-services). It provides tools for monitoring and controlling the server.
+The adminstrator service is hosted on localhost by default as a [Builtin Service](#builtin-services). It provides tools for monitoring and controlling the server.
 
 ## Configuration Options
 

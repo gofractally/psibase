@@ -17,16 +17,21 @@
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#ifdef PSIBASE_ENABLE_SSL
+#include <boost/beast/ssl.hpp>
+#endif
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/make_unique.hpp>
 #include <boost/optional.hpp>
 #include <boost/signals2/signal.hpp>
+#include <boost/type_erasure/is_empty.hpp>
 
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
@@ -36,6 +41,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+#include <pthread.h>
 
 namespace beast     = boost::beast;  // from <boost/beast.hpp>
 namespace websocket = beast::websocket;
@@ -350,7 +357,7 @@ namespace psibase::http
          res.set(bhttp::field::content_type, "text/html");
          set_cors(res);
          set_keep_alive(res);
-         res.body() = why.to_string();
+         res.body() = std::string(why);
          res.prepare_payload();
          return res;
       };
@@ -366,8 +373,8 @@ namespace psibase::http
          res.set(bhttp::field::allow, allowed_methods);
          set_cors(res);
          set_keep_alive(res);
-         res.body() = "The resource '" + target.to_string() + "' does not accept the method " +
-                      method.to_string() + ".";
+         res.body() = "The resource '" + std::string(target) + "' does not accept the method " +
+                      std::string(method) + ".";
          res.prepare_payload();
          return res;
       };
@@ -381,7 +388,7 @@ namespace psibase::http
          res.set(bhttp::field::content_type, "text/html");
          set_cors(res);
          set_keep_alive(res);
-         res.body() = "The resource '" + target.to_string() + "' was not found.";
+         res.body() = "The resource '" + std::string(target) + "' was not found.";
          res.prepare_payload();
          return res;
       };
@@ -396,7 +403,7 @@ namespace psibase::http
          res.set(bhttp::field::content_type, content_type);
          set_cors(res);
          set_keep_alive(res);
-         res.body() = why.to_string();
+         res.body() = std::string(why);
          res.prepare_payload();
          return res;
       };
@@ -462,7 +469,7 @@ namespace psibase::http
               session  = send.self.derived_session().shared_from_this()](auto&& result) mutable
          {
             auto* p = session.get();
-            net::post(p->stream.socket().get_executor(),
+            net::post(p->stream.get_executor(),
                       [callback = std::move(callback), session = std::move(session),
                        result = static_cast<decltype(result)>(result)]()
                       {
@@ -539,7 +546,7 @@ namespace psibase::http
                    method_not_allowed(req.target(), req.method_string(), "GET, POST, OPTIONS"));
             data.host        = {host.begin(), host.size()};
             data.rootHost    = server.http_config->host;
-            data.target      = req.target().to_string();
+            data.target      = std::string(req.target());
             data.contentType = (std::string)req[bhttp::field::content_type];
             data.body        = std::move(req.body());
 
@@ -590,7 +597,7 @@ namespace psibase::http
             if (!result)
                return send(
                    error(bhttp::status::not_found,
-                         "The resource '" + req.target().to_string() + "' was not found.\n"));
+                         "The resource '" + std::string(req.target()) + "' was not found.\n"));
             return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
          }  // !native
          else if (req.target() == "/native/push_boot" && server.http_config->push_boot_async)
@@ -622,7 +629,7 @@ namespace psibase::http
                 [error, ok,
                  session = send.self.derived_session().shared_from_this()](push_boot_result result)
                 {
-                   net::post(session->stream.socket().get_executor(),
+                   net::post(session->stream.get_executor(),
                              [error, ok, session = std::move(session), result = std::move(result)]
                              {
                                 try
@@ -678,7 +685,7 @@ namespace psibase::http
                 [error, ok, session = send.self.derived_session().shared_from_this()](
                     push_transaction_result result)
                 {
-                   net::post(session->stream.socket().get_executor(),
+                   net::post(session->stream.get_executor(),
                              [error, ok, session = std::move(session), result = std::move(result)]
                              {
                                 try
@@ -709,7 +716,8 @@ namespace psibase::http
             return;
          }  // push_transaction
          else if (req.target() == "/native/p2p" && websocket::is_upgrade(req) &&
-                  server.http_config->accept_p2p_websocket && server.http_config->enable_p2p)
+                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
+                  server.http_config->enable_p2p)
          {
             if (forbid_cross_origin())
                return;
@@ -756,6 +764,21 @@ namespace psibase::http
             server.http_config->shutdown(std::move(req.body()));
             return send(accepted());
          }
+         else if (req.target() == "/native/admin/perf" && server.http_config->get_perf)
+         {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() != bhttp::verb::get)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+            run_native_handler(
+                server.http_config->get_perf,
+                [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
+                { session->queue_(ok(make_result(), "application/json")); });
+         }
          else if (req.target() == "/native/admin/peers" && server.http_config->get_peers)
          {
             if (!is_admin(*server.http_config, req))
@@ -773,7 +796,7 @@ namespace psibase::http
                 [ok,
                  session = send.self.derived_session().shared_from_this()](get_peers_result result)
                 {
-                   net::post(session->stream.socket().get_executor(),
+                   net::post(session->stream.get_executor(),
                              [ok, session = std::move(session), result = std::move(result)]()
                              {
                                 session->queue_.pause_read = false;
@@ -812,7 +835,7 @@ namespace psibase::http
                  session = send.self.derived_session().shared_from_this()](connect_result result)
                 {
                    net::post(
-                       session->stream.socket().get_executor(),
+                       session->stream.get_executor(),
                        [ok_no_content, error, session = std::move(session),
                         result = std::move(result)]()
                        {
@@ -856,7 +879,7 @@ namespace psibase::http
                  session = send.self.derived_session().shared_from_this()](connect_result result)
                 {
                    net::post(
-                       session->stream.socket().get_executor(),
+                       session->stream.get_executor(),
                        [ok_no_content, error, session = std::move(session),
                         result = std::move(result)]()
                        {
@@ -974,7 +997,7 @@ namespace psibase::http
          else
          {
             return send(error(bhttp::status::not_found,
-                              "The resource '" + req.target().to_string() + "' was not found.\n"));
+                              "The resource '" + std::string(req.target()) + "' was not found.\n"));
          }
       }
       catch (const std::exception& e)
@@ -1112,20 +1135,14 @@ namespace psibase::http
                   auto p = ptr.get();
                   // Capture only the stream, not self, because after returning, there is
                   // no longer anything keeping the session alive
-                  p->stream.async_accept(
-                      p->request,
-                      [ptr = std::move(ptr)](const std::error_code& ec)
-                      {
-                         if (!ec)
-                         {
-                            // FIXME: handle local sockets
-                            if constexpr (std::is_same_v<decltype(self.derived_session().stream),
-                                                         beast::tcp_stream>)
-                            {
-                               ptr->next(std::move(ptr->stream));
-                            }
-                         }
-                      });
+                  p->stream.async_accept(p->request,
+                                         [ptr = std::move(ptr)](const std::error_code& ec)
+                                         {
+                                            if (!ec)
+                                            {
+                                               ptr->next(std::move(ptr->stream));
+                                            }
+                                         });
                }
             };
 
@@ -1177,8 +1194,7 @@ namespace psibase::http
       void run()
       {
          PSIBASE_LOG(logger, debug) << "Accepted connection";
-         _timer.reset(
-             new boost::asio::steady_timer(derived_session().stream.socket().get_executor()));
+         _timer.reset(new boost::asio::steady_timer(derived_session().stream.get_executor()));
          last_activity_timepoint = steady_clock::now();
          start_socket_timer();
          do_read();
@@ -1293,10 +1309,14 @@ namespace psibase::http
       void do_close()
       {
          // Send a TCP shutdown
-         beast::error_code ec;
-         derived_session().stream.socket().shutdown(tcp::socket::shutdown_send, ec);
+         derived_session().do_shutdown();
          _timer->cancel();  // cancel connection timer.
          // At this point the connection is closed gracefully
+      }
+      void do_shutdown()
+      {
+         beast::error_code ec;
+         derived_session().stream.socket().shutdown(tcp::socket::shutdown_send, ec);
       }
    };  // http_session
 
@@ -1315,6 +1335,43 @@ namespace psibase::http
       beast::tcp_stream stream;
    };
 
+#ifdef PSIBASE_ENABLE_SSL
+   struct tls_http_session : public http_session<tls_http_session>,
+                             public std::enable_shared_from_this<tls_http_session>
+   {
+      tls_http_session(server_impl& server, tcp::socket&& socket)
+          : http_session<tls_http_session>(server),
+            context(server.http_config->tls_context),
+            stream(std::move(socket), *context)
+      {
+         std::ostringstream ss;
+         ss << stream.next_layer().socket().remote_endpoint();
+         logger.add_attribute("RemoteEndpoint",
+                              boost::log::attributes::constant<std::string>(ss.str()));
+      }
+
+      void do_shutdown()
+      {
+         stream.async_shutdown([self = shared_from_this()](const std::error_code& ec) {});
+      }
+
+      void run()
+      {
+         stream.async_handshake(boost::asio::ssl::stream_base::server,
+                                [self = shared_from_this()](const std::error_code& ec)
+                                {
+                                   if (!ec)
+                                   {
+                                      self->http_session<tls_http_session>::run();
+                                   }
+                                });
+      }
+
+      tls_context_ptr                             context;
+      boost::beast::ssl_stream<beast::tcp_stream> stream;
+   };
+#endif
+
    struct unix_http_session : public http_session<unix_http_session>,
                               public std::enable_shared_from_this<unix_http_session>
    {
@@ -1322,7 +1379,7 @@ namespace psibase::http
           : http_session<unix_http_session>(server), stream(std::move(socket))
       {
          logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
-                                                    socket.remote_endpoint().path()));
+                                                    stream.socket().remote_endpoint().path()));
       }
 
       beast::basic_stream<unixs,
@@ -1336,93 +1393,37 @@ namespace psibase::http
    };
 
    // Accepts incoming connections and launches the sessions
-   class listener : public std::enable_shared_from_this<listener>
+   template <typename Acceptor>
+   class listener : public std::enable_shared_from_this<listener<Acceptor>>
    {
-      server_impl&    server;
-      tcp::acceptor   tcp_acceptor;
-      unixs::acceptor unix_acceptor;
-      bool            acceptor_ready = false;
-
+      server_impl&                    server;
+      Acceptor                        acceptor;
       psibase::loggers::common_logger logger;
 
      public:
-      listener(server_impl& server)
-          : server(server),
-            tcp_acceptor(net::make_strand(server.ioc)),
-            unix_acceptor(net::make_strand(server.ioc))
+      listener(server_impl& server, const typename Acceptor::endpoint_type& endpoint)
+          : server(server), acceptor(net::make_strand(server.ioc))
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
-         if (server.http_config->address.size())
-         {
-            boost::asio::ip::address a;
-            try
-            {
-               a = net::ip::make_address(server.http_config->address);
-            }
-            catch (std::exception& e)
-            {
-               throw std::runtime_error("make_address(): "s + server.http_config->address + ": " +
-                                        e.what());
-            }
-
-            start_listen(tcp_acceptor, tcp::endpoint{a, server.http_config->port});
-         }
-
-         if (server.http_config->unix_path.size())
-         {
-            //take a sniff and see if anything is already listening at the given socket path, or if the socket path exists
-            // but nothing is listening
-            boost::system::error_code test_ec;
-            unixs::socket             test_socket(server.ioc);
-            test_socket.connect(server.http_config->unix_path.c_str(), test_ec);
-
-            //looks like a service is already running on that socket, don't touch it... fail out
-            if (test_ec == boost::system::errc::success)
-            {
-               PSIBASE_LOG(logger, error) << "http unix socket is in use";
-               listen_fail();
-            }
-            //socket exists but no one home, go ahead and remove it and continue on
-            else if (test_ec == boost::system::errc::connection_refused)
-               ::unlink(server.http_config->unix_path.c_str());
-            else if (test_ec != boost::system::errc::no_such_file_or_directory)
-            {
-               PSIBASE_LOG(logger, error)
-                   << "unexpected failure when probing existing http unix socket: "
-                   << test_ec.message();
-               listen_fail();
-            }
-
-            start_listen(unix_acceptor, unixs::endpoint(server.http_config->unix_path));
-         }
-
-         acceptor_ready = true;
+         start_listen(endpoint);
       }
 
       static void close(std::shared_ptr<listener>&& self, bool)
       {
-         boost::asio::dispatch(self->tcp_acceptor.get_executor(),
+         boost::asio::dispatch(self->acceptor.get_executor(),
                                [self]
                                {
-                                  if (self->tcp_acceptor.is_open())
+                                  if (self->acceptor.is_open())
                                   {
-                                     self->tcp_acceptor.cancel();
-                                  }
-                               });
-         boost::asio::dispatch(self->unix_acceptor.get_executor(),
-                               [self]
-                               {
-                                  if (self->unix_acceptor.is_open())
-                                  {
-                                     self->unix_acceptor.cancel();
+                                     self->acceptor.cancel();
                                   }
                                });
       }
 
       void listen_fail() { throw std::runtime_error("unable to open listen socket"); }
 
-      template <typename Acceptor, typename Endpoint>
-      void start_listen(Acceptor& acceptor, const Endpoint& endpoint)
+      template <typename Endpoint>
+      void start_listen(const Endpoint& endpoint)
       {
          beast::error_code ec;
 
@@ -1449,28 +1450,23 @@ namespace psibase::http
       }
 
       // Start accepting incoming connections
+      template <typename Session>
       bool run()
       {
-         if (!acceptor_ready)
-            return acceptor_ready;
-         server.register_connection(shared_from_this());
-         if (tcp_acceptor.is_open())
-            do_accept(tcp_acceptor);
-         if (unix_acceptor.is_open())
-            do_accept(unix_acceptor);
-         return acceptor_ready;
+         server.register_connection(this->shared_from_this());
+         do_accept<Session>();
+         return true;
       }
 
      private:
-      template <typename Acceptor>
-      void do_accept(Acceptor& acceptor)
+      template <typename Session>
+      void do_accept()
       {
          // The new connection gets its own strand
          acceptor.async_accept(
              net::make_strand(server.ioc),
              beast::bind_front_handler(
-                 [&acceptor, self = shared_from_this(), this](beast::error_code ec,
-                                                              auto              socket) mutable
+                 [self = this->shared_from_this(), this](beast::error_code ec, auto socket) mutable
                  {
                     if (ec)
                     {
@@ -1482,25 +1478,13 @@ namespace psibase::http
                     else
                     {
                        // Create the http session and run it
-                       if constexpr (std::is_same_v<Acceptor, tcp::acceptor>)
-                       {
-                          boost::system::error_code ec;
-                          std::make_shared<tcp_http_session>(self->server, std::move(socket))
-                              ->run();
-                       }
-                       else if constexpr (std::is_same_v<Acceptor, unixs::acceptor>)
-                       {
-                          boost::system::error_code ec;
-                          auto                      rep = socket.remote_endpoint(ec);
-                          std::make_shared<unix_http_session>(self->server, std::move(socket))
-                              ->run();
-                       }
+                       std::make_shared<Session>(self->server, std::move(socket))->run();
                     }
 
                     // Accept another connection
                     if (ec != boost::asio::error::operation_aborted)
                     {
-                       do_accept(acceptor);
+                       do_accept<Session>();
                     }
                     else
                     {
@@ -1513,15 +1497,193 @@ namespace psibase::http
       }
    };  // listener
 
+   listen_spec parse_listen(const std::string& s)
+   {
+      auto parse_host = [](std::string_view s, bool secure) -> listen_spec
+      {
+         if (s.ends_with('/'))
+         {
+            s = s.substr(0, s.size() - 1);
+         }
+         if (secure)
+         {
+            return parse_listen_tcp<true>(std::string(s));
+         }
+         else
+         {
+            return parse_listen_tcp<false>(std::string(s));
+         }
+      };
+      if (s.starts_with("http://"))
+      {
+         return parse_host(s.substr(7), false);
+      }
+      else if (s.starts_with("https://"))
+      {
+#ifdef PSIBASE_ENABLE_SSL
+         return parse_host(s.substr(8), true);
+#else
+         throw std::runtime_error("Cannot listen on " + s +
+                                  " because psinode was compiled without TLS support");
+#endif
+      }
+      else if (s.find('/') != std::string_view::npos)
+      {
+         return local_listen_spec(s);
+      }
+      else
+      {
+         return parse_listen_tcp<false>(s);
+      }
+   }
+
+   template <bool Secure>
+   tcp_listen_spec<Secure> parse_listen_tcp(const std::string& s)
+   {
+      auto check = [&](bool b)
+      {
+         if (!b)
+            throw std::runtime_error("Invalid endpoint: " + s);
+      };
+      net::ip::address addr;
+      unsigned short   port = Secure ? 443 : 80;
+      if (s.starts_with('['))
+      {
+         auto end = s.find(']');
+         check(end != std::string::npos);
+         addr = net::ip::make_address_v6(s.substr(1, end - 1));
+         if (end + 1 != s.size())
+         {
+            check(s[end + 1] == ':');
+            auto res = std::from_chars(s.data() + end + 2, s.data() + s.size(), port);
+            check(res.ec == std::errc{} && res.ptr == s.data() + s.size());
+         }
+      }
+      else
+      {
+         boost::system::error_code ec;
+         addr = net::ip::make_address(s, ec);
+         if (ec)
+         {
+            auto pos = s.rfind(':');
+            if (pos == std::string::npos)
+            {
+               addr = net::ip::make_address("0.0.0.0");
+               pos  = 0;
+            }
+            else
+            {
+               addr = net::ip::make_address_v4(s.substr(0, pos));
+               pos  = pos + 1;
+            }
+            auto res = std::from_chars(s.data() + pos, s.data() + s.size(), port);
+            check(res.ec == std::errc{} && res.ptr == s.data() + s.size());
+         }
+      }
+      return {{addr, port}};
+   }
+   local_listen_spec parse_listen_local(const std::string& s)
+   {
+      return local_listen_spec(s);
+   }
+
+   template <bool Secure>
+   std::string to_string(const tcp_listen_spec<Secure>& spec)
+   {
+      std::ostringstream ss;
+      ss << spec.endpoint;
+      if constexpr (Secure)
+      {
+         return "https://" + ss.str();
+      }
+      else
+      {
+         return ss.str();
+      }
+   }
+
+   std::string to_string(const local_listen_spec& spec)
+   {
+      auto result = spec.path();
+      if (result.find('/') == std::string::npos)
+      {
+         result = "./" + result;
+      }
+      return result;
+   }
+
+   std::string to_string(const listen_spec& spec)
+   {
+      return std::visit([](const auto& spec) { return to_string(spec); }, spec);
+   }
+
+   template <bool Secure>
+   bool make_listener(server_impl& server, const tcp_listen_spec<Secure>& spec)
+   {
+      auto l = std::make_shared<listener<net::ip::tcp::acceptor>>(server, spec.endpoint);
+      if constexpr (Secure)
+      {
+#if PSIBASE_ENABLE_SSL
+         return l->template run<tls_http_session>();
+#else
+         return false;
+#endif
+      }
+      else
+      {
+         return l->template run<tcp_http_session>();
+      }
+   }
+
+   bool make_listener(server_impl& server, const local_listen_spec& spec)
+   {
+      //take a sniff and see if anything is already listening at the given socket path, or if the socket path exists
+      // but nothing is listening
+      boost::system::error_code test_ec;
+      unixs::socket             test_socket(server.ioc);
+      test_socket.connect(spec, test_ec);
+
+      //looks like a service is already running on that socket, don't touch it... fail out
+      if (test_ec == boost::system::errc::success)
+      {
+         PSIBASE_LOG(loggers::generic::get(), error) << "http unix socket is in use";
+         return false;
+      }
+      //socket exists but no one home, go ahead and remove it and continue on
+      else if (test_ec == boost::system::errc::connection_refused)
+         ::unlink(spec.path().c_str());
+      else if (test_ec != boost::system::errc::no_such_file_or_directory)
+      {
+         PSIBASE_LOG(loggers::generic::get(), error)
+             << "unexpected failure when probing existing http unix socket: " << test_ec.message();
+         return false;
+      }
+      return std::make_shared<listener<unixs::acceptor>>(server, spec)->run<unix_http_session>();
+   }
+
    bool server_impl::start()
    {
-      auto l = std::make_shared<listener>(*this);
-      if (!l->run())
+      bool has_listener = false;
+      for (const auto& spec : http_config->listen)
+      {
+         has_listener |=
+             std::visit([&](const auto& spec) { return make_listener(*this, spec); }, spec);
+      }
+      if (!has_listener)
+      {
          return false;
+      }
 
       threads.reserve(http_config->num_threads);
       for (unsigned i = 0; i < http_config->num_threads; ++i)
-         threads.emplace_back([this, _ = std::unique_lock{thread_count}]() mutable { ioc.run(); });
+      {
+         threads.emplace_back(
+             [this, i, _ = std::unique_lock{thread_count}]() mutable
+             {
+                pthread_setname_np(pthread_self(), ("http-" + std::to_string(i)).c_str());
+                ioc.run();
+             });
+      }
       return true;
    }
 

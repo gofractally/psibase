@@ -2,6 +2,7 @@
 //! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
 
 use fracpack_macro::fracpack_macro_impl;
+use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
 use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
@@ -11,6 +12,7 @@ use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
 
 mod fracpack_macro;
+mod graphql_macro;
 mod number_macro;
 mod reflect_macro;
 mod service_macro;
@@ -408,4 +410,22 @@ pub fn method(item: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn method_raw(item: TokenStream) -> TokenStream {
     method_macro_impl(false, item)
+}
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn queries(attr: TokenStream, item: TokenStream) -> TokenStream {
+    queries_macro_impl(attr, item)
+}
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn table_query(item: TokenStream) -> TokenStream {
+    table_query_macro_impl(item)
+}
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn table_query_subindex(item: TokenStream) -> TokenStream {
+    table_query_subindex_macro_impl(item)
 }

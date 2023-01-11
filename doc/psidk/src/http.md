@@ -406,6 +406,7 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `POST` | `/native/admin/keys`       | Creates or imports a key pair                                                 |
 | `GET`  | `/native/admin/config`     | Returns the current [server configuration](#server-configuration)             |
 | `PUT`  | `/native/admin/config`     | Sets the [server configuration](#server-configuration)                        |
+| `GET`  | `/native/admin/perf`       | Returns [performance monitoring](#performance-monitoring) data                |
 | `GET`  | `/native/admin/log`        | Websocket that provides access to [live server logs](#websocket-logger)       |
 
 ### Server status
@@ -470,17 +471,25 @@ Each peer has the following fields:
 
 `/native/admin/config` provides `GET` and `PUT` access to the server's configuration. Changes made using this API are persistent across server restarts. New versions of psibase may add fields at any time. Clients that wish to set the configuration should `GET` the configuration first and return unknown fields to the server unchanged.
 
-| Field      | Type    | Description                                                                                                                                                                                               |
-|------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `p2p`      | Boolean | Controls whether the server accepts incoming P2P connections.                                                                                                                                             |
-| `peers` | Array | A list of peer URLs that the server may connect to. To manage the active connections, see [peer management](#peer-management) |
-| `autoconnect` | Number or Boolean | The target number of out-going connections. If set to true, the server will try to connect to all configured peers. |
-| `producer` | String  | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
-| `host`     | String  | The server's hostname.                                                                                                                                                                                    |
-| `port`     | Number  | The port that the server runs on. Changes to the port will take effect the next time the server starts.                                                                                                   |
-| `services` | Array   | A list of built in services. `host` is the virtual hostname for the service. If `host` ends with `.` the global `host` will be appended to it. `root` is a directory containing the content to be served. |
-| `admin`    | String  | Controls service access to the admin API. `*` allows access for all services.  `static:*` allows access for builtin services. The name of a service allows access for that service.                       |
-| `loggers`  | Object  | A description of the [destinations for log records](#logging)                                                                                                                                             |
+| Field                | Type              | Description                                                                                                                                                                                               |
+|----------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `p2p`                | Boolean           | Controls whether the server accepts incoming P2P connections.                                                                                                                                             |
+| `peers`              | Array             | A list of peer URLs that the server may connect to. To manage the active connections, see [peer management](#peer-management)                                                                             |
+| `autoconnect`        | Number or Boolean | The target number of out-going connections. If set to true, the server will try to connect to all configured peers.                                                                                       |
+| `producer`           | String            | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
+| `host`               | String            | The server's hostname.                                                                                                                                                                                    |
+| `listen`             | Array             | Interfaces that the server will listen on. Changes to the set of interfaces will take effect the next time the server starts.                                                                             |
+| `listen[n].protocol` | String            | One of `http`, `https`, or `local`                                                                                                                                                                        |
+| `listen[n].address`  | String            | (`http` or `https`) An IP address that refers to a local interface                                                                                                                                        |
+| `listen[n].port`     | Number            | (`http` or `https`) The TCP port number                                                                                                                                                                   |
+| `listen[n].path`     | String            | (`local` only) A path to a local socket                                                                                                                                                                   |
+| `tls`                | Object            | The TLS context. Changes to the TLS context will take effect the next time the server starts.                                                                                                             |
+| `tls.certificate`    | String            | The path to the server's certificate chain in PEM format                                                                                                                                                  |
+| `tls.key`            | String            | The path to the file containing the private key for the server's certificate in PEM format                                                                                                                |
+| `tls.trustfiles`     | Array             | A list of files containing trusted root CAs in PEM format.                                                                                                                                                |
+| `services`           | Array             | A list of built in services. `host` is the virtual hostname for the service. If `host` ends with `.` the global `host` will be appended to it. `root` is a directory containing the content to be served. |
+| `admin`              | String            | Controls service access to the admin API. `*` allows access for all services.  `static:*` allows access for builtin services. The name of a service allows access for that service.                       |
+| `loggers`            | Object            | A description of the [destinations for log records](#logging)                                                                                                                                             |
 
 Example:
 ```json
@@ -489,7 +498,18 @@ Example:
     "peers": ["http://psibase.io/"],
     "producer": "prod",
     "host": "127.0.0.1.sslip.io",
-    "port": 8080,
+    "listen": [
+        {
+            "protocol": "http",
+            "address": "0.0.0.0",
+            "port": 8080
+        }
+    ],
+    "tls": {
+        "certificate": "psibase.cert",
+        "key": "psibase.key",
+        "trustfiles": []
+    },
     "services": [
         {
             "host": "localhost",
@@ -520,6 +540,102 @@ Example:
             "path": "/dev/log"
         }
     }
+}
+```
+
+### Performance monitoring
+
+`/native/admin/perf` reports an assortment of performance related statistics.
+
+| Field          | Type   | Description                                                                                                                                                    |
+|----------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp`    | Number | The time in microseconds since an unspecified epoch. The epoch shall not change during the lifetime of the server. Restarting the server may change the epoch. |
+| `transactions` | Object | Transaction statistics                                                                                                                                         |
+| `memory`       | Object | Categorized list of resident memory in bytes                                                                                                                   |
+| `tasks`        | Array  | Per-thread statistics                                                                                                                                          |
+
+The `transactions` field holds transaction statistics. It does not include transactions that were only seen in blocks.
+
+| Field         | Type   | Description                                                                                                                      |
+|---------------|--------|----------------------------------------------------------------------------------------------------------------------------------|
+| `total`       | Number | The total number of transactions received                                                                                        |
+| `unprocessed` | Number | The current transaction queue depth                                                                                              |
+| `succeeded`   | Number | The number of transactions that succeeded                                                                                        |
+| `failed`      | Number | The number of transactions that failed                                                                                           |
+| `skipped`     | Number | The number of transactions skipped. This currently means that the node flushed its queue when it was not accepting transactions. |
+
+The `memory` field holds a breakdown of resident memory usage.
+
+| Field          | Type   | Description                                          |
+|----------------|--------|------------------------------------------------------|
+| `database`     | Number | Memory used by the database cache                    |
+| `code`         | Number | Native executable code                               |
+| `data`         | Number | Static data                                          |
+| `wasmMemory`   | Number | WASM linear memory                                   |
+| `wasmCode`     | Number | Memory used to store compiled WASM modules           |
+| `unclassified` | Number | Everything that doesn't fall under another category. |
+
+The `tasks` array holds per-thread statistics.
+
+| Field        | Type   | Description                                                            |
+|--------------|--------|------------------------------------------------------------------------|
+| `id`         | Number | The thread id                                                          |
+| `group`      | String | Identifies the thread pool that that thread is part of                 |
+| `user`       | Number | The accumulated user time of the thread in microseconds                |
+| `system`     | Number | The accumulated system time of the thread in microseconds              |
+| `pageFaults` | Number | The number of page faults                                              |
+| `read`       | Number | The total number of bytes fetched from the storage layer by the thread |
+| `written`    | Number | The total number of bytes sent to the storage layer by the thread      |
+
+Caveats:
+The precision of time measurements may be less than representation in microseconds might imply. Statistics that are unavailable may be reported as 0.
+
+```json
+{
+  "timestamp": "36999617055",
+  "memory": {
+    "database": "12914688",
+    "code": "10002432",
+    "wasmMemory": "7143424",
+    "wasmCode": "7860224",
+    "unclassified": "9269248"
+  },
+  "tasks": [
+    {
+      "id": 16367,
+      "group": "chain",
+      "user": "850000",
+      "system": "190000",
+      "pageFaults": "1",
+      "read": "0",
+      "written": "589824"
+    },
+    {
+      "id": 16368,
+      "group": "database",
+      "user": "6370000",
+      "system": "5750000",
+      "pageFaults": "0",
+      "read": "0",
+      "written": "0"
+    },
+    {
+      "id": 16369,
+      "group": "http",
+      "user": "120000",
+      "system": "30000",
+      "pageFaults": "0",
+      "read": "0",
+      "written": "0"
+    }
+  ],
+  "transactions": {
+    "unprocessed": "0",
+    "total": "6",
+    "failed": "2",
+    "succeeded": "3",
+    "skipped": "1"
+  }
 }
 ```
 

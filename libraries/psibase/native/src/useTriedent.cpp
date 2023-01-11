@@ -350,6 +350,12 @@ namespace psibase
       return impl->trie->is_slow();
    }
 
+   std::vector<std::span<const char>> SharedDatabase::span() const
+   {
+      auto result = impl->trie->span();
+      return {result.begin(), result.end()};
+   }
+
    struct DatabaseImpl
    {
       SharedDatabase                           shared;

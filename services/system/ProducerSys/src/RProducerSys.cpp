@@ -47,7 +47,7 @@ std::optional<HttpReply> RProducerSys::serveSys(HttpRequest request)
 void RProducerSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content), Tables{getReceiver()});
+   storeContent(std::move(path), std::move(contentType), std::move(content), Tables{getReceiver()});
 }
 
 PSIBASE_DISPATCH(SystemService::RProducerSys)

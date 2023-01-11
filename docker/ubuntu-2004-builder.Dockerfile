@@ -70,13 +70,10 @@ RUN cd /opt \
 ENV RUSTUP_HOME=/opt/rustup
 ENV CARGO_HOME=/opt/cargo
 
-# TODO: switch back to release after 1.65 is stable
 RUN cd /root \
     && curl --proto '=https' --tlsv1.2 -sSf -o rustup.sh https://sh.rustup.rs \
     && chmod 700 rustup.sh \
     && ./rustup.sh -y --no-modify-path \
-    && /opt/cargo/bin/rustup toolchain install beta \
-    && /opt/cargo/bin/rustup default beta \
     && /opt/cargo/bin/rustup target add wasm32-wasi \
     && /opt/cargo/bin/cargo install mdbook mdbook-linkcheck mdbook-mermaid sccache  \
     && chmod -R 777 $RUSTUP_HOME \

@@ -20,6 +20,7 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 
+#include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/asio/system_timer.hpp>
 
 #include <charconv>
@@ -31,6 +32,8 @@
 
 using namespace psibase;
 using namespace psibase::net;
+
+using http::listen_spec;
 
 struct native_service
 {
@@ -287,6 +290,12 @@ namespace psibase
          const auto& s = boost::program_options::validators::get_single_string(values);
          v             = admin_service_from_string(s);
       }
+
+      void validate(boost::any& v, const std::vector<std::string>& values, listen_spec*, int)
+      {
+         boost::program_options::validators::check_first_occurrence(v);
+         v = parse_listen(boost::program_options::validators::get_single_string(values));
+      }
    }  // namespace http
 }  // namespace psibase
 
@@ -404,7 +413,7 @@ void loop(Timer& timer, F&& f)
        });
 }
 
-void pushTransaction(psibase::SharedState&                  sharedState,
+bool pushTransaction(psibase::SharedState&                  sharedState,
                      const std::shared_ptr<const Revision>& revisionAtBlockStart,
                      BlockContext&                          bc,
                      SystemContext&                         proofSystem,
@@ -500,6 +509,7 @@ void pushTransaction(psibase::SharedState&                  sharedState,
       try
       {
          entry.callback(std::move(trace));
+         return !trace.error;
       }
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
@@ -523,18 +533,30 @@ void pushTransaction(psibase::SharedState&                  sharedState,
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
    }
+   return false;
 }  // pushTransaction
 
-std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view peer)
+std::tuple<bool, std::string_view, std::string_view> parse_endpoint(std::string_view peer)
 {
    // TODO: handle ipv6 addresses [addr]:port
+   bool secure = false;
    if (peer.starts_with("ws://"))
    {
       peer = peer.substr(5);
    }
-   if (peer.starts_with("http://"))
+   else if (peer.starts_with("http://"))
    {
       peer = peer.substr(7);
+   }
+   else if (peer.starts_with("wss://"))
+   {
+      secure = true;
+      peer   = peer.substr(6);
+   }
+   else if (peer.starts_with("https://"))
+   {
+      secure = true;
+      peer   = peer.substr(8);
    }
    if (peer.ends_with('/'))
    {
@@ -543,11 +565,11 @@ std::pair<std::string_view, std::string_view> parse_endpoint(std::string_view pe
    auto pos = peer.find(':');
    if (pos == std::string_view::npos)
    {
-      return {peer, "80"};
+      return {secure, peer, secure ? "443" : "80"};
    }
    else
    {
-      return {peer.substr(0, pos), peer.substr(pos + 1)};
+      return {secure, peer.substr(0, pos), peer.substr(pos + 1)};
    }
 }
 
@@ -555,7 +577,8 @@ std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 {
    for (auto& url : urls)
    {
-      if (!url.starts_with("http:") && !url.starts_with("ws:"))
+      if (!url.starts_with("http:") && !url.starts_with("ws:") && !url.starts_with("https") &&
+          !url.starts_with("wss:"))
       {
          url = "http://" + url + "/";
       }
@@ -604,6 +627,332 @@ struct RestartInfo
 };
 PSIO_REFLECT(RestartInfo, shouldRestart);
 
+struct ThreadInfo
+{
+   pid_t        id;
+   std::string  group;
+   std::int64_t user;
+   std::int64_t system;
+   std::int64_t pageFaults;
+   std::int64_t read;
+   std::int64_t written;
+};
+PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
+
+struct MemStats
+{
+   std::size_t database;
+   std::size_t code;
+   std::size_t data;
+   std::size_t wasmMemory;
+   std::size_t wasmCode;
+   std::size_t unclassified;
+};
+PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
+
+// TODO: this will need to be reworked when we have more complete transaction tracking
+struct TransactionStats
+{
+   std::uint64_t unprocessed;
+   std::uint64_t total;
+   std::uint64_t failed;
+   std::uint64_t succeeded;
+   std::uint64_t skipped;
+};
+PSIO_REFLECT(TransactionStats, unprocessed, total, failed, succeeded, skipped)
+
+struct Perf
+{
+   std::int64_t            timestamp;
+   MemStats                memory;
+   std::vector<ThreadInfo> tasks;
+   TransactionStats        transactions;
+};
+PSIO_REFLECT(Perf, timestamp, memory, tasks, transactions)
+
+std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
+{
+   std::int64_t value;
+   is >> value;
+   return value / clk_tck * 1000000 + (value % clk_tck) * 1000000 / clk_tck;
+}
+
+ThreadInfo getThreadInfo(const std::filesystem::path& name, long clk_tck)
+{
+   ThreadInfo result = {};
+   {
+      std::ifstream in(name / "stat");
+      in >> result.id;
+      std::string tmp;
+      for (int i = 0; i < 10; ++i)
+      {
+         in >> tmp;
+      }
+      // (12) majflt
+      in >> result.pageFaults;
+      in >> tmp;
+      // (14) utime
+      result.user = read_as_microseconds(in, clk_tck);
+      // (15) stime
+      result.system = read_as_microseconds(in, clk_tck);
+   }
+   if (result.id == getpid())
+   {
+      result.group = "chain";
+   }
+   else
+   {
+      std::ifstream in(name / "comm");
+      char          buf[17] = {};
+      in.read(buf, 16);
+      std::string_view thread_name(buf);
+      if (thread_name.starts_with("http"))
+      {
+         result.group = "http";
+      }
+      else if (thread_name.starts_with("swap"))
+      {
+         result.group = "database";
+      }
+   }
+   {
+      std::ifstream in(name / "io");
+      std::string   line;
+      auto          split = [](std::string_view line)
+      {
+         auto pos = line.find(": ");
+         if (pos == std::string_view::npos)
+         {
+            return std::pair{std::string_view{}, std::string_view{}};
+         }
+         else
+         {
+            return std::pair{line.substr(0, pos), line.substr(pos + 2)};
+         }
+      };
+      auto parse_int = [](std::string_view s)
+      {
+         std::int64_t result = 0;
+         std::from_chars(s.begin(), s.end(), result);
+         return result;
+      };
+      while (std::getline(in, line))
+      {
+         auto [key, value] = split(line);
+         if (key == "read_bytes")
+         {
+            result.read = parse_int(value);
+         }
+         else if (key == "write_bytes")
+         {
+            result.written = parse_int(value);
+         }
+      }
+   }
+   return result;
+}
+
+struct MappingInfo
+{
+   std::uintptr_t begin;
+   std::uintptr_t end;
+   std::size_t    rss;
+   bool           executable;
+   bool           anonymous;
+   bool           special;
+};
+
+bool parse_map_line(const char* begin, const char* end, MappingInfo& mapping)
+{
+   auto res = std::from_chars(begin, end, mapping.begin, 16);
+   if (res.ec != std::errc())
+      return false;
+   begin = res.ptr;
+   if (begin == end || *begin != '-')
+      return false;
+   ++begin;
+   res = std::from_chars(begin, end, mapping.end, 16);
+   if (res.ec != std::errc())
+      return false;
+   begin = res.ptr;
+
+   auto read_field = [&]
+   {
+      while (begin != end && *begin == ' ')
+      {
+         ++begin;
+      }
+      const char* start = begin;
+      while (begin != end && *begin != ' ')
+      {
+         ++begin;
+      }
+      return std::string_view{start, begin};
+   };
+   auto flags         = read_field();
+   mapping.executable = flags.find('x') != std::string_view::npos;
+   auto offset        = read_field();
+   auto dev           = read_field();
+   auto inode         = read_field();
+   auto pathname      = read_field();
+   mapping.anonymous  = pathname == "";
+   mapping.special    = pathname.starts_with('[') && pathname.ends_with(']');
+   return true;
+}
+
+bool parse_mapping_field(std::string_view line, std::size_t& value)
+{
+   auto pos = line.find(':');
+   if (pos == std::string_view::npos)
+      return false;
+   pos      = line.find_first_not_of(' ', pos + 1);
+   auto res = std::from_chars(line.begin() + pos, line.end(), value);
+   if (res.ec != std::errc())
+      return false;
+   if (std::string_view(res.ptr, line.end()) != " kB")
+      return false;
+   value *= 1024;
+   return true;
+}
+
+std::istream& operator>>(std::istream& is, MappingInfo& info)
+{
+   std::string line;
+   if (!std::getline(is, line))
+      return is;
+   if (!parse_map_line(line.data(), line.data() + line.size(), info))
+      throw std::runtime_error("Failed to parse mapping");
+   info.rss = 0;
+   while (std::getline(is, line))
+   {
+      if (line.starts_with("VmFlags:"))
+         break;
+      else if (line.starts_with("Rss:"))
+      {
+         if (!parse_mapping_field(line, info.rss))
+            throw std::runtime_error("Failed to parse Rss");
+      }
+   }
+   return is;
+}
+
+enum class RegionGroup
+{
+   unknown,
+   database,
+   wasmMemory,
+   wasmCode,
+};
+
+struct RegionInfo
+{
+   struct Region
+   {
+      std::uintptr_t begin;
+      std::uintptr_t end;
+      RegionGroup    group;
+   };
+   // Returns the first region that intersects the given range
+   RegionGroup get(std::uintptr_t begin, std::uintptr_t end)
+   {
+      auto pos = std::partition_point(regions.begin(), regions.end(),
+                                      [begin](const auto& r) { return r.end <= begin; });
+      if (pos != regions.end() && pos->begin < end)
+         return pos->group;
+      return RegionGroup::unknown;
+   }
+   void add(std::span<const char> range, RegionGroup group)
+   {
+      regions.push_back({reinterpret_cast<std::uintptr_t>(range.data()),
+                         reinterpret_cast<std::uintptr_t>(range.data() + range.size()), group});
+   }
+   void prepare()
+   {
+      std::sort(regions.begin(), regions.end(),
+                [](const auto& lhs, const auto& rhs) { return lhs.begin < rhs.begin; });
+   }
+   std::vector<Region> regions;
+};
+
+MemStats getMemStats(const SharedState& state)
+{
+   RegionInfo regions;
+   for (auto span : state.dbSpan())
+   {
+      regions.add(span, RegionGroup::database);
+   }
+   for (auto span : state.codeSpan())
+   {
+      regions.add(span, RegionGroup::wasmCode);
+   }
+   for (auto span : state.linearMemorySpan())
+   {
+      regions.add(span, RegionGroup::wasmMemory);
+   }
+   regions.prepare();
+   MemStats result = {};
+   {
+      std::ifstream in("/proc/self/smaps");
+      MappingInfo   info;
+      while (in >> info)
+      {
+         switch (regions.get(info.begin, info.end))
+         {
+            case RegionGroup::database:
+               result.database += info.rss;
+               break;
+            case RegionGroup::wasmCode:
+               result.wasmCode += info.rss;
+               break;
+            case RegionGroup::wasmMemory:
+               result.wasmMemory += info.rss;
+               break;
+            default:
+            {
+               if (info.executable)
+               {
+                  result.code += info.rss;
+               }
+               else if (!info.anonymous && !info.special)
+               {
+                  result.data += info.rss;
+               }
+               else
+               {
+                  result.unclassified += info.rss;
+               }
+               break;
+            }
+         }
+      }
+   }
+   return result;
+}
+
+Perf get_perf(const SharedState& state, const TransactionStats& transactions)
+{
+   long clk_tck = ::sysconf(_SC_CLK_TCK);
+   Perf result;
+   result.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
+   result.memory       = getMemStats(state);
+   result.transactions = transactions;
+   for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
+   {
+      result.tasks.push_back(getThreadInfo(entry, clk_tck));
+   }
+   return result;
+}
+
+struct TLSConfig
+{
+   std::string              certificate;
+   std::string              key;
+   std::vector<std::string> trustfiles;
+};
+PSIO_REFLECT(TLSConfig, certificate, key, trustfiles)
+
 struct PsinodeConfig
 {
    bool                        p2p = false;
@@ -611,7 +960,8 @@ struct PsinodeConfig
    autoconnect_t               autoconnect;
    AccountNumber               producer;
    std::string                 host;
-   std::uint16_t               port = 8080;
+   std::vector<listen_spec>    listen;
+   TLSConfig                   tls;
    std::vector<native_service> services;
    http::admin_service         admin;
    psibase::loggers::Config    loggers;
@@ -622,7 +972,10 @@ PSIO_REFLECT(PsinodeConfig,
              autoconnect,
              producer,
              host,
-             port,
+             listen,
+#ifdef PSIBASE_ENABLE_SSL
+             tls,
+#endif
              services,
              admin,
              loggers);
@@ -649,11 +1002,36 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    {
       file.set("", "host", config.host, "The HTTP server's host name");
    }
-   if (!config.host.empty() || !config.services.empty())
+   if (!config.listen.empty())
    {
-      file.set("", "port", std::to_string(config.port),
-               "The TCP port that the HTTP server listens on");
+      std::vector<std::string> listen;
+      for (const auto& l : config.listen)
+      {
+         listen.push_back(to_string(l));
+      }
+      file.set(
+          "", "listen", listen, [](std::string_view text) { return std::string(text); },
+          "TCP or local socket endpoint on which the server accepts connections");
    }
+#ifdef PSIBASE_ENABLE_SSL
+   if (!config.tls.certificate.empty())
+   {
+      file.set("", "tls-cert", config.tls.certificate,
+               "A file containing the server's certificate chain");
+   }
+   if (!config.tls.key.empty())
+   {
+      file.set("", "tls-key", config.tls.key,
+               "A file containing the key corresponding to tls-cert");
+   }
+   if (!config.tls.trustfiles.empty())
+   {
+      file.set(
+          "", "tls-trustfile", config.tls.trustfiles,
+          [](std::string_view text) { return std::string(text); },
+          "A file containing trusted certificate authorities");
+   }
+#endif
    if (!config.services.empty())
    {
       std::vector<std::string> services;
@@ -702,9 +1080,12 @@ void run(const std::string&              db_path,
          autoconnect_t                   autoconnect,
          bool                            enable_incoming_p2p,
          std::string                     host,
-         unsigned short                  port,
+         std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
+         std::vector<std::string>        root_ca,
+         std::string                     tls_cert,
+         std::string                     tls_key,
          uint32_t                        leeway_us,
          RestartInfo&                    runResult)
 {
@@ -716,6 +1097,9 @@ void run(const std::string&              db_path,
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
    auto queue       = std::make_shared<transaction_queue>();
+   //
+   TransactionStats transactionStats = {};
+   std::mutex       transactionStatsMutex;
 
    if (system->sharedDatabase.isSlow())
    {
@@ -747,6 +1131,28 @@ void run(const std::string&              db_path,
 
    auto server_work = boost::asio::make_work_guard(chainContext);
 
+#ifdef PSIBASE_ENABLE_SSL
+   http_config->tls_context =
+       std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tlsv13);
+   boost::asio::ssl::context& sslContext(*http_config->tls_context);
+   if (root_ca.empty())
+   {
+      sslContext.set_default_verify_paths();
+   }
+   else
+   {
+      for (const auto& ca : root_ca)
+      {
+         sslContext.load_verify_file(ca);
+      }
+   }
+   if (!tls_cert.empty())
+   {
+      sslContext.use_certificate_chain_file(tls_cert);
+      sslContext.use_private_key_file(tls_key, boost::asio::ssl::context::pem);
+   }
+#endif
+
    using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
@@ -758,40 +1164,63 @@ void run(const std::string&              db_path,
    auto connect_one = [&resolver, &node, &chainContext, &http_config, &runResult](
                           const std::string& peer, auto&& f)
    {
-      auto [host, service] = parse_endpoint(peer);
-      auto result          = std::make_shared<websocket_connection>(chainContext);
-      result->url          = peer;
-      async_connect(std::move(result), resolver, host, service,
-                    [&node, &http_config, &runResult, f = static_cast<decltype(f)>(f)](
-                        const std::error_code& ec, auto&& conn)
-                    {
-                       if (!ec)
+      auto [secure, host, service] = parse_endpoint(peer);
+      auto do_connect              = [&](auto&& conn)
+      {
+         conn->url = peer;
+         async_connect(std::move(conn), resolver, host, service,
+                       [&node, &http_config, &runResult, f = static_cast<decltype(f)>(f)](
+                           const std::error_code& ec, auto&& conn)
                        {
-                          if (http_config->status.load().shutdown)
+                          if (!ec)
                           {
-                             conn->close(runResult.shouldRestart
-                                             ? connection_base::close_code::restart
-                                             : connection_base::close_code::shutdown);
-                             f(make_error_code(boost::asio::error::operation_aborted));
-                             return;
+                             if (http_config->status.load().shutdown)
+                             {
+                                conn->close(runResult.shouldRestart
+                                                ? connection_base::close_code::restart
+                                                : connection_base::close_code::shutdown);
+                                f(make_error_code(boost::asio::error::operation_aborted));
+                                return;
+                             }
+                             node.add_connection(std::move(conn));
                           }
-                          node.add_connection(std::move(conn));
-                       }
-                       f(ec);
-                    });
+                          f(ec);
+                       });
+      };
+      if (secure)
+      {
+#if PSIBASE_ENABLE_SSL
+         auto conn = std::make_shared<
+             websocket_connection<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(
+             chainContext, *http_config->tls_context);
+         conn->stream.next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
+         conn->stream.next_layer().set_verify_callback(
+             boost::asio::ssl::host_name_verification(std::string(host)));
+         do_connect(std::move(conn));
+#else
+         PSIBASE_LOG(psibase::loggers::generic::get(), warning)
+             << "Connection to " << peer
+             << " not attempted because psinode was built without TLS support";
+         boost::asio::post(chainContext, [f = static_cast<decltype(f)>(f)]
+                           { f(std::error_code(EPROTONOSUPPORT, std::generic_category())); });
+#endif
+      }
+      else
+      {
+         do_connect(std::make_shared<websocket_connection<boost::beast::tcp_stream>>(chainContext));
+      }
    };
 
    timer_type timer(chainContext);
 
-   if (!host.empty() || !services.empty())
+   if (!listen.empty())
    {
       // TODO: command-line options
       http_config->num_threads         = 4;
       http_config->max_request_size    = 20 * 1024 * 1024;
       http_config->idle_timeout_ms     = std::chrono::milliseconds{4000};
       http_config->allow_origin        = "*";
-      http_config->address             = "0.0.0.0";
-      http_config->port                = port;
+      http_config->listen              = listen;
       http_config->host                = host;
       http_config->enable_transactions = !host.empty();
       http_config->status =
@@ -805,16 +1234,28 @@ void run(const std::string&              db_path,
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =
-          [queue](std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
+          [queue, &transactionStats, &transactionStatsMutex](
+              std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
       {
+         {
+            std::lock_guard l{transactionStatsMutex};
+            ++transactionStats.total;
+            ++transactionStats.unprocessed;
+         }
          std::scoped_lock lock{queue->mutex};
          queue->entries.push_back(
              {true, std::move(packed_signed_transactions), std::move(callback), {}});
       };
 
       http_config->push_transaction_async =
-          [queue](std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
+          [queue, &transactionStats, &transactionStatsMutex](
+              std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
       {
+         {
+            std::lock_guard l{transactionStatsMutex};
+            ++transactionStats.total;
+            ++transactionStats.unprocessed;
+         }
          std::scoped_lock lock{queue->mutex};
          queue->entries.push_back({false, std::move(packed_signed_trx), {}, std::move(callback)});
       };
@@ -822,8 +1263,14 @@ void run(const std::string&              db_path,
       http_config->accept_p2p_websocket = [&chainContext, &node](auto&& stream)
       {
          boost::asio::post(
-             chainContext, [&node, stream = std::move(stream)]() mutable
-             { node.add_connection(std::make_shared<websocket_connection>(std::move(stream))); });
+             chainContext,
+             [&node, stream = std::move(stream)]() mutable
+             {
+                node.add_connection(
+                    std::make_shared<websocket_connection<
+                        typename std::remove_cv_t<decltype(stream)>::next_layer_type>>(
+                        std::move(stream)));
+             });
       };
 
       http_config->shutdown = [&chainContext, &node, &http_config, &connect_one, &timer, &runResult,
@@ -866,6 +1313,24 @@ void run(const std::string&              db_path,
                                  node.peers().disconnect_all(restart);
                               });
          }
+      };
+
+      http_config->get_perf =
+          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
+      {
+         TransactionStats trx;
+         {
+            std::lock_guard lock{transactionStatsMutex};
+            trx = transactionStats;
+         }
+         callback(
+             [result = get_perf(*sharedState, trx)]() mutable
+             {
+                std::vector<char>   json;
+                psio::vector_stream stream(json);
+                to_json(result, stream);
+                return json;
+             });
       };
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
@@ -924,82 +1389,93 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->set_config =
-          [&chainContext, &node, &db_path, &runResult, &http_config, &host, &port, &admin,
-           &services, &connect_one](std::vector<char> json, http::connect_callback callback)
+      http_config->set_config = [&chainContext, &node, &db_path, &runResult, &http_config, &host,
+                                 &admin, &services, &tls_cert, &tls_key, &root_ca, &connect_one](
+                                    std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
 
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
-                            &db_path, &runResult, &http_config, &host, &port, &services, &admin,
-                            &connect_one, callback = std::move(callback)]() mutable
-                           {
-                              std::optional<http::services_t> new_services;
-                              if (services != config.services || host != config.host)
-                              {
-                                 new_services.emplace();
-                                 for (const auto& entry : config.services)
-                                 {
-                                    load_service(entry, *new_services, config.host);
-                                 }
-                              }
-                              node.set_producer_id(config.producer);
-                              http_config->enable_p2p = config.p2p;
-                              if (!http_config->status.load().shutdown)
-                              {
-                                 node.autoconnect(std::vector(config.peers),
-                                                  config.autoconnect.value, connect_one);
-                              }
-                              host     = config.host;
-                              port     = config.port;
-                              services = config.services;
-                              admin    = config.admin;
-                              loggers::configure(config.loggers);
-                              {
-                                 std::shared_lock l{http_config->mutex};
-                                 http_config->host                = host;
-                                 http_config->admin               = admin;
-                                 http_config->enable_transactions = !host.empty();
-                                 if (new_services)
-                                 {
-                                    // Use swap instead of move to delay freeing the old
-                                    // services until after releasing the mutex
-                                    http_config->services.swap(*new_services);
-                                 }
-                              }
-                              {
-                                 auto       path = std::filesystem::path(db_path) / "config";
-                                 ConfigFile file;
-                                 {
-                                    std::ifstream in(path);
-                                    file.parse(in);
-                                 }
-                                 to_config(config, file);
-                                 {
-                                    std::ofstream out(path);
-                                    file.write(out);
-                                 }
-                                 runResult.configChanged = true;
-                              }
-                              callback(std::nullopt);
-                           });
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
+              &runResult, &http_config, &host, &services, &admin, &tls_cert, &tls_key, &root_ca,
+              &connect_one, callback = std::move(callback)]() mutable
+             {
+                std::optional<http::services_t> new_services;
+                if (services != config.services || host != config.host)
+                {
+                   new_services.emplace();
+                   for (const auto& entry : config.services)
+                   {
+                      load_service(entry, *new_services, config.host);
+                   }
+                }
+                node.set_producer_id(config.producer);
+                http_config->enable_p2p = config.p2p;
+                if (!http_config->status.load().shutdown)
+                {
+                   node.autoconnect(std::vector(config.peers), config.autoconnect.value,
+                                    connect_one);
+                }
+                host     = config.host;
+                services = config.services;
+                admin    = config.admin;
+#ifdef PSIBASE_ENABLE_SSL
+                tls_cert = config.tls.certificate;
+                tls_key  = config.tls.key;
+                root_ca  = config.tls.trustfiles;
+#endif
+                loggers::configure(config.loggers);
+                {
+                   std::shared_lock l{http_config->mutex};
+                   http_config->host                = host;
+                   http_config->listen              = config.listen;
+                   http_config->admin               = admin;
+                   http_config->enable_transactions = !host.empty();
+                   if (new_services)
+                   {
+                      // Use swap instead of move to delay freeing the old
+                      // services until after releasing the mutex
+                      http_config->services.swap(*new_services);
+                   }
+                }
+                {
+                   auto       path = std::filesystem::path(db_path) / "config";
+                   ConfigFile file;
+                   {
+                      std::ifstream in(path);
+                      file.parse(in);
+                   }
+                   to_config(config, file);
+                   {
+                      std::ofstream out(path);
+                      file.write(out);
+                   }
+                   runResult.configChanged = true;
+                }
+                callback(std::nullopt);
+             });
       };
 
-      http_config->get_config = [&chainContext, &node, &http_config, &host, &port, &admin,
-                                 &services](http::get_config_callback callback)
+      http_config->get_config = [&chainContext, &node, &http_config, &host, &admin, &tls_cert,
+                                 &tls_key, &root_ca, &services](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
-                           [&chainContext, &node, &http_config, &host, &port, &services, &admin,
-                            callback = std::move(callback)]() mutable
+                           [&chainContext, &node, &http_config, &host, &services, &admin, &tls_cert,
+                            &tls_key, &root_ca, callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
                               result.p2p = http_config->enable_p2p;
                               std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
                               result.producer = node.producer_name();
                               result.host     = host;
-                              result.port     = port;
+                              result.listen   = http_config->listen;
+#ifdef PSIBASE_ENABLE_SSL
+                              result.tls.certificate = tls_cert;
+                              result.tls.key         = tls_key;
+                              result.tls.trustfiles  = root_ca;
+#endif
                               result.services = services;
                               result.admin    = admin;
                               result.loggers  = loggers::Config::get();
@@ -1134,6 +1610,11 @@ void run(const std::string&              db_path,
       }
       auto fail_all = [&](const std::string& message)
       {
+         {
+            std::lock_guard lock{transactionStatsMutex};
+            transactionStats.unprocessed -= entries.size();
+            transactionStats.skipped += entries.size();
+         }
          for (auto& entry : entries)
          {
             if (entry.callback)
@@ -1156,13 +1637,26 @@ void run(const std::string&              db_path,
          auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
          {
+            bool res;
             if (entry.is_boot)
-               push_boot(*bc, entry);
+               res = push_boot(*bc, entry);
             else
-               pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
-                               std::chrono::microseconds(leeway_us),  // TODO
-                               std::chrono::microseconds(leeway_us),  // TODO
-                               std::chrono::microseconds(leeway_us));
+               res = pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
+                                     std::chrono::microseconds(leeway_us),  // TODO
+                                     std::chrono::microseconds(leeway_us),  // TODO
+                                     std::chrono::microseconds(leeway_us));
+            {
+               std::lock_guard lock{transactionStatsMutex};
+               --transactionStats.unprocessed;
+               if (res)
+               {
+                  ++transactionStats.succeeded;
+               }
+               else
+               {
+                  ++transactionStats.failed;
+               }
+            }
          }
 
          // TODO: this should go in the leader's production loop
@@ -1192,38 +1686,52 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 int main(int argc, char* argv[])
 {
    std::string                 db_path;
-   std::string                 producer  = {};
-   auto                        keys      = std::make_shared<CompoundProver>();
-   std::string                 host      = {};
-   unsigned short              port      = 8080;
+   std::string                 producer = {};
+   auto                        keys     = std::make_shared<CompoundProver>();
+   std::string                 host     = {};
+   std::vector<listen_spec>    listen;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
    bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
    http::admin_service         admin;
+   std::vector<std::string>    root_ca;
+   std::string                 tls_cert;
+   std::string                 tls_key;
 
    namespace po = boost::program_options;
 
    po::options_description desc("psinode");
-   po::options_description common_opts("psinode");
+   po::options_description common_opts("Options");
    auto                    opt = common_opts.add_options();
-   opt("producer,p", po::value<std::string>(&producer)->default_value(""), "Name of this producer");
+   opt("producer,p", po::value<std::string>(&producer)->default_value("")->value_name("name"),
+       "Name of this producer");
    opt("key,k", po::value(&keys->provers)->default_value({}, ""),
        "A private key to use for block production");
-   opt("peer", po::value(&peers)->default_value({}, ""), "Peer endpoint");
-   opt("autoconnect", po::value(&autoconnect)->default_value({}, "unlimited"),
-       "Preferred number of peers");
-   opt("p2p", po::bool_switch(&enable_incoming_p2p)->default_value(false, "off"),
-       "Enable incoming p2p connections; requires --host");
    opt("host,o", po::value<std::string>(&host)->value_name("name")->default_value(""),
-       "Host http server");
-   opt("port", po::value(&port)->default_value(8080), "http server port");
-   opt("service", po::value(&services)->default_value({}, ""), "Static content");
+       "Root host name for the http server");
+   opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
+       "TCP or local socket endpoint on which the server accepts connections");
+   opt("p2p", po::bool_switch(&enable_incoming_p2p)->default_value(false, "off"),
+       "Enable incoming p2p connections");
+   opt("peer", po::value(&peers)->default_value({}, "")->value_name("URL"), "Peer endpoint");
+   opt("autoconnect", po::value(&autoconnect)->default_value({}, "")->value_name("num"),
+       "Limits the number of peers to be connected automatically");
+   opt("service", po::value(&services)->default_value({}, "")->value_name("host:directory"),
+       "Serve static content from directory using the specified virtual host name");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
-   opt("leeway,l", po::value<uint32_t>(&leeway_us)->default_value(200000),
-       "Transaction leeway, in us. Defaults to 200000.");
+#ifdef PSIBASE_ENABLE_SSL
+   opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
+       "A list of trusted Certification Authorities in PEM format");
+   opt("tls-cert", po::value(&tls_cert)->default_value("")->value_name("path"),
+       "The file containing the server's certificate in PEM format");
+   opt("tls-key", po::value(&tls_key)->default_value("")->value_name("path"),
+       "The file containing the private key corresponding to --tls-cert in PEM format");
+#endif
+   opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
+       "Transaction leeway, in µs.");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
@@ -1284,7 +1792,7 @@ int main(int argc, char* argv[])
    if (vm.count("help"))
    {
       std::cerr << usage << "\n\n";
-      std::cerr << desc << "\n";
+      std::cerr << common_opts << "\n";
       return 1;
    }
 
@@ -1299,7 +1807,7 @@ int main(int argc, char* argv[])
          restart.shouldRestart     = true;
          restart.soft              = true;
          run(db_path, AccountNumber{producer}, keys, peers, autoconnect, enable_incoming_p2p, host,
-             port, services, admin, leeway_us, restart);
+             listen, services, admin, root_ca, tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

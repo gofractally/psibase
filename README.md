@@ -24,12 +24,13 @@ Set the `WASI_SDK_PREFIX` environment variable before building. Alternatively, u
 ```sh
 git submodule update --init --recursive
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -Wno-dev ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/psidk ..
 make -j $(nproc)
 ctest -j $(nproc)
+make install
 ```
 
-The built product lives in `build/psidk`.
+The built product lives in `/opt/psidk`.
 
 To build documentation, use `-DBUILD_DOC=yes`
 
@@ -56,7 +57,7 @@ sudo apt-get install -yq    \
     python-is-python3       \
     wget
 
-export WASI_SDK_PREFIX=~/work/wasi-sdk-14.0
+export WASI_SDK_PREFIX=~/work/wasi-sdk-17.0
 export PATH=~/work/node-v16.17.0-linux-x64/bin:~/.cargo/bin:$PATH
 
 cd ~/work
@@ -68,19 +69,16 @@ sudo ./b2 --prefix=/usr/local --build-dir=build variant=release --with-chrono --
      --with-filesystem --with-iostreams --with-log --with-program_options --with-system --with-test install
 
 cd ~/work
-wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz
-tar xf wasi-sdk-14.0-linux.tar.gz
+wget https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-17/wasi-sdk-17.0-linux.tar.gz
+tar xf wasi-sdk-17.0-linux.tar.gz
 
 cd ~/work
 wget https://nodejs.org/dist/v16.17.0/node-v16.17.0-linux-x64.tar.xz
 tar xf node-v16.17.0-linux-x64.tar.xz
 npm i -g npm yarn
 
-# TODO: switch back to release after 1.65 is stable
 cd ~/work
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup toolchain install beta
-rustup default beta
 rustup target add wasm32-wasi
 cargo install mdbook mdbook-linkcheck mdbook-mermaid
 ```

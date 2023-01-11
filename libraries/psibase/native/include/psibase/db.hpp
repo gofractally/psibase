@@ -48,14 +48,15 @@ namespace psibase
       ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
       void             removeRevisions(Writer& writer, const Checksum256& irreversible);
 
-      void                             setBlockData(Writer&               writer,
-                                                    const Checksum256&    blockId,
-                                                    std::span<const char> key,
-                                                    std::span<const char> value);
-      std::optional<std::vector<char>> getBlockData(Writer&               writer,
-                                                    const Checksum256&    blockId,
-                                                    std::span<const char> key);
-      bool                             isSlow() const;
+      void                               setBlockData(Writer&               writer,
+                                                      const Checksum256&    blockId,
+                                                      std::span<const char> key,
+                                                      std::span<const char> value);
+      std::optional<std::vector<char>>   getBlockData(Writer&               writer,
+                                                      const Checksum256&    blockId,
+                                                      std::span<const char> key);
+      bool                               isSlow() const;
+      std::vector<std::span<const char>> span() const;
    };
 
    struct DatabaseImpl;

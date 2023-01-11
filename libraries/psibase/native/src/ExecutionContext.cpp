@@ -124,6 +124,19 @@ namespace psibase
 
    WasmCache::~WasmCache() {}
 
+   std::vector<std::span<const char>> WasmCache::span() const
+   {
+      std::vector<std::span<const char>> result;
+      std::lock_guard                    lock{impl->mutex};
+      for (const auto& backend : impl->backends)
+      {
+         auto& alloc = backend.backend->get_module().allocator;
+         result.push_back({alloc._base, alloc._capacity});
+         result.push_back({alloc._code_base, alloc._code_size});
+      }
+      return result;
+   }
+
    struct ExecutionMemoryImpl
    {
       eosio::vm::wasm_allocator wa;
@@ -140,6 +153,13 @@ namespace psibase
       impl = std::move(src.impl);
    }
    ExecutionMemory::~ExecutionMemory() {}
+
+   std::span<const char> ExecutionMemory::span() const
+   {
+      auto        raw         = impl->wa.get_base_ptr<const char>();
+      std::size_t syspagesize = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
+      return {raw - syspagesize, eosio::vm::max_memory + 2 * syspagesize};
+   }
 
    // TODO: debugger
    struct ExecutionContextImpl : NativeFunctions

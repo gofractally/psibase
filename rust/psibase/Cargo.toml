@@ -15,7 +15,7 @@ chrono = "0.4"
 custom_error = "1.9"
 fracpack = { version = "0.1.7", path = "../fracpack" }
 futures = "0.3"
-include_dir = "0.7"
+include_dir = "0.7.3"
 mime_guess = "2.0"
 psibase_macros = { version = "0.1.6", path = "../psibase_macros" }
 psibase_names = { version = "0.1.5", path = "../psibase_names" }
