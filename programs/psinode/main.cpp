@@ -320,7 +320,9 @@ struct transaction_queue
    }
 
 #define CATCH_IGNORE \
-   catch (...) {}
+   catch (...)       \
+   {                 \
+   }
 
 bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 {
@@ -1584,7 +1586,15 @@ void run(const std::string&              db_path,
    }
    else
    {
-      server_work.reset();
+      PSIBASE_LOG(loggers::generic::get(), notice)
+          << "The server is not configured to accept connections on any interface. Use --listen "
+             "<port> to add a listener.";
+      boost::asio::post(chainContext,
+                        [&server_work, &timer]
+                        {
+                           server_work.reset();
+                           timer.cancel();
+                        });
    }
 
    node.set_producer_id(producer);
