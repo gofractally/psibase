@@ -28,7 +28,7 @@ TEST_CASE("ec")
    transactor<SystemService::AuthEcSys> ecsys(SystemService::AuthEcSys::service,
                                               SystemService::AuthEcSys::service);
 
-   auto alice = t.from(t.add_account(AccountNumber("alice")));
+   auto alice = t.from(AccountNumber("alice"));
    auto bob   = t.from(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
    auto sue   = t.add_ec_account("sue", pub_key1);
 
