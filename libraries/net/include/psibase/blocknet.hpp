@@ -79,7 +79,8 @@ namespace psibase::net
          follower,
          candidate,
          leader,
-         nonvoting
+         nonvoting,
+         shutdown,
       };
 
       template <typename ExecutionContext>
@@ -370,6 +371,15 @@ namespace psibase::net
          {
             _block_timer.cancel();
          }
+      }
+
+      void async_shutdown()
+      {
+         // TODO: if we are the current leader, finish the
+         // current block and try to hand off leadership before
+         // shutting down.
+         _state = producer_state::shutdown;
+         stop_leader();
       }
 
       // The block broadcast algorithm is most independent of consensus.

@@ -1,0 +1,148 @@
+cmake_minimum_required(VERSION 3.16.3)
+project(psidk)
+
+get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../../.. REALPATH)
+
+separate_arguments(release-cxx-flags NATIVE_COMMAND ${CMAKE_CXX_FLAGS_RELEASE})
+separate_arguments(release-link-flags NATIVE_COMMAND ${CMAKE_EXE_LINKER_FLAGS_RELEASE})
+add_library(wasm-base INTERFACE)
+target_compile_options(wasm-base INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single $<$<CONFIG:Mixed>:${release-cxx-flags}>)
+target_link_options(wasm-base INTERFACE $<$<CONFIG:Mixed>:${release-link-flags}>)
+
+separate_arguments(debug-cxx-flags NATIVE_COMMAND ${CMAKE_CXX_FLAGS_DEBUG})
+separate_arguments(debug-link-flags NATIVE_COMMAND ${CMAKE_EXE_LINKER_FLAGS_DEBUG})
+add_library(wasm-base-debug INTERFACE)
+target_compile_options(wasm-base-debug INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single $<$<CONFIG:Mixed>:${debug-cxx-flags}>)
+target_link_options(wasm-base-debug INTERFACE $<$<CONFIG:Mixed>:${debug-link-flags}>)
+
+add_library(boost INTERFACE)
+target_include_directories(boost INTERFACE @ROOT_BINARY_DIR@/wasm/boost)
+
+add_library(catch2 INTERFACE)
+target_include_directories(catch2 INTERFACE @ROOT_BINARY_DIR@/wasm/catch2/include)
+target_compile_options(catch2 INTERFACE -DCATCH_CONFIG_NO_POSIX_SIGNALS -DCATCH_CONFIG_DISABLE_EXCEPTIONS)
+
+function(add_libs suffix)
+
+    if(suffix)
+        set(lib-suffix ${suffix})
+    else()
+        set(lib-suffix $<$<CONFIG:Debug>:-debug>)
+    endif()
+
+    add_library(simdjson${suffix} INTERFACE)
+    target_include_directories(simdjson${suffix} INTERFACE @ROOT_SOURCE_DIR@/external/simdjson/include)
+    target_link_libraries(simdjson${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/external/simdjson
+        -lsimdjson # TODO: ${suffix}
+    )
+
+    add_library(psio${suffix} INTERFACE)
+    target_include_directories(psio${suffix} INTERFACE
+        @ROOT_SOURCE_DIR@/libraries/psio/include
+        @ROOT_SOURCE_DIR@/libraries/psio/consthash/include
+        @ROOT_SOURCE_DIR@/external/rapidjson/include
+    )
+    target_link_libraries(psio${suffix} INTERFACE
+        boost
+        simdjson${suffix}
+        wasm-base${suffix}
+    )
+    target_compile_features(psio${suffix} INTERFACE cxx_std_20)
+
+    add_library(psibase${suffix} INTERFACE)
+    target_include_directories(psibase${suffix} INTERFACE
+        @ROOT_SOURCE_DIR@/libraries/psibase/common/include
+        @ROOT_SOURCE_DIR@/services/system/AccountSys/include
+        @ROOT_SOURCE_DIR@/services/system/AuthAnySys/include
+        @ROOT_SOURCE_DIR@/services/system/AuthEcSys/include
+        @ROOT_SOURCE_DIR@/services/system/ProducerSys/include
+        @ROOT_SOURCE_DIR@/services/system/ProxySys/include
+        @ROOT_SOURCE_DIR@/services/system/SetCodeSys/include
+        @ROOT_SOURCE_DIR@/services/system/TransactionSys/include
+        @ROOT_SOURCE_DIR@/services/system/VerifyEcSys/include
+        @ROOT_SOURCE_DIR@/services/user/CommonSys/include
+        @ROOT_SOURCE_DIR@/services/user/ExploreSys/include
+        @ROOT_SOURCE_DIR@/services/user/NftSys/include
+        @ROOT_SOURCE_DIR@/services/user/PsiSpaceSys/include
+        @ROOT_SOURCE_DIR@/services/user/SymbolSys/include
+        @ROOT_SOURCE_DIR@/services/user/TokenSys/include
+    )
+    target_link_libraries(psibase${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
+        wasm-base${suffix}
+        -lpsibase${lib-suffix}
+        psio${suffix}
+        boost
+    )
+
+    add_library(psibase-service-base${suffix} INTERFACE)
+    target_link_libraries(psibase-service-base${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
+        psibase${suffix}
+        -lpsibase-service-base${lib-suffix}
+    )
+    target_compile_options(psibase-service-base${suffix} INTERFACE -DCOMPILING_SERVICE)
+    target_link_options(psibase-service-base${suffix} INTERFACE
+        -Wl,--stack-first
+        -Wl,--entry,start
+        -Wl,--export=called
+        -Wl,-z,stack-size=8192
+        -Wl,--no-merge-data-segments
+        -nostdlib
+    )
+
+    file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
+
+    # Service with simple malloc/free
+    add_library(Psibase::service-simple-malloc${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Psibase::service-simple-malloc${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
+        psibase-service-base${suffix}
+        -lc++
+        -lc++abi-replacements${lib-suffix}
+        -lc-simple-malloc${lib-suffix}
+        -lpsibase-service-wasi-polyfill${lib-suffix}
+        ${LIBCLANG_RT_BUILTINS}
+    )
+
+    # Service with full malloc/free
+    add_library(Psibase::service-full-malloc${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Psibase::service-full-malloc${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
+        psibase-service-base${suffix}
+        -lc++
+        -lc++abi-replacements${lib-suffix}
+        -lc
+        -lpsibase-service-wasi-polyfill${lib-suffix}
+        ${LIBCLANG_RT_BUILTINS}
+    )
+
+    add_library(Psibase::service${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Psibase::service${suffix} INTERFACE Psibase::service-simple-malloc${suffix})
+
+    add_library(Psibase::test${suffix} INTERFACE IMPORTED)
+    target_compile_options(Psibase::test${suffix} INTERFACE -DCOMPILING_TESTS)
+    target_link_libraries(Psibase::test${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
+        psibase${suffix}
+        catch2
+        boost
+        -lc++
+        -lc++abi
+        -lc
+        -lpsitestlib${lib-suffix}
+        ${LIBCLANG_RT_BUILTINS}
+        ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
+    )
+    target_include_directories(Psibase::test${suffix} INTERFACE
+        @ROOT_SOURCE_DIR@/libraries/psibase/tester/include
+    )
+    target_link_options(Psibase::test${suffix} INTERFACE
+        -Wl,--entry,_start
+        -nostdlib
+    )
+endfunction()
+
+add_libs("")
+add_libs("-debug")

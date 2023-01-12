@@ -2,11 +2,6 @@
 
 These instructions cover using [nginx](http://nginx.org/) and [Let's Encrypt](https://letsencrypt.org/) to add https support to `psinode`.
 
-psinode doesn't support https itself. It would create several complications if it did:
-
-- psinode's binary release supports multiple distributions. Unfortunately different distributions have incompatible versions of the OpenSSL library. About the only way to resolve that is to statically link OpenSSL, which makes it hard to keep up with its security fixes.
-- Since psinode hosts a variable set of subdomains, https requires wildcard certificates. Let's Encrypt's wildcard certificates require a periodic dance between the https server, the Let's Encrypt API, and DNS entries to confirm ownership of the domain. `certbot` knows how to do this dance using `nginx`.
-
 These instructions cover using GoDaddy. Unfortunately every DNS provider needs a different `certbot` plugin to support wildcard certificates; see [this issue](https://github.com/certbot/certbot/issues/6178). If you're using a different DNS provider, then check the lists at [DNS Plugins](https://eff-certbot.readthedocs.io/en/stable/using.html#dns-plugins) and [Third-party plugins](https://eff-certbot.readthedocs.io/en/stable/using.html#third-party-plugins). We're using the [dns-godaddy plugin](https://github.com/miigotu/certbot-dns-godaddy).
 
 These instructions cover using Ubuntu 22.04.

@@ -106,7 +106,7 @@ optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 void RTokenSys::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content),
+   storeContent(std::move(path), std::move(contentType), std::move(content),
                 ServiceTables<WebContentTable>{getReceiver()});
 }
 

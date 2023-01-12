@@ -23,6 +23,8 @@ namespace psibase
       WasmCache(const WasmCache&);
       WasmCache(WasmCache&&);
       ~WasmCache();
+
+      std::vector<std::span<const char>> span() const;
    };
 
    struct ExecutionMemoryImpl;
@@ -33,6 +35,8 @@ namespace psibase
       ExecutionMemory();
       ExecutionMemory(ExecutionMemory&&);
       ~ExecutionMemory();
+
+      std::span<const char> span() const;
    };
 
    struct TransactionContext;

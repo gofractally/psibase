@@ -153,7 +153,7 @@ namespace psibase
    struct Connection
    {
       using NodeType = Node;
-      using Edge     = Edge<Node, EdgeName>;
+      using Edge     = psibase::Edge<Node, EdgeName>;
 
       std::vector<Edge> edges;
       PageInfo          pageInfo;
@@ -442,7 +442,7 @@ namespace psibase
    template <typename T, typename K>
    constexpr auto gql_callable_fn(const TableIndex<T, K>*)
    {
-      using Connection = Connection<  //
+      using Connection = psibase::Connection<  //
           T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
       return makeConnection<Connection, T, K>;
    }  // gql_callable_fn
@@ -1126,7 +1126,7 @@ namespace psibase
                             const std::optional<std::string>& after)
    {
       using Decoder    = EventDecoder<Events>;
-      using Connection = Connection<  //
+      using Connection = psibase::Connection<  //
           Decoder, psio::reflect<Decoder>::name + "Connection",
           psio::reflect<Decoder>::name + "Edge">;
       Connection result;

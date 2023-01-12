@@ -5,16 +5,18 @@
 /// Please don't publish this as the real psispace-sys service.
 #[psibase::service(name = "psispace-sys")]
 mod service {
+    use async_graphql::*;
     use psibase::{
-        check, get_sender, get_service, serve_action_templates, serve_graphiql, serve_pack_action,
-        AccountNumber, HexBytes, HttpReply, HttpRequest, Pack, Reflect, Table, TableIndex, Unpack,
+        check, get_sender, get_service, queries, serve_action_templates, serve_graphiql,
+        serve_graphql, serve_pack_action, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack,
+        Reflect, Table, TableIndex, ToKey, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
     type ContentKey = (AccountNumber, String);
 
     #[table(name = "ContentTable", index = 0)]
-    #[derive(Debug, Pack, Unpack, PartialEq, Eq, Reflect, Serialize, Deserialize)]
+    #[derive(Debug, Pack, Unpack, PartialEq, Eq, Reflect, Serialize, Deserialize, SimpleObject)]
     pub struct ContentRow {
         pub account: AccountNumber,
         pub path: String,
@@ -37,6 +39,40 @@ mod service {
                 headers: Vec::new(),
             }
         }
+    }
+
+    // TODO: create a macro for unnamed field keys (eg as seen in tuples keys),
+    // so that we can support these types of tables in GQL queries.
+    #[derive(ToKey, InputObject)]
+    pub struct ContentKeyNamed {
+        pub account: AccountNumber,
+        pub path: String,
+    }
+
+    impl ContentKeyNamed {
+        pub fn new(account: AccountNumber, path: String) -> Self {
+            Self { account, path }
+        }
+    }
+
+    impl From<ContentKeyNamed> for ContentKey {
+        fn from(key: ContentKeyNamed) -> Self {
+            (key.account, key.path)
+        }
+    }
+
+    #[queries]
+    impl Queries {
+        /// List all the existing files
+        table_query!(content, ContentTable, get_index_pk: ContentKeyNamed);
+
+        /// List files content by account subindex
+        table_query_subindex!(
+            content_by_account,
+            ContentTable,
+            get_index_pk,
+            account: AccountNumber,
+        );
     }
 
     /// Store a new file
@@ -83,7 +119,7 @@ mod service {
     fn handle_contract_request(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_action_templates::<Wrapper>(&request))
             .or_else(|| serve_pack_action::<Wrapper>(&request))
-            // TODO: add GraphQL
+            .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
             .or_else(|| handle_content_request(get_service(), request))
     }
@@ -144,7 +180,8 @@ mod tests {
         service::{ContentRow, ContentTable},
         Wrapper,
     };
-    use psibase::{account, ChainResult, HexBytes, HttpReply, HttpRequest, Table};
+    use psibase::{account, AccountNumber, ChainResult, HexBytes, HttpReply, HttpRequest, Table};
+    use serde_json::{json, Value};
 
     #[psibase::test_case(services("psispace-sys"))]
     fn users_can_store_content(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -307,6 +344,173 @@ mod tests {
         let response = push_servesys_request(&chain, "bob", "/default-profile/styles.css").get()?;
         assert!(response.is_some());
         assert_reply(&response.unwrap(), &style_content_type, &style_content);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(services("psispace-sys"))]
+    fn graphql_content_query_retrieves_properly(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let account_prefix = "acc";
+
+        // Create 50 files from 10 accounts
+        for i in 1..=10 {
+            let account = AccountNumber::from(format!("{}{}", account_prefix, i).as_str());
+            chain.new_account(account)?;
+
+            for j in 1..=5 {
+                let path = format!("/articles/blog{}.html", j);
+                let content_type = "text/html".to_owned();
+                let content: HexBytes = format!("<h1>Hello world {}</h1>", j).into_bytes().into();
+                Wrapper::push_from(&chain, account).storeSys(
+                    path.clone(),
+                    content_type.clone(),
+                    content.clone(),
+                );
+            }
+        }
+
+        let gql ="
+            fragment contentSummaryFragment on ContentRowConnection {
+                pageInfo { startCursor endCursor hasNextPage hasPreviousPage }
+                edges { node { account path contentType} }
+            }
+
+            {
+                firstContent: content(first: 1) {...contentSummaryFragment}
+                lastContent: content(last: 1) {...contentSummaryFragment}
+                first20Contents: content(first: 20) {...contentSummaryFragment}
+                last20Contents: content(last: 20) {...contentSummaryFragment}
+                acc3FirstContent: contentByAccount(account: \\\"acc3\\\", first: 1) {...contentSummaryFragment}
+                acc5LastContent: contentByAccount(account: \\\"acc5\\\", last: 1) {...contentSummaryFragment}
+                acc4First99Contents: contentByAccount(account: \\\"acc4\\\", first: 99) {...contentSummaryFragment}
+                acc6Last99Contents: contentByAccount(account: \\\"acc6\\\", last: 99) {...contentSummaryFragment}
+                altAcc3FirstContent: content(ge: {account: \\\"acc3\\\", path: \\\"/\\\"}, le: {account: \\\"acc3\\\", path: \\\"0\\\"}, first: 1) {...contentSummaryFragment}
+                altAcc3First99Contents: content(ge: {account: \\\"acc3\\\", path: \\\"/\\\"}, le: {account: \\\"acc3\\\", path: \\\"0\\\"}, first: 99) {...contentSummaryFragment}
+            }
+        ";
+        let json_query = format!("{{\"query\":\"{}\"}}", gql).replace('\n', "");
+
+        let response = Wrapper::push(&chain).serveSys(HttpRequest {
+            host: "psispace-sys.testnet.psibase.io".to_string(),
+            rootHost: "testnet.psibase.io".to_string(),
+            target: "/graphql".to_string(),
+            method: "POST".to_string(),
+            contentType: "application/json".to_string(),
+            body: json_query.to_string().into_bytes().into(),
+        });
+
+        let response = response.get()?;
+        assert!(response.is_some());
+
+        let json_response: Value = serde_json::from_slice(response.unwrap().body.0.as_ref())?;
+
+        let first_content_edges = json_response["data"]["firstContent"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(first_content_edges.len(), 1);
+
+        let first_content = &first_content_edges[0]["node"];
+        let expected_first_content = json!({
+            "account": "acc9",
+            "contentType": "text/html",
+            "path": "/articles/blog1.html",
+        });
+        assert_eq!(first_content, &expected_first_content);
+
+        let last_content_edges = json_response["data"]["lastContent"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(last_content_edges.len(), 1);
+
+        let last_content = &last_content_edges[0]["node"];
+        let expected_last_content = json!({
+            "account": "acc10",
+            "contentType": "text/html",
+            "path": "/articles/blog5.html",
+        });
+        assert_eq!(last_content, &expected_last_content);
+
+        let first_20_edges = json_response["data"]["first20Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(first_20_edges.len(), 20);
+        assert_eq!(&first_20_edges[0]["node"], first_content);
+
+        let last_20_edges = json_response["data"]["last20Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(last_20_edges.len(), 20);
+        assert_eq!(&last_20_edges[19]["node"], last_content);
+
+        let acc3_first_content = &json_response["data"]["acc3FirstContent"]["edges"][0]["node"];
+        assert_eq!(acc3_first_content["account"].as_str().unwrap(), "acc3");
+        assert_eq!(
+            acc3_first_content["path"].as_str().unwrap(),
+            "/articles/blog1.html"
+        );
+
+        let acc5_last_content = &json_response["data"]["acc5LastContent"]["edges"][0]["node"];
+        assert_eq!(acc5_last_content["account"].as_str().unwrap(), "acc5");
+        assert_eq!(
+            acc5_last_content["path"].as_str().unwrap(),
+            "/articles/blog5.html"
+        );
+
+        let acc4_first_99_edges = json_response["data"]["acc4First99Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(acc4_first_99_edges.len(), 5);
+        assert_eq!(
+            acc4_first_99_edges[0]["node"]["account"].as_str().unwrap(),
+            "acc4"
+        );
+        assert_eq!(
+            acc4_first_99_edges[0]["node"]["path"].as_str().unwrap(),
+            "/articles/blog1.html"
+        );
+
+        let acc6_last_99_edges = json_response["data"]["acc6Last99Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(acc6_last_99_edges.len(), 5);
+        assert_eq!(
+            acc6_last_99_edges[4]["node"]["account"].as_str().unwrap(),
+            "acc6"
+        );
+        assert_eq!(
+            acc6_last_99_edges[4]["node"]["path"].as_str().unwrap(),
+            "/articles/blog5.html"
+        );
+
+        let alt_acc3_first_edges = json_response["data"]["altAcc3FirstContent"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(alt_acc3_first_edges.len(), 1);
+        assert_eq!(
+            alt_acc3_first_edges[0]["node"]["account"].as_str().unwrap(),
+            "acc3"
+        );
+        assert_eq!(
+            alt_acc3_first_edges[0]["node"]["path"].as_str().unwrap(),
+            "/articles/blog1.html"
+        );
+
+        let alt_acc3_first_99_edges = json_response["data"]["altAcc3First99Contents"]["edges"]
+            .as_array()
+            .unwrap();
+        assert_eq!(alt_acc3_first_99_edges.len(), 5);
+        assert_eq!(
+            alt_acc3_first_99_edges[0]["node"]["account"]
+                .as_str()
+                .unwrap(),
+            "acc3"
+        );
+        assert_eq!(
+            alt_acc3_first_99_edges[0]["node"]["path"].as_str().unwrap(),
+            "/articles/blog1.html"
+        );
 
         Ok(())
     }

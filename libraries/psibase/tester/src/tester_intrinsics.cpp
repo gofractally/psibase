@@ -3,7 +3,7 @@
 
 #include <psibase/check.hpp>
 
-[[clang::import_name("writeConsole")]] extern "C" void writeConsole(const char* cstr, uint32_t len);
+extern "C" [[clang::import_name("writeConsole")]] void writeConsole(const char* cstr, uint32_t len);
 
 extern "C" void prints(const char* cstr)
 {

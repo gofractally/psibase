@@ -176,7 +176,7 @@ namespace psibase::net
                randomize_timer();
             }
          }
-         else
+         else if (_state != producer_state::shutdown)
          {
             if (_state != producer_state::nonvoting)
             {
@@ -299,7 +299,10 @@ namespace psibase::net
             current_term = term;
             chain().setTerm(current_term);
             voted_for = null_producer;
-            _state    = producer_state::follower;
+            if (_state == producer_state::leader || _state == producer_state::candidate)
+            {
+               _state = producer_state::follower;
+            }
          }
       }
       void check_votes()
