@@ -134,8 +134,8 @@ namespace psibase
      private:
       uint32_t                          id;
       std::optional<psibase::StatusRow> status;
-      bool                              producing            = false;
-      bool                              isManualBlockControl = false;
+      bool                              producing        = false;
+      bool                              isAutoBlockStart = true;
 
      public:
       static const PublicKey  defaultPubKey;
@@ -164,12 +164,12 @@ namespace psibase
 
       /**
        * By default, the TestChain will automatically advance a block after any action is called on any service.
-       * Call this function to modify the behavior of this chain accordingly. When the chain is only advancing blocks manually,
-       * startBlock can be called to advance the chain to the next block.
+       * Call this function to modify the behavior of this chain accordingly. When autoBlockStart is disabled, the
+       * the chain will only advance blocks manually when you explicitly call startBlock.
        *
-       * @param manual Whether the chain should advance a block after each action is called.
+       * @param enable Whether the chain should advance a block after each action is called.
        */
-      void setManualBlockControl(bool manual);
+      void setAutoBlockStart(bool enable);
 
       /**
        * Start a new pending block.  If a block is currently pending, finishes it first.
@@ -269,7 +269,7 @@ namespace psibase
             auto act = action_builder_proxy(sender, receiver)
                            .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
 
-            if (!chain.isManualBlockControl)
+            if (chain.isAutoBlockStart)
             {
                chain.startBlock(0);
             }

@@ -215,9 +215,9 @@ std::string psibase::TestChain::getPath()
    return result;
 }
 
-void psibase::TestChain::setManualBlockControl(bool manual)
+void psibase::TestChain::setAutoBlockStart(bool enable)
 {
-   isManualBlockControl = manual;
+   isAutoBlockStart = enable;
 }
 
 void psibase::TestChain::startBlock(int64_t skip_miliseconds)
