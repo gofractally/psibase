@@ -29,18 +29,22 @@ const psibase = (appletContract: string) => {
                         host: "psibase.127.0.0.1.sslip.io",
                         port: 8081,
                         proxy: {
+                            "^/ws/.*": {
+                                target: "ws://localhost:8080/",
+                                ws: true,
+                                rewrite: (path) => path.replace(/^\/ws/, ""),
+                            },
                             "/": {
                                 target: "http://psibase.127.0.0.1.sslip.io:8080/",
                                 bypass: (req, _res, _opt) => {
-                                    const host = req.headers.host || "";
-                                    const subdomain = host.split(".")[0];
                                     if (
-                                        subdomain === appletContract &&
-                                        req.method !== "POST" &&
-                                        req.headers.accept !==
-                                        "application/json" &&
-                                        !req.url.startsWith("/common") &&
-                                        !req.url.startsWith("/api")
+                                        req.url === "/" ||
+                                        (req.method !== "POST" &&
+                                            req.method !== "PUT" &&
+                                            req.headers.accept !==
+                                                "application/json" &&
+                                            !req.url.startsWith("/common") &&
+                                            !req.url.startsWith("/api"))
                                     ) {
                                         return req.url;
                                     }
@@ -78,11 +82,14 @@ const psibase = (appletContract: string) => {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react({
-        babel: {
-            parserOpts: {
-                plugins: ['decorators-legacy']
-            }
-        }
-    }), psibase("__contract__(kebabCase)")],
+    plugins: [
+        react({
+            babel: {
+                parserOpts: {
+                    plugins: ["decorators-legacy"],
+                },
+            },
+        }),
+        psibase("__contract__(kebabCase)"),
+    ],
 });

@@ -10,12 +10,13 @@ const TYPES: { [key in TextType]: string } = {
     secondary: "text-gray-500",
 };
 
-export type TextSize = "xs" | "sm" | "base" | "lg" | "inherit";
+export type TextSize = "xs" | "sm" | "base" | "lg" | "xl" | "inherit";
 const SIZES: { [key in TextSize]: string } = {
     xs: "text-xs",
     sm: "text-sm",
     base: "text-base",
     lg: "text-lg",
+    xl: "text-xl",
     inherit: "",
 };
 

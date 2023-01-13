@@ -11,7 +11,7 @@ body {
     @apply text-gray-900;
     font-variant-numeric: lining-nums;
     font-weight: 400;
-    @apply bg-gray-50;
+    /* @apply bg-gray-50; */
     @apply h-full w-full /*overflow-hidden*/;
 }
 #root {
