@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s # By default, scrape targets every 15 seconds.
+
+scrape_configs:
+  - job_name: "psinode_logs"
+    scrape_interval: 1s
+    static_configs:
+      - targets: ["localhost:9144"]
+
+  - job_name: "psinode_perf"
+    scrape_interval: 1s
+    metrics_path: /probe
+    params:
+      module: [default]
+    static_configs:
+      - targets: ["http://localhost:8090/native/admin/perf"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:7979
+
+  - job_name: "prometheus"
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # - job_name: "node"
+  #   scrape_interval: 5s
+  #   static_configs:
+  #     - targets: ["localhost:8085"]

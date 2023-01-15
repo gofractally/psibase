@@ -1,0 +1,27 @@
+global:
+  config_version: 3
+input:
+  type: file
+  path: /home/sohdev/Workspace/eden/psibase/build/tester_psinode_db/psibase.log
+  readall: false
+imports:
+  - type: grok_patterns
+    dir: ./patterns
+metrics:
+  - type: counter
+    name: psinode_http_requests_total
+    help: Total number of http requests to psinode
+    # Example: [2023-01-13T14:48:45.819Z] [info] [127.0.0.1:36808]: Handled HTTP request: GET localhost:8090/native/admin/status 200 8
+    match: "Handled HTTP request: %{WORD:http_method} %{URIHOST:http_host}%{URIPATH:http_path} %{WORD:http_status_code}"
+    labels:
+      http_method: "{{.http_method}}"
+      http_status_code: "{{.http_status_code}}"
+      http_path: "{{.http_host}}{{.http_path}}"
+  - type: counter
+    name: psinode_produced_blocks_total
+    help: Total number of produced blocks
+    # Example: [2023-01-13T15:03:29.000Z] [info]: Produced block 000019C0003F0E8CC582C71737A3705936D0BF614DCAD2455C60991AD39463A6
+    match: "Produced block"
+server:
+  protocol: http
+  port: 9144
