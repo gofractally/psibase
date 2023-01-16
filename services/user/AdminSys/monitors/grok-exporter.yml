@@ -1,17 +1,18 @@
 global:
   config_version: 3
 input:
-  type: file
-  path: /home/sohdev/Workspace/eden/psibase/build/tester_psinode_db/psibase.log
-  readall: false
+  type: stdin
+  # type: file
+  # path: /root/psibase.log
+  # readall: false
 imports:
   - type: grok_patterns
-    dir: ./patterns
+    dir: ./grok-patterns
 metrics:
   - type: counter
     name: psinode_http_requests_total
     help: Total number of http requests to psinode
-    # Example: [2023-01-13T14:48:45.819Z] [info] [127.0.0.1:36808]: Handled HTTP request: GET localhost:8090/native/admin/status 200 8
+    # Example: [2023-01-13T14:48:45.819Z] [info] [127.0.0.1:36808]: Handled HTTP request: GET localhost:8080/native/admin/status 200 8
     match: "Handled HTTP request: %{WORD:http_method} %{URIHOST:http_host}%{URIPATH:http_path} %{WORD:http_status_code}"
     labels:
       http_method: "{{.http_method}}"

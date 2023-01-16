@@ -1,0 +1,35 @@
+version: "3.4"
+
+services:
+  exporters:
+    build:
+      context: .
+      dockerfile: exporters.Dockerfile
+    volumes:
+      - ./docker-aux:/root/docker-aux
+      - ./grok-exporter.yml:/root/grok-exporter.yml
+      - ./json-exporter.yml:/root/json-exporter.yml
+      - ./patterns:/root/grok-patterns
+      - ./supervisord.conf:/root/supervisord.conf
+      - ../../../../build/tester_psinode_db/psibase.log:/root/psibase.log
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "8091:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_BASIC_ENABLED=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+    volumes:
+      - ./grafana-datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
+      - ./grafana-dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yml
+      - ./dashboards:/var/lib/grafana/dashboards
