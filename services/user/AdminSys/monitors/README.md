@@ -4,7 +4,7 @@ Psinode monitoring is powered by metrics collected and fed into Prometheus. Then
 
 ## Running with docker
 
-Before running you need to add a logger file to the psibase node config you want to inspect. See the suggested config below. You can simply add that inside the admin sys config or just edit the config file of the node database.
+1. Before running you need to add a logger file to the psibase node config you want to inspect. See the suggested config below. You can simply add that inside the admin sys config or just edit the config file of the node database.
 
 ```ini
 [logger.~00017668]
@@ -27,7 +27,15 @@ maxSize = 1073741823
 flush = on
 ```
 
-With that config successfully added, you need to edit `docker-compose.yml` and update the `psibase.log` path to be pointing to the correct log file of your psibase node.
+2. Update the `prometheus.yml` file to have the correct target of your psinode instance. Eg: if it's running locally, outside of your docker network, you can leave as is and add a new built-in config in the psinode admin panel:
+
+```
+service = host.docker.internal:/home/sohdev/Workspace/eden/psibase/build/share/psibase/services/admin-sys
+```
+
+If the psinode is running in another docker, just make sure you have access to that network and update the target properly. You will not need the builtin service conf.
+
+3. With that config successfully added, you need to edit `docker-compose.yml` and update the `psinode_db` volume path to be pointing to the correct psinode db of your psibase node. This is how we read the logs to calculate the http stats.
 
 Then simply run:
 
@@ -38,6 +46,8 @@ docker-compose up
 Open `http://localhost:8080` and you will be able to see the Admin-Sys panel with the embedded dashboards.
 
 ## Running locally
+
+You don't need to, but if you prefer or have to run this in the same server, you can execute the following steps.
 
 Grok exporter listens to psibase logs and extracts the metrics.
 

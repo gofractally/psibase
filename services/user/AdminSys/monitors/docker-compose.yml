@@ -11,7 +11,7 @@ services:
       - ./json-exporter.yml:/root/json-exporter.yml
       - ./patterns:/root/grok-patterns
       - ./supervisord.conf:/root/supervisord.conf
-      - ../../../../build/tester_psinode_db/psibase.log:/root/psibase.log
+      - ../../../../build/tester_psinode_db:/root/psinode_db
 
   prometheus:
     image: prom/prometheus:latest
