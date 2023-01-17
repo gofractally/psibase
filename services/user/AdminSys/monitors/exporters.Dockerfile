@@ -14,6 +14,8 @@ RUN cd /root \
  && mv psidk-ubuntu-2004 psidk \
  && wget https://github.com/fstab/grok_exporter/releases/download/v1.0.0.RC5/grok_exporter-1.0.0.RC5.linux-amd64.zip \
  && unzip grok_exporter-*.zip \
+ && wget https://github.com/vi/websocat/releases/download/v1.11.0/websocat.aarch64-unknown-linux-musl \
+ && chmod a+x websocat.aarch64-unknown-linux-musl \
  && wget https://github.com/prometheus-community/json_exporter/releases/download/v0.5.0/json_exporter-0.5.0.linux-amd64.tar.gz \
  && tar -xzvf json_exporter-0.5.0.linux-amd64.tar.gz
 
