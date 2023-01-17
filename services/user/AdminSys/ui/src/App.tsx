@@ -21,6 +21,10 @@ function App() {
         if (!activeItem) {
             setActiveItem(getPageTab());
         }
+        window.addEventListener("hashchange", () => {
+            setActiveItem(getPageTab());
+        });
+        return () => window.removeEventListener("hashchange", () => {});
     }, []);
 
     const [peers, peersError, refetchPeers] = usePollJson<Peer[]>(
@@ -31,18 +35,9 @@ function App() {
         "/native/admin/config"
     );
 
-    const onTabClick = (tab: string) => {
-        updatePageTab(tab);
-        setActiveItem(tab);
-    };
-
     return (
         <>
-            <NavHeader
-                menuItems={MENU_ITEMS}
-                activeItem={activeItem}
-                onClick={onTabClick}
-            />
+            <NavHeader menuItems={MENU_ITEMS} activeItem={activeItem} />
             <StatusBanner peersError={peersError} configError={configError} />
             {activeItem === "Dashboard" ? (
                 <DashboardPage />
@@ -68,14 +63,6 @@ function App() {
 export default App;
 
 const getPageTab = () => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("tab") || "Dashboard";
-};
-
-const updatePageTab = (newTab: string) => {
-    if (window.history.pushState) {
-        const newURL = new URL(window.location.href);
-        newURL.search = `?tab=${newTab}`;
-        window.history.pushState({ path: newURL.href }, "", newURL.href);
-    }
+    const tab = window.location.hash.substring(1) || "Unknown";
+    return MENU_ITEMS.includes(tab) ? tab : "Dashboard";
 };

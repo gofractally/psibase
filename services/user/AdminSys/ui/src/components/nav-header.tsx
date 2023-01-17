@@ -1,13 +1,11 @@
 interface NavHeaderProps {
     menuItems: string[];
     activeItem: string;
-    onClick: (selectedItem: string) => void;
 }
 
 export const NavHeader = ({
     menuItems,
     activeItem: currentNav,
-    onClick,
 }: NavHeaderProps) => {
     return (
         <Header>
@@ -21,7 +19,6 @@ export const NavHeader = ({
                         key={item}
                         label={item}
                         isActive={currentNav === item}
-                        onClick={() => onClick(item)}
                     />
                 ))}
             </NavGroup>
@@ -51,7 +48,7 @@ interface NavItemProps {
     isActive?: boolean;
 }
 
-const NavItem = ({ onClick, label, isActive }: NavItemProps) => {
+const NavItem = ({ label, isActive }: NavItemProps) => {
     const classBase =
         "rounded-md px-3 py-2 text-sm font-bold text-gray-500 no-underline ";
     const className =
@@ -61,7 +58,7 @@ const NavItem = ({ onClick, label, isActive }: NavItemProps) => {
     return isActive ? (
         <div className={className}>{label}</div>
     ) : (
-        <a href="#" className={className} onClick={onClick}>
+        <a href={`#${label}`} className={className}>
             {label}
         </a>
     );
