@@ -822,11 +822,13 @@ namespace psio
             if constexpr (Unpack)
             {
                value->template emplace<I>();
-               return is_p::unpack(&std::get<I>(*value), has_unknown, src, pos, end_pos);
+               return is_p::template unpack<Unpack, Verify>(&std::get<I>(*value), has_unknown, src,
+                                                            pos, end_pos);
             }
             else
             {
-               return is_p::unpack(nullptr, has_unknown, src, pos, end_pos);
+               return is_p::template unpack<Unpack, Verify>(nullptr, has_unknown, src, pos,
+                                                            end_pos);
             }
          }
          else

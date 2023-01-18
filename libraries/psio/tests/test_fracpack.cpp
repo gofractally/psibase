@@ -21,12 +21,26 @@ struct Catch::StringMaker<std::optional<T>>
    }
 };
 
+template <typename... T>
+struct Catch::StringMaker<std::variant<T...>>
+{
+   static std::string convert(const std::variant<T...>& value)
+   {
+      return std::visit(
+          [](const auto& v)
+          { return Catch::StringMaker<std::remove_cvref_t<decltype(v)>>::convert(v); },
+          value);
+   }
+};
+
 template <typename T>
 bool bitwise_equal(const std::vector<T>& lhs, const std::vector<T>& rhs);
 template <typename T>
 bool bitwise_equal(const std::optional<T>& lhs, const std::optional<T>& rhs);
 template <typename... T>
 bool bitwise_equal(const std::tuple<T...>& lhs, const std::tuple<T...>& rhs);
+template <typename... T>
+bool bitwise_equal(const std::variant<T...>& lhs, const std::variant<T...>& rhs);
 
 template <typename T>
    requires std::is_arithmetic_v<T> bool
@@ -71,6 +85,26 @@ bool bitwise_equal(const std::tuple<T...>& lhs, const std::tuple<T...>& rhs)
    return bitwise_equal(lhs, rhs, std::make_index_sequence<sizeof...(T)>());
 }
 
+template <typename... T>
+bool bitwise_equal(const std::variant<T...>& lhs, const std::variant<T...>& rhs)
+{
+   if (lhs.index() != rhs.index())
+      return false;
+   return std::visit(
+       [](const auto& lhs, const auto& rhs)
+       {
+          if constexpr (std::is_same_v<decltype(lhs), decltype(rhs)>)
+          {
+             return bitwise_equal(lhs, rhs);
+          }
+          else
+          {
+             return false;
+          }
+       },
+       lhs, rhs);
+}
+
 template <typename T>
 struct BitwiseEqual : Catch::MatcherBase<T>
 {
@@ -91,6 +125,9 @@ constexpr bool need_bitwise_compare<std::vector<T>> = need_bitwise_compare<T>;
 
 template <typename... T>
 constexpr bool need_bitwise_compare<std::tuple<T...>> = (... || need_bitwise_compare<T>);
+
+template <typename... T>
+constexpr bool need_bitwise_compare<std::variant<T...>> = (... || need_bitwise_compare<T>);
 
 template <typename T>
 void test(const T& value)
@@ -276,6 +313,14 @@ void test(std::initializer_list<T> values)
       test(std::tuple{std::optional<std::vector<T>>{}});
       test(std::tuple{std::optional{std::vector<T>{}}});
       test(std::tuple{std::optional{std::vector<T>(values)}});
+   }
+   // variant
+   for (const auto& v : values)
+   {
+      test(std::variant<T>{v});
+      test(std::variant<T, T, T>{std::in_place_index<0>, v});
+      test(std::variant<T, T, T>{std::in_place_index<1>, v});
+      test(std::variant<T, T, T>{std::in_place_index<2>, v});
    }
 }
 
