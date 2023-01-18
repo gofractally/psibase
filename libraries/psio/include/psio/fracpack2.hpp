@@ -8,6 +8,8 @@
 
 #include <psio/reflect.hpp>
 
+#include <cstring>
+
 namespace psio
 {
    // If a type T supports the expressions `clio_unwrap_packable(T&)`,
@@ -15,11 +17,10 @@ namespace psio
    // returns `const T2&`, then packing or unpacking T packs or unpacks
    // the returned reference instead.
    template <typename T>
-   concept PackableWrapper = requires(T& x, const T& cx)
-   {
-      clio_unwrap_packable(x);
-      clio_unwrap_packable(cx);
-   };
+   concept PackableWrapper = requires(T& x, const T& cx) {
+                                clio_unwrap_packable(x);
+                                clio_unwrap_packable(cx);
+                             };
 
    template <typename T, bool Reflected>
    struct is_packable_reflected;
@@ -93,7 +94,8 @@ namespace psio
    struct is_packable<std::vector<T>>;
 
    template <Packable T, int N>
-   requires(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>;
+      requires(!is_packable_memcpy<T>::value)
+   struct is_packable<std::array<T, N>>;
 
    template <Packable T>
    struct is_packable<std::optional<T>>;
@@ -186,7 +188,7 @@ namespace psio
                return false;
          }
          heap_pos = new_heap_pos;
-         Derived::unpack<Unpack, Verify>(value, has_unknown, src, heap_pos, end_heap_pos);
+         Derived::template unpack<Unpack, Verify>(value, has_unknown, src, heap_pos, end_heap_pos);
       }
 
       // Unpack and/or verify either:
@@ -202,11 +204,11 @@ namespace psio
                                                 uint32_t    end_heap_pos)
       {
          if constexpr (Derived::is_variable_size)
-            return Derived::embedded_variable_unpack<Unpack, Verify>(
+            return Derived::template embedded_variable_unpack<Unpack, Verify>(
                 value, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_heap_pos);
          else
-            return Derived::unpack<Unpack, Verify>(value, has_unknown, src, fixed_pos,
-                                                   end_fixed_pos);
+            return Derived::template unpack<Unpack, Verify>(value, has_unknown, src, fixed_pos,
+                                                            end_fixed_pos);
       }
    };  // base_packable_impl
 
@@ -235,7 +237,7 @@ namespace psio
             if (end_pos - pos < sizeof(T))
                return false;
          if constexpr (Unpack)
-            memcpy(value, src + pos, sizeof(T));
+            std::memcpy(value, src + pos, sizeof(T));
          pos += sizeof(T);
          return true;
       }
@@ -248,7 +250,7 @@ namespace psio
                                      uint32_t&   pos,
                                      uint32_t    end_pos)
    {
-      return is_packable<T>::unpack<Unpack, Verify>(value, has_unknown, src, pos, end_pos);
+      return is_packable<T>::template unpack<Unpack, Verify>(value, has_unknown, src, pos, end_pos);
    }
 
    template <>
@@ -342,7 +344,8 @@ namespace psio
                                        uint32_t&   pos,
                                        uint32_t    end_pos)
       {
-         return is_p::unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src, pos, end_pos);
+         return is_p::template unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src, pos,
+                                                      end_pos);
       }
 
       template <bool Unpack, bool Verify>
@@ -354,9 +357,9 @@ namespace psio
                                                          uint32_t&   heap_pos,
                                                          uint32_t    end_heap_pos)
       {
-         return is_p::embedded_variable_unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src,
-                                                               fixed_pos, end_fixed_pos, heap_pos,
-                                                               end_heap_pos);
+         return is_p::template embedded_variable_unpack<Unpack, Verify>(
+             ptr<Unpack>(value), has_unknown, src, fixed_pos, end_fixed_pos, heap_pos,
+             end_heap_pos);
       }
 
       template <bool Unpack, bool Verify>
@@ -368,9 +371,9 @@ namespace psio
                                                 uint32_t&   heap_pos,
                                                 uint32_t    end_heap_pos)
       {
-         return is_p::embedded_unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src,
-                                                      fixed_pos, end_fixed_pos, heap_pos,
-                                                      end_heap_pos);
+         return is_p::template embedded_unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src,
+                                                               fixed_pos, end_fixed_pos, heap_pos,
+                                                               end_heap_pos);
       }
    };  // is_packable<PackableWrapper>
 
@@ -412,7 +415,7 @@ namespace psio
          {
             value->resize(size);
             if (size)
-               memcpy(value->data(), src + pos, fixed_size);
+               std::memcpy(value->data(), src + pos, fixed_size);
          }
          pos = new_pos;
          return true;
@@ -438,13 +441,15 @@ namespace psio
    };
 
    template <Packable T>
-   requires(is_packable_memcpy<T>::value) struct is_packable<std::vector<T>>
+      requires(is_packable_memcpy<T>::value)
+   struct is_packable<std::vector<T>>
        : packable_container_memcpy_impl<std::vector<T>, is_packable<std::vector<T>>>
    {
    };
 
    template <Packable T>
-   requires(!is_packable_memcpy<T>::value) struct is_packable<std::vector<T>>
+      requires(!is_packable_memcpy<T>::value)
+   struct is_packable<std::vector<T>>
        : base_packable_impl<std::vector<T>, is_packable<std::vector<T>>>
    {
       static constexpr uint32_t fixed_size        = 4;
@@ -495,14 +500,14 @@ namespace psio
          {
             value->resize(size);
             for (const auto& x : *value)
-               if (!is_packable<T>::embedded_unpack<Unpack, Verify>(
+               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
                        &x, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
                   return false;
          }
          else
          {
             for (uint32_t i = 0; i < size; ++i)
-               if (!is_packable<T>::embedded_unpack<Unpack, Verify>(
+               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
                        nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
                   return false;
          }
@@ -512,7 +517,8 @@ namespace psio
    };    // is_packable<std::vector<T>> (!memcpy)
 
    template <Packable T, int N>
-   requires(!is_packable_memcpy<T>::value) struct is_packable<std::array<T, N>>
+      requires(!is_packable_memcpy<T>::value)
+   struct is_packable<std::array<T, N>>
        : base_packable_impl<std::array<T, N>, is_packable<std::array<T, N>>>
    {
       static constexpr uint32_t fixed_size =
@@ -554,14 +560,14 @@ namespace psio
          if constexpr (Unpack)
          {
             for (const auto& x : *value)
-               if (!is_packable<T>::embedded_unpack<Unpack, Verify>(
+               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
                        &x, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
                   return false;
          }
          else
          {
             for (uint32_t i = 0; i < N; ++i)
-               if (!is_packable<T>::embedded_unpack<Unpack, Verify>(
+               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
                        nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
                   return false;
          }
@@ -654,7 +660,7 @@ namespace psio
          }
          fixed_pos = orig_pos;
          value->emplace();
-         return is_packable<T>::embedded_variable_unpack<Unpack, Verify>(
+         return is_packable<T>::template embedded_variable_unpack<Unpack, Verify>(
              &**value, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_heap_pos);
       }
    };  // is_packable<std::optional<T>>
@@ -756,8 +762,8 @@ namespace psio
                 {
                    using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
                    if (fixed_pos < end_fixed_pos || !is_p::is_optional)
-                      ok &= is_p::embedded_unpack<Unpack, Verify>(x, has_unknown, src, fixed_pos,
-                                                                  end_fixed_pos, heap_pos, end_pos);
+                      ok &= is_p::template embedded_unpack<Unpack, Verify>(
+                          x, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos);
                 });
          }
          else
@@ -768,7 +774,7 @@ namespace psio
                 {
                    using is_p = is_packable<std::remove_cvref_t<decltype(*p)>>;
                    if (fixed_pos < end_fixed_pos || !is_p::is_optional)
-                      ok &= is_p::embedded_unpack<Unpack, Verify>(
+                      ok &= is_p::template embedded_unpack<Unpack, Verify>(
                           nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos);
                 });
          }
@@ -1069,11 +1075,11 @@ namespace psio
                    {
                       using is_p = is_packable<typename m::ValueType>;
                       if constexpr (Unpack)
-                         ok &= is_p::unpack<Unpack, Verify>(&(value->*member(&value)), has_unknown,
-                                                            src, pos, end_pos);
+                         ok &= is_p::template unpack<Unpack, Verify>(
+                             &(value->*member(&value)), has_unknown, src, pos, end_pos);
                       else
-                         ok &=
-                             is_p::unpack<Unpack, Verify>(nullptr, has_unknown, src, pos, end_pos);
+                         ok &= is_p::template unpack<Unpack, Verify>(nullptr, has_unknown, src, pos,
+                                                                     end_pos);
                    }
                 });
             return ok;
