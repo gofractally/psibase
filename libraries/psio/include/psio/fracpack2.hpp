@@ -35,7 +35,7 @@ namespace psio
    struct is_packable_reflected<T, true>;
 
    template <typename T>
-   struct is_packable : is_packable_reflected<T, ReflectedAsMember<T>>
+   struct is_packable : is_packable_reflected<T, Reflected<T>>
    {
    };
 

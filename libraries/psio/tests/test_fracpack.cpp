@@ -23,10 +23,10 @@ struct Catch::StringMaker<std::optional<T>>
 
 template <typename T>
 bool bitwise_equal(const std::vector<T>& lhs, const std::vector<T>& rhs);
-template <typename Tuple, std::size_t... I>
-bool biwise_equal(const Tuple& lhs, const Tuple& rhs, std::index_sequence<I...>);
 template <typename T>
 bool bitwise_equal(const std::optional<T>& lhs, const std::optional<T>& rhs);
+template <typename... T>
+bool bitwise_equal(const std::tuple<T...>& lhs, const std::tuple<T...>& rhs);
 
 template <typename T>
    requires std::is_arithmetic_v<T> bool
@@ -35,7 +35,9 @@ bitwise_equal(const T& lhs, const T& rhs)
    return std::memcmp(&lhs, &rhs, sizeof(T)) == 0;
 }
 
-bool bitwise_equal(const std::string& lhs, const std::string& rhs)
+template <typename T>
+   requires(!std::is_arithmetic_v<T>) bool
+bitwise_equal(const T& lhs, const T& rhs)
 {
    return lhs == rhs;
 }
@@ -277,6 +279,28 @@ void test(std::initializer_list<T> values)
    }
 }
 
+struct fixed_struct
+{
+   std::uint32_t value;
+   friend bool   operator==(const fixed_struct&, const fixed_struct&) = default;
+};
+PSIO_REFLECT(fixed_struct, definitionWillNotChange(), value)
+
+struct padded_struct
+{
+   std::uint8_t  v1;
+   std::uint32_t v2;
+   friend bool   operator==(const padded_struct&, const padded_struct&) = default;
+};
+PSIO_REFLECT(padded_struct, definitionWillNotChange(), v1, v2)
+
+struct variable_struct
+{
+   std::uint32_t value;
+   friend bool   operator==(const variable_struct&, const variable_struct&) = default;
+};
+PSIO_REFLECT(variable_struct, value)
+
 TEST_CASE("roundtrip")
 {
    test<bool>({false, true});
@@ -307,4 +331,7 @@ TEST_CASE("roundtrip")
         std::numeric_limits<double>::max(), std::numeric_limits<double>::infinity(),
         std::numeric_limits<double>::signaling_NaN(), std::numeric_limits<double>::quiet_NaN()});
    test<std::string>({"", "Lorem ipsum dolor sit amet"});
+   test<fixed_struct>({{0x12345678}, {0x90abcdef}});
+   test<padded_struct>({{42, 0x12345678}, {43, 0x90abcdef}});
+   test<variable_struct>({{0x12345678}, {0x90abcdef}});
 }
