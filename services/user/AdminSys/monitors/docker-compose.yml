@@ -27,7 +27,18 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_BASIC_ENABLED=false
       - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - ./grafana-datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
       - ./grafana-dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yml
       - ./dashboards:/var/lib/grafana/dashboards
+
+  ## not required, just an example for proxying grafana
+  # nginx:
+  #   image: nginx:latest
+  #   ports:
+  #     - "8095:80"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf
+  #     - ./nginx:/usr/share/nginx/html

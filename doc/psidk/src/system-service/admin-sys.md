@@ -59,7 +59,7 @@ The easiest way to run these services is to use docker containers, since we prep
 
 ### Running with docker
 
-1. Update the `prometheus.yml` file to have the correct target of your psinode instance. Eg: if it's running locally, outside of your docker network, you can leave as is and add a new built-in service in psinode config, then restart it:
+Update the `prometheus.yml` file to have the correct target of your psinode instance. Eg: if it's running locally, outside of your docker network, you can leave as is and add a new built-in service in psinode config, then restart it:
 
 ```
 service = host.docker.internal:$PREFIX/share/psibase/services/admin-sys
@@ -67,15 +67,54 @@ service = host.docker.internal:$PREFIX/share/psibase/services/admin-sys
 
 If the psinode is running in another docker, just make sure you have access to that network and update the target properly. You will not need the builtin service conf.
 
-2. With that config successfully added, you need to edit `docker-compose.yml` and update the `psinode_db` volume path to be pointing to the correct psinode db of your psibase node. This is how we read the logs to calculate the http stats.
-
-Then simply run:
+Then, simply run:
 
 ```sh
 docker-compose up
 ```
 
 Open `http://localhost:8080` and you will be able to see the Admin-Sys panel with the embedded dashboards.
+
+### Proxying Grafana
+
+If you are accessing the admin-sys ui locally, eg. from http://localhost:8080 you can skip this part.
+
+Most cases you will end up putting the access to the admin-sys behind a reverse proxy with at least the minimum HTTP basic-auth or perhaps restricting IPs. In any case, this reverse proxy needs to add a rule for accessing the Grafana dashboards on `/grafana` location. Here's an example:
+
+```conf
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+upstream docker-grafana {
+    server grafana:3000;
+}
+
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+
+    location /grafana/ {
+        rewrite  ^/grafana/(.*)  /$1 break;
+        proxy_set_header Host $http_host;
+        proxy_pass http://docker-grafana;
+    }
+
+    # Proxy Grafana Live WebSocket connections.
+    location /grafana/api/live/ {
+        rewrite  ^/grafana/(.*)  /$1 break;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $http_host;
+        proxy_pass http://docker-grafana;
+    }
+}
+```
+
+Full instructions can be found here: https://grafana.com/tutorials/run-grafana-behind-a-proxy/
 
 ### Running locally
 
