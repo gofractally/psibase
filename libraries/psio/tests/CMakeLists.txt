@@ -10,6 +10,7 @@ if(DEFINED IS_NATIVE)
 #        flat_views.cpp
         benchmark.cpp
 #        crypto.cpp
+        test_fracpack.cpp
     )
     target_link_libraries(psio-tests psio catch2 Threads::Threads )
 endif()
