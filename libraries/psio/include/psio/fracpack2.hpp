@@ -297,8 +297,10 @@ namespace psio
       static constexpr bool     is_optional       = is_p::is_optional;
       static constexpr bool     supports_0_offset = is_p::supports_0_offset;
 
+      static bool has_value(const T& value) { return is_p::has_value(clio_unwrap_packable(value)); }
+
       template <bool Unpack>
-      inner* ptr(T* value)
+      static inner* ptr(T* value)
       {
          if constexpr (Unpack)
             return &clio_unwrap_packable(*value);
@@ -587,6 +589,8 @@ namespace psio
       static constexpr bool     is_optional       = true;
       static constexpr bool     supports_0_offset = false;
 
+      static bool has_value(const std::optional<T>& value) { return value.has_value(); }
+
       template <typename S>
       static void pack(const std::optional<T>& value, S& stream)
       {
@@ -704,7 +708,7 @@ namespace psio
                 ++i;
                 if constexpr (is_p::is_optional)
                 {
-                   if (x.has_value())
+                   if (is_p::has_value(x))
                       num_present = i;
                 }
                 else
@@ -964,7 +968,7 @@ namespace psio
                       if constexpr (is_packable<typename m::ValueType>::is_optional &&
                                     !reflect<T>::definitionWillNotChange)
                       {
-                         if ((value.*member(&value)).has_value())
+                         if (is_packable<typename m::ValueType>::has_value(value.*member(&value)))
                             num_present = i;
                       }
                       else

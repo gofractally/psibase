@@ -142,7 +142,7 @@ template <typename T, std::size_t N>
 constexpr bool need_bitwise_compare<std::array<T, N>> = need_bitwise_compare<T>;
 
 template <typename T>
-void test(const T& value)
+auto test_base(const T& value)
 {
    psio::size_stream ss;
    psio::is_packable<T>::pack(value, ss);
@@ -212,6 +212,96 @@ void test(const T& value)
                                                                    pos, i));
       }
    }
+   return data;
+}
+
+template <typename T>
+struct packable_wrapper
+{
+   T           value;
+   friend bool operator==(const packable_wrapper& lhs, const packable_wrapper& rhs)
+   {
+      return bitwise_equal(lhs.value, rhs.value);
+   }
+};
+template <typename T>
+const T& clio_unwrap_packable(const packable_wrapper<T>& wrapper)
+{
+   return wrapper.value;
+}
+template <typename T>
+T& clio_unwrap_packable(packable_wrapper<T>& wrapper)
+{
+   return wrapper.value;
+}
+
+template <typename... T>
+auto wrap_packable(const std::variant<T...>& value);
+template <typename T>
+auto wrap_packable(const std::optional<T>& value);
+template <typename T>
+auto wrap_packable(const std::vector<T>& value);
+template <typename T>
+auto wrap_packable(const std::tuple<T>& value);
+
+template <typename T>
+auto wrap_packable(const T& value)
+{
+   return packable_wrapper{value};
+}
+
+template <typename T>
+auto wrap_packable(const std::optional<T>& value)
+{
+   return packable_wrapper{value ? std::optional{wrap_packable(*value)} : std::nullopt};
+}
+
+template <typename T>
+auto wrap_packable(const std::vector<T>& value)
+{
+   std::vector<decltype(wrap_packable(value.front()))> result;
+   for (const auto& v : value)
+   {
+      result.push_back(wrap_packable(v));
+   }
+   return packable_wrapper{result};
+}
+
+template <typename T>
+auto wrap_packable(const std::tuple<T>& value)
+{
+   return packable_wrapper{std::tuple{wrap_packable(std::get<0>(value))}};
+}
+
+template <std::size_t I, typename R, typename V>
+auto wrap_packable_variant(const V& v)
+{
+   if (v.index() == I)
+   {
+      return R{std::in_place_index<I>, wrap_packable(std::get<I>(v))};
+   }
+   else if constexpr (I)
+   {
+      return wrap_packable_variant<I - 1, R>(v);
+   }
+   // valueless_by_exception doesn't exist
+   __builtin_unreachable();
+}
+
+template <typename... T>
+auto wrap_packable(const std::variant<T...>& value)
+{
+   return packable_wrapper{
+       wrap_packable_variant<sizeof...(T) - 1,
+                             std::variant<decltype(wrap_packable(std::declval<T>()))...>>(value)};
+}
+
+template <typename T>
+void test(const T& value)
+{
+   auto base    = test_base(value);
+   auto wrapped = test_base(wrap_packable(value));
+   CHECK(base == wrapped);
 }
 
 template <typename T>
@@ -224,6 +314,12 @@ struct extensible_wrapper
       return bitwise_equal(lhs.value, rhs.value);
    }
 };
+
+template <typename T>
+auto wrap_packable(const extensible_wrapper<T>& value)
+{
+   return packable_wrapper{extensible_wrapper{wrap_packable(value.value)}};
+}
 
 template <typename T>
 struct Catch::StringMaker<extensible_wrapper<T>>
@@ -244,6 +340,12 @@ struct nonextensible_wrapper
       return bitwise_equal(lhs.value, rhs.value);
    }
 };
+
+template <typename T>
+auto wrap_packable(const nonextensible_wrapper<T>& value)
+{
+   return packable_wrapper{nonextensible_wrapper{wrap_packable(value.value)}};
+}
 
 template <typename T>
 struct Catch::StringMaker<nonextensible_wrapper<T>>
