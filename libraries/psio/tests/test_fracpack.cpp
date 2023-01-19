@@ -1,7 +1,7 @@
 #include <psio/fracpack2.hpp>
 #include <psio/stream.hpp>
-#include <psio/to_hex.hpp>
 #include <psio/to_json.hpp>  // FIXME: needed by to_hex
+#include <psio/to_hex.hpp>
 
 #include <type_traits>
 
