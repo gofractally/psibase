@@ -1,5 +1,7 @@
 #include <psio/fracpack2.hpp>
 #include <psio/stream.hpp>
+#include <psio/to_hex.hpp>
+#include <psio/to_json.hpp>  // FIXME: needed by to_hex
 
 #include <type_traits>
 
@@ -627,4 +629,42 @@ TEST_CASE("compatibility")
                     struct_<std::int32_t, std::optional<std::int32_t>>(42, std::nullopt), false);
    test_compat_wrap(struct_<std::int32_t, std::optional<std::int32_t>>(42, 43),
                     struct_<std::int32_t>(42), true);
+}
+
+template <typename T>
+void test_invalid(const char* hex)
+{
+   INFO("data: " << hex);
+   INFO("type: " << typeid(T).name());
+   std::vector<char> data;
+   CHECK(psio::from_hex(hex, data));
+   {
+      T             result{};
+      std::uint32_t pos         = 0;
+      bool          has_unknown = false;
+      CHECK(!psio::is_packable<T>::template unpack<true, true>(&result, has_unknown, data.data(),
+                                                               pos, data.size()));
+   }
+   {
+      std::uint32_t pos         = 0;
+      bool          has_unknown = false;
+      CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, data.data(),
+                                                                pos, data.size()));
+   }
+}
+
+template <typename T>
+void test_invalid(std::initializer_list<const char*> hex)
+{
+   for (const char* h : hex)
+   {
+      test_invalid<T>(h);
+   }
+}
+
+TEST_CASE("invalid")
+{
+   test_invalid<std::optional<std::uint8_t>>({"00000000", "02000000", "03000000", "05000000FFFF"});
+   test_invalid<std::vector<std::uint16_t>>("03000000FFFFFFFFFFFF");
+   test_invalid<std::tuple<std::uint32_t, std::optional<std::uint8_t>>>("0800CCCCCCCCFFFFFFFF");
 }
