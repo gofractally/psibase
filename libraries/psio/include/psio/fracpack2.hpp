@@ -76,7 +76,7 @@ namespace psio
    {
    };
 
-   template <PackableMemcpy T, int N>
+   template <PackableMemcpy T, std::size_t N>
    struct is_packable_memcpy<std::array<T, N>> : std::bool_constant<true>
    {
       static_assert(sizeof(std::array<T, N>) == N * sizeof(T));
@@ -94,7 +94,7 @@ namespace psio
    template <Packable T>
    struct is_packable<std::vector<T>>;
 
-   template <Packable T, int N>
+   template <Packable T, std::size_t N>
       requires(!is_packable_memcpy<T>::value)
    struct is_packable<std::array<T, N>>;
 
@@ -518,7 +518,7 @@ namespace psio
       }  // unpack
    };    // is_packable<std::vector<T>> (!memcpy)
 
-   template <Packable T, int N>
+   template <Packable T, std::size_t N>
       requires(!is_packable_memcpy<T>::value)
    struct is_packable<std::array<T, N>>
        : base_packable_impl<std::array<T, N>, is_packable<std::array<T, N>>>
@@ -530,7 +530,7 @@ namespace psio
       static constexpr bool supports_0_offset = false;
 
       template <typename S>
-      static void pack(const T& value, S& stream)
+      static void pack(const std::array<T, N>& value, S& stream)
       {
          stream.about_to_write(is_packable<T>::fixed_size * N);
          uint32_t fixed_pos = stream.written();
@@ -545,11 +545,11 @@ namespace psio
       }
 
       template <bool Unpack, bool Verify>
-      [[nodiscard]] static bool unpack(T*          value,
-                                       bool&       has_unknown,
-                                       const char* src,
-                                       uint32_t&   pos,
-                                       uint32_t    end_pos)
+      [[nodiscard]] static bool unpack(std::array<T, N>* value,
+                                       bool&             has_unknown,
+                                       const char*       src,
+                                       uint32_t&         pos,
+                                       uint32_t          end_pos)
       {
          uint32_t fixed_pos     = pos;
          uint32_t heap_pos      = pos + is_packable<T>::fixed_size * N;
@@ -561,7 +561,7 @@ namespace psio
          }
          if constexpr (Unpack)
          {
-            for (const auto& x : *value)
+            for (auto& x : *value)
                if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
                        &x, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
                   return false;

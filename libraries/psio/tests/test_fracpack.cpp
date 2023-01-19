@@ -41,6 +41,8 @@ template <typename... T>
 bool bitwise_equal(const std::tuple<T...>& lhs, const std::tuple<T...>& rhs);
 template <typename... T>
 bool bitwise_equal(const std::variant<T...>& lhs, const std::variant<T...>& rhs);
+template <typename T, std::size_t N>
+bool bitwise_equal(const std::array<T, N>& lhs, const std::array<T, N>& rhs);
 
 template <typename T>
    requires std::is_arithmetic_v<T> bool
@@ -105,6 +107,13 @@ bool bitwise_equal(const std::variant<T...>& lhs, const std::variant<T...>& rhs)
        lhs, rhs);
 }
 
+template <typename T, std::size_t N>
+bool bitwise_equal(const std::array<T, N>& lhs, const std::array<T, N>& rhs)
+{
+   return std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(),
+                     [](const T& lhs, const T& rhs) { return bitwise_equal(lhs, rhs); });
+}
+
 template <typename T>
 struct BitwiseEqual : Catch::MatcherBase<T>
 {
@@ -128,6 +137,9 @@ constexpr bool need_bitwise_compare<std::tuple<T...>> = (... || need_bitwise_com
 
 template <typename... T>
 constexpr bool need_bitwise_compare<std::variant<T...>> = (... || need_bitwise_compare<T>);
+
+template <typename T, std::size_t N>
+constexpr bool need_bitwise_compare<std::array<T, N>> = need_bitwise_compare<T>;
 
 template <typename T>
 void test(const T& value)
@@ -318,9 +330,26 @@ void test(std::initializer_list<T> values)
    for (const auto& v : values)
    {
       test(std::variant<T>{v});
-      test(std::variant<T, T, T>{std::in_place_index<0>, v});
-      test(std::variant<T, T, T>{std::in_place_index<1>, v});
-      test(std::variant<T, T, T>{std::in_place_index<2>, v});
+      test(std::variant<T, T>{std::in_place_index<0>, v});
+      test(std::variant<T, T>{std::in_place_index<1>, v});
+   }
+   // array
+   {
+      std::array<T, 20> a = {};
+      assert(values.size() <= a.size());
+      std::copy(values.begin(), values.end(), a.begin());
+      test(a);
+      test(std::optional<std::array<T, 20>>{});
+      test(std::optional{a});
+      test(extensible_wrapper{a});
+      test(extensible_wrapper{std::optional<std::array<T, 20>>{}});
+      test(extensible_wrapper{std::optional{a}});
+      test(nonextensible_wrapper{a});
+      test(nonextensible_wrapper{std::optional<std::array<T, 20>>{}});
+      test(nonextensible_wrapper{std::optional{a}});
+      test(std::tuple{a});
+      test(std::tuple{std::optional<std::array<T, 20>>{}});
+      test(std::tuple{std::optional{a}});
    }
 }
 
@@ -379,4 +408,9 @@ TEST_CASE("roundtrip")
    test<fixed_struct>({{0x12345678}, {0x90abcdef}});
    test<padded_struct>({{42, 0x12345678}, {43, 0x90abcdef}});
    test<variable_struct>({{0x12345678}, {0x90abcdef}});
+   test<std::variant<std::int32_t, double, std::string>>(
+       {1, 2.0, "Although I am an old man, night is generally my time for walking."});
+   test<std::array<std::int32_t, 3>>({{1, 2, 3}, {4, 5, 6}, {7, 8, 9}});
+   test<std::array<std::string, 3>>(
+       {{"a", "bb", "ccc"}, {"dddd", "eeeee", "ffffff"}, {"ggggggg", "hhhhhhhh", "iiiiiiiii"}});
 }
