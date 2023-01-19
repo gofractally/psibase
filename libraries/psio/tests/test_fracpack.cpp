@@ -514,5 +514,117 @@ TEST_CASE("roundtrip")
        {1, 2.0, "Although I am an old man, night is generally my time for walking."});
    test<std::array<std::int32_t, 3>>({{1, 2, 3}, {4, 5, 6}, {7, 8, 9}});
    test<std::array<std::string, 3>>(
-       {{"a", "bb", "ccc"}, {"dddd", "eeeee", "ffffff"}, {"ggggggg", "hhhhhhhh", "iiiiiiiii"}});
+       {{"I have no name", "I am but two days old.", "What shall I call thee?"},
+        {"I happy am", "Joy is my name,", "Sweet joy befall thee!"}});
+}
+
+template <typename T, typename U>
+void test_compat(const T& t, const U& u, bool expect_unknown)
+{
+   std::vector<char>   data;
+   psio::vector_stream out{data};
+   psio::is_packable<T>::pack(t, out);
+   {
+      U             result{};
+      std::uint32_t pos         = 0;
+      bool          has_unknown = false;
+      CHECK(psio::is_packable<U>::template unpack<true, true>(&result, has_unknown, data.data(),
+                                                              pos, data.size()));
+      CHECK(has_unknown == expect_unknown);
+      CHECK_THAT(result, BitwiseEqual(u));
+      if (!expect_unknown)
+         CHECK(pos == data.size());
+   }
+   {
+      std::uint32_t pos         = 0;
+      bool          has_unknown = false;
+      CHECK(psio::is_packable<U>::template unpack<false, true>(nullptr, has_unknown, data.data(),
+                                                               pos, data.size()));
+      CHECK(has_unknown == expect_unknown);
+      if (!expect_unknown)
+         CHECK(pos == data.size());
+   }
+   {
+      U             result{};
+      std::uint32_t pos         = 0;
+      bool          has_unknown = false;
+      CHECK(psio::is_packable<U>::template unpack<true, false>(&result, has_unknown, data.data(),
+                                                               pos, data.size()));
+      CHECK(has_unknown == false);  // Not modified when Verify is false
+      CHECK_THAT(result, BitwiseEqual(u));
+      if (!expect_unknown)
+         CHECK(pos == data.size());
+   }
+}
+
+template <typename T, typename U>
+void test_compat_wrap(const T& t, const U& u, bool expect_unknown)
+{
+   using namespace std::literals;
+   test_compat(t, u, expect_unknown);
+   test_compat(std::optional{t}, std::optional{u}, expect_unknown);
+   test_compat(std::vector{t}, std::vector{u}, expect_unknown);
+   test_compat(std::tuple{t, "It is an ancient mariner"s},
+               std::tuple{u, "It is an ancient mariner"s}, expect_unknown);
+   test_compat(std::optional{std::vector{t}}, std::optional{std::vector{u}}, expect_unknown);
+   test_compat(extensible_wrapper{t}, extensible_wrapper{u}, expect_unknown);
+   test_compat(extensible_wrapper{std::optional{t}}, extensible_wrapper{std::optional{u}},
+               expect_unknown);
+   test_compat(extensible_wrapper{std::vector{t}}, extensible_wrapper{std::vector{u}},
+               expect_unknown);
+   test_compat(nonextensible_wrapper{t}, nonextensible_wrapper{u}, expect_unknown);
+   test_compat(nonextensible_wrapper{std::optional{t}}, nonextensible_wrapper{std::optional{u}},
+               expect_unknown);
+   test_compat(nonextensible_wrapper{std::vector{t}}, nonextensible_wrapper{std::vector{u}},
+               expect_unknown);
+   test_compat(std::array{t}, std::array{u}, expect_unknown);
+   test_compat(std::variant<T>{t}, std::variant<U>{u}, expect_unknown);
+}
+
+template <typename...>
+struct struct_;
+
+template <>
+struct struct_<>
+{
+   PSIO_REFLECT(struct_);
+   friend bool operator==(const struct_&, const struct_&) = default;
+};
+
+template <typename T0>
+struct struct_<T0>
+{
+   T0 v0;
+   PSIO_REFLECT(struct_, v0)
+   friend bool operator==(const struct_& lhs, const struct_& rhs)
+   {
+      return bitwise_equal(lhs.v0, rhs.v0);
+   }
+};
+
+template <typename T0, typename T1>
+struct struct_<T0, T1>
+{
+   T0 v0;
+   T1 v1;
+   PSIO_REFLECT(struct_, v0, v1)
+   friend bool operator==(const struct_& lhs, const struct_& rhs)
+   {
+      return bitwise_equal(lhs.v0, rhs.v0) && bitwise_equal(lhs.v1, rhs.v1);
+   }
+};
+
+TEST_CASE("compatibility")
+{
+   using namespace std::literals;
+   test_compat_wrap(""sv, ""s, false);
+   test_compat_wrap("Tyger Tyger, burning bright"sv, "Tyger Tyger, burning bright"s, false);
+   test_compat_wrap(std::tuple<std::int32_t>(42),
+                    std::tuple<std::int32_t, std::optional<std::int32_t>>(42, std::nullopt), false);
+   test_compat_wrap(std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),
+                    std::tuple<std::int32_t>(42), true);
+   test_compat_wrap(struct_<std::int32_t>(42),
+                    struct_<std::int32_t, std::optional<std::int32_t>>(42, std::nullopt), false);
+   test_compat_wrap(struct_<std::int32_t, std::optional<std::int32_t>>(42, 43),
+                    struct_<std::int32_t>(42), true);
 }
