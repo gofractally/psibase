@@ -226,7 +226,7 @@ SCENARIO("Recalling tokens")
 
       THEN("The token is recallable by default")
       {
-         auto unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
+         auto unrecallableBit = TokenRecord::Configurations::value(unrecallable);
          CHECK(false == token.config.get(unrecallableBit));
       }
       THEN("Alice can recall Bob's tokens")
@@ -247,7 +247,7 @@ SCENARIO("Recalling tokens")
       {
          CHECK(a.setTokenConf(tokenId, unrecallable, true).succeeded());
 
-         uint8_t unrecallableBit = TokenRecord::Configurations::getIndex(unrecallable);
+         uint8_t unrecallableBit = TokenRecord::Configurations::value(unrecallable);
          CHECK(a.getToken(tokenId).returnVal().config.get(unrecallableBit));
 
          AND_THEN("Alice may not recall Bob's tokens")

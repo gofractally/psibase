@@ -15,7 +15,7 @@ namespace UserService
 
       uint64_t eventHead;
 
-      using Configurations = psibase::NamedBits<psibase::NamedBit{"manualDebit"}>;
+      using Configurations = psibase::Enum<psibase::EnumElement{"manualDebit"}>;
 
       auto operator<=>(const NftHolderRecord&) const = default;
    };

@@ -18,7 +18,7 @@ namespace
 {
    namespace userConfig
    {
-      constexpr auto manualDebit = psibase::NamedBit{"manualDebit"};
+      constexpr auto manualDebit = psibase::EnumElement{"manualDebit"};
    }
 }  // namespace
 
@@ -88,13 +88,13 @@ void NftSys::burn(NID nftId)
 
 void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<String> memo)
 {
-   auto                   record       = getNft(nftId);
-   psibase::AccountNumber sender       = getSender();
-   CreditRecord           creditRecord = getCredRecord(nftId);
-   auto manualDebitFlag                = NftHolderRecord::Configurations::getIndex("manualDebit"_m);
-   auto senderHolder                   = getNftHolder(sender);
-   auto receiverHolder                 = getNftHolder(receiver);
-   bool isTransfer                     = not receiverHolder.config.get(manualDebitFlag);
+   auto                   record          = getNft(nftId);
+   psibase::AccountNumber sender          = getSender();
+   CreditRecord           creditRecord    = getCredRecord(nftId);
+   auto                   manualDebitFlag = NftHolderRecord::Configurations::value("manualDebit"_m);
+   auto                   senderHolder    = getNftHolder(sender);
+   auto                   receiverHolder  = getNftHolder(receiver);
+   bool                   isTransfer      = not receiverHolder.config.get(manualDebitFlag);
 
    check(record.owner == sender, missingRequiredAuth);
    check(receiver != record.owner, creditorIsDebitor);
@@ -183,11 +183,11 @@ void NftSys::debit(NID nftId, const_view<String> memo)
    Tables().open<CreditTable>().erase(nftId);
 }
 
-void NftSys::setUserConf(psibase::NamedBit flag, bool enable)
+void NftSys::setUserConf(psibase::EnumElement flag, bool enable)
 {
    auto sender  = getSender();
    auto record  = getNftHolder(sender);
-   auto bit     = NftHolderRecord::Configurations::getIndex(flag);
+   auto bit     = NftHolderRecord::Configurations::value(flag);
    bool flagSet = getNftHolder(sender).config.get(bit);
 
    check(flagSet != enable, redundantUpdate);
@@ -261,7 +261,7 @@ bool NftSys::exists(NID nftId)
    return Tables().open<NftTable>().get(nftId).has_value();
 }
 
-bool NftSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
+bool NftSys::getUserConf(psibase::AccountNumber account, psibase::EnumElement flag)
 {
    auto hodler = Tables().open<NftHolderTable>().get(account);
    if (hodler.has_value() == false)
@@ -270,7 +270,7 @@ bool NftSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
    }
    else
    {
-      auto bit = NftHolderRecord::Configurations::getIndex(flag);
+      auto bit = NftHolderRecord::Configurations::value(flag);
       return (*hodler).config.get(bit);
    }
 }

@@ -46,7 +46,7 @@ void InviteSys::init()
    to<SystemService::ProxySys>().registerServer(InviteSys::service);
 
    // Configure manual debit for self on Token and NFT
-   auto manualDebit = psibase::NamedBit{"manualDebit"};
+   auto manualDebit = psibase::EnumElement{"manualDebit"};
    to<TokenSys>().setUserConf(manualDebit, true);
    to<NftSys>().setUserConf(manualDebit, true);
 

@@ -26,7 +26,7 @@ namespace UserService
                   psio::const_view<psibase::String> memo);
       void uncredit(NID nftId, psio::const_view<psibase::String> memo);
       void debit(NID nftId, psio::const_view<psibase::String> memo);
-      void setUserConf(psibase::NamedBit flag, bool enable);
+      void setUserConf(psibase::EnumElement flag, bool enable);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 
@@ -35,7 +35,7 @@ namespace UserService
       NftHolderRecord getNftHolder(psibase::AccountNumber account);
       CreditRecord    getCredRecord(NID nftId);
       bool            exists(NID nftId);
-      bool            getUserConf(psibase::AccountNumber account, psibase::NamedBit flag);
+      bool            getUserConf(psibase::AccountNumber account, psibase::EnumElement flag);
 
      public:
       struct Events
@@ -47,7 +47,7 @@ namespace UserService
          {
             void minted(uint64_t prevEvent, NID nftId, Account issuer) {}
             void burned(uint64_t prevEvent, NID nftId) {}
-            void userConfSet(uint64_t prevEvent, Account account, psibase::NamedBit flag, bool enable) {}
+            void userConfSet(uint64_t prevEvent, Account account, psibase::EnumElement flag, bool enable) {}
             void credited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, StringView memo) {}
             void uncredited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, StringView memo) {}
             void transferred(uint64_t prevEvent, NID nftId, Account creditor, Account debitor, StringView memo) {}

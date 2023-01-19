@@ -53,7 +53,7 @@ namespace UserService
       uint64_t eventHead;
 
       using Configurations =
-          psibase::NamedBits<psibase::NamedBit{"unrecallable"}, psibase::NamedBit{"untradeable"}>;
+          psibase::Enum<psibase::EnumElement{"unrecallable"}, psibase::EnumElement{"untradeable"}>;
 
       static bool isValidKey(TID tokenId)
       {
@@ -127,7 +127,7 @@ namespace UserService
       psibase::Bitset<8>     config;
       uint64_t               eventHead = 0;
 
-      using Configurations = psibase::NamedBits<psibase::NamedBit{"manualDebit"}>;
+      using Configurations = psibase::Enum<psibase::EnumElement{"manualDebit"}>;
 
       auto operator<=>(const TokenHolderRecord&) const = default;
    };
