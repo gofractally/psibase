@@ -153,6 +153,7 @@ namespace psio
       // template <bool Unpack, bool Verify>
       // [[nodiscard]] static bool unpack(T*          value,
       //                                  bool&       has_unknown,
+      //                                  bool&       known_end,
       //                                  const char* src,
       //                                  uint32_t&   pos,
       //                                  uint32_t    end_pos);
@@ -161,6 +162,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool embedded_variable_unpack(T*          value,
                                                          bool&       has_unknown,
+                                                         bool&       known_pos,
                                                          const char* src,
                                                          uint32_t&   fixed_pos,
                                                          uint32_t    end_fixed_pos,
@@ -177,6 +179,8 @@ namespace psio
             {
                if constexpr (Unpack)
                   value->clear();
+               if constexpr (Verify)
+                  known_pos = true;
                return true;
             }
          }
@@ -185,12 +189,12 @@ namespace psio
          {
             if (offset < 4 || new_heap_pos < heap_pos || new_heap_pos > end_heap_pos)
                return false;
-            if (new_heap_pos != heap_pos && !has_unknown)
+            if (new_heap_pos != heap_pos && known_pos)
                return false;
          }
          heap_pos = new_heap_pos;
-         return Derived::template unpack<Unpack, Verify>(value, has_unknown, src, heap_pos,
-                                                         end_heap_pos);
+         return Derived::template unpack<Unpack, Verify>(value, has_unknown, known_pos, src,
+                                                         heap_pos, end_heap_pos);
       }
 
       // Unpack and/or verify either:
@@ -199,6 +203,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool embedded_unpack(T*          value,
                                                 bool&       has_unknown,
+                                                bool&       known_pos,
                                                 const char* src,
                                                 uint32_t&   fixed_pos,
                                                 uint32_t    end_fixed_pos,
@@ -207,10 +212,11 @@ namespace psio
       {
          if constexpr (Derived::is_variable_size)
             return Derived::template embedded_variable_unpack<Unpack, Verify>(
-                value, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_heap_pos);
+                value, has_unknown, known_pos, src, fixed_pos, end_fixed_pos, heap_pos,
+                end_heap_pos);
          else
-            return Derived::template unpack<Unpack, Verify>(value, has_unknown, src, fixed_pos,
-                                                            end_fixed_pos);
+            return Derived::template unpack<Unpack, Verify>(value, has_unknown, known_pos, src,
+                                                            fixed_pos, end_fixed_pos);
       }
    };  // base_packable_impl
 
@@ -231,13 +237,17 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(T*          value,
                                        bool&       has_unknown,
+                                       bool&       known_end,
                                        const char* src,
                                        uint32_t&   pos,
                                        uint32_t    end_pos)
       {
          if constexpr (Verify)
+         {
+            known_end = true;
             if (end_pos - pos < sizeof(T))
                return false;
+         }
          if constexpr (Unpack)
             std::memcpy(value, src + pos, sizeof(T));
          pos += sizeof(T);
@@ -252,7 +262,9 @@ namespace psio
                                      uint32_t&   pos,
                                      uint32_t    end_pos)
    {
-      return is_packable<T>::template unpack<Unpack, Verify>(value, has_unknown, src, pos, end_pos);
+      bool known_end;
+      return is_packable<T>::template unpack<Unpack, Verify>(value, has_unknown, known_end, src,
+                                                             pos, end_pos);
    }
 
    template <>
@@ -272,13 +284,17 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(bool*       value,
                                        bool&       has_unknown,
+                                       bool&       known_end,
                                        const char* src,
                                        uint32_t&   pos,
                                        uint32_t    end_pos)
       {
          if constexpr (Verify)
+         {
+            known_end = true;
             if (end_pos - pos < 1 || src[pos] > 1)
                return false;
+         }
          if constexpr (Unpack)
             *value = src[pos] != 0;
          pos += 1;
@@ -344,40 +360,44 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(T*          value,
                                        bool&       has_unknown,
+                                       bool&       known_end,
                                        const char* src,
                                        uint32_t&   pos,
                                        uint32_t    end_pos)
       {
-         return is_p::template unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src, pos,
-                                                      end_pos);
+         return is_p::template unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, known_end,
+                                                      src, pos, end_pos);
       }
 
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool embedded_variable_unpack(T*          value,
                                                          bool&       has_unknown,
+                                                         bool&       known_end,
                                                          const char* src,
                                                          uint32_t&   fixed_pos,
                                                          uint32_t    end_fixed_pos,
                                                          uint32_t&   heap_pos,
                                                          uint32_t    end_heap_pos)
       {
+         // TODO: Does this need to exist?
          return is_p::template embedded_variable_unpack<Unpack, Verify>(
-             ptr<Unpack>(value), has_unknown, src, fixed_pos, end_fixed_pos, heap_pos,
+             ptr<Unpack>(value), has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
              end_heap_pos);
       }
 
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool embedded_unpack(T*          value,
                                                 bool&       has_unknown,
+                                                bool&       known_end,
                                                 const char* src,
                                                 uint32_t&   fixed_pos,
                                                 uint32_t    end_fixed_pos,
                                                 uint32_t&   heap_pos,
                                                 uint32_t    end_heap_pos)
       {
-         return is_p::template embedded_unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, src,
-                                                               fixed_pos, end_fixed_pos, heap_pos,
-                                                               end_heap_pos);
+         return is_p::template embedded_unpack<Unpack, Verify>(
+             ptr<Unpack>(value), has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+             end_heap_pos);
       }
    };  // is_packable<PackableWrapper>
 
@@ -401,6 +421,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(T*          value,
                                        bool&       has_unknown,
+                                       bool&       known_end,
                                        const char* src,
                                        uint32_t&   pos,
                                        uint32_t    end_pos)
@@ -412,6 +433,7 @@ namespace psio
          uint32_t new_pos = pos + fixed_size;
          if constexpr (Verify)
          {
+            known_end = true;
             if ((fixed_size % sizeof(typename T::value_type)) || new_pos < pos || new_pos > end_pos)
                return false;
          }
@@ -484,6 +506,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(std::vector<T>* value,
                                        bool&           has_unknown,
+                                       bool&           known_end,
                                        const char*     src,
                                        uint32_t&       pos,
                                        uint32_t        end_pos)
@@ -497,6 +520,7 @@ namespace psio
          uint32_t end_fixed_pos = heap_pos;
          if constexpr (Verify)
          {
+            known_end = true;
             if ((fixed_size % is_packable<T>::fixed_size) || heap_pos < pos || heap_pos > end_pos)
                return false;
          }
@@ -505,14 +529,16 @@ namespace psio
             value->resize(size);
             for (auto& x : *value)
                if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
-                       &x, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
+                       &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                       end_pos))
                   return false;
          }
          else
          {
             for (uint32_t i = 0; i < size; ++i)
                if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
-                       nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
+                       nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                       end_pos))
                   return false;
          }
          pos = heap_pos;
@@ -549,6 +575,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(std::array<T, N>* value,
                                        bool&             has_unknown,
+                                       bool&             known_end,
                                        const char*       src,
                                        uint32_t&         pos,
                                        uint32_t          end_pos)
@@ -558,6 +585,7 @@ namespace psio
          uint32_t end_fixed_pos = heap_pos;
          if constexpr (Verify)
          {
+            known_end = true;
             if (heap_pos < pos || heap_pos > end_pos)
                return false;
          }
@@ -565,14 +593,16 @@ namespace psio
          {
             for (auto& x : *value)
                if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
-                       &x, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
+                       &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                       end_pos))
                   return false;
          }
          else
          {
             for (uint32_t i = 0; i < N; ++i)
                if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
-                       nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
+                       nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                       end_pos))
                   return false;
          }
          pos = heap_pos;
@@ -635,6 +665,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(std::optional<T>* value,
                                        bool&             has_unknown,
+                                       bool&             known_end,
                                        const char*       src,
                                        uint32_t&         pos,
                                        uint32_t          end_pos)
@@ -642,6 +673,7 @@ namespace psio
          uint32_t fixed_pos = pos;
          if constexpr (Verify)
          {
+            known_end = true;
             if (end_pos - pos < 4)
             {
                return false;
@@ -649,13 +681,14 @@ namespace psio
          }
          pos += 4;
          uint32_t end_fixed_pos = pos;
-         return embedded_unpack<Unpack, Verify>(value, has_unknown, src, fixed_pos, end_fixed_pos,
-                                                pos, end_pos);
+         return embedded_unpack<Unpack, Verify>(value, has_unknown, known_end, src, fixed_pos,
+                                                end_fixed_pos, pos, end_pos);
       }
 
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool embedded_unpack(std::optional<T>* value,
                                                 bool&             has_unknown,
+                                                bool&             known_pos,
                                                 const char*       src,
                                                 uint32_t&         fixed_pos,
                                                 uint32_t          end_fixed_pos,
@@ -680,8 +713,8 @@ namespace psio
             value->emplace();
          }
          return is_packable<T>::template embedded_variable_unpack<Unpack, Verify>(
-             Unpack ? &**value : nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos,
-             end_heap_pos);
+             Unpack ? &**value : nullptr, has_unknown, known_pos, src, fixed_pos, end_fixed_pos,
+             heap_pos, end_heap_pos);
       }
    };  // is_packable<std::optional<T>>
 
@@ -758,6 +791,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(std::tuple<Ts...>* value,
                                        bool&              has_unknown,
+                                       bool&              known_end,
                                        const char*        src,
                                        uint32_t&          pos,
                                        uint32_t           end_pos)
@@ -770,6 +804,7 @@ namespace psio
          uint32_t end_fixed_pos = heap_pos;
          if constexpr (Verify)
          {
+            known_end = true;
             if (heap_pos < pos || heap_pos > end_pos)
                return false;
          }
@@ -783,7 +818,8 @@ namespace psio
                    using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
                    if (fixed_pos < end_fixed_pos || !is_p::is_optional)
                       ok &= is_p::template embedded_unpack<Unpack, Verify>(
-                          &x, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos);
+                          &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                          end_pos);
                 });
          }
          else
@@ -795,7 +831,8 @@ namespace psio
                    using is_p = is_packable<std::remove_cvref_t<decltype(*p)>>;
                    if (fixed_pos < end_fixed_pos || !is_p::is_optional)
                       ok &= is_p::template embedded_unpack<Unpack, Verify>(
-                          nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos, end_pos);
+                          nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                          end_pos);
                 });
          }
          if (!ok)
@@ -803,7 +840,10 @@ namespace psio
          if constexpr (Verify)
          {
             if (fixed_pos < end_fixed_pos)
+            {
                has_unknown = true;
+               known_end   = false;
+            }
          }
          pos = heap_pos;
          return true;
@@ -814,6 +854,7 @@ namespace psio
    [[nodiscard]] bool unpack_variant_impl(size_t               tag,
                                           std::variant<Ts...>* value,
                                           bool&                has_unknown,
+                                          bool&                end_known,
                                           const char*          src,
                                           uint32_t&            pos,
                                           uint32_t             end_pos)
@@ -826,19 +867,19 @@ namespace psio
             if constexpr (Unpack)
             {
                value->template emplace<I>();
-               return is_p::template unpack<Unpack, Verify>(&std::get<I>(*value), has_unknown, src,
-                                                            pos, end_pos);
+               return is_p::template unpack<Unpack, Verify>(&std::get<I>(*value), has_unknown,
+                                                            end_known, src, pos, end_pos);
             }
             else
             {
-               return is_p::template unpack<Unpack, Verify>(nullptr, has_unknown, src, pos,
-                                                            end_pos);
+               return is_p::template unpack<Unpack, Verify>(nullptr, has_unknown, end_known, src,
+                                                            pos, end_pos);
             }
          }
          else
          {
-            return unpack_variant_impl<Unpack, Verify, I + 1>(tag, value, has_unknown, src, pos,
-                                                              end_pos);
+            return unpack_variant_impl<Unpack, Verify, I + 1>(tag, value, has_unknown, end_known,
+                                                              src, pos, end_pos);
          }
       }
       else
@@ -846,7 +887,10 @@ namespace psio
          if constexpr (Unpack)
             return false;
          if constexpr (Verify)
+         {
             has_unknown = true;
+            end_known   = false;
+         }
          return true;
       }
    }
@@ -878,6 +922,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(std::variant<Ts...>* value,
                                        bool&                has_unknown,
+                                       bool&                known_end,
                                        const char*          src,
                                        uint32_t&            pos,
                                        uint32_t             end_pos)
@@ -896,15 +941,14 @@ namespace psio
          if constexpr (Verify)
             if (content_end < content_pos || content_end > end_pos)
                return false;
-         bool inner_unknown = false;
-         if (!unpack_variant_impl<Unpack, Verify, 0>(tag, value, inner_unknown, src, content_pos,
-                                                     content_end))
+         bool inner_known_end;
+         if (!unpack_variant_impl<Unpack, Verify, 0>(tag, value, has_unknown, inner_known_end, src,
+                                                     content_pos, content_end))
             return false;
          if constexpr (Verify)
          {
-            if (inner_unknown)
-               has_unknown = true;
-            else if (content_pos != content_end)
+            known_end = true;
+            if (inner_known_end && content_pos != content_end)
                return false;
          }
          pos = content_end;
@@ -1040,6 +1084,7 @@ namespace psio
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(T*          value,
                                        bool&       has_unknown,
+                                       bool&       known_end,
                                        const char* src,
                                        uint32_t&   pos,
                                        uint32_t    end_pos)
@@ -1058,6 +1103,7 @@ namespace psio
             {
                if (heap_pos < pos || heap_pos > end_pos)
                   return false;
+               known_end = true;
             }
             bool ok = true;
             reflect<T>::for_each(
@@ -1071,12 +1117,12 @@ namespace psio
                       {
                          if constexpr (Unpack)
                             ok &= is_p::template embedded_unpack<Unpack, Verify>(
-                                &(value->*member(value)), has_unknown, src, fixed_pos,
+                                &(value->*member(value)), has_unknown, known_end, src, fixed_pos,
                                 end_fixed_pos, heap_pos, end_pos);
                          else
                             ok &= is_p::template embedded_unpack<Unpack, Verify>(
-                                nullptr, has_unknown, src, fixed_pos, end_fixed_pos, heap_pos,
-                                end_pos);
+                                nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos,
+                                heap_pos, end_pos);
                       }
                    }
                 });
@@ -1085,7 +1131,10 @@ namespace psio
             if constexpr (Verify)
             {
                if (fixed_pos < end_fixed_pos)
+               {
                   has_unknown = true;
+                  known_end   = false;
+               }
             }
             pos = heap_pos;
             return true;
@@ -1093,6 +1142,10 @@ namespace psio
          else
          {
             bool ok = true;
+            if constexpr (Verify)
+            {
+               known_end = true;
+            }
             reflect<T>::for_each(
                 [&](const meta& ref, auto member)
                 {
@@ -1102,10 +1155,10 @@ namespace psio
                       using is_p = is_packable<typename m::ValueType>;
                       if constexpr (Unpack)
                          ok &= is_p::template unpack<Unpack, Verify>(
-                             &(value->*member(value)), has_unknown, src, pos, end_pos);
+                             &(value->*member(value)), has_unknown, known_end, src, pos, end_pos);
                       else
-                         ok &= is_p::template unpack<Unpack, Verify>(nullptr, has_unknown, src, pos,
-                                                                     end_pos);
+                         ok &= is_p::template unpack<Unpack, Verify>(nullptr, has_unknown,
+                                                                     known_end, src, pos, end_pos);
                    }
                 });
             return ok;

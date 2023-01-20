@@ -1,7 +1,7 @@
 #include <psio/fracpack2.hpp>
 #include <psio/stream.hpp>
-#include <psio/to_json.hpp>  // FIXME: needed by to_hex
 #include <psio/to_hex.hpp>
+#include <psio/to_json.hpp>  // FIXME: needed by to_hex
 
 #include <type_traits>
 
@@ -156,9 +156,11 @@ auto test_base(const T& value)
       T             result{};
       std::uint32_t pos         = 0;
       bool          has_unknown = false;
-      CHECK(psio::is_packable<T>::template unpack<true, true>(&result, has_unknown, data.data(),
-                                                              pos, data.size()));
+      bool          known_end;
+      CHECK(psio::is_packable<T>::template unpack<true, true>(&result, has_unknown, known_end,
+                                                              data.data(), pos, data.size()));
       CHECK(!has_unknown);
+      CHECK(known_end);
       if constexpr (need_bitwise_compare<T>)
       {
          CHECK_THAT(result, BitwiseEqual(value));
@@ -172,17 +174,20 @@ auto test_base(const T& value)
    {
       std::uint32_t pos         = 0;
       bool          has_unknown = false;
-      CHECK(psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, data.data(),
-                                                               pos, data.size()));
+      bool          known_end;
+      CHECK(psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
+                                                               data.data(), pos, data.size()));
       CHECK(!has_unknown);
+      CHECK(known_end);
       CHECK(pos == data.size());
    }
    {
       T             result{};
       std::uint32_t pos         = 0;
       bool          has_unknown = false;
-      CHECK(psio::is_packable<T>::template unpack<true, false>(&result, has_unknown, data.data(),
-                                                               pos, data.size()));
+      bool          known_end;  // unused when Verify = false
+      CHECK(psio::is_packable<T>::template unpack<true, false>(&result, has_unknown, known_end,
+                                                               data.data(), pos, data.size()));
       CHECK(!has_unknown);
       if constexpr (need_bitwise_compare<T>)
       {
@@ -204,14 +209,16 @@ auto test_base(const T& value)
          T             result{};
          std::uint32_t pos         = 0;
          bool          has_unknown = false;
-         CHECK(!psio::is_packable<T>::template unpack<true, true>(&result, has_unknown, copy.get(),
-                                                                  pos, i));
+         bool          known_end;
+         CHECK(!psio::is_packable<T>::template unpack<true, true>(&result, has_unknown, known_end,
+                                                                  copy.get(), pos, i));
       }
       {
          std::uint32_t pos         = 0;
          bool          has_unknown = false;
-         CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, copy.get(),
-                                                                   pos, i));
+         bool          known_end;
+         CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
+                                                                   copy.get(), pos, i));
       }
    }
    return data;
@@ -530,30 +537,38 @@ void test_compat(const T& t, const U& u, bool expect_unknown)
       U             result{};
       std::uint32_t pos         = 0;
       bool          has_unknown = false;
-      CHECK(psio::is_packable<U>::template unpack<true, true>(&result, has_unknown, data.data(),
-                                                              pos, data.size()));
+      bool          known_end;
+      CHECK(psio::is_packable<U>::template unpack<true, true>(&result, has_unknown, known_end,
+                                                              data.data(), pos, data.size()));
       CHECK(has_unknown == expect_unknown);
       CHECK_THAT(result, BitwiseEqual(u));
       if (!expect_unknown)
+         CHECK(known_end);
+      if (known_end)
          CHECK(pos == data.size());
    }
    {
       std::uint32_t pos         = 0;
       bool          has_unknown = false;
-      CHECK(psio::is_packable<U>::template unpack<false, true>(nullptr, has_unknown, data.data(),
-                                                               pos, data.size()));
+      bool          known_end;
+      CHECK(psio::is_packable<U>::template unpack<false, true>(nullptr, has_unknown, known_end,
+                                                               data.data(), pos, data.size()));
       CHECK(has_unknown == expect_unknown);
       if (!expect_unknown)
+         CHECK(known_end);
+      if (known_end)
          CHECK(pos == data.size());
    }
    {
       U             result{};
       std::uint32_t pos         = 0;
       bool          has_unknown = false;
-      CHECK(psio::is_packable<U>::template unpack<true, false>(&result, has_unknown, data.data(),
-                                                               pos, data.size()));
+      bool          known_end;
+      CHECK(psio::is_packable<U>::template unpack<true, false>(&result, has_unknown, known_end,
+                                                               data.data(), pos, data.size()));
       CHECK(has_unknown == false);  // Not modified when Verify is false
       CHECK_THAT(result, BitwiseEqual(u));
+      // known_end can't be used because it is uninitialzed when Verify is false
       if (!expect_unknown)
          CHECK(pos == data.size());
    }
@@ -642,14 +657,16 @@ void test_invalid(const char* hex)
       T             result{};
       std::uint32_t pos         = 0;
       bool          has_unknown = false;
-      CHECK(!psio::is_packable<T>::template unpack<true, true>(&result, has_unknown, data.data(),
-                                                               pos, data.size()));
+      bool          known_end;
+      CHECK(!psio::is_packable<T>::template unpack<true, true>(&result, has_unknown, known_end,
+                                                               data.data(), pos, data.size()));
    }
    {
       std::uint32_t pos         = 0;
       bool          has_unknown = false;
-      CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, data.data(),
-                                                                pos, data.size()));
+      bool          known_end;
+      CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
+                                                                data.data(), pos, data.size()));
    }
 }
 
@@ -666,5 +683,15 @@ TEST_CASE("invalid")
 {
    test_invalid<std::optional<std::uint8_t>>({"00000000", "02000000", "03000000", "05000000FFFF"});
    test_invalid<std::vector<std::uint16_t>>("03000000FFFFFFFFFFFF");
+   // negative offset
    test_invalid<std::tuple<std::uint32_t, std::optional<std::uint8_t>>>("0800CCCCCCCCFFFFFFFF");
+   test_invalid<struct_<std::uint32_t, std::optional<std::uint8_t>>>("0800CCCCCCCCFFFFFFFF");
+   // gaps after unknown fields
+   test_invalid<std::tuple<std::tuple<std::uint32_t>,
+                           std::tuple<std::uint32_t, std::optional<std::uint8_t>>>>(
+       "0800"
+       "08000000"
+       "0F000000"
+       "0800CCCCCCCC04000000FF"
+       "0800DDDDDDDD05000000EEEE");
 }
