@@ -1,7 +1,9 @@
 #include <psio/fracpack2.hpp>
 #include <psio/stream.hpp>
-#include <psio/to_hex.hpp>
+// Prevent clang-format from munging the header order
 #include <psio/to_json.hpp>  // FIXME: needed by to_hex
+//
+#include <psio/to_hex.hpp>
 
 #include <type_traits>
 
@@ -681,6 +683,8 @@ void test_invalid(std::initializer_list<const char*> hex)
 
 TEST_CASE("invalid")
 {
+   // bool is 0 or 1
+   test_invalid<bool>({"02", "03", "FF"});
    test_invalid<std::optional<std::uint8_t>>({"00000000", "02000000", "03000000", "05000000FFFF"});
    test_invalid<std::vector<std::uint16_t>>("03000000FFFFFFFFFFFF");
    // negative offset

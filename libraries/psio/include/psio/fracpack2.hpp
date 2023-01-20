@@ -292,7 +292,7 @@ namespace psio
          if constexpr (Verify)
          {
             known_end = true;
-            if (end_pos - pos < 1 || src[pos] > 1)
+            if (end_pos - pos < 1 || static_cast<unsigned char>(src[pos]) > 1)
                return false;
          }
          if constexpr (Unpack)
