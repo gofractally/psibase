@@ -10,11 +10,6 @@ static constexpr bool enable_print = false;
 
 using namespace psibase;
 
-namespace
-{
-   constexpr std::string_view systemSuffix{"sys"};
-}
-
 namespace SystemService
 {
    void AccountSys::init()
@@ -59,24 +54,8 @@ namespace SystemService
       auto status = statusIndex.get(std::tuple{});
       check(status.has_value(), "not started");
 
-      auto creatorTable = tables.open<CreatorTable>();
-      auto creator      = creatorTable.getIndex<0>().get(SingletonKey{});
-
-      auto senderName = getSender().str();
-      bool fromSysAcc = senderName.ends_with(systemSuffix);
-      if (!fromSysAcc)
-      {
-         if (creator.has_value())
-         {
-            check((*creator).accountCreator == getSender(),
-                  "Only " + (*creator).accountCreator.str() +
-                      " is authorized to create new accounts.");
-         }
-         bool        newSysAcc = name.str().ends_with(systemSuffix);
-         std::string err       = "Only a system account can create an account with the suffix: ";
-         err += systemSuffix;
-         check(!newSysAcc, err.c_str());
-      }
+      auto sender = getSender();
+      check(sender == service || sender == inviteService, "Unauthorized account creation");
 
       if (enable_print)
       {
@@ -117,7 +96,7 @@ namespace SystemService
       auto   account      = accountIndex.get((getSender()));
       check(account.has_value(), "account does not exist");
 
-      to<AuthInterface>(authService).checkUserSys(getSender());
+      to<AuthInterface>(authService).canAuthUserSys(getSender());
 
       account->authService = authService;
       accountTable.put(*account);
@@ -129,27 +108,6 @@ namespace SystemService
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
       return accountIndex.get(num) != std::nullopt;
-   }
-
-   void AccountSys::setCreator(psibase::AccountNumber name)
-   {
-      Tables tables{getReceiver()};
-      auto   creatorTable = tables.open<CreatorTable>();
-      auto   creator      = creatorTable.getIndex<0>().get(SingletonKey{});
-      if (creator.has_value())
-      {
-         check(getSender() == creator->accountCreator,
-               "Only current creator can change the creator");
-      }
-      else
-      {
-         // Any system account may be used to turn on account creation restrictions
-         auto senderName = getSender().str();
-         check(senderName.ends_with(systemSuffix),
-               "A system account must be used to set the initial account creator");
-      }
-
-      creatorTable.put(CreatorRecord{.key = SingletonKey{}, .accountCreator = name});
    }
 
 }  // namespace SystemService

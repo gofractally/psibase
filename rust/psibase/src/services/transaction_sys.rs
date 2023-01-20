@@ -150,7 +150,7 @@ pub mod auth_interface {
     ///
     /// * `user`:  The user being checked
     #[action]
-    fn checkUserSys(user: crate::AccountNumber) {
+    fn canAuthUserSys(user: crate::AccountNumber) {
         unimplemented!()
     }
 

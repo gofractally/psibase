@@ -53,26 +53,24 @@ void InviteSys::init()
    // Create the invite payer account and set its auth contract
    to<AccountSys>().newAccount(payerAccount, AuthInviteSys::service, true);
 
-   // Enable the invite system in AccountSys
-   to<AccountSys>().setCreator(service);
-
    // TODO - Set whitelist so only the fractally service can create invites.
    // setWhitelist({"fractally"_m})
 }
 
-void InviteSys::createInvite(PublicKey inviteKey, AccountNumber inviter)
+void InviteSys::createInvite(PublicKey inviteKey)
 {
    auto inviteTable = Tables().open<InviteTable>();
-   auto invite      = inviteTable.get(inviteKey);
-   check(not invite.has_value(), inviteAlreadyExists.data());
+   check(not inviteTable.get(inviteKey).has_value(), inviteAlreadyExists.data());
 
    // Add invite
+   auto         inviter = getSender();
    uint32_t     secondsInWeek{60 * 60 * 24 * 7};
    InviteRecord newInvite{
        .pubkey          = inviteKey,
        .inviter         = inviter,
        .expiry          = to<TransactionSys>().currentBlock().time.seconds + secondsInWeek,
        .newAccountToken = true,
+       .state           = InviteStates::pending,
    };
    inviteTable.put(newInvite);
 
@@ -88,40 +86,115 @@ void InviteSys::createInvite(PublicKey inviteKey, AccountNumber inviter)
    eventTable.put(eventRecord);
 }
 
-void InviteSys::acceptCreate(PublicKey     inviteKey,
-                             AccountNumber newAccountName,
-                             PublicKey     newAccountKey)
+void InviteSys::accept(PublicKey inviteKey)
 {
+   auto inviteTable = Tables().open<InviteTable>();
+   auto invite      = inviteTable.get(inviteKey);
+   check(invite.has_value(), inviteDNE.data());
+
+   to<AuthInviteSys>().requireAuth(inviteKey);
+
+   auto acceptedBy = getSender();
+   check(acceptedBy != InviteSys::payerAccount,
+         "Call 'accept' with the accepting account as the sender.");
+   check(invite->state != InviteStates::rejected, "This invite was already rejected");
+
+   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   check(invite->expiry > now, inviteExpired.data());
+
+   invite->actor = acceptedBy;
+   invite->state = InviteStates::accepted;
+   inviteTable.put(*invite);
+
+   // Emit event
+   auto eventTable  = Tables().open<ServiceEventTable>();
+   auto eventRecord = eventTable.get(SingletonKey{})
+                          .value_or(ServiceEventRecord{
+                              .key       = SingletonKey{},
+                              .eventHead = 0,
+                          });
+   eventRecord.eventHead =
+       emit().history().inviteAccepted(eventRecord.eventHead, inviteKey, acceptedBy);
+   eventTable.put(eventRecord);
+}
+
+void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, PublicKey newAccountKey)
+{
+   auto sender      = getSender();
+   auto inviteTable = Tables().open<InviteTable>();
+   auto invite      = inviteTable.get(inviteKey);
+   check(invite.has_value(), inviteDNE.data());
+
+   to<AuthInviteSys>().requireAuth(inviteKey);
+
+   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   check(invite->expiry > now, inviteExpired.data());
+
+   check(invite->state != InviteStates::rejected, alreadyRejected.data());
+
+   bool accountExists = to<AccountSys>().exists(acceptedBy);
+   check(not accountExists, "The acceptedBy account already exists");
+
+   check(sender == InviteSys::payerAccount, mustUseInvitedSys.data());
    check(inviteKey != newAccountKey, needUniquePubkey.data());
+   check(invite->newAccountToken, noNewAccToken.data());
+   invite->newAccountToken = false;
 
-   acceptInvite(inviteKey, newAccountName, newAccount);
-
-   // Create the new account
-   to<AccountSys>().newAccount(newAccountName, AuthAnySys::service, true);
-
-   // Set the key & update auth
+   // Create new account, and set key & auth
+   to<AccountSys>().newAccount(acceptedBy, AuthAnySys::service, true);
    std::tuple<PublicKey> params{newAccountKey};
-   Action                setKey{.sender  = newAccountName,
+   Action                setKey{.sender  = acceptedBy,
                                 .service = AuthEcSys::service,
                                 .method  = "setKey"_m,
                                 .rawData = psio::convert_to_frac(params)};
    to<TransactionSys>().runAs(move(setKey), vector<ServiceMethod>{});
    std::tuple<AccountNumber> params2{AuthEcSys::service};
-   Action                    setAuth{.sender  = newAccountName,
+   Action                    setAuth{.sender  = acceptedBy,
                                      .service = AccountSys::service,
                                      .method  = "setAuthCntr"_m,
                                      .rawData = psio::convert_to_frac(params2)};
    to<TransactionSys>().runAs(move(setAuth), vector<ServiceMethod>{});
-}
 
-void InviteSys::accept(PublicKey inviteKey)
-{
-   acceptInvite(inviteKey, getSender(), existingAccount);
+   invite->state = InviteStates::accepted;
+   invite->actor = acceptedBy;
+   inviteTable.put(*invite);
+
+   // Emit event
+   auto eventTable  = Tables().open<ServiceEventTable>();
+   auto eventRecord = eventTable.get(SingletonKey{})
+                          .value_or(ServiceEventRecord{
+                              .key       = SingletonKey{},
+                              .eventHead = 0,
+                          });
+   eventRecord.eventHead =
+       emit().history().inviteAccepted(eventRecord.eventHead, inviteKey, acceptedBy);
+   eventTable.put(eventRecord);
 }
 
 void InviteSys::reject(psibase::PublicKey inviteKey)
 {
-   Tables().open<InviteTable>().erase(inviteKey);
+   auto table  = Tables().open<InviteTable>();
+   auto invite = table.get(inviteKey);
+   check(invite.has_value(), inviteDNE);
+
+   to<AuthInviteSys>().requireAuth(inviteKey);
+   check(invite->state != InviteStates::accepted, alreadyAccepted.data());
+   check(invite->state != InviteStates::rejected, alreadyRejected.data());
+
+   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   check(invite->expiry > now, inviteExpired.data());
+
+   auto sender = getSender();
+   if (sender == InviteSys::payerAccount)
+   {
+      check(invite->newAccountToken == true,
+            "Only an existing account can be used to reject this invite");
+      invite->newAccountToken = false;
+   }
+
+   invite->state = InviteStates::rejected;
+   invite->actor = sender;
+   table.put(*invite);
 
    // Emit event
    auto eventTable  = Tables().open<ServiceEventTable>();
@@ -135,46 +208,14 @@ void InviteSys::reject(psibase::PublicKey inviteKey)
    eventTable.put(eventRecord);
 }
 
-void InviteSys::acceptInvite(PublicKey     inviteKey,
-                             AccountNumber acceptedBy,
-                             AccepterType  accepterType)
-{
-   auto inviteTable = Tables().open<InviteTable>();
-   auto invite      = inviteTable.get(inviteKey);
-   auto now         = to<TransactionSys>().currentBlock().time.seconds;
-
-   check(invite.has_value(), inviteDNE.data());
-   check(invite->expiry > now, inviteExpired.data());
-   if (accepterType == newAccount)
-   {
-      check(invite->newAccountToken, noNewAccToken.data());
-      invite->newAccountToken = false;
-   }
-   invite->acceptedBy = acceptedBy;
-   inviteTable.put(*invite);
-
-   // Emit event
-   auto eventTable  = Tables().open<ServiceEventTable>();
-   auto eventRecord = eventTable.get(SingletonKey{})
-                          .value_or(ServiceEventRecord{
-                              .key       = SingletonKey{},
-                              .eventHead = 0,
-                          });
-
-   eventRecord.eventHead = emit().history().inviteAccepted(eventRecord.eventHead, inviteKey);
-   eventTable.put(eventRecord);
-}
-
 void InviteSys::delInvite(PublicKey inviteKey)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.get(inviteKey);
-   if (invite.has_value())
-   {
-      check(invite->inviter == sender, unauthDelete.data());
-      inviteTable.remove(*invite);
-   }
+   check(invite.has_value(), inviteDNE.data());
+   check(invite->inviter == sender, unauthDelete.data());
+   inviteTable.remove(*invite);
 
    // Emit event
    auto eventTable  = Tables().open<UserEventTable>();

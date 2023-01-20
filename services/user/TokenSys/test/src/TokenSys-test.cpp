@@ -36,7 +36,7 @@ SCENARIO("Using system token")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
 
@@ -84,7 +84,7 @@ SCENARIO("Creating a token")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
 
@@ -157,7 +157,7 @@ SCENARIO("Minting tokens")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
@@ -214,7 +214,7 @@ SCENARIO("Recalling tokens")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
@@ -268,7 +268,7 @@ SCENARIO("Interactions with the Issuer NFT")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
@@ -355,7 +355,7 @@ SCENARIO("Burning tokens")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
@@ -434,7 +434,7 @@ SCENARIO("Toggling manual-debit")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
@@ -497,7 +497,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
@@ -566,7 +566,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<TokenSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<TokenSys>();
@@ -696,7 +696,7 @@ SCENARIO("Mapping a symbol to a token")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto bob   = t.from(t.add_account("bob"_a));
       auto a     = alice.to<TokenSys>();
       auto b     = bob.to<TokenSys>();

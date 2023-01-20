@@ -19,11 +19,17 @@ namespace UserService
                         psibase::Action                           action,
                         std::vector<SystemService::ServiceMethod> allowedActions,
                         std::vector<psibase::Claim>               claims);
-      void checkUserSys(psibase::AccountNumber user);
+      void canAuthUserSys(psibase::AccountNumber user);
+
+      void requireAuth(const psibase::PublicKey& pubkey);
+
+     private:
+      std::optional<psibase::Claim> getInviteClaim(const std::vector<psibase::Claim>& claims);
    };
    PSIO_REFLECT(AuthInviteSys,  //
                 method(checkAuthSys, flags, requester, action, allowedActions, claims),
-                method(checkUserSys, user)
+                method(canAuthUserSys, user),
+                method(requireAuth, pubkey)
                 //
    )
 }  // namespace UserService

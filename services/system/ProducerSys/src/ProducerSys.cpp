@@ -109,7 +109,7 @@ namespace SystemService
       }
    }
 
-   void ProducerSys::checkUserSys(psibase::AccountNumber user)
+   void ProducerSys::canAuthUserSys(psibase::AccountNumber user)
    {
       // noop
    }

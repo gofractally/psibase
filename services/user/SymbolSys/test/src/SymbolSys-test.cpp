@@ -37,7 +37,7 @@ SCENARIO("Buying a symbol")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<SymbolSys>();
       auto bob   = t.from(t.add_account("bob"_a));
       auto b     = bob.to<SymbolSys>();
@@ -162,7 +162,7 @@ SCENARIO("Measuring price increases")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto a     = alice.to<SymbolSys>();
 
       auto aliceBalance = 1'000'000e8;
@@ -277,7 +277,7 @@ SCENARIO("Using symbol ownership NFT")
    {
       DefaultTestChain t;
 
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto bob   = t.from(t.add_account("bob"_a));
       auto a     = alice.to<SymbolSys>();
 
@@ -329,7 +329,7 @@ SCENARIO("Buying and selling symbols")
       DefaultTestChain t;
 
       // Add a couple accounts
-      auto alice = t.from("alice"_a);
+      auto alice = t.from(t.add_account("alice"_a));
       auto bob   = t.from(t.add_account("bob"_a));
 
       // Fund Alice and Bob with the system token

@@ -19,7 +19,7 @@ mod service {
     }
 
     #[action]
-    fn checkUserSys(user: AccountNumber) {
+    fn canAuthUserSys(user: AccountNumber) {
         unimplemented!()
     }
 

@@ -32,22 +32,21 @@ namespace UserService
       else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
-      check(claims.size() == 1, onlyOneClaim.data());
+      if (getInviteClaim(claims))
+      {
+         check(action.service == InviteSys::service, restrictedService.data());
 
-      auto claim = claims[0];
-      check(claim.service == SystemService::VerifyEcSys::service, mustUseVerifyEC.data());
+         // Compile time check that acceptCreate and reject are still methods in InviteSys
+         using T1 = decltype(&UserService::Invite::InviteSys::acceptCreate);
+         using T2 = decltype(&UserService::Invite::InviteSys::reject);
+         check(action.method == "acceptCreate"_m || action.method == "reject"_m,
+               restrictedActions.data());
+         return;
+      }
 
-      auto inviteKey = psio::convert_from_frac<PublicKey>(claim.rawData);
-      auto inviteOpt = to<InviteSys>().getInvite(inviteKey);
-      check(inviteOpt.has_value(), inviteDNE.data());
-
-      check(action.service == InviteSys::service, restrictedService.data());
-
-      // Compile time check that acceptCreate and reject are still methods in InviteSys
-      using T1 = decltype(&UserService::Invite::InviteSys::acceptCreate);
-      using T2 = decltype(&UserService::Invite::InviteSys::reject);
-      check(action.method == "acceptCreate"_m || action.method == "reject"_m,
-            restrictedActions.data());
+      std::string err = "checkAuthSys: ";
+      err += missingInviteSig;
+      abortMessage(err);
 
       // Billing notes: The point of an invite is to allow those without a psibase account to create one
       //    in a way that doesn't suffer from the chicken/egg problem that you *already* need an account
@@ -60,10 +59,43 @@ namespace UserService
       //    prepaid by the user who creates the invite.
    }
 
-   void AuthInviteSys::checkUserSys(psibase::AccountNumber user)
+   void AuthInviteSys::canAuthUserSys(psibase::AccountNumber user)
    {
       check(user == InviteSys::payerAccount, notWhitelisted.data());
    }
+
+   std::optional<Claim> AuthInviteSys::getInviteClaim(const std::vector<Claim>& claims)
+   {
+      for (const auto& claim : claims)
+      {
+         if (claim.service == SystemService::VerifyEcSys::service)
+         {
+            auto inviteKey = psio::convert_from_frac<PublicKey>(claim.rawData);
+            auto inviteOpt = Invite::InviteSys::Tables{Invite::InviteSys::service}
+                                 .open<Invite::InviteTable>()
+                                 .get(inviteKey);
+
+            if (inviteOpt.has_value())
+            {
+               return std::optional<Claim>{claim};
+            }
+         }
+      }
+      return std::nullopt;
+   }
+
+   void AuthInviteSys::requireAuth(const PublicKey& pubkey)
+   {
+      auto claimOpt = getInviteClaim(to<SystemService::TransactionSys>().getTransaction().claims);
+
+      std::string err = "requireAuth: ";
+      err += missingInviteSig;
+
+      check(claimOpt.has_value(), err);
+      check(claimOpt->service == SystemService::VerifyEcSys::service, err);
+      check(psio::convert_from_frac<PublicKey>(claimOpt->rawData) == pubkey, err);
+   }
+
 }  // namespace UserService
 
 PSIBASE_DISPATCH(UserService::AuthInviteSys)

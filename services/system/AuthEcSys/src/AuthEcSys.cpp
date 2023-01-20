@@ -57,20 +57,11 @@ namespace SystemService
                    action.service.str() + "::" + action.method.str());
    }
 
-   void AuthEcSys::checkUserSys(psibase::AccountNumber user)
+   void AuthEcSys::canAuthUserSys(psibase::AccountNumber user)
    {
-      // Anyone may use AuthEcSys
-   }
-
-   void AuthEcSys::newAccount(psibase::AccountNumber account, psibase::PublicKey payload)
-   {
-      check(false, "Not supported yet");
-      //check(getSender() == InviteSys::service, "Only invite-sys can create a new account");
-      check(payload.data.index() == 0, "only k1 currently supported");
-      auto authTable = db.open<AuthTable>();
-      check(!authTable.getIndex<0>().get(account).has_value(), "account already exists");
-
-      authTable.put(AuthRecord{.account = account, .pubkey = payload});
+      // Anyone with a public key in the AuthTable may use AuthEcSys
+      auto row = db.open<AuthTable>().getIndex<0>().get(user);
+      check(row.has_value(), "sender does not have a public key");
    }
 
    void AuthEcSys::setKey(psibase::PublicKey key)

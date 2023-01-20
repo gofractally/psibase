@@ -1,7 +1,6 @@
 #pragma once
 
 #include <psibase/Table.hpp>
-//#include <psio/reflect.hpp>
 
 namespace UserService
 {
@@ -32,17 +31,34 @@ namespace UserService
       PSIO_REFLECT(UserEventRecord, user, eventHead);
       using UserEventTable = psibase::Table<UserEventRecord, &UserEventRecord::user>;
 
+      enum InviteStates
+      {
+         pending = 0,
+         accepted,
+         rejected
+      };
+
       struct InviteRecord
       {
          psibase::PublicKey     pubkey;
          psibase::AccountNumber inviter;
-         psibase::AccountNumber acceptedBy;
+         psibase::AccountNumber actor;
          uint32_t               expiry;
          bool                   newAccountToken = false;
+         uint8_t                state;
+
+         auto secondary() const { return std::tie(inviter, pubkey); }
       };
-      PSIO_REFLECT(InviteRecord, pubkey, inviter, acceptedBy, expiry, newAccountToken);
+      PSIO_REFLECT(InviteRecord,
+                   pubkey,
+                   inviter,
+                   actor,
+                   expiry,
+                   newAccountToken,
+                   state,
+                   method(secondary));
       using InviteTable =
-          psibase::Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::inviter>;
+          psibase::Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::secondary>;
 
    }  // namespace Invite
 }  // namespace UserService

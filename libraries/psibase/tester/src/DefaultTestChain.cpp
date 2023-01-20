@@ -51,8 +51,6 @@ DefaultTestChain::DefaultTestChain(
    from(UserService::SymbolSys::service).to<UserService::SymbolSys>().init();
    from(UserService::Invite::InviteSys::service).to<UserService::Invite::InviteSys>().init();
 
-   auto alice = from(add_account("alice"_a));
-
    for (const auto& c : additionalServices)
    {
       addService(c.first, c.second);
@@ -191,20 +189,17 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
 
 void DefaultTestChain::setBlockProducers(bool show /* = false*/)
 {
-   transactor<SystemService::ProducerSys> psys{SystemService::ProducerSys::service,
-                                               SystemService::ProducerSys::service};
-   std::vector<Producer>                  producerConfig = {{"firstproducer"_a, {}}};
+   transactor<ProducerSys> psys{ProducerSys::service, ProducerSys::service};
+   std::vector<Producer>   producerConfig = {{"firstproducer"_a, {}}};
    auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
    check(psibase::show(show, trace) == "", "Failed to set producers");
 }
 
 void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
 {
-   transactor<SystemService::AccountSys>     asys{SystemService::TransactionSys::service,
-                                              SystemService::AccountSys::service};
-   transactor<SystemService::TransactionSys> tsys{SystemService::TransactionSys::service,
-                                                  SystemService::TransactionSys::service};
-   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
+   transactor<AccountSys>     asys{TransactionSys::service, AccountSys::service};
+   transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
+   auto                       trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
@@ -214,8 +209,7 @@ AccountNumber DefaultTestChain::add_account(
     AccountNumber authService /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
 {
-   transactor<SystemService::AccountSys> asys(SystemService::TransactionSys::service,
-                                              SystemService::AccountSys::service);
+   transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
 
    auto trace = pushTransaction(  //
        makeTransaction({asys.newAccount(acc, authService, true)}));
@@ -237,15 +231,13 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                                                const PublicKey& public_key,
                                                bool             show /* = false */)
 {
-   transactor<SystemService::AccountSys> asys(SystemService::AccountSys::service,
-                                              SystemService::AccountSys::service);
-   transactor<SystemService::AuthEcSys>  ecsys(SystemService::AuthEcSys::service,
-                                               SystemService::AuthEcSys::service);
+   transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
+   transactor<AuthEcSys>  ecsys(AuthEcSys::service, AuthEcSys::service);
 
    auto trace = pushTransaction(makeTransaction({
-       asys.newAccount(name, SystemService::AuthAnySys::service, true),
+       asys.newAccount(name, AuthAnySys::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthCntr(SystemService::AuthEcSys::service),
+       asys.from(name).setAuthCntr(AuthEcSys::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -259,13 +251,22 @@ AccountNumber DefaultTestChain::add_ec_account(const char*      name,
    return add_ec_account(AccountNumber(name), public_key, show);
 }
 
+void DefaultTestChain::setAuthEc(AccountNumber name, const PublicKey& pubkey, bool show /* = false */)
+{
+   auto n  = name.str();
+   auto t1 = from(name).to<AuthEcSys>().setKey(pubkey);
+   check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
+   auto t2 = from(name).to<AccountSys>().setAuthCntr(AuthEcSys::service);
+   check(psibase::show(show, t2.trace()) == "", "Failed to setAuthCntr for " + n);
+}
+
 AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            const char*   filename,
                                            bool          show /* = false */)
 {
-   add_account(acc, SystemService::AuthAnySys::service, show);
+   add_account(acc, AuthAnySys::service, show);
 
-   transactor<SystemService::SetCodeSys> scsys{acc, SystemService::SetCodeSys::service};
+   transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
 
    auto trace =
        pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
@@ -287,7 +288,7 @@ void DefaultTestChain::registerSysRpc()
    auto r = ProxySys::service;
 
    // Register servers
-   std::vector<psibase::Action> a{
+   std::vector<Action> a{
        transactor<ProxySys>{CommonSys::service, r}.registerServer(CommonSys::service),
        transactor<ProxySys>{AccountSys::service, r}.registerServer(RAccountSys::service),
        transactor<ProxySys>{ExploreSys::service, r}.registerServer(ExploreSys::service),
@@ -320,7 +321,7 @@ void DefaultTestChain::registerSysRpc()
    const std::string ttf  = "font/ttf";
    const std::string svg  = "image/svg+xml";
 
-   std::vector<psibase::Action> b{
+   std::vector<Action> b{
        // CommonSys Fancy UI
        rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/dist/index.html")),
        rpcCommon.storeSys("/index.js", js, readWholeFile(comDir + "/ui/dist/index.js")),

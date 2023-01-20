@@ -136,11 +136,11 @@ namespace SystemService
       ///
       /// * `user`:  The user being checked
       // TODO: Return error message instead?
-      void checkUserSys(psibase::AccountNumber user);
+      void canAuthUserSys(psibase::AccountNumber user);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, action, allowedActions, claims),
-                method(checkUserSys, user))
+                method(canAuthUserSys, user))
 
    struct TransactionSysStatus
    {

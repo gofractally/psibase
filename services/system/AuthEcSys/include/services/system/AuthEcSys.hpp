@@ -28,9 +28,8 @@ namespace SystemService
                         psibase::Action             action,
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
-      void checkUserSys(psibase::AccountNumber user);
 
-      void newAccount(psibase::AccountNumber account, psibase::PublicKey payload);
+      void canAuthUserSys(psibase::AccountNumber user);
       void setKey(psibase::PublicKey key);
 
      private:
@@ -38,9 +37,8 @@ namespace SystemService
    };
    PSIO_REFLECT(AuthEcSys,  //
                 method(checkAuthSys, flags, requester, action, allowedActions, claims),
-                method(checkUserSys, user),
-                method(setKey, key),
-                method(newAccount, account, payload)
+                method(canAuthUserSys, user),
+                method(setKey, key)
                 //
    )
 }  // namespace SystemService

@@ -4,6 +4,7 @@
 #include <psibase/String.hpp>
 #include <psibase/psibase.hpp>
 
+#include <services/system/AccountSys.hpp>
 #include <services/system/CommonTables.hpp>
 #include <services/user/InviteErrors.hpp>
 #include <services/user/InviteTables.hpp>
@@ -20,20 +21,20 @@ namespace UserService
                                                UserEventTable,
                                                ServiceEventTable,
                                                InitTable>;
-         static constexpr auto service      = psibase::AccountNumber("invite-sys");
+         static constexpr auto service      = SystemService::AccountSys::inviteService;
          static constexpr auto payerAccount = psibase::AccountNumber("invited-sys");
 
          InviteSys(psio::shared_view_ptr<psibase::Action> action);
 
          void init();
 
-         void createInvite(psibase::PublicKey inviteKey, psibase::AccountNumber inviter);
-
-         void acceptCreate(psibase::PublicKey     inviteKey,
-                           psibase::AccountNumber newAccountName,
-                           psibase::PublicKey     newAccountKey);
+         void createInvite(psibase::PublicKey inviteKey);
 
          void accept(psibase::PublicKey inviteKey);
+
+         void acceptCreate(psibase::PublicKey     inviteKey,
+                           psibase::AccountNumber acceptedBy,
+                           psibase::PublicKey     newAccountKey);
 
          void reject(psibase::PublicKey inviteKey);
 
@@ -66,7 +67,8 @@ namespace UserService
                                uint32_t               numCheckedRows,
                                uint32_t               numDeleted);
             void inviteAccepted(uint64_t              prevEvent,
-                               psibase::PublicKey     inviteKey);
+                               psibase::PublicKey     inviteKey,
+                               psibase::AccountNumber accepter);
             void inviteRejected(uint64_t              prevEvent,
                                psibase::PublicKey     inviteKey);
             void whitelistSet(uint64_t                prevEvent,
@@ -80,25 +82,14 @@ namespace UserService
          // clang-format on
          using UserEvents    = psibase::EventIndex<&UserEventRecord::eventHead, "prevEvent">;
          using ServiceEvents = psibase::EventIndex<&ServiceEventRecord::eventHead, "prevEvent">;
-
-        private:
-         enum AccepterType
-         {
-            newAccount,
-            existingAccount
-         };
-
-         void acceptInvite(psibase::PublicKey     inviteKey,
-                           psibase::AccountNumber acceptedBy,
-                           AccepterType           accepterType);
       };
 
       // clang-format off
       PSIO_REFLECT(InviteSys,
          method(init),
          method(createInvite, inviteKey, inviter),
-         method(acceptCreate, inviteKey, newAccountName, newAccountKey),
          method(accept, inviteKey),
+         method(acceptCreate, inviteKey, acceptedBy, newAccountKey),
          method(reject, inviteKey),
          method(delInvite, inviteKey),
          method(delExpired, maxDeleted),
@@ -112,7 +103,7 @@ namespace UserService
          method(inviteCreated, prevEvent, inviteKey, inviter),
          method(inviteDeleted, prevEvent, inviteKey),
          method(expInvDeleted, prevEvent, numCheckedRows, numDeleted),
-         method(inviteAccepted, prevEvent, inviteKey),
+         method(inviteAccepted, prevEvent, inviteKey, accepter),
          method(inviteRejected, prevEvent, inviteKey),
          method(whitelistSet, prevEvent, accounts),
          method(blacklistSet, prevEvent, accounts)
