@@ -718,6 +718,39 @@ namespace psio
       }
    };  // is_packable<std::optional<T>>
 
+   inline bool verify_extensions(const char* src,
+                                 bool        known_pos,
+                                 uint32_t    fixed_pos,
+                                 uint32_t    end_fixed_pos,
+                                 uint32_t&   heap_pos,
+                                 uint32_t    end_heap_pos)
+   {
+      if ((end_fixed_pos - fixed_pos) % 4 != 0)
+         return false;
+      while (fixed_pos < end_fixed_pos)
+      {
+         uint32_t offset;
+         bool     has_unknown = false;
+         auto     base        = fixed_pos;
+         if (!unpack_numeric<true, false>(&offset, has_unknown, src, fixed_pos, end_fixed_pos))
+            return false;
+         if (offset >= 2)
+         {
+            if (offset < 4)
+               return false;
+            if (known_pos && offset + base != heap_pos)
+               return false;
+            if (offset > end_heap_pos - base)
+               return false;
+            if (offset < heap_pos - base)
+               return false;
+            heap_pos  = base + offset;
+            known_pos = false;
+         }
+      }
+      return true;
+   }
+
    template <Packable... Ts>
    struct is_packable<std::tuple<Ts...>>
        : base_packable_impl<std::tuple<Ts...>, is_packable<std::tuple<Ts...>>>
@@ -841,6 +874,8 @@ namespace psio
          {
             if (fixed_pos < end_fixed_pos)
             {
+               if (!verify_extensions(src, known_end, fixed_pos, end_fixed_pos, heap_pos, end_pos))
+                  return false;
                has_unknown = true;
                known_end   = false;
             }
@@ -1132,6 +1167,9 @@ namespace psio
             {
                if (fixed_pos < end_fixed_pos)
                {
+                  if (!verify_extensions(src, known_end, fixed_pos, end_fixed_pos, heap_pos,
+                                         end_pos))
+                     return false;
                   has_unknown = true;
                   known_end   = false;
                }

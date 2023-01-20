@@ -535,6 +535,8 @@ void test_compat(const T& t, const U& u, bool expect_unknown)
    std::vector<char>   data;
    psio::vector_stream out{data};
    psio::is_packable<T>::pack(t, out);
+   INFO("data: " << psio::hex(data.begin(), data.end()));
+   INFO("type: " << typeid(U).name());
    {
       U             result{};
       std::uint32_t pos         = 0;
@@ -633,6 +635,20 @@ struct struct_<T0, T1>
    }
 };
 
+template <typename T0, typename T1, typename T2>
+struct struct_<T0, T1, T2>
+{
+   T0 v0;
+   T1 v1;
+   T2 v2;
+   PSIO_REFLECT(struct_, v0, v1, v2)
+   friend bool operator==(const struct_& lhs, const struct_& rhs)
+   {
+      return bitwise_equal(lhs.v0, rhs.v0) && bitwise_equal(lhs.v1, rhs.v1) &&
+             bitwise_equal(lhs.v2, rhs.v2);
+   }
+};
+
 TEST_CASE("compatibility")
 {
    using namespace std::literals;
@@ -642,6 +658,8 @@ TEST_CASE("compatibility")
                     std::tuple<std::int32_t, std::optional<std::int32_t>>(42, std::nullopt), false);
    test_compat_wrap(std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),
                     std::tuple<std::int32_t>(42), true);
+   test_compat_wrap(std::tuple(), std::tuple<std::optional<std::uint8_t>>(std::nullopt), false);
+   test_compat_wrap(std::tuple<std::optional<std::uint8_t>>(42), std::tuple(), true);
    test_compat_wrap(struct_<std::int32_t>(42),
                     struct_<std::int32_t, std::optional<std::int32_t>>(42, std::nullopt), false);
    test_compat_wrap(struct_<std::int32_t, std::optional<std::int32_t>>(42, 43),
@@ -685,7 +703,9 @@ TEST_CASE("invalid")
 {
    // bool is 0 or 1
    test_invalid<bool>({"02", "03", "FF"});
+   // optional must be 1 or an offset pointer
    test_invalid<std::optional<std::uint8_t>>({"00000000", "02000000", "03000000", "05000000FFFF"});
+   // vector byte size must be a multiple of the element size
    test_invalid<std::vector<std::uint16_t>>("03000000FFFFFFFFFFFF");
    // negative offset
    test_invalid<std::tuple<std::uint32_t, std::optional<std::uint8_t>>>("0800CCCCCCCCFFFFFFFF");
@@ -698,4 +718,16 @@ TEST_CASE("invalid")
        "0F000000"
        "0800CCCCCCCC04000000FF"
        "0800DDDDDDDD05000000EEEE");
+   test_invalid<
+       struct_<struct_<std::uint32_t>, struct_<std::uint32_t, std::optional<std::uint8_t>>>>(
+       "0800"
+       "08000000"
+       "0F000000"
+       "0800CCCCCCCC04000000FF"
+       "0800DDDDDDDD05000000EEEE");
+   // Malformed extensions
+   test_invalid<std::tuple<>>({"0100FF", "040002000000", "040005000000FFFF", "08000800000005000000",
+                               "08000100000005000000FF", "0C000C0000000900000004000000FF"});
+   test_invalid<struct_<>>({"0100FF", "040002000000", "040005000000FFFF", "08000800000005000000",
+                            "08000100000005000000FF", "0C000C0000000900000004000000FF"});
 }
