@@ -20,6 +20,7 @@ using namespace SystemService;
 using psio::const_view;
 using std::begin;
 using std::end;
+using std::find;
 using std::move;
 using std::optional;
 using std::string;
@@ -62,8 +63,24 @@ void InviteSys::createInvite(PublicKey inviteKey)
    auto inviteTable = Tables().open<InviteTable>();
    check(not inviteTable.get(inviteKey).has_value(), inviteAlreadyExists.data());
 
+   auto inviter       = getSender();
+   auto settingsTable = Tables().open<InviteSettingsTable>();
+   auto settings      = settingsTable.get(SingletonKey{}).value_or(InviteSettingsRecord{});
+
+   if (settings.whitelist.size() > 0)
+   {
+      bool whitelisted = find(settings.whitelist.begin(), settings.whitelist.end(), inviter) !=
+                         settings.whitelist.end();
+      check(whitelisted, onlyWhitelisted.data());
+   }
+   else if (settings.blacklist.size() > 0)
+   {
+      bool blacklisted = find(settings.blacklist.begin(), settings.blacklist.end(), inviter) !=
+                         settings.blacklist.end();
+      check(not blacklisted, noBlacklisted.data());
+   }
+
    // Add invite
-   auto         inviter = getSender();
    uint32_t     secondsInWeek{60 * 60 * 24 * 7};
    InviteRecord newInvite{
        .pubkey          = inviteKey,
@@ -265,14 +282,36 @@ void InviteSys::setWhitelist(vector<AccountNumber> accounts)
 {
    check(getSender() == getReceiver(), missingRequiredAuth.data());
 
+   // Check that no blacklisted accounts are being whitelisted
    auto settingsTable = Tables().open<InviteSettingsTable>();
    auto settings      = settingsTable.get(SingletonKey{}).value_or(InviteSettingsRecord{});
-
-   // Check that no blacklisted accounts are being whitelisted
    for (const auto& acc : settings.blacklist)
    {
-      check(find(begin(accounts), end(accounts), acc) == end(accounts),
-            "cannot add blacklisted account to whitelist");
+      bool blacklisted = find(begin(accounts), end(accounts), acc) != end(accounts);
+      if (blacklisted)
+      {
+         string err = "Account " + acc.str() + " already on blacklist";
+         abortMessage(err);
+      }
+   }
+
+   // Detect invalid accounts
+   std::map<AccountNumber, uint32_t> counts;
+   auto                              accountSys = to<AccountSys>();
+   for (const auto& acc : accounts)
+   {
+      if (!accountSys.exists(acc))
+      {
+         std::string err = "Account " + acc.str() + " does not exist";
+         abortMessage(err);
+      }
+      if (counts[acc] == 0)
+         counts[acc]++;
+      else
+      {
+         std::string err = "Account " + acc.str() + " duplicated";
+         abortMessage(err);
+      }
    }
 
    settings.whitelist = accounts;
@@ -294,14 +333,28 @@ void InviteSys::setBlacklist(vector<AccountNumber> accounts)
 {
    check(getSender() == getReceiver(), missingRequiredAuth.data());
 
+   // Check that no whitelisted accounts are being blacklisted
    auto settingsTable = Tables().open<InviteSettingsTable>();
    auto settings      = settingsTable.get(SingletonKey{}).value_or(InviteSettingsRecord{});
+   check(settings.whitelist.empty(), whitelistIsSet.data());
 
-   // Check that no whitelisted accounts are being blacklisted
-   for (const auto& acc : settings.whitelist)
+   // Detect invalid accounts
+   std::map<AccountNumber, uint32_t> counts;
+   auto                              accountSys = to<AccountSys>();
+   for (const auto& acc : accounts)
    {
-      check(find(begin(accounts), end(accounts), acc) == end(accounts),
-            "cannot add whitelisted account to blacklist");
+      if (!accountSys.exists(acc))
+      {
+         std::string err = "Account " + acc.str() + " does not exist";
+         abortMessage(err);
+      }
+      if (counts[acc] == 0)
+         counts[acc]++;
+      else
+      {
+         std::string err = "Account " + acc.str() + " duplicated";
+         abortMessage(err);
+      }
    }
 
    settings.blacklist = accounts;

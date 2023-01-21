@@ -19,6 +19,9 @@ namespace UserService
       constexpr std::string_view alreadyAccepted = "This invite was already accepted";
       constexpr std::string_view alreadyRejected = "This invite was already rejected";
       constexpr std::string_view mustUseInvitedSys = "You must send this action as: invited-sys";
+      constexpr std::string_view onlyWhitelisted = "Only whitelisted accounts can create invites";
+      constexpr std::string_view noBlacklisted = "Blacklisted accounts cannot create invites";
+      constexpr std::string_view whitelistIsSet = "Cannot modify blacklist while whitelist is set";
 
       // AuthInviteSys
       constexpr std::string_view restrictedService =

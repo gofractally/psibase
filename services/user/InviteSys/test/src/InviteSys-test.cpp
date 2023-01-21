@@ -285,20 +285,186 @@ SCENARIO("Expired invites")
    }
 }
 
-// - Setting a whitelist - TODO
+// - Setting a whitelist
 //    - A whitelist can be set by invite-sys
 //    - All whitelisted accounts must exist
 //    - All whitelisted accounts must be unique
 //    - No whitelisted accounts may already be on the blacklist
 //    - Then only whitelisted accounts can create invites
 //    - Setting the whitelist to an empty array should delete the whitelist from the db
+SCENARIO("Setting a whitelist", "[whiteblack]")
+{
+   GIVEN("Chain with initialized invite system")
+   {
+      DefaultTestChain t;
 
-// - Setting a blacklist - TODO
+      auto alice = t.from(t.add_account("alice"_a));
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto a     = alice.to<InviteSys>();
+      auto b     = bob.to<InviteSys>();
+
+      auto inviteSys = t.from(InviteSys::service).to<InviteSys>();
+
+      using ListType = std::vector<psibase::AccountNumber>;
+
+      THEN("A whitelist can only be set on the Invite service by Invite-sys")
+      {
+         auto setWhitelist = a.setWhitelist(ListType{"alice"_a});
+         CHECK(setWhitelist.failed(missingRequiredAuth));
+
+         auto setWhitelist2 = inviteSys.setWhitelist(ListType{"alice"_a});
+         CHECK(setWhitelist2.succeeded());
+      }
+      THEN("A nonexistent account cannot be added to the whitelist")
+      {
+         auto setWhitelist = inviteSys.setWhitelist(ListType{"asdfg"_a});
+         CHECK(setWhitelist.failed("Account asdfg does not exist"));
+      }
+      THEN("Duplicate accounts cannot be added to the whitelist")
+      {
+         auto setWhitelist = inviteSys.setWhitelist(ListType{"alice"_a, "alice"_a});
+         CHECK(setWhitelist.failed("Account alice duplicated"));
+      }
+      THEN("A blacklist can be set on the invite service")
+      {
+         auto setBlacklist = inviteSys.setBlacklist(ListType{"alice"_a});
+         CHECK(setBlacklist.succeeded());
+      }
+      WHEN("A blacklisted account is set")
+      {
+         inviteSys.setBlacklist(ListType{"alice"_a});
+
+         THEN("The blacklisted account cannot then be added to the whitelist")
+         {
+            auto setWhitelist = inviteSys.setWhitelist(ListType{"alice"_a});
+            CHECK(setWhitelist.failed("Account alice already on blacklist"));
+         }
+         THEN("The blacklist can be cleared")
+         {
+            auto setBlacklist = inviteSys.setBlacklist(ListType{});
+            CHECK(setBlacklist.succeeded());
+
+            AND_THEN("The formerly blacklisted account can be added to the whitelist")
+            {
+               auto setWhitelist = inviteSys.setWhitelist(ListType{"alice"_a});
+               CHECK(setWhitelist.succeeded());
+            }
+         }
+      }
+      WHEN("A whitelist is set")
+      {
+         inviteSys.setWhitelist(ListType{"alice"_a});
+
+         THEN("A non-whitelisted account cannot create an invite")
+         {
+            auto createInvite = b.createInvite(invPub);
+            CHECK(createInvite.failed(onlyWhitelisted));
+         }
+         THEN("A whitelisted account can create an invite")
+         {
+            auto createInvite = a.createInvite(invPub);
+            CHECK(createInvite.succeeded());
+         }
+         THEN("The whitelist can be cleared")
+         {
+            auto setWhitelist = inviteSys.setWhitelist(ListType{});
+            AND_THEN("A formerly non-whitelisted account can create an invite")
+            {
+               auto createInvite = b.createInvite(invPub);
+               CHECK(createInvite.succeeded());
+            }
+         }
+      }
+   }
+}
+
+// - Setting a blacklist
 //    - A blacklist can be set by invite-sys, only if there is no whitelist
 //    - All blacklisted accounts must exist
 //    - All blacklisted accounts must be unique
 //    - Blacklisted accounts cannot create invites
 //    - Setting the blacklist to an empty array should delete the whitelist from the db
+SCENARIO("Setting a blacklist", "[whiteblack]")
+{
+   GIVEN("Chain with initialized invite system")
+   {
+      DefaultTestChain t;
+
+      auto alice = t.from(t.add_account("alice"_a));
+      auto bob   = t.from(t.add_account("bob"_a));
+      auto a     = alice.to<InviteSys>();
+      auto b     = bob.to<InviteSys>();
+
+      auto inviteSys = t.from(InviteSys::service).to<InviteSys>();
+
+      using ListType = std::vector<psibase::AccountNumber>;
+
+      THEN("A whitelist can be set")
+      {
+         auto setWhitelist = inviteSys.setWhitelist(ListType{"alice"_a});
+         CHECK(setWhitelist.succeeded());
+      }
+      WHEN("A whitelist is set")
+      {
+         inviteSys.setWhitelist(ListType{"alice"_a});
+
+         THEN("A blacklist cannot be set or cleared")
+         {
+            auto setBlacklist = inviteSys.setBlacklist(ListType{"bob"_a});
+            CHECK(setBlacklist.failed(whitelistIsSet));
+            auto clearBlacklist = inviteSys.setBlacklist(ListType{});
+            CHECK(clearBlacklist.failed(whitelistIsSet));
+         }
+         THEN("The whitelist can be cleared")
+         {
+            auto clearWhitelist = inviteSys.setWhitelist(ListType{});
+            CHECK(clearWhitelist.succeeded());
+
+            AND_THEN("A blacklist can be set")
+            {
+               auto setBlacklist = inviteSys.setBlacklist(ListType{"bob"_a});
+               CHECK(setBlacklist.succeeded());
+            }
+         }
+      }
+      THEN("A nonexistent account cannot be added to the blacklist")
+      {
+         auto setBlacklist = inviteSys.setBlacklist(ListType{"asdfg"_a});
+         CHECK(setBlacklist.failed("Account asdfg does not exist"));
+      }
+      THEN("A duplicate account cannot be added to the blacklist")
+      {
+         auto setBlacklist = inviteSys.setBlacklist(ListType{"bob"_a, "bob"_a});
+         CHECK(setBlacklist.failed("Account bob duplicated"));
+      }
+      WHEN("An account is blacklisted")
+      {
+         inviteSys.setBlacklist(ListType{"bob"_a});
+
+         THEN("A nonblacklisted account can create an invite")
+         {
+            auto createInvite = a.createInvite(invPub);
+            CHECK(createInvite.succeeded());
+         }
+         THEN("A blacklisted account cannot create an invite")
+         {
+            auto createInvite = b.createInvite(invPub);
+            CHECK(createInvite.failed(noBlacklisted));
+         }
+         THEN("A blacklist can be cleared")
+         {
+            auto clearBlacklist = inviteSys.setBlacklist(ListType{});
+            CHECK(clearBlacklist.succeeded());
+
+            AND_THEN("A formerly blacklisted account can create an invite")
+            {
+               auto createInvite = b.createInvite(invPub);
+               CHECK(createInvite.succeeded());
+            }
+         }
+      }
+   }
+}
 
 // - Accepting invites
 //    - An invite can be accepted by a normal user
