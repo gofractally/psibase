@@ -56,12 +56,8 @@ namespace psio
        std::is_same_v<T, float> ||      //
        std::is_same_v<T, double>;
 
-   template <bool Unpack, bool Verify, PackableNumeric T>
-   [[nodiscard]] bool unpack_numeric(T*          value,
-                                     bool&       has_unknown,
-                                     const char* src,
-                                     uint32_t&   pos,
-                                     uint32_t    end_pos);
+   template <bool Verify, PackableNumeric T>
+   [[nodiscard]] bool unpack_numeric(T* value, const char* src, uint32_t& pos, uint32_t end_pos);
 
    template <typename T>
    struct is_packable_memcpy : std::bool_constant<false>
@@ -171,7 +167,7 @@ namespace psio
       {
          uint32_t orig_pos = fixed_pos;
          uint32_t offset;
-         if (!unpack_numeric<true, Verify>(&offset, has_unknown, src, fixed_pos, end_fixed_pos))
+         if (!unpack_numeric<Verify>(&offset, src, fixed_pos, end_fixed_pos))
             return false;
          if constexpr (Derived::supports_0_offset)
          {
@@ -255,16 +251,12 @@ namespace psio
       }
    };  // is_packable<PackableMemcpy>
 
-   template <bool Unpack, bool Verify, PackableNumeric T>
-   [[nodiscard]] bool unpack_numeric(T*          value,
-                                     bool&       has_unknown,
-                                     const char* src,
-                                     uint32_t&   pos,
-                                     uint32_t    end_pos)
+   template <bool Verify, PackableNumeric T>
+   [[nodiscard]] bool unpack_numeric(T* value, const char* src, uint32_t& pos, uint32_t end_pos)
    {
-      bool known_end;
-      return is_packable<T>::template unpack<Unpack, Verify>(value, has_unknown, known_end, src,
-                                                             pos, end_pos);
+      bool has_unknown, known_end;
+      return is_packable<T>::template unpack<true, Verify>(value, has_unknown, known_end, src, pos,
+                                                           end_pos);
    }
 
    template <>
@@ -432,7 +424,7 @@ namespace psio
                                        uint32_t    end_pos)
       {
          uint32_t fixed_size;
-         if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
+         if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
             return false;
          uint32_t size    = fixed_size / sizeof(typename T::value_type);
          uint32_t new_pos = pos + fixed_size;
@@ -517,7 +509,7 @@ namespace psio
                                        uint32_t        end_pos)
       {
          uint32_t fixed_size;
-         if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
+         if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
             return false;
          uint32_t size          = fixed_size / is_packable<T>::fixed_size;
          uint32_t fixed_pos     = pos;
@@ -629,8 +621,7 @@ namespace psio
       static bool has_value(const char* src, uint32_t pos, uint32_t end_pos)
       {
          uint32_t offset;
-         bool     has_unknown = false;
-         if (!unpack_numeric<true, Verify>(&offset, has_unknown, src, pos, end_pos))
+         if (!unpack_numeric<Verify>(&offset, src, pos, end_pos))
             return false;
          return offset != 1;
       }
@@ -711,7 +702,7 @@ namespace psio
       {
          uint32_t orig_pos = fixed_pos;
          uint32_t offset;
-         if (!unpack_numeric<true, Verify>(&offset, has_unknown, src, fixed_pos, end_fixed_pos))
+         if (!unpack_numeric<Verify>(&offset, src, fixed_pos, end_fixed_pos))
             return false;
          if (offset == 1)
          {
@@ -745,9 +736,8 @@ namespace psio
       while (fixed_pos < end_fixed_pos)
       {
          uint32_t offset;
-         bool     has_unknown = false;
-         auto     base        = fixed_pos;
-         if (!unpack_numeric<true, false>(&offset, has_unknown, src, fixed_pos, end_fixed_pos))
+         auto     base = fixed_pos;
+         if (!unpack_numeric<false>(&offset, src, fixed_pos, end_fixed_pos))
             return false;
          last_has_value = offset != 1;
          if (offset >= 2)
@@ -846,7 +836,7 @@ namespace psio
                                        uint32_t           end_pos)
       {
          uint16_t fixed_size;
-         if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
+         if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
             return false;
          uint32_t fixed_pos     = pos;
          uint32_t heap_pos      = pos + fixed_size;
@@ -1003,13 +993,13 @@ namespace psio
                                        uint32_t             end_pos)
       {
          uint8_t tag;
-         if (!unpack_numeric<true, Verify>(&tag, has_unknown, src, pos, end_pos))
+         if (!unpack_numeric<Verify>(&tag, src, pos, end_pos))
             return false;
          if constexpr (Verify)
             if (tag & 0x80)
                return false;
          uint32_t size;
-         if (!unpack_numeric<true, Verify>(&size, has_unknown, src, pos, end_pos))
+         if (!unpack_numeric<Verify>(&size, src, pos, end_pos))
             return false;
          uint32_t content_pos = pos;
          uint32_t content_end = pos + size;
@@ -1169,7 +1159,7 @@ namespace psio
             uint16_t fixed_size;
             if constexpr (reflect<T>::definitionWillNotChange)
                fixed_size = members_fixed_size;
-            else if (!unpack_numeric<true, Verify>(&fixed_size, has_unknown, src, pos, end_pos))
+            else if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
                return false;
             uint32_t fixed_pos     = pos;
             uint32_t heap_pos      = pos + fixed_size;
