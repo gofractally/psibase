@@ -14,8 +14,14 @@
 #include <services/system/SetCodeSys.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
+#include <services/user/AuthInviteSys.hpp>
 #include <services/user/ExploreSys.hpp>
+#include <services/user/InviteSys.hpp>
+#include <services/user/NftSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
+#include <services/user/RTokenSys.hpp>
+#include <services/user/SymbolSys.hpp>
+#include <services/user/TokenSys.hpp>
 #include <utility>
 #include <vector>
 
@@ -39,6 +45,11 @@ DefaultTestChain::DefaultTestChain(
    createSysServiceAccounts();
    setBlockProducers();
    registerSysRpc();
+
+   from(UserService::NftSys::service).to<UserService::NftSys>().init();
+   from(UserService::TokenSys::service).to<UserService::TokenSys>().init();
+   from(UserService::SymbolSys::service).to<UserService::SymbolSys>().init();
+   from(UserService::Invite::InviteSys::service).to<UserService::Invite::InviteSys>().init();
 
    for (const auto& c : additionalServices)
    {
@@ -64,24 +75,23 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                     .services =
                                         {
                                             {
-                                                .service = SystemService::TransactionSys::service,
-                                                .flags =
-                                                    SystemService::TransactionSys::serviceFlags,
-                                                .code = readWholeFile("TransactionSys.wasm"),
+                                                .service = TransactionSys::service,
+                                                .flags   = TransactionSys::serviceFlags,
+                                                .code    = readWholeFile("TransactionSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::SetCodeSys::service,
-                                                .flags   = SystemService::SetCodeSys::serviceFlags,
+                                                .service = SetCodeSys::service,
+                                                .flags   = SetCodeSys::serviceFlags,
                                                 .code    = readWholeFile("SetCodeSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::AccountSys::service,
+                                                .service = AccountSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("AccountSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::ProducerSys::service,
-                                                .flags   = SystemService::ProducerSys::serviceFlags,
+                                                .service = ProducerSys::service,
+                                                .flags   = ProducerSys::serviceFlags,
                                                 .code    = readWholeFile("ProducerSys.wasm"),
                                             },
                                             {
@@ -90,17 +100,17 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .code    = readWholeFile("ProxySys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::AuthAnySys::service,
+                                                .service = AuthAnySys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("AuthAnySys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::AuthEcSys::service,
+                                                .service = AuthEcSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("AuthEcSys.wasm"),
                                             },
                                             {
-                                                .service = SystemService::VerifyEcSys::service,
+                                                .service = VerifyEcSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("VerifyEcSys.wasm"),
                                             },
@@ -139,6 +149,36 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .flags   = 0,
                                                 .code    = readWholeFile("PsiSpaceSys.wasm"),
                                             },
+                                            {
+                                                .service = UserService::TokenSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("TokenSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::RTokenSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("RTokenSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::NftSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("NftSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::SymbolSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("SymbolSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::Invite::InviteSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("InviteSys.wasm"),
+                                            },
+                                            {
+                                                .service = UserService::AuthInviteSys::service,
+                                                .flags   = 0,
+                                                .code    = readWholeFile("AuthInviteSys.wasm"),
+                                            },
                                         },
                                 }),
                     }}),
@@ -149,20 +189,17 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
 
 void DefaultTestChain::setBlockProducers(bool show /* = false*/)
 {
-   transactor<SystemService::ProducerSys> psys{SystemService::ProducerSys::service,
-                                               SystemService::ProducerSys::service};
-   std::vector<Producer>                  producerConfig = {{"testchain"_a, {}}};
+   transactor<ProducerSys> psys{ProducerSys::service, ProducerSys::service};
+   std::vector<Producer>   producerConfig = {{"firstproducer"_a, {}}};
    auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
    check(psibase::show(show, trace) == "", "Failed to set producers");
 }
 
 void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
 {
-   transactor<SystemService::AccountSys>     asys{SystemService::TransactionSys::service,
-                                              SystemService::AccountSys::service};
-   transactor<SystemService::TransactionSys> tsys{SystemService::TransactionSys::service,
-                                                  SystemService::TransactionSys::service};
-   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
+   transactor<AccountSys>     asys{TransactionSys::service, AccountSys::service};
+   transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
+   auto                       trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
@@ -172,8 +209,7 @@ AccountNumber DefaultTestChain::add_account(
     AccountNumber authService /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
 {
-   transactor<SystemService::AccountSys> asys(SystemService::TransactionSys::service,
-                                              SystemService::AccountSys::service);
+   transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
 
    auto trace = pushTransaction(  //
        makeTransaction({asys.newAccount(acc, authService, true)}));
@@ -195,15 +231,13 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
                                                const PublicKey& public_key,
                                                bool             show /* = false */)
 {
-   transactor<SystemService::AccountSys> asys(SystemService::AccountSys::service,
-                                              SystemService::AccountSys::service);
-   transactor<SystemService::AuthEcSys>  ecsys(SystemService::AuthEcSys::service,
-                                               SystemService::AuthEcSys::service);
+   transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
+   transactor<AuthEcSys>  ecsys(AuthEcSys::service, AuthEcSys::service);
 
    auto trace = pushTransaction(makeTransaction({
-       asys.newAccount(name, SystemService::AuthAnySys::service, true),
+       asys.newAccount(name, AuthAnySys::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthCntr(SystemService::AuthEcSys::service),
+       asys.from(name).setAuthCntr(AuthEcSys::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -217,13 +251,22 @@ AccountNumber DefaultTestChain::add_ec_account(const char*      name,
    return add_ec_account(AccountNumber(name), public_key, show);
 }
 
+void DefaultTestChain::setAuthEc(AccountNumber name, const PublicKey& pubkey, bool show /* = false */)
+{
+   auto n  = name.str();
+   auto t1 = from(name).to<AuthEcSys>().setKey(pubkey);
+   check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
+   auto t2 = from(name).to<AccountSys>().setAuthCntr(AuthEcSys::service);
+   check(psibase::show(show, t2.trace()) == "", "Failed to setAuthCntr for " + n);
+}
+
 AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            const char*   filename,
                                            bool          show /* = false */)
 {
-   add_account(acc, SystemService::AuthAnySys::service, show);
+   add_account(acc, AuthAnySys::service, show);
 
-   transactor<SystemService::SetCodeSys> scsys{acc, SystemService::SetCodeSys::service};
+   transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
 
    auto trace =
        pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
@@ -245,7 +288,7 @@ void DefaultTestChain::registerSysRpc()
    auto r = ProxySys::service;
 
    // Register servers
-   std::vector<psibase::Action> a{
+   std::vector<Action> a{
        transactor<ProxySys>{CommonSys::service, r}.registerServer(CommonSys::service),
        transactor<ProxySys>{AccountSys::service, r}.registerServer(RAccountSys::service),
        transactor<ProxySys>{ExploreSys::service, r}.registerServer(ExploreSys::service),
@@ -278,7 +321,7 @@ void DefaultTestChain::registerSysRpc()
    const std::string ttf  = "font/ttf";
    const std::string svg  = "image/svg+xml";
 
-   std::vector<psibase::Action> b{
+   std::vector<Action> b{
        // CommonSys Fancy UI
        rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/dist/index.html")),
        rpcCommon.storeSys("/index.js", js, readWholeFile(comDir + "/ui/dist/index.js")),

@@ -261,7 +261,7 @@ namespace SystemService
                abortMessage("unknown sender \"" + act.sender.str() + "\"");
 
             if constexpr (enable_print)
-               print("call checkAuthSys on ", account->authService.str(), " for account ",
+               print("call checkAuthSys on ", account->authService.str(), " for sender account ",
                      act.sender.str(), "\n");
             Actor<AuthInterface> auth(TransactionSys::service, account->authService);
             uint32_t             flags = AuthInterface::topActionReq;

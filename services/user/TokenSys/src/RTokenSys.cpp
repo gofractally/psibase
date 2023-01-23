@@ -57,7 +57,7 @@ struct TokenQuery
       return tokenSys.index<TokenTable, 0>();
    }
 
-   auto userConf(AccountNumber user, psibase::NamedBit flag) const
+   auto userConf(AccountNumber user, psibase::EnumElement flag) const
    {
       return to<TokenSys>().getUserConf(user, flag);
    }

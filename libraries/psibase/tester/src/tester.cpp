@@ -215,6 +215,11 @@ std::string psibase::TestChain::getPath()
    return result;
 }
 
+void psibase::TestChain::setAutoBlockStart(bool enable)
+{
+   isAutoBlockStart = enable;
+}
+
 void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 {
    auto time = status ? status->current.time : TimePointSec{};
@@ -245,7 +250,7 @@ void psibase::TestChain::finishBlock()
    producing = false;
 }
 
-void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec)
+void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
 {
    t.tapos.expiration.seconds = (status ? status->current.time.seconds : 0) + expire_sec;
    auto [index, suffix]       = SystemService::headTapos();
@@ -253,7 +258,7 @@ void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec)
    t.tapos.refBlockSuffix     = suffix;
 }
 
-psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions)
+psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions) const
 {
    Transaction t;
    fillTapos(t);
@@ -277,9 +282,8 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    return psio::convert_from_frac<TransactionTrace>(bin);
 }
 
-[[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(
-    Transaction                                          trx,
-    const std::vector<std::pair<PublicKey, PrivateKey>>& keys)
+[[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(Transaction    trx,
+                                                                            const KeyList& keys)
 {
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
@@ -292,20 +296,4 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    for (auto& [pub, priv] : keys)
       signedTrx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
    return pushTransaction(signedTrx);
-}
-
-psibase::TransactionTrace psibase::TestChain::transact(
-    std::vector<Action>&&                                actions,
-    const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
-    const char*                                          expectedExcept)
-{
-   auto trace = pushTransaction(makeTransaction(std::move(actions)), keys);
-   expect(trace, expectedExcept);
-   return trace;
-}
-
-psibase::TransactionTrace psibase::TestChain::transact(std::vector<Action>&& actions,
-                                                       const char*           expectedExcept)
-{
-   return transact(std::move(actions), {{defaultPubKey, defaultPrivKey}}, expectedExcept);
 }

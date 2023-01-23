@@ -3,7 +3,7 @@ function(add_user_service suffix name)
     target_include_directories(${name}${suffix} PUBLIC
         include
         ../CommonSys/include
-        ../ExchangeSys/include
+        ../InviteSys/include
         ../NftSys/include
         ../PsiSpaceSys/include
         ../SymbolSys/include
@@ -25,7 +25,7 @@ function(add_user_test suffix name)
     target_include_directories(${TARGET} PUBLIC
       ../include
       ../../CommonSys/include
-      ../../ExchangeSys/include
+      ../../InviteSys/include
       ../../NftSys/include
       ../../PsiSpaceSys/include
       ../../SymbolSys/include
@@ -66,7 +66,7 @@ add("-debug")
 if(DEFINED IS_WASM)
     add_subdirectory(AdminSys)
     add_subdirectory(CommonSys)
-    add_subdirectory(ExchangeSys)
+    add_subdirectory(InviteSys)
     add_subdirectory(ExploreSys)
     add_subdirectory(launchTestChain)
     add_subdirectory(mincon)

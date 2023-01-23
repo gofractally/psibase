@@ -43,8 +43,6 @@ namespace SystemService
       statusTable.put({.totalAccounts = totalAccounts});
    }
 
-   // TODO: limit who can use -sys suffix
-   // TODO: verify name round-trips through strings
    void AccountSys::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
    {
       Tables tables{getReceiver()};
@@ -56,14 +54,8 @@ namespace SystemService
       auto status = statusIndex.get(std::tuple{});
       check(status.has_value(), "not started");
 
-      auto creatorTable = tables.open<CreatorTable>();
-      auto creator      = creatorTable.getIndex<0>().get(SingletonKey{});
-      if (creator.has_value())
-      {
-         check(
-             (*creator).accountCreator == getSender(),
-             "Only " + (*creator).accountCreator.str() + " is authorized to create new accounts.");
-      }
+      auto sender = getSender();
+      check(sender == service || sender == inviteService, "Unauthorized account creation");
 
       if (enable_print)
       {
@@ -74,6 +66,10 @@ namespace SystemService
       }
 
       check(name.value, "invalid account name");
+
+      // Check compression roundtrip
+      check(AccountNumber{name.str()}.value, "invalid account name");
+
       if (accountIndex.get(name))
       {
          if (requireNew)
@@ -99,6 +95,9 @@ namespace SystemService
       auto   accountIndex = accountTable.getIndex<0>();
       auto   account      = accountIndex.get((getSender()));
       check(account.has_value(), "account does not exist");
+
+      to<AuthInterface>(authService).canAuthUserSys(getSender());
+
       account->authService = authService;
       accountTable.put(*account);
    }
@@ -109,14 +108,6 @@ namespace SystemService
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
       return accountIndex.get(num) != std::nullopt;
-   }
-
-   void AccountSys::setCreator(psibase::AccountNumber creator)
-   {
-      check(false, "Feature not yet supported.");
-
-      Tables{getReceiver()}.open<CreatorTable>().put(
-          CreatorRecord{.key = SingletonKey{}, .accountCreator = creator});
    }
 
 }  // namespace SystemService

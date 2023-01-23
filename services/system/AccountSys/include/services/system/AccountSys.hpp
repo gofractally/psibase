@@ -26,28 +26,17 @@ namespace SystemService
    PSIO_REFLECT(Account, accountNum, authService)
    using AccountTable = psibase::Table<Account, &Account::key>;
 
-   struct SingletonKey
-   {
-   };
-   PSIO_REFLECT(SingletonKey);
-   struct CreatorRecord
-   {
-      SingletonKey           key;
-      psibase::AccountNumber accountCreator;
-   };
-   PSIO_REFLECT(CreatorRecord, key, accountCreator);
-   using CreatorTable = psibase::Table<CreatorRecord, &CreatorRecord::key>;
-
    // TODO: account deletion, with an index to prevent reusing IDs
    // TODO: a mode which restricts which account may use newAccount.
    //       also let the UI know.
    class AccountSys : public psibase::Service<AccountSys>
    {
      public:
-      static constexpr auto                   service     = psibase::AccountNumber("account-sys");
-      static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
+      static constexpr auto                   service       = psibase::AccountNumber("account-sys");
+      static constexpr auto                   inviteService = psibase::AccountNumber("invite-sys");
+      static constexpr psibase::AccountNumber nullAccount   = psibase::AccountNumber(0);
 
-      using Tables = psibase::ServiceTables<AccountSysStatusTable, AccountTable, CreatorTable>;
+      using Tables = psibase::ServiceTables<AccountSysStatusTable, AccountTable>;
 
       void init();
       void newAccount(psibase::AccountNumber name,
@@ -55,8 +44,6 @@ namespace SystemService
                       bool                   requireNew);
       void setAuthCntr(psibase::AccountNumber authService);
       bool exists(psibase::AccountNumber num);
-
-      void setCreator(psibase::AccountNumber creator);
 
       struct Events
       {
@@ -76,8 +63,7 @@ namespace SystemService
                 method(init),
                 method(newAccount, name, authService, requireNew),
                 method(setAuthCntr, authService),
-                method(exists, num),
-                method(setCreator, creator)
+                method(exists, num)
                 //
    )
 }  // namespace SystemService
