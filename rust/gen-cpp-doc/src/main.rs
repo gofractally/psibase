@@ -717,6 +717,7 @@ fn parse<'tu>(
         &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include/c++/v1"),
         &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include"),
         &("-I".to_owned() + &wasi_sdk_prefix + "/lib/clang/13.0.0/include"),
+        &("-I".to_owned() + &wasi_sdk_prefix + "/lib/clang/15.0.6/include"),
         &("-I".to_owned() + build_path + "/wasm/boost"),
         &("-I".to_owned() + build_path + "/wasm/deps/include"),
         &("-I".to_owned() + repo_path + "/services/system/ProxySys/include"),
