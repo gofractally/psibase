@@ -32,27 +32,19 @@ namespace UserService
       else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
-      if (getInviteClaim(claims))
-      {
-         check(action.service == InviteSys::service, restrictedService.data());
+      check(action.service == InviteSys::service, restrictedService.data());
 
-         // Compile time check that acceptCreate and reject are still methods in InviteSys
-         using T1 = decltype(&UserService::Invite::InviteSys::acceptCreate);
-         using T2 = decltype(&UserService::Invite::InviteSys::reject);
-         check(action.method == "acceptCreate"_m || action.method == "reject"_m,
-               restrictedActions.data());
-         return;
-      }
-
-      std::string err = "checkAuthSys: ";
-      err += missingInviteSig;
-      abortMessage(err);
+      // Compile time check that acceptCreate and reject are still methods in InviteSys
+      using T1 = decltype(&UserService::Invite::InviteSys::acceptCreate);
+      using T2 = decltype(&UserService::Invite::InviteSys::reject);
+      check(action.method == "acceptCreate"_m || action.method == "reject"_m,
+            restrictedActions.data());
 
       // Billing notes: The point of an invite is to allow those without a psibase account to create one
       //    in a way that doesn't suffer from the chicken/egg problem that you *already* need an account
       //    to call an action (such as accepting an invite to create an account).
       // Therefore, this service allows the invited-sys user to be used by those without an account,
-      //    specifically for calling the accept/reject invite actions on invite-sys. That means that if
+      //    specifically for calling the acceptCreate/reject invite actions on invite-sys. That means that if
       //    it succeeds, invited-sys is the account that will be billed for the action. Invited-sys is a
       //    system account and has infinite resources, so the billing will always succeed.
       // This does not mean that no one paid for the action to accept an invite, because the action is
@@ -64,36 +56,40 @@ namespace UserService
       check(user == InviteSys::payerAccount, notWhitelisted.data());
    }
 
-   std::optional<Claim> AuthInviteSys::getInviteClaim(const std::vector<Claim>& claims)
-   {
-      for (const auto& claim : claims)
-      {
-         if (claim.service == SystemService::VerifyEcSys::service)
-         {
-            auto inviteKey = psio::convert_from_frac<PublicKey>(claim.rawData);
-            auto inviteOpt = Invite::InviteSys::Tables{Invite::InviteSys::service}
-                                 .open<Invite::InviteTable>()
-                                 .get(inviteKey);
-
-            if (inviteOpt.has_value())
-            {
-               return std::optional<Claim>{claim};
-            }
-         }
-      }
-      return std::nullopt;
-   }
-
    void AuthInviteSys::requireAuth(const PublicKey& pubkey)
    {
-      auto claimOpt = getInviteClaim(to<SystemService::TransactionSys>().getTransaction().claims);
+      auto claims = to<SystemService::TransactionSys>().getTransaction().claims;
+      bool found =
+          std::find_if(claims.begin(), claims.end(),
+                       [&](auto claim)
+                       {
+                          return claim.service == SystemService::VerifyEcSys::service &&
+                                 psio::convert_from_frac<PublicKey>(claim.rawData) == pubkey;
+                       }) != claims.end();
 
       std::string err = "requireAuth: ";
       err += missingInviteSig;
 
-      check(claimOpt.has_value(), err);
-      check(claimOpt->service == SystemService::VerifyEcSys::service, err);
-      check(psio::convert_from_frac<PublicKey>(claimOpt->rawData) == pubkey, err);
+      check(found, err);
+   }
+
+   auto AuthInviteSys::serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>
+   {
+      if (auto result = psibase::servePackAction<AuthInviteSys>(request))
+         return result;
+
+      if (auto result = psibase::serveContent(request, Tables{}))
+         return result;
+
+      return std::nullopt;
+   }
+
+   void AuthInviteSys::storeSys(std::string       path,
+                                std::string       contentType,
+                                std::vector<char> content)
+   {
+      psibase::check(psibase::getSender() == psibase::getReceiver(), "wrong sender");
+      psibase::storeContent(std::move(path), std::move(contentType), std::move(content), Tables{});
    }
 
 }  // namespace UserService

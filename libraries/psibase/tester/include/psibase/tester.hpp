@@ -165,11 +165,11 @@ namespace psibase
       std::string getPath();
 
       /**
-       * By default, the TestChain will automatically advance a block after any action is called on any service.
-       * Call this function to modify the behavior of this chain accordingly. When autoBlockStart is disabled, the
-       * the chain will only advance blocks manually when you explicitly call startBlock.
+       * By default, the TestChain will automatically advance blocks.
+       * When autoBlockStart is disabled, the the chain will only advance blocks manually.
+       * To manually advance a block, you must call startBlock.
        *
-       * @param enable Whether the chain should advance a block after each action is called.
+       * @param enable Whether the chain should automatically advance blocks.
        */
       void setAutoBlockStart(bool enable);
 

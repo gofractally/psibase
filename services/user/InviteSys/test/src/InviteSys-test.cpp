@@ -97,7 +97,7 @@ SCENARIO("Creating an invite")
       THEN("Invited-sys cannot create an invite")
       {
          auto createInvite = i.createInvite(userPub);
-         CHECK(createInvite.failed(missingInviteSig));
+         CHECK(createInvite.failed(restrictedActions));
       }
    }
 }

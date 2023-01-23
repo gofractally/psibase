@@ -1,9 +1,6 @@
 #pragma once
 
-#include <psibase/Table.hpp>
-#include <psibase/crypto.hpp>
 #include <psibase/psibase.hpp>
-#include <psibase/serveContent.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/user/InviteErrors.hpp>
 
@@ -14,6 +11,8 @@ namespace UserService
      public:
       static constexpr auto service = psibase::AccountNumber("auth-inv-sys");
 
+      using Tables = psibase::ServiceTables<psibase::WebContentTable>;
+
       void checkAuthSys(uint32_t                                  flags,
                         psibase::AccountNumber                    requester,
                         psibase::Action                           action,
@@ -23,13 +22,16 @@ namespace UserService
 
       void requireAuth(const psibase::PublicKey& pubkey);
 
-     private:
-      std::optional<psibase::Claim> getInviteClaim(const std::vector<psibase::Claim>& claims);
+      std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
+
+      void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
    PSIO_REFLECT(AuthInviteSys,  //
                 method(checkAuthSys, flags, requester, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(requireAuth, pubkey)
+                method(requireAuth, pubkey),
+                method(serveSys, request),
+                method(storeSys, path, contentType, content)
                 //
    )
 }  // namespace UserService
