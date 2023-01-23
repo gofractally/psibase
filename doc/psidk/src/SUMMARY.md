@@ -39,6 +39,7 @@
   - [Applets](applet/applets.md)
   - [Inter applet communication](applet/inter-applet-communication.md)
   - [Action scripts](applet/action-scripts.md)
+  - [Transaction signing](applet/transaction-signing.md)
 - [System Services]()
   - [transact-sys](system-service/transact-sys.md)
   - [common-sys](system-service/common-sys.md)
