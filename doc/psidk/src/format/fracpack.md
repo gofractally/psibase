@@ -100,7 +100,7 @@ When a subobject is variable size, it has an Offset Pointer which points to the 
 - `1`: indicates an optional is empty
 - `2,3`: reserved for future use
 
-The special values are a space-saving measure. e.g. suppose we have an `std::optional<std::string>`. The 3 possible states, `nullopt`, `empty`, and `!empty`, are encoded as `1`, `0`, or an offset.
+The special values are a space-saving measure. e.g. suppose we have an `std::optional<std::string>`. The 3 possible states, `nullopt`, `empty`, and `!empty`, are encoded as `1`, `0`, or an offset. An empty container MUST NOT be encoded with an offset.
 
 ### Fixed-Length Arrays of Variable-Size Objects
 
@@ -130,14 +130,11 @@ uint8_t[]           variable_data;  // Variable-size objects
 
 Optionals always use a variable-size encoding, whether their inner data is fixed-size or variable size. An optional represents an empty state by using `1` for its [Offset Pointer](#offset-pointers). It represents non-empty as an Offset Pointer which points to the contained data. If the contained data is variable-size, then it already uses an offset pointer; Optional reuses this pointer to save space.
 
-There are 2 special rules for optionals embedded within extensible structs and tuples:
+For optionals embedded within extensible structs and tuples:
 
-- If any field is optional, then all the remaining fields must also be optional.
 - If the last `n` optional fields are empty, then they must be omitted from `fixed_data`.
 
 TODO: Implement these rules in Rust. Verify them in C++.
-
-TODO: Reconsider this rule. Its purpose is to guarantee that decoding and re-encoding a fracpacked binary results in an identical binary. There are situations which prevent the guarantee, e.g. unrecognized but populated fields in an upgraded struct, tuple, or union, accidental NaN normalization, and potentially more. Psibase doesn't rely on this guarantee. It places a burden on both fracpack implementors and on users.
 
 ### Tagged Unions
 
@@ -149,24 +146,30 @@ uint32_t        size;   // The amount of data
 uint8_t[size]   data;   // Selected inner object
 ```
 
-Alternatives are sequentially-numbered starting from `0`. The must not be greater than 127. The `size` field allows decoders to safely skip newly-added alternatives that they are not aware of.
+Alternatives are sequentially-numbered starting from `0`. The tag must not be greater than 127.
 
 ## Safety Checking
 
-When deserializing an object of type `T`, if the data is not a valid serialization of any type that can be deserialized as `T`, validation MUST fail. The following is a non-exhaustive list of conditions that MUST be validated:
-- bool values must be 0 or 1
-- Unknown fixed data MUST be a multiple of 4 octets and each 4-octet group MUST be a valid offset pointer
+When deserializing an object of type `T`
+- If any field that is part of `T` is malformed, validation MUST fail
+- if the data is not a valid serialization of any type that can be deserialized as `T`, validation SHOULD fail
+
+The following is a non-exhaustive list of requirements to validate:
+- bool values MUST be 0 or 1
+- Unknown fixed data SHOULD be a multiple of 4 octets and each 4-octet group SHOULD be a valid offset pointer
 - Every regular offset pointer MUST equal the end of the preceding object if it is known
+- Every regular offset point MUST NOT be before the last known position even if the end of the preceding object is not known.
 - Every offset pointer MUST be in bounds
-- The size of a vector must be an exact multiple of the fixed size of each element
-- An offset pointer to an empty vector must be represented as 0
-- The size of a variant must be the same as the size of the inner object if the inner size is known
+- The size of a vector MUST be an exact multiple of the fixed size of each element
+- An offset pointer to an empty vector MUST be represented as 0
+- The size of a variant MUST be the same as the size of the inner object if the inner size is known
+- The last field of a tuple or extensible struct MUST NOT be an empty optional
 
 TODO: finish this list. Make sure both the C++ and Rust implementations' checkers enforce the rules.
 
 ## Serialization Compatibility
 
-An serialized object of type `T` may be deserialized as type `U` if any of the following conditions hold
+An serialized object of type `T` may be deserialized as type `U` if any of the following are true:
 - `T` is the same type as `U`
 - `T` and `U` are both non-extensible structs with the same number of members AND each member of `T` can be deserialized as the corresponding member of `U`
 - `T` and `U` are both tuples or extensible structs with the same number of members AND each member of `T` can be deserialized as the corresponding member of `U`
