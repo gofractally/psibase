@@ -745,4 +745,14 @@ TEST_CASE("invalid")
    test_invalid<struct_<std::optional<std::uint8_t>>>(
        {"040001000000", "08000100000001000000", "08000800000001000000FF"});
    test_invalid<struct_<>>({"040001000000", "08000100000001000000", "08000800000001000000FF"});
+   // Offset pointer to empty container must use compression
+   test_invalid<std::optional<std::string>>("0400000000000000");
+   test_invalid<std::optional<std::vector<std::uint8_t>>>("0400000000000000");
+   test_invalid<std::optional<std::vector<std::tuple<>>>>("0400000000000000");
+   test_invalid<std::tuple<std::string>>("04000400000000000000");
+   test_invalid<std::tuple<std::vector<std::uint8_t>>>("04000400000000000000");
+   test_invalid<std::tuple<std::vector<std::tuple<>>>>("04000400000000000000");
+   test_invalid<struct_<std::string>>("04000400000000000000");
+   test_invalid<struct_<std::vector<std::uint8_t>>>("04000400000000000000");
+   test_invalid<struct_<std::vector<std::tuple<>>>>("04000400000000000000");
 }

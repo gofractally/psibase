@@ -187,6 +187,9 @@ namespace psio
                return false;
             if (new_heap_pos != heap_pos && known_pos)
                return false;
+            if constexpr (Derived::supports_0_offset)
+               if (Derived::is_empty_container(src, new_heap_pos, end_heap_pos))
+                  return false;
          }
          heap_pos = new_heap_pos;
          return Derived::template unpack<Unpack, Verify>(value, has_unknown, known_pos, src,
@@ -331,6 +334,10 @@ namespace psio
       {
          return is_p::is_empty_container(clio_unwrap_packable(value));
       }
+      static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         return is_p::is_empty_container(src, pos, end_pos);
+      }
 
       template <typename S>
       static void embedded_fixed_pack(const T& value, S& stream)
@@ -414,6 +421,13 @@ namespace psio
       }
 
       static bool is_empty_container(const T& value) { return value.empty(); }
+      static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         uint32_t fixed_size;
+         if (!unpack_numeric<true>(&fixed_size, src, pos, end_pos))
+            return false;
+         return fixed_size == 0;
+      }
 
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(T*          value,
@@ -499,6 +513,13 @@ namespace psio
       }
 
       static bool is_empty_container(const std::vector<T>& value) { return value.empty(); }
+      static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         uint32_t fixed_size;
+         if (!unpack_numeric<true>(&fixed_size, src, pos, end_pos))
+            return false;
+         return fixed_size == 0;
+      }
 
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(std::vector<T>* value,
