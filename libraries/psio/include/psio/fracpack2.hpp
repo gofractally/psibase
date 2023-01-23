@@ -314,6 +314,11 @@ namespace psio
       static constexpr bool     supports_0_offset = is_p::supports_0_offset;
 
       static bool has_value(const T& value) { return is_p::has_value(clio_unwrap_packable(value)); }
+      template <bool Verify>
+      static bool has_value(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         return is_p::template has_value<Verify>(src, pos, end_pos);
+      }
 
       template <bool Unpack>
       static inner* ptr(T* value)
@@ -620,6 +625,15 @@ namespace psio
       static constexpr bool     supports_0_offset = false;
 
       static bool has_value(const std::optional<T>& value) { return value.has_value(); }
+      template <bool Verify>
+      static bool has_value(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         uint32_t offset;
+         bool     has_unknown = false;
+         if (!unpack_numeric<true, Verify>(&offset, has_unknown, src, pos, end_pos))
+            return false;
+         return offset != 1;
+      }
 
       template <typename S>
       static void pack(const std::optional<T>& value, S& stream)
@@ -720,6 +734,7 @@ namespace psio
 
    inline bool verify_extensions(const char* src,
                                  bool        known_pos,
+                                 bool&       last_has_value,
                                  uint32_t    fixed_pos,
                                  uint32_t    end_fixed_pos,
                                  uint32_t&   heap_pos,
@@ -734,6 +749,7 @@ namespace psio
          auto     base        = fixed_pos;
          if (!unpack_numeric<true, false>(&offset, has_unknown, src, fixed_pos, end_fixed_pos))
             return false;
+         last_has_value = offset != 1;
          if (offset >= 2)
          {
             if (offset < 4)
@@ -841,7 +857,8 @@ namespace psio
             if (heap_pos < pos || heap_pos > end_pos)
                return false;
          }
-         bool ok = true;
+         bool ok             = true;
+         bool last_has_value = true;
          if constexpr (Unpack)
          {
             tuple_foreach(  //
@@ -850,9 +867,22 @@ namespace psio
                 {
                    using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
                    if (fixed_pos < end_fixed_pos || !is_p::is_optional)
+                   {
                       ok &= is_p::template embedded_unpack<Unpack, Verify>(
                           &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
                           end_pos);
+                      if constexpr (Verify)
+                      {
+                         if constexpr (is_p::is_optional)
+                         {
+                            last_has_value = is_p::has_value(x);
+                         }
+                         else
+                         {
+                            last_has_value = true;
+                         }
+                      }
+                   }
                 });
          }
          else
@@ -863,9 +893,23 @@ namespace psio
                 {
                    using is_p = is_packable<std::remove_cvref_t<decltype(*p)>>;
                    if (fixed_pos < end_fixed_pos || !is_p::is_optional)
+                   {
+                      if constexpr (Verify)
+                      {
+                         if constexpr (is_p::is_optional)
+                         {
+                            last_has_value =
+                                is_p::template has_value<Verify>(src, fixed_pos, end_fixed_pos);
+                         }
+                         else
+                         {
+                            last_has_value = true;
+                         }
+                      }
                       ok &= is_p::template embedded_unpack<Unpack, Verify>(
                           nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
                           end_pos);
+                   }
                 });
          }
          if (!ok)
@@ -874,11 +918,14 @@ namespace psio
          {
             if (fixed_pos < end_fixed_pos)
             {
-               if (!verify_extensions(src, known_end, fixed_pos, end_fixed_pos, heap_pos, end_pos))
+               if (!verify_extensions(src, known_end, last_has_value, fixed_pos, end_fixed_pos,
+                                      heap_pos, end_pos))
                   return false;
                has_unknown = true;
                known_end   = false;
             }
+            if (!last_has_value)
+               return false;
          }
          pos = heap_pos;
          return true;
@@ -1133,7 +1180,8 @@ namespace psio
                   return false;
                known_end = true;
             }
-            bool ok = true;
+            bool ok             = true;
+            bool last_has_value = true;
             reflect<T>::for_each(
                 [&](const meta& ref, auto member)
                 {
@@ -1143,14 +1191,28 @@ namespace psio
                       using is_p = is_packable<typename m::ValueType>;
                       if (fixed_pos < end_fixed_pos || !is_p::is_optional)
                       {
+                         if constexpr (Verify)
+                         {
+                            if constexpr (is_p::is_optional && !reflect<T>::definitionWillNotChange)
+                            {
+                               last_has_value =
+                                   is_p::template has_value<Verify>(src, fixed_pos, end_fixed_pos);
+                            }
+                            else
+                            {
+                               last_has_value = true;
+                            }
+                         }
                          if constexpr (Unpack)
                             ok &= is_p::template embedded_unpack<Unpack, Verify>(
                                 &(value->*member(value)), has_unknown, known_end, src, fixed_pos,
                                 end_fixed_pos, heap_pos, end_pos);
                          else
+                         {
                             ok &= is_p::template embedded_unpack<Unpack, Verify>(
                                 nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos,
                                 heap_pos, end_pos);
+                         }
                       }
                    }
                 });
@@ -1160,12 +1222,14 @@ namespace psio
             {
                if (fixed_pos < end_fixed_pos)
                {
-                  if (!verify_extensions(src, known_end, fixed_pos, end_fixed_pos, heap_pos,
-                                         end_pos))
+                  if (!verify_extensions(src, known_end, last_has_value, fixed_pos, end_fixed_pos,
+                                         heap_pos, end_pos))
                      return false;
                   has_unknown = true;
                   known_end   = false;
                }
+               if (!last_has_value)
+                  return false;
             }
             pos = heap_pos;
             return true;

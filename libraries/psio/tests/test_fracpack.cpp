@@ -5,6 +5,7 @@
 //
 #include <psio/to_hex.hpp>
 
+#include <boost/core/demangle.hpp>
 #include <type_traits>
 
 #include <catch2/catch.hpp>
@@ -82,7 +83,7 @@ bool bitwise_equal(const std::vector<T>& lhs, const std::vector<T>& rhs)
 template <typename Tuple, std::size_t... I>
 bool bitwise_equal(const Tuple& lhs, const Tuple& rhs, std::index_sequence<I...>)
 {
-   return (... && bitwise_equal(std::get<I>(lhs), std::get<I>(rhs)));
+   return (true && ... && bitwise_equal(std::get<I>(lhs), std::get<I>(rhs)));
 }
 
 template <typename... T>
@@ -153,6 +154,8 @@ auto test_base(const T& value)
    std::vector<char>   data;
    psio::vector_stream out{data};
    psio::is_packable<T>::pack(value, out);
+   INFO("data: " << psio::hex(data.begin(), data.end()));
+   INFO("type: " << boost::core::demangle(typeid(T).name()));
    CHECK(data.size() == ss.size);
    {
       T             result{};
@@ -536,7 +539,7 @@ void test_compat(const T& t, const U& u, bool expect_unknown)
    psio::vector_stream out{data};
    psio::is_packable<T>::pack(t, out);
    INFO("data: " << psio::hex(data.begin(), data.end()));
-   INFO("type: " << typeid(U).name());
+   INFO("type: " << boost::core::demangle(typeid(U).name()));
    {
       U             result{};
       std::uint32_t pos         = 0;
@@ -664,13 +667,16 @@ TEST_CASE("compatibility")
                     struct_<std::int32_t, std::optional<std::int32_t>>(42, std::nullopt), false);
    test_compat_wrap(struct_<std::int32_t, std::optional<std::int32_t>>(42, 43),
                     struct_<std::int32_t>(42), true);
+   test_compat_wrap(
+       std::tuple(std::tuple(std::optional{std::uint8_t{0xFF}}), std::optional{std::uint8_t{0xCC}}),
+       std::tuple{std::tuple{}}, true);
 }
 
 template <typename T>
 void test_invalid(const char* hex)
 {
    INFO("data: " << hex);
-   INFO("type: " << typeid(T).name());
+   INFO("type: " << boost::core::demangle(typeid(T).name()));
    std::vector<char> data;
    CHECK(psio::from_hex(hex, data));
    {
@@ -732,4 +738,11 @@ TEST_CASE("invalid")
                             "08000100000005000000FF", "0C000C0000000900000004000000FF"});
    // variant cannot unpack unknown alternatives; known alternatives must have the correct size
    test_invalid<std::variant<std::uint8_t>>({"0002000000FFFF", "0101000000FF"});
+   // No trailing empty optionals
+   test_invalid<std::tuple<std::optional<std::uint8_t>>>(
+       {"040001000000", "08000100000001000000", "08000800000001000000FF"});
+   test_invalid<std::tuple<>>({"040001000000", "08000100000001000000", "08000800000001000000FF"});
+   test_invalid<struct_<std::optional<std::uint8_t>>>(
+       {"040001000000", "08000100000001000000", "08000800000001000000FF"});
+   test_invalid<struct_<>>({"040001000000", "08000100000001000000", "08000800000001000000FF"});
 }
