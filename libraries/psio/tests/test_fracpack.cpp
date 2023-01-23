@@ -730,4 +730,6 @@ TEST_CASE("invalid")
                                "08000100000005000000FF", "0C000C0000000900000004000000FF"});
    test_invalid<struct_<>>({"0100FF", "040002000000", "040005000000FFFF", "08000800000005000000",
                             "08000100000005000000FF", "0C000C0000000900000004000000FF"});
+   // variant cannot unpack unknown alternatives; known alternatives must have the correct size
+   test_invalid<std::variant<std::uint8_t>>({"0002000000FFFF", "0101000000FF"});
 }

@@ -919,14 +919,7 @@ namespace psio
       }
       else
       {
-         if constexpr (Unpack)
-            return false;
-         if constexpr (Verify)
-         {
-            has_unknown = true;
-            end_known   = false;
-         }
-         return true;
+         return false;
       }
    }
 
