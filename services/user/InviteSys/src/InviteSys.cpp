@@ -382,7 +382,12 @@ struct Queries
 {
    auto getEventHead(AccountNumber user) const
    {  //
-      return inviteSys.index<Invite::UserEventTable, 0>().get(user);
+      return InviteSys::Tables(InviteSys::service).open<Invite::UserEventTable>().get(user);
+   }
+
+   auto getInvite(psibase::PublicKey pubkey) const
+   {
+      return InviteSys::Tables(InviteSys::service).open<InviteTable>().get(pubkey);
    }
 
    auto events() const
@@ -404,6 +409,7 @@ struct Queries
 };
 PSIO_REFLECT(Queries,
              method(getEventHead, user),
+             method(getInvite, pubkey),
              method(events),
              method(userEvents, user, first, after),
              method(serviceEvents, first, after));
