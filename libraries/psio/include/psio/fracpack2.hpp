@@ -7,6 +7,7 @@
 #pragma once
 
 #include <psio/reflect.hpp>
+#include <psio/stream.hpp>
 
 #include <cassert>
 #include <cstring>
@@ -1272,4 +1273,130 @@ namespace psio
       }  // unpack
    };    // is_packable_reflected
 
+   template <Packable T, typename S>
+   void to_frac(const T& value, S& stream)
+   {
+      psio::is_packable<T>::pack(value, stream);
+   }
+
+   template <Packable T>
+   std::uint32_t fracpack_size(const T& value)
+   {
+      size_stream ss;
+      psio::to_frac(value, ss);
+      return ss.size;
+   }
+
+   template <Packable T>
+   std::vector<char> to_frac(const T& value)
+   {
+      std::vector<char> result(psio::fracpack_size(value));
+      fast_buf_stream   s(result.data(), result.size());
+      psio::to_frac(value, s);
+      return result;
+   }
+
+   enum validation_t : std::uint8_t
+   {
+      invalid,
+      valid,
+      extended,
+   };
+   template <Packable T>
+   validation_t fracpack_validate(std::span<const char> data)
+   {
+      bool          has_unknown = false;
+      bool          known_end;
+      std::uint32_t pos = 0;
+      if (!is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
+                                                        data.data(), pos, data.size()))
+         return validation_t::invalid;
+      if (known_end && pos != data.size())
+         return validation_t::invalid;
+      return has_unknown ? validation_t::extended : validation_t::valid;
+   }
+   template <Packable T>
+   bool fracpack_validate_compatible(std::span<const char> data)
+   {
+      return fracpack_validate<T>(data) != validation_t::invalid;
+   }
+   template <Packable T>
+   bool fracpack_validate_strict(std::span<const char> data)
+   {
+      return fracpack_validate<T>(data) == validation_t::valid;
+   }
+
+   template <typename T>
+   struct prevalidated
+   {
+      T data;
+   };
+   template <typename T>
+   prevalidated(T&) -> prevalidated<T&>;
+   template <typename T>
+   prevalidated(T*&) -> prevalidated<T*>;
+   template <typename T>
+   prevalidated(T&&) -> prevalidated<T>;
+
+   template <Packable T>
+   bool from_frac(T& value, std::span<const char> data)
+   {
+      bool          has_unknown = false;
+      bool          known_end;
+      std::uint32_t pos = 0;
+      if (!is_packable<T>::template unpack<true, true>(&value, has_unknown, known_end, data.data(),
+                                                       pos, data.size()))
+         return false;
+      if (known_end && pos != data.size())
+         return false;
+      return true;
+   }
+
+   template <Packable T>
+   T from_frac(std::span<const char> data)
+   {
+      T result;
+      if (!from_frac(result, data))
+         abort_error(stream_error::invalid_frac_encoding);
+      return result;
+   }
+
+   template <Packable T>
+   bool from_frac_strict(T& value, std::span<const char> data)
+   {
+      bool          has_unknown = false;
+      bool          known_end;
+      std::uint32_t pos = 0;
+      T             result;
+      if (!is_packable<T>::template unpack<true, true>(&result, has_unknown, known_end, data.data(),
+                                                       pos, data.size()))
+         return false;
+      if (has_unknown)
+         return false;
+      if (known_end && pos != data.size())
+         return false;
+      return true;
+   }
+
+   template <Packable T>
+   T from_frac_strict(std::span<const char> data)
+   {
+      T result;
+      if (!from_frac_strict(result, data))
+         abort_error(stream_error::invalid_frac_encoding);
+      return result;
+   }
+
+   template <Packable T, typename S>
+   T from_frac(const prevalidated<S>& data)
+   {
+      bool                  has_unknown = false;
+      bool                  known_end;
+      std::uint32_t         pos = 0;
+      T                     result;
+      std::span<const char> actual(data.data);
+      (void)is_packable<T>::template unpack<true, false>(&result, has_unknown, known_end,
+                                                         actual.data(), pos, actual.size());
+      return result;
+   }
 }  // namespace psio

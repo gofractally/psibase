@@ -204,10 +204,16 @@ auto test_base(const T& value)
       }
       CHECK(pos == data.size());
    }
+   // convenience functions
+   {
+      CHECK_THAT(psio::from_frac<T>(data), BitwiseEqual(value));
+      CHECK_THAT(psio::from_frac<T>(psio::prevalidated{data}), BitwiseEqual(value));
+      CHECK(psio::fracpack_validate_strict<T>(data));
+   }
    // Any prefix of the data should fail to verify
    for (std::size_t i = 0; i < data.size(); ++i)
    {
-      // Making a copy in a separate allocation allows ubsan to detect out-of-bounds access
+      // Making a copy in a separate allocation allows asan to detect out-of-bounds access
       std::unique_ptr<char[]> copy{new char[i]};
       std::memcpy(copy.get(), data.data(), i);
       {
@@ -578,6 +584,11 @@ void test_compat(const T& t, const U& u, bool expect_unknown)
       // known_end can't be used because it is uninitialzed when Verify is false
       if (!expect_unknown)
          CHECK(pos == data.size());
+   }
+   {
+      CHECK_THAT(psio::from_frac<U>(data), BitwiseEqual(u));
+      CHECK_THAT(psio::from_frac<U>(psio::prevalidated{data}), BitwiseEqual(u));
+      CHECK(psio::fracpack_validate<U>(data) == (expect_unknown? psio::validation_t::extended : psio::validation_t::valid));
    }
 }
 
