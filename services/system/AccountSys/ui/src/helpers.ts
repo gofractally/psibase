@@ -41,9 +41,15 @@ export const updateAccountInCommonNav = (account: string) => {
 
 export const fetchAccountsByKey = async (publicKey: string) => {
     if (!publicKey) throw new Error(`No public key found ${publicKey}`);
-    return getJson<{ account: string; pubkey: string }[]>(
-        await siblingUrl(null, "auth-ec-sys", "accwithkey/" + publicKey)
-    );
+    try {
+        return await getJson<{ account: string; pubkey: string }[]>(
+            await siblingUrl(null, "auth-ec-sys", "accwithkey/" + publicKey)
+        );
+    } catch(e) {
+        console.error(e)
+        return []
+    }
+    
 };
 
 export const fetchAccounts = async () => {
