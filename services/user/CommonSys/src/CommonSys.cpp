@@ -106,30 +106,6 @@ namespace SystemService
                             Tables{getReceiver()});
    }
 
-   std::optional<HttpReply> CommonSys::serveCommon(HttpRequest request)
-   {
-      if (request.method == "GET")
-      {
-         for (auto [target, replacement] : commonResMap)
-         {
-            if (target == request.target)
-            {
-               auto index = ServiceTables<WebContentTable>{getReceiver()}
-                                .open<WebContentTable>()
-                                .getIndex<0>();
-               if (auto content = index.get(std::string(replacement)))
-               {
-                  return HttpReply{
-                      .contentType = content->contentType,
-                      .body        = content->content,
-                  };
-               }
-            }
-         }
-      }
-      return std::nullopt;
-   }
-
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::CommonSys)
