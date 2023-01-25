@@ -30,6 +30,7 @@
       - [Web Services](rust-service/reference/web-services.md)
   - [Concepts]()
     - [Events](concepts/events.md)
+    - [Invites](concepts/invites.md)
 - [Data Formats]()
   - [JSON](format/json.md)
   - [Schema](format/schema.md)
