@@ -32,9 +32,6 @@ namespace SystemService
       {
          if (request.target.starts_with("/applet/"))
          {
-            // All requests to load a specific applet will return the root index from common-sys.
-            // Then common-sys will read the URL bar, detect that an applet is being loaded,
-            // and request the applet to load inside an iframe.
             request.target = "/";
          }
          if (request.target == "/common/thisservice")
