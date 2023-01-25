@@ -168,7 +168,7 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    std::tuple<AccountNumber> params2{AuthEcSys::service};
    Action                    setAuth{.sender  = acceptedBy,
                                      .service = AccountSys::service,
-                                     .method  = "setAuthCntr"_m,
+                                     .method  = "setAuthServ"_m,
                                      .rawData = psio::convert_to_frac(params2)};
    to<TransactionSys>().runAs(move(setAuth), vector<ServiceMethod>{});
 

@@ -42,8 +42,12 @@ namespace SystemService
       void newAccount(psibase::AccountNumber name,
                       psibase::AccountNumber authService,
                       bool                   requireNew);
-      void setAuthCntr(psibase::AccountNumber authService);
-      bool exists(psibase::AccountNumber num);
+
+      /// Used to update the auth service used by an account
+      void setAuthServ(psibase::AccountNumber authService);
+
+      /// Return value indicates whether the account `name` exists
+      bool exists(psibase::AccountNumber name);
 
       struct Events
       {
@@ -62,8 +66,8 @@ namespace SystemService
    PSIO_REFLECT(AccountSys,
                 method(init),
                 method(newAccount, name, authService, requireNew),
-                method(setAuthCntr, authService),
-                method(exists, num)
+                method(setAuthServ, authService),
+                method(exists, name)
                 //
    )
 }  // namespace SystemService

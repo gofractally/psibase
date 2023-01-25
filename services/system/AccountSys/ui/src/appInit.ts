@@ -52,7 +52,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                         );
                         await action(
                             thisApplet,
-                            "setAuthCntr",
+                            "setAuthServ",
                             { authService: "auth-ec-sys" },
                             name
                         );

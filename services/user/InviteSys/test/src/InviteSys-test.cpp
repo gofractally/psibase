@@ -44,8 +44,8 @@ SCENARIO("Auth")
 
       THEN("Alice cannot use AuthInviteSys")
       {
-         auto setAuthCntr = a.setAuthCntr(AuthInviteSys::service);
-         CHECK(setAuthCntr.failed(notWhitelisted));
+         auto setAuthServ = a.setAuthServ(AuthInviteSys::service);
+         CHECK(setAuthServ.failed(notWhitelisted));
       }
       THEN("AccountSys can still create new accounts")
       {
