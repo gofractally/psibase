@@ -7,6 +7,7 @@
 - [Psinode and Psibase](psibase/README.md)
   - [Serving https](psibase/https.md)
   - [Logging](psibase/logging.md)
+- [Documentation](psibase/documentation.md)
 - [Services](services.md)
   - [C++ Services]()
     - [Basic Service](cpp-service/basic/README.md)
