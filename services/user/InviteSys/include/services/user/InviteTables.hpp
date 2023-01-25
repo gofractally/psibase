@@ -14,6 +14,16 @@ namespace UserService
       PSIO_REFLECT(ServiceEventRecord, key, eventHead);
       using ServiceEventTable = psibase::Table<ServiceEventRecord, &ServiceEventRecord::key>;
 
+      struct UserEventRecord
+      {
+         psibase::AccountNumber user;
+         uint64_t               eventHead;
+      };
+      PSIO_REFLECT(UserEventRecord, user, eventHead);
+      using UserEventTable = psibase::Table<UserEventRecord, &UserEventRecord::user>;
+
+      /// Table to track the contents of the invite creation
+      /// whitelist and blacklist
       struct InviteSettingsRecord
       {
          psibase::SingletonKey               key;
@@ -23,14 +33,6 @@ namespace UserService
       PSIO_REFLECT(InviteSettingsRecord, key, whitelist, blacklist);
       using InviteSettingsTable = psibase::Table<InviteSettingsRecord, &InviteSettingsRecord::key>;
 
-      struct UserEventRecord
-      {
-         psibase::AccountNumber user;
-         uint64_t               eventHead;
-      };
-      PSIO_REFLECT(UserEventRecord, user, eventHead);
-      using UserEventTable = psibase::Table<UserEventRecord, &UserEventRecord::user>;
-
       enum InviteStates
       {
          pending = 0,
@@ -38,6 +40,18 @@ namespace UserService
          rejected
       };
 
+      /// Table to track the contents of an invite
+      ///
+      /// - `pubkey`: The public key of the invite. This uniquely identifies
+      /// an invite and is also used to authenticate transactions by users without
+      /// an existing Psibase account.
+      /// - `inviter`: The creator of the invite object
+      /// - `actor`: The last account to accept or reject the invite
+      /// - `expiry`: The time in seconds at which this invite expires
+      /// - `newAccountToken`: A flag that represents whether a new account may
+      /// still be created by redeeming this invite
+      /// - `state`: An integer representing whether the invite is pending (0),
+      /// accepted (1), or rejected (2)
       struct InviteRecord
       {
          psibase::PublicKey     pubkey;

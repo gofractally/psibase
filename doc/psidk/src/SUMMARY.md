@@ -49,4 +49,6 @@
   - [proxy-sys](system-service/proxy-sys.md)
   - [psispace-sys](system-service/psispace-sys.md)
   - [admin-sys](system-service/admin-sys.md)
+- [Core Services]()
+  - [invite-sys](system-service/invite-sys.md)
 - [Standard Actions](standards/actions.md)
