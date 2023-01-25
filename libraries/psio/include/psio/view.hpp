@@ -11,7 +11,8 @@ namespace psio
    template <typename P>
    struct view_buffer
    {
-      P data;
+      P           data;
+      friend auto operator<=>(const view_buffer&, const view_buffer&) = default;
    };
 
    template <typename T>
@@ -309,6 +310,124 @@ namespace psio
           prevalidated{static_cast<view_base<T>&>(v).data + fixed_offsets<std::remove_cv_t<T>>[I]}};
    }
 
+   template <typename T>
+   struct view_iterator : view_base<T>
+   {
+      view_iterator() = default;
+      explicit view_iterator(prevalidated<char_ptr<T>> data) : view_base<T>{data.data} {}
+      template <typename U>
+         requires(std::is_same_v<T, const U>)
+      view_iterator(const view_iterator<U>& other) : view_base<T>(other.data)
+      {
+      }
+      using value_type       = std::remove_cv_t<T>;
+      using reference        = view<T>;
+      using difference_type  = std::ptrdiff_t;
+      using iterator_concept = std::random_access_iterator_tag;
+      constexpr view_iterator& operator++() { return *this += 1; }
+      constexpr view_iterator  operator++(int)
+      {
+         auto result = *this;
+         ++*this;
+         return result;
+      }
+      constexpr view_iterator& operator--() { return *this -= 1; }
+      constexpr view_iterator  operator--(int)
+      {
+         auto result = *this;
+         --*this;
+         return result;
+      }
+      constexpr view_iterator& operator+=(difference_type diff)
+      {
+         this->data += diff * is_packable<std::remove_cv_t<T>>::fixed_size;
+         return *this;
+      }
+      constexpr view_iterator& operator-=(difference_type diff) { return *this += -diff; }
+      friend view_iterator     operator+(const view_iterator& rhs, difference_type lhs)
+      {
+         view_iterator result = rhs;
+         result += lhs;
+         return result;
+      }
+      friend view_iterator operator+(difference_type lhs, const view_iterator& rhs)
+      {
+         return rhs + lhs;
+      }
+      friend view_iterator operator-(const view_iterator& rhs, difference_type lhs)
+      {
+         view_iterator result = rhs;
+         result -= lhs;
+         return result;
+      }
+      friend difference_type operator-(const view_iterator& rhs, const view_iterator& lhs)
+      {
+         return (rhs.data - lhs.data) / is_packable<std::remove_cv_t<T>>::fixed_size;
+      }
+      friend constexpr auto operator<=>(const view_iterator&, const view_iterator&) = default;
+      reference             operator*() const
+      {
+         if constexpr (is_packable<value_type>::is_optional ||
+                       !is_packable<value_type>::is_variable_size)
+            return reference{prevalidated{this->data}};
+         else
+         {
+            std::uint32_t offset;
+            std::uint32_t pos = 0;
+            (void)unpack_numeric<false>(&offset, this->data, pos, 4);
+            return reference{prevalidated{this->data + offset}};
+         }
+      }
+      auto      operator->() const { return operator_arrow_proxy{**this}; }
+      reference operator[](difference_type n) const { return *(*this + n); }
+   };
+
+   template <typename T>
+      requires(is_std_vector_v<std::remove_cv_t<T>>)
+   struct view_interface<T> : view_base<T>
+   {
+      using value_type = T::value_type;
+      using reference  = view<std::conditional_t<std::is_const_v<T>, const value_type, value_type>>;
+      using const_reference = view<const value_type>;
+      using size_type       = std::size_t;
+      using difference_type = std::ptrdiff_t;
+      using const_iterator  = view_iterator<const value_type>;
+      using iterator =
+          view_iterator<std::conditional_t<std::is_const_v<T>, const value_type, value_type>>;
+      using reverse_iterator       = std::reverse_iterator<iterator>;
+      using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+      iterator begin() const { return iterator{prevalidated{this->data + 4}}; }
+      iterator end() const
+      {
+         std::uint32_t size;
+         std::uint32_t pos = 0;
+         (void)unpack_numeric<false>(&size, this->data, pos, 4);
+         return iterator{prevalidated{this->data + 4 + size}};
+      }
+      const_iterator         cbegin() const { return begin(); }
+      const_iterator         cend() const { return end(); }
+      reverse_iterator       rbegin() const { return reverse_iterator(end()); }
+      reverse_iterator       rend() const { return reverse_iterator(begin()); }
+      const_reverse_iterator crbegin() const { return const_reverse_iterator(end()); }
+      const_reverse_iterator crend() const { return const_reverse_iterator(begin()); }
+      bool                   empty() { return size() == 0; }
+      std::size_t            size() const { return end() - begin(); }
+      reference              operator[](size_type idx) const { return *(begin() + idx); }
+      reference              at(size_type idx) const
+      {
+         if (idx < size())
+         {
+            return *(begin() + idx);
+         }
+         else
+         {
+            throw std::out_of_range("view<vector> our of range");
+         }
+      }
+      reference front() const { return *begin(); }
+      reference back() const { return *(end() - 1); }
+   };
+
    template <typename T, typename Ch>
    Ch* validate_view(std::span<Ch> data)
    {
@@ -327,9 +446,9 @@ namespace psio
    concept ReflectProxy = requires(const T& t) { t.psio_get_proxy(); };
 
    template <ReflectProxy T>
-   decltype(auto) get_view_data(const T& proxy)
+   auto get_view_data(const T& proxy)
    {
-      return proxy.psio_get_proxy();
+      return get_view_data(proxy.psio_get_proxy());
    }
 
    template <typename T>
@@ -340,6 +459,11 @@ namespace psio
       static_assert(ReflectProxy<view_interface<T>> ||
                     std::is_base_of_v<view_base<T>, view_interface<T>>);
       explicit view(std::span<char_t<T>> data) : view_interface<T>{validate_view<T>(data)} {}
+      template <typename U>
+         requires(std::is_same_v<T, const U>)
+      view(const view<U>& other) : view_interface<T>{get_view_data(other)}
+      {
+      }
       template <typename U>
       explicit constexpr view(prevalidated<U>&& data)
           : view_interface<T>{std::span<char_t<T>>{data.data}.data()}

@@ -1336,6 +1336,8 @@ namespace psio
    template <typename T>
    prevalidated(T*&) -> prevalidated<T*>;
    template <typename T>
+   prevalidated(T* const&) -> prevalidated<T*>;
+   template <typename T>
    prevalidated(T&&) -> prevalidated<T>;
 
    template <Packable T>
