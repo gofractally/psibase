@@ -1,3 +1,5 @@
+#pragma once
+
 #include <psio/fracpack2.hpp>
 
 #include <type_traits>

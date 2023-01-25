@@ -1,5 +1,7 @@
 #include <psio/view.hpp>
 
+#include <psio/shared_view_ptr.hpp>
+
 #include <catch2/catch.hpp>
 
 template <typename T, typename F>
@@ -219,4 +221,22 @@ TEST_CASE("vector view", "[view]")
           *(v.begin() + 2) = 4;
        },
        std::vector<uint8_t>{1, 3, 4, 2});
+}
+
+TEST_CASE("shared_view_ptr view", "[view]")
+{
+   test_view(psio::shared_view_ptr<std::uint8_t>(std::uint8_t{42}),
+             [](auto v)
+             {
+                CHECK(!!v);
+                CHECK(*v == 42);
+                CHECK(v.size() == 1);
+             });
+   test_view(psio::shared_view_ptr{struct0{42, 127}},
+             [](auto v)
+             {
+                CHECK(!!v);
+                CHECK(v->v0() == 42);
+                CHECK(v->v1() == 127);
+             });
 }

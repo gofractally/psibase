@@ -1,4 +1,5 @@
 #include <psio/fracpack2.hpp>
+#include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
 // Prevent clang-format from munging the header order
 #include <psio/to_json.hpp>  // FIXME: needed by to_hex
@@ -39,6 +40,15 @@ struct Catch::StringMaker<std::variant<T...>>
 };
 
 template <typename T>
+struct Catch::StringMaker<psio::shared_view_ptr<T>>
+{
+   static std::string convert(const psio::shared_view_ptr<T>& value)
+   {
+      return psio::hex(value.data(), value.data() + value.size());
+   }
+};
+
+template <typename T>
 bool bitwise_equal(const std::vector<T>& lhs, const std::vector<T>& rhs);
 template <typename T>
 bool bitwise_equal(const std::optional<T>& lhs, const std::optional<T>& rhs);
@@ -48,6 +58,8 @@ template <typename... T>
 bool bitwise_equal(const std::variant<T...>& lhs, const std::variant<T...>& rhs);
 template <typename T, std::size_t N>
 bool bitwise_equal(const std::array<T, N>& lhs, const std::array<T, N>& rhs);
+template <typename T>
+bool bitwise_equal(const psio::shared_view_ptr<T>& lhs, const psio::shared_view_ptr<T>& rhs);
 
 template <typename T>
    requires std::is_arithmetic_v<T> bool
@@ -120,31 +132,30 @@ bool bitwise_equal(const std::array<T, N>& lhs, const std::array<T, N>& rhs)
 }
 
 template <typename T>
+bool bitwise_equal(const psio::shared_view_ptr<T>& lhs, const psio::shared_view_ptr<T>& rhs)
+{
+   return bitwise_equal(lhs->unpack(), rhs->unpack());
+}
+
+template <typename T>
 struct BitwiseEqual : Catch::MatcherBase<T>
 {
    explicit BitwiseEqual(const T& v) : value(v) {}
    bool        match(const T& other) const { return bitwise_equal(value, other); }
-   std::string describe() const { return " == " + Catch::StringMaker<T>::convert(value); }
+   std::string describe() const { return "== " + Catch::StringMaker<T>::convert(value); }
    T           value;
 };
 
-template <typename T>
-constexpr bool need_bitwise_compare = std::is_floating_point_v<T>;
-
-template <typename T>
-constexpr bool need_bitwise_compare<std::optional<T>> = need_bitwise_compare<T>;
-
-template <typename T>
-constexpr bool need_bitwise_compare<std::vector<T>> = need_bitwise_compare<T>;
-
-template <typename... T>
-constexpr bool need_bitwise_compare<std::tuple<T...>> = (... || need_bitwise_compare<T>);
-
-template <typename... T>
-constexpr bool need_bitwise_compare<std::variant<T...>> = (... || need_bitwise_compare<T>);
-
-template <typename T, std::size_t N>
-constexpr bool need_bitwise_compare<std::array<T, N>> = need_bitwise_compare<T>;
+std::vector<std::byte> to_bytes(const std::vector<char>& data)
+{
+   std::vector<std::byte> result;
+   result.reserve(data.size());
+   for (auto ch : data)
+   {
+      result.push_back(static_cast<std::byte>(ch));
+   }
+   return result;
+}
 
 template <typename T>
 auto test_base(const T& value)
@@ -166,14 +177,7 @@ auto test_base(const T& value)
                                                               data.data(), pos, data.size()));
       CHECK(!has_unknown);
       CHECK(known_end);
-      if constexpr (need_bitwise_compare<T>)
-      {
-         CHECK_THAT(result, BitwiseEqual(value));
-      }
-      else
-      {
-         CHECK(result == value);
-      }
+      CHECK_THAT(result, BitwiseEqual(value));
       CHECK(pos == data.size());
    }
    {
@@ -194,14 +198,7 @@ auto test_base(const T& value)
       CHECK(psio::is_packable<T>::template unpack<true, false>(&result, has_unknown, known_end,
                                                                data.data(), pos, data.size()));
       CHECK(!has_unknown);
-      if constexpr (need_bitwise_compare<T>)
-      {
-         CHECK_THAT(result, BitwiseEqual(value));
-      }
-      else
-      {
-         CHECK(result == value);
-      }
+      CHECK_THAT(result, BitwiseEqual(value));
       CHECK(pos == data.size());
    }
    // convenience functions
@@ -473,6 +470,13 @@ void test(std::initializer_list<T> values)
       test(std::tuple{std::optional<std::array<T, 20>>{}});
       test(std::tuple{std::optional{a}});
    }
+   // shared_view_ptr
+   {
+      for (const auto& v : values)
+      {
+         test(psio::shared_view_ptr{v});
+      }
+   }
 }
 
 struct fixed_struct
@@ -588,7 +592,8 @@ void test_compat(const T& t, const U& u, bool expect_unknown)
    {
       CHECK_THAT(psio::from_frac<U>(data), BitwiseEqual(u));
       CHECK_THAT(psio::from_frac<U>(psio::prevalidated{data}), BitwiseEqual(u));
-      CHECK(psio::fracpack_validate<U>(data) == (expect_unknown? psio::validation_t::extended : psio::validation_t::valid));
+      CHECK(psio::fracpack_validate<U>(data) ==
+            (expect_unknown ? psio::validation_t::extended : psio::validation_t::valid));
    }
 }
 
@@ -614,6 +619,8 @@ void test_compat_wrap(const T& t, const U& u, bool expect_unknown)
                expect_unknown);
    test_compat(std::array{t}, std::array{u}, expect_unknown);
    test_compat(std::variant<T>{t}, std::variant<U>{u}, expect_unknown);
+   test_compat(psio::shared_view_ptr{t}, psio::shared_view_ptr{u}, expect_unknown);
+   test_compat(psio::shared_view_ptr<T>{t}, to_bytes(psio::to_frac(t)), false);
 }
 
 template <typename...>
