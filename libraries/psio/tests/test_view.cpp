@@ -189,6 +189,19 @@ TEST_CASE("vector view", "[view]")
                 CHECK(v.at(2) == 127);
                 CHECK(v.at(3) == 255);
                 CHECK_THROWS_AS(v.at(4), std::out_of_range);
+                CHECK(*v.begin() == 0);
+                CHECK(*--v.end() == 255);
+                CHECK(*v.cbegin() == 0);
+                CHECK(*--v.cend() == 255);
+                CHECK(*v.rbegin() == 255);
+                CHECK(*--v.rend() == 0);
+                CHECK(*v.crbegin() == 255);
+                CHECK(*--v.crend() == 0);
+                CHECK(v.end() - v.begin() == 4);
+                CHECK(4 + v.begin() == v.end());
+                CHECK(v.begin() + 4 == v.end());
+                CHECK(v.end() - 4 == v.begin());
+                CHECK(v.begin() < v.end());
                 int sum = 0;
                 for (std::uint8_t elem : v)
                 {
