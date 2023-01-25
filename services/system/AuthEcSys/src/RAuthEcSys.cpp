@@ -49,7 +49,7 @@ namespace SystemService
              after);
       }
 
-      auto account(AccountNumber name)
+      auto account(AccountNumber name) const
       {
          AuthEcSys::Tables db{AuthEcSys::service};
          auto              account = db.open<AuthEcSys::AuthTable>().get(name);
