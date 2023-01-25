@@ -722,6 +722,7 @@ fn parse<'tu>(
         &("-I".to_owned() + build_path + "/wasm/deps/include"),
         &("-I".to_owned() + repo_path + "/services/system/ProxySys/include"),
         &("-I".to_owned() + repo_path + "/services/system/TransactionSys/include"),
+        &("-I".to_owned() + repo_path + "/services/system/AccountSys/include"),
         &("-I".to_owned() + repo_path + "/services/user/CommonSys/include"),
         &("-I".to_owned() + repo_path + "/services/user/PsiSpaceSys/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
