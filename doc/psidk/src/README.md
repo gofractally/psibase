@@ -118,6 +118,8 @@ Decentralized deployments give users the maximum confidence in the validity of t
 
 Rather than use a permissionless and unbounded set of active infrastructure providers, as is done in many other distributed web application deployment infrastructure systems such as the Ethereum blockchain, Psibase uses a permissionless and unbounded set of infrastructure provider candidates and runs a continuous election in order to achieve a limited final set of active infrastructure providers. This is done to maximize throughput while preserving the system integrity.
 
+Some core capabilities may be missing from Psibase to accomodate this deployment type at this time. Simple and centralized deployments are our current priority.
+
 ## Conclusion
 
 Psibase is more than a blockchain platform. Psibase is the brand that encapsulates a whole host of open-source technical innovations including a new blockchain architecture, libraries for database management and data-serialization, and a full-stack web3 application and microservices framework. It is the output of the research and development arm of ƒractally concerned with producing best-in-class base-layer infrastructure that can be trusted to reliably power the next generation of humanity's online collaboration and governance tools.
