@@ -31,7 +31,7 @@ The following sequence diagram provides an outline of the high level user flow f
 sequenceDiagram
    title Inviting a user to an application
    actor Bob
-   participant invite-sys applet
+   participant InviteApplet
    participant Application
    participant Chain
 
@@ -39,24 +39,24 @@ sequenceDiagram
    Application->>Chain: New invite "PVT_9FE8XA"
    Note over Chain: Store invite
    note over Application: Alice sends invite link to Bob
-   Bob->>invite-sys applet: Opens link<br>"/applet/invite-sys?token=PVT_9FE8XA"
-   invite-sys applet->>Bob: Sign In or Create account?
+   Bob->>InviteApplet: Opens link<br>"/applet/invite-sys?token=PVT_9FE8XA"
+   InviteApplet->>Bob: Sign In or Create account?
    alt Creating Account
-   Bob->>invite-sys applet: Create account<br>with Token "PVT_9FE8XA"
-   invite-sys applet->>Chain: ::acceptCreate(token, newAccName = bob, newAccKey)
+   Bob->>InviteApplet: Create account<br>with Token "PVT_9FE8XA"
+   InviteApplet->>Chain: ::acceptCreate(token, newAccName = bob, newAccKey)
    Note over Chain: Create account called Bob.<br>Record Bob accepts invite.
    else Signing In
-   Bob->>invite-sys applet: My account is Bob<br> with Token "PVT_9FE8XA"
-   invite-sys applet->>Chain: ::accept("PVT_9FE8XA")
+   Bob->>InviteApplet: My account is Bob<br> with Token "PVT_9FE8XA"
+   InviteApplet->>Chain: ::accept("PVT_9FE8XA")
    Note over Chain: Record Bob accepts invite.
    end
-   invite-sys applet->>Bob: Redirect to application
+   InviteApplet->>Bob: Redirect to application
    Bob->>Application: acceptInvite("PVT_9FE8XA")
-   Application->>invite-sys applet: Who redeemed "PVT_9FE8XA"?
-   invite-sys applet-->>Application: Bob
+   Application->>InviteApplet: Who redeemed "PVT_9FE8XA"?
+   InviteApplet-->>Application: Bob
    Note over Application: Records Bob's membership
-   Application->>invite-sys applet: delInvite("PVT_9FE8XA")
-   invite-sys applet-->>Application: (free resources)
+   Application->>InviteApplet: delInvite("PVT_9FE8XA")
+   InviteApplet-->>Application: (free resources)
    Application->>Bob: Congrats
 ```
 
