@@ -1,4 +1,4 @@
-# Invites
+# Invites and user onboarding
 
 ## Background
 
