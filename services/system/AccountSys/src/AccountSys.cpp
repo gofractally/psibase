@@ -88,7 +88,7 @@ namespace SystemService
       statusTable.put(*status);
    }
 
-   void AccountSys::setAuthCntr(psibase::AccountNumber authService)
+   void AccountSys::setAuthServ(psibase::AccountNumber authService)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
@@ -102,12 +102,12 @@ namespace SystemService
       accountTable.put(*account);
    }
 
-   bool AccountSys::exists(AccountNumber num)
+   bool AccountSys::exists(AccountNumber name)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
-      return accountIndex.get(num) != std::nullopt;
+      return accountIndex.get(name) != std::nullopt;
    }
 
 }  // namespace SystemService

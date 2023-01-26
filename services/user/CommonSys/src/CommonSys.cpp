@@ -32,9 +32,6 @@ namespace SystemService
       {
          if (request.target.starts_with("/applet/"))
          {
-            // All requests to load a specific applet will return the root index from common-sys.
-            // Then common-sys will read the URL bar, detect that an applet is being loaded,
-            // and request the applet to load inside an iframe.
             request.target = "/";
          }
          if (request.target == "/common/thisservice")
@@ -104,30 +101,6 @@ namespace SystemService
       psibase::check(getSender() == getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
                             Tables{getReceiver()});
-   }
-
-   std::optional<HttpReply> CommonSys::serveCommon(HttpRequest request)
-   {
-      if (request.method == "GET")
-      {
-         for (auto [target, replacement] : commonResMap)
-         {
-            if (target == request.target)
-            {
-               auto index = ServiceTables<WebContentTable>{getReceiver()}
-                                .open<WebContentTable>()
-                                .getIndex<0>();
-               if (auto content = index.get(std::string(replacement)))
-               {
-                  return HttpReply{
-                      .contentType = content->contentType,
-                      .body        = content->content,
-                  };
-               }
-            }
-         }
-      }
-      return std::nullopt;
    }
 
 }  // namespace SystemService
