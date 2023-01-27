@@ -21,7 +21,7 @@ pub mod server_interface {
     /// Handle HTTP requests
     ///
     /// Define this action in your service to handle HTTP requests. You'll also need to
-    /// [register your service](https://doc-sys.psibase.io/rust-service/reference/web-services.html#registration).
+    /// [register your service](https://doc-sys.psibase.io/services/rust-service/reference/web-services.html#registration).
     ///
     /// `serveSys` can do any of the following:
     ///

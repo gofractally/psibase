@@ -14,9 +14,6 @@ namespace SystemService
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
-
-     private:
-      std::optional<psibase::HttpReply> serveRestEndpoints(psibase::HttpRequest& request);
    };
    PSIO_REFLECT(RAuthEcSys,  //
                 method(serveSys, request),

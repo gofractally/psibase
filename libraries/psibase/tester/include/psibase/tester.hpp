@@ -124,6 +124,8 @@ namespace psibase
       Result(TransactionTrace&& t) : TraceResult(std::forward<TransactionTrace>(t)) {}
    };
 
+   using KeyList = std::vector<std::pair<psibase::PublicKey, psibase::PrivateKey>>;
+
    /**
     * Manages a chain.
     * Only one TestChain can exist at a time.
@@ -134,7 +136,8 @@ namespace psibase
      private:
       uint32_t                          id;
       std::optional<psibase::StatusRow> status;
-      bool                              producing = false;
+      bool                              producing        = false;
+      bool                              isAutoBlockStart = true;
 
      public:
       static const PublicKey  defaultPubKey;
@@ -162,6 +165,15 @@ namespace psibase
       std::string getPath();
 
       /**
+       * By default, the TestChain will automatically advance blocks.
+       * When autoBlockStart is disabled, the the chain will only advance blocks manually.
+       * To manually advance a block, you must call startBlock.
+       *
+       * @param enable Whether the chain should automatically advance blocks.
+       */
+      void setAutoBlockStart(bool enable);
+
+      /**
        * Start a new pending block.  If a block is currently pending, finishes it first.
        * May push additional blocks if any time is skipped.
        *
@@ -182,12 +194,12 @@ namespace psibase
       /*
        * Set the reference block of the transaction to the head block.
        */
-      void fillTapos(Transaction& t, uint32_t expire_sec = 2);
+      void fillTapos(Transaction& t, uint32_t expire_sec = 2) const;
 
       /*
        * Creates a transaction.
        */
-      Transaction makeTransaction(std::vector<Action>&& actions = {});
+      Transaction makeTransaction(std::vector<Action>&& actions = {}) const;
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
@@ -197,43 +209,17 @@ namespace psibase
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] TransactionTrace pushTransaction(
-          Transaction                                          trx,
-          const std::vector<std::pair<PublicKey, PrivateKey>>& keys = {
-              {defaultPubKey, defaultPrivKey}});
-
-      /**
-       * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
-       *
-       * Validates the transaction status according to @ref eosio::expect.
-       */
-      TransactionTrace transact(std::vector<Action>&&                                actions,
-                                const std::vector<std::pair<PublicKey, PrivateKey>>& keys,
-                                const char* expectedExcept = nullptr);
-      TransactionTrace transact(std::vector<Action>&& actions,
-                                const char*           expectedExcept = nullptr);
-
-      template <typename Action, typename... Args>
-      auto trace(const std::optional<std::vector<std::vector<char>>>& cfd,
-                 const Action&                                        action,
-                 Args&&... args)
-      {
-         if (!cfd)
-         {
-            return pushTransaction(makeTransaction({action.to_action(std::forward<Args>(args)...)}),
-                                   {defaultPrivKey});
-         }
-         else
-         {
-            return pushTransaction(
-                makeTransaction({}, {action.to_action(std::forward<Args>(args)...)}),
-                {defaultPrivKey}, *cfd);
-         }
-      }
+      [[nodiscard]] TransactionTrace pushTransaction(Transaction    trx,
+                                                     const KeyList& keys = {{defaultPubKey,  //
+                                                                             defaultPrivKey}});
 
       template <typename Action>
-      auto trace(Action&& a)
+      auto trace(Action&& a, const KeyList& keyList)
       {
+         if (keyList.size() > 0)
+         {
+            return pushTransaction(makeTransaction({a}), keyList);
+         }
          return pushTransaction(makeTransaction({a}));
       }
 
@@ -242,14 +228,15 @@ namespace psibase
        */
       struct PushTransactionProxy
       {
-         PushTransactionProxy(TestChain& t, AccountNumber s, AccountNumber r)
-             : chain(t), sender(s), receiver(r)
+         PushTransactionProxy(TestChain& t, AccountNumber s, AccountNumber r, const KeyList& keys)
+             : chain(t), sender(s), receiver(r), keys(keys)
          {
          }
 
          TestChain&    chain;
          AccountNumber sender;
          AccountNumber receiver;
+         KeyList       keys;
 
          template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
          auto call(Args&&... args) const
@@ -259,7 +246,12 @@ namespace psibase
             auto act = action_builder_proxy(sender, receiver)
                            .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
 
-            return Result<result_type>(chain.trace(act));
+            if (chain.isAutoBlockStart)
+            {
+               chain.startBlock(0);
+            }
+
+            return Result<result_type>(chain.trace(act, keys));
          }
       };
 
@@ -277,11 +269,17 @@ namespace psibase
       {
          TestChain&    t;
          AccountNumber id;
+         KeyList       signingKeys;
 
          template <typename Other>
          auto to() const
          {
-            return ServiceUser<Other>(t, id, Other::service);
+            return ServiceUser<Other>(t, id, Other::service, signingKeys);
+         }
+
+         auto with(const KeyList& signingKeys)
+         {  //
+            return UserContext{t, id, signingKeys};
          }
 
          operator AccountNumber() { return id; }

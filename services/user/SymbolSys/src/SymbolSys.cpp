@@ -54,7 +54,7 @@ void SymbolSys::init()
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
-   // Configure manualDebit
+   // Configure manualDebit for self on Token and NFT
    to<TokenSys>().setUserConf("manualDebit"_m, true);
    to<NftSys>().setUserConf("manualDebit"_m, true);
 

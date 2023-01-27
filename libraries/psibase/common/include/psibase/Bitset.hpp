@@ -75,32 +75,32 @@ namespace psibase
    PSIO_REFLECT(Bitset_32, bits);
    PSIO_REFLECT(Bitset_64, bits);
 
-   using NamedBit = psibase::MethodNumber;
-   template <NamedBit... Args>
-   class NamedBits
+   using EnumElement = psibase::MethodNumber;
+   template <EnumElement... Args>
+   class Enum
    {
      public:
-      static const size_t nrBits = sizeof...(Args);
-      // TODO: rename; UPPERCASE_IS_FOR_MACROS_ONLY
-      static constexpr uint8_t INVALID = std::numeric_limits<uint8_t>::max();
+      static const size_t nrElements = sizeof...(Args);
 
-      static constexpr uint8_t getIndex(NamedBit flag)
+      static constexpr uint8_t invalid = std::numeric_limits<uint8_t>::max();
+
+      static constexpr uint8_t value(EnumElement elem)
       {
          std::size_t i = 0;
-         while (i < _flags.size())
+         while (i < elements.size())
          {
-            if (flag == _flags[i])
+            if (elem == elements[i])
             {
                return static_cast<uint8_t>(i);
             }
             ++i;
          }
 
-         return INVALID;
+         return invalid;
       }
 
      private:
-      static constexpr std::array<NamedBit, nrBits> _flags = {{Args...}};
+      static constexpr std::array<EnumElement, nrElements> elements = {{Args...}};
    };
 
 }  // namespace psibase

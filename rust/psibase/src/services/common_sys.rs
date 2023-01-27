@@ -11,11 +11,6 @@ mod service {
     }
 
     #[action]
-    fn serveCommon(request: HttpRequest) -> Option<crate::http::HttpReply> {
-        unimplemented!()
-    }
-
-    #[action]
     fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
         unimplemented!()
     }

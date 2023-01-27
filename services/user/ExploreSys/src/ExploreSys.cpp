@@ -23,8 +23,6 @@ namespace SystemService
 {
    std::optional<psibase::HttpReply> ExploreSys::serveSys(psibase::HttpRequest request)
    {
-      //      if (auto result = to<CommonSys>().serveCommon(request).unpack())
-      //         return result;
       if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
       if (auto result = psibase::serveContent(request, Tables{psibase::getReceiver()}))

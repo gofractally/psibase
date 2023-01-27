@@ -13,6 +13,11 @@ namespace SystemService
                         psibase::Action             action,
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
+      void canAuthUserSys(psibase::AccountNumber user);
    };
-   PSIO_REFLECT(AuthAnySys, method(checkAuthSys, flags, requester, action, allowedActions, claims))
+   PSIO_REFLECT(AuthAnySys,  //
+                method(checkAuthSys, flags, requester, action, allowedActions, claims),
+                method(canAuthUserSys, user)
+                //
+   )
 }  // namespace SystemService

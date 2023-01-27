@@ -1,5 +1,9 @@
 {
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "xaver.clang-format",
+    "editor.tabSize": 3,
+    "[markdown]": {
+        "files.trimTrailingWhitespace": false
+    },
     "C_Cpp.clang_format_path": "/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
 }

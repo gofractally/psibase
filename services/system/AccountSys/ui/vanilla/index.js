@@ -40,7 +40,7 @@ initializeApplet(async () => {
           action("auth-ec-sys", "setKey", { key: pubKey }, name);
           action(
             contractName,
-            "setAuthCntr",
+            "setAuthServ",
             { authService: "auth-ec-sys" },
             name,
           );
@@ -183,7 +183,7 @@ const KeyPair = () => {
                     <td>
                         <button onClick=${generateKeyPair}>Generate</button>
                     </td>
-                </tr>    
+                </tr>
                 <tr>
                     <td>Public key</td>
                     <td>
