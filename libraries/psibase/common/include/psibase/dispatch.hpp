@@ -3,7 +3,6 @@
 #include <psibase/Service.hpp>
 #include <psibase/nativeFunctions.hpp>
 #include <psio/fracpack.hpp>
-#include <psio/to_hex.hpp>
 
 namespace psibase
 {
@@ -62,17 +61,9 @@ namespace psibase
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
 
-             printf("running action: %s\n",
-                    psio::to_hex(std::span{act.data(), act.size()}).c_str());
-             fflush(stdout);
-
              auto param_data = std::span{act->rawData().data(), act->rawData().size()};
              psibase::check(psio::fracpack_validate<param_tuple>(param_data),
-                            "invalid argument encoding for " + act->method().unpack().str() + ": " +
-                                psio::to_hex(param_data));
-
-             printf("validated\n");
-             fflush(stdout);
+                            "invalid argument encoding for " + act->method().unpack().str());
 
              psio::view<const param_tuple> param_view(psio::prevalidated{param_data});
 
