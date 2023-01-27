@@ -59,13 +59,12 @@ namespace UserService
    void AuthInviteSys::requireAuth(const PublicKey& pubkey)
    {
       auto claims = to<SystemService::TransactionSys>().getTransaction().claims;
-      bool found =
-          std::find_if(claims.begin(), claims.end(),
-                       [&](auto claim)
-                       {
-                          return claim.service == SystemService::VerifyEcSys::service &&
-                                 psio::convert_from_frac<PublicKey>(claim.rawData) == pubkey;
-                       }) != claims.end();
+      bool found  = std::find_if(claims.begin(), claims.end(),
+                                 [&](auto claim)
+                                 {
+                                   return claim.service == SystemService::VerifyEcSys::service &&
+                                          psio::from_frac<PublicKey>(claim.rawData) == pubkey;
+                                }) != claims.end();
 
       std::string err = "requireAuth: ";
       err += missingInviteSig;
