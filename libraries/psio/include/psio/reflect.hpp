@@ -26,7 +26,6 @@
 #include <boost/preprocessor/variadic/to_seq.hpp>
 
 #include <psio/get_type_name.hpp>
-#include <psio/member_proxy.hpp>
 
 namespace psio
 {
@@ -676,14 +675,14 @@ namespace std
                                            &STRUCT::PSIO_GET_IDENT(elem)>();          \
    }
 
-#define PSIO_PROXY_METHOD(r, STRUCT, i, elem)                                           \
-   template <typename... Args>                                                          \
-   auto PSIO_GET_IDENT(elem)(Args... args)                                              \
-   {                                                                                    \
-      psio::member_proxy<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))),  \
-                                            &STRUCT::PSIO_GET_IDENT(elem), ProxyObject> \
-                             m(_psio_proxy_obj);                                        \
-      return m.call(std::forward<decltype(args)>(args)...);                             \
+#define PSIO_PROXY_METHOD(r, STRUCT, i, elem)                                          \
+   template <typename... Args>                                                         \
+   auto PSIO_GET_IDENT(elem)(Args... args)                                             \
+   {                                                                                   \
+      return _psio_proxy_obj                                                           \
+          .template call<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))), \
+                                            &STRUCT::PSIO_GET_IDENT(elem)>(            \
+              std::forward<decltype(args)>(args)...);                                  \
    }
 
 /**

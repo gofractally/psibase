@@ -147,65 +147,6 @@ TEST_CASE("benchmark")
       }
    }
 
-   //SECTION("protbuf unpack")
-   {
-      psio::size_stream ss;
-      psio::to_protobuf(tester, ss);
-
-      std::vector<char>      buf(ss.size);
-      psio::fixed_buf_stream ps(buf.data(), buf.size());
-      psio::to_protobuf(tester, ps);
-
-      auto start = std::chrono::steady_clock::now();
-      for (uint32_t i = 0; i < 10000; ++i)
-      {
-         flat_object temp;
-
-         psio::input_stream in(buf.data(), buf.size());
-         psio::from_protobuf_object(temp, in);
-      }
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-      std::cout << "unpack pb:      " << std::chrono::duration<double, std::milli>(delta).count()
-                << " ms  size: " << ss.size << "   ";
-      psio::size_stream  capsize;
-      psio::input_stream capin(buf.data(), buf.size());
-      psio::capp_pack(capin, capsize);
-
-      std::cout << "capsize: " << capsize.size << "\n";
-   }
-
-   //   SECTION("protbuf unpack and uncompress")
-   {
-      psio::size_stream ss;
-      psio::to_protobuf(tester, ss);
-
-      std::vector<char>      buf(ss.size);
-      psio::fixed_buf_stream ps(buf.data(), buf.size());
-      psio::to_protobuf(tester, ps);
-
-      auto compressed = psio::capn_compress(buf);
-
-      auto start = std::chrono::steady_clock::now();
-      for (uint32_t i = 0; i < 10000; ++i)
-      {
-         flat_object temp;
-         auto        uncompressed = psio::capn_uncompress(compressed);
-
-         psio::input_stream in(uncompressed.data(), uncompressed.size());
-         psio::from_protobuf_object(temp, in);
-      }
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-      std::cout << "unpack pb&cap:   " << std::chrono::duration<double, std::milli>(delta).count()
-                << " ms  size: " << ss.size << "   ";
-      psio::size_stream  capsize;
-      psio::input_stream capin(buf.data(), buf.size());
-      psio::capp_pack(capin, capsize);
-
-      std::cout << "capsize: " << capsize.size << "\n";
-   }
-
    //SECTION("bin unpack")
    {
       psio::size_stream ss;
@@ -330,22 +271,6 @@ TEST_CASE("benchmark")
       end   = std::chrono::steady_clock::now();
       delta = end - start;
       std::cout << "pack   flat&cap: " << std::chrono::duration<double, std::milli>(delta).count()
-                << " ms  size: " << s << "\n";
-
-      start = std::chrono::steady_clock::now();
-      for (uint32_t i = 0; i < 10000; ++i)
-      {
-         psio::size_stream ss;
-         psio::to_protobuf(tester, ss);
-         s = ss.size;
-
-         std::vector<char>      buf(ss.size);
-         psio::fixed_buf_stream ps(buf.data(), buf.size());
-         psio::to_protobuf(tester, ps);
-      }
-      end   = std::chrono::steady_clock::now();
-      delta = end - start;
-      std::cout << "pack   pb:      " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << s << "\n";
 
       start = std::chrono::steady_clock::now();
