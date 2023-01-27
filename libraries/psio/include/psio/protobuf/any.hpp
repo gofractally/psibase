@@ -58,12 +58,30 @@ namespace psio
          }
          void add(uint32_t field, int64_t s) { members.push_back(entry{field, s}); }
          void add(uint32_t field, int32_t s) { members.push_back(entry{field, s}); }
-         void add(uint32_t field, int16_t s) { members.push_back(entry{field, varuint32{uint32_t(s)}}); }
-         void add(uint32_t field, uint16_t s) { members.push_back(entry{field, varuint32{uint32_t(s)}}); }
-         void add(uint32_t field, int8_t s) { members.push_back(entry{field, varuint32{uint32_t(s)}}); }
-         void add(uint32_t field, uint8_t s) { members.push_back(entry{field, varuint32{uint32_t(s)}}); }
-         void add(uint32_t field, bool s) { members.push_back(entry{field, varuint32{uint32_t(s)}}); }
-         void add(uint32_t field, char s) { members.push_back(entry{field, varuint32{uint32_t(s)}}); }
+         void add(uint32_t field, int16_t s)
+         {
+            members.push_back(entry{field, varuint32{uint32_t(s)}});
+         }
+         void add(uint32_t field, uint16_t s)
+         {
+            members.push_back(entry{field, varuint32{uint32_t(s)}});
+         }
+         void add(uint32_t field, int8_t s)
+         {
+            members.push_back(entry{field, varuint32{uint32_t(s)}});
+         }
+         void add(uint32_t field, uint8_t s)
+         {
+            members.push_back(entry{field, varuint32{uint32_t(s)}});
+         }
+         void add(uint32_t field, bool s)
+         {
+            members.push_back(entry{field, varuint32{uint32_t(s)}});
+         }
+         void add(uint32_t field, char s)
+         {
+            members.push_back(entry{field, varuint32{uint32_t(s)}});
+         }
          void add(uint32_t field, double s)
          {
             int64_t i;

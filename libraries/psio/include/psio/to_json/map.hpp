@@ -1,6 +1,6 @@
 #pragma once
-#include <psio/to_json.hpp>
 #include <map>
+#include <psio/to_json.hpp>
 
 namespace psio
 {

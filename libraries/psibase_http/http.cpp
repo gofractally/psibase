@@ -575,7 +575,7 @@ namespace psibase::http
             auto endExecTime = steady_clock::now();
             // TODO: option to print this
             // printf("%s\n", prettyTrace(atrace).c_str());
-            auto result  = psio::convert_from_frac<std::optional<HttpReply>>(atrace.rawRetval);
+            auto result  = psio::from_frac<std::optional<HttpReply>>(atrace.rawRetval);
             auto endTime = steady_clock::now();
 
             // TODO: consider bundling into a single attribute

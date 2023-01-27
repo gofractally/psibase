@@ -3,17 +3,18 @@
 #include <iostream>
 
 #include <psio/compress.hpp>
-#include <psio/varint.hpp>
 #include <psio/json/any.hpp>
+#include <psio/varint.hpp>
 
+#include <fstream>
 #include <psio/bytes.hpp>
 #include <psio/to_json/map.hpp>
 #include <psio/translator.hpp>
-#include <fstream>
 
 #include <chrono>
 
 #include <psio/fracpack.hpp>
+#include <psio/shared_view_ptr.hpp>
 
 namespace benchmark
 {
@@ -63,23 +64,23 @@ TEST_CASE("benchmark")
    tester.sub.a      = 3;
    tester.sub.b      = 4;
 
- //  SECTION("unpacking from flat")
+   //  SECTION("unpacking from flat")
    {
       psio::shared_view_ptr<flat_object> p(tester);
 
       auto start = std::chrono::steady_clock::now();
       for (uint32_t i = 0; i < 10000; ++i)
       {
-         p.unpack();
+         p->unpack();
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
 
       std::cout << "unpack flat:    " << std::chrono::duration<double, std::milli>(delta).count()
-                << " ms  size: " << p.size()<< "  ";
+                << " ms  size: " << p.size() << "  ";
 
-      std::vector<char> buf(p.size()+4);
-      memcpy( buf.data(), p.data(), buf.size() );
+      std::vector<char> buf(p.size() + 4);
+      memcpy(buf.data(), p.data(), buf.size());
       /*
       std::vector<char>      buf(p.data(),p.data()+p.size()+4);
       */
@@ -96,7 +97,7 @@ TEST_CASE("benchmark")
       //          std::cout <<"uncompressed.size: " << uncompressed.size() <<"\n";
    }
 
- //  SECTION("validating flat without unpacking")
+   //  SECTION("validating flat without unpacking")
    {
       psio::shared_view_ptr<flat_object> p(tester);
 
@@ -112,37 +113,38 @@ TEST_CASE("benchmark")
                 << " ms  size: " << p.size() << "  \n";
    }
 
-//   SECTION("flat unpack and uncompress")
+   //   SECTION("flat unpack and uncompress")
    {
-     if( 0 ) { 
-      psio::size_stream ss;
-      psio::fracpack(tester, ss);
-
-      std::vector<char>      buf(ss.size);
-      psio::fixed_buf_stream ps(buf.data(), buf.size());
-      psio::fracpack(tester, ps);
-
-      auto compressed = psio::capn_compress(buf);
-
-      auto start = std::chrono::steady_clock::now();
-      for (uint32_t i = 0; i < 10000; ++i)
+      if (0)
       {
-         flat_object        temp;
-         auto               uncompressed = psio::capn_uncompress(compressed);
-         psio::input_stream in(uncompressed.data(), uncompressed.size());
-         psio::fracunpack(temp, in);
+         psio::size_stream ss;
+         psio::to_frac(tester, ss);
+
+         std::vector<char>      buf(ss.size);
+         psio::fixed_buf_stream ps(buf.data(), buf.size());
+         psio::to_frac(tester, ps);
+
+         auto compressed = psio::capn_compress(buf);
+
+         auto start = std::chrono::steady_clock::now();
+         for (uint32_t i = 0; i < 10000; ++i)
+         {
+            flat_object temp;
+            auto        uncompressed = psio::capn_uncompress(compressed);
+            psio::from_frac(temp, uncompressed);
+         }
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+
+         std::cout << "unpack flat&cap: "
+                   << std::chrono::duration<double, std::milli>(delta).count()
+                   << " ms  size: " << ss.size << "  ";
+         psio::size_stream  capsize;
+         psio::input_stream capin(buf.data(), buf.size());
+         psio::capp_pack(capin, capsize);
+
+         std::cout << "capsize: " << capsize.size << "\n";
       }
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-
-      std::cout << "unpack flat&cap: " << std::chrono::duration<double, std::milli>(delta).count()
-                << " ms  size: " << ss.size << "  ";
-      psio::size_stream  capsize;
-      psio::input_stream capin(buf.data(), buf.size());
-      psio::capp_pack(capin, capsize);
-
-      std::cout << "capsize: " << capsize.size << "\n";
-     }
    }
 
    //SECTION("protbuf unpack")
@@ -173,7 +175,7 @@ TEST_CASE("benchmark")
       std::cout << "capsize: " << capsize.size << "\n";
    }
 
-//   SECTION("protbuf unpack and uncompress")
+   //   SECTION("protbuf unpack and uncompress")
    {
       psio::size_stream ss;
       psio::to_protobuf(tester, ss);
@@ -306,16 +308,15 @@ TEST_CASE("benchmark")
       s     = 0;
       start = std::chrono::steady_clock::now();
 
-
-      std::vector<char>      buf;
-      std::vector<char>      buf2;
+      std::vector<char> buf;
+      std::vector<char> buf2;
       s = psio::fracpack_size(tester);
       buf.resize(s);
       buf2.resize(s);
       for (uint32_t i = 0; i < 10000; ++i)
       {
          psio::fixed_buf_stream ps(buf.data(), buf.size());
-         psio::fracpack(tester, ps);
+         psio::to_frac(tester, ps);
 
          // psio::size_stream capsize;
 

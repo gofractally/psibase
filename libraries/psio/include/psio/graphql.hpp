@@ -2,9 +2,9 @@
 
 #include <cctype>
 #include <charconv>
-#include <psio/fracpack.hpp>
 #include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
+#include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
 #include <psio/to_json.hpp>
 #include <set>
@@ -113,7 +113,7 @@ namespace psio
          return "String";
       else if constexpr (is_std_vector<T>::value)
          return "[" + generate_gql_whole_name((typename T::value_type*)nullptr, is_input) + "]";
-      else if constexpr (is_shared_view_ptr<T>::value)
+      else if constexpr (is_shared_view_ptr_v<T>)
          return generate_gql_partial_name((T*)nullptr, is_input);
       else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
          if (is_input)
@@ -136,7 +136,7 @@ namespace psio
          return generate_gql_whole_name((typename T::element_type*)nullptr, is_input, true);
       else if constexpr (is_std_reference_wrapper<T>::value)
          return generate_gql_whole_name((typename T::type*)nullptr, is_input, false);
-      else if constexpr (is_shared_view_ptr<T>::value)
+      else if constexpr (is_shared_view_ptr_v<T>)
          return generate_gql_whole_name((typename T::value_type*)nullptr, is_input, false);
       else if (is_optional)
          return generate_gql_partial_name((T*)nullptr, is_input);
@@ -326,7 +326,7 @@ namespace psio
          fill_gql_schema((typename T::type*)nullptr, stream, defined_types, is_input);
       else if constexpr (is_std_vector_v<T>)
          fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
-      else if constexpr (is_shared_view_ptr<T>())
+      else if constexpr (is_shared_view_ptr_v<T>)
          fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
       else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
          fill_gql_schema_as((T*)nullptr, (T*)nullptr, stream, defined_types, is_input,

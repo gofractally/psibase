@@ -48,7 +48,7 @@ namespace psibase
    };
 
    template <typename T>
-   psio::shared_view_ptr<T> fraccall(const Action& a)
+   auto fraccall(const Action& a)
    {
       auto packed_action = psio::convert_to_frac(a);  /// TODO: avoid double copy of action data
       auto result_size   = raw::call(packed_action.data(), packed_action.size());
@@ -59,7 +59,6 @@ namespace psibase
          check(result.validate(), "value returned was not serialized as expected");
          return result;
       }
-      return {};
    }
 
    /**

@@ -4,9 +4,8 @@ if(DEFINED IS_NATIVE)
     find_package(Threads REQUIRED)
     add_executable(psio-tests
         graphql.cpp
-#        fracpack.cpp
         psio_tests.cpp
-        reflect.cpp
+#        reflect.cpp
 #        flat_views.cpp
 #        benchmark.cpp
 #        crypto.cpp
@@ -19,9 +18,8 @@ endif()
 if(DEFINED IS_WASM)
     add_executable(psio-tests
         graphql.cpp
-        fracpack.cpp
         psio_tests.cpp
-        reflect.cpp
+#        reflect.cpp
 #        flat_views.cpp
         benchmark.cpp
     )

@@ -59,9 +59,11 @@ namespace psio
    template <typename T, typename S>
    void to_protobuf_member(const T& obj, S& stream)
    {
-      if constexpr (is_std_optional<T>::value) {
-         if( not obj ) return;
-         to_protobuf_member( *obj, stream );
+      if constexpr (is_std_optional<T>::value)
+      {
+         if (not obj)
+            return;
+         to_protobuf_member(*obj, stream);
       }
       else if constexpr (std::is_same_v<T, std::string>)
       {
@@ -98,8 +100,10 @@ namespace psio
    template <typename Member, typename Stream>
    void write_protobuf_field(int field, const Member& member, Stream& stream)
    {
-      if constexpr (is_std_optional<Member>::value) {
-         if( !member ) return;
+      if constexpr (is_std_optional<Member>::value)
+      {
+         if (!member)
+            return;
       }
       else if constexpr (is_std_vector<std::decay_t<Member>>::value)
       {

@@ -1,14 +1,16 @@
 #pragma once
+#include <psio/fracpack.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/from_json.hpp>
 #include <psio/from_protobuf.hpp>
 #include <psio/protobuf/json.hpp>
-#include <psio/fracpack.hpp>
 #include <psio/protobuf/schema.hpp>
 #include <psio/schema.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 #include <psio/to_protobuf.hpp>
+
+#include <sstream>
 
 namespace psio
 {
@@ -55,13 +57,13 @@ namespace psio
          return get_type_name<T>();  //reflect<T>::name();
       }
 
-      virtual std::vector<char> json_to_frac(std::string json) const override 
+      virtual std::vector<char> json_to_frac(std::string json) const override
       {
          auto t = convert_from_json<T>(json);
          return to_frac(t);
       }
 
-      virtual std::vector<char> json_to_protobuf(std::string json) const override 
+      virtual std::vector<char> json_to_protobuf(std::string json) const override
       {
          auto t = convert_from_json<T>(json);
          return to_protobuf(t);
@@ -108,8 +110,6 @@ namespace psio
          return to_protobuf(t);
       }
 
-
-
       virtual std::vector<char> bin_to_protobuf(const std::vector<char>& b) const override
       {
          auto t = convert_from_bin<T>(b);
@@ -121,7 +121,6 @@ namespace psio
          auto t = convert_from_bin<T>(b);
          return to_frac(t);
       }
-
 
       virtual std::string bin_to_json(const std::vector<char>& b) const override
       {
@@ -142,7 +141,7 @@ namespace psio
       }
       string get_json_schema() const { return format_json(_schema); }
       string get_protobuf_schema() { return to_protobuf_schema(_schema); }
-      string get_gql_schema()const;
+      string get_gql_schema() const;
 
       uint32_t get_type_num(const string& type_name) const
       {
@@ -565,28 +564,37 @@ namespace psio
       out.write('}');
       return true;
    }
-   template<typename T>
-   string translator<T>::get_gql_schema()const {
-
-      auto transform_type= []( auto s ) {
-         if( s == "int32" ) s = "Int";
-         if( s == "int32[]" ) s = "Int[]";
-         if( s == "int32?" ) s = "Int?";
-         if( s == "string" ) s = "String";
-         if( s == "string[]" ) s = "String[]";
-         if( s == "string?" ) s = "String?";
-         if( s.back() == ']' ) {
-            if( s.size() > 3 ) {
-               if( s[s.size()-3] == '?' )
-                  return '[' + s.substr(0,s.size()-3)+"]!";
+   template <typename T>
+   string translator<T>::get_gql_schema() const
+   {
+      auto transform_type = [](auto s)
+      {
+         if (s == "int32")
+            s = "Int";
+         if (s == "int32[]")
+            s = "Int[]";
+         if (s == "int32?")
+            s = "Int?";
+         if (s == "string")
+            s = "String";
+         if (s == "string[]")
+            s = "String[]";
+         if (s == "string?")
+            s = "String?";
+         if (s.back() == ']')
+         {
+            if (s.size() > 3)
+            {
+               if (s[s.size() - 3] == '?')
+                  return '[' + s.substr(0, s.size() - 3) + "]!";
                else
-                  return '[' + s.substr(0,s.size()-2)+"!]!";
+                  return '[' + s.substr(0, s.size() - 2) + "!]!";
             }
-            return '[' + s.substr(0,s.size()-2)+"]!";
+            return '[' + s.substr(0, s.size() - 2) + "]!";
          }
-         if( s.back() == '?' )
-            return s.substr(0,s.size()-1);
-         return s +"!";
+         if (s.back() == '?')
+            return s.substr(0, s.size() - 1);
+         return s + "!";
       };
 
       std::stringstream ss;
@@ -604,33 +612,42 @@ namespace psio
       ss << "scalar Int8\n";
       ss << "scalar Char\n";
 
-      for( auto& items : _schema.types ) {
-        std::visit( [&]( auto i ){
-          if constexpr( std::is_same_v<decltype(i),object_type> ) {
-        ss << "type " << items.first << " { \n";
-              for( auto member : i.members ) {
-                  ss << "   " << member.name;
-                  if( member.params.size() ) {
-                     ss<<"(";
-                        int first = 0;
-                        for( auto param : member.params ) {
-                          if( first++ )
-                             ss << ", ";
-                          ss << param.name << ": " << transform_type(param.type);
-                        }
-                     ss<<")";
-                  }
+      for (auto& items : _schema.types)
+      {
+         std::visit(
+             [&](auto i)
+             {
+                if constexpr (std::is_same_v<decltype(i), object_type>)
+                {
+                   ss << "type " << items.first << " { \n";
+                   for (auto member : i.members)
+                   {
+                      ss << "   " << member.name;
+                      if (member.params.size())
+                      {
+                         ss << "(";
+                         int first = 0;
+                         for (auto param : member.params)
+                         {
+                            if (first++)
+                               ss << ", ";
+                            ss << param.name << ": " << transform_type(param.type);
+                         }
+                         ss << ")";
+                      }
 
-                  ss << ": " << transform_type(member.type) <<"  @psibase( index:" << member.number <<" )";
-                  ss <<"\n"; 
-
-
-              }
-        ss << "}\n\n";
-          } else {
-        //      ss << "   other\n";
-          }
-        }, items.second );
+                      ss << ": " << transform_type(member.type)
+                         << "  @psibase( index:" << member.number << " )";
+                      ss << "\n";
+                   }
+                   ss << "}\n\n";
+                }
+                else
+                {
+                   //      ss << "   other\n";
+                }
+             },
+             items.second);
       }
       return ss.str();
    }

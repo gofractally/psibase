@@ -39,7 +39,7 @@ namespace PricingDefaults
 
 SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
 {
-   MethodNumber m{action->method()->value().get()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});

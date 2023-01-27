@@ -11,7 +11,7 @@
 using namespace UserService;
 using namespace UserService::Errors;
 using namespace psibase;
-using psio::const_view;
+using psio::view;
 using SystemService::AccountSys;
 using SystemService::TransactionSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
@@ -48,7 +48,7 @@ namespace
 
 TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
 {
-   MethodNumber m{action->method()->value().get()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().getIndex<0>().get(SingletonKey{});
@@ -119,7 +119,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    return newId;
 }
 
-void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
+void TokenSys::mint(TID tokenId, Quantity amount, view<const String> memo)
 {
    auto sender  = getSender();
    auto token   = getToken(tokenId);
@@ -198,7 +198,7 @@ void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
    Tables().open<TokenTable>().put(token);
 }
 
-void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
+void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, view<const String> memo)
 {
    auto sender      = getSender();
    auto balance     = getBalance(tokenId, sender);
@@ -247,7 +247,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
 void TokenSys::uncredit(TID                tokenId,
                         AccountNumber      receiver,
                         Quantity           maxAmount,
-                        const_view<String> memo)
+                        view<const String> memo)
 {
    auto sender          = getSender();
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
@@ -271,7 +271,7 @@ void TokenSys::uncredit(TID                tokenId,
    Tables().open<BalanceTable>().put(creditorBalance);
 }
 
-void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
+void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, view<const String> memo)
 {
    auto receiver        = getSender();  //The action sender is the token receiver
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
@@ -305,7 +305,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    Tables().open<TokenHolderTable>().put(receiverHolder);
 }
 
-void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
+void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, view<const String> memo)
 {
    auto sender          = getSender();
    auto token           = getToken(tokenId);

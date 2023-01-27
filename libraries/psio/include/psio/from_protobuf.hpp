@@ -1,7 +1,7 @@
 #pragma once
 #include <psio/from_bin.hpp>
-#include <psio/tuple.hpp>
 #include <psio/to_protobuf.hpp>
+#include <psio/tuple.hpp>
 
 namespace psio
 {
@@ -134,10 +134,10 @@ namespace psio
    template <typename T, typename S>
    void from_protobuf_member(T& obj, S& stream)
    {
-      if constexpr (is_std_optional<T>::value) 
+      if constexpr (is_std_optional<T>::value)
       {
          obj = typename is_std_optional<T>::value_type{};
-         from_protobuf_member( *obj, stream );
+         from_protobuf_member(*obj, stream);
       }
       else if constexpr (std::is_same_v<T, std::string>)
       {

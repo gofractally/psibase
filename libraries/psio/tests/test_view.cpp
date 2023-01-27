@@ -54,24 +54,29 @@ TEST_CASE("u8 view", "[view]")
 
 TEST_CASE("tuple view", "[view]")
 {
-   std::tuple t{std::uint8_t(42), std::uint8_t{127}};
+   std::tuple t{std::uint8_t(42), std::optional{std::uint8_t{43}}, std::vector{std::uint8_t{44}}};
    test_view(t,
              [&](auto v)
              {
                 CHECK(get<0>(v) == 42);
-                CHECK(get<1>(v) == 127);
+                CHECK(*get<1>(v) == 43);
+                CHECK(get<2>(v).front() == 44);
                 CHECK(v.unpack() == t);
-                auto [v0, v1] = v;
+                auto [v0, v1, v2] = v;
                 CHECK(v0 == 42);
-                CHECK(v1 == 127);
+                CHECK(*v1 == 43);
+                CHECK(v2.front() == 44);
              });
    test_mutate(
+       t,
        [](auto v)
        {
-          get<0>(v) = 42;
-          get<1>(v) = 127;
+          get<0>(v)         = 0xCC;
+          *get<1>(v)        = 0xDD;
+          get<2>(v).front() = 0xEE;
        },
-       t);
+       std::tuple{std::uint8_t(0xCC), std::optional{std::uint8_t{0xDD}},
+                  std::vector{std::uint8_t{0xEE}}});
 }
 
 struct struct0

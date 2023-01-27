@@ -742,10 +742,22 @@ namespace psibase
              },
              input_stream, output_stream, error, true);
 
-      psio::input_stream stream(v->data(), v->size());
+      std::uint32_t pos = 0;
+
+      auto fracunpack = [&](auto& value)
+      {
+         bool has_unknown = false;
+         bool known_end;
+         if (!psio::is_packable<std::remove_reference_t<decltype(value)>>::template unpack<true,
+                                                                                           false>(
+                 &value, has_unknown, known_end, v->data(), pos, v->size()))
+            check(false, "Invalid frac encoding");
+         check(known_end,
+               "The end of the object must be known in order to decode consecutive packed objects");
+      };
 
       AccountNumber service;
-      fracunpack(service, stream);
+      fracunpack(service);
       if (service != decoder.service)
          return gql_query(
              EventDecoderStatus{
@@ -760,7 +772,7 @@ namespace psibase
              input_stream, output_stream, error, true);
 
       MethodNumber type;
-      fracunpack(type, stream);
+      fracunpack(type);
 
       bool ok    = true;
       bool found = false;
@@ -772,10 +784,11 @@ namespace psibase
              static_assert(MT::isFunction);
              using TT = decltype(psio::tuple_remove_view(
                  std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
-             if (psio::fracvalidate<TT>(stream.pos, stream.end).valid)
+             std::span<char> eventData{v->data() + pos, v->data() + v->size()};
+             if (psio::fracpack_validate<TT>(eventData))
              {
                 found      = true;
-                auto value = psio::convert_from_frac<TT>(stream);
+                auto value = psio::from_frac<TT>(psio::prevalidated{eventData});
                 ok = gql_query_decoder_value(decoder, type, value, input_stream, output_stream,
                                              error,
                                              {meta.param_names.begin(), meta.param_names.end()});
@@ -799,13 +812,12 @@ namespace psibase
    }  // gql_query(EventDecoder)
 
    template <typename T>
-   concept EventType = requires(T events)
-   {
-      typename decltype(events)::History;
-      // Don't require Ui and Merkle for now
-      //typename decltype(events)::Ui;
-      //typename decltype(events)::Merkle;
-   };
+   concept EventType = requires(T events) {
+                          typename decltype(events)::History;
+                          // Don't require Ui and Merkle for now
+                          //typename decltype(events)::Ui;
+                          //typename decltype(events)::Merkle;
+                       };
 
    /// GraphQL support for decoding multiple events
    ///
@@ -1157,10 +1169,23 @@ namespace psibase
             result.pageInfo.hasNextPage = false;
             break;
          }
-         psio::input_stream stream(v->data(), v->size());
+
+         std::uint32_t pos = 0;
+
+         auto fracunpack = [&](auto& value)
+         {
+            bool has_unknown = false;
+            bool known_end;
+            if (!psio::is_packable<std::remove_reference_t<decltype(value)>>::template unpack<
+                    true, false>(&value, has_unknown, known_end, v->data(), pos, v->size()))
+               check(false, "Invalid frac encoding");
+            check(known_end,
+                  "The end of the object must be known in order to decode consecutive packed "
+                  "objects");
+         };
 
          AccountNumber c;
-         fracunpack(c, stream);
+         fracunpack(c);
          if (c != service)
          {
             result.pageInfo.hasNextPage = false;
@@ -1168,7 +1193,7 @@ namespace psibase
          }
 
          MethodNumber type;
-         fracunpack(type, stream);
+         fracunpack(type);
 
          bool found = false;
          psio::reflect<Events>::get_by_name(
@@ -1180,9 +1205,10 @@ namespace psibase
                 using TT = decltype(psio::tuple_remove_view(
                     std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
                 // TODO: EventDecoder validates and unpacks this again
-                if (psio::fracvalidate<TT>(stream.pos, stream.end).valid)
+                std::span<const char> eventData{v->begin() + pos, v->end()};
+                if (psio::fracpack_validate<TT>(eventData))
                 {
-                   auto value = psio::convert_from_frac<TT>(stream);
+                   auto value = psio::from_frac<TT>(psio::prevalidated{eventData});
                    get_event_field<0>(  //
                        value, fieldName, {}, {meta.param_names.begin(), meta.param_names.end()},
                        [&](auto _, const auto& field)

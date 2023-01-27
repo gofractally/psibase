@@ -67,7 +67,9 @@ namespace psio
 
       /** allocate the memory so another function can fill it in */
       explicit shared_view_ptr(size_tag s)
-          : _data{std::make_shared_for_overwrite<char[]>(s.size + sizeof(s.size))}
+          // make_shared_for_overwrite not supported by libc++ as of wasi-sdk-17
+          //: _data{std::make_shared_for_overwrite<char[]>(s.size + sizeof(s.size))}
+          : _data{new char[s.size + sizeof(s.size)]}
       {
          memcpy(_data.get(), &s.size, sizeof(s.size));
       }
@@ -103,16 +105,26 @@ namespace psio
          return s;
       }
 
+      bool validate() const { return fracpack_validate<T>(data_without_size_prefix()); }
+
+      bool validate_strict() const
+      {
+         return fracpack_validate_strict<T>(data_without_size_prefix());
+      }
+
       void reset() { _data.reset(); }
+
+      auto unpack() const { return (*this)->unpack(); }
 
      private:
       static auto validate(const std::span<const char>& data)
       {
-         if (!frackpack_validate_compatible<std::remove_cv_t<T>>(data))
+         if (!fracpack_validate_compatible<std::remove_cv_t<T>>(data))
             abort_error(stream_error::invalid_frac_encoding);
          return prevalidated<std::span<const char>>{data};
       }
       template <typename U>
+         requires Packable<std::remove_cv_t<U>>
       friend class shared_view_ptr;
       std::shared_ptr<char[]> _data;
    };
@@ -163,6 +175,20 @@ namespace psio
       std::span<const char> data_without_size_prefix() const { return std::span(data(), size()); }
    };
 
+   template <typename T, typename S>
+   void to_json(const shared_view_ptr<T>& value, S& stream)
+   {
+      to_json(value.unpack(), stream);
+   }
+
+   template <typename T, typename S>
+   void from_json(shared_view_ptr<T>& value, S& stream)
+   {
+      T tmp;
+      from_json(tmp, stream);
+      value = shared_view_ptr<T>{std::move(tmp)};
+   }
+
    template <typename T>
    struct is_packable<shared_view_ptr<T>>
        : base_packable_impl<shared_view_ptr<T>, is_packable<shared_view_ptr<T>>>
@@ -179,6 +205,24 @@ namespace psio
          if (!unpack_numeric<true>(&fixed_size, src, pos, end_pos))
             return false;
          return fixed_size == 0;
+      }
+
+      template <bool Verify>
+      static bool clear_container(shared_view_ptr<T>* value)
+      {
+         *value = shared_view_ptr<T>{size_tag{0}};
+         if constexpr (Verify)
+         {
+            // We don't need to proagate these up, because an empty object
+            // definitely does not contain unknown data
+            bool          has_unknown = false;
+            bool          known_end;
+            std::uint32_t pos = 0;
+            if (!is_packable<T>::template unpack<false, Verify>(nullptr, has_unknown, known_end,
+                                                                value->data(), pos, 0))
+               return false;
+         }
+         return true;
       }
 
       static void pack(const shared_view_ptr<T>& ptr, auto& stream)

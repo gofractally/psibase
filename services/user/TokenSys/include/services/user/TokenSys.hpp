@@ -25,7 +25,7 @@ namespace UserService
 
       TID create(Precision precision, Quantity maxSupply);
 
-      void mint(TID tokenId, Quantity amount, psio::const_view<psibase::String> memo);
+      void mint(TID tokenId, Quantity amount, psio::view<const psibase::String> memo);
 
       //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
       //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
@@ -38,22 +38,22 @@ namespace UserService
       void credit(TID                               tokenId,
                   psibase::AccountNumber            receiver,
                   Quantity                          amount,
-                  psio::const_view<psibase::String> memo);
+                  psio::view<const psibase::String> memo);
 
       void uncredit(TID                               tokenId,
                     psibase::AccountNumber            receiver,
                     Quantity                          maxAmount,
-                    psio::const_view<psibase::String> memo);
+                    psio::view<const psibase::String> memo);
 
       void debit(TID                               tokenId,
                  psibase::AccountNumber            sender,
                  Quantity                          amount,
-                 psio::const_view<psibase::String> memo);
+                 psio::view<const psibase::String> memo);
 
       void recall(TID                               tokenId,
                   psibase::AccountNumber            from,
                   Quantity                          amount,
-                  psio::const_view<psibase::String> memo);
+                  psio::view<const psibase::String> memo);
 
       void mapSymbol(TID tokenId, SID symbolId);
 
@@ -77,7 +77,7 @@ namespace UserService
       struct Events
       {
          using Account    = psibase::AccountNumber;
-         using StringView = psio::const_view<psibase::String>;
+         using StringView = psio::view<const psibase::String>;
 
          // clang-format off
          struct History

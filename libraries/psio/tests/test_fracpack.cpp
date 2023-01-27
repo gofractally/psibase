@@ -1,4 +1,4 @@
-#include <psio/fracpack2.hpp>
+#include <psio/fracpack.hpp>
 #include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
 // Prevent clang-format from munging the header order
@@ -504,6 +504,7 @@ PSIO_REFLECT(variable_struct, value)
 TEST_CASE("roundtrip")
 {
    test<bool>({false, true});
+   test<char>({'a', 'b', 'c'});
    test<std::int8_t>({-128, -1, 0, 1, 127});
    test<std::uint8_t>({0, 1, 255});
    test<std::int16_t>({-32768, -1, 0, 1, 32767});
@@ -531,6 +532,7 @@ TEST_CASE("roundtrip")
         std::numeric_limits<double>::max(), std::numeric_limits<double>::infinity(),
         std::numeric_limits<double>::signaling_NaN(), std::numeric_limits<double>::quiet_NaN()});
    test<std::string>({"", "Lorem ipsum dolor sit amet"});
+   test<std::tuple<>>({std::tuple()});
    test<fixed_struct>({{0x12345678}, {0x90abcdef}});
    test<padded_struct>({{42, 0x12345678}, {43, 0x90abcdef}});
    test<variable_struct>({{0x12345678}, {0x90abcdef}});

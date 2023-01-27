@@ -793,12 +793,11 @@ namespace psibase::net
                 is_leader(*state->producers, state->info.header.term, state->info.header.producer),
                 "Wrong producer");
             auto block = chain().get(state->blockId());
-            if (auto aux = block->auxConsensusData().get(); aux.valid())
+            if (auto aux = block->auxConsensusData())
             {
-               auto data   = psio::convert_from_frac<BlockConfirm>(*aux);
-               auto header = block->block()->header().get();
-               check(data.blockNum >= header->commitNum().get() &&
-                         data.blockNum <= header->blockNum().get(),
+               auto data   = psio::from_frac<BlockConfirm>(*aux);
+               auto header = block->block().header();
+               check(data.blockNum >= header.commitNum() && data.blockNum <= header.blockNum(),
                      "blockNum out of range");
                auto committed = state;
                while (committed->blockNum() > data.blockNum)

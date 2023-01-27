@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psio/fracpack2.hpp>
+#include <psio/fracpack.hpp>
 
 #include <type_traits>
 
@@ -9,6 +9,24 @@ namespace psio
    template <typename T>
       requires Packable<std::remove_cv_t<T>>
    class view;
+
+   template <typename T>
+   struct remove_view
+   {
+      using type = T;
+   };
+
+   template <typename T>
+   struct remove_view<view<T>>
+   {
+      using type = T;
+   };
+
+   template <typename T>
+   using remove_view_t = typename remove_view<T>::type;
+
+   template <typename... T>
+   std::tuple<std::remove_cv_t<remove_view_t<T>>...> tuple_remove_view(const std::tuple<T...>&);
 
    template <typename P>
    struct view_buffer
@@ -78,7 +96,8 @@ namespace psio
          else
          {
             std::uint32_t offset;
-            (void)unpack_numeric<false>(&offset, out_ptr, 0, 4);
+            std::uint32_t pos = 0;
+            (void)unpack_numeric<false>(&offset, out_ptr, pos, 4);
             return result_type(prevalidated{out_ptr + offset});
          }
       }
@@ -87,7 +106,7 @@ namespace psio
    struct make_reflect_proxy
    {
       template <typename T>
-      using fn = reflect<T>::template proxy<frac_proxy_view<char_t<T>>>;
+      using fn = typename reflect<T>::template proxy<frac_proxy_view<char_t<T>>>;
    };
 
    struct not_reflected
@@ -98,9 +117,10 @@ namespace psio
 
    template <typename T>
    using view_interface_impl =
-       std::conditional_t<Reflected<std::remove_cv_t<T>> && !PackableWrapper<std::remove_cv_t<T>>,
-                          make_reflect_proxy,
-                          not_reflected>::template fn<T>;
+       typename std::conditional_t<Reflected<std::remove_cv_t<T>> &&
+                                       !PackableWrapper<std::remove_cv_t<T>>,
+                                   make_reflect_proxy,
+                                   not_reflected>::template fn<T>;
 
    template <typename T>
    struct view_interface : view_interface_impl<T>
@@ -114,6 +134,8 @@ namespace psio
       T  value;
       T* operator->() { return &value; }
    };
+   template <typename T>
+   operator_arrow_proxy(const T&) -> operator_arrow_proxy<T>;
 
    template <typename T>
       requires(is_std_optional<std::remove_cv_t<T>>::value)
@@ -140,7 +162,11 @@ namespace psio
          (void)unpack_numeric<false>(&offset, this->data, pos, 4);
          if (offset == 1)
          {
+#ifdef __cpp_exceptions
             throw std::bad_optional_access{};
+#else
+            abort_error("bad optional access");
+#endif
          }
          return R{prevalidated{this->data + offset}};
       }
@@ -255,7 +281,11 @@ namespace psio
       }
       else
       {
+#ifdef __cpp_exceptions
          throw std::bad_variant_access{};
+#else
+         abort_error("bad variant access");
+#endif
       }
    }
    template <std::size_t I, typename T>
@@ -269,7 +299,11 @@ namespace psio
       }
       else
       {
+#ifdef __cpp_exceptions
          throw std::bad_variant_access{};
+#else
+         abort_error("bad variant access");
+#endif
       }
    }
    template <typename R, typename T>
@@ -308,8 +342,22 @@ namespace psio
       requires(is_std_tuple<std::remove_cv_t<T>>::value)
    auto get(view<T> v)
    {
-      return view<std::tuple_element_t<I, T>>{
-          prevalidated{static_cast<view_base<T>&>(v).data + fixed_offsets<std::remove_cv_t<T>>[I]}};
+      using member_type = std::tuple_element_t<I, T>;
+      using result_type = view<member_type>;
+      auto out_ptr = static_cast<view_base<T>&>(v).data + fixed_offsets<std::remove_cv_t<T>>[I];
+
+      if constexpr (is_packable<std::remove_cv_t<member_type>>::is_optional ||
+                    !is_packable<std::remove_cv_t<member_type>>::is_variable_size)
+      {
+         return result_type(prevalidated{std::move(out_ptr)});
+      }
+      else
+      {
+         std::uint32_t offset;
+         std::uint32_t pos = 0;
+         (void)unpack_numeric<false>(&offset, out_ptr, pos, 4);
+         return result_type(prevalidated{out_ptr + offset});
+      }
    }
 
    template <typename T>
@@ -385,10 +433,14 @@ namespace psio
    };
 
    template <typename T>
+   concept PackableUnalignedMemcpy =
+       std::is_same_v<T, char> || std::is_same_v<T, unsigned char> || std::is_same_v<T, std::byte>;
+
+   template <typename T>
       requires(is_std_vector_v<std::remove_cv_t<T>>)
    struct view_interface<T> : view_base<T>
    {
-      using value_type = T::value_type;
+      using value_type = typename T::value_type;
       using reference  = view<std::conditional_t<std::is_const_v<T>, const value_type, value_type>>;
       using const_reference = view<const value_type>;
       using size_type       = std::size_t;
@@ -398,13 +450,13 @@ namespace psio
           view_iterator<std::conditional_t<std::is_const_v<T>, const value_type, value_type>>;
       using reverse_iterator       = std::reverse_iterator<iterator>;
       using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-      iterator begin() const { return iterator{prevalidated{this->data + 4}}; }
+      iterator begin() const { return iterator{prevalidated{view_base<T>::data + 4}}; }
       iterator end() const
       {
          std::uint32_t size;
          std::uint32_t pos = 0;
-         (void)unpack_numeric<false>(&size, this->data, pos, 4);
-         return iterator{prevalidated{this->data + 4 + size}};
+         (void)unpack_numeric<false>(&size, view_base<T>::data, pos, 4);
+         return iterator{prevalidated{view_base<T>::data + 4 + size}};
       }
       const_iterator         cbegin() const { return begin(); }
       const_iterator         cend() const { return end(); }
@@ -423,11 +475,27 @@ namespace psio
          }
          else
          {
+#ifdef __cpp_exceptions
             throw std::out_of_range("view<vector> our of range");
+#else
+            abort_error("view<vector> our of range");
+#endif
          }
       }
       reference front() const { return *begin(); }
       reference back() const { return *(end() - 1); }
+      // vector<char> is common enough to make this worthwhile
+      remove_view_t<reference>* data() const
+         requires PackableUnalignedMemcpy<value_type>
+      {
+         return reinterpret_cast<remove_view_t<reference>*>(view_base<T>::data + 4);
+      }
+      // span's converting constructor is not viable because the iterator's reference type is a proxy
+      operator std::span<const value_type>() const
+         requires PackableUnalignedMemcpy<value_type>
+      {
+         return {data(), size()};
+      }
    };
 
    template <typename T, typename Ch>
@@ -484,7 +552,7 @@ namespace psio
       }
                   operator T() const { return unpack(); }
       const view& operator=(const T& value) const
-         requires(!std::is_const_v<T> && !is_packable<T>::is_variable_size)
+         requires(!std::is_const_v<T> && !is_packable<std::remove_cv_t<T>>::is_variable_size)
       {
          fast_buf_stream stream{psio::get_view_data(*this), is_packable<T>::fixed_size};
          is_packable<T>::pack(value, stream);

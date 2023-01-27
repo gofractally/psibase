@@ -17,10 +17,7 @@
 namespace psibase::net
 {
    template <typename T, typename Derived>
-   concept has_recv = requires(Derived& d, const T& msg)
-   {
-      d.consensus().recv(0, msg);
-   };
+   concept has_recv = requires(Derived& d, const T& msg) { d.consensus().recv(0, msg); };
 
    // message type 0 is reserved to ensure that message signatures
    // are disjoint from block signatures.
@@ -151,7 +148,7 @@ namespace psibase::net
          std::vector<char> result(psio::fracpack_size(msg) + 1);
          result[0] = Msg::type;
          psio::fast_buf_stream s(result.data() + 1, result.size() - 1);
-         psio::fracpack(msg, s);
+         psio::to_frac(msg, s);
          return result;
       }
       template <NeedsSignature Msg>
@@ -184,8 +181,7 @@ namespace psibase::net
          try
          {
             using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-            check(psio::fracvalidate<message_type>(s.pos, s.end).valid, "Invalid message");
-            return recv(peer, psio::convert_from_frac<message_type>(s));
+            return recv(peer, psio::from_frac<message_type>({s.pos, s.end}));
          }
          catch (std::exception& e)
          {

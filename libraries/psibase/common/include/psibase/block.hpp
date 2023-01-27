@@ -4,6 +4,7 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/time.hpp>
+#include <psio/shared_view_ptr.hpp>
 
 namespace psibase
 {

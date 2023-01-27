@@ -719,10 +719,9 @@ struct callbacks
                               uint32_t         cb_alloc_data,
                               uint32_t         cb_alloc)
    {
-      auto&              chain = assert_chain(chain_index);
-      psio::input_stream s     = {args_packed.data(), args_packed.size()};
-      auto               signedTrx =
-          psio::convert_from_frac<psibase::SignedTransaction>(psio::input_stream{s.pos, s.end});
+      auto&              chain     = assert_chain(chain_index);
+      psio::input_stream s         = {args_packed.data(), args_packed.size()};
+      auto               signedTrx = psio::from_frac<psibase::SignedTransaction>(args_packed);
 
       chain.start_if_needed();
       psibase::TransactionTrace trace;

@@ -40,12 +40,15 @@ namespace psio
    {
    };
 
+   // Checking Reflected here is necessary to handle recursive structures
+   // because is_packable<T> might already be on the instantiation stack
    template <typename T>
-   concept Packable = is_packable<T>::value;
+   concept Packable = Reflected<T> || is_packable<T>::value;
 
    template <typename T>
    concept PackableNumeric =            //
        std::is_same_v<T, std::byte> ||  //
+       std::is_same_v<T, char> ||       //
        std::is_same_v<T, uint8_t> ||    //
        std::is_same_v<T, uint16_t> ||   //
        std::is_same_v<T, uint32_t> ||   //
@@ -115,6 +118,13 @@ namespace psio
       // True if T is a variable-sized container and it is empty
       static bool is_empty_container(const T& value) { return false; }
 
+      template <bool Verify>
+      static bool clear_container(T* value)
+      {
+         value->clear();
+         return true;
+      }
+
       // Pack either:
       // * Object content if T is fixed size
       // * Space for offset if T is variable size. Must write 0 if is_empty_container().
@@ -175,7 +185,8 @@ namespace psio
             if (offset == 0)
             {
                if constexpr (Unpack)
-                  value->clear();
+                  if (!Derived::template clear_container<Verify>(value))
+                     return false;
                if constexpr (Verify)
                   known_pos = true;
                return true;
@@ -1296,6 +1307,12 @@ namespace psio
       return result;
    }
 
+   template <Packable T>
+   auto convert_to_frac(const T& value)
+   {
+      return to_frac(value);
+   }
+
    enum validation_t : std::uint8_t
    {
       invalid,
@@ -1329,6 +1346,10 @@ namespace psio
    template <typename T>
    struct prevalidated
    {
+      template <typename... A>
+      explicit constexpr prevalidated(A&&... a) : data(std::forward<A>(a)...)
+      {
+      }
       T data;
    };
    template <typename T>
@@ -1339,6 +1360,9 @@ namespace psio
    prevalidated(T* const&) -> prevalidated<T*>;
    template <typename T>
    prevalidated(T&&) -> prevalidated<T>;
+   template <typename T, typename U>
+   prevalidated(T&& t, U&& u)
+       -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
 
    template <Packable T>
    bool from_frac(T& value, std::span<const char> data)
@@ -1369,8 +1393,7 @@ namespace psio
       bool          has_unknown = false;
       bool          known_end;
       std::uint32_t pos = 0;
-      T             result;
-      if (!is_packable<T>::template unpack<true, true>(&result, has_unknown, known_end, data.data(),
+      if (!is_packable<T>::template unpack<true, true>(&value, has_unknown, known_end, data.data(),
                                                        pos, data.size()))
          return false;
       if (has_unknown)

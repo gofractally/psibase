@@ -33,7 +33,8 @@ namespace psio
 
    // defined in reflect.hpp
    template <typename T>
-   requires(is_reflected<T>::value) constexpr const char* get_type_name(const T*);
+      requires(is_reflected<T>::value)
+   constexpr const char* get_type_name(const T*);
 
    template <typename T>
    constexpr const char* get_type_name(const std::optional<T>*);

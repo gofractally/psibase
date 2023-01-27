@@ -1301,10 +1301,10 @@ namespace dwarf
       die.tag          = dw_tag_compile_unit;
       die.has_children = true;
       die.attrs        = {
-                 {dw_at_language, dw_form_data8, uint64_t(dw_lang_c_plus_plus)},
-                 {dw_at_low_pc, dw_form_addr, uint64_t(code_start)},
-                 {dw_at_high_pc, dw_form_addr, uint64_t((char*)code_start + code_size)},
-                 {dw_at_stmt_list, dw_form_sec_offset, uint64_t(0)},
+          {dw_at_language, dw_form_data8, uint64_t(dw_lang_c_plus_plus)},
+          {dw_at_low_pc, dw_form_addr, uint64_t(code_start)},
+          {dw_at_high_pc, dw_form_addr, uint64_t((char*)code_start + code_size)},
+          {dw_at_stmt_list, dw_form_sec_offset, uint64_t(0)},
       };
       write_die(0, abbrev_data, info_data, codes, die);
 
@@ -1342,8 +1342,8 @@ namespace dwarf
          die.tag          = dw_tag_subprogram;
          die.has_children = false;
          die.attrs        = {
-                    {dw_at_low_pc, dw_form_addr, fn_begin},
-                    {dw_at_high_pc, dw_form_addr, fn_end},
+             {dw_at_low_pc, dw_form_addr, fn_begin},
+             {dw_at_high_pc, dw_form_addr, fn_end},
          };
          if (sub.linkage_name)
             die.attrs.push_back({dw_at_linkage_name, dw_form_string, *sub.linkage_name});
