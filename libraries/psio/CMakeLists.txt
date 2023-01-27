@@ -37,14 +37,6 @@ target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/varint.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes.hpp
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_protobuf.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_protobuf.hpp
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/protobuf/any.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/protobuf/json.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/protobuf/query.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/protobuf/schema.hpp
 )
 
 add_subdirectory( consthash )
