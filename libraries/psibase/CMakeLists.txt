@@ -174,6 +174,7 @@ function(add suffix)
             ../../services/system/VerifyEcSys/include
             ../../services/user/CommonSys/include
             ../../services/user/ExploreSys/include
+            ../../services/user/FractalSys/include
             ../../services/user/InviteSys/include
             ../../services/user/NftSys/include
             ../../services/user/PsiSpaceSys/include
