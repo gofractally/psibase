@@ -47,8 +47,7 @@ psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber se
    std::size_t  sz = eccPubKey.size();
    secp256k1_ec_pubkey_serialize(ctx, reinterpret_cast<unsigned char*>(eccPubKey.data()), &sz, &pub,
                                  SECP256K1_EC_COMPRESSED);
-   pubKey =
-       psio::convert_to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<0>, eccPubKey}});
+   pubKey = psio::to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<0>, eccPubKey}});
 }
 
 psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber     service,
@@ -68,8 +67,7 @@ psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber   
    std::size_t  sz = eccPubKey.size();
    secp256k1_ec_pubkey_serialize(ctx, reinterpret_cast<unsigned char*>(eccPubKey.data()), &sz, &pub,
                                  SECP256K1_EC_COMPRESSED);
-   pubKey =
-       psio::convert_to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<0>, eccPubKey}});
+   pubKey = psio::to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<0>, eccPubKey}});
 }
 
 std::vector<char> psibase::EcdsaSecp256K1Sha256Prover::prove(std::span<const char> data,
@@ -89,8 +87,7 @@ std::vector<char> psibase::EcdsaSecp256K1Sha256Prover::prove(std::span<const cha
       EccSignature result;
       secp256k1_ecdsa_signature_serialize_compact(
           ctx, reinterpret_cast<unsigned char*>(result.data()), &sig);
-      return psio::convert_to_frac(
-          Signature{Signature::variant_type{std::in_place_index<0>, result}});
+      return psio::to_frac(Signature{Signature::variant_type{std::in_place_index<0>, result}});
    }
    else
    {
@@ -113,7 +110,7 @@ void psibase::EcdsaSecp256K1Sha256Prover::get(std::vector<ClaimKey>& out) const
    EccPrivateKey key;
    std::memcpy(key.data(), privateKey, sizeof(privateKey));
    PrivateKey::variant_type result{std::in_place_index<0>, key};
-   out.push_back({service, psio::convert_to_frac(PrivateKey{result})});
+   out.push_back({service, psio::to_frac(PrivateKey{result})});
 }
 
 psibase::Claim psibase::EcdsaSecp256K1Sha256Prover::get() const

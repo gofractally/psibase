@@ -16,7 +16,6 @@
 #include <utility>
 #include <vector>
 
-
 namespace psibase
 {
    // Eventually replace uses with <=> once the standard library
@@ -256,7 +255,7 @@ namespace psibase
       ///
       /// This reads an object from the database. It does not cache; it returns a fresh object
       /// each time it's used.
-      T operator*() const { return psio::convert_from_frac<T>(*base); }
+      T operator*() const { return psio::from_frac<T>(psio::prevalidated{*base}); }
 
       /// Comparisons
       std::weak_ordering operator<=>(const KvIterator& rhs) const = default;
@@ -291,7 +290,8 @@ namespace psibase
    concept compatible_key = compatible_key_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>;
 
    template <typename... T, typename... U>
-   requires(compatible_key<T, U>&&...) struct compatible_tuple<std::tuple<T...>, std::tuple<U...>>
+      requires(compatible_key<T, U> && ...)
+   struct compatible_tuple<std::tuple<T...>, std::tuple<U...>>
    {
       static constexpr bool value = true;
    };
@@ -302,15 +302,16 @@ namespace psibase
       static constexpr bool value = false;
    };
    template <typename... T, typename... U>
-   requires(sizeof...(T) <=
-            sizeof...(U)) struct compatible_tuple_prefix<std::tuple<T...>, std::tuple<U...>>
+      requires(sizeof...(T) <= sizeof...(U))
+   struct compatible_tuple_prefix<std::tuple<T...>, std::tuple<U...>>
    {
       static constexpr bool value =
           compatible_tuple<boost::mp11::mp_take_c<std::tuple<U...>, sizeof...(T)>,
                            std::tuple<T...>>::value;
    };
    template <typename T, typename... U>
-   requires(sizeof...(U) >= 1) struct compatible_tuple_prefix<T, std::tuple<U...>>
+      requires(sizeof...(U) >= 1)
+   struct compatible_tuple_prefix<T, std::tuple<U...>>
    {
       static constexpr bool value = compatible_key<boost::mp11::mp_front<std::tuple<U...>>, T>;
    };
@@ -463,7 +464,7 @@ namespace psibase
             buffer.resize(res);
             raw::getResult(buffer.data(), buffer.size(), 0);
          }
-         return psio::convert_from_frac<T>(buffer);
+         return psio::from_frac<T>(psio::prevalidated{buffer});
       }
 
      private:
@@ -573,7 +574,7 @@ namespace psibase
             {
                std::vector<char> buffer(sz);
                raw::getResult(buffer.data(), buffer.size(), 0);
-               auto data              = psio::convert_from_frac<T>(std::move(buffer));
+               auto data              = psio::from_frac<T>(psio::prevalidated{std::move(buffer)});
                auto replace_secondary = [&](uint8_t& idx, auto wrapped)
                {
                   auto old_key = std::invoke(decltype(wrapped)::value, data);
@@ -672,9 +673,7 @@ namespace psibase
       }
 
       /// Look up table object by key using the first table index by default
-      auto get(auto key) const{
-         return getIndex<0>().get(key);
-      }
+      auto get(auto key) const { return getIndex<0>().get(key); }
 
      private:
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
@@ -687,11 +686,10 @@ namespace psibase
    };
 
    template <typename T>
-   concept TableType = requires(T table)
-   {
-      typename decltype(table)::key_type;
-      typename decltype(table)::value_type;
-   };
+   concept TableType = requires(T table) {
+                          typename decltype(table)::key_type;
+                          typename decltype(table)::value_type;
+                       };
 
    // TODO: allow tables to be forward declared.  The simplest method is:
    // struct xxx : Table<...> {};

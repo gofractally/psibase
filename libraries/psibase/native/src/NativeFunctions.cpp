@@ -156,10 +156,11 @@ namespace psibase
 
       void verifyCodeByHashRow(psio::input_stream key, psio::input_stream value)
       {
-         check(psio::fracvalidate<CodeByHashRow>(value.pos, value.end).valid_and_known(),
+         check(psio::fracpack_validate_strict<CodeByHashRow>({value.pos, value.end}),
                "CodeByHashRow has invalid format");
          // TODO: use a view here instead of unpacking to a rich object
-         auto code     = psio::convert_from_frac<CodeByHashRow>(value);
+         auto code =
+             psio::from_frac<CodeByHashRow>(psio::prevalidated{std::span{value.pos, value.end}});
          auto codeHash = sha256(code.code.data(), code.code.size());
          check(code.codeHash == codeHash, "CodeByHashRow has incorrect codeHash");
          auto expected_key = psio::convert_to_key(code.key());
@@ -170,9 +171,9 @@ namespace psibase
 
       void verifyConfigRow(psio::input_stream key, psio::input_stream value)
       {
-         check(psio::fracvalidate<ConfigRow>(value.pos, value.end).valid_and_known(),
+         check(psio::fracpack_validate_strict<ConfigRow>({value.pos, value.end}),
                "ConfigRow has invalid format");
-         auto row          = psio::convert_from_frac<ConfigRow>(value);
+         auto row = psio::from_frac<ConfigRow>(psio::prevalidated{std::span{value.pos, value.end}});
          auto expected_key = psio::convert_to_key(row.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
@@ -188,9 +189,10 @@ namespace psibase
                                psio::input_stream key,
                                psio::input_stream value)
       {
-         check(psio::fracvalidate<WasmConfigRow>(value.pos, value.end).valid_and_known(),
+         check(psio::fracpack_validate_strict<WasmConfigRow>({value.pos, value.end}),
                "WasmConfigRow has invalid format");
-         auto row          = psio::convert_from_frac<WasmConfigRow>(value);
+         auto row =
+             psio::from_frac<WasmConfigRow>(psio::prevalidated{std::span{value.pos, value.end}});
          auto expected_key = psio::convert_to_key(row.key(table));
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
@@ -341,10 +343,8 @@ namespace psibase
          check(false, "call depth exceeded (temporary rule)");
 
       // TODO: don't unpack rawData
-      // TODO: verify no extra data
-      check(psio::fracvalidate<Action>(data.data(), data.end()).valid_and_known(),
-            "call: invalid data format");
-      auto act = psio::convert_from_frac<Action>({data.data(), data.size()});
+      check(psio::fracpack_validate_strict<Action>(data), "call: invalid data format");
+      auto act = psio::from_frac<Action>(psio::prevalidated{data});
       check(act.sender == code.codeNum || (code.flags & CodeRow::allowSudo),
             "service is not authorized to call as another sender");
 

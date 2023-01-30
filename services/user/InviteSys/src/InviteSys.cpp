@@ -17,7 +17,7 @@ using namespace UserService;
 using namespace UserService::Invite;
 using namespace UserService::Errors;
 using namespace SystemService;
-using psio::const_view;
+using psio::view;
 using std::begin;
 using std::end;
 using std::find;
@@ -28,7 +28,7 @@ using std::vector;
 
 InviteSys::InviteSys(psio::shared_view_ptr<psibase::Action> action)
 {
-   MethodNumber m{action->method()->value().get()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});

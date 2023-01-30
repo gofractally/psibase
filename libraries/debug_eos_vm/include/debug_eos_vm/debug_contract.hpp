@@ -9,21 +9,21 @@ namespace debug_contract
    template <typename Backend>
    struct debugging_module
    {
-      std::unique_ptr<Backend> module;
+      std::unique_ptr<Backend>                      module;
       std::shared_ptr<dwarf::debugger_registration> reg;
    };
 
    template <typename Backend>
    struct substitution_cache
    {
-      std::map<fc::sha256, fc::sha256> substitutions;
-      std::map<fc::sha256, std::vector<uint8_t>> codes;
+      std::map<fc::sha256, fc::sha256>                substitutions;
+      std::map<fc::sha256, std::vector<uint8_t>>      codes;
       std::map<fc::sha256, debugging_module<Backend>> cached_modules;
 
       bool substitute_apply(const eosio::chain::digest_type& code_hash,
-                            uint8_t vm_type,
-                            uint8_t vm_version,
-                            eosio::chain::apply_context& context)
+                            uint8_t                          vm_type,
+                            uint8_t                          vm_version,
+                            eosio::chain::apply_context&     context)
       {
          if (vm_type || vm_version)
             return false;
@@ -56,7 +56,7 @@ namespace debug_contract
             try
             {
                eosio::vm::wasm_code_ptr code(it->second.data(), size);
-               auto bkend = std::make_unique<Backend>(code, size, nullptr);
+               auto                     bkend = std::make_unique<Backend>(code, size, nullptr);
                eosio::chain::eos_vm_host_functions_t::resolve(bkend->get_module());
                auto reg = debug_eos_vm::enable_debug(it->second, *bkend, dwarf_info, "apply");
                return cached_modules[code_hash] =

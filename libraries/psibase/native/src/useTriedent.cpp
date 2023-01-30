@@ -35,15 +35,9 @@ namespace psibase
 #ifdef SANITY_CHECK
       std::map<std::vector<char>, std::vector<char>, blob_less> _sanity[numDatabases];
 
-      auto& sanity()
-      {
-         return _sanity;
-      }
+      auto& sanity() { return _sanity; }
 
-      auto& sanity() const
-      {
-         return _sanity;
-      }
+      auto& sanity() const { return _sanity; }
 #else
       std::map<std::vector<char>, std::vector<char>, blob_less> (&sanity())[];
       const std::map<std::vector<char>, std::vector<char>, blob_less> (&sanity() const)[];
@@ -306,7 +300,7 @@ namespace psibase
          check(roots.size() == numDatabases, "wrong number of roots in fork");
          if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
             throw std::runtime_error("Status row missing in fork");
-         auto status = psio::convert_from_frac<StatusRow>(statusBytes);
+         auto status = psio::from_frac<StatusRow>(psio::prevalidated{statusBytes});
          if (!status.head)
             throw std::runtime_error("Status row is missing head information in fork");
          if (!writer.get(topRoot, revisionById(status.head->header.previous), nullptr, nullptr))

@@ -26,7 +26,6 @@
 #include <boost/preprocessor/variadic/to_seq.hpp>
 
 #include <psio/get_type_name.hpp>
-#include <psio/member_proxy.hpp>
 
 namespace psio
 {
@@ -191,10 +190,7 @@ namespace psio
    reflect_undefined<QueryClass> get_reflect_impl(const QueryClass&);
 
    template <typename QueryClass>
-   concept ReflectedAsMember = requires(QueryClass& v)
-   {
-      v.get_reflect_impl(v);
-   };
+   concept ReflectedAsMember = requires(QueryClass& v) { v.get_reflect_impl(v); };
 
    template <ReflectedAsMember QueryClass>
    auto get_reflect_impl(const QueryClass& v)
@@ -447,7 +443,8 @@ namespace psio
    };
 
    template <typename T>
-   requires(is_reflected<T>::value) constexpr const char* get_type_name(const T*)
+      requires(is_reflected<T>::value)
+   constexpr const char* get_type_name(const T*)
    {
       return reflect<T>::name.c_str();
    }
@@ -664,28 +661,28 @@ namespace std
    BOOST_PP_IIF(BOOST_PP_CHECK_EMPTY(members), PSIO_EMPTY, PSIO_MEMBER_POINTER_IMPL2) \
    (STRUCT, members)
 
-#define PSIO_PROXY_DATA(r, STRUCT, i, elem)                                                \
-   psio::member_proxy<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))),        \
-                                         &STRUCT::PSIO_GET_IDENT(elem), ProxyObject>       \
-                      PSIO_GET_IDENT(elem)()                                               \
-   {                                                                                       \
-      return _psio_proxy_obj;                                                              \
-   }                                                                                       \
-   psio::member_proxy<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))),        \
-                                         &STRUCT::PSIO_GET_IDENT(elem), const ProxyObject> \
-                      PSIO_GET_IDENT(elem)() const                                         \
-   {                                                                                       \
-      return _psio_proxy_obj;                                                              \
+#define PSIO_PROXY_DATA(r, STRUCT, i, elem)                                           \
+   decltype(auto) PSIO_GET_IDENT(elem)()                                              \
+   {                                                                                  \
+      return _psio_proxy_obj                                                          \
+          .template get<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))), \
+                                           &STRUCT::PSIO_GET_IDENT(elem)>();          \
+   }                                                                                  \
+   decltype(auto) PSIO_GET_IDENT(elem)() const                                        \
+   {                                                                                  \
+      return _psio_proxy_obj                                                          \
+          .template get<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))), \
+                                           &STRUCT::PSIO_GET_IDENT(elem)>();          \
    }
 
-#define PSIO_PROXY_METHOD(r, STRUCT, i, elem)                                           \
-   template <typename... Args>                                                          \
-   auto PSIO_GET_IDENT(elem)(Args... args)                                              \
-   {                                                                                    \
-      psio::member_proxy<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))),  \
-                                            &STRUCT::PSIO_GET_IDENT(elem), ProxyObject> \
-                             m(_psio_proxy_obj);                                        \
-      return m.call(std::forward<decltype(args)>(args)...);                             \
+#define PSIO_PROXY_METHOD(r, STRUCT, i, elem)                                          \
+   template <typename... Args>                                                         \
+   auto PSIO_GET_IDENT(elem)(Args... args)                                             \
+   {                                                                                   \
+      return _psio_proxy_obj                                                           \
+          .template call<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))), \
+                                            &STRUCT::PSIO_GET_IDENT(elem)>(            \
+              std::forward<decltype(args)>(args)...);                                  \
    }
 
 /**
@@ -770,11 +767,10 @@ namespace std
          explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)            \
          {                                                                                        \
          }                                                                                        \
-         auto&              psio_get_proxy() const { return _psio_proxy_obj; }                    \
-         ProxyObject*       operator->() { return &_psio_proxy_obj; }                             \
-         const ProxyObject* operator->() const { return &_psio_proxy_obj; }                       \
-         ProxyObject&       operator*() { return _psio_proxy_obj; }                               \
-         const ProxyObject& operator*() const { return _psio_proxy_obj; }                         \
+         auto& psio_get_proxy() const                                                             \
+         {                                                                                        \
+            return _psio_proxy_obj;                                                               \
+         }                                                                                        \
          BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_DATA, STRUCT, PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)) \
          BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_METHOD, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__))    \
       };                                                                                          \

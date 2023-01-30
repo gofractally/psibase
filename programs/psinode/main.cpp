@@ -271,7 +271,7 @@ namespace psibase
             throw std::runtime_error("Not implemented: keys from service " + key.service.str());
          }
          auto result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
-             key.service, psio::convert_from_frac<PrivateKey>(key.rawData));
+             key.service, psio::from_frac<PrivateKey>(key.rawData));
          v = std::shared_ptr<Prover>(std::move(result));
       }
       else
@@ -330,8 +330,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
    {
       // TODO: verify no extra data
       // TODO: view
-      auto transactions =
-          psio::convert_from_frac<std::vector<SignedTransaction>>(entry.packed_signed_trx);
+      auto transactions = psio::from_frac<std::vector<SignedTransaction>>(entry.packed_signed_trx);
       TransactionTrace trace;
 
       try
@@ -428,7 +427,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
    {
       // TODO: verify no extra data
       // TODO: view
-      auto             trx = psio::convert_from_frac<SignedTransaction>(entry.packed_signed_trx);
+      auto             trx = psio::from_frac<SignedTransaction>(entry.packed_signed_trx);
       TransactionTrace trace;
 
       try
@@ -1531,7 +1530,7 @@ void run(const std::string&              db_path,
                    if (key.rawData)
                    {
                       result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
-                          key.service, psio::convert_from_frac<PrivateKey>(*key.rawData));
+                          key.service, psio::from_frac<PrivateKey>(*key.rawData));
                    }
                    else
                    {

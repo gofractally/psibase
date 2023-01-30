@@ -53,7 +53,7 @@ uint8_t[fixed_size] fixed_data;     // Fixed-size objects and offsets
 uint8_t[]           variable_data;  // Variable-size inner objects
 ```
 
-Fixed-size subobjects live entirely within `fixed_data`. Variable-size subobjects have an [Offset Pointer](#offset-pointers) in `fixed_data` which points into `variable_data`. `fixed_size`, when present, enables decoders to safely skip newly-added optional fields. `fixed_size` is only present for extensible (the default) structs. Non-extensible structs don't have it since the fixed size is always known in that case.
+Fixed-size subobjects live entirely within `fixed_data`. Variable-size subobjects have an [Offset Pointer](#offset-pointers) in `fixed_data` which points into `variable_data`. `variable_data` MUST be encoded in order with no gaps. `fixed_size`, when present, enables decoders to safely skip newly-added optional fields. `fixed_size` is only present for extensible (the default) structs. Non-extensible structs don't have it since the fixed size is always known in that case.
 
 ### Tuples
 
@@ -100,7 +100,7 @@ When a subobject is variable size, it has an Offset Pointer which points to the 
 - `1`: indicates an optional is empty
 - `2,3`: reserved for future use
 
-The special values are a space-saving measure. e.g. suppose we have an `std::optional<std::string>`. The 3 possible states, `nullopt`, `empty`, and `!empty`, are encoded as `1`, `0`, or an offset.
+The special values are a space-saving measure. e.g. suppose we have an `std::optional<std::string>`. The 3 possible states, `nullopt`, `empty`, and `!empty`, are encoded as `1`, `0`, or an offset. An empty container MUST NOT be encoded with an offset.
 
 ### Fixed-Length Arrays of Variable-Size Objects
 
@@ -130,16 +130,11 @@ uint8_t[]           variable_data;  // Variable-size objects
 
 Optionals always use a variable-size encoding, whether their inner data is fixed-size or variable size. An optional represents an empty state by using `1` for its [Offset Pointer](#offset-pointers). It represents non-empty as an Offset Pointer which points to the contained data. If the contained data is variable-size, then it already uses an offset pointer; Optional reuses this pointer to save space.
 
-There are 2 special rules for optionals embedded within structs and tuples:
+For optionals embedded within extensible structs and tuples:
 
-- If any field is optional, then all the remaining fields must also be optional.
 - If the last `n` optional fields are empty, then they must be omitted from `fixed_data`.
 
 TODO: Implement these rules in Rust. Verify them in C++.
-
-TODO: This rule is incompatible with non-extensible structs since `fixed_size` isn't present.
-
-TODO: Reconsider this rule. Its purpose is to guarantee that decoding and re-encoding a fracpacked binary results in an identical binary. There are situations which prevent the guarantee, e.g. unrecognized but populated fields in an upgraded struct, tuple, or union, accidental NaN normalization, and potentially more. Psibase doesn't rely on this guarantee. It places a burden on both fracpack implementors and on users.
 
 ### Tagged Unions
 
@@ -151,15 +146,34 @@ uint32_t        size;   // The amount of data
 uint8_t[size]   data;   // Selected inner object
 ```
 
-Alternatives are sequentially-numbered starting from `0`. The `size` field allows decoders to safely skip newly-added alternatives that they are not aware of.
+Alternatives are sequentially-numbered starting from `0`. The tag must not be greater than 127.
 
 ## Safety Checking
 
-Fracpack places additional requirements on packed data to enable quick safety checks while decoding.
+When deserializing an object of type `T`
+- If any field that is part of `T` is malformed, validation MUST fail
+- if the data is not a valid serialization of any type that can be deserialized as `T`, validation SHOULD fail
 
-- `variable_data` must be in the same order as `fixed_data`
-- Offset pointers must leave no gaps, except when unknown fields are skipped (e.g. extensible structs, tuples, and unknown enum entries)
-- Additional rules for [Optionals](#optionals)
-- Tagged Unions' `tag` field must be less than 128. This allows a potential extension in the future which will be signaled by the MSB.
+The following is a non-exhaustive list of requirements to validate:
+- bool values MUST be 0 or 1
+- Unknown fixed data SHOULD be a multiple of 4 octets and each 4-octet group SHOULD be a valid offset pointer
+- Every regular offset pointer MUST equal the end of the preceding object if it is known
+- Every regular offset point MUST NOT be before the last known position even if the end of the preceding object is not known.
+- Every offset pointer MUST be in bounds
+- The size of a vector MUST be an exact multiple of the fixed size of each element
+- An offset pointer to an empty vector MUST be represented as 0
+- The size of a variant MUST be the same as the size of the inner object if the inner size is known
+- The last field of a tuple or extensible struct MUST NOT be an empty optional
 
 TODO: finish this list. Make sure both the C++ and Rust implementations' checkers enforce the rules.
+
+## Serialization Compatibility
+
+An serialized object of type `T` may be deserialized as type `U` if any of the following are true:
+- `T` is the same type as `U`
+- `T` and `U` are both non-extensible structs with the same number of members AND each member of `T` can be deserialized as the corresponding member of `U`
+- `T` and `U` are both tuples or extensible structs with the same number of members AND each member of `T` can be deserialized as the corresponding member of `U`
+- `T` and `U` are both tuples or extensible structs AND `T` has fewer members than `U` AND every member of `T` can be deserialized as the corresponding member of `U` AND every trailing member of `U` that does not have a corresponding member of `T` is optional. The trailing members of `U` will be be set to empty.
+- `T` and `U` are both tuples or extensible structs AND `T` has more members than `U` AND every member of `T` that has a corresponding member of `U` can be deserialized as the corresponding member of `U` AND every trailing member of `T` that does not have a corresponding member of `U` is optional. The trailing members of `T` will be dropped.
+- `T` and `U` are unions AND `U` has at least as many alternatives as `T` AND every alternative of `T` can be deserialized as the corresponding alternative of `U`
+- `T` and `U` are both containers of the same kind AND the value type of `T` can be deserialized as the value type of `U`. The possible kinds of containers are optional, array, and vector.

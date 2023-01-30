@@ -4,12 +4,13 @@ if(DEFINED IS_NATIVE)
     find_package(Threads REQUIRED)
     add_executable(psio-tests
         graphql.cpp
-        fracpack.cpp
         psio_tests.cpp
-        reflect.cpp
+#        reflect.cpp
 #        flat_views.cpp
-        benchmark.cpp
+#        benchmark.cpp
 #        crypto.cpp
+        test_fracpack.cpp
+        test_view.cpp
     )
     target_link_libraries(psio-tests psio catch2 Threads::Threads )
 endif()
@@ -17,9 +18,8 @@ endif()
 if(DEFINED IS_WASM)
     add_executable(psio-tests
         graphql.cpp
-        fracpack.cpp
         psio_tests.cpp
-        reflect.cpp
+#        reflect.cpp
 #        flat_views.cpp
         benchmark.cpp
     )
