@@ -155,6 +155,10 @@ std::filesystem::path parse_path(std::string_view             s,
    {
       return get_prefix() / std::filesystem::path(s.substr(7)).relative_path();
    }
+   else if (s.empty())
+   {
+      return std::filesystem::path();
+   }
    else
    {
       return context / s;
@@ -207,6 +211,8 @@ void load_service(const native_service& config,
 {
    auto  host    = config.host.ends_with('.') ? config.host + root_host : config.host;
    auto& service = services[config.host];
+   if (config.root.empty())
+      return;
    for (const auto& entry : std::filesystem::recursive_directory_iterator{config.root})
    {
       auto                 extension = entry.path().filename().extension().native();
@@ -1557,6 +1563,11 @@ void run(const std::string&              db_path,
               &connect_one, callback = std::move(callback)]() mutable
              {
                 std::optional<http::services_t> new_services;
+                for (auto& entry : config.services)
+                {
+                   entry.root =
+                       parse_path(entry.root.native(), std::filesystem::current_path() / db_path);
+                }
                 if (services != config.services || host != config.host)
                 {
                    new_services.emplace();
