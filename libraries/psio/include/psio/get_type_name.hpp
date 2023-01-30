@@ -20,12 +20,6 @@ namespace psio
       return BOOST_PP_STRINGIZE(T);              \
    }
 
-#define PSIO_REFLECT_TYPENAME_CUSTOM(T, CUSTOM)  \
-   constexpr const char* get_type_name(const T*) \
-   {                                             \
-      return BOOST_PP_STRINGIZE(CUSTOM);         \
-   }
-
    template <typename T>
    struct is_reflected : std::false_type
    {

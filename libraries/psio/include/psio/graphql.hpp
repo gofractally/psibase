@@ -224,7 +224,7 @@ namespace psio
              using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
              if constexpr (!MemPtr::isFunction)
              {
-                fill_gql_schema((remove_cvref_t<typename MemPtr::ValueType>*)nullptr, stream,
+                fill_gql_schema((std::remove_cvref_t<typename MemPtr::ValueType>*)nullptr, stream,
                                 defined_types, is_input);
              }
           });
@@ -667,7 +667,7 @@ namespace psio
       if constexpr (i < sizeof...(Args))
       {
          constexpr bool is_optional =
-             is_std_optional<remove_cvref_t<decltype(std::get<i>(args))>>();
+             is_std_optional<std::remove_cvref_t<decltype(std::get<i>(args))>>();
          if constexpr (is_optional)
             filled[i] |= true;
          gql_mark_optional<i + 1>(args, filled);
@@ -687,7 +687,8 @@ namespace psio
          if (i >= arg_names.size())
             return error("mismatched arg names"), false;
 
-         constexpr bool is_opt = is_std_optional_v<remove_cvref_t<decltype(std::get<i>(args))>>;
+         constexpr bool is_opt =
+             is_std_optional_v<std::remove_cvref_t<decltype(std::get<i>(args))>>;
          if (input_stream.current_value != std::data(arg_names)[i])
             return gql_parse_args<i + 1>(args, filled, found, input_stream, error, arg_names);
          input_stream.skip();

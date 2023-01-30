@@ -30,29 +30,17 @@
 namespace psio
 {
    template <typename R, typename C, typename... Args>
-   constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...));  // { return ; }
+   constexpr std::tuple<std::remove_cvref_t<Args>...> args_as_tuple(
+       R (C::*)(Args...));  // { return ; }
    template <typename R, typename C, typename... Args>
-   constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (C::*)(Args...) const)
+   constexpr std::tuple<std::remove_cvref_t<Args>...> args_as_tuple(R (C::*)(Args...) const)
    {
       return {};
    }
    template <typename R, typename... Args>
-   constexpr std::tuple<std::decay_t<Args>...> args_as_tuple(R (*)(Args...))
+   constexpr std::tuple<std::remove_cvref_t<Args>...> args_as_tuple(R (*)(Args...))
    {
       return {};
-   }
-
-   template <typename Tuple, size_t... I>
-   constexpr auto prune_tuple_h(Tuple t, std::index_sequence<I...>)
-   {
-      return std::make_tuple(std::get<I>(t)...);
-   }
-
-   template <typename... Ts>
-   constexpr auto prune_tuple(std::tuple<Ts...> t)
-   {
-      return prune_tuple_h(
-          t, std::make_index_sequence<std::tuple_size<std::tuple<Ts...>>::value - 1>{});
    }
 
    template <typename Tuple, size_t... I>
@@ -92,16 +80,10 @@ namespace psio
       tuple_foreach_i<0>(obj, std::forward<S>(s));
    }
 
-   template <typename F>
-   constexpr void tuple_foreach_type(const std::tuple<>* obj, F&& f)
+   template <typename... T, typename F>
+   constexpr void tuple_foreach_type(const std::tuple<T...>* obj, F&& f)
    {
-   }
-
-   template <typename T, typename... Ts, typename F>
-   constexpr void tuple_foreach_type(const std::tuple<T, Ts...>* obj, F&& f)
-   {
-      f((T*)nullptr);
-      tuple_foreach_type((const std::tuple<Ts...>*)nullptr, std::forward<F>(f));
+      (f((T*)nullptr), ...);
    }
 
    template <typename R, typename C, typename... Args>
@@ -187,17 +169,17 @@ namespace psio
    };
 
    template <typename QueryClass>
-   reflect_undefined<QueryClass> get_reflect_impl(const QueryClass&);
+   reflect_undefined<QueryClass> psio_get_reflect_impl(const QueryClass&);
 
    template <typename QueryClass>
-   concept ReflectedAsMember = requires(QueryClass& v) { v.get_reflect_impl(v); };
+   concept ReflectedAsMember = requires(QueryClass& v) { v.psio_get_reflect_impl(v); };
 
    template <ReflectedAsMember QueryClass>
-   auto get_reflect_impl(const QueryClass& v)
-       -> decltype(std::declval<QueryClass>().get_reflect_impl(v));
+   auto psio_get_reflect_impl(const QueryClass& v)
+       -> decltype(std::declval<QueryClass>().psio_get_reflect_impl(v));
 
    template <typename QueryClass>
-   using reflect = std::decay_t<decltype(get_reflect_impl(std::declval<QueryClass>()))>;
+   using reflect = std::decay_t<decltype(psio_get_reflect_impl(std::declval<QueryClass>()))>;
 
    template <typename>
    struct is_std_vector : std::false_type
@@ -278,17 +260,6 @@ namespace psio
    template <typename... T>
    struct is_std_variant<std::variant<T...>> : std::true_type
    {
-      static std::string name() { return get_variant_typename<T...>(); }
-      template <typename First, typename... Rest>
-      static std::string get_variant_typename()
-      {
-         if constexpr (sizeof...(Rest) > 0)
-            return std::string(get_type_name<First>()) + "|" + get_variant_typename<Rest...>();
-         else
-            return std::string(get_type_name<First>()) + "|";
-      }
-      using alts_as_tuple                       = std::tuple<T...>;
-      constexpr static const uint16_t num_types = sizeof...(T);
    };
 
    template <typename T>
@@ -302,15 +273,6 @@ namespace psio
    template <typename... T>
    struct is_std_tuple<std::tuple<T...>> : std::true_type
    {
-      static std::string name() { return get_tuple_typename<T...>(); }
-      template <typename First, typename... Rest>
-      static std::string get_tuple_typename()
-      {
-         if constexpr (sizeof...(Rest) > 0)
-            return std::string(get_type_name<First>()) + "&" + get_tuple_typename<Rest...>();
-         else
-            return std::string(get_type_name<First>()) + "&";
-      }
    };
 
    template <typename T>
@@ -324,25 +286,10 @@ namespace psio
    template <typename K, typename V>
    struct is_std_map<std::map<K, V>> : std::true_type
    {
-      static const std::string& name()
-      {
-         static std::string n =
-             std::string("map<") + get_type_name<K>() + "," + get_type_name<V>() + ">";
-         return n;
-      }
    };
 
    template <typename T>
    constexpr bool is_std_map_v = is_std_map<T>::value;
-
-   template <typename T>
-   struct remove_cvref
-   {
-      typedef std::remove_cv_t<std::remove_reference_t<T>> type;
-   };
-
-   template <typename T>
-   using remove_cvref_t = typename remove_cvref<T>::type;
 
    template <typename... Ts>
    struct TypeList
@@ -419,7 +366,7 @@ namespace psio
    template <typename F, typename... Args>
    void forEachType(TypeList<Args...>, F&& f)
    {
-      (f((remove_cvref_t<Args>*)nullptr), ...);
+      (f((std::remove_cvref_t<Args>*)nullptr), ...);
    }
 
    template <typename F, typename... Args>
@@ -431,7 +378,7 @@ namespace psio
          f(p, i < names.size() ? names.begin()[i] : nullptr);
          ++i;
       };
-      (g((remove_cvref_t<Args>*)nullptr), ...);
+      (g((std::remove_cvref_t<Args>*)nullptr), ...);
    }
 
    template <typename T>
@@ -449,15 +396,6 @@ namespace psio
       return reflect<T>::name.c_str();
    }
 }  // namespace psio
-
-// TODO: not legal to add new definitions to std namespace
-namespace std
-{
-   namespace
-   {
-      PSIO_REFLECT_TYPENAME(string)
-   }
-}  // namespace std
 
 #define PSIO_EMPTY(...)
 #define PSIO_FIRST(a, ...) a
@@ -594,18 +532,18 @@ namespace std
 #define PSIO_GET_QUOTED_ARGS_IMPL2(r, _, arg) #arg
 
 #define PSIO_TUPLE_TYPE(s, STRUCT, elem) \
-   psio::remove_cvref_t<decltype(psio::result_of_member(&STRUCT::PSIO_GET_IDENT(elem)))>
+   std::remove_cvref_t<decltype(psio::result_of_member(&STRUCT::PSIO_GET_IDENT(elem)))>
 
-#define PSIO_FOR_EACH_MEMBER(r, STRUCT, i, elem)                                                \
-   {                                                                                            \
-      /* TODO: fix or remove: auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem)); */   \
-      auto off = ~uint64_t(0);                                                                  \
-      (void)lambda(                                                                             \
-          psio::meta{                                                                           \
-              .name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .offset = off,                  \
-                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)},               \
-              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem)) \
-              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });           \
+#define PSIO_FOR_EACH_MEMBER(r, STRUCT, i, elem)                                               \
+   {                                                                                           \
+      /* TODO: fix or remove: auto off = __builtin_offsetof(STRUCT, PSIO_GET_IDENT(elem)); */  \
+      auto off = ~uint64_t(0);                                                                 \
+      (void)lambda(                                                                            \
+          psio::meta{                                                                          \
+              .name = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), .offset = off,                 \
+                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)},              \
+              [](auto p) -> decltype(&std::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem)) \
+              { return &std::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });           \
    }
 
 #define PSIO_FOR_EACH_METHOD(r, STRUCT, elem)                                                  \
@@ -614,8 +552,8 @@ namespace std
            .name                                   = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), \
                                       .param_names = {PSIO_GET_QUOTED_ARGS(elem)},             \
            },                                                                                  \
-           [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem))   \
-           { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });
+           [](auto p) -> decltype(&std::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem))    \
+           { return &std::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });
 
 #define PSIO_GET_BY_STR(r, STRUCT, elem)              \
    if (BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)) == m) \
@@ -634,14 +572,14 @@ namespace std
       (void)lambda(&STRUCT::PSIO_GET_IDENT(elem));                          \
       return true;
 
-#define PSIO_GET_MEMBER_BY_NAME(r, STRUCT, i, elem)                                             \
-   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                              \
-      (void)lambda(                                                                             \
-          psio::meta{                                                                           \
-              .name                              = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)),    \
-                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)},               \
-              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem)) \
-              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });           \
+#define PSIO_GET_MEMBER_BY_NAME(r, STRUCT, i, elem)                                            \
+   case psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))):                             \
+      (void)lambda(                                                                            \
+          psio::meta{                                                                          \
+              .name                              = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)),   \
+                                         .number = PSIO_NUMBER_OR_AUTO(i, elem)},              \
+              [](auto p) -> decltype(&std::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem)) \
+              { return &std::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });           \
       return true;
 
 #define PSIO_GET_METHOD_BY_NAME(r, STRUCT, elem)                                                  \
@@ -650,8 +588,8 @@ namespace std
           psio::meta{                                                                             \
               .name                                   = BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem)), \
                                          .param_names = {PSIO_GET_QUOTED_ARGS(elem)}},            \
-              [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem))   \
-              { return &psio::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });             \
+              [](auto p) -> decltype(&std::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem))    \
+              { return &std::remove_cvref_t<decltype(*p)>::PSIO_GET_IDENT(elem); });              \
       return true;
 
 #define PSIO_MEMBER_POINTER_IMPL1(s, STRUCT, elem) &STRUCT::PSIO_GET_IDENT(elem)
@@ -677,7 +615,7 @@ namespace std
 
 #define PSIO_PROXY_METHOD(r, STRUCT, i, elem)                                          \
    template <typename... Args>                                                         \
-   auto PSIO_GET_IDENT(elem)(Args... args)                                             \
+   decltype(auto) PSIO_GET_IDENT(elem)(Args... args)                                   \
    {                                                                                   \
       return _psio_proxy_obj                                                           \
           .template call<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))), \
@@ -696,7 +634,7 @@ namespace std
  *    * numbered(int, ident)           non-static data member with field number
  */
 #define PSIO_REFLECT(STRUCT, ...)                                                                 \
-   struct reflect_impl_##STRUCT                                                                   \
+   struct psio_reflect_impl_##STRUCT                                                              \
    {                                                                                              \
       static constexpr bool is_defined = true;                                                    \
       static constexpr bool is_struct  = true;                                                    \
@@ -775,4 +713,4 @@ namespace std
          BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_METHOD, STRUCT, PSIO_REFLECT_METHODS(__VA_ARGS__))    \
       };                                                                                          \
    };                                                                                             \
-   reflect_impl_##STRUCT get_reflect_impl(const STRUCT&);
+   psio_reflect_impl_##STRUCT psio_get_reflect_impl(const STRUCT&);
