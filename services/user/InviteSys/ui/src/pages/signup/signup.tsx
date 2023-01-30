@@ -2,11 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useMutation } from "@tanstack/react-query";
-import { KeyType, genKeyPair } from "common/keyConversions.mjs";
+import { KeyType, genKeyPair, privateStringToKeyPair } from "common/keyConversions.mjs";
 import { useForm } from "react-hook-form";
 import type { SubmitHandler, UseFormReturn } from "react-hook-form";
 import { psiboardApplet } from "service";
-
 import { Button, Heading, Input, Text } from "components";
 import { isAccountAvailable } from "store/queries/isAccountTaken";
 import { parsePrivateKey } from "store/queries/usePrivateKey";
@@ -31,25 +30,35 @@ export const SignUp = () => {
         setStep("create");
     };
 
-    const token = useParam('token')
-    const { error, data, mutate } = useMutation({
+    const { error, data, mutate: acceptCreate, isSuccess, isLoading } = useMutation({
         mutationFn: async ({
+            token,
             accountName,
             publicKey,
         }: {
+            token: string;
             accountName: string;
             publicKey: string;
         }) => {
 
             // const { publicKey } = parsePrivateKey(token);
-
-            return psiboardApplet.acceptCreate("", accountName, publicKey);
+            console.log('mutation', { token, accountName, publicKey })
+            return psiboardApplet.createAccount({ token, accountName, publicKey});
         },
+        onError: () => {
+            console.log('errored..')
+        }, 
+        onSuccess: () => {
+            setStep("success");
+        }
     });
 
     const onConfirm: SubmitHandler<Inputs> = async (data: Inputs) => {
+        const token = useParam('token')
+
         const privateKey = data.password;
-        const { publicKey } = parsePrivateKey(privateKey);
+        const { publicKey, isValid } = parsePrivateKey(privateKey);
+        acceptCreate({ accountName: data.account_name, publicKey, token: token! })
 
         // setFormSubmitted(true);
         // setGeneralError("");
@@ -63,10 +72,10 @@ export const SignUp = () => {
         // }
 
         // try {
-        //     const accounts = await importAccount({
-        //         privateKey: data.key,
-        //         publicKey,
-        //     });
+            // const accounts = await importAccount({
+            //     privateKey: data.key,
+            //     publicKey,
+            // });
         //     addAccounts(accounts);
         //     updatePublicKey("");
         //     reset();
@@ -82,7 +91,6 @@ export const SignUp = () => {
         // }
 
         // setFormSubmitted(false);
-        setStep("success");
         console.log("SUBMITTED");
     };
 

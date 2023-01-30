@@ -6,8 +6,7 @@ import { useInviteToken } from "store/queries/usePrivateKey";
 import { useInitilize } from "store/hooks/useInitialize";
 import { useGenerateLink } from "store/hooks/useGenerateLink";
 
-const accounts = ["satoshinakamoto", "mashedpotato", "tothemoon"];
-const isSignedIn = accounts.length;
+
 
 export const Options = () => {
     useInitilize(psiboardApplet)
@@ -19,6 +18,9 @@ export const Options = () => {
 
     const { isValid: isInviteValid, error } = useInviteToken(token);
     const { data: inviteLink, mutate: generateLink, isLoading: isInviting, error: inviteError } = useGenerateLink();
+
+    const accounts = [...(currentUser ? [currentUser] : []), "satoshinakamoto", "mashedpotato", "tothemoon"]
+    const isSignedIn = accounts.length > 0;
 
     return (
         <>
@@ -75,13 +77,14 @@ export const Options = () => {
                     <Button
                         size="xl"
                         type="primary"
-                        href="/sign-up"
+                        href={`/sign-up?token=${token}`}
                         title="Create account"
                     >
                         Create account and sign in
                     </Button>
                 </section>
-            )}            {currentUser && (
+            )}
+            {currentUser && (
                 <section className="bg-gray-50 p-3">
                     <Text size="base">
                         Invite a friend!

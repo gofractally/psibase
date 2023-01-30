@@ -1,8 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
-    keyToString,
     privateStringToKeyPair,
-    stringToKey,
 } from "common/keyConversions.mjs";
 
 export const parsePrivateKey = (

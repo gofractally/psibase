@@ -184,8 +184,8 @@ export class PsiboardService extends Service {
     }
 
     @Op()
-    createAccount({ inviteKey, accountName, publicKey }: { inviteKey: string, accountName: string, publicKey: string }) {
-        this.acceptCreate(inviteKey, accountName, publicKey);
+    createAccount({ token, accountName, publicKey }: { token: string, accountName: string, publicKey: string }) {
+        this.acceptCreate(token, accountName, publicKey);
     }
 
     @Op()
