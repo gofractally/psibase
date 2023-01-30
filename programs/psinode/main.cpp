@@ -671,6 +671,141 @@ struct Perf
 };
 PSIO_REFLECT(Perf, timestamp, memory, tasks, transactions)
 
+void write_om_descriptor(std::string_view name,
+                         std::string_view type,
+                         std::string_view unit,
+                         std::string_view help,
+                         auto&            stream)
+{
+   stream.write("# TYPE ", 7);
+   stream.write(name.data(), name.size());
+   stream.write(' ');
+   stream.write(type.data(), type.size());
+   stream.write('\n');
+
+   if (!unit.empty())
+   {
+      stream.write("# UNIT ", 7);
+      stream.write(name.data(), name.size());
+      stream.write(' ');
+      stream.write(unit.data(), unit.size());
+      stream.write('\n');
+   }
+
+   stream.write("# HELP ", 7);
+   stream.write(name.data(), name.size());
+   stream.write(' ');
+   stream.write(help.data(), help.size());
+   stream.write('\n');
+}
+
+void write_om_mem(std::string_view name, std::int64_t v, auto& stream)
+{
+   std::string_view prefix = "psinode_memory{category=";
+   stream.write(prefix.data(), prefix.size());
+   to_json(name, stream);
+   stream.write("} ", 2);
+   auto value = std::to_string(v);
+   stream.write(value.data(), value.size());
+   stream.write('\n');
+}
+
+void write_om_mem(const Perf& perf, auto& stream)
+{
+   write_om_descriptor("psinode_memory", "gauge", "bytes", "Resident Memory", stream);
+   write_om_mem("database", perf.memory.database, stream);
+   write_om_mem("code", perf.memory.code, stream);
+   write_om_mem("data", perf.memory.data, stream);
+   write_om_mem("wasm_code", perf.memory.wasmCode, stream);
+   write_om_mem("wasm_memory", perf.memory.wasmMemory, stream);
+   write_om_mem("unclassified", perf.memory.unclassified, stream);
+}
+
+std::string usec_as_sec(std::int64_t time)
+{
+   return std::to_string(time) + "e-6";
+}
+
+void write_om_sample(std::string_view name, std::string_view value, auto& stream)
+{
+   stream.write(name.data(), name.size());
+   stream.write(' ');
+   stream.write(value.data(), value.size());
+   stream.write('\n');
+}
+
+void write_om_task_sample(std::string_view  name,
+                          const ThreadInfo& task,
+                          std::string_view  value,
+                          auto&             stream)
+{
+   stream.write(name.data(), name.size());
+   stream.write("{group=", 7);
+   to_json(task.group, stream);
+   stream.write(",task=", 6);
+   to_json(std::to_string(task.id), stream);
+   stream.write("} ", 2);
+   stream.write(value.data(), value.size());
+   stream.write('\n');
+}
+
+void write_om_tasks(const Perf& perf, auto& stream)
+{
+   write_om_descriptor("psinode_cpu_user", "counter", "seconds", "CPU Time (User)", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_cpu_user_total", task, usec_as_sec(task.user), stream);
+   }
+   write_om_descriptor("psinode_cpu_system", "counter", "seconds", "CPU Time (System)", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_cpu_system_total", task, usec_as_sec(task.system), stream);
+   }
+   write_om_descriptor("psinode_page_faults", "counter", "", "Page Faults", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_page_faults_total", task, std::to_string(task.pageFaults),
+                           stream);
+   }
+   write_om_descriptor("psinode_read", "counter", "bytes", "Bytes Read", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_read_total", task, std::to_string(task.read), stream);
+   }
+   write_om_descriptor("psinode_written", "counter", "bytes", "Bytes Written", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_written_total", task, std::to_string(task.written), stream);
+   }
+}
+
+void write_om_transaction_stats(const TransactionStats& stats, auto& stream)
+{
+   write_om_descriptor("psinode_transactions_submitted", "counter", "", "Total Transactions",
+                       stream);
+   write_om_sample("psinode_transactions_submitted_total", std::to_string(stats.total), stream);
+   write_om_descriptor("psinode_transactions_succeeded", "counter", "", "Succeeded Transactions",
+                       stream);
+   write_om_sample("psinode_transactions_succeeded_total", std::to_string(stats.succeeded), stream);
+   write_om_descriptor("psinode_transactions_failed", "counter", "", "Failed Transactions", stream);
+   write_om_sample("psinode_transactions_failed_total", std::to_string(stats.failed), stream);
+   write_om_descriptor("psinode_transactions_skipped", "counter", "", "Skipped Transactions",
+                       stream);
+   write_om_sample("psinode_transactions_skipped_total", std::to_string(stats.skipped), stream);
+   write_om_descriptor("psinode_transactions_unprocessed", "gauge", "", "Pending Transactions",
+                       stream);
+   write_om_sample("psinode_transactions_unprocessed", std::to_string(stats.unprocessed), stream);
+}
+
+template <typename S>
+void to_openmetrics_text(const Perf& perf, S& stream)
+{
+   write_om_mem(perf, stream);
+   write_om_tasks(perf, stream);
+   write_om_transaction_stats(perf.transactions, stream);
+   stream.write("# EOF\n", 6);
+}
+
 std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
 {
    std::int64_t value;
@@ -1331,6 +1466,24 @@ void run(const std::string&              db_path,
                 psio::vector_stream stream(json);
                 to_json(result, stream);
                 return json;
+             });
+      };
+
+      http_config->get_metrics =
+          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
+      {
+         TransactionStats trx;
+         {
+            std::lock_guard lock{transactionStatsMutex};
+            trx = transactionStats;
+         }
+         callback(
+             [result = get_perf(*sharedState, trx)]() mutable
+             {
+                std::vector<char>   data;
+                psio::vector_stream stream(data);
+                to_openmetrics_text(result, stream);
+                return data;
              });
       };
 

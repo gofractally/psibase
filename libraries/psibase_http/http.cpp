@@ -775,6 +775,21 @@ namespace psibase::http
                 [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
                 { session->queue_(ok(make_result(), "application/json")); });
          }
+         else if (req.target() == "/native/admin/metrics" && server.http_config->get_metrics)
+         {
+            if (req.method() != bhttp::verb::get)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+            run_native_handler(
+                server.http_config->get_metrics,
+                [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
+                {
+                   session->queue_(
+                       ok(make_result(),
+                          "application/openmetrics-text; version=1.0.0; charset=utf-8"));
+                });
+         }
          else if (req.target() == "/native/admin/peers" && server.http_config->get_peers)
          {
             if (!is_admin(*server.http_config, req))
