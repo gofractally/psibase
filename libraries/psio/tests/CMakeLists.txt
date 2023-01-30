@@ -7,7 +7,7 @@ if(DEFINED IS_NATIVE)
         psio_tests.cpp
 #        reflect.cpp
 #        flat_views.cpp
-#        benchmark.cpp
+        benchmark.cpp
 #        crypto.cpp
         test_fracpack.cpp
         test_view.cpp

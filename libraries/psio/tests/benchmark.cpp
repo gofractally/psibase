@@ -79,8 +79,8 @@ TEST_CASE("benchmark")
       std::cout << "unpack flat:    " << std::chrono::duration<double, std::milli>(delta).count()
                 << " ms  size: " << p.size() << "  ";
 
-      std::vector<char> buf(p.size() + 4);
-      memcpy(buf.data(), p.data(), buf.size());
+      std::vector<char> buf(p.data_with_size_prefix().size());
+      memcpy(buf.data(), p.data_with_size_prefix().data(), buf.size());
       /*
       std::vector<char>      buf(p.data(),p.data()+p.size()+4);
       */

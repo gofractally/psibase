@@ -429,7 +429,8 @@ namespace psio
       static void pack(const T& value, S& stream)
       {
          is_packable<uint32_t>::pack(value.size() * sizeof(typename T::value_type), stream);
-         stream.write(value.data(), value.size() * sizeof(typename T::value_type));
+         if (value.size())
+            stream.write(value.data(), value.size() * sizeof(typename T::value_type));
       }
 
       static bool is_empty_container(const T& value) { return value.empty(); }
