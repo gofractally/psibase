@@ -1205,7 +1205,7 @@ namespace psibase
                 using TT = decltype(psio::tuple_remove_view(
                     std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
                 // TODO: EventDecoder validates and unpacks this again
-                std::span<const char> eventData{v->begin() + pos, v->end()};
+                std::span<const char> eventData{v->data() + pos, v->data() + v->size()};
                 if (psio::fracpack_validate<TT>(eventData))
                 {
                    auto value = psio::from_frac<TT>(psio::prevalidated{eventData});
