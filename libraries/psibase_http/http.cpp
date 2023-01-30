@@ -766,6 +766,10 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/perf" && server.http_config->get_perf)
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::get)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "GET"));
@@ -777,6 +781,10 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/metrics" && server.http_config->get_metrics)
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::get)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "GET"));
