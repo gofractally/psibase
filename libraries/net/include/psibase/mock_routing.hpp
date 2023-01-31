@@ -89,6 +89,17 @@ namespace psibase::net
          }
          assert(!"Unknown peer");
       }
+      bool has_peer(mock_routing* other)
+      {
+         for (const auto& [id, data] : _peers)
+         {
+            if (data.first == other)
+            {
+               return true;
+            }
+         }
+         return false;
+      }
       peer_id* add_peer_impl(mock_routing* other)
       {
          peer_id id    = next_peer_id++;

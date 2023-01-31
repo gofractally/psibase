@@ -115,6 +115,64 @@ struct TestNode
    auto&                          chain() { return node.chain(); }
 };
 
+struct NodeSet
+{
+   explicit NodeSet(boost::asio::io_context& ctx) : ctx(ctx) {}
+   void add(AccountNumber producer) { nodes.push_back(std::make_unique<TestNode>(ctx, producer)); }
+   template <typename Engine>
+   void randomize(Engine& rng)
+   {
+      assert(nodes.size() < 64);
+      std::uniform_int_distribution dist{std::uint64_t{0}, (std::uint64_t(1) << nodes.size()) - 1};
+      auto                          bitset = dist(rng);
+      for (std::size_t i = 0; i < nodes.size(); ++i)
+      {
+         for (std::size_t j = i + 1; j < nodes.size(); ++j)
+         {
+            auto mask = (std::uint64_t(1) << i) | (std::uint64_t(1) << j);
+            adjust_connection(nodes[i]->node, nodes[j]->node, (bitset & mask) == mask);
+         }
+      }
+   }
+   static void adjust_connection(node_type& lhs, node_type& rhs, bool connect)
+   {
+      if (lhs.has_peer(&rhs))
+      {
+         if (!connect)
+         {
+            lhs.remove_peer(&rhs);
+         }
+      }
+      else if (connect)
+      {
+         lhs.add_peer(&rhs);
+      }
+   }
+   void connect_all()
+   {
+      for (std::size_t i = 0; i < nodes.size(); ++i)
+      {
+         for (std::size_t j = i + 1; j < nodes.size(); ++j)
+         {
+            adjust_connection(nodes[i]->node, nodes[j]->node, true);
+         }
+      }
+   }
+   node_type&               operator[](std::size_t idx) { return nodes.at(idx)->node; }
+   boost::asio::io_context& ctx;
+   std::vector<std::unique_ptr<TestNode>> nodes;
+};
+
+std::ostream& operator<<(std::ostream& os, const NodeSet& nodes)
+{
+   for (const auto& node : nodes.nodes)
+   {
+      if (!node->node.network()._peers.empty())
+         os << ' ' << node->node.consensus().producer_name().str();
+   }
+   return os;
+}
+
 std::vector<char> readWholeFile(const std::filesystem::path& name)
 {
    std::ifstream     in(name);
@@ -201,44 +259,24 @@ TEST_CASE("random connect/disconnect")
    loggers::common_logger logger;
    logger.add_attribute("Host", boost::log::attributes::constant(std::string{"main"}));
    boost::asio::io_context ctx;
+   NodeSet                 nodes(ctx);
    AccountNumber           ida{"a"};
    AccountNumber           idb{"b"};
    AccountNumber           idc{"c"};
-   TestNode                a(ctx, ida);
-   TestNode                b(ctx, idb);
-   TestNode                c(ctx, idc);
-   a.node.add_peer(&b.node);
-   a.node.add_peer(&c.node);
-   b.node.add_peer(&c.node);
+   nodes.add(ida);
+   nodes.add(idb);
+   nodes.add(idc);
+   nodes.connect_all();
 
-   boot(a.node.chain().getBlockContext(), {ida, idb, idc});
+   boot(nodes[0].chain().getBlockContext(), {ida, idb, idc});
 
-   int        active_set = 7;
-   timer_type timer(ctx);
-   auto       adjust_connection = [&](TestNode* n1, TestNode* n2, bool old_state, bool new_state)
-   {
-      if (old_state && !new_state)
-      {
-         n1->node.remove_peer(&n2->node);
-      }
-      else if (!old_state && new_state)
-      {
-         n1->node.add_peer(&n2->node);
-      }
-   };
+   timer_type   timer(ctx);
    std::mt19937 rng;
    loop(timer,
         [&]()
         {
-           std::uniform_int_distribution<> dist(0, 7);
-           auto                            next_set = dist(rng);
-           PSIBASE_LOG(logger, info)
-               << "active nodes:" << ((next_set & 1) ? " a" : "") << ((next_set & 2) ? " b" : "")
-               << ((next_set & 4) ? " c" : "");
-           adjust_connection(&a, &b, (active_set & 3) == 3, (next_set & 3) == 3);
-           adjust_connection(&a, &c, (active_set & 5) == 5, (next_set & 5) == 5);
-           adjust_connection(&b, &c, (active_set & 6) == 6, (next_set & 6) == 6);
-           active_set = next_set;
+           nodes.randomize(rng);
+           PSIBASE_LOG(logger, info) << "connected nodes:" << nodes;
         });
    // This should result in a steady stream of empty blocks
    auto run_for = [&](auto total_time)
@@ -256,16 +294,13 @@ TEST_CASE("random connect/disconnect")
    PSIBASE_LOG(logger, info) << "Final sync";
    using namespace std::literals::chrono_literals;
    // Make all nodes active
-   adjust_connection(&a, &b, (active_set & 3) == 3, true);
-   adjust_connection(&a, &c, (active_set & 5) == 5, true);
-   adjust_connection(&b, &c, (active_set & 6) == 6, true);
-   active_set = 7;
+   nodes.connect_all();
    run_for(10s);
 
-   auto final_state = a.chain().get_head_state();
+   auto final_state = nodes[0].chain().get_head_state();
    // Verify that all three chains are consistent
-   CHECK(final_state->blockId() == b.chain().get_head_state()->blockId());
-   CHECK(final_state->blockId() == c.chain().get_head_state()->blockId());
+   CHECK(final_state->blockId() == nodes[1].chain().get_head_state()->blockId());
+   CHECK(final_state->blockId() == nodes[2].chain().get_head_state()->blockId());
    // Verify that the final block looks sane
    mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
    CHECK(final_time <= mock_clock::now());
