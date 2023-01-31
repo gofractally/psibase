@@ -160,6 +160,15 @@ namespace psibase::net
                match_index[1].clear();
                match_index[1].resize(prods.second->size());
             }
+            // Before boot, every node can be be a leader. This is the only time when
+            // it is possble to have multiple leaders. Exit leader mode and start a new
+            // election.
+            if (active_producers[0]->size() == 0 && !active_producers[1])
+            {
+               _election_timer.cancel();
+               stop_leader();
+               _state = producer_state::unknown;
+            }
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);

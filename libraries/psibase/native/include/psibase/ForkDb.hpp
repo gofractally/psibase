@@ -803,6 +803,7 @@ namespace psibase
       bool isProducing() const { return !!blockContext; }
 
       auto& getLogger() { return logger; }
+      auto& getBlockLogger() { return blockLogger; }
 
       explicit ForkDb(SystemContext*          sc,
                       std::shared_ptr<Prover> prover = std::make_shared<CompoundProver>())

@@ -26,6 +26,7 @@ namespace psibase::test
       static void           reset();
       static void           reset(time_point);
       static void           advance(duration);
+      static void           advance();
    };
 
    struct mock_timer
@@ -36,16 +37,22 @@ namespace psibase::test
       template <typename ExecutionContext>
       mock_timer(ExecutionContext& ctx) : _impl(std::make_shared<impl>())
       {
-         _impl->post = [&ctx](const auto& f) { ctx.post(f); };
+         _impl->bind = [&ctx](const auto& f)
+         {
+            return [&ctx, f, work = typename ExecutionContext::work{ctx}](const std::error_code& ec)
+            { ctx.post([f, ec] { f(ec); }); };
+         };
       }
+      ~mock_timer();
       void expires_at(time_point);
       void expires_after(duration);
       void async_wait(std::function<void(const std::error_code&)>);
       struct impl
       {
-         std::vector<std::function<void(const std::error_code&)>> callbacks;
-         std::function<void(std::function<void()>)>               post;
-         time_point                                               deadline;
+         using callback_type = std::function<void(const std::error_code&)>;
+         std::vector<callback_type>                         callbacks;
+         std::function<callback_type(const callback_type&)> bind;
+         time_point                                         deadline;
       };
       std::shared_ptr<impl> _impl;
       void                  cancel();
