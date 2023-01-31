@@ -42,15 +42,17 @@ declare module "common/rpc.mjs" {
         getAppletName(): Promise<string>;
         getAppletId(): Promise<AppletId>;
 
-        public get operations(): Operation[]
-        public get queries(): Operation[]
-
+        public get operations(): Operation[];
+        public get queries(): Operation[];
     }
 
-    function Action(target: any, key: string, descriptor: any): void
-    function Op(name?: string): (target: any, key: string, descriptor: any) => void
-    function Qry(name?: string): (target: any, key: string, descriptor: any) => void
-
+    function Action(target: any, key: string, descriptor: any): void;
+    function Op(
+        name?: string
+    ): (target: any, key: string, descriptor: any) => void;
+    function Qry(
+        name?: string
+    ): (target: any, key: string, descriptor: any) => void;
 
     function getCurrentApplet(): Promise<string>;
 
@@ -104,6 +106,10 @@ declare module "common/rpc.mjs" {
         baseUrl: string,
         transaction: any,
         privateKeys?: string[] // TODO: remove optional once we're done with fake-auth
+    ): Promise<any>;
+    function packAndDigestTransaction(
+        baseUrl: string,
+        transaction: any
     ): Promise<any>;
     function verifyFields(obj: any, fieldNames: any): boolean;
 

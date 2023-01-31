@@ -22,11 +22,7 @@ export const fetchQuery = <T>(
     service: string,
     params: any = {},
     subPath: string = ""
-): Promise<T> => {
-    return new Promise<T>((resolve) => {
-        query(new AppletId(service, subPath), queryName, params);
-    });
-};
+): Promise<T> => query(new AppletId(service, subPath), queryName, params);
 
 export const getLoggedInUser = async (): Promise<string> => {
     return query<any, string>(
@@ -41,15 +37,14 @@ export const updateAccountInCommonNav = (account: string) => {
 
 export const fetchAccountsByKey = async (publicKey: string) => {
     if (!publicKey) throw new Error(`No public key found ${publicKey}`);
-    try {
-        return await getJson<{ account: string; pubkey: string }[]>(
-            await siblingUrl(null, "auth-ec-sys", "accwithkey/" + publicKey)
-        );
-    } catch(e) {
-        console.error(e)
-        return []
-    }
-    
+    const accKeys = await fetchQuery<{ account: string; pubkey: string }[]>(
+        "accWithKey",
+        "auth-ec-sys",
+        {
+            key: publicKey,
+        }
+    );
+    return accKeys;
 };
 
 export const fetchAccounts = async () => {
