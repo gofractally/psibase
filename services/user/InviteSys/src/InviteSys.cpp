@@ -9,6 +9,7 @@
 #include <services/user/NftSys.hpp>
 #include <services/user/TokenSys.hpp>
 
+#include <psibase/serveContent.hpp>
 #include <psibase/Bitset.hpp>
 #include <vector>
 
@@ -26,7 +27,7 @@ using std::optional;
 using std::string;
 using std::vector;
 
-InviteSys::InviteSys(psio::shared_view_ptr<psibase::Action> action)
+InviteSys::InviteSys(psio::shared_view_ptr<Action> action)
 {
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
@@ -188,7 +189,7 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    eventTable.put(eventRecord);
 }
 
-void InviteSys::reject(psibase::PublicKey inviteKey)
+void InviteSys::reject(PublicKey inviteKey)
 {
    auto table  = Tables().open<InviteTable>();
    auto invite = table.get(inviteKey);
@@ -372,7 +373,7 @@ void InviteSys::setBlacklist(vector<AccountNumber> accounts)
    eventTable.put(eventRecord);
 }
 
-optional<InviteRecord> InviteSys::getInvite(psibase::PublicKey pubkey)
+optional<InviteRecord> InviteSys::getInvite(PublicKey pubkey)
 {
    return Tables().open<InviteTable>().get(pubkey);
 }
@@ -439,10 +440,19 @@ auto InviteSys::serveSys(HttpRequest request) -> std::optional<HttpReply>
    if (auto result = serveSimpleUI<InviteSys, true>(request))
       return result;
 
+   if (auto result = serveContent(request, Tables{getReceiver()}))
+      return result;
+
    if (auto result = serveGraphQL(request, Queries{}))
       return result;
 
    return std::nullopt;
+}
+
+void InviteSys::storeSys(string path, string contentType, vector<char> content)
+{
+   check(getSender() == getReceiver(), "wrong sender");
+   storeContent(move(path), move(contentType), move(content), Tables());
 }
 
 PSIBASE_DISPATCH(UserService::Invite::InviteSys)
