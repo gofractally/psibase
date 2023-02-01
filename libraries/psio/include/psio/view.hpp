@@ -362,7 +362,7 @@ namespace psio
 
       constexpr auto offset = fixed_offsets<std::remove_cv_t<T>>[I];
 
-      if constexpr (is_packable<member_type>::is_optional)
+      if constexpr (is_packable<std::remove_cv_t<member_type>>::is_optional)
       {
          std::uint16_t fixed_size;
          std::uint32_t pos = 0;
