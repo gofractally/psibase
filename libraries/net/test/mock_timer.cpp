@@ -22,7 +22,7 @@ namespace psibase::test
             {
                for (const auto& f : head->callbacks)
                {
-                  head->post([f]() { f(std::error_code{}); });
+                  f(std::error_code{});
                }
                head->callbacks.clear();
             }
@@ -39,7 +39,7 @@ namespace psibase::test
             timer_queue.pop_back();
             for (const auto& f : impl->callbacks)
             {
-               impl->post([f]() { f(make_error_code(boost::asio::error::operation_aborted)); });
+               f(make_error_code(boost::asio::error::operation_aborted));
             }
             impl->callbacks.clear();
             std::make_heap(timer_queue.begin(), timer_queue.end(), timer_queue_compare);
@@ -65,6 +65,19 @@ namespace psibase::test
       mock_current_time += diff;
       process_queue(mock_current_time);
    }
+   void mock_clock::advance()
+   {
+      std::lock_guard l{queue_mutex};
+      if (!timer_queue.empty())
+      {
+         mock_current_time = timer_queue.front()->deadline;
+         process_queue(mock_current_time);
+      }
+   }
+   mock_timer::~mock_timer()
+   {
+      cancel();
+   }
    void mock_timer::expires_at(time_point expiration)
    {
       std::lock_guard l{queue_mutex};
@@ -80,7 +93,7 @@ namespace psibase::test
    void mock_timer::async_wait(std::function<void(const std::error_code&)> callback)
    {
       std::lock_guard l{queue_mutex};
-      _impl->callbacks.push_back(std::move(callback));
+      _impl->callbacks.push_back(_impl->bind(std::move(callback)));
       if (_impl->callbacks.size() == 1)
       {
          timer_queue.push_back(_impl);

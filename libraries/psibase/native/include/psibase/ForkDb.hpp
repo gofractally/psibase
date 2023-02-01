@@ -41,11 +41,11 @@ namespace psibase
       cft,
       bft
    };
-   std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const CftConsensus& c)
+   inline std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const CftConsensus& c)
    {
       return {ConsensusAlgorithm::cft, c.producers};
    }
-   std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const BftConsensus& c)
+   inline std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const BftConsensus& c)
    {
       return {ConsensusAlgorithm::bft, c.producers};
    }
@@ -803,6 +803,7 @@ namespace psibase
       bool isProducing() const { return !!blockContext; }
 
       auto& getLogger() { return logger; }
+      auto& getBlockLogger() { return blockLogger; }
 
       explicit ForkDb(SystemContext*          sc,
                       std::shared_ptr<Prover> prover = std::make_shared<CompoundProver>())
