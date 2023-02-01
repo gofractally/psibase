@@ -513,7 +513,18 @@ namespace psibase::net
       void                             on_accept_block(const BlockHeaderState*) {}
       void                             post_send_block(peer_id, const Checksum256&) {}
       void                             on_erase_block(const Checksum256&) {}
-      void                             set_producers(const auto&) {}
-      void                             cancel() {}
+      void                             set_producers(auto prods)
+      {
+         if (prods.first->size() != 0 || prods.second)
+            throw std::runtime_error("Consensus algorithm not available");
+         active_producers[0] = std::move(prods.first);
+         active_producers[1] = std::move(prods.second);
+
+         _state = producer_state::leader;
+         PSIBASE_LOG(logger, info)
+             << "Starting block production for term " << current_term << " as " << self.str();
+         start_leader();
+      }
+      void cancel() {}
    };
 }  // namespace psibase::net

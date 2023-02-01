@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/log.hpp>
+#include <psibase/message_serializer.hpp>
 
 #include <boost/asio/io_context.hpp>
 #include <cassert>
@@ -15,7 +16,7 @@ namespace psibase::net
    struct mock_network;
 
    template <typename Derived>
-   struct mock_routing
+   struct mock_routing : message_serializer<Derived>
    {
       explicit mock_routing(boost::asio::io_context& ctx) : ctx(ctx)
       {

@@ -77,6 +77,7 @@ namespace psibase::net
       using Base::_state;
       using Base::active_producers;
       using Base::chain;
+      using Base::consensus;
       using Base::current_term;
       using Base::for_each_key;
       using Base::is_producer;
@@ -270,7 +271,7 @@ namespace psibase::net
          }
          if (chain().commit(jointCommitIndex))
          {
-            set_producers(chain().getProducers());
+            consensus().set_producers(chain().getProducers());
          }
       }
       BlockNum update_match_index(producer_id producer, BlockNum confirmed, std::size_t group)

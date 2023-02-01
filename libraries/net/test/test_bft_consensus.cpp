@@ -19,9 +19,9 @@ using namespace psibase::net;
 using namespace psibase;
 using namespace psibase::test;
 
-using node_type = node<null_link, mock_routing, cft_consensus, ForkDb>;
+using node_type = node<null_link, mock_routing, bft_consensus, ForkDb>;
 
-TEST_CASE("cft random connect/disconnect", "[cft]")
+TEST_CASE("bft random connect/disconnect", "[bft]")
 {
    using namespace std::literals::chrono_literals;
    loggers::common_logger logger;
@@ -29,7 +29,7 @@ TEST_CASE("cft random connect/disconnect", "[cft]")
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
 
-   setup<CftConsensus>(nodes, {"a", "b", "c"});
+   setup<BftConsensus>(nodes, {"a", "b", "c", "d"});
 
    timer_type   timer(ctx);
    std::mt19937 rng;
@@ -41,13 +41,14 @@ TEST_CASE("cft random connect/disconnect", "[cft]")
         });
    // This should result in a steady stream of empty blocks
    runFor(ctx, 5min);
+   ctx.poll();
    timer.cancel();
    ctx.poll();
 
    PSIBASE_LOG(logger, info) << "Final sync";
    // Make all nodes active
    nodes.connect_all();
-   runFor(ctx, 10s);
+   runFor(ctx, 20s);
 
    auto final_state = nodes[0].chain().get_head_state();
    // Verify that all three chains are consistent

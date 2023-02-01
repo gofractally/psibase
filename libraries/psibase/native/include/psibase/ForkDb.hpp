@@ -41,11 +41,11 @@ namespace psibase
       cft,
       bft
    };
-   std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const CftConsensus& c)
+   inline std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const CftConsensus& c)
    {
       return {ConsensusAlgorithm::cft, c.producers};
    }
-   std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const BftConsensus& c)
+   inline std::tuple<ConsensusAlgorithm, const std::vector<Producer>&> split(const BftConsensus& c)
    {
       return {ConsensusAlgorithm::bft, c.producers};
    }
