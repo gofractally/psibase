@@ -190,11 +190,11 @@ namespace SystemService
       // TODO: limit execution time
       // TODO: limit charged CPU & NET which can go into a block
       auto top_act = getCurrentAction();
-      auto args    = psio::convert_from_frac<ProcessTransactionArgs>(top_act.rawData);
+      auto args    = psio::from_frac<ProcessTransactionArgs>(top_act.rawData);
       // TODO: avoid copying inner rawData during unpack
       auto t = args.transaction.data_without_size_prefix();
-      check(psio::fracvalidate<Transaction>(t).valid_and_known(), "transaction has invalid format");
-      trx     = psio::convert_from_frac<Transaction>(t);
+      check(psio::fracpack_validate_strict<Transaction>(t), "transaction has invalid format");
+      trx     = psio::from_frac<Transaction>(psio::prevalidated{t});
       auto id = sha256(top_act.rawData.data(), top_act.rawData.size());
 
       check(trx.actions.size() > 0, "transaction has no actions");

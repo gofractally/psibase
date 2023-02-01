@@ -261,7 +261,7 @@ namespace psibase
       using id_type = Checksum256;
       const BlockHeaderState* insert(const psio::shared_view_ptr<SignedBlock>& b)
       {
-         BlockInfo info(*b->block());
+         BlockInfo info(b->block());
          PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
          if (info.header.blockNum <= commitIndex)
          {
@@ -380,7 +380,7 @@ namespace psibase
       }
       auto get_prev_id(const id_type& id)
       {
-         return Checksum256(*get(id)->block()->header()->previous());
+         return Checksum256(get(id)->block().header().previous());
       }
 
       void setTerm(TermNum term) { currentTerm = term; }
@@ -543,7 +543,7 @@ namespace psibase
                ctx.callStartBlock();
                ctx.execAllInBlock();
                auto [newRevision, id] =
-                   ctx.writeRevision(FixedProver(blockPtr->signature().get()), claim);
+                   ctx.writeRevision(FixedProver(blockPtr->signature()), claim);
                // TODO: diff header fields
                check(id == state->blockId(), "blockId does not match");
                state->revision = newRevision;
@@ -636,7 +636,7 @@ namespace psibase
                 (blockNum == commitIndex &&
                  !in_best_chain(ExtendedBlockId{iter->first, blockNum})) ||
                 (blockNum > commitIndex &&
-                 states.find(iter->second->block()->header()->previous()) == states.end()))
+                 states.find(iter->second->block().header().previous()) == states.end()))
             {
                f(iter->first);
                auto state_iter = states.find(iter->first);

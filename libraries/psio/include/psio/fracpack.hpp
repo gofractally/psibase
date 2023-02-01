@@ -1,2608 +1,1428 @@
+// TODO: The interaction between checking for no extra data (no gaps)
+//       and the possible presence of unknown fields and variant tags
+//       has some unsolved border cases. It might be best to only check
+//       for gaps when in a mode which prohibits unknown fields and skip
+//       checking for gaps when in a mode which allows unknown fields.
+
 #pragma once
 
-#include <psio/check.hpp>
-#include <psio/from_json.hpp>
-#include <psio/get_type_name.hpp>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
-#include <psio/to_json.hpp>
-#include <psio/unaligned_type.hpp>
-#include <span>
 
-//#include <boost/hana/for_each.hpp>
-
-/// required for UTF8 validation of strings
-#include <simdjson.h>
-//#include <rapidjson/encodings.h>
-
-// #define DEBUG
-// #include <iostream>
+#include <cassert>
+#include <cstring>
 
 namespace psio
 {
+   // If a type T supports the expressions `clio_unwrap_packable(T&)`,
+   // which returns a `T2&`, and `clio_unwrap_packable(const T&)`, which
+   // returns `const T2&`, then packing or unpacking T packs or unpacks
+   // the returned reference instead.
    template <typename T>
-   class shared_view_ptr;
+   concept PackableWrapper = requires(T& x, const T& cx) {
+                                clio_unwrap_packable(x);
+                                clio_unwrap_packable(cx);
+                             };
 
-   template <typename>
-   struct is_shared_view_ptr : std::false_type
+   template <typename T, bool Reflected>
+   struct is_packable_reflected;
+
+   template <typename T>
+   struct is_packable_reflected<T, false> : std::bool_constant<false>
    {
    };
 
    template <typename T>
-   struct is_shared_view_ptr<shared_view_ptr<T>> : std::true_type
+   struct is_packable_reflected<T, true>;
+
+   template <typename T>
+   struct is_packable : is_packable_reflected<T, Reflected<T>>
    {
-      using value_type = T;
    };
 
-   template <typename View, typename Enable = void>
-   struct view;
-   template <typename View, typename Enable = void>
-   struct const_view;
+   // Checking Reflected here is necessary to handle recursive structures
+   // because is_packable<T> might already be on the instantiation stack
+   template <typename T>
+   concept Packable = Reflected<T> || is_packable<T>::value;
 
    template <typename T>
-   struct remove_view
+   concept PackableNumeric =            //
+       std::is_same_v<T, std::byte> ||  //
+       std::is_same_v<T, char> ||       //
+       std::is_same_v<T, uint8_t> ||    //
+       std::is_same_v<T, uint16_t> ||   //
+       std::is_same_v<T, uint32_t> ||   //
+       std::is_same_v<T, uint64_t> ||   //
+       std::is_same_v<T, int8_t> ||     //
+       std::is_same_v<T, int16_t> ||    //
+       std::is_same_v<T, int32_t> ||    //
+       std::is_same_v<T, int64_t> ||    //
+       std::is_same_v<T, float> ||      //
+       std::is_same_v<T, double>;
+
+   template <bool Verify, PackableNumeric T>
+   [[nodiscard]] bool unpack_numeric(T* value, const char* src, uint32_t& pos, uint32_t end_pos);
+
+   template <typename T>
+   struct is_packable_memcpy : std::bool_constant<false>
    {
-      using type = T;
    };
+
    template <typename T>
-   struct remove_view<view<T>>
+   concept PackableMemcpy = is_packable_memcpy<T>::value;
+
+   template <PackableNumeric T>
+   struct is_packable_memcpy<T> : std::bool_constant<true>
    {
-      using type = T;
-   };
-   template <typename T>
-   struct remove_view<const_view<T>>
-   {
-      using type = T;
    };
 
-   template <typename T>
-   using remove_view_t = typename remove_view<T>::type;
-
-   template <typename T, typename P>
-   constexpr bool view_is()
+   template <PackableMemcpy T, std::size_t N>
+   struct is_packable_memcpy<std::array<T, N>> : std::bool_constant<true>
    {
-      return std::is_same_v<view<T>, P> || std::is_same_v<const_view<T>, P>;
-   }
-
-   template <typename... Ts>
-   struct view<std::variant<Ts...>>;
-   template <typename... Ts>
-   struct view<std::tuple<Ts...>>;
-
-   template <typename... Ts>
-   struct view<const std::variant<Ts...>>;
-
-   template <typename T>
-   struct view<T, std::enable_if_t<std::is_arithmetic_v<T>>>;
+      static_assert(sizeof(std::array<T, N>) == N * sizeof(T));
+   };
 
    template <>
-   struct view<std::string>;
-
-   template <typename T>
-   struct view<T, std::enable_if_t<reflect<T>::is_struct>>;
-
-   template <typename... Ts>
-   struct const_view<std::variant<Ts...>>;
-
-   template <typename... Ts>
-   struct const_view<std::tuple<Ts...>>;
-
-   template <typename... Ts>
-   struct const_view<const std::variant<Ts...>>;
-
-   template <typename T>
-   struct const_view<T, std::enable_if_t<std::is_arithmetic_v<T>>>;
+   struct is_packable<std::string>;
 
    template <>
-   struct const_view<std::string>;
+   struct is_packable<std::string_view>;
 
-   template <typename T>
-   struct const_view<T, std::enable_if_t<reflect<T>::is_struct>>;
+   template <PackableMemcpy T>
+   struct is_packable<std::span<T>>;
 
-   template <typename>
-   struct is_view : std::false_type
-   {
-   };
+   template <Packable T>
+   struct is_packable<std::vector<T>>;
 
-   template <typename T>
-   struct is_view<view<T>> : std::true_type
-   {
-      using value_type = T;
-   };
-   template <typename T>
-   struct is_view<const_view<T>> : std::true_type
-   {
-      using value_type = T;
-   };
+   template <Packable T, std::size_t N>
+      requires(!is_packable_memcpy<T>::value)
+   struct is_packable<std::array<T, N>>;
 
-   /*
-   struct offset_ptr
+   template <Packable T>
+   struct is_packable<std::optional<T>>;
+
+   template <Packable... Ts>
+   struct is_packable<std::tuple<Ts...>>;
+
+   template <Packable... Ts>
+   struct is_packable<std::variant<Ts...>>;
+
+   // Default implementations for is_packable<T>
+   template <typename T, typename Derived>
+   struct base_packable_impl : std::bool_constant<true>
    {
-      offset_ptr(uint32_t i = 0) : offset(i) {}
-      offset_ptr& operator=(uint32_t i)
+      // // Pack object into a single contiguous region
+      // template <typename S>
+      // static void pack(const T& value, S& stream);
+
+      // True if T is a variable-sized container and it is empty
+      static bool is_empty_container(const T& value) { return false; }
+
+      template <bool Verify>
+      static bool clear_container(T* value)
       {
-         offset = i;
-         return *this;
-      }
-
-      unaligned_type<uint32_t> offset;
-
-      template <typename T>
-      auto* get() const;
-   };
-   */
-   using offset_ptr = uint32_t;
-
-   template <typename T>
-   constexpr uint32_t fracpack_fixed_size_impl();
-
-   template <typename T>
-   constexpr uint16_t fracpack_fixed_size()
-   {
-      constexpr auto size = fracpack_fixed_size_impl<T>();
-      if constexpr (size > 0xffff)
-         T::fixed_size_is_too_big();
-      return size;
-   }
-
-   /**
-     *  A struct can be packed using memcpy if the following properties are true:
-     *    0. it is an arithmetic type
-     *    1. sizeof(T) == ∑sizeof(members)
-     *    2. alignement_of(T) == 1
-     *    3. the order of reflected fields, matches memory layout
-     *    4. all members meet the can_memcpy requirement
-     *    5. the struct is definitionWillNotChange
-     */
-   template <typename T>
-   constexpr bool can_memcpy()
-   {
-      if constexpr (std::is_arithmetic_v<T>)
-      {
+         value->clear();
          return true;
       }
-      else if constexpr (std::is_trivially_copyable_v<T>)
-      {
-         if constexpr (psio::reflect<T>::is_struct)
-         {
-            if (not psio::reflect<T>::definitionWillNotChange)
-               return false;
 
-            bool     is_flat  = true;
-            uint64_t last_pos = 0;
-            psio::reflect<T>::for_each(
-                [&](const psio::meta& ref, auto member)
+      // Pack either:
+      // * Object content if T is fixed size
+      // * Space for offset if T is variable size. Must write 0 if is_empty_container().
+      template <typename S>
+      static void embedded_fixed_pack(const T& value, S& stream)
+      {
+         if constexpr (Derived::is_variable_size)
+            stream.write_raw(uint32_t(0));
+         else
+            Derived::pack(value, stream);
+      }
+
+      // Repack offset if T is variable size
+      template <typename S>
+      static void embedded_fixed_repack(const T& value,
+                                        uint32_t fixed_pos,
+                                        uint32_t heap_pos,
+                                        S&       stream)
+      {
+         if (Derived::is_variable_size && !Derived::is_empty_container(value))
+            stream.rewrite_raw(fixed_pos, heap_pos - fixed_pos);
+      }
+
+      // Pack object content if T is variable size
+      template <typename S>
+      static void embedded_variable_pack(const T& value, S& stream)
+      {
+         if (Derived::is_variable_size && !Derived::is_empty_container(value))
+            Derived::pack(value, stream);
+      }
+
+      // // Unpack and/or Verify object in a single contiguous region
+      // template <bool Unpack, bool Verify>
+      // [[nodiscard]] static bool unpack(T*          value,
+      //                                  bool&       has_unknown,
+      //                                  bool&       known_end,
+      //                                  const char* src,
+      //                                  uint32_t&   pos,
+      //                                  uint32_t    end_pos);
+
+      // Unpack and/or Verify object which is pointed to by an offset
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool embedded_variable_unpack(T*          value,
+                                                         bool&       has_unknown,
+                                                         bool&       known_pos,
+                                                         const char* src,
+                                                         uint32_t&   fixed_pos,
+                                                         uint32_t    end_fixed_pos,
+                                                         uint32_t&   heap_pos,
+                                                         uint32_t    end_heap_pos)
+      {
+         uint32_t orig_pos = fixed_pos;
+         uint32_t offset;
+         if (!unpack_numeric<Verify>(&offset, src, fixed_pos, end_fixed_pos))
+            return false;
+         if constexpr (Derived::supports_0_offset)
+         {
+            if (offset == 0)
+            {
+               if constexpr (Unpack)
+                  if (!Derived::template clear_container<Verify>(value))
+                     return false;
+               if constexpr (Verify)
+                  known_pos = true;
+               return true;
+            }
+         }
+         uint32_t new_heap_pos = orig_pos + offset;
+         if constexpr (Verify)
+         {
+            if (offset < 4 || new_heap_pos < heap_pos || new_heap_pos > end_heap_pos)
+               return false;
+            if (new_heap_pos != heap_pos && known_pos)
+               return false;
+            if constexpr (Derived::supports_0_offset)
+               if (Derived::is_empty_container(src, new_heap_pos, end_heap_pos))
+                  return false;
+         }
+         heap_pos = new_heap_pos;
+         return Derived::template unpack<Unpack, Verify>(value, has_unknown, known_pos, src,
+                                                         heap_pos, end_heap_pos);
+      }
+
+      // Unpack and/or verify either:
+      // * Object at fixed_pos if T is fixed size
+      // * Object at offset if T is variable size
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool embedded_unpack(T*          value,
+                                                bool&       has_unknown,
+                                                bool&       known_pos,
+                                                const char* src,
+                                                uint32_t&   fixed_pos,
+                                                uint32_t    end_fixed_pos,
+                                                uint32_t&   heap_pos,
+                                                uint32_t    end_heap_pos)
+      {
+         if constexpr (Derived::is_variable_size)
+            return Derived::template embedded_variable_unpack<Unpack, Verify>(
+                value, has_unknown, known_pos, src, fixed_pos, end_fixed_pos, heap_pos,
+                end_heap_pos);
+         else
+            return Derived::template unpack<Unpack, Verify>(value, has_unknown, known_pos, src,
+                                                            fixed_pos, end_fixed_pos);
+      }
+   };  // base_packable_impl
+
+   template <PackableMemcpy T>
+   struct is_packable<T> : base_packable_impl<T, is_packable<T>>
+   {
+      static constexpr uint32_t fixed_size        = sizeof(T);
+      static constexpr bool     is_variable_size  = false;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const T& value, S& stream)
+      {
+         stream.write_raw(value);
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(T*          value,
+                                       bool&       has_unknown,
+                                       bool&       known_end,
+                                       const char* src,
+                                       uint32_t&   pos,
+                                       uint32_t    end_pos)
+      {
+         if constexpr (Verify)
+         {
+            known_end = true;
+            if (end_pos - pos < sizeof(T))
+               return false;
+         }
+         if constexpr (Unpack)
+            std::memcpy(value, src + pos, sizeof(T));
+         pos += sizeof(T);
+         return true;
+      }
+   };  // is_packable<PackableMemcpy>
+
+   template <bool Verify, PackableNumeric T>
+   [[nodiscard]] bool unpack_numeric(T* value, const char* src, uint32_t& pos, uint32_t end_pos)
+   {
+      bool has_unknown, known_end;
+      return is_packable<T>::template unpack<true, Verify>(value, has_unknown, known_end, src, pos,
+                                                           end_pos);
+   }
+
+   template <>
+   struct is_packable<bool> : base_packable_impl<bool, is_packable<bool>>
+   {
+      static constexpr uint32_t fixed_size        = 1;
+      static constexpr bool     is_variable_size  = false;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const bool& value, S& stream)
+      {
+         stream.write_raw(value);
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(bool*       value,
+                                       bool&       has_unknown,
+                                       bool&       known_end,
+                                       const char* src,
+                                       uint32_t&   pos,
+                                       uint32_t    end_pos)
+      {
+         if constexpr (Verify)
+         {
+            known_end = true;
+            if (end_pos - pos < 1 || static_cast<unsigned char>(src[pos]) > 1)
+               return false;
+         }
+         if constexpr (Unpack)
+            *value = src[pos] != 0;
+         pos += 1;
+         return true;
+      }
+   };  // is_packable<bool>
+
+   template <PackableWrapper T>
+   struct is_packable<T> : std::bool_constant<true>
+   {
+      using inner = std::remove_cvref_t<decltype(clio_unwrap_packable(std::declval<T&>()))>;
+      using is_p  = is_packable<inner>;
+
+      static constexpr uint32_t fixed_size        = is_p::fixed_size;
+      static constexpr bool     is_variable_size  = is_p::is_variable_size;
+      static constexpr bool     is_optional       = is_p::is_optional;
+      static constexpr bool     supports_0_offset = is_p::supports_0_offset;
+
+      static bool has_value(const T& value) { return is_p::has_value(clio_unwrap_packable(value)); }
+      template <bool Verify>
+      static bool has_value(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         return is_p::template has_value<Verify>(src, pos, end_pos);
+      }
+
+      template <bool Unpack>
+      static inner* ptr(T* value)
+      {
+         if constexpr (Unpack)
+            return &clio_unwrap_packable(*value);
+         else
+            return nullptr;
+      }
+
+      template <typename S>
+      static void pack(const T& value, S& stream)
+      {
+         return is_p::pack(clio_unwrap_packable(value), stream);
+      }
+
+      static bool is_empty_container(const T& value)
+      {
+         return is_p::is_empty_container(clio_unwrap_packable(value));
+      }
+      static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         return is_p::is_empty_container(src, pos, end_pos);
+      }
+
+      template <typename S>
+      static void embedded_fixed_pack(const T& value, S& stream)
+      {
+         return is_p::embedded_fixed_pack(clio_unwrap_packable(value), stream);
+      }
+
+      template <typename S>
+      static void embedded_fixed_repack(const T& value,
+                                        uint32_t fixed_pos,
+                                        uint32_t heap_pos,
+                                        S&       stream)
+      {
+         return is_p::embedded_fixed_repack(clio_unwrap_packable(value), fixed_pos, heap_pos,
+                                            stream);
+      }
+
+      template <typename S>
+      static void embedded_variable_pack(const T& value, S& stream)
+      {
+         return is_p::embedded_variable_pack(clio_unwrap_packable(value), stream);
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(T*          value,
+                                       bool&       has_unknown,
+                                       bool&       known_end,
+                                       const char* src,
+                                       uint32_t&   pos,
+                                       uint32_t    end_pos)
+      {
+         return is_p::template unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, known_end,
+                                                      src, pos, end_pos);
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool embedded_variable_unpack(T*          value,
+                                                         bool&       has_unknown,
+                                                         bool&       known_end,
+                                                         const char* src,
+                                                         uint32_t&   fixed_pos,
+                                                         uint32_t    end_fixed_pos,
+                                                         uint32_t&   heap_pos,
+                                                         uint32_t    end_heap_pos)
+      {
+         // TODO: Does this need to exist?
+         return is_p::template embedded_variable_unpack<Unpack, Verify>(
+             ptr<Unpack>(value), has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+             end_heap_pos);
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool embedded_unpack(T*          value,
+                                                bool&       has_unknown,
+                                                bool&       known_end,
+                                                const char* src,
+                                                uint32_t&   fixed_pos,
+                                                uint32_t    end_fixed_pos,
+                                                uint32_t&   heap_pos,
+                                                uint32_t    end_heap_pos)
+      {
+         return is_p::template embedded_unpack<Unpack, Verify>(
+             ptr<Unpack>(value), has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+             end_heap_pos);
+      }
+   };  // is_packable<PackableWrapper>
+
+   template <typename T, typename Derived>
+   struct packable_container_memcpy_impl : base_packable_impl<T, Derived>
+   {
+      static constexpr uint32_t fixed_size        = 4;
+      static constexpr bool     is_variable_size  = true;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = true;
+
+      template <typename S>
+      static void pack(const T& value, S& stream)
+      {
+         is_packable<uint32_t>::pack(value.size() * sizeof(typename T::value_type), stream);
+         if (value.size())
+            stream.write(value.data(), value.size() * sizeof(typename T::value_type));
+      }
+
+      static bool is_empty_container(const T& value) { return value.empty(); }
+      static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         uint32_t fixed_size;
+         if (!unpack_numeric<true>(&fixed_size, src, pos, end_pos))
+            return false;
+         return fixed_size == 0;
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(T*          value,
+                                       bool&       has_unknown,
+                                       bool&       known_end,
+                                       const char* src,
+                                       uint32_t&   pos,
+                                       uint32_t    end_pos)
+      {
+         uint32_t fixed_size;
+         if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
+            return false;
+         uint32_t size    = fixed_size / sizeof(typename T::value_type);
+         uint32_t new_pos = pos + fixed_size;
+         if constexpr (Verify)
+         {
+            known_end = true;
+            if ((fixed_size % sizeof(typename T::value_type)) || new_pos < pos || new_pos > end_pos)
+               return false;
+         }
+         if constexpr (Unpack)
+         {
+            value->resize(size);
+            if (size)
+               std::memcpy(value->data(), src + pos, fixed_size);
+         }
+         pos = new_pos;
+         return true;
+      }
+   };  // packable_container_memcpy_impl
+
+   template <>
+   struct is_packable<std::string>
+       : packable_container_memcpy_impl<std::string, is_packable<std::string>>
+   {
+   };
+
+   template <>
+   struct is_packable<std::string_view>
+       : packable_container_memcpy_impl<std::string_view, is_packable<std::string_view>>
+   {
+   };
+
+   template <PackableMemcpy T>
+   struct is_packable<std::span<T>>
+       : packable_container_memcpy_impl<std::span<T>, is_packable<std::span<T>>>
+   {
+   };
+
+   template <Packable T>
+      requires(is_packable_memcpy<T>::value)
+   struct is_packable<std::vector<T>>
+       : packable_container_memcpy_impl<std::vector<T>, is_packable<std::vector<T>>>
+   {
+   };
+
+   template <Packable T>
+      requires(!is_packable_memcpy<T>::value)
+   struct is_packable<std::vector<T>>
+       : base_packable_impl<std::vector<T>, is_packable<std::vector<T>>>
+   {
+      static constexpr uint32_t fixed_size        = 4;
+      static constexpr bool     is_variable_size  = true;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = true;
+
+      template <typename S>
+      static void pack(const std::vector<T>& value, S& stream)
+      {
+         uint32_t num_bytes = value.size() * is_packable<T>::fixed_size;
+         assert(num_bytes == value.size() * is_packable<T>::fixed_size);
+         is_packable<uint32_t>::pack(num_bytes, stream);
+         stream.about_to_write(num_bytes);
+         uint32_t fixed_pos = stream.written();
+         for (const auto& x : value)
+            is_packable<T>::embedded_fixed_pack(x, stream);
+         for (const auto& x : value)
+         {
+            is_packable<T>::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
+            is_packable<T>::embedded_variable_pack(x, stream);
+            fixed_pos += is_packable<T>::fixed_size;
+         }
+      }
+
+      static bool is_empty_container(const std::vector<T>& value) { return value.empty(); }
+      static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         uint32_t fixed_size;
+         if (!unpack_numeric<true>(&fixed_size, src, pos, end_pos))
+            return false;
+         return fixed_size == 0;
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(std::vector<T>* value,
+                                       bool&           has_unknown,
+                                       bool&           known_end,
+                                       const char*     src,
+                                       uint32_t&       pos,
+                                       uint32_t        end_pos)
+      {
+         uint32_t fixed_size;
+         if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
+            return false;
+         uint32_t size          = fixed_size / is_packable<T>::fixed_size;
+         uint32_t fixed_pos     = pos;
+         uint32_t heap_pos      = pos + fixed_size;
+         uint32_t end_fixed_pos = heap_pos;
+         if constexpr (Verify)
+         {
+            known_end = true;
+            if ((fixed_size % is_packable<T>::fixed_size) || heap_pos < pos || heap_pos > end_pos)
+               return false;
+         }
+         if constexpr (Unpack)
+         {
+            value->resize(size);
+            for (auto& x : *value)
+               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
+                       &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                       end_pos))
+                  return false;
+         }
+         else
+         {
+            for (uint32_t i = 0; i < size; ++i)
+               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
+                       nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                       end_pos))
+                  return false;
+         }
+         pos = heap_pos;
+         return true;
+      }  // unpack
+   };    // is_packable<std::vector<T>> (!memcpy)
+
+   template <Packable T, std::size_t N>
+      requires(!is_packable_memcpy<T>::value)
+   struct is_packable<std::array<T, N>>
+       : base_packable_impl<std::array<T, N>, is_packable<std::array<T, N>>>
+   {
+      static constexpr uint32_t fixed_size =
+          is_packable<T>::is_variable_size ? 4 : is_packable<T>::fixed_size * N;
+      static constexpr bool is_variable_size  = is_packable<T>::is_variable_size;
+      static constexpr bool is_optional       = false;
+      static constexpr bool supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const std::array<T, N>& value, S& stream)
+      {
+         stream.about_to_write(is_packable<T>::fixed_size * N);
+         uint32_t fixed_pos = stream.written();
+         for (const auto& x : value)
+            is_packable<T>::embedded_fixed_pack(x, stream);
+         for (const auto& x : value)
+         {
+            is_packable<T>::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
+            is_packable<T>::embedded_variable_pack(x, stream);
+            fixed_pos += is_packable<T>::fixed_size;
+         }
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(std::array<T, N>* value,
+                                       bool&             has_unknown,
+                                       bool&             known_end,
+                                       const char*       src,
+                                       uint32_t&         pos,
+                                       uint32_t          end_pos)
+      {
+         uint32_t fixed_pos     = pos;
+         uint32_t heap_pos      = pos + is_packable<T>::fixed_size * N;
+         uint32_t end_fixed_pos = heap_pos;
+         if constexpr (Verify)
+         {
+            known_end = true;
+            if (heap_pos < pos || heap_pos > end_pos)
+               return false;
+         }
+         if constexpr (Unpack)
+         {
+            for (auto& x : *value)
+               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
+                       &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                       end_pos))
+                  return false;
+         }
+         else
+         {
+            for (uint32_t i = 0; i < N; ++i)
+               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
+                       nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                       end_pos))
+                  return false;
+         }
+         pos = heap_pos;
+         return true;
+      }
+   };
+
+   template <Packable T>
+   struct is_packable<std::optional<T>>
+       : base_packable_impl<std::optional<T>, is_packable<std::optional<T>>>
+   {
+      static constexpr uint32_t fixed_size        = 4;
+      static constexpr bool     is_variable_size  = true;
+      static constexpr bool     is_optional       = true;
+      static constexpr bool     supports_0_offset = false;
+
+      static bool has_value(const std::optional<T>& value) { return value.has_value(); }
+      template <bool Verify>
+      static bool has_value(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         uint32_t offset;
+         if (!unpack_numeric<Verify>(&offset, src, pos, end_pos))
+            return false;
+         return offset != 1;
+      }
+
+      template <typename S>
+      static void pack(const std::optional<T>& value, S& stream)
+      {
+         uint32_t fixed_pos = stream.written();
+         embedded_fixed_pack(value, stream);
+         uint32_t heap_pos = stream.written();
+         embedded_fixed_repack(value, fixed_pos, heap_pos, stream);
+         embedded_variable_pack(value, stream);
+      }
+
+      template <typename S>
+      static void embedded_fixed_pack(const std::optional<T>& value, S& stream)
+      {
+         if (!is_packable<T>::is_optional && is_packable<T>::is_variable_size && value.has_value())
+            is_packable<T>::embedded_fixed_pack(*value, stream);
+         else
+            stream.write_raw(uint32_t(1));
+      }
+
+      template <typename S>
+      static void embedded_fixed_repack(const std::optional<T>& value,
+                                        uint32_t                fixed_pos,
+                                        uint32_t                heap_pos,
+                                        S&                      stream)
+      {
+         if (value.has_value())
+         {
+            if (!is_packable<T>::is_optional && is_packable<T>::is_variable_size)
+               is_packable<T>::embedded_fixed_repack(*value, fixed_pos, heap_pos, stream);
+            else
+               stream.rewrite_raw(fixed_pos, heap_pos - fixed_pos);
+         }
+      }
+
+      template <typename S>
+      static void embedded_variable_pack(const std::optional<T>& value, S& stream)
+      {
+         if (value.has_value() && !is_packable<T>::is_empty_container(*value))
+            is_packable<T>::pack(*value, stream);
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(std::optional<T>* value,
+                                       bool&             has_unknown,
+                                       bool&             known_end,
+                                       const char*       src,
+                                       uint32_t&         pos,
+                                       uint32_t          end_pos)
+      {
+         uint32_t fixed_pos = pos;
+         if constexpr (Verify)
+         {
+            known_end = true;
+            if (end_pos - pos < 4)
+            {
+               return false;
+            }
+         }
+         pos += 4;
+         uint32_t end_fixed_pos = pos;
+         return embedded_unpack<Unpack, Verify>(value, has_unknown, known_end, src, fixed_pos,
+                                                end_fixed_pos, pos, end_pos);
+      }
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool embedded_unpack(std::optional<T>* value,
+                                                bool&             has_unknown,
+                                                bool&             known_pos,
+                                                const char*       src,
+                                                uint32_t&         fixed_pos,
+                                                uint32_t          end_fixed_pos,
+                                                uint32_t&         heap_pos,
+                                                uint32_t          end_heap_pos)
+      {
+         uint32_t orig_pos = fixed_pos;
+         uint32_t offset;
+         if (!unpack_numeric<Verify>(&offset, src, fixed_pos, end_fixed_pos))
+            return false;
+         if (offset == 1)
+         {
+            if constexpr (Unpack)
+            {
+               *value = std::nullopt;
+            }
+            return true;
+         }
+         fixed_pos = orig_pos;
+         if constexpr (Unpack)
+         {
+            value->emplace();
+         }
+         return is_packable<T>::template embedded_variable_unpack<Unpack, Verify>(
+             Unpack ? &**value : nullptr, has_unknown, known_pos, src, fixed_pos, end_fixed_pos,
+             heap_pos, end_heap_pos);
+      }
+   };  // is_packable<std::optional<T>>
+
+   inline bool verify_extensions(const char* src,
+                                 bool        known_pos,
+                                 bool&       last_has_value,
+                                 uint32_t    fixed_pos,
+                                 uint32_t    end_fixed_pos,
+                                 uint32_t&   heap_pos,
+                                 uint32_t    end_heap_pos)
+   {
+      if ((end_fixed_pos - fixed_pos) % 4 != 0)
+         return false;
+      while (fixed_pos < end_fixed_pos)
+      {
+         uint32_t offset;
+         auto     base = fixed_pos;
+         if (!unpack_numeric<false>(&offset, src, fixed_pos, end_fixed_pos))
+            return false;
+         last_has_value = offset != 1;
+         if (offset >= 2)
+         {
+            if (offset < 4)
+               return false;
+            if (known_pos && offset + base != heap_pos)
+               return false;
+            if (offset > end_heap_pos - base)
+               return false;
+            if (offset < heap_pos - base)
+               return false;
+            heap_pos  = base + offset;
+            known_pos = false;
+         }
+      }
+      return true;
+   }
+
+   template <Packable... Ts>
+   struct is_packable<std::tuple<Ts...>>
+       : base_packable_impl<std::tuple<Ts...>, is_packable<std::tuple<Ts...>>>
+   {
+      static constexpr uint32_t fixed_size        = 4;
+      static constexpr bool     is_variable_size  = true;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const std::tuple<Ts...>& value, S& stream)
+      {
+         // TODO: verify fixed_size doesn't overflow
+         int num_present = 0;
+         int i           = 0;
+         tuple_foreach(  //
+             value,
+             [&](const auto& x)
+             {
+                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                ++i;
+                if constexpr (is_p::is_optional)
                 {
-                   using MemPtr = decltype(member(std::declval<T*>()));
-                   if constexpr (not std::is_member_function_pointer_v<MemPtr>)
+                   if (is_p::has_value(x))
+                      num_present = i;
+                }
+                else
+                {
+                   num_present = i;
+                }
+             });
+         uint16_t fixed_size = 0;
+         i                   = 0;
+         tuple_foreach(  //
+             value,
+             [&](const auto& x)
+             {
+                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                if (i < num_present)
+                   fixed_size += is_p::fixed_size;
+                ++i;
+             });
+         is_packable<uint16_t>::pack(fixed_size, stream);
+         uint32_t fixed_pos = stream.written();
+         i                  = 0;
+         tuple_foreach(  //
+             value,
+             [&](const auto& x)
+             {
+                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                if (i < num_present)
+                   is_p::embedded_fixed_pack(x, stream);
+                ++i;
+             });
+         i = 0;
+         tuple_foreach(  //
+             value,
+             [&](const auto& x)
+             {
+                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                if (i < num_present)
+                {
+                   is_p::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
+                   is_p::embedded_variable_pack(x, stream);
+                   fixed_pos += is_p::fixed_size;
+                }
+                ++i;
+             });
+      }  // pack
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(std::tuple<Ts...>* value,
+                                       bool&              has_unknown,
+                                       bool&              known_end,
+                                       const char*        src,
+                                       uint32_t&          pos,
+                                       uint32_t           end_pos)
+      {
+         uint16_t fixed_size;
+         if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
+            return false;
+         uint32_t fixed_pos     = pos;
+         uint32_t heap_pos      = pos + fixed_size;
+         uint32_t end_fixed_pos = heap_pos;
+         if constexpr (Verify)
+         {
+            known_end = true;
+            if (heap_pos < pos || heap_pos > end_pos)
+               return false;
+         }
+         bool ok             = true;
+         bool last_has_value = true;
+         if constexpr (Unpack)
+         {
+            tuple_foreach(  //
+                *value,
+                [&](auto& x)
+                {
+                   using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
+                   if (fixed_pos < end_fixed_pos || !is_p::is_optional)
                    {
-                      using member_type =
-                          std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
-                      is_flat &= ref.offset == last_pos;
-                      is_flat &= can_memcpy<member_type>();
-                      last_pos += sizeof(member_type);
+                      ok &= is_p::template embedded_unpack<Unpack, Verify>(
+                          &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                          end_pos);
+                      if constexpr (Verify)
+                      {
+                         if constexpr (is_p::is_optional)
+                         {
+                            last_has_value = is_p::has_value(x);
+                         }
+                         else
+                         {
+                            last_has_value = true;
+                         }
+                      }
                    }
                 });
-            return (is_flat) and (last_pos == sizeof(T));
          }
          else
+         {
+            tuple_foreach_type(  //
+                (std::tuple<Ts...>*)nullptr,
+                [&](auto* p)
+                {
+                   using is_p = is_packable<std::remove_cvref_t<decltype(*p)>>;
+                   if (fixed_pos < end_fixed_pos || !is_p::is_optional)
+                   {
+                      if constexpr (Verify)
+                      {
+                         if constexpr (is_p::is_optional)
+                         {
+                            last_has_value =
+                                is_p::template has_value<Verify>(src, fixed_pos, end_fixed_pos);
+                         }
+                         else
+                         {
+                            last_has_value = true;
+                         }
+                      }
+                      ok &= is_p::template embedded_unpack<Unpack, Verify>(
+                          nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                          end_pos);
+                   }
+                });
+         }
+         if (!ok)
             return false;
-      }
-      else
-         return false;
-   }
-
-   template <typename T>
-   constexpr bool has_non_optional_after_optional()
-   {
-      if constexpr (psio::reflect<T>::is_struct)
-      {
-         bool found_optional = false;
-         bool has_error      = false;
-         psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto member)
-             {
-                using MemPtr = decltype(member(std::declval<T*>()));
-                if constexpr (not std::is_member_function_pointer_v<MemPtr>)
-                {
-                   using member_type =
-                       std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
-                   if constexpr (is_std_optional<member_type>())
-                   {
-                      found_optional = true;
-                   }
-                   else
-                   {
-                      has_error |= found_optional;
-                   }
-                }
-             });
-         return has_error;
-      }
-      else if constexpr (is_std_tuple<T>::value)
-      {
-         bool found_optional = false;
-         bool has_error      = false;
-         tuple_foreach(T(),
-                       [&](const auto& x)
-                       {
-                          using member_type = std::decay_t<decltype(x)>;
-                          if constexpr (is_std_optional<member_type>())
-                          {
-                             found_optional = true;
-                          }
-                          else
-                          {
-                             has_error |= found_optional;
-                          }
-                       });
-         return has_error;
-      }
-      return false;
-   }
-
-   /** 
-     *  Recursively checks the types for any field which requires dynamic allocation,
-     */
-   template <typename T>
-   constexpr bool may_use_heap()
-   {
-      if constexpr (std::is_same_v<bool, T>)
-         return false;
-      else if constexpr (is_std_array<T>::value)
-         return may_use_heap<typename is_std_array<T>::value_type>();
-      else if constexpr (is_std_optional<T>::value)
-         return true;
-      else if constexpr (is_std_tuple<T>::value)
-         return true;
-      else if constexpr (is_std_variant<T>::value)
-         return true;
-      else if constexpr (is_shared_view_ptr<T>::value)
-         return may_use_heap<typename is_shared_view_ptr<T>::value_type>();
-      else if constexpr (std::is_arithmetic_v<T>)
-         return false;
-      else if constexpr (not psio::reflect<T>::definitionWillNotChange)
-         return true;
-      else if constexpr (can_memcpy<T>())
-         return false;
-      else if constexpr (std::is_same_v<std::string, T>)
-         return true;
-      else if constexpr (is_std_vector<T>::value)
-         return true;
-      else if constexpr (psio::reflect<T>::is_struct)
-      {
-         bool is_flat = true;
-         psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto member)
-             {
-                using MemPtr = decltype(member(std::declval<T*>()));
-                if constexpr (!std::is_member_function_pointer_v<MemPtr>)
-                {
-                   using member_type =
-                       std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
-                   is_flat &= not may_use_heap<member_type>();
-                }
-             });
-         return not is_flat;
-      }
-      else
-      {
-         T::may_use_heap_undefined;
-      }
-   }
-
-   template <typename T>
-   constexpr bool known_members_may_use_heap()
-   {
-      if constexpr (psio::reflect<T>::is_struct)
-      {
-         bool use_heap = false;
-         psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto member)
-             {
-                using MemPtr = decltype(member(std::declval<T*>()));
-                if constexpr (not std::is_member_function_pointer_v<MemPtr>)
-                {
-                   using member_type =
-                       std::remove_cv_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
-                   if constexpr (psio::reflect<member_type>::is_struct)
-                      use_heap |= known_members_may_use_heap<member_type>();
-                   else
-                      use_heap |= may_use_heap<member_type>();
-                }
-             });
-         return use_heap;
-      }
-      else
-      {
-         T::known_members_may_use_heap_undefined;
-      }
-   }
-
-   template <typename T>
-   constexpr uint32_t fracpack_fixed_size_impl()
-   {
-      if constexpr (std::is_same_v<bool, T>)
-         return 1;
-      else if constexpr (is_std_array_v<T>)
-      {
-         if constexpr (may_use_heap<typename is_std_array<T>::value_type>())
+         if constexpr (Verify)
          {
-            return sizeof(offset_ptr) * is_std_array<T>::size;
+            if (fixed_pos < end_fixed_pos)
+            {
+               if (!verify_extensions(src, known_end, last_has_value, fixed_pos, end_fixed_pos,
+                                      heap_pos, end_pos))
+                  return false;
+               has_unknown = true;
+               known_end   = false;
+            }
+            if (!last_has_value)
+               return false;
+         }
+         pos = heap_pos;
+         return true;
+      }  // unpack
+   };    // is_packable<std::tuple<Ts...>>
+
+   template <bool Unpack, bool Verify, size_t I, typename... Ts>
+   [[nodiscard]] bool unpack_variant_impl(size_t               tag,
+                                          std::variant<Ts...>* value,
+                                          bool&                has_unknown,
+                                          bool&                end_known,
+                                          const char*          src,
+                                          uint32_t&            pos,
+                                          uint32_t             end_pos)
+   {
+      if constexpr (I < sizeof...(Ts))
+      {
+         using is_p = is_packable<std::variant_alternative_t<I, std::variant<Ts...>>>;
+         if (tag == I)
+         {
+            if constexpr (Unpack)
+            {
+               value->template emplace<I>();
+               return is_p::template unpack<Unpack, Verify>(&std::get<I>(*value), has_unknown,
+                                                            end_known, src, pos, end_pos);
+            }
+            else
+            {
+               return is_p::template unpack<Unpack, Verify>(nullptr, has_unknown, end_known, src,
+                                                            pos, end_pos);
+            }
          }
          else
          {
-            return fracpack_fixed_size_impl<typename is_std_array<T>::value_type>() *
-                   is_std_array<T>::size;
+            return unpack_variant_impl<Unpack, Verify, I + 1>(tag, value, has_unknown, end_known,
+                                                              src, pos, end_pos);
          }
       }
-      else if constexpr (is_std_tuple<T>::value)
+      else
       {
-         uint32_t fixed_size = 0;
-         tuple_foreach_type((T*)nullptr,
-                            [&](auto* x)
-                            {
-                               using member_type = std::decay_t<decltype(*x)>;
-                               if constexpr (may_use_heap<member_type>())
-                               {
-                                  fixed_size += 4;
-                               }
-                               else
-                               {
-                                  fixed_size += fracpack_fixed_size_impl<member_type>();
-                               }
-                            });
-         return fixed_size;
+         return false;
       }
-      else if constexpr (is_shared_view_ptr<T>::value)
+   }
+
+   template <Packable... Ts>
+   struct is_packable<std::variant<Ts...>>
+       : base_packable_impl<std::variant<Ts...>, is_packable<std::variant<Ts...>>>
+   {
+      static_assert(sizeof...(Ts) < 128);
+
+      static constexpr uint32_t fixed_size        = 4;
+      static constexpr bool     is_variable_size  = true;
+      static constexpr bool     is_optional       = false;
+      static constexpr bool     supports_0_offset = false;
+
+      template <typename S>
+      static void pack(const std::variant<Ts...>& value, S& stream)
       {
-         T::undefined_fracpack_fixed_size();
+         is_packable<uint8_t>::pack(value.index(), stream);
+         uint32_t size_pos = stream.written();
+         is_packable<uint32_t>::pack(0, stream);
+         uint32_t content_pos = stream.written();
+         std::visit([&](const auto& x)
+                    { is_packable<std::remove_cvref_t<decltype(x)>>::pack(x, stream); },
+                    value);
+         stream.rewrite_raw(size_pos, uint32_t(stream.written() - content_pos));
       }
-      else if constexpr (is_std_optional<T>::value)
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(std::variant<Ts...>* value,
+                                       bool&                has_unknown,
+                                       bool&                known_end,
+                                       const char*          src,
+                                       uint32_t&            pos,
+                                       uint32_t             end_pos)
       {
-         return sizeof(offset_ptr);
+         uint8_t tag;
+         if (!unpack_numeric<Verify>(&tag, src, pos, end_pos))
+            return false;
+         if constexpr (Verify)
+            if (tag & 0x80)
+               return false;
+         uint32_t size;
+         if (!unpack_numeric<Verify>(&size, src, pos, end_pos))
+            return false;
+         uint32_t content_pos = pos;
+         uint32_t content_end = pos + size;
+         if constexpr (Verify)
+            if (content_end < content_pos || content_end > end_pos)
+               return false;
+         bool inner_known_end;
+         if (!unpack_variant_impl<Unpack, Verify, 0>(tag, value, has_unknown, inner_known_end, src,
+                                                     content_pos, content_end))
+            return false;
+         if constexpr (Verify)
+         {
+            known_end = true;
+            if (inner_known_end && content_pos != content_end)
+               return false;
+         }
+         pos = content_end;
+         return true;
       }
-      else if constexpr (can_memcpy<T>())
-      {
-         return sizeof(T);
-      }
-      else if constexpr (is_std_variant<T>::value)
-      {
-         return sizeof(offset_ptr);
-      }
-      else if constexpr (std::is_same_v<std::string, T> || is_std_vector<T>::value)
-      {
-         return sizeof(offset_ptr);
-      }
-      else if constexpr (reflect<T>::is_struct)
+   };  // is_packable<std::variant<Ts...>>
+
+   template <typename T>
+   struct is_packable_reflected<T, true> : base_packable_impl<T, is_packable<T>>
+   {
+      static constexpr uint32_t get_members_fixed_size()
       {
          uint32_t size = 0;
          reflect<T>::for_each(
              [&](const meta& ref, auto member)
              {
-                using MemPtr = decltype(member(std::declval<T*>()));
-                if constexpr (not std::is_member_function_pointer_v<remove_cvref_t<MemPtr>>)
-                {
-                   using member_type = decltype(result_of_member(std::declval<MemPtr>()));
-                   if constexpr (may_use_heap<member_type>())
-                   {
-                      size += sizeof(offset_ptr);
-                   }
-                   else
-                   {
-                      size += fracpack_fixed_size_impl<member_type>();
-                   }
-                }
+                using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                if constexpr (!m::isFunction)
+                   size += is_packable<typename m::ValueType>::fixed_size;
              });
          return size;
       }
-      else
-      {
-         T::undefined_fracpack_fixed_size;
-      }
-   }
 
-   template <typename T>
-   constexpr uint32_t fixed_size_before_optional()
-   {
-      if constexpr (psio::reflect<T>::is_struct)
+      static constexpr bool get_is_var_size()
       {
-         bool     found_optional = false;
-         uint32_t fixed_size     = 0;
-         psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto member)
+         if (!reflect<T>::definitionWillNotChange)
+            return true;
+         bool is_var = false;
+         reflect<T>::for_each(
+             [&](const meta& ref, auto member)
              {
-                using MemPtr = decltype(member(std::declval<T*>()));
-                if constexpr (not std::is_member_function_pointer_v<MemPtr>)
+                using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                if constexpr (!m::isFunction)
+                   is_var |= is_packable<typename m::ValueType>::is_variable_size;
+             });
+         return is_var;
+      }
+
+      static constexpr uint32_t members_fixed_size = get_members_fixed_size();
+      static constexpr bool     is_variable_size   = get_is_var_size();
+      static constexpr uint32_t fixed_size         = is_variable_size ? 4 : members_fixed_size;
+      static constexpr bool     is_optional        = false;
+      static constexpr bool     supports_0_offset  = false;
+
+      static_assert(members_fixed_size <= 0xffff);
+
+      template <typename S>
+      static void pack(const T& value, S& stream)
+      {
+         if constexpr (is_variable_size)
+         {
+            int num_present = 0;
+            int i           = 0;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
                 {
-                   using member_type =
-                       std::decay_t<decltype(psio::result_of_member(std::declval<MemPtr>()))>;
-
-                   if constexpr (is_std_optional<member_type>())
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
                    {
-                      found_optional = true;
-                   }
-
-                   if (not found_optional)
-                   {
-                      if constexpr (may_use_heap<member_type>())
-                         fixed_size += 4;
+                      ++i;
+                      if constexpr (is_packable<typename m::ValueType>::is_optional &&
+                                    !reflect<T>::definitionWillNotChange)
+                      {
+                         if (is_packable<typename m::ValueType>::has_value(value.*member(&value)))
+                            num_present = i;
+                      }
                       else
-                         fixed_size += fracpack_fixed_size<member_type>();
+                      {
+                         num_present = i;
+                      }
                    }
-                }
-             });
-         return fixed_size;
-      }
-      else if constexpr (is_std_tuple<T>::value)
+                });
+            uint16_t fixed_size = 0;
+            i                   = 0;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      if (i < num_present)
+                         fixed_size += is_packable<typename m::ValueType>::fixed_size;
+                      ++i;
+                   }
+                });
+            if constexpr (!reflect<T>::definitionWillNotChange)
+               is_packable<uint16_t>::pack(fixed_size, stream);
+            uint32_t fixed_pos = stream.written();
+            i                  = 0;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      if (i < num_present)
+                         is_packable<typename m::ValueType>::embedded_fixed_pack(
+                             value.*member(&value), stream);
+                      ++i;
+                   }
+                });
+            i = 0;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      if (i < num_present)
+                      {
+                         using is_p = is_packable<typename m::ValueType>;
+                         is_p::embedded_fixed_repack(value.*member(&value), fixed_pos,
+                                                     stream.written(), stream);
+                         is_p::embedded_variable_pack(value.*member(&value), stream);
+                         fixed_pos += is_p::fixed_size;
+                      }
+                      ++i;
+                   }
+                });
+         }  // is_variable_size
+         else
+         {
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                      is_packable<typename m::ValueType>::pack(value.*member(&value), stream);
+                });
+         }
+      }  // pack
+
+      template <bool Unpack, bool Verify>
+      [[nodiscard]] static bool unpack(T*          value,
+                                       bool&       has_unknown,
+                                       bool&       known_end,
+                                       const char* src,
+                                       uint32_t&   pos,
+                                       uint32_t    end_pos)
       {
-         bool     found_optional = false;
-         uint32_t fixed_size     = 0;
-         tuple_foreach_type((T*)nullptr,
-                            [&](auto* x)
+         if constexpr (is_variable_size)
+         {
+            uint16_t fixed_size;
+            if constexpr (reflect<T>::definitionWillNotChange)
+               fixed_size = members_fixed_size;
+            else if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
+               return false;
+            uint32_t fixed_pos     = pos;
+            uint32_t heap_pos      = pos + fixed_size;
+            uint32_t end_fixed_pos = heap_pos;
+            if constexpr (Verify)
+            {
+               if (heap_pos < pos || heap_pos > end_pos)
+                  return false;
+               known_end = true;
+            }
+            bool ok             = true;
+            bool last_has_value = true;
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
+                   {
+                      using is_p = is_packable<typename m::ValueType>;
+                      if (fixed_pos < end_fixed_pos || !is_p::is_optional)
+                      {
+                         if constexpr (Verify)
+                         {
+                            if constexpr (is_p::is_optional && !reflect<T>::definitionWillNotChange)
                             {
-                               using member_type = std::decay_t<decltype(*x)>;
-                               if constexpr (is_std_optional<member_type>())
-                               {
-                                  found_optional = true;
-                               }
-                               if (not found_optional)
-                               {
-                                  if constexpr (may_use_heap<member_type>())
-                                  {
-                                     fixed_size += 4;
-                                  }
-                                  else
-                                  {
-                                     fixed_size += fracpack_fixed_size<member_type>();
-                                  }
-                               }
-                            });
-      }
-      return fracpack_fixed_size<T>();
-   }
-
-   template <typename T>
-   uint32_t fracpack_size(const T& v);
-
-   using char_ptr = char*;
-
-   /**
-     *  used to pack a member of a struct or vector
-     */
-   template <typename T, typename S>
-   void fracpack_member(char_ptr& heap, const T& member, S& stream)
-   {
-      if constexpr (may_use_heap<T>())
-      {
-         // define a helper function so that it can be reused in the
-         // case that T is an optional
-         auto pack_on_heap = [&](const auto& mem)
-         {
-            uint32_t ps = fracpack_size(mem);
-            if constexpr (std::is_same_v<size_stream, S>)
-            {
-               stream.skip(sizeof(uint32_t));  /// skip offset
-               stream.skip(ps);                /// data
-            }
-            else
-            {
-               uint32_t offset = heap - stream.pos;
-               stream.write(&offset, sizeof(offset));
-               S substream(heap, stream.end - heap);
-               fracpack(mem, substream);
-               heap += ps;
-            }
-         };
-
-         // pack empty optional
-         if constexpr (is_std_optional<T>::value)
-         {
-            if (not member)
-            {
-               uint32_t tomb = 1;
-               stream.write(&tomb, sizeof(tomb));
-            }
-            else
-            {
-               using opt_type = typename is_std_optional<T>::value_type;
-
-               if constexpr (is_std_vector<opt_type>::value ||
-                             std::is_same_v<opt_type, std::string>)
-               {
-                  if (member->size() == 0)
-                  {
-                     uint32_t tomb = 0;
-                     stream.write(&tomb, sizeof(tomb));
-                     return;
-                  }
-               }
-               if constexpr (is_shared_view_ptr<opt_type>::value)
-                  T::undefined_fracpack_member();
-               pack_on_heap(*member);
-            }
-            return;
-         }
-         // shared_view_ptr<T>, where may_use_heap<T> == true, is
-         // packed as if it was a vector<char> containing a packed
-         // T. It is not nullable.
-         else if constexpr (is_shared_view_ptr<T>::value)
-         {
-            if (member.size() == 0)
-            {
-               abort_error("shared_view_ptr is not allowed to be null");
-               return;
-            }
-         }
-         /** pack empty vector */
-         else if constexpr (is_std_vector<T>::value)
-         {
-            if (member.size() == 0)
-            {  /// empty vec opt
-               uint32_t offset = 0;
-               stream.write(&offset, sizeof(offset));
-               return; /** return from visiting this member */
-            }
-         }
-         /** pack empty string */
-         else if constexpr (std::is_same_v<T, std::string>)
-         {
-            if (member.size() == 0)
-            {  /// empty string opt
-               uint32_t offset = 0;
-               stream.write(&offset, sizeof(offset));
-               return; /** return from visiting this member */
-            }
-         }
-
-         pack_on_heap(member);
-      }
-      else
-      {
-         fracpack(member, stream);
-      }
-   }
-   template <typename T, typename S>
-   void fracpack(const shared_view_ptr<T>& v, S& stream)
-   {
-      if constexpr (may_use_heap<T>())
-         stream.write(v.data_with_size_prefix().data(), v.data_with_size_prefix().size());
-      else
-         T::fracpack_not_defined();
-   }
-
-   template <typename S>
-   void fracpack(bool v, S& stream)
-   {
-      char c = v;
-      stream.write(&c, 1);
-   }
-
-   /**
-     *  Writes v to a stream...without a size prefix
-     */
-   template <typename T, typename S>
-   void fracpack(const T& v, S& stream)
-   {
-      if constexpr (is_std_tuple<T>::value)
-      {
-         uint16_t start_heap = fracpack_fixed_size<T>();
-         stream.write(&start_heap, sizeof(start_heap));
-
-         char* heap = nullptr;
-         if constexpr (not std::is_same_v<size_stream, S>)
-            heap = stream.pos + start_heap;
-
-         tuple_foreach(v, [&](const auto& x) { fracpack_member(heap, x, stream); });
-      }
-      else if constexpr (is_std_variant<T>::value)
-      {
-         uint8_t idx = v.index();
-         //    std::cout << "packing variant: " << int(idx) <<"\n";
-         stream.write(&idx, sizeof(idx));
-         uint32_t varsize = 0;
-         std::visit(
-             [&](const auto& iv)
-             {
-                varsize = fracpack_size(iv);
-                //      std::cout << "  element size: " << varsize <<"\n";
-                stream.write(&varsize, sizeof(varsize));
-                fracpack(iv, stream);
-             },
-             v);
-         //  return 1+ sizeof(varsize) + varsize;
-      }
-      else if constexpr (is_std_optional<T>::value)
-      {
-         //         std::cout<<"root optional....\n";
-         char* heap = nullptr;
-
-         if constexpr (not std::is_same_v<size_stream, S>)
-            heap = stream.pos + 4;
-
-         fracpack_member<T>(heap, v, stream);
-
-         if constexpr (not std::is_same_v<size_stream, S>)
-            stream.pos = heap;
-      }
-      else if constexpr (can_memcpy<T>())
-      {
-         stream.write(&v, sizeof(T));
-      }
-      else if constexpr (std::is_same_v<std::string, T>)
-      {
-         uint32_t s = v.size();
-         stream.write(&s, sizeof(s));
-         if (s > 0)
-            stream.write(v.data(), s);
-      }
-      else if constexpr (is_std_vector<T>::value)
-      {
-         //         std::cout << "packing vector at: " << stream.consumed() <<"\n";
-         using value_type = typename is_std_vector<T>::value_type;
-
-         if constexpr (can_memcpy<value_type>())
-         {
-            uint16_t fix_size = fracpack_fixed_size<value_type>();
-            uint32_t s        = v.size() * fix_size;
-
-            stream.write(&s, sizeof(s));
-            if (s > 0)
-               stream.write(v.data(), s);
-         }
-         else if constexpr (not may_use_heap<value_type>())
-         {
-            //   std::cout << "packing vector of not may use heap\n";
-            uint16_t fix_size = fracpack_fixed_size<value_type>();
-            //   std::cout << "fix_size: " << fix_size <<"\n";
-            uint32_t s = v.size() * fix_size;
-
-            stream.write(&s, sizeof(s));
-            for (const auto& item : v)
-            {
-               fracpack(item, stream);
-            }
-            //  return s + sizeof(s);
-         }
-         else
-         {
-            uint32_t s = v.size() * sizeof(offset_ptr);
-            stream.write(&s, sizeof(s));
-            //     uint16_t start_heap = s + 4;  // why 4... it is needed
-            char* heap = nullptr;
-
-            if constexpr (not std::is_same_v<size_stream, S>)
-               heap = stream.pos + s;
-            for (const auto& item : v)
-            {
-               fracpack_member(heap, item, stream);
-            }
-            // return start_heap;
-         }
-      }
-      else if constexpr (is_std_array<T>::value)
-      {
-         uint16_t start_heap = fracpack_fixed_size<T>();
-
-         using member_type = typename is_std_array<T>::value_type;
-
-         char* heap = nullptr;
-
-         if constexpr (not std::is_same_v<size_stream, S>)
-            heap = stream.pos + start_heap;
-
-         if constexpr (can_memcpy<member_type>())
-         {
-            stream.write(&v[0], sizeof(member_type) * is_std_array<T>::size);
-         }
-         else
-         {
-            for (const auto& i : v)
-               fracpack_member(heap, i, stream);
-         }
-      }
-      else if constexpr (psio::reflect<T>::is_struct)
-      {
-         //       std::cout << "packing struct at: " << stream.consumed() <<"\n";
-         //  std::cout << "packing struct: \n";
-         uint16_t start_heap = fracpack_fixed_size<T>();
-         if constexpr (not psio::reflect<T>::definitionWillNotChange)
-         {
-            //           std::cout << "ext struct heap: " <<start_heap<<"\n";
-            stream.write(&start_heap, sizeof(start_heap));
-            //           std::cout << "wrote heap: " << stream.consumed() <<"\n";
-         }
-         char* heap = nullptr;
-
-         if constexpr (not std::is_same_v<size_stream, S>)
-            heap = stream.pos + start_heap;
-
-         /// no need to write start_heap, it is always the same because
-         /// the structure is "fixed" and cannot be extended in the future
-         reflect<T>::for_each(
-             [&](const meta& ref, auto member)
-             {
-                if constexpr (!std::is_member_function_pointer_v<decltype(member(&v))>)
-                   fracpack_member(heap, v.*member(&v), stream);
-             });
-
-         if constexpr (not std::is_same_v<size_stream, S>)
-            stream.pos = heap;
-         //         std::cout <<"return start_heap: " << start_heap <<"\n";
-         //return start_heap;  /// it has been advanced and now points at end of heap
-      }
-      else
-      {
-         T::fracpack_not_defined;
-      }
-   }
-
-   template <typename T, typename S>
-   void fracunpack(T& v, S& stream);
-   template <typename T, typename S>
-   void fraccheck(S& stream);
-
-   // TODO: does validation check for 0 or 1? Should we drop that restriction?
-   template <typename S>
-   void fracunpack(bool& v, S& stream)
-   {
-      char c;
-      stream.read(&c, 1);
-      v = c != 0;
-   }
-
-   template <typename T, typename S>
-   void fracunpack_member(T& member, S& stream)
-   {
-      if constexpr (may_use_heap<T>())
-      {
-         if constexpr (is_std_optional<T>::value)
-         {
-            uint32_t offset;
-            stream.read(&offset, sizeof(offset));
-
-            using opt_type = typename is_std_optional<T>::value_type;
-            if constexpr (is_shared_view_ptr<opt_type>::value)
-               T::undefined_fracunpack_member();
-
-            // TODO: does validation make sure 2,3 aren't used?
-            if (offset == 0)
-            {
-               // TODO: does validation make sure it's a string, vector, or shared_view_ptr (only may_use_heap)?
-               member = opt_type();
-            }
-            else if (offset >= 4)
-            {
-               member = opt_type();
-               S insubstr(stream.pos + offset - sizeof(offset_ptr), stream.end);
-               fracunpack(*member, insubstr);
-            }
-            else
-               member.reset();
-         }
-         /** unpack empty vector / string */
-         else if constexpr (is_shared_view_ptr<T>::value)
-         {
-            uint32_t offset;
-            stream.read(&offset, sizeof(offset));
-            if (offset >= 4)
-            {
-               S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
-               fracunpack(member, insubstream);
-               // TODO: Does validation check the inner content or leave it to the caller?
-            }
-            else
-               member.reset();
-         }
-         else if constexpr (is_std_vector<T>::value || std::is_same_v<T, std::string>)
-         {
-            uint32_t offset;
-            stream.read(&offset, sizeof(offset));
-            if (offset >= 4)
-            {
-               // TODO: Does validation make sure inner size isn't 0? Should that rule be kept?
-               S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
-               fracunpack(member, insubstream);
-            }
-            else
-               // TODO: Does validation make sure 2,3 aren't used?
-               member.resize(0);
-         }
-         else
-         {
-            uint32_t offset;
-            stream.read(&offset, sizeof(offset));
-            S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
-            fracunpack(member, insubstream);
-         }
-      }
-      else
-      {
-         fracunpack(member, stream);
-      }
-   }
-
-   template <uint32_t I, typename V, typename First, typename... Rest>
-   bool init_type(uint8_t i, V& v)
-   {
-      if (i == I)
-      {
-         v = V(std::in_place_index_t<I>(), First());
-         return true;
-      }
-      else if constexpr (sizeof...(Rest) > 0)
-      {
-         return init_type<I + 1, V, Rest...>(i, v);
-      }
-      return false;
-   }
-   template <typename First, typename... Rest>
-   bool init_variant_by_index(uint8_t index, std::variant<First, Rest...>& v)
-   {
-      return init_type<0, std::variant<First, Rest...>, First, Rest...>(index, v);
-   }
-
-   template <typename T, typename S>
-   void fracunpack(T& v, S& stream)
-   {
-      if constexpr (std::is_same_v<std::string, T>)
-      {
-         uint32_t size;
-         stream.read((char*)&size, sizeof(size));
-         v.resize(size);
-         if (size > 0)
-            stream.read(v.data(), size);
-      }
-      else if constexpr (is_std_array<T>::value)
-      {
-         using member_type = typename is_std_array<T>::value_type;
-
-         if constexpr (can_memcpy<member_type>())
-         {
-            stream.read(&v[0], sizeof(member_type) * is_std_array<T>::size);
-         }
-         else
-         {
-            for (auto& i : v)
-               fracunpack_member(i, stream);
-         }
-      }
-      else if constexpr (is_std_tuple<T>::value)
-      {
-         uint16_t start_heap;
-         stream.read(&start_heap, sizeof(start_heap));
-
-         const char* heap = stream.pos + start_heap;
-         tuple_foreach(v,
-                       [&](auto& x)
-                       {
-                          // TODO: does validation check that non-optional isn't truncated?
-                          if (stream.pos < heap)
-                             fracunpack_member(x, stream);
-                       });
-      }
-      else if constexpr (is_shared_view_ptr<T>::value)
-      {
-         // TODO: does validation check the inner or leave it to the caller?
-         if constexpr (!may_use_heap<typename is_shared_view_ptr<T>::value_type>())
-            T::fracunpack_not_defined;
-         v.reset();
-         uint32_t size;
-         stream.read((char*)&size, sizeof(size));
-         v.resize(size);
-         stream.read(v.data(), size);
-      }
-      else if constexpr (is_std_variant<T>::value)
-      {
-         uint8_t idx;
-         stream.read(&idx, 1);
-         bool     known = init_variant_by_index(idx, v);
-         uint32_t size;
-         stream.read(&size, sizeof(size));
-         if (known && size)
-         {
-            S substr(stream.pos, stream.pos + size);
-            stream.skip(size);
-            std::visit([&](auto& iv) { fracunpack(iv, substr); }, v);
-         }
-         else
-         {
-            // TODO: Does validation check size != 0?
-            stream.skip(size);
-         }
-      }
-      else if constexpr (can_memcpy<T>())
-      {
-         stream.read((char*)&v, sizeof(T));
-      }
-      else if constexpr (is_std_vector<T>::value)
-      {
-         using value_type = typename is_std_vector<T>::value_type;
-         if constexpr (can_memcpy<value_type>())
-         {
-            uint16_t fix_size = fracpack_fixed_size<value_type>();
-
-            uint32_t size;
-            stream.read((char*)&size, sizeof(size));
-            // TODO: Does validation check (size % fix_size) == 0? Could cause memory overrun.
-            uint32_t s = size / fix_size;
-            v.resize(s);
-            if (s > 0)
-               stream.read(v.data(), size);
-         }
-         else
-         {
-            uint16_t fix_size = fracpack_fixed_size<value_type>();
-            if constexpr (may_use_heap<value_type>())
-               fix_size = sizeof(offset_ptr);
-            uint32_t size;
-            stream.read(&size, sizeof(size));
-            // TODO: Does validation check (size % fix_size) == 0? Could cause memory overrun.
-            auto elem = size / fix_size;
-            v.resize(elem);
-            for (auto& e : v)
-            {
-               fracunpack_member(e, stream);
-            }
-         }
-      }
-      else if constexpr (is_std_optional<T>::value)
-      {
-         fracunpack_member(v, stream);
-         /*
-         uint32_t offset;
-         stream.read( &offset, sizeof(offset) );
-         if( offset != 4 ) v = T();
-         v = typename is_std_optional<T>::value_type();
-         fracunpack( *v, stream );
-         */
-      }
-      else if constexpr (reflect<T>::is_struct)
-      {
-         uint16_t start_heap = fracpack_fixed_size<T>();
-         if constexpr (not psio::reflect<T>::definitionWillNotChange)
-         {
-            // TODO: does validation check this won't overrun?
-            stream.read(&start_heap, sizeof(start_heap));
-         }
-         const char* heap = stream.pos + start_heap;
-         reflect<T>::for_each(
-             [&](const meta& ref, auto member)
-             {
-                if constexpr (!std::is_member_function_pointer_v<decltype(member(&v))>)
-                   if (stream.pos < heap)
-                      fracunpack_member(v.*member(&v), stream);
-             });
-      }
-      else
-      {
-         T::fracunpack_not_defined;
-      }
-   }  // fracunpack
-
-   template <typename T, typename S>
-   void fraccheck_member(S& stream)
-   {
-      if constexpr (may_use_heap<T>())
-      {
-         if constexpr (is_std_optional<T>::value)
-         {
-            uint32_t offset;
-            stream.read(&offset, sizeof(offset));
-
-            using opt_type = typename is_std_optional<T>::value_type;
-
-            if (offset >= 4)
-            {
-               check_input_stream insubstr(stream.pos + offset - sizeof(offset_ptr), stream.end);
-               fraccheck<opt_type>(insubstr);
-               stream.add_total_read(insubstr.get_total_read());
-            }
-         }
-         /** unpack empty vector / string */
-         else if constexpr (is_std_vector<T>::value || std::is_same_v<T, std::string>)
-         {
-            uint32_t offset;
-            stream.read(&offset, sizeof(offset));
-            if (offset >= 4)
-            {
-               S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
-               fraccheck<T>(insubstream);
-
-               /** this is safe to read after the above lone because it already checked
-                *  the bounds. This enforces that an empty string or vector is always
-                *  encoded as a zero offset rather than an offset to a 0 allocated on the
-                *  heap.
-                */
-               uint32_t vec_str_size = 0;
-               memcpy(&vec_str_size, stream.pos + offset, sizeof(vec_str_size));
-
-               if (vec_str_size == 0)
-                  abort_error(stream_error::empty_vec_used_offset);
-
-               stream.add_total_read(insubstream.get_total_read());
-            }
-         }
-         else
-         {
-            uint32_t offset;
-            stream.read(&offset, sizeof(offset));
-            S insubstream(stream.pos + offset - sizeof(offset_ptr), stream.end);
-            fraccheck<T>(insubstream);
-            stream.add_total_read(insubstream.get_total_read());
-         }
-      }
-      else
-      {
-         fraccheck<T>(stream);
-      }
-   }
-
-   struct check_stream
-   {
-      check_stream(const char* startptr = nullptr, const char* endptr = nullptr)
-          : valid(false),
-            unknown(false),
-            begin(startptr),
-            end(endptr),
-            heap(startptr),
-            pos(startptr)
-      {
-      }
-      check_stream(const check_stream&)            = default;
-      check_stream& operator=(const check_stream&) = default;
-
-      bool valid;    ///< no errors detected
-      bool unknown;  ///< unknown fields detected, TODO: move from bools to ints
-
-      bool valid_and_known() const { return valid and not unknown; }
-
-      template <typename T>
-      friend check_stream fracvalidate(const char* b, const char* e);
-
-      template <typename T>
-      friend check_stream fracvalidate_view(const view<T>& v, const char* p, const char* e);
-
-      template <typename MemberType>
-      friend uint32_t fracvalidate_member(const char* memptr, check_stream& stream);
-
-      template <typename MemberType>
-      friend void fracvalidate_offset(uint32_t offset, const char* memptr, check_stream& stream);
-
-     private:
-      const char* begin;  ///< the start of the stream
-      const char* end;    ///< the absolute limit on reads
-      const char* heap;   ///< the location of the heap
-      const char* pos;    ///< the highest point read
-   };
-
-   template <typename T>
-   check_stream fracvalidate(const char* b, const char* e);
-
-   template <typename T>
-   check_stream fracvalidate(const std::span<const char>& v)
-   {
-      return fracvalidate<T>(v.data(), v.data() + v.size());
-   }
-
-   template <typename T>
-   check_stream fracvalidate(const char* b, size_t s)
-   {
-      return fracvalidate<T>(b, b + s);
-   }
-   template <typename T>
-   check_stream fracvalidate_view(const view<T>& v, const char* p, const char* e);
-
-   //#ifdef __wasm__
-   // Adaptors for rapidjson
-   struct rapidjson_stream_adaptor
-   {
-      rapidjson_stream_adaptor(const char* src, int sz)
-      {
-         int chars = std::min(sz, 4);
-         memcpy(buf, src, chars);
-         memset(buf + chars, 0, 4 - chars);
-      }
-      void Put(char ch) {}
-      char Take() { return buf[idx++]; }
-      char buf[4];
-      int  idx = 0;
-   };
-   //#endif
-
-   template <typename T>
-   constexpr bool may_be_zero_offset()
-   {
-      if constexpr (is_std_vector<T>::value)
-         return true;
-      else if constexpr (std::is_same_v<std::string, T>)
-         return true;
-      else if constexpr (is_std_optional<T>::value)
-         return may_be_zero_offset<typename is_std_optional<T>::value_type>();
-      return false;
-   }
-
-   template <typename MemberType>
-   void fracvalidate_offset(uint32_t offset, const char* memptr, check_stream& stream)
-   {
-      //std::cout << "validating offset to..." << psio::get_type_name<MemberType>() <<"\n";
-      const char* obj_start = memptr + offset;
-
-      /// the offset is expected to start after the end of the known heap
-      /// if the last offset object had unknown fields then there may be
-      /// some unaccounted for heap usage that we cannot verify... but we do
-      /// know the portion that we can account for.
-      ///
-      /// As soon as the stream comes across any unknown data we releax the check, this
-      /// may mean that some "invalid but unreachable" data is included in a buffer that
-      /// has some unknowns, but for data with no unknowns we maintain the stricter check
-      if (stream.unknown)
-      {
-         if (not(stream.valid = (obj_start >= stream.heap) and obj_start < stream.end))
-         {
-            //                     std::cerr<< ".......obj start < expected stream.heap\n";
-            return;
-         }
-      }
-      else
-      {
-         if (not(stream.valid = (obj_start == stream.heap) and obj_start < stream.end))
-         {
-            //             std::cerr<< "offset to type: " << get_type_name<MemberType>() <<"\n";
-            //           std::cerr<< obj_start - stream.begin << " vs " << stream.heap - stream.begin <<"\n";
-            //            std::cerr<< ".......obj start != expected stream.heap\n";
-            return;
-         }
-      }
-
-      stream.unknown |= obj_start > stream.heap;
-
-      //auto substr  = fracvalidate<opt_member_type>( stream.heap, stream.end );
-      //      std::cout << __LINE__ << " obj_start: " << obj_start - stream.begin <<"\n";
-      //      std::cout << __LINE__ << " obj_start: " << stream.heap - stream.begin <<"\n";
-      auto substr = fracvalidate<MemberType>(obj_start, stream.end);
-#ifdef DEBUG
-      //      std::cout << __LINE__ << " substr.valid: " << substr.valid <<"\n";
-      //      std::cout << __LINE__ << " substr.heap: " << substr.heap - substr.begin <<"\n";
-      if (not substr.valid)
-      {
-         //         auto n = psio::get_type_name<MemberType>();
-         //         std::cout << "   valoffset substream " << n << " invalid\n";
-      }
-#endif
-
-      /// empty vectors / strings shouldn't be on the heap
-      /// this check is for canonical form only.
-      if constexpr (is_std_vector<MemberType>() || std::is_same_v<MemberType, std::string>)
-      {
-         //        std::cout << __LINE__ << " steam.valid: " << stream.valid <<"\n";
-         if (offset > 0)
-         {
-            //           std::cout <<"vector/string...\n";
-            uint32_t data_size;
-            memcpy(&data_size, obj_start, sizeof(data_size));
-            stream.valid &= (data_size != 0);
-         }
-      }
-      //stream.pos      = substr.pos;
-      //      std::cout << "   heap advanced by:  " << substr.heap - stream.heap <<"\n";
-      stream.heap = substr.heap;
-      stream.valid &= substr.valid;
-      stream.unknown |= substr.unknown;
-      //      std::cout << __LINE__ << " steam.valid: " << stream.valid <<"\n";
-   }
-
-   template <typename MemberType>
-   uint32_t fracvalidate_member(const char* memptr, check_stream& stream)
-   {
-      //         std::cout << "validating member..." << psio::get_type_name<MemberType>() <<"   ";
-      //         std::cout << "heap: " << stream.heap - stream.begin <<"\n";
-      if constexpr (may_use_heap<MemberType>())
-      {
-         //      std::cout << "    may use heap \n";
-         if (stream.valid /*&= (stream.end - memptr >= 4)*/)
-         {
-            uint32_t offset;
-            memcpy(&offset, memptr, sizeof(offset));
-            //               std::cout << " offset: " << offset <<"\n";
-
-            if constexpr (may_be_zero_offset<MemberType>())
-            {
-               if (offset == 0)
-                  return 4;
-            }
-            if constexpr (is_std_optional<MemberType>::value)
-            {
-               //         std::cout << "      validating optional member...\n";
-               if (offset == 1)
-                  return 4;
-
-               if constexpr (std::is_same_v<std::string, MemberType> ||
-                             is_std_vector<MemberType>::value)
-               {
-                  if ((stream.valid = (offset == 0)))
-                  {
-                     return 4;
-                  }
-               }
-               if (offset < 4)
-               {
-                  stream.valid = false;
-               }
-               else
-               {
-                  using opt_member_type = typename is_std_optional<MemberType>::value_type;
-                  if constexpr (is_shared_view_ptr<opt_member_type>::value)
-                     MemberType::undefined_fracvalidate_member();
-                  fracvalidate_offset<opt_member_type>(offset, memptr, stream);
-               }
-            }
-            else
-            {
-               fracvalidate_offset<MemberType>(offset, memptr, stream);
-            }
-            return 4;
-         }
-         else
-         {
-            //               std::cerr<< " stream wasn't valid...\n";
-         }
-         return 0;
-      }
-      else
-      {
-         return fracpack_fixed_size<MemberType>();
-      }
-   }
-
-   /**
-    * @pre b is valid pointer
-    * @pre e > b
-    */
-   // TODO: incorrectly validates PsiBase::PublicKey when variant's size field is smaller than it should be
-   // TODO: fix buffer overruns which happen throughout the validation code
-   // TODO: optional<optional<T>> offset 0 is always invalid, but not checked
-   template <typename T>
-   check_stream fracvalidate(const char* b, const char* e)
-   {
-      //      std::cout << "validating T..." << psio::get_type_name<T>() <<"\n";
-      check_stream stream(b, e);
-      if constexpr (is_std_array<T>::value)
-      {
-         using member_type = typename is_std_array<T>::value_type;
-         stream.heap       = stream.pos + fracpack_fixed_size<T>();
-         stream.valid      = stream.heap <= stream.end;
-         if constexpr (may_use_heap<member_type>())
-         {
-            for (uint32_t i = 0; stream.valid and i < is_std_array<T>::size; ++i)
-            {
-               stream.pos += fracvalidate_member<member_type>(stream.pos, stream);
-            }
-         }
-         return stream;
-      }
-      else if constexpr (is_shared_view_ptr<T>::value)
-      {
-         if constexpr (!may_use_heap<typename is_shared_view_ptr<T>::value_type>())
-            T::fracvalidate_not_defined;
-         if ((stream.valid = (stream.end - stream.begin >= 4)))
-         {
-            std::uint32_t size;
-            std::memcpy(&size, stream.begin, sizeof(size));
-            stream.pos += sizeof(size) + size;
-            stream.heap  = stream.pos;
-            stream.valid = fracvalidate<typename is_shared_view_ptr<T>::value_type>(
-                               stream.begin + 4, stream.pos)
-                               .valid;
-         }
-         return stream;
-      }
-      else if constexpr (not may_use_heap<T>())
-      {
-         stream.pos   = stream.begin + fracpack_fixed_size<T>();
-         stream.heap  = stream.pos;
-         stream.valid = stream.pos <= stream.end;
-         return stream;
-      }
-      else if constexpr (std::is_same_v<T, std::string>)
-      {
-         //        std::cout << " heap befor evalidate string:  "<< stream.heap - stream.begin <<"\n";
-         if (bool(stream.valid = (stream.end - stream.begin >= 4)))
-         {
-            uint32_t strsize;
-            memcpy(&strsize, stream.begin, sizeof(strsize));
-            stream.pos += sizeof(strsize) + strsize;
-            stream.heap = stream.pos;
-
-            //        std::cout << " heap after validate string:  "<< stream.heap - stream.begin <<"\n";
-            if ((stream.valid &= (stream.pos <= stream.end)))
-            {
-               //#ifndef __wasm__
-               stream.valid &= simdjson::validate_utf8(stream.begin + sizeof(strsize), strsize);
-               //#else
-               //               rapidjson_stream_adaptor s2(stream.begin+sizeof(strsize), strsize);
-               //               stream.valid = rapidjson::UTF8<>::Validate(s2, s2);
-               //#endif
-            }
-         }
-         else
-         {
-            abort_error(stream_error::overrun);
-         }
-         return stream;
-      }
-      else if constexpr (is_std_vector<T>::value)
-      {
-         using member_type = typename is_std_vector<T>::value_type;
-         if (bool(stream.valid = 4 <= stream.end - stream.begin))
-         {
-            uint32_t size;
-            memcpy(&size, stream.begin, sizeof(size));
-            stream.pos += 4;
-            stream.heap = stream.pos + size;  /// heap starts after size bytes
-            if constexpr (not may_use_heap<member_type>())
-            {
-               stream.pos = stream.heap;  /// TODO: is this required for return
-               stream.valid =
-                   (size % fracpack_fixed_size<member_type>() == 0) and stream.heap <= stream.end;
-               return stream;
-            }
-            else if (bool(stream.valid = (size % sizeof(uint32_t) == 0)))
-            {  /// must be a multiple of offset
-               //stream.heap += size;
-               auto end = stream.heap;
-               while (stream.valid and stream.pos != end)
-               {
-                  stream.pos += fracvalidate_member<member_type>(stream.pos, stream);
-               }
-               return stream;
-            }
-            else
-            {
-               //std::cout << "uses heap but size isn't multiple of offsetptr size\n";
-            }
-         }
-         else
-         {
-            //  std::cout <<"not enough space to read size\n";
-         }
-      }
-      else if constexpr (is_std_optional<T>::value)
-      {
-         //         std::cout << "root validate optional " << get_type_name<T>() <<"\n";
-         stream.heap = stream.pos + 4;
-         if (not bool(stream.valid = (stream.end - stream.pos < (ssize_t)sizeof(uint32_t))))
-         {
-            uint32_t offset;
-            memcpy(&offset, stream.pos, sizeof(offset));
-            //           std::cout <<"       offset = " << offset<<"\n";
-            if (offset == 1)
-            {
-               stream.valid = 1;
-               return stream;
-            }
-            using member_type = typename is_std_optional<T>::value_type;
-            if constexpr (std::is_same_v<std::string, member_type> ||
-                          is_std_vector<member_type>::value)
-            {
-               if ((stream.valid = (offset == 0)))
-               {
-                  //                  std::cout<<"\n.... empty string opt on optional\n";
-                  return stream;
-               }
-            }
-
-            fracvalidate_offset<typename is_std_optional<T>::value_type>(offset, stream.pos,
-                                                                         stream);
-
-            return stream;
-         }
-         else
-         {
-#ifdef DEBUG
-//            std::cerr<< ".................. stream not long enough\n";
-#endif
-         }
-         return stream;
-      }
-      else if constexpr (is_std_variant<T>::value)
-      {
-         if (not bool(stream.valid = stream.begin + 4 + 1 <= stream.end))
-         {
-            return stream;
-         }
-         uint8_t type = *stream.pos;
-         stream.pos++;
-         uint32_t size;
-         memcpy(&size, stream.pos, sizeof(size));
-         stream.pos += 4;
-         if (type >= is_std_variant<T>::num_types)
-         {
-            stream.unknown = true;
-            stream.valid   = stream.pos + size <= stream.end;
-            return stream;
-         }
-         const_view<T> v(stream.begin);
-
-         check_stream substr(0, 0);
-         v->visit([&](auto i) { substr = fracvalidate_view(i, stream.pos, stream.end); });
-
-         stream.valid &= substr.valid;
-         stream.unknown |= substr.unknown;
-         stream.heap = substr.heap;
-         stream.pos  = substr.pos;
-         return stream;
-      }
-      else if constexpr (is_std_tuple<T>::value)
-      {
-         uint16_t start_heap;
-         memcpy(&start_heap, stream.pos, sizeof(start_heap));
-
-         stream.pos += sizeof(start_heap);
-         stream.heap = stream.pos + start_heap;
-
-         stream.valid = start_heap >= fixed_size_before_optional<T>();
-         stream.unknown |= start_heap > fracpack_fixed_size<T>();
-
-         const char* memptr = stream.pos;
-
-         tuple_foreach(T(),
-                       [&](const auto& m)
-                       {
-                          auto delta =
-                              fracvalidate_member<std::decay_t<decltype(m)>>(memptr, stream);
-                          memptr += delta;
-                       });
-
-         return stream;
-      }
-      else if constexpr (reflect<T>::is_struct and psio::reflect<T>::definitionWillNotChange)
-      {
-         stream.pos   = stream.begin + fracpack_fixed_size<T>();
-         stream.heap  = stream.pos;
-         stream.valid = stream.pos <= stream.end;
-
-         if constexpr (known_members_may_use_heap<T>())
-         {
-            if (stream.valid)
-            {
-               const char* memptr = stream.begin;
-               // visit each offset ptr
-               reflect<T>::for_each(
-                   [&](const meta& ref, auto member)
-                   {
-                      using MemPtr = decltype(member(std::declval<T*>()));
-                      if constexpr (not std::is_member_function_pointer_v<MemPtr>)
-                      {
-                         using member_type = decltype(result_of_member(std::declval<MemPtr>()));
-                         memptr += fracvalidate_member<member_type>(memptr, stream);
+                               last_has_value =
+                                   is_p::template has_value<Verify>(src, fixed_pos, end_fixed_pos);
+                            }
+                            else
+                            {
+                               last_has_value = true;
+                            }
+                         }
+                         if constexpr (Unpack)
+                            ok &= is_p::template embedded_unpack<Unpack, Verify>(
+                                &(value->*member(value)), has_unknown, known_end, src, fixed_pos,
+                                end_fixed_pos, heap_pos, end_pos);
+                         else
+                         {
+                            ok &= is_p::template embedded_unpack<Unpack, Verify>(
+                                nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos,
+                                heap_pos, end_pos);
+                         }
                       }
-                   });
-            }
-         }
-      }
-      else
-      {
-         uint16_t start_heap;
-         memcpy(&start_heap, stream.pos, sizeof(start_heap));
-
-         stream.pos += sizeof(start_heap);
-         stream.heap = stream.pos + start_heap;
-
-         stream.valid = start_heap >= fixed_size_before_optional<T>() and stream.end >= stream.heap;
-         stream.unknown |= start_heap > fracpack_fixed_size<T>();
-
-         // visit each offset ptr
-         if constexpr (known_members_may_use_heap<T>())
-         {
-            if (stream.valid)
+                   }
+                });
+            if (!ok)
+               return false;
+            if constexpr (Verify)
             {
-               const char* memptr = stream.pos;
-               reflect<T>::for_each(
-                   [&](const meta& ref, auto member)
+               if (fixed_pos < end_fixed_pos)
+               {
+                  if (!verify_extensions(src, known_end, last_has_value, fixed_pos, end_fixed_pos,
+                                         heap_pos, end_pos))
+                     return false;
+                  has_unknown = true;
+                  known_end   = false;
+               }
+               if (!last_has_value)
+                  return false;
+            }
+            pos = heap_pos;
+            return true;
+         }  // is_variable_size
+         else
+         {
+            bool ok = true;
+            if constexpr (Verify)
+            {
+               known_end = true;
+            }
+            reflect<T>::for_each(
+                [&](const meta& ref, auto member)
+                {
+                   using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
+                   if constexpr (!m::isFunction)
                    {
-                      using MemPtr = decltype(member(std::declval<T*>()));
-                      if constexpr (not std::is_member_function_pointer_v<MemPtr>)
-                      {
-                         using member_type = decltype(result_of_member(std::declval<MemPtr>()));
-                         memptr += fracvalidate_member<member_type>(memptr, stream);
-                      }
-                   });
-            }
+                      using is_p = is_packable<typename m::ValueType>;
+                      if constexpr (Unpack)
+                         ok &= is_p::template unpack<Unpack, Verify>(
+                             &(value->*member(value)), has_unknown, known_end, src, pos, end_pos);
+                      else
+                         ok &= is_p::template unpack<Unpack, Verify>(nullptr, has_unknown,
+                                                                     known_end, src, pos, end_pos);
+                   }
+                });
+            return ok;
          }
-      }
-      return stream;
+      }  // unpack
+   };    // is_packable_reflected
+
+   template <Packable T, typename S>
+   void to_frac(const T& value, S& stream)
+   {
+      psio::is_packable<T>::pack(value, stream);
    }
 
-   template <typename T>
-   check_stream fracvalidate_view(const_view<T>& v, const char* p, const char* e)
+   template <Packable T>
+   std::uint32_t fracpack_size(const T& value)
    {
-      return fracvalidate<T>(p, e);
+      size_stream ss;
+      psio::to_frac(value, ss);
+      return ss.size;
    }
 
-   /** 
-     * returns the number of bytes that would be written
-     * if fracpack(v) was called
-     */
-   template <typename T>
-   uint32_t fracpack_size(const T& v)
+   template <Packable T>
+   std::vector<char> to_frac(const T& value)
    {
-      size_stream size_str;
-      fracpack(v, size_str);
-      return size_str.size;
-   }
-
-   template <uint32_t I, typename Tuple>
-   struct get_tuple_offset;
-
-   template <uint32_t Idx, typename First, typename... Ts>
-   constexpr uint32_t get_offset()
-   {
-      static_assert(Idx < sizeof...(Ts) + 1, "index out of range");
-      if constexpr (Idx == 0)
-         return 0;
-      else if constexpr (sizeof...(Ts) == 0)
-         if constexpr (may_use_heap<First>())
-            return 4;
-         else
-            return fracpack_fixed_size<First>();
-      else
-      {
-         if constexpr (may_use_heap<First>())
-            return get_offset<Idx - 1, Ts...>() + 4;
-         else
-            return get_offset<Idx - 1, Ts...>() + fracpack_fixed_size<First>();
-      }
-   }
-
-   template <uint32_t I, typename... Args>
-   struct get_tuple_offset<I, std::tuple<Args...>>
-   {
-      static constexpr const uint32_t value = get_offset<I, Args...>();
-   };
-
-   template <typename T>
-   auto get_offset(char* pos)
-   {
-      if constexpr (is_std_optional<T>::value)
-         // views mix Option<T> with T; this function mishandles that.
-         T::this_case_is_broken();
-      uint32_t off = *reinterpret_cast<unaligned_type<uint32_t>*>(pos);
-      if constexpr (std::is_same_v<std::string, T> || is_std_vector<T>::value)
-      {
-         if (off == 0)
-            return view<T>(pos);
-         else
-            return view<T>(pos + off);
-      }
-      return view<T>(pos + off);
-   }
-   template <typename T>
-   auto get_offset(const char* pos)
-   {
-      if constexpr (is_std_optional<T>::value)
-         // views mix Option<T> with T; this function mishandles that.
-         T::this_case_is_broken();
-      uint32_t off = *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
-      if constexpr (std::is_same_v<std::string, T> || is_std_vector<T>::value)
-      {
-         if (off == 0)
-            return const_view<T>(pos);
-         else
-            return const_view<T>(pos + off);
-      }
-      return const_view<T>(pos + off);
-   }
-
-   struct const_frac_proxy_view
-   {
-      const_frac_proxy_view(const char* c) : buffer(c) {}
-
-      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[](T&& k) const
-      {
-         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
-      }
-      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[](T&& k)
-      {
-         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
-      }
-
-      template <uint32_t idx, uint64_t Name, auto MemberPtr>
-      auto get() const
-      {
-         using class_type  = decltype(psio::class_of_member(MemberPtr));
-         using tuple_type  = typename psio::reflect<class_type>::struct_tuple_type;
-         using member_type = decltype(psio::result_of_member(MemberPtr));
-
-         constexpr uint32_t offset = psio::get_tuple_offset<idx, tuple_type>::value +
-                                     2 * (not psio::reflect<class_type>::definitionWillNotChange);
-
-         auto out_ptr = buffer + offset;
-
-         if constexpr (is_std_optional<member_type>::value)
-         {
-            using opt_type        = typename is_std_optional<member_type>::value_type;
-            using const_view_type = const_view<opt_type>;
-
-            if constexpr (!psio::reflect<class_type>::definitionWillNotChange)
-            {
-               uint16_t start_heap = *reinterpret_cast<const unaligned_type<uint16_t>*>(buffer);
-               if (start_heap < offset + 2)
-                  return const_view_type(nullptr);
-            }
-            auto ptr = reinterpret_cast<const unaligned_type<offset_ptr>*>(out_ptr);
-            if (ptr->val < 4)
-               return const_view_type(nullptr);
-            return get_offset<opt_type>(out_ptr);  //view_type(ptr->get<opt_type>());
-         }
-         else if constexpr (may_use_heap<member_type>())
-         {
-            return get_offset<member_type>(out_ptr);
-         }
-         else
-         {
-            return const_view<member_type>(out_ptr);
-         }
-      }
-      const char* buffer;
-   };
-   struct frac_proxy_view
-   {
-      frac_proxy_view(char* c) : buffer(c) {}
-
-      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[](T&& k) const
-      {
-         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
-      }
-      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename T>
-      auto operator[](T&& k)
-      {
-         return get<idx, Name, MemberPtr>()[std::forward<T>(k)];
-      }
-
-      /** This method is called by the reflection library to get the field */
-      template <uint32_t idx, uint64_t Name, auto MemberPtr>
-      auto get()
-      {
-         using class_type  = decltype(psio::class_of_member(MemberPtr));
-         using tuple_type  = typename psio::reflect<class_type>::struct_tuple_type;
-         using member_type = decltype(psio::result_of_member(MemberPtr));
-
-         constexpr uint32_t offset = psio::get_tuple_offset<idx, tuple_type>::value +
-                                     2 * (not psio::reflect<class_type>::definitionWillNotChange);
-
-         char* out_ptr = buffer + offset;
-         //       std::cout << "offset: " << offset <<"\n";
-
-         if constexpr (is_std_optional<member_type>::value)
-         {
-            using opt_type  = typename is_std_optional<member_type>::value_type;
-            using view_type = view<opt_type>;
-
-            if constexpr (!psio::reflect<class_type>::definitionWillNotChange)
-            {
-               uint16_t start_heap = *reinterpret_cast<unaligned_type<uint16_t>*>(buffer);
-               if (start_heap < offset + 2)
-                  return view_type(nullptr);
-            }
-            auto ptr = reinterpret_cast<const unaligned_type<offset_ptr>*>(out_ptr);
-            if (ptr->val < 4)
-               return view_type(nullptr);
-            return get_offset<opt_type>(out_ptr);
-         }
-         else if constexpr (may_use_heap<member_type>())
-         {
-            return get_offset<member_type>(out_ptr);
-         }
-         else
-         {
-            return view<member_type>(out_ptr);
-         }
-      }
-
-      //private:
-      char* buffer;
-   };
-
-   template <typename View, typename Enable>
-   struct view
-   {
-      using View::not_defined;
-   };
-   template <typename View, typename Enable>
-   struct const_view
-   {
-      using View::not_defined;
-   };
-
-   template <>
-   struct view<bool>
-   {
-      using char_ptr = char*;
-      view(char_ptr p = nullptr) : pos(p) {}
-      operator bool() const { return *pos != 0; }
-
-      template <typename V>
-      auto& operator=(V&& v)
-      {
-         *pos = (0 != v);
-         return *this;
-      }
-
-      template <typename S>
-      friend S& operator<<(S& stream, const view& member)
-      {
-         return stream << bool(0 != *member.pos);
-      }
-
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-      auto* operator->() const { return this; }
-      auto& operator*() const { return *this; }
-
-     private:
-      friend struct const_view<bool>;
-      char_ptr pos;
-   };
-
-   template <>
-   struct const_view<bool>
-   {
-      using char_ptr = const char*;
-      const_view(char_ptr p = nullptr) : pos(p) {}
-      const_view(view<bool> v) : pos(v.pos) {}
-      operator bool() const { return *pos != 0; }
-
-      template <typename S>
-      friend S& operator<<(S& stream, const const_view& member)
-      {
-         return stream << bool(0 != *member.pos);
-      }
-
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-      auto* operator->() const { return this; }
-      auto& operator*() const { return *this; }
-
-     private:
-      char_ptr pos;
-   };
-
-   template <typename T>
-   struct view<T, std::enable_if_t<std::is_arithmetic_v<T>>>
-   {
-      using char_ptr = char*;
-      view(char_ptr p = nullptr) : pos(p) {}
-      operator T() const { return *reinterpret_cast<const unaligned_type<T>*>(pos); }
-
-      template <typename V>
-      auto& operator=(V&& v)
-      {
-         *reinterpret_cast<unaligned_type<T>*>(pos) = std::forward<V>(v);
-         return *this;
-      }
-
-      template <typename S>
-      friend S& operator<<(S& stream, const view& member)
-      {
-         return stream << (T) * reinterpret_cast<unaligned_type<T>*>(member.pos);
-      }
-
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-      auto* operator->() const { return this; }
-      auto& operator*() const { return *this; }
-
-     private:
-      friend struct const_view<T>;
-      char_ptr pos;
-   };
-
-   template <typename T>
-   struct const_view<T, std::enable_if_t<std::is_arithmetic_v<T>>>
-   {
-      using char_ptr = const char*;
-      const_view(char_ptr p = nullptr) : pos(p) {}
-      const_view(view<T> v) : pos(v.pos) {}
-
-      operator T() const { return *reinterpret_cast<const unaligned_type<T>*>(pos); }
-
-      template <typename S>
-      friend S& operator<<(S& stream, const const_view& member)
-      {
-         return stream << (T) * reinterpret_cast<const unaligned_type<T>*>(member.pos);
-      }
-
-      auto* operator->() const { return this; }
-      auto& operator*() const { return *this; }
-
-     private:
-      char_ptr pos;
-   };
-
-   template <>
-   struct view<std::string>
-   {
-      view(char* p = nullptr) : pos(p) {}
-
-      uint32_t size() const { return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos); }
-
-      bool valid() const { return pos != nullptr; }
-
-      operator std::string_view() const { return std::string_view(pos + 4, size()); }
-      operator std::string() const { return std::string(pos + 4, size()); }
-
-      template <typename S>
-      friend S& operator<<(S& stream, const view& member)
-      {
-         return stream << std::string_view(member);
-      }
-
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-
-      // TODO: add [] operators for mutation in place
-
-     private:
-      friend struct const_view<std::string>;
-      char* pos;
-   };
-
-   template <>
-   struct const_view<std::string>
-   {
-      const_view(const char* p = nullptr) : pos(p) {}
-      const_view(view<std::string> v) : pos(v.pos) {}
-
-      uint32_t size() const { return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos); }
-
-      bool valid() const { return pos != nullptr; }
-
-      operator std::string_view() const { return std::string_view(pos + 4, size()); }
-      operator std::string() const { return std::string(pos + 4, size()); }
-
-      template <typename S>
-      friend S& operator<<(S& stream, const const_view& member)
-      {
-         return stream << std::string_view(member);
-      }
-
-      auto* operator->() const { return this; }
-      auto& operator*() const { return *this; }
-
-     private:
-      const char* pos;
-   };
-
-   /* Bugged; views don't point at an offset pointer
-   template <typename T>
-   struct view<shared_view_ptr<T>>
-   {
-      view(char* p = nullptr) : pos(p) {}
-      auto operator->()
-      {
-         auto s = *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
-         if (not s)
-            return view<T>(nullptr);
-         return view<T>(pos + 4);
-      }
-      auto operator*()
-      {
-         if (not pos)
-            return view<T>(nullptr);
-         return view<T>(pos + 4);
-      }
-      bool valid() const
-      {
-         return pos != nullptr && 0 != *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
-      }
-      operator T() const { return view<T>(pos); }
-
-     private:
-      friend const_view<shared_view_ptr<T>>;
-      char* pos;
-   };
-
-   template <typename T>
-   struct const_view<shared_view_ptr<T>>
-   {
-      const_view(const char* p = nullptr) : pos(p) {}
-      const_view(view<shared_view_ptr<T>> v) : pos(v.pos) {}
-
-      auto operator->() const
-      {
-         auto s = *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
-         if (not s)
-            return const_view<T>(nullptr);
-         return view<T>(pos + 4);
-      }
-      auto operator*() const
-      {
-         if (not pos)
-            return const_view<T>(nullptr);
-         return const_view<T>(pos + 4);
-      }
-
-      bool valid() const
-      {
-         return pos != nullptr && 0 != *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
-      }
-
-      operator T() const { return view<T>(pos); }
-
-     private:
-      const char* pos;
-   };
-   */
-
-   /// TODO: specialize this based on whether T is memcpyable and ensure
-   /// so that data() and data_size() return types that are proper (e.g. unaligned_type<T>*) and factor
-   /// in the fact thatthey might be unaligned.
-   template <typename T>
-   struct view<std::vector<T>>
-   {
-      view(char* p = nullptr) : pos(p) {}
-
-      uint32_t size() const
-      {
-         if constexpr (not may_use_heap<T>())
-         {
-            constexpr uint16_t fix_size = fracpack_fixed_size<T>();
-            return bytes_size() / fix_size;
-         }
-         else
-         {
-            return bytes_size() / 4;
-         }
-      }
-
-      auto operator[](uint32_t idx)
-      {
-         if constexpr (may_use_heap<T>())
-         {
-            return get_offset<T>(pos + 4 + idx * sizeof(uint32_t));
-         }
-         else
-         {
-            return view<T>(pos + 4 + idx * fracpack_fixed_size<T>());
-         }
-      }
-
-      inline char* bytes() const { return pos + sizeof(uint32_t); }
-
-      inline uint32_t bytes_size() const
-      {
-         return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
-      }
-
-      bool valid() const { return pos != nullptr; }
-
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-
-      operator std::vector<T>() const
-      {
-         input_stream   in(pos, pos + 0xfffffff);  /// TODO: maintain real end
-         std::vector<T> tmp;
-         fracunpack<std::vector<T>>(tmp, in);
-         return tmp;
-      }
-
-     private:
-      friend struct const_view<std::vector<T>>;
-      char* pos;
-   };
-
-   template <typename T, size_t S>
-   struct view<std::array<T, S>>
-   {
-      view(char* p = nullptr) : pos(p) {}
-
-      uint32_t size() const { return S; }
-
-      auto operator[](uint32_t idx)
-      {
-         if constexpr (may_use_heap<T>())
-         {
-            return get_offset<T>(pos + idx * sizeof(uint32_t));
-         }
-         else
-         {
-            return view<T>(pos + idx * fracpack_fixed_size<T>());
-         }
-      }
-
-      inline char*    bytes() const { return pos; }
-      inline uint32_t bytes_size() const { return S * fracpack_fixed_size<T>(); }
-
-      bool valid() const { return pos != nullptr; }
-
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-
-      operator std::array<T, S>() const
-      {
-         input_stream     in(pos, pos + 0xfffffff);  /// TODO: maintain real end
-         std::array<T, S> tmp;
-         fracunpack<std::array<T, S>>(tmp, in);
-         return tmp;
-      }
-
-     private:
-      friend struct const_view<std::array<T, S>>;
-      char* pos;
-   };
-   template <typename T, size_t S>
-   struct const_view<std::array<T, S>>
-   {
-      const_view(const char* p = nullptr) : pos(p) {}
-      const_view(view<std::array<T, S>> v) : pos(v.pos) {}
-
-      uint32_t size() const { return S; }
-
-      auto operator[](uint32_t idx) const
-      {
-         if constexpr (may_use_heap<T>())
-         {
-            return get_offset<T>(pos + idx * sizeof(uint32_t));
-         }
-         else
-         {
-            return view<T>(pos + idx * fracpack_fixed_size<T>());
-         }
-      }
-
-      inline const char* bytes() const { return pos; }
-      inline uint32_t    bytes_size() const { return S * fracpack_fixed_size<T>(); }
-
-      bool valid() const { return pos != nullptr; }
-
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-
-      operator std::array<T, S>() const
-      {
-         input_stream     in(pos, pos + 0xfffffff);  /// TODO: maintain real end
-         std::array<T, S> tmp;
-         fracunpack<std::array<T, S>>(tmp, in);
-         return tmp;
-      }
-
-     private:
-      const char* pos;
-   };
-
-   /// TODO: specialize this based on whether T is memcpyable and ensure
-   /// so that data() and data_size() return types that are proper (e.g. unaligned_type<T>*) and factor
-   /// in the fact thatthey might be unaligned.
-   template <typename T>
-   struct const_view<std::vector<T>>
-   {
-      const_view(const char* p = nullptr) : pos(p) {}
-      const_view(view<std::vector<T>> v) : pos(v.pos) {}
-
-      uint32_t size() const
-      {
-         if constexpr (not may_use_heap<T>())
-         {
-            constexpr uint16_t fix_size = fracpack_fixed_size<T>();
-            return bytes_size() / fix_size;
-         }
-         else
-         {
-            return bytes_size() / 4;
-         }
-      }
-
-      auto operator[](uint32_t idx) const
-      {
-         if constexpr (may_use_heap<T>())
-         {
-            return get_offset<T>(pos + 4 + idx * sizeof(uint32_t));
-         }
-         else
-         {
-            return const_view<T>(pos + 4 + idx * fracpack_fixed_size<T>());
-         }
-      }
-
-      inline const char* bytes() const { return pos + sizeof(uint32_t); }
-      inline uint32_t    bytes_size() const
-      {
-         return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos);
-      }
-
-      bool valid() const { return pos != nullptr; }
-
-      auto* operator->() const { return this; }
-      auto& operator*() const { return *this; }
-
-      operator std::vector<T>() const
-      {
-         input_stream   in(pos, pos + 0xfffffff);  /// TODO: maintain real end
-         std::vector<T> tmp;
-         fracunpack<std::vector<T>>(tmp, in);
-         return tmp;
-      }
-
-     private:
-      const char* pos;
-   };
-
-   template <typename T>
-   struct view<T, std::enable_if_t<reflect<T>::is_struct>>
-       : public reflect<T>::template proxy<psio::frac_proxy_view>
-   {
-      using base = typename reflect<T>::template proxy<psio::frac_proxy_view>;
-      using base::base;
-      view(char* p) : base(p) {}
-
-      friend struct const_view<T>;
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-
-      operator T() const
-      {
-         input_stream in(this->psio_get_proxy().buffer,
-                         this->psio_get_proxy().buffer + 0xfffffff);  /// TODO: maintain real end
-         T            tmp;
-         fracunpack<T>(tmp, in);
-         return tmp;
-      }
-
-      T get() const { return (T)(*this); }
-   };
-
-   template <typename T>
-   struct const_view<T, std::enable_if_t<reflect<T>::is_struct>>
-       : public reflect<T>::template proxy<psio::const_frac_proxy_view>
-   {
-      using base = typename reflect<T>::template proxy<psio::const_frac_proxy_view>;
-      using base::base;
-      const_view(view<T> v) : base(v.pos) {}
-      const_view(char* p) : base(p) {}
-
-      operator T() const
-      {
-         input_stream in(this->psio_get_proxy().buffer,
-                         this->psio_get_proxy().buffer + 0xfffffff);  /// TODO: maintain real end
-         T            tmp;
-         fracunpack<T>(tmp, in);
-         return tmp;
-      }
-
-      T get() const { return (T)(*this); }
-
-      auto* operator->() const { return this; }
-      auto& operator*() const { return *this; }
-   };
-
-   template <typename... Ts>
-   struct view<std::tuple<Ts...>>
-   {
-      using tuple_type = std::tuple<typename remove_view<Ts>::type...>;
-      view(char* p = nullptr) : pos(p) {}
-
-      template <uint8_t I>
-      auto get()
-      {
-         using element_type    = std::tuple_element_t<I, tuple_type>;
-         const auto i_offset   = get_offset<I, Ts...>();
-         uint16_t   start_heap = 0;
-         memcpy(&start_heap, pos, sizeof(start_heap));
-
-         if constexpr (may_use_heap<element_type>())
-         {
-            if constexpr (is_std_optional<element_type>::value)
-            {
-               // views mix Option<T> with T; this function mishandles that.
-               element_type::this_case_is_broken();
-               if (i_offset + 4 > start_heap)
-                  return view<element_type>(nullptr);
-               if (reinterpret_cast<unaligned_type<uint32_t>*>(pos + sizeof(start_heap) + i_offset)
-                       ->val < 4)
-                  return view<element_type>(nullptr);
-            }
-            return get_offset<element_type>(pos + sizeof(start_heap) + i_offset);
-         }
-         else
-         {
-            return view<element_type>(pos + sizeof(start_heap) + i_offset);
-         }
-      }
-
-      template <typename Lamda>
-      auto call(Lamda&& fun)
-      {
-         return _call(std::forward<Lamda>(fun), std::make_index_sequence<sizeof...(Ts)>{});
-      }
-
-      char* data() { return pos; }
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-
-     private:
-      friend struct const_view<std::tuple<Ts...>>;
-
-      template <typename Function, size_t... I>
-      auto _call(Function&& f, std::index_sequence<I...>)
-      {
-         return f(get<I>()...);
-      }
-
-      char* pos;
-   };
-
-   template <typename... Ts>
-   struct const_view<std::tuple<Ts...>>
-   {
-      using tuple_type = std::tuple<typename remove_view<Ts>::type...>;
-      const_view(const char* p = nullptr) : pos(p) {}
-      const_view(view<std::tuple<Ts...>> v) : pos(v.pos) {}
-
-      template <uint8_t I>
-      auto get() const
-      {
-         using element_type    = std::tuple_element_t<I, tuple_type>;
-         const auto i_offset   = get_offset<I, Ts...>();
-         uint16_t   start_heap = 0;
-         memcpy(&start_heap, pos, sizeof(start_heap));
-
-         if constexpr (may_use_heap<element_type>())
-         {
-            if constexpr (is_std_optional<element_type>::value)
-            {
-               // views mix Option<T> with T; this function mishandles that.
-               element_type::this_case_is_broken();
-               if (i_offset + 4 > start_heap)
-                  return view<element_type>(nullptr);
-               if (reinterpret_cast<unaligned_type<uint32_t>*>(pos + sizeof(start_heap) + i_offset)
-                       ->val < 4)
-                  return view<element_type>(nullptr);
-            }
-            return get_offset<element_type>(pos + sizeof(start_heap) + i_offset);
-         }
-         else
-         {
-            return const_view<element_type>(pos + sizeof(start_heap) + i_offset);
-         }
-      }
-
-      template <typename Lamda>
-      auto call(Lamda&& fun) const
-      {
-         return _call(std::forward<Lamda>(fun), std::make_index_sequence<sizeof...(Ts)>{});
-      }
-
-      const char* data() const { return pos; }
-      const auto* operator->() const { return this; }
-      const auto& operator*() const { return *this; }
-
-     private:
-      template <typename Function, size_t... I>
-      auto _call(Function&& f, std::index_sequence<I...>) const
-      {
-         return f(get<I>()...);
-      }
-
-      const char* pos;
-   };
-
-   template <typename... Ts>
-   struct view<std::variant<Ts...>>
-   {
-      view(char* p = nullptr) : pos(p) {}
-
-      template <typename Visitor>
-      void visit(Visitor&& v)
-      {
-         _visit_variant<Visitor, Ts...>(std::forward<Visitor>(v));
-      }
-
-      bool     valid() const { return pos != nullptr; }
-      uint8_t  type() const { return *pos; }
-      uint32_t size() const { return *reinterpret_cast<unaligned_type<uint32_t>*>(pos + 1); }
-      /// the data of the inner object
-      char* data() { return pos + 5; }
-      auto* operator->() { return this; }
-      auto& operator*() { return *this; }
-
-      operator std::variant<Ts...>() const
-      {
-         input_stream        in(pos, pos + 0xfffffff);  /// TODO: maintain real end
-         std::variant<Ts...> tmp;
-         fracunpack<std::variant<Ts...>>(tmp, in);
-         return tmp;
-      }
-
-     private:
-      friend struct const_view<std::variant<Ts...>>;
-      char* pos;
-      template <typename Visitor, typename First, typename... Rest>
-      void _visit_variant(Visitor&& v)
-      {
-         if (sizeof...(Rest) + 1 + *pos == sizeof...(Ts))
-         {
-            if constexpr (is_std_optional<First>::value)
-               // views mix Option<T> with T; this function mishandles that.
-               First::visit_not_implemented_for_optional();
-            v(view<First>(pos + 1 + 4));
-         }
-         else if constexpr (sizeof...(Rest) > 0)
-         {
-            _visit_variant<Visitor, Rest...>(std::forward<Visitor>(v));
-         }
-      }
-   };
-   template <typename... Ts>
-   struct const_view<std::variant<Ts...>>
-   {
-      const_view(const char* p = nullptr) : pos(p) {}
-      const_view(view<std::variant<Ts...>> v) : pos(v.pos) {}
-
-      template <typename Visitor>
-      void visit(Visitor&& v) const
-      {
-         _visit_variant<Visitor, Ts...>(std::forward<Visitor>(v));
-      }
-
-      bool     valid() const { return pos != nullptr; }
-      uint8_t  type() const { return *pos; }
-      uint32_t size() const { return *reinterpret_cast<const unaligned_type<uint32_t>*>(pos + 1); }
-      const char* data() const { return pos + 5; }
-      auto*       operator->() const { return this; }
-      auto&       operator*() const { return *this; }
-
-      operator std::variant<Ts...>() const
-      {
-         input_stream        in(pos, pos + 0xfffffff);  /// TODO: maintain real end
-         std::variant<Ts...> tmp;
-         fracunpack<std::variant<Ts...>>(tmp, in);
-         return tmp;
-      }
-
-     private:
-      const char* pos;
-      template <typename Visitor, typename First, typename... Rest>
-      void _visit_variant(Visitor&& v) const
-      {
-         if (sizeof...(Rest) + 1 + *pos == sizeof...(Ts))
-         {
-            if constexpr (is_std_optional<First>::value)
-               // views mix Option<T> with T; this function mishandles that.
-               First::visit_not_implemented_for_optional();
-            v(const_view<First>(pos + 1 + 4));
-         }
-         else if constexpr (sizeof...(Rest) > 0)
-         {
-            _visit_variant<Visitor, Rest...>(std::forward<Visitor>(v));
-         }
-      }
-   };
-
-   template <typename T>
-   std::vector<char> convert_to_frac(const T& v)
-   {
-      std::vector<char> result(fracpack_size(v));
-      fast_buf_stream   buf(result.data(), result.size());
-      fracpack(v, buf);
-      return result;
-   }
-   template <typename T>
-   T convert_from_frac(const std::vector<char>& v)
-   {
-      T            tmp;
-      input_stream buf(v.data(), v.size());
-      fracunpack(tmp, buf);
-      return tmp;
-   }
-   template <typename T>
-   T convert_from_frac(input_stream buf)
-   {
-      T tmp;
-      fracunpack(tmp, buf);
-      return tmp;
-   }
-
-   /* used so as not to confuse with other types that might be used to consrtuct shared_view*/
-   struct size_tag
-   {
-      uint32_t size;
-   };
-
-   /**
-     *  A shared_ptr<char> array containing the data
-     *  
-     *  uint32_t    size
-     *  char[size]  fracpack(T) 
-     */
-   template <typename T>
-   class shared_view_ptr
-   {
-     public:
-      typedef T value_type;
-
-      shared_view_ptr(const T& from)
-      {
-         uint32_t size = fracpack_size(from);
-
-         _data = std::shared_ptr<char>(new char[size + sizeof(size)], [](char* c) { delete[] c; });
-         memcpy(_data.get(), &size, sizeof(size));
-
-         fast_buf_stream out(_data.get() + sizeof(size), size);
-         psio::fracpack(from, out);
-         //         std::cout <<"\n\n\n consumed "<< out.consumed() << "vs "<<size<<"\n\n\n";
-      }
-
-      shared_view_ptr(const char* data, uint32_t size)
-      {
-         _data = std::shared_ptr<char>(new char[size + sizeof(size)], [](char* c) { delete[] c; });
-         memcpy(_data.get(), &size, sizeof(size));
-         memcpy(_data.get() + sizeof(size), data, size);
-      }
-
-      shared_view_ptr(const shared_view_ptr<std::vector<char>>& p) { _data = p._data; }
-
-      /** allocate the memory so another function can fill it in */
-      explicit shared_view_ptr(size_tag s)
-      {
-         _data =
-             std::shared_ptr<char>(new char[s.size + sizeof(s.size)], [](char* c) { delete[] c; });
-         memcpy(_data.get(), &s.size, sizeof(s.size));
-      }
-
-      shared_view_ptr(){};
-      shared_view_ptr(std::nullptr_t){};
-      //bool operator!() const { return _data == nullptr; }
-      explicit operator bool() const { return _data != nullptr; }
-
-      const auto operator->() const { return const_view<T>(data()); }
-      auto       operator->() { return view<T>(data()); }
-
-      const auto operator*() const { return const_view<T>(data()); }
-      auto       operator*() { return view<T>(data()); }
-
-      /** returns the data without a size prefix */
-      const char* data() const { return _data.get() + 4; }
-      /** returns the data without a size prefix */
-      char* data() { return _data.get() + 4; }
-
-      std::span<const char> data_with_size_prefix() const
-      {
-         return std::string_view(_data.get(), size() + sizeof(uint32_t));
-      }
-
-      std::span<const char> data_without_size_prefix() const
-      {
-         return std::string_view(data(), size());
-      }
-
-      /** @return the number of bytes of packed data after the size prefix */
-      size_t size() const
-      {
-         if (_data == nullptr)
-            return 0;
-         uint32_t s;
-         memcpy(&s, _data.get(), sizeof(s));
-         return s;
-      }
-
-      void reset() { _data.reset(); }
-
-      void resize(uint32_t size)
-      {
-         _data.reset();
-         _data = std::shared_ptr<char>(new char[size + sizeof(size)], [](char* c) { delete[] c; });
-         memcpy(_data.get(), &size, sizeof(size));
-      }
-
-      bool validate(bool& unknown) const
-      {
-         if (_data)
-         {
-            auto r  = psio::fracvalidate<T>(data(), data() + size());
-            unknown = r.unknown;
-            return r.valid;
-         }
-         return false;
-      }
-      bool validate() const
-      {
-         if (_data)
-         {
-            return psio::fracvalidate<T>(data(), data() + size()).valid;
-         }
-         return false;
-      }
-      bool validate_all_known() const
-      {
-         if (_data)
-         {
-            return psio::fracvalidate<T>(data(), data() + size()).valid_and_known();
-         }
-         return false;
-      }
-
-      T unpack() const
-      {
-         T            tmp{};
-         input_stream in(_data.get() + sizeof(uint32_t), size());
-         psio::fracunpack(tmp, in);
-         return tmp;
-      }
-
-     private:
-      std::shared_ptr<char> _data;
-   };
-   template <>
-   class shared_view_ptr<void>
-   {
-   };
-
-   template <typename T, typename S>
-   void to_json(const shared_view_ptr<T>& obj, S& stream)
-   {
-      to_json(obj.unpack(), stream);
-   }
-
-   template <typename T, typename S>
-   void from_json(shared_view_ptr<T>& obj, S& stream)
-   {
-      if constexpr (std::is_same_v<T, std::string>)
-         // ambiguous case
-         shared_view_ptr<T>::from_json_undefined();
-      if (stream.peek_token().get().type == json_token_type::type_string)
-      {
-         // TODO: avoid copy
-         std::vector<char> v;
-         from_json(v, stream);
-         obj = {v.data(), v.size()};
-      }
-      else
-      {
-         T inner;
-         from_json(inner, stream);
-         obj = inner;
-      }
-   }
-
-   template <typename T, typename R, typename... Args>
-   constexpr auto tuple_from_function_args(R (T::*func)(Args...))
-       -> std::tuple<std::decay_t<Args>...>;
-
-   template <typename T, typename R, typename... Args>
-   constexpr auto tuple_from_function_args(R (T::*func)(Args...) const)
-       -> std::tuple<std::decay_t<Args>...>;
-
-   template <typename... Args>
-   constexpr auto tuple_remove_view(std::tuple<Args...>) -> std::tuple<remove_view_t<Args>...>;
-
-   template <typename T>
-   std::vector<char> to_frac(const T& v)
-   {
-      std::vector<char> result(fracpack_size(v));
+      std::vector<char> result(psio::fracpack_size(value));
       fast_buf_stream   s(result.data(), result.size());
-      fracpack(v, s);
+      psio::to_frac(value, s);
       return result;
    }
 
-   template <typename T>
-   T from_frac(const std::vector<char>& b)
+   template <Packable T>
+   auto convert_to_frac(const T& value)
    {
-      if (fracvalidate<T>(b.data(), b.data() + b.size()).valid)
-         return convert_from_frac<T>(b);
-      abort_error(stream_error::invalid_frac_encoding);
+      return to_frac(value);
+   }
+
+   enum validation_t : std::uint8_t
+   {
+      invalid,
+      valid,
+      extended,
+   };
+   template <Packable T>
+   validation_t fracpack_validate(std::span<const char> data)
+   {
+      bool          has_unknown = false;
+      bool          known_end;
+      std::uint32_t pos = 0;
+      if (!is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
+                                                        data.data(), pos, data.size()))
+         return validation_t::invalid;
+      if (known_end && pos != data.size())
+         return validation_t::invalid;
+      return has_unknown ? validation_t::extended : validation_t::valid;
+   }
+   template <Packable T>
+   bool fracpack_validate_compatible(std::span<const char> data)
+   {
+      return fracpack_validate<T>(data) != validation_t::invalid;
+   }
+   template <Packable T>
+   bool fracpack_validate_strict(std::span<const char> data)
+   {
+      return fracpack_validate<T>(data) == validation_t::valid;
    }
 
    template <typename T>
-   auto make_view(const char* data, size_t size)
+   struct prevalidated
    {
-      if (fracvalidate<T>(data, size).valid_and_known())
-         return const_view<T>(data);
-      return const_view<T>();
+      template <typename... A>
+      explicit constexpr prevalidated(A&&... a) : data(std::forward<A>(a)...)
+      {
+      }
+      T data;
+   };
+   template <typename T>
+   prevalidated(T&) -> prevalidated<T&>;
+   template <typename T>
+   prevalidated(T*&) -> prevalidated<T*>;
+   template <typename T>
+   prevalidated(T* const&) -> prevalidated<T*>;
+   template <typename T>
+   prevalidated(T&&) -> prevalidated<T>;
+   template <typename T, typename U>
+   prevalidated(T&& t, U&& u)
+       -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
+
+   template <Packable T>
+   bool from_frac(T& value, std::span<const char> data)
+   {
+      bool          has_unknown = false;
+      bool          known_end;
+      std::uint32_t pos = 0;
+      if (!is_packable<T>::template unpack<true, true>(&value, has_unknown, known_end, data.data(),
+                                                       pos, data.size()))
+         return false;
+      if (known_end && pos != data.size())
+         return false;
+      return true;
    }
 
+   template <Packable T>
+   T from_frac(std::span<const char> data)
+   {
+      T result;
+      if (!from_frac(result, data))
+         abort_error(stream_error::invalid_frac_encoding);
+      return result;
+   }
+
+   template <Packable T>
+   bool from_frac_strict(T& value, std::span<const char> data)
+   {
+      bool          has_unknown = false;
+      bool          known_end;
+      std::uint32_t pos = 0;
+      if (!is_packable<T>::template unpack<true, true>(&value, has_unknown, known_end, data.data(),
+                                                       pos, data.size()))
+         return false;
+      if (has_unknown)
+         return false;
+      if (known_end && pos != data.size())
+         return false;
+      return true;
+   }
+
+   template <Packable T>
+   T from_frac_strict(std::span<const char> data)
+   {
+      T result;
+      if (!from_frac_strict(result, data))
+         abort_error(stream_error::invalid_frac_encoding);
+      return result;
+   }
+
+   template <Packable T, typename S>
+   T from_frac(const prevalidated<S>& data)
+   {
+      bool                  has_unknown = false;
+      bool                  known_end;
+      std::uint32_t         pos = 0;
+      T                     result;
+      std::span<const char> actual(data.data);
+      (void)is_packable<T>::template unpack<true, false>(&result, has_unknown, known_end,
+                                                         actual.data(), pos, actual.size());
+      return result;
+   }
 }  // namespace psio

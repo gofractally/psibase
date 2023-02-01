@@ -6,6 +6,7 @@
 #include <optional>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
+#include <type_traits>
 #include <variant>
 
 #include <rapidjson/encodings.h>
@@ -272,7 +273,7 @@ template <typename S> void to_json(float value, S& stream)              { return
           [&](const psio::meta& ref, auto member)
           {
              if constexpr (not std::is_member_function_pointer_v<
-                               remove_cvref_t<decltype(member(&t))>>)
+                               std::remove_cvref_t<decltype(member(&t))>>)
              {
                 auto addfield = [&]()
                 {
@@ -291,7 +292,7 @@ template <typename S> void to_json(float value, S& stream)              { return
                    to_json(t.*member(&t), stream);
                 };
 
-                using member_type = remove_cvref_t<decltype(member(&t))>;
+                using member_type = std::remove_cvref_t<decltype(member(&t))>;
                 if constexpr (not is_std_optional<member_type>::value)
                 {
                    addfield();

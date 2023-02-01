@@ -23,9 +23,9 @@ namespace UserService
       void burn(NID nftId);
       void credit(NID                               nftId,
                   psibase::AccountNumber            receiver,
-                  psio::const_view<psibase::String> memo);
-      void uncredit(NID nftId, psio::const_view<psibase::String> memo);
-      void debit(NID nftId, psio::const_view<psibase::String> memo);
+                  psio::view<const psibase::String> memo);
+      void uncredit(NID nftId, psio::view<const psibase::String> memo);
+      void debit(NID nftId, psio::view<const psibase::String> memo);
       void setUserConf(psibase::EnumElement flag, bool enable);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
@@ -41,7 +41,7 @@ namespace UserService
       struct Events
       {
          using Account    = psibase::AccountNumber;
-         using StringView = psio::const_view<psibase::String>;
+         using StringView = psio::view<const psibase::String>;
          // clang-format off
          struct History
          {

@@ -238,9 +238,9 @@ namespace psibase
       std::vector<char>     packed(psio::fracpack_size(service) + psio::fracpack_size(type) +
                                    psio::fracpack_size(value));
       psio::fast_buf_stream stream(packed.data(), packed.size());
-      psio::fracpack(service, stream);
-      psio::fracpack(type, stream);
-      psio::fracpack(value, stream);
+      psio::to_frac(service, stream);
+      psio::to_frac(type, stream);
+      psio::to_frac(value, stream);
       return putSequentialRaw(db, packed);
    }
 
@@ -304,7 +304,7 @@ namespace psibase
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio::convert_from_frac<V>(*v);
+      return psio::from_frac<V>(psio::prevalidated{*v});
    }
 
    /// Get a key-value pair, if any
@@ -358,21 +358,37 @@ namespace psibase
                                          AccountNumber*       service      = nullptr,
                                          Type*                type         = nullptr)
    {
+      // TODO: this record format is seriously problematic.
+      // fracpack in general is not able to determine the end of an object,
+      // so simply appending components is not reliable. The layout
+      // also doesn't match any struct (except when V is fixed size),
+      // which makes reading unnecessarily complicated
       std::optional<V> result;
       auto             v = getSequentialRaw(db, id);
       if (!v)
          return result;
-      psio::input_stream stream(v->data(), v->size());
+
+      std::uint32_t pos = 0;
+
+      auto fracunpack = [&](auto& value)
+      {
+         bool has_unknown = false;
+         bool known_end;
+         if (!psio::is_packable<std::remove_reference_t<decltype(value)>>::template unpack<true,
+                                                                                           false>(
+                 &value, has_unknown, known_end, v->data(), pos, v->size()))
+            check(false, "Invalid frac encoding");
+      };
 
       AccountNumber c;
-      fracunpack(c, stream);
+      fracunpack(c);
       if (service)
          *service = c;
       if (matchService && *matchService != c)
          return result;
 
       Type t;
-      fracunpack(t, stream);
+      fracunpack(t);
       if (type)
          *type = t;
       if (matchType && *matchType != t)
@@ -380,7 +396,7 @@ namespace psibase
 
       result.emplace();
       // TODO: validate (allow opt-in or opt-out)
-      fracunpack(*result, stream);
+      fracunpack(*result);
       return result;
    }
 
@@ -411,7 +427,7 @@ namespace psibase
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio::convert_from_frac<V>(*v);
+      return psio::from_frac<V>(psio::prevalidated{*v});
    }
 
    /// Get the first key-value pair which is greater than or equal to `key`
@@ -452,7 +468,7 @@ namespace psibase
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio::convert_from_frac<V>(*v);
+      return psio::from_frac<V>(psio::prevalidated{*v});
    }
 
    /// Get the key-value pair immediately-before provided key
@@ -489,7 +505,7 @@ namespace psibase
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio::convert_from_frac<V>(*v);
+      return psio::from_frac<V>(psio::prevalidated{*v});
    }
 
    /// Get the maximum key-value pair which has key as a prefix

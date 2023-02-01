@@ -10,13 +10,13 @@ namespace debug_eos_vm
 
       const void* code_begin = nullptr;
       const void* wasm_begin = nullptr;
-      size_t wasm_size = 0;
-      size_t code_size = 0;
+      size_t      wasm_size  = 0;
+      size_t      code_size  = 0;
 
-      std::vector<dwarf::jit_fn_loc> fn_locs;
+      std::vector<dwarf::jit_fn_loc>    fn_locs;
       std::vector<dwarf::jit_instr_loc> instr_locs;
-      const dwarf::jit_instr_loc* offset_to_addr = nullptr;
-      std::size_t offset_to_addr_len = 0;
+      const dwarf::jit_instr_loc*       offset_to_addr     = nullptr;
+      std::size_t                       offset_to_addr_len = 0;
 
       uint32_t code_offset(const void* p)
       {
@@ -38,7 +38,7 @@ namespace debug_eos_vm
       {
          fn_locs.emplace_back();
          fn_locs.back().code_prologue = code_offset(code_addr);
-         fn_locs.back().wasm_begin = wasm_offset(wasm_addr);
+         fn_locs.back().wasm_begin    = wasm_offset(wasm_addr);
       }
 
       void on_function_body(const void* code_addr)
@@ -103,7 +103,7 @@ namespace debug_eos_vm
             }
          }
 
-         offset_to_addr = instr_locs.data();
+         offset_to_addr     = instr_locs.data();
          offset_to_addr_len = instr_locs.size();
       }
 
@@ -144,10 +144,10 @@ namespace debug_eos_vm
            eosio::vm::guarded_vector<eosio::vm::function_body> & elems)                           \
    {                                                                                              \
       const void* code_start = code.raw() - code.offset();                                        \
-      parse_section_impl(code, elems,                                                             \
-                         eosio::vm::detail::get_max_function_section_elements(_options),          \
-                         [&](eosio::vm::wasm_code_ptr& code, eosio::vm::function_body& fb,        \
-                             std::size_t idx) { parse_function_body(code, fb, idx); });           \
+      parse_section_impl(                                                                         \
+          code, elems, eosio::vm::detail::get_max_function_section_elements(_options),            \
+          [&](eosio::vm::wasm_code_ptr& code, eosio::vm::function_body& fb, std::size_t idx)      \
+          { parse_function_body(code, fb, idx); });                                               \
       EOS_VM_ASSERT(elems.size() == _mod->functions.size(), eosio::vm::wasm_parse_exception,      \
                     "code section must have the same size as the function section");              \
       eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<Host, true>> code_writer(   \
@@ -156,8 +156,8 @@ namespace debug_eos_vm
       for (size_t i = 0; i < _function_bodies.size(); i++)                                        \
       {                                                                                           \
          eosio::vm::function_body& fb = _mod->code[i];                                            \
-         eosio::vm::func_type& ft = _mod->types.at(_mod->functions.at(i));                        \
-         local_types_t local_types(ft, fb.locals);                                                \
+         eosio::vm::func_type&     ft = _mod->types.at(_mod->functions.at(i));                    \
+         local_types_t             local_types(ft, fb.locals);                                    \
          imap.on_function_start(code_writer.get_addr(), _function_bodies[i].first.raw());         \
          code_writer.emit_prologue(ft, fb.locals, i);                                             \
          imap.on_function_body(code_writer.get_addr());                                           \
@@ -173,16 +173,16 @@ namespace debug_eos_vm
 
    template <typename Backend>
    std::shared_ptr<dwarf::debugger_registration> enable_debug(std::vector<uint8_t>& code,
-                                                              Backend& backend,
-                                                              dwarf::info& dwarf_info,
-                                                              const char* entry)
+                                                              Backend&              backend,
+                                                              dwarf::info&          dwarf_info,
+                                                              const char*           entry)
    {
-      auto& module = backend.get_module();
-      auto func_index = module.get_exported_function(entry);
+      auto& module     = backend.get_module();
+      auto  func_index = module.get_exported_function(entry);
       if (func_index == std::numeric_limits<uint32_t>::max())
          throw std::runtime_error("can not find " + std::string(entry));
       auto& alloc = module.allocator;
-      auto& dbg = backend.get_debug();
+      auto& dbg   = backend.get_debug();
       return dwarf::register_with_debugger(
           dwarf_info, dbg.fn_locs, dbg.instr_locs, alloc.get_code_start(), alloc._code_size,
           (char*)alloc.get_code_start() +

@@ -2,9 +2,9 @@
 
 #include <cctype>
 #include <charconv>
-#include <psio/fracpack.hpp>
 #include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
+#include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
 #include <psio/to_json.hpp>
 #include <set>
@@ -113,7 +113,7 @@ namespace psio
          return "String";
       else if constexpr (is_std_vector<T>::value)
          return "[" + generate_gql_whole_name((typename T::value_type*)nullptr, is_input) + "]";
-      else if constexpr (is_shared_view_ptr<T>::value)
+      else if constexpr (is_shared_view_ptr_v<T>)
          return generate_gql_partial_name((T*)nullptr, is_input);
       else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
          if (is_input)
@@ -136,7 +136,7 @@ namespace psio
          return generate_gql_whole_name((typename T::element_type*)nullptr, is_input, true);
       else if constexpr (is_std_reference_wrapper<T>::value)
          return generate_gql_whole_name((typename T::type*)nullptr, is_input, false);
-      else if constexpr (is_shared_view_ptr<T>::value)
+      else if constexpr (is_shared_view_ptr_v<T>)
          return generate_gql_whole_name((typename T::value_type*)nullptr, is_input, false);
       else if (is_optional)
          return generate_gql_partial_name((T*)nullptr, is_input);
@@ -224,7 +224,7 @@ namespace psio
              using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
              if constexpr (!MemPtr::isFunction)
              {
-                fill_gql_schema((remove_cvref_t<typename MemPtr::ValueType>*)nullptr, stream,
+                fill_gql_schema((std::remove_cvref_t<typename MemPtr::ValueType>*)nullptr, stream,
                                 defined_types, is_input);
              }
           });
@@ -326,7 +326,7 @@ namespace psio
          fill_gql_schema((typename T::type*)nullptr, stream, defined_types, is_input);
       else if constexpr (is_std_vector_v<T>)
          fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
-      else if constexpr (is_shared_view_ptr<T>())
+      else if constexpr (is_shared_view_ptr_v<T>)
          fill_gql_schema((typename T::value_type*)nullptr, stream, defined_types, is_input);
       else if constexpr (reflect<T>::is_struct && !has_get_gql_name<T>::value)
          fill_gql_schema_as((T*)nullptr, (T*)nullptr, stream, defined_types, is_input,
@@ -667,7 +667,7 @@ namespace psio
       if constexpr (i < sizeof...(Args))
       {
          constexpr bool is_optional =
-             is_std_optional<remove_cvref_t<decltype(std::get<i>(args))>>();
+             is_std_optional<std::remove_cvref_t<decltype(std::get<i>(args))>>();
          if constexpr (is_optional)
             filled[i] |= true;
          gql_mark_optional<i + 1>(args, filled);
@@ -687,7 +687,8 @@ namespace psio
          if (i >= arg_names.size())
             return error("mismatched arg names"), false;
 
-         constexpr bool is_opt = is_std_optional_v<remove_cvref_t<decltype(std::get<i>(args))>>;
+         constexpr bool is_opt =
+             is_std_optional_v<std::remove_cvref_t<decltype(std::get<i>(args))>>;
          if (input_stream.current_value != std::data(arg_names)[i])
             return gql_parse_args<i + 1>(args, filled, found, input_stream, error, arg_names);
          input_stream.skip();

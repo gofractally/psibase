@@ -3,8 +3,8 @@
 #include <chrono>
 #include <functional>
 #include <memory>
-#include <vector>
 #include <system_error>
+#include <vector>
 
 namespace psibase::test
 {

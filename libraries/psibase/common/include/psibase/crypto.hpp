@@ -18,7 +18,7 @@ namespace psibase
    template <typename T>
    Checksum256 sha256(const T& obj)
    {
-      auto bin = psio::convert_to_frac(obj);
+      auto bin = psio::to_frac(obj);
       return sha256(bin.data(), bin.size());
    }
 

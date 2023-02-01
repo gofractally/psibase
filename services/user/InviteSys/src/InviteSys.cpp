@@ -17,7 +17,7 @@ using namespace UserService;
 using namespace UserService::Invite;
 using namespace UserService::Errors;
 using namespace SystemService;
-using psio::const_view;
+using psio::view;
 using std::begin;
 using std::end;
 using std::find;
@@ -28,7 +28,7 @@ using std::vector;
 
 InviteSys::InviteSys(psio::shared_view_ptr<psibase::Action> action)
 {
-   MethodNumber m{action->method()->value().get()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
@@ -377,12 +377,37 @@ optional<InviteRecord> InviteSys::getInvite(psibase::PublicKey pubkey)
    return Tables().open<InviteTable>().get(pubkey);
 }
 
+struct SimpleInvite
+{
+   std::string   pubkey;
+   AccountNumber inviter;
+   AccountNumber actor;
+   uint32_t      expiry;
+   bool          newAccountToken;
+   uint8_t       state;
+};
+PSIO_REFLECT(SimpleInvite, pubkey, inviter, actor, expiry, newAccountToken, state);
+
 auto inviteSys = QueryableService<InviteSys::Tables, InviteSys::Events>{InviteSys::service};
 struct Queries
 {
    auto getEventHead(AccountNumber user) const
    {  //
-      return inviteSys.index<Invite::UserEventTable, 0>().get(user);
+      return InviteSys::Tables(InviteSys::service).open<Invite::UserEventTable>().get(user);
+   }
+
+   auto getInvite(string pubkey) const
+   {
+      // TODO: return InviteRecord directly when gql handles public keys
+      auto inv = InviteSys::Tables(InviteSys::service)
+                     .open<InviteTable>()
+                     .get(publicKeyFromString(pubkey));
+
+      if (inv)
+         return std::optional<SimpleInvite>(
+             {pubkey, inv->inviter, inv->actor, inv->expiry, inv->newAccountToken, inv->state});
+
+      return optional<SimpleInvite>{};
    }
 
    auto events() const
@@ -404,6 +429,7 @@ struct Queries
 };
 PSIO_REFLECT(Queries,
              method(getEventHead, user),
+             method(getInvite, pubkey),
              method(events),
              method(userEvents, user, first, after),
              method(serviceEvents, first, after));

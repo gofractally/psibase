@@ -13,6 +13,19 @@ namespace psibase
       raw::setRetval(p.data(), p.size());
    }
 
+   template <typename F, typename T, std::size_t... I>
+   decltype(auto) tuple_call(F&& f, T&& t, std::index_sequence<I...>)
+   {
+      return f(get<I>(std::forward<T>(t))...);
+   }
+
+   template <typename F, typename T>
+   decltype(auto) tuple_call(F&& f, T&& t)
+   {
+      return tuple_call(std::forward<F>(f), std::forward<T>(t),
+                        std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<T>>>());
+   }
+
    /**
     *  This method is called when a service receives a call and will
     *  and will call the proper method on Contact assuming Service has
@@ -40,7 +53,7 @@ namespace psibase
       auto service{makeService()};
 
       bool called = psio::reflect<Service>::get_by_name(
-          act->method()->value(),
+          act->method().value(),
           [&](auto meta, auto member)
           {
              auto member_func  = member(&service);
@@ -48,14 +61,13 @@ namespace psibase
              using param_tuple =
                  decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
 
-             auto param_data = act->rawData()->bytes();
-             psibase::check(
-                 psio::fracvalidate<param_tuple>(param_data, param_data + act->rawData()->bytes_size())
-                     .valid,
-                 "invalid argument encoding");
-             psio::const_view<param_tuple> param_view(param_data);
+             auto param_data = std::span{act->rawData().data(), act->rawData().size()};
+             psibase::check(psio::fracpack_validate<param_tuple>(param_data),
+                            "invalid argument encoding for " + act->method().unpack().str());
 
-             param_view->call(
+             psio::view<const param_tuple> param_view(psio::prevalidated{param_data});
+
+             tuple_call(
                  [&](auto... args)
                  {
                     if constexpr (std::is_same_v<void, result_type>)
@@ -67,10 +79,11 @@ namespace psibase
                        callMethod<result_type, Service, decltype(member_func), decltype(args)...>(
                            service, member_func, std::forward<decltype(args)>(args)...);
                     }
-                 });  // param_view::call
-          });         // reflect::get
+                 },
+                 param_view);
+          });  // reflect::get
       if (!called)
-         abortMessage("unknown service action: " + act->method()->get().str());
+         abortMessage("unknown service action: " + act->method().unpack().str());
       internal::sender = prevSender;
       // psio::member_proxy
    }  // dispatch

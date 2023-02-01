@@ -71,9 +71,9 @@ namespace psibase
          // TODO: full fracpack validate, no unknown, recursive
          //       might be redundant elsewhere?
          auto trxView     = *signedTransaction.transaction;
-         auto actionsView = *trxView.actions();
+         auto actionsView = trxView.actions();
          check(actionsView.size() == 1, "genesis transaction must have exactly 1 action");
-         execGenesisAction(*this, actionsView[0].get());
+         execGenesisAction(*this, actionsView[0]);
          blockContext.needGenesisAction = false;
       }
       else
@@ -106,10 +106,8 @@ namespace psibase
       atrace.action = action;
       try
       {
-         auto& db = self.blockContext.db;
-         // TODO: verify, no extra data
-         auto data = psio::convert_from_frac<GenesisActionData>(
-             {action.rawData.data(), action.rawData.size()});
+         auto& db   = self.blockContext.db;
+         auto  data = psio::from_frac_strict<GenesisActionData>(action.rawData);
          for (auto& service : data.services)
          {
             check(service.service.value, "account 0 is reserved");
@@ -153,7 +151,7 @@ namespace psibase
    {
       // TODO: fracpack validation, allowing new fields in inner transaction. Might be redundant elsewhere?
       auto trxView    = *signedTransaction.transaction;
-      auto claimsView = *trxView.claims();
+      auto claimsView = trxView.claims();
       check(signedTransaction.proofs.size() == claimsView.size(),
             "proofs and claims must have same size");
       auto id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());

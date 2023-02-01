@@ -1,11 +1,12 @@
 #pragma once
+#include <map>
+#include <psio/fracpack.hpp>
 #include <psio/reflect.hpp>
 #include <psio/varint.hpp>
-#include <map>
+#include <psio/view.hpp>
 #include <string>
 #include <variant>
 #include <vector>
-#include <psio/fracpack.hpp>
 
 namespace psio
 {
@@ -82,11 +83,11 @@ namespace psio
    {
       struct member
       {
-         string    name; ///< the member name
-         type_name type; 
-         int32_t   number = 0; ///< the index of the member 
-         uint32_t  offset = 0; ///< the offset to the member from the start of the object
-         uint32_t  size   = 0; ///< the size of the member in the fixed part of object (not in heap)
+         string    name;  ///< the member name
+         type_name type;
+         int32_t   number = 0;  ///< the index of the member
+         uint32_t  offset = 0;  ///< the offset to the member from the start of the object
+         uint32_t  size = 0;  ///< the size of the member in the fixed part of object (not in heap)
 
          template <typename R, typename T, typename... Args>
          void set_params(std::initializer_list<const char*> names, R (T::*method)(Args...))
@@ -113,8 +114,8 @@ namespace psio
          void push_param(std::initializer_list<const char*>::iterator begin,
                          std::initializer_list<const char*>::iterator end)
          {
-            params.push_back(
-                {.name = begin != end ? *begin : "", .type = get_type_name<remove_view_t<std::remove_cv_t<A>>>()});
+            params.push_back({.name = begin != end ? *begin : "",
+                              .type = get_type_name<remove_view_t<std::remove_cv_t<A>>>()});
             if constexpr (sizeof...(Args) > 0)
                push_param<Args...>(begin != end ? ++begin : end, end);
          }
@@ -137,9 +138,10 @@ namespace psio
       }
 
       vector<member> members;
-      uint32_t       size    = 0;      /// size of the object minus the heap
-      uint32_t       min_size = 0;     /// the minimum size of fields excluding heap and excluding the optional fields
-      bool           dynamic  = false;  /// whether or not the object may use the heap
+      uint32_t       size = 0;  /// size of the object minus the heap
+      uint32_t       min_size =
+          0;  /// the minimum size of fields excluding heap and excluding the optional fields
+      bool dynamic = false;  /// whether or not the object may use the heap
    };
 
    using object_member       = object_type::member;
@@ -203,7 +205,7 @@ namespace psio
       bool add_type(schema_type t, L&& on_generate)
       {
          using type = std::remove_cv_t<T>;
-         auto tn = get_type_name<type>();
+         auto tn    = get_type_name<type>();
          if (types.find(tn) == types.end())
          {
             on_generate(static_cast<type*>(nullptr));
@@ -222,7 +224,8 @@ namespace psio
       template <typename L, typename A, typename... Args>
       void generate_variant(const std::tuple<A, Args...>* v, L&& on_generate)
       {
-         if (add_type<std::tuple<std::remove_cv_t<A>, std::remove_cv_t<Args>...>>(tuple_type(), on_generate))
+         if (add_type<std::tuple<std::remove_cv_t<A>, std::remove_cv_t<Args>...>>(tuple_type(),
+                                                                                  on_generate))
          {
             tuple_type vt;
             generate_helper<L, tuple_type, A, Args...>(vt, on_generate);
@@ -253,16 +256,17 @@ namespace psio
          }
       }
 
-
       template <typename T, typename... Ts>
-      void generate() {
+      void generate()
+      {
          generate<T>([](auto) {});
-         if constexpr( sizeof...(Ts) > 0 )
+         if constexpr (sizeof...(Ts) > 0)
             generate<Ts...>();
       }
       template <typename... Ts>
-      void generate_tuple_members( const std::tuple<Ts...>* ) {
-         if constexpr( sizeof...(Ts)  > 0)
+      void generate_tuple_members(const std::tuple<Ts...>*)
+      {
+         if constexpr (sizeof...(Ts) > 0)
             generate<Ts...>();
       }
 
@@ -313,11 +317,9 @@ namespace psio
                              std::decay_t<decltype(static_cast<std::decay_t<T>*>(nullptr)->*m)>;
                          generate<member_type>(on_generate);
 
-                         auto tn   = get_type_name<member_type>();
-                         auto size = fracpack_fixed_size<member_type>();
-                         if constexpr( may_use_heap<member_type>() ) {
-                            size = 4;
-                         }
+                         using is_p = is_packable<member_type>;
+                         auto tn    = get_type_name<member_type>();
+                         auto size  = is_p::fixed_size;
 
                          ot.members.push_back({.name   = r.name,
                                                .type   = tn,
@@ -330,18 +332,17 @@ namespace psio
                       else
                       {
                          using member_type = decltype(result_of(m));
-                         using args_tuple = decltype(tuple_remove_view(args_as_tuple(m)));
-                         generate_tuple_members( (const args_tuple*)nullptr );
+                         using args_tuple  = decltype(tuple_remove_view(args_as_tuple(m)));
+                         generate_tuple_members((const args_tuple*)nullptr);
 
-                         
                          generate<member_type>(on_generate);
                          auto tn = get_type_name<member_type>();
                          ot.members.push_back({.name = r.name, .type = tn, .number = r.number});
                          ot.members.back().set_params(r.param_names, m);
                       }
                    });
-               ot.size  = offset;
-               types[n] = ot;
+               ot.size    = offset;
+               types[n]   = ot;
                ot.dynamic = std::is_final_v<T>;
             }
          }

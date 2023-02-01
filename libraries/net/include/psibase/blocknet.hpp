@@ -54,12 +54,12 @@ namespace psibase::net
       psio::shared_view_ptr<SignedBlock> block;
       std::string                        to_string() const
       {
-         BlockInfo info{*block->block()};
-         return "block: term=" + std::to_string(TermNum{block->block()->header()->term()}) +
-                " leader=" + AccountNumber{block->block()->header()->producer()}.str() +
+         BlockInfo info{block->block()};
+         return "block: term=" + std::to_string(TermNum{block->block().header().term()}) +
+                " leader=" + AccountNumber{block->block().header().producer()}.str() +
                 " id=" + loggers::to_string(info.blockId) +
-                " blocknum=" + std::to_string(BlockNum{block->block()->header()->blockNum()}) +
-                " irreversible=" + std::to_string(BlockNum{block->block()->header()->commitNum()});
+                " blocknum=" + std::to_string(BlockNum{block->block().header().blockNum()}) +
+                " irreversible=" + std::to_string(BlockNum{block->block().header().commitNum()});
       }
    };
    PSIO_REFLECT(BlockMessage, block)
@@ -169,11 +169,11 @@ namespace psibase::net
             {
                return;
             }
-            auto prev = chain().get(Checksum256(b->block()->header()->previous()));
+            auto prev = chain().get(Checksum256(b->block().header().previous()));
             if (prev)
             {
-               connection.hello = {Checksum256(b->block()->header()->previous()),
-                                   BlockNum(b->block()->header()->blockNum()) - 1};
+               connection.hello = {Checksum256(b->block().header().previous()),
+                                   BlockNum(b->block().header().blockNum()) - 1};
             }
             else
             {
@@ -233,7 +233,7 @@ namespace psibase::net
                // what happens if the peer lies, but at least this way we guarantee
                // that our local invariants hold.
                connection.last_received = {request.xid.id(),
-                                           BlockNum(b->block()->header()->blockNum())};
+                                           BlockNum(b->block().header().blockNum())};
             }
             else if (auto* b = chain().get_state(request.xid.id()))
             {

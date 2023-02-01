@@ -22,7 +22,7 @@ namespace SystemService
 
       uint32_t totalAccounts = 0;
       auto     codeIndex     = psibase::TableIndex<psibase::CodeRow, std::tuple<>>{
-                  psibase::CodeRow::db, psio::convert_to_key(codePrefix()), false};
+          psibase::CodeRow::db, psio::convert_to_key(codePrefix()), false};
       if constexpr (enable_print)
          writeConsole("initial accounts: ");
       for (auto it = codeIndex.begin(); it != codeIndex.end(); ++it)
