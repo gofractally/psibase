@@ -20,7 +20,8 @@ namespace UserService
                                                InviteTable,
                                                UserEventTable,
                                                ServiceEventTable,
-                                               InitTable>;
+                                               InitTable,
+                                               psibase::WebContentTable>;
          static constexpr auto service      = SystemService::AccountSys::inviteService;
          static constexpr auto payerAccount = psibase::AccountNumber("invited-sys");
 
@@ -52,6 +53,7 @@ namespace UserService
          std::optional<InviteRecord> getInvite(psibase::PublicKey pubkey);
 
          std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
+         void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
          // clang-format off
       struct Events
@@ -95,6 +97,7 @@ namespace UserService
          method(delExpired, maxDeleted),
          method(getInvite, pubkey),
          method(serveSys, request),
+         method(storeSys, path, contentType, content),
          method(setWhitelist, accounts),
          method(setBlacklist, accounts)
       );

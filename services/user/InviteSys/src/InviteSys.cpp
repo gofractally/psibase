@@ -410,6 +410,9 @@ PSIO_REFLECT(Queries,
 
 auto InviteSys::serveSys(HttpRequest request) -> std::optional<HttpReply>
 {
+   if (auto result = serveContent(request, Tables{getReceiver()}))
+      return result;
+
    if (auto result = serveSimpleUI<InviteSys, true>(request))
       return result;
 
@@ -417,6 +420,13 @@ auto InviteSys::serveSys(HttpRequest request) -> std::optional<HttpReply>
       return result;
 
    return std::nullopt;
+}
+
+void InviteSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
+{
+   psibase::check(psibase::getSender() == psibase::getReceiver(), "wrong sender");
+   psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
+                         Tables{psibase::getReceiver()});
 }
 
 PSIBASE_DISPATCH(UserService::Invite::InviteSys)

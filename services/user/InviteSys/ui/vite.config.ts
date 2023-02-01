@@ -111,7 +111,7 @@ export default defineConfig({
         svgr({ exportAsDefault: true }),
         react(),
         mdPlugin({ mode: [Mode.HTML] }),
-        psibase({ serviceName: "psiboard", server: true }),
+        psibase({ serviceName: "invite-sys", server: true }),
     ],
     resolve: {
         // These aliases are the second stage of translation when locating a local resource.

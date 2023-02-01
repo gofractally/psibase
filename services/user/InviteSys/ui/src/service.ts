@@ -118,7 +118,7 @@ const resIsQueryResponse = (res: unknown): res is QueryResponse => {
  *
  * @param {String} name - The optional id of the query, will otherwise default to the method name.
  */
-export function Qry(name) {
+export function Qry(name?: string) {
     return function (target, key, descriptor) {
         const id = name ? name : key;
         const op = {
@@ -142,6 +142,19 @@ export function Qry(name) {
 
 
 export class PsiboardService extends Service {
+
+    @Qry()
+    getClaim(params) {
+        if (params.method === "acceptCreated") {
+            console.info("HANDLE ACCEPT CREATED!! invite-sys params >>>", params, window.location);
+            // TODO: parse window.location private key token -- similar to what we have in AuthEcSys index.js
+            // return {claim: {
+            //     service: "verifyec-sys",
+            //     rawData: [1,2,3],
+            //   }, pubkey: "PUB_K1_5E7M3LjUpSTGhg5HpSbTgFrb7En9HuwJCBdkZ1wGjWDX7NRFh1" };    
+        }
+        throw new Error("we only generate claims for the `acceptCreated` action");
+    }
 
     @Action('invite-sys')
     delInvite(inviteKey: string) {
