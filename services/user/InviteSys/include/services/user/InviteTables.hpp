@@ -74,5 +74,14 @@ namespace UserService
       using InviteTable =
           psibase::Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::secondary>;
 
+      struct NewAccountRecord
+      {
+         psibase::AccountNumber name;
+         psibase::AccountNumber invitee;
+      };
+      PSIO_REFLECT(NewAccountRecord, name, invitee);
+      using NewAccTable = psibase::Table<NewAccountRecord, &NewAccountRecord::name>;
+
+
    }  // namespace Invite
 }  // namespace UserService

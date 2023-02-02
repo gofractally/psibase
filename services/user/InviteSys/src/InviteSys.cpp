@@ -176,6 +176,12 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    invite->actor = acceptedBy;
    inviteTable.put(*invite);
 
+   // Remember which account is responsible for inviting the new account
+   auto newAccTable = Tables().open<NewAccTable>();
+   auto newAcc      = newAccTable.get(acceptedBy);
+   check(not newAcc.has_value(), accAlreadyExists.data());
+   newAccTable.put(NewAccountRecord{acceptedBy, invite->inviter});
+
    // Emit event
    auto eventTable  = Tables().open<ServiceEventTable>();
    auto eventRecord = eventTable.get(SingletonKey{})
@@ -372,9 +378,28 @@ void InviteSys::setBlacklist(vector<AccountNumber> accounts)
    eventTable.put(eventRecord);
 }
 
-optional<InviteRecord> InviteSys::getInvite(psibase::PublicKey pubkey)
+optional<InviteRecord> InviteSys::getInvite(PublicKey pubkey)
 {
    return Tables().open<InviteTable>().get(pubkey);
+}
+
+bool InviteSys::isExpired(PublicKey pubkey)
+{
+   auto inviteTable = Tables().open<InviteTable>();
+   auto invite      = inviteTable.get(pubkey);
+   check(invite.has_value(), inviteDNE.data());
+
+   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   return now >= invite->expiry;
+}
+
+void InviteSys::checkClaim(AccountNumber actor, PublicKey pubkey)
+{
+   auto invite = getInvite(pubkey);
+   check(invite.has_value(), "This invite does not exist. It may have been deleted after expiry.");
+   check(invite->state == InviteStates::accepted, "invite is not in accepted state");
+   check(invite->actor == actor, "only " + invite->actor.str() + " may accept this invite");
+   check(not isExpired(pubkey), "this invite is expired");
 }
 
 struct SimpleInvite
@@ -410,6 +435,11 @@ struct Queries
       return optional<SimpleInvite>{};
    }
 
+   auto getInviter(psibase::AccountNumber user)
+   {
+      return InviteSys::Tables(InviteSys::service).open<Invite::NewAccTable>().get(user);
+   }
+
    auto events() const
    {  //
       return inviteSys.allEvents();
@@ -430,6 +460,7 @@ struct Queries
 PSIO_REFLECT(Queries,
              method(getEventHead, user),
              method(getInvite, pubkey),
+             method(getInviter, user),
              method(events),
              method(userEvents, user, first, after),
              method(serviceEvents, first, after));
