@@ -605,7 +605,7 @@ namespace psibase::net
          }
          return false;
       }
-      void on_fork_switch(BlockHeader* head)
+      void on_fork_switch(const BlockHeader* head)
       {
          if (!chain().in_best_chain(orderToXid(best_prepare)))
          {

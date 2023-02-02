@@ -150,8 +150,17 @@ struct NodeSet
          }
       }
    }
-   Node&                    operator[](std::size_t idx) { return nodes.at(idx)->node; }
-   boost::asio::io_context& ctx;
+   Node&                  operator[](std::size_t idx) { return nodes.at(idx)->node; }
+   psibase::BlockContext* getBlockContext()
+   {
+      for (auto& n : nodes)
+      {
+         if (auto result = n->node.chain().getBlockContext())
+            return result;
+      }
+      return nullptr;
+   }
+   boost::asio::io_context&                     ctx;
    std::vector<std::unique_ptr<TestNode<Node>>> nodes;
 };
 
@@ -167,6 +176,7 @@ std::ostream& operator<<(std::ostream& os, const NodeSet<Node>& nodes)
 }
 
 void pushTransaction(psibase::BlockContext* ctx, psibase::Transaction trx);
+void setProducers(psibase::BlockContext* ctc, const psibase::Consensus& producers);
 
 void boot(psibase::BlockContext* ctx, const psibase::Consensus& producers);
 

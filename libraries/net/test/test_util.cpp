@@ -102,6 +102,27 @@ void boot(BlockContext* ctx, const Consensus& producers)
                                    .setConsensus(producers)}});
 }
 
+static Tapos getTapos(psibase::BlockContext* ctx)
+{
+   Tapos result;
+   result.expiration.seconds = ctx->current.header.time.seconds + 1;
+   std::memcpy(&result.refBlockSuffix,
+               ctx->current.header.previous.data() + ctx->current.header.previous.size() -
+                   sizeof(result.refBlockSuffix),
+               sizeof(result.refBlockSuffix));
+   result.refBlockIndex = (ctx->current.header.blockNum - 1) & 0x7f;
+   return result;
+}
+
+void setProducers(psibase::BlockContext* ctx, const psibase::Consensus& producers)
+{
+   pushTransaction(
+       ctx,
+       Transaction{.tapos   = getTapos(ctx),
+                   .actions = {transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
+                                   .setConsensus(producers)}});
+}
+
 void runFor(boost::asio::io_context& ctx, mock_clock::duration total_time)
 {
    for (auto end = mock_clock::now() + total_time; mock_clock::now() < end; mock_clock::advance())

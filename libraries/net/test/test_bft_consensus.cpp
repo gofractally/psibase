@@ -1,4 +1,4 @@
-#include <psibase/cft.hpp>
+#include <psibase/bft.hpp>
 
 #include <psibase/fork_database.hpp>
 #include <psibase/log.hpp>
@@ -51,9 +51,10 @@ TEST_CASE("bft random connect/disconnect", "[bft]")
    runFor(ctx, 20s);
 
    auto final_state = nodes[0].chain().get_head_state();
-   // Verify that all three chains are consistent
+   // Verify that all chains are consistent
    CHECK(final_state->blockId() == nodes[1].chain().get_head_state()->blockId());
    CHECK(final_state->blockId() == nodes[2].chain().get_head_state()->blockId());
+   CHECK(final_state->blockId() == nodes[3].chain().get_head_state()->blockId());
    // Verify that the final block looks sane
    mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
    CHECK(final_time <= mock_clock::now());

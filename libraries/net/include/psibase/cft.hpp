@@ -212,7 +212,7 @@ namespace psibase::net
          }
       }
 
-      void on_fork_switch(BlockHeader* new_head)
+      void on_fork_switch(const BlockHeader* new_head)
       {
          if (is_cft() && _state == producer_state::follower && new_head->term == current_term &&
              new_head->blockNum > chain().commit_index())

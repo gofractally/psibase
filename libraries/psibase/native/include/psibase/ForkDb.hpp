@@ -443,17 +443,22 @@ namespace psibase
       template <typename F, typename Accept>
       void async_switch_fork(F&& callback, Accept&& on_accept_block)
       {
-         // Don't switch if we are currently building a block.
-         // TODO: interrupt the current block if it is better than the block being built.
-         if (blockContext)
-         {
-            switchForkCallback = std::move(callback);
-            return;
-         }
          auto pos =
              byOrderIndex.lower_bound(std::tuple(currentTerm + 1, BlockNum(0), Checksum256{}));
          --pos;
          auto new_head = get_state(pos->second);
+         // Also consider the block currently being built, if it exists
+         if (blockContext)
+         {
+            if (!blockContext->needGenesisAction &&
+                byOrderIndex.find(head->order()) != byOrderIndex.end() &&
+                new_head->order() < std::tuple(blockContext->current.header.term,
+                                               blockContext->current.header.blockNum,
+                                               Checksum256{}))
+            {
+               return;
+            }
+         }
          if (head != new_head)
          {
             for (auto i = new_head->blockNum() + 1; i <= head->blockNum(); ++i)
@@ -495,7 +500,7 @@ namespace psibase
                id           = get_prev_id(id);
             }
             head = new_head;
-            callback(&head->info.header);
+            callback(head->info);
          }
       }
       // TODO: somehow prevent poisoning the cache if a malicious peer
@@ -745,14 +750,6 @@ namespace psibase
          if (blockContext->needGenesisAction)
          {
             abort_block();
-            // if we've received blocks while trying to produce, make sure that
-            // we handle them.
-            if (switchForkCallback)
-            {
-               auto callback = std::move(switchForkCallback);
-               // TODO: get rid of this. the caller should handle nullptr and call async_switch_fork instead of calling it here.
-               async_switch_fork(std::move(callback), [](const void*) {});
-            }
             return nullptr;
          }
          try
@@ -761,6 +758,8 @@ namespace psibase
             // If we're not a valid producer for the next block, then
             // we shouldn't have started block production.
             assert(!!claim);
+            // If the head block is changed, the pending block needs to be cancelled.
+            assert(blockContext->current.header.previous == head->blockId());
             auto [revision, id] = blockContext->writeRevision(prover, *claim);
             systemContext->sharedDatabase.setHead(*writer, revision);
             assert(head->blockId() == blockContext->current.header.previous);
@@ -922,7 +921,6 @@ namespace psibase
 
      private:
       std::optional<BlockContext>                               blockContext;
-      std::function<void(BlockHeader*)>                         switchForkCallback;
       SystemContext*                                            systemContext = nullptr;
       WriterPtr                                                 writer;
       CheckedProver                                             prover;
