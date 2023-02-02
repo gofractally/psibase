@@ -14,7 +14,7 @@ import {
     privateStringToKeyPair,
     signatureToFracpack,
 } from "common/keyConversions.mjs";
-import { KeyPairWithAccounts } from "./App";
+import { KeyPair, KeyPairWithAccounts } from "./App";
 
 interface execArgs {
     name?: any;
@@ -72,6 +72,29 @@ export const initAppFn = (setAppInitialized: () => void) =>
                     }
                 },
             },
+            {
+                id: "storeKey",
+                exec: async (keyPair: KeyPair) => {
+                    const keyStore = JSON.parse(
+                        window.localStorage.getItem("keyPairs") || "[]"
+                    );
+
+                    const existingKey = keyStore.find(
+                        (kp: KeyPair) => kp.publicKey === keyPair.publicKey
+                    );
+
+                    // Checks if the key is already in the store
+                    if (existingKey) {
+                        return;
+                    } else {
+                        keyStore.push(keyPair);
+                        window.localStorage.setItem(
+                            "keyPairs",
+                            JSON.stringify(keyStore)
+                        );
+                    }
+                },
+            },
         ]);
         setQueries([
             {
@@ -96,7 +119,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                     interface GetClaimParams {
                         service: string;
                         sender: string;
-                        actionName: string;
+                        method: string;
                         params: any;
                     }
 

@@ -1,4 +1,5 @@
-import { action, AppletId, getJson,  operation, query,  } from "common/rpc.mjs";
+import { publicKeyPairToFracpack, publicKeyPairToString, publicStringToKeyPair } from "common/keyConversions.mjs";
+import { action, AppletId, getJson,  operation, query, uint8ArrayToHex,  } from "common/rpc.mjs";
 
 const OPERATIONS_KEY = 'OPERATIONS_KEY'
 const QUERIES_KEY = 'QUERIES_KEY'
@@ -139,21 +140,33 @@ export function Qry(name?: string) {
     };
 }
 
-
-
 export class PsiboardService extends Service {
 
     @Qry()
-    getClaim(params) {
-        if (params.method === "acceptCreated") {
-            console.info("HANDLE ACCEPT CREATED!! invite-sys params >>>", params, window.location);
-            // TODO: parse window.location private key token -- similar to what we have in AuthEcSys index.js
-            // return {claim: {
-            //     service: "verifyec-sys",
-            //     rawData: [1,2,3],
-            //   }, pubkey: "PUB_K1_5E7M3LjUpSTGhg5HpSbTgFrb7En9HuwJCBdkZ1wGjWDX7NRFh1" };    
+    async getClaim(params) {
+        if (params.method === "acceptCreate") {
+            console.info("HANDLE ACCEPT CREATE!! invite-sys params >>>", params, window.location);
+            const token = params.data.inviteKey;
+            const keyPair = publicStringToKeyPair(token);
+            if (!keyPair) {
+                throw new Error("Invalid invite token");
+            }
+
+            const keyBytes = publicKeyPairToFracpack(keyPair);
+            const pubkey = publicKeyPairToString(keyPair);
+
+            return {
+                claim: {
+                    service: "verifyec-sys",
+                    rawData: uint8ArrayToHex(keyBytes),
+                }, 
+                pubkey
+            };
         }
-        throw new Error("we only generate claims for the `acceptCreated` action");
+        
+        // We only generate claims for the `acceptCreated` action
+        // Applet Queries are REQUIRED to return a value, hence null here
+        return null;
     }
 
     @Action('invite-sys')
@@ -167,8 +180,8 @@ export class PsiboardService extends Service {
     }
 
     @Action('invite-sys', () => 'invited-sys')
-    acceptCreate(inviteKey: string, newAccountName: string, newAccountKey: string) {
-        return { inviteKey, newAccountName, newAccountKey};
+    acceptCreate(inviteKey: string, acceptedBy: string, newAccountKey: string) {
+        return { inviteKey, acceptedBy, newAccountKey};
     }
 
     @Action('invite-sys')

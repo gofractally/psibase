@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useMutation } from "@tanstack/react-query";
-import { KeyType, genKeyPair, privateStringToKeyPair } from "common/keyConversions.mjs";
+import { KeyType, genKeyPair, privateStringToKeyPair, publicKeyPairToString } from "common/keyConversions.mjs";
 import { useForm } from "react-hook-form";
 import type { SubmitHandler, UseFormReturn } from "react-hook-form";
 import { psiboardApplet } from "service";
@@ -43,7 +43,16 @@ export const SignUp = () => {
 
             // const { publicKey } = parsePrivateKey(token);
             console.log('mutation', { token, accountName, publicKey })
-            return psiboardApplet.createAccount({ token, accountName, publicKey});
+            
+            // Token is a private key, so we need to convert it to a public key
+            const tokenKeyPair = privateStringToKeyPair(token);
+            const tokenPublicKey = publicKeyPairToString(tokenKeyPair);
+
+            return psiboardApplet.createAccount({ 
+                token: tokenPublicKey, 
+                accountName, 
+                publicKey
+            });
         },
         onError: () => {
             console.log('errored..')
