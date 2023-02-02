@@ -103,6 +103,25 @@ struct TestNode
    auto& chain() { return node.chain(); }
 };
 
+struct NetworkPartition
+{
+   NetworkPartition() = default;
+   NetworkPartition(const std::vector<std::string_view>& names)
+   {
+      for (auto name : names)
+      {
+         groups.insert({psibase::AccountNumber{name}, 0});
+      }
+   }
+   std::map<psibase::AccountNumber, std::size_t> groups;
+   std::optional<std::size_t>                    operator[](psibase::AccountNumber producer) const
+   {
+      if (auto iter = groups.find(producer); iter != groups.end())
+         return iter->second;
+      return {};
+   }
+};
+
 template <typename Node>
 struct NodeSet
 {
@@ -123,6 +142,19 @@ struct NodeSet
          {
             auto mask = (std::uint64_t(1) << i) | (std::uint64_t(1) << j);
             adjust_connection(nodes[i]->node, nodes[j]->node, (bitset & mask) == mask);
+         }
+      }
+   }
+   void partition(const NetworkPartition& groups)
+   {
+      for (std::size_t i = 0; i < nodes.size(); ++i)
+      {
+         for (std::size_t j = i + 1; j < nodes.size(); ++j)
+         {
+            auto mask = (std::uint64_t(1) << i) | (std::uint64_t(1) << j);
+            auto g1   = groups[nodes[i]->node.producer_name()];
+            auto g2   = groups[nodes[j]->node.producer_name()];
+            adjust_connection(nodes[i]->node, nodes[j]->node, g1 && g2 && *g1 == *g2);
          }
       }
    }
@@ -201,7 +233,7 @@ void setup(NodeSet<N>& nodes, const std::vector<psibase::AccountNumber>& produce
 }
 
 template <typename C, typename N>
-void setup(NodeSet<N>& nodes, const std::initializer_list<std::string_view>& producer_names)
+void setup(NodeSet<N>& nodes, const std::vector<std::string_view>& producer_names)
 {
    std::vector<psibase::AccountNumber> producers;
    for (auto prod : producer_names)

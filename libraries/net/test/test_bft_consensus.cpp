@@ -61,3 +61,43 @@ TEST_CASE("bft random connect/disconnect", "[bft]")
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum == final_state->info.header.blockNum - 2);
 }
+
+std::vector<std::tuple<std::vector<std::string_view>, std::size_t>> bft_quorum = {
+    {{"a"}, 1},
+    {{"a", "b"}, 2},
+    {{"a", "b", "c"}, 3},
+    {{"a", "b", "c", "d"}, 3},
+    {{"a", "b", "c", "d", "e"}, 4},
+    {{"a", "b", "c", "d", "e", "f"}, 5},
+    {{"a", "b", "c", "d", "e", "f", "g"}, 5},
+};
+
+TEST_CASE("bft quorum", "[bft]")
+{
+   TEST_START(logger);
+
+   auto [prods, count] = GENERATE(from_range(bft_quorum));
+   auto activeProds    = prods;
+   activeProds.resize(count);
+
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+
+   setup<BftConsensus>(nodes, prods);
+   nodes.partition(activeProds);
+   runFor(ctx, 20s);
+
+   auto final_state = nodes[0].chain().get_head_state();
+   for (const auto& node : nodes.nodes)
+   {
+      if (count == 1 || !node->node.network()._peers.empty())
+         CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
+      else
+         CHECK(node->chain().get_head_state()->blockId() == Checksum256{});
+   }
+   // Verify that the final block looks sane
+   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   CHECK(final_time <= mock_clock::now());
+   CHECK(final_time >= mock_clock::now() - 2s);
+   CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
+}
