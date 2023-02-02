@@ -3,6 +3,7 @@
 #include <boost/asio/error.hpp>
 
 #include <algorithm>
+#include <iostream>
 #include <mutex>
 
 namespace psibase::test
@@ -45,6 +46,8 @@ namespace psibase::test
             std::make_heap(timer_queue.begin(), timer_queue.end(), timer_queue_compare);
          }
       }
+      std::mt19937              global_random_engine;
+      std::mt19937::result_type global_random_seed = 0;
    }  // namespace
 
    mock_clock::time_point mock_clock::now()
@@ -53,6 +56,10 @@ namespace psibase::test
       return mock_current_time;
    }
 
+   void mock_clock::reset()
+   {
+      reset(time_point());
+   }
    void mock_clock::reset(time_point new_now)
    {
       std::lock_guard l{queue_mutex};
@@ -74,6 +81,12 @@ namespace psibase::test
          process_queue(mock_current_time);
       }
    }
+   std::ostream& operator<<(std::ostream& os, mock_clock::time_point tp)
+   {
+      os << tp.time_since_epoch().count();
+      return os;
+   }
+
    mock_timer::~mock_timer()
    {
       cancel();
@@ -104,5 +117,30 @@ namespace psibase::test
    {
       std::lock_guard l{queue_mutex};
       cancel_timer(_impl);
+   }
+
+   global_random::result_type global_random::operator()()
+   {
+      return global_random_engine();
+   }
+   void global_random::seed(result_type value)
+   {
+      global_random_engine.seed(value);
+   }
+   global_random::result_type global_random::make_seed()
+   {
+      if (global_random_seed)
+      {
+         return global_random_seed;
+      }
+      else
+      {
+         static std::random_device seed_gen;
+         return seed_gen();
+      }
+   }
+   void global_random::set_global_seed(result_type value)
+   {
+      global_random_seed = value;
    }
 }  // namespace psibase::test

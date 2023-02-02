@@ -19,8 +19,59 @@
 using namespace psibase::net;
 using namespace psibase;
 using namespace psibase::test;
+using namespace std::literals::chrono_literals;
 
 using node_type = node<null_link, mock_routing, any_consensus, ForkDb>;
+
+namespace psibase
+{
+   std::ostream& operator<<(std::ostream& os, const CftConsensus& consensus)
+   {
+      os << "CFT:";
+      for (const auto& [name, auth] : consensus.producers)
+      {
+         os << " " << name.str();
+      }
+      return os;
+   }
+
+   std::ostream& operator<<(std::ostream& os, const BftConsensus& consensus)
+   {
+      os << "BFT:";
+      for (const auto& [name, auth] : consensus.producers)
+      {
+         os << " " << name.str();
+      }
+      return os;
+   }
+
+   std::ostream& operator<<(std::ostream& os, const Consensus& consensus)
+   {
+      std::visit([&os](const auto& obj) { os << obj; }, consensus);
+      return os;
+   }
+
+   std::ostream& operator<<(std::ostream& os, const ProducerSet& producers)
+   {
+      if (producers.algorithm == ConsensusAlgorithm::cft)
+      {
+         os << "CFT:";
+      }
+      else if (producers.algorithm == ConsensusAlgorithm::bft)
+      {
+         os << "BFT:";
+      }
+      else
+      {
+         os << "?FT:";
+      }
+      for (const auto& [name, auth] : producers.activeProducers)
+      {
+         os << " " << name.str();
+      }
+      return os;
+   }
+}  // namespace psibase
 
 template <typename C>
 Consensus makeConsensus(std::initializer_list<AccountNumber> names)
@@ -133,17 +184,18 @@ void add_producers(NodeSet<N>& nodes, const Consensus& consensus)
 
 TEST_CASE("producer schedule change", "[bft][cft]")
 {
+   TEST_START(logger);
+
    auto [start, change] = GENERATE(from_range(transitions));
-   using namespace std::literals::chrono_literals;
-   loggers::common_logger logger;
-   logger.add_attribute("Host", boost::log::attributes::constant(std::string{"main"}));
+   INFO("initial consensus: " << start);
+   INFO("changed consensus: " << change);
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
    add_producers(nodes, start);
    nodes.connect_all();
    boot(nodes.getBlockContext(), start);
-
    runFor(ctx, 15s);
+
    add_producers(nodes, change);
    setProducers(nodes.getBlockContext(), change);
    nodes.connect_all();

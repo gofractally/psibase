@@ -210,3 +210,11 @@ void setup(NodeSet<N>& nodes, const std::initializer_list<std::string_view>& pro
 }
 
 void runFor(boost::asio::io_context& ctx, psibase::test::mock_clock::duration total_time);
+
+#define TEST_START(logger)                                                              \
+   psibase::loggers::common_logger logger;                                              \
+   logger.add_attribute("Host", boost::log::attributes::constant(std::string{"main"})); \
+   auto seed = psibase::test::global_random::make_seed();                               \
+   INFO("seed: " << seed);                                                              \
+   psibase::test::global_random::seed(seed);                                            \
+   psibase::test::mock_clock::reset();

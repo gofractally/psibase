@@ -2,7 +2,9 @@
 
 #include <chrono>
 #include <functional>
+#include <iosfwd>
 #include <memory>
+#include <random>
 #include <system_error>
 #include <vector>
 
@@ -28,6 +30,8 @@ namespace psibase::test
       static void           advance(duration);
       static void           advance();
    };
+
+   std::ostream& operator<<(std::ostream&, mock_clock::time_point);
 
    struct mock_timer
    {
@@ -57,4 +61,27 @@ namespace psibase::test
       std::shared_ptr<impl> _impl;
       void                  cancel();
    };
+
+   struct global_random
+   {
+      using result_type = std::mt19937::result_type;
+      static constexpr auto min() { return std::mt19937::min(); }
+      static constexpr auto max() { return std::mt19937::max(); }
+      result_type           operator()();
+      static void           seed(result_type value);
+      static result_type    make_seed();
+      static void           set_global_seed(result_type value);
+   };
 }  // namespace psibase::test
+
+namespace psibase::net
+{
+   template <typename T>
+   struct random_source;
+   template <>
+   struct random_source<psibase::test::mock_timer>
+   {
+      using type = psibase::test::global_random;
+   };
+
+}  // namespace psibase::net

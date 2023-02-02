@@ -18,14 +18,14 @@
 using namespace psibase::net;
 using namespace psibase;
 using namespace psibase::test;
+using namespace std::literals::chrono_literals;
 
 using node_type = node<null_link, mock_routing, bft_consensus, ForkDb>;
 
 TEST_CASE("bft random connect/disconnect", "[bft]")
 {
-   using namespace std::literals::chrono_literals;
-   loggers::common_logger logger;
-   logger.add_attribute("Host", boost::log::attributes::constant(std::string{"main"}));
+   TEST_START(logger);
+
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
 

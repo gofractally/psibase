@@ -18,21 +18,21 @@
 using namespace psibase::net;
 using namespace psibase;
 using namespace psibase::test;
+using namespace std::literals::chrono_literals;
 
 using node_type = node<null_link, mock_routing, cft_consensus, ForkDb>;
 
 TEST_CASE("cft random connect/disconnect", "[cft]")
 {
-   using namespace std::literals::chrono_literals;
-   loggers::common_logger logger;
-   logger.add_attribute("Host", boost::log::attributes::constant(std::string{"main"}));
+   TEST_START(logger);
+
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
 
    setup<CftConsensus>(nodes, {"a", "b", "c"});
 
-   timer_type   timer(ctx);
-   std::mt19937 rng;
+   timer_type    timer(ctx);
+   global_random rng;
    loop(timer, 10s,
         [&]()
         {
