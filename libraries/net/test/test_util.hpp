@@ -120,30 +120,61 @@ struct NetworkPartition
          return iter->second;
       return {};
    }
+   // generates a single connected subset of nodes. Each producer is included
+   // in the subset with probability p.
+   static auto subset(std::uniform_random_bit_generator auto& rng, double p = 0.5)
+   {
+      return [&rng, p](const std::vector<psibase::AccountNumber>& producers)
+      {
+         NetworkPartition            result;
+         std::bernoulli_distribution dist(p);
+         for (auto producer : producers)
+         {
+            if (dist(rng))
+               result.groups.insert({producer, 0});
+         }
+         return result;
+      };
+   }
+   // Splits the producers into two disjoint connected subsets of approximately equal size.
+   static auto split(std::uniform_random_bit_generator auto& rng)
+   {
+      return [&rng](const std::vector<psibase::AccountNumber>& prods)
+      {
+         NetworkPartition result;
+         std::size_t      count = prods.size() / 2;
+         std::size_t      n     = prods.size();
+         for (const auto& prod : prods)
+         {
+            std::uniform_int_distribution<std::size_t> dist(0, n - 1);
+            if (dist(rng) < count)
+            {
+               result.groups.insert({prod, 0});
+               --count;
+            }
+            else
+            {
+               result.groups.insert({prod, 1});
+            }
+            --n;
+         }
+         return result;
+      };
+   }
 };
+
+std::ostream& operator<<(std::ostream& os, const NetworkPartition&);
 
 template <typename Node>
 struct NodeSet
 {
-   explicit NodeSet(boost::asio::io_context& ctx) : ctx(ctx) {}
+   explicit NodeSet(boost::asio::io_context& ctx) : ctx(ctx)
+   {
+      logger.add_attribute("Host", boost::log::attributes::constant(std::string{"main"}));
+   }
    void add(psibase::AccountNumber producer)
    {
       nodes.push_back(std::make_unique<TestNode<Node>>(ctx, producer));
-   }
-   template <typename Engine>
-   void randomize(Engine& rng)
-   {
-      assert(nodes.size() < 64);
-      std::uniform_int_distribution dist{std::uint64_t{0}, (std::uint64_t(1) << nodes.size()) - 1};
-      auto                          bitset = dist(rng);
-      for (std::size_t i = 0; i < nodes.size(); ++i)
-      {
-         for (std::size_t j = i + 1; j < nodes.size(); ++j)
-         {
-            auto mask = (std::uint64_t(1) << i) | (std::uint64_t(1) << j);
-            adjust_connection(nodes[i]->node, nodes[j]->node, (bitset & mask) == mask);
-         }
-      }
    }
    void partition(const NetworkPartition& groups)
    {
@@ -157,6 +188,17 @@ struct NodeSet
             adjust_connection(nodes[i]->node, nodes[j]->node, g1 && g2 && *g1 == *g2);
          }
       }
+      PSIBASE_LOG(logger, info) << "connected nodes:" << groups;
+   }
+   template <std::invocable<std::vector<psibase::AccountNumber>> F>
+   void partition(F&& f)
+   {
+      std::vector<psibase::AccountNumber> prods;
+      for (const auto& node : nodes)
+      {
+         prods.push_back(node->node.producer_name());
+      }
+      partition(f(std::move(prods)));
    }
    static void adjust_connection(Node& lhs, Node& rhs, bool connect)
    {
@@ -194,6 +236,7 @@ struct NodeSet
    }
    boost::asio::io_context&                     ctx;
    std::vector<std::unique_ptr<TestNode<Node>>> nodes;
+   psibase::loggers::common_logger              logger;
 };
 
 template <typename Node>

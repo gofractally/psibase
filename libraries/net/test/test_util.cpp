@@ -130,3 +130,47 @@ void runFor(boost::asio::io_context& ctx, mock_clock::duration total_time)
       ctx.poll();
    }
 }
+
+void printAccounts(std::ostream& os, const std::vector<AccountNumber>& producers)
+{
+   bool first = true;
+   for (AccountNumber producer : producers)
+   {
+      if (first)
+         first = false;
+      else
+         os << ' ';
+      os << producer.str();
+   }
+}
+
+std::ostream& operator<<(std::ostream& os, const NetworkPartition& obj)
+{
+   std::map<std::size_t, std::vector<AccountNumber>> groups;
+   for (auto [producer, group] : obj.groups)
+   {
+      groups[group].push_back(producer);
+   }
+   for (auto iter = groups.begin(), end = groups.end(); iter != end;)
+   {
+      if (iter->second.size() > 1)
+         ++iter;
+      else
+         iter = groups.erase(iter);
+   }
+   if (groups.size() == 1)
+   {
+      os << " ";
+      printAccounts(os, groups.begin()->second);
+   }
+   else
+   {
+      for (const auto& [_, group] : groups)
+      {
+         os << " {";
+         printAccounts(os, group);
+         os << "}";
+      }
+   }
+   return os;
+}

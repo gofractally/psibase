@@ -22,7 +22,7 @@ using namespace std::literals::chrono_literals;
 
 using node_type = node<null_link, mock_routing, bft_consensus, ForkDb>;
 
-TEST_CASE("bft random connect/disconnect", "[bft]")
+TEST_CASE("bft crash", "[bft]")
 {
    TEST_START(logger);
 
@@ -31,14 +31,9 @@ TEST_CASE("bft random connect/disconnect", "[bft]")
 
    setup<BftConsensus>(nodes, {"a", "b", "c", "d"});
 
-   timer_type   timer(ctx);
-   std::mt19937 rng;
-   loop(timer, 10s,
-        [&]()
-        {
-           nodes.randomize(rng);
-           PSIBASE_LOG(logger, info) << "connected nodes:" << nodes;
-        });
+   timer_type    timer(ctx);
+   global_random rng;
+   loop(timer, 10s, [&]() { nodes.partition(NetworkPartition::subset(rng, 0.67)); });
    // This should result in a steady stream of empty blocks
    runFor(ctx, 5min);
    ctx.poll();
@@ -95,6 +90,39 @@ TEST_CASE("bft quorum", "[bft]")
       else
          CHECK(node->chain().get_head_state()->blockId() == Checksum256{});
    }
+   // Verify that the final block looks sane
+   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   CHECK(final_time <= mock_clock::now());
+   CHECK(final_time >= mock_clock::now() - 2s);
+   CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
+}
+
+TEST_CASE("bft partition", "[bft]")
+{
+   TEST_START(logger);
+
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+
+   setup<BftConsensus>(nodes, {"a", "b", "c", "d"});
+
+   timer_type    timer(ctx);
+   global_random rng;
+   loop(timer, 15s, [&]() { nodes.partition(NetworkPartition::split(rng)); });
+   // This may advance the chain, but should not be expected to
+   runFor(ctx, 10min);
+   ctx.poll();
+   timer.cancel();
+   ctx.poll();
+
+   PSIBASE_LOG(logger, info) << "Final sync";
+   // Make all nodes active
+   nodes.connect_all();
+   runFor(ctx, 20s);
+
+   auto final_state = nodes[0].chain().get_head_state();
+   for (const auto& node : nodes.nodes)
+      CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
    // Verify that the final block looks sane
    mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
    CHECK(final_time <= mock_clock::now());
