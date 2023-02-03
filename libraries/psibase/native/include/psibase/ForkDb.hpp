@@ -431,7 +431,10 @@ namespace psibase
             if (prev != states.end() && prev->second.invalid)
             {
                current->second.invalid = true;
-               iter                    = byOrderIndex.erase(iter);
+            }
+            if (current->second.invalid)
+            {
+               iter = byOrderIndex.erase(iter);
             }
             else
             {
