@@ -68,12 +68,35 @@ struct TempDir
    std::filesystem::path path;
 };
 
+struct WasmMemoryCache
+{
+   std::vector<std::vector<psibase::ExecutionMemory>> memories;
+   void                                               init(psibase::SystemContext& ctx)
+   {
+      if (!memories.empty())
+      {
+         ctx.executionMemories = std::move(memories.back());
+         memories.pop_back();
+      }
+   }
+   void cleanup(psibase::SystemContext& ctx)
+   {
+      if (!ctx.executionMemories.empty())
+         memories.push_back(std::move(ctx.executionMemories));
+   }
+   static WasmMemoryCache& instance()
+   {
+      static WasmMemoryCache result;
+      return result;
+   }
+};
+
 struct TempDatabase
 {
    TempDatabase()
        : dir("psibase-test"),
          sharedState{std::make_shared<psibase::SharedState>(
-             psibase::SharedDatabase{dir.path.native(), true},
+             psibase::SharedDatabase{dir.path.native(), true, 1'000'000ul, 27, 27, 27, 27},
              psibase::WasmCache{16})}
    {
    }
@@ -95,6 +118,12 @@ struct TestNode
       node.network().logger.add_attribute("Host", attr);
       node.set_producer_id(producer);
       node.load_producers();
+      WasmMemoryCache::instance().init(*system);
+   }
+   ~TestNode()
+   {
+      WasmMemoryCache::instance().cleanup(*system);
+      db.sharedState->addSystemContext(std::move(system));
    }
    TempDatabase                            db;
    std::unique_ptr<psibase::SystemContext> system;
