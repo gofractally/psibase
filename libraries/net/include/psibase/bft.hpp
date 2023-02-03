@@ -272,7 +272,8 @@ namespace psibase::net
       std::vector<TermNum> producer_views;
 
       Timer                     _new_term_timer;
-      std::chrono::milliseconds _timeout = std::chrono::seconds(10);
+      std::chrono::milliseconds _timeout       = std::chrono::seconds(10);
+      std::chrono::milliseconds _timeout_delta = std::chrono::seconds(5);
 
       template <typename ExecutionContext>
       explicit basic_bft_consensus(ExecutionContext& ctx) : Base(ctx), _new_term_timer(ctx)
@@ -476,13 +477,18 @@ namespace psibase::net
       {
          if (_state == producer_state::follower || _state == producer_state::leader)
          {
-            // TODO: increase timeout if no progress since last timeout
             _new_term_timer.expires_after(_timeout);
             _new_term_timer.async_wait(
                 [this, old_term = current_term](const std::error_code& ec)
                 {
                    if (!ec && old_term == current_term)
                    {
+                      auto committed = chain().get_block_by_num(chain().commit_index());
+                      if (committed && committed->block().header().term() < current_term)
+                      {
+                         // If we have not committed a block in the current term, increase the block timer
+                         _timeout += _timeout_delta;
+                      }
                       increase_view();
                       start_timer();
                    }

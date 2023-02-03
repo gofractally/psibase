@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <deque>
 #include <functional>
 #include <iosfwd>
 #include <memory>
@@ -60,6 +61,25 @@ namespace psibase::test
       };
       std::shared_ptr<impl> _impl;
       void                  cancel();
+   };
+
+   struct mock_execution_context
+   {
+      using clock_type = mock_clock;
+      using duration   = clock_type::duration;
+      using time_point = clock_type::time_point;
+      ~mock_execution_context();
+      template <typename ExecutionContext, typename F>
+      void post_after(ExecutionContext& ctx, duration delay, F&& f)
+      {
+         while (!impl.empty() && impl.front()->callbacks.empty())
+            impl.pop_front();
+         mock_timer timer(ctx);
+         timer.expires_after(delay);
+         timer.async_wait(std::forward<F>(f));
+         impl.push_back(std::move(timer._impl));
+      }
+      std::deque<std::shared_ptr<mock_timer::impl>> impl;
    };
 
    struct global_random

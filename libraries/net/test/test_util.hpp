@@ -190,6 +190,18 @@ struct NetworkPartition
          return result;
       };
    }
+   static auto all()
+   {
+      return [](const std::vector<psibase::AccountNumber>& prods)
+      {
+         NetworkPartition result;
+         for (const auto& prod : prods)
+         {
+            result.groups.insert({prod, 0});
+         }
+         return result;
+      };
+   }
 };
 
 std::ostream& operator<<(std::ostream& os, const NetworkPartition&);
@@ -205,7 +217,14 @@ struct NodeSet
    {
       nodes.push_back(std::make_unique<TestNode<Node>>(ctx, producer));
    }
-   void partition(const NetworkPartition& groups)
+   void add(const std::vector<psibase::AccountNumber>& producers)
+   {
+      for (auto producer : producers)
+      {
+         add(producer);
+      }
+   }
+   void partition(const NetworkPartition& groups, psibase::test::mock_clock::duration latency = {})
    {
       for (std::size_t i = 0; i < nodes.size(); ++i)
       {
@@ -214,22 +233,25 @@ struct NodeSet
             auto mask = (std::uint64_t(1) << i) | (std::uint64_t(1) << j);
             auto g1   = groups[nodes[i]->node.producer_name()];
             auto g2   = groups[nodes[j]->node.producer_name()];
-            adjust_connection(nodes[i]->node, nodes[j]->node, g1 && g2 && *g1 == *g2);
+            adjust_connection(nodes[i]->node, nodes[j]->node, g1 && g2 && *g1 == *g2, latency);
          }
       }
       PSIBASE_LOG(logger, info) << "connected nodes:" << groups;
    }
    template <std::invocable<std::vector<psibase::AccountNumber>> F>
-   void partition(F&& f)
+   void partition(F&& f, psibase::test::mock_clock::duration latency = {})
    {
       std::vector<psibase::AccountNumber> prods;
       for (const auto& node : nodes)
       {
          prods.push_back(node->node.producer_name());
       }
-      partition(f(std::move(prods)));
+      partition(f(std::move(prods)), latency);
    }
-   static void adjust_connection(Node& lhs, Node& rhs, bool connect)
+   static void adjust_connection(Node&                               lhs,
+                                 Node&                               rhs,
+                                 bool                                connect,
+                                 psibase::test::mock_clock::duration latency)
    {
       if (lhs.has_peer(&rhs))
       {
@@ -237,21 +259,16 @@ struct NodeSet
          {
             lhs.remove_peer(&rhs);
          }
+         // TODO: adjust latency
       }
       else if (connect)
       {
-         lhs.add_peer(&rhs);
+         lhs.add_peer(&rhs, latency);
       }
    }
-   void connect_all()
+   void connect_all(psibase::test::mock_clock::duration latency = {})
    {
-      for (std::size_t i = 0; i < nodes.size(); ++i)
-      {
-         for (std::size_t j = i + 1; j < nodes.size(); ++j)
-         {
-            adjust_connection(nodes[i]->node, nodes[j]->node, true);
-         }
-      }
+      partition(NetworkPartition::all(), latency);
    }
    Node&                  operator[](std::size_t idx) { return nodes.at(idx)->node; }
    psibase::BlockContext* getBlockContext()
@@ -282,6 +299,9 @@ std::ostream& operator<<(std::ostream& os, const NodeSet<Node>& nodes)
 void pushTransaction(psibase::BlockContext* ctx, psibase::Transaction trx);
 void setProducers(psibase::BlockContext* ctc, const psibase::Consensus& producers);
 
+std::vector<psibase::AccountNumber> makeAccounts(
+    const std::vector<std::string_view>& producer_names);
+
 void boot(psibase::BlockContext* ctx, const psibase::Consensus& producers);
 
 template <typename C>
@@ -293,6 +313,12 @@ void boot(psibase::BlockContext* ctx, const std::vector<psibase::AccountNumber>&
       consensus.producers.push_back({account});
    }
    boot(ctx, consensus);
+}
+
+template <typename C>
+void boot(psibase::BlockContext* ctx, const std::vector<std::string_view>& names)
+{
+   boot<C>(ctx, makeAccounts(names));
 }
 
 template <typename C, typename N>

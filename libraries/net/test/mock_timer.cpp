@@ -58,13 +58,9 @@ namespace psibase::test
 
    void mock_clock::reset()
    {
-      reset(time_point());
-   }
-   void mock_clock::reset(time_point new_now)
-   {
       std::lock_guard l{queue_mutex};
-      mock_current_time = new_now;
-      process_queue(new_now);
+      mock_current_time = {};
+      timer_queue.clear();
    }
    void mock_clock::advance(mock_clock::duration diff)
    {
@@ -117,6 +113,15 @@ namespace psibase::test
    {
       std::lock_guard l{queue_mutex};
       cancel_timer(_impl);
+   }
+
+   mock_execution_context::~mock_execution_context()
+   {
+      std::lock_guard l{queue_mutex};
+      for (auto& p : impl)
+      {
+         cancel_timer(p);
+      }
    }
 
    global_random::result_type global_random::operator()()

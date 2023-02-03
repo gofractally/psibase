@@ -54,6 +54,15 @@ void pushTransaction(BlockContext* ctx, Transaction trx)
    ctx->pushTransaction(strx, trace, std::nullopt);
 }
 
+std::vector<psibase::AccountNumber> makeAccounts(
+    const std::vector<std::string_view>& producer_names)
+{
+   std::vector<psibase::AccountNumber> result;
+   for (auto prod : producer_names)
+      result.push_back(psibase::AccountNumber{prod});
+   return result;
+}
+
 void boot(BlockContext* ctx, const Consensus& producers)
 {
    // TransactionSys + ProducerSys + AuthAnySys + AccountSys
@@ -129,6 +138,7 @@ void runFor(boost::asio::io_context& ctx, mock_clock::duration total_time)
    {
       ctx.poll();
    }
+   ctx.poll();
 }
 
 void printAccounts(std::ostream& os, const std::vector<AccountNumber>& producers)

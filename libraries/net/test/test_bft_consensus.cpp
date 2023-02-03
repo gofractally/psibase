@@ -129,3 +129,46 @@ TEST_CASE("bft partition", "[bft]")
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
 }
+
+TEST_CASE("bft latency", "[bft]")
+{
+   TEST_START(logger);
+
+   auto latency = GENERATE(150ms, 450ms, 900ms, 1050ms, 2100ms, 3450ms, 7650ms, 10350ms, 15450ms);
+
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+   auto                    producers = makeAccounts({"a", "b", "c", "d"});
+   nodes.add(producers);
+   nodes.partition(NetworkPartition::all(), latency);
+   boot<BftConsensus>(nodes.getBlockContext(), producers);
+
+   runFor(ctx, 5min);
+
+   // The producers are not guaranteed to be perfectly in sync
+   for (const auto& node : nodes.nodes)
+   {
+      auto final_state = node->chain().get_head_state();
+      // Verify that the final block looks sane
+      mock_clock::time_point final_time{
+          std::chrono::seconds{final_state->info.header.time.seconds}};
+      CHECK(final_time <= mock_clock::now());
+      CHECK(final_time >= mock_clock::now() - 2s - latency);
+      auto irreversible = node->chain().get_block_by_num(final_state->info.header.commitNum);
+      mock_clock::time_point irreversible_time{
+          std::chrono::seconds{irreversible->block().header().time().seconds()}};
+      CHECK(final_time - irreversible_time >= 3 * latency);
+      CHECK(final_time - irreversible_time <= 3 * latency + 2s);
+   }
+   // Check consistency
+   for (const auto& node1 : nodes.nodes)
+   {
+      auto commit1 = node1->chain().commit_index();
+      for (const auto& node2 : nodes.nodes)
+      {
+         auto commit2    = node2->chain().commit_index();
+         auto min_commit = std::min(commit1, commit2);
+         CHECK(node1->chain().get_block_id(min_commit) == node1->chain().get_block_id(min_commit));
+      }
+   }
+}
