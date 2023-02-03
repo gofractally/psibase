@@ -376,6 +376,7 @@ namespace psibase::net
             _block_timer.cancel();
             PSIBASE_LOG(consensus().logger, info) << "Stopping block production";
             chain().abort_block();
+            _state = producer_state::follower;
             // Handles the case where there is a block that is better than the
             // current head, but worse than the pending block that was aborted.
             switch_fork();
@@ -387,8 +388,8 @@ namespace psibase::net
          // TODO: if we are the current leader, finish the
          // current block and try to hand off leadership before
          // shutting down.
-         _state = producer_state::shutdown;
          stop_leader();
+         _state = producer_state::shutdown;
       }
 
       // The block broadcast algorithm is most independent of consensus.
