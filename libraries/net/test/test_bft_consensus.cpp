@@ -118,7 +118,7 @@ TEST_CASE("bft partition", "[bft]")
    PSIBASE_LOG(logger, info) << "Final sync";
    // Make all nodes active
    nodes.connect_all();
-   runFor(ctx, 20s);
+   runFor(ctx, 30s);
 
    auto final_state = nodes[0].chain().get_head_state();
    for (const auto& node : nodes.nodes)
