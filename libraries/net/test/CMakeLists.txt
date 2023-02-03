@@ -18,19 +18,19 @@ target_include_directories(test_consensus PUBLIC ../include)
 target_link_libraries(test_consensus PUBLIC catch2 psibase services_system)
 
 add_test(
-    NAME "test_consensus"
+    NAME test_consensus
     WORKING_DIRECTORY ${ROOT_BINARY_DIR}
     COMMAND test_consensus "[combined]"
 )
 
 add_test(
-    NAME "test_consensus (CFT)"
+    NAME test_consensus-cft
     WORKING_DIRECTORY ${ROOT_BINARY_DIR}
     COMMAND test_consensus "[cft]"
 )
 
 add_test(
-    NAME "test_consensus (BFT)"
+    NAME test_consensus-bft
     WORKING_DIRECTORY ${ROOT_BINARY_DIR}
     COMMAND test_consensus "[bft]"
 )
