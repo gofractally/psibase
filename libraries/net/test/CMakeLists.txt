@@ -18,9 +18,21 @@ target_include_directories(test_consensus PUBLIC ../include)
 target_link_libraries(test_consensus PUBLIC catch2 psibase services_system)
 
 add_test(
-    NAME test_consensus
+    NAME "test_consensus"
     WORKING_DIRECTORY ${ROOT_BINARY_DIR}
-    COMMAND test_consensus
+    COMMAND test_consensus "[combined]"
+)
+
+add_test(
+    NAME "test_consensus (CFT)"
+    WORKING_DIRECTORY ${ROOT_BINARY_DIR}
+    COMMAND test_consensus "[cft]"
+)
+
+add_test(
+    NAME "test_consensus (BFT)"
+    WORKING_DIRECTORY ${ROOT_BINARY_DIR}
+    COMMAND test_consensus "[bft]"
 )
 
 #add_executable(test_direct_routing test_direct_routing.cpp mock_timer.cpp)

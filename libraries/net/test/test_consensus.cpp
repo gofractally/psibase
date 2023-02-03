@@ -182,7 +182,7 @@ void add_producers(NodeSet<N>& nodes, const Consensus& consensus)
        consensus);
 }
 
-TEST_CASE("producer schedule change", "[bft][cft]")
+TEST_CASE("producer schedule change", "[combined]")
 {
    TEST_START(logger);
 
