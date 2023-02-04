@@ -1,21 +1,62 @@
 #define CATCH_CONFIG_MAIN
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/commonErrors.hpp>
+#include <services/user/CoreFractalSys.hpp>
 #include <services/user/FractalSys.hpp>
+#include <services/user/InviteSys.hpp>
 
 using namespace psibase;
 using namespace UserService;
 using namespace UserService::Errors;
 using namespace UserService::Fractal;
 
+namespace
+{
+   auto invPub  = publicKeyFromString("PUB_K1_7jTdMYEaHi66ZEcrh7To9XKingVkRdBuz6abm3meFbGw8zFFve");
+   auto invPriv = privateKeyFromString("PVT_K1_ZGRNZ4qwN1Ei9YEyVBr1aBGekAxC5FKVPR3rQA2HnEhvqviF2");
+
+   auto userPub  = publicKeyFromString("PUB_K1_5Dcj42CYrYpPMpCPWPzBSpM9gThV5ywAPdbYgiL2JUxGrnVUbn");
+   auto userPriv = privateKeyFromString("PVT_K1_SjmZ1DKTPNZFnfPEPwGb9rt3CAuwAoqYjZf5UoM4Utwm5dJW3");
+}  // namespace
+
 SCENARIO("Creating a fractal")
 {
    GIVEN("Default chain setup")
    {
-      THEN("Alice can create a fractal") {}
+      DefaultTestChain t;
+
+      auto alice      = t.from(t.add_account("alice"_a));
+      auto fractalSys = t.from(FractalSys::service);
+      auto coreFrac   = t.from(CoreFractalSys::service);
+      auto a          = alice.to<FractalSys>();
+
+      THEN("Alice can create an identity in fractal-sys")
+      {
+         auto createIdentity = a.createIdentity();
+         REQUIRE(createIdentity.succeeded());
+      }
+      THEN("Alice can create a fractal")
+      {
+         a.createIdentity();
+         auto createFractal =
+             a.newFractal("astronauts"_a, CoreFractalSys::service, "Astronaut Club");
+         CHECK(createFractal.succeeded());
+      }
       WHEN("Alice creates a fractal")
       {
-         THEN("Bob cannot create a fractal with the same name") {}
+         a.createIdentity();
+         a.newFractal("astronauts"_a, CoreFractalSys::service, "Astronaut Club");
+
+         THEN("Bob cannot create a fractal with the same name")
+         {
+            auto bob = t.from(t.add_account("bob"_a));
+            auto b   = bob.to<FractalSys>();
+            b.createIdentity();
+
+            auto newFrac =
+                b.newFractal("astronauts"_a, CoreFractalSys::service, "Astronaut Club 2!");
+            CHECK(newFrac.failed("already exists"));
+         }
       }
    }
 }
@@ -24,13 +65,68 @@ SCENARIO("Inviting people to a fractal")
 {
    GIVEN("Alice has a fractal")
    {
-      THEN("Alice can invite a user to the fractal") {}
+      DefaultTestChain t;
+
+      auto alice      = t.from(t.add_account("alice"_a));
+      auto bob        = t.from(t.add_ec_account("bob"_a, userPub));
+      auto fractalSys = t.from(FractalSys::service);
+      auto coreFrac   = t.from(CoreFractalSys::service);
+      auto fractal    = "astronauts"_a;
+
+      auto a = alice.to<FractalSys>();
+      a.createIdentity();
+      a.newFractal(fractal, CoreFractalSys::service, "Astronaut Club");
+
+      THEN("Alice can invite a user to the fractal")
+      {
+         auto invite = a.invite(fractal, invPub);
+         CHECK(invite.succeeded());
+      }
       WHEN("Alice invites a user to the fractal")
       {
-         THEN("Bob can join the fractal") {}
-         WHEN("Bob joins the fractal")
+         a.invite(fractal, invPub);
+         KeyList userAndInviteKeys{{userPub, userPriv}, {invPub, invPriv}};
+         KeyList userKeys{{userPub, userPriv}};
+
+         THEN("Bob can claim the invite")
          {
-            THEN("Bob is a member of the fractal") {}
+            auto acceptInvite = bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
+            CHECK(acceptInvite.succeeded());
+
+            auto claim = bob.with(userKeys).to<FractalSys>().claim(invPub);
+            CHECK(claim.succeeded());
+         }
+         WHEN("Bob claims the invite")
+         {
+            bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
+            bob.with(userKeys).to<FractalSys>().claim(invPub);
+
+            THEN("Bob has a fractal-sys identity")
+            {
+               auto identity = a.getIdentity(bob).returnVal();
+               CHECK(identity.has_value());
+               CHECK(identity->name == bob.id);
+            }
+            THEN("Bob can accept the invite")
+            {
+               auto accept = bob.with(userKeys).to<FractalSys>().accept(invPub);
+               CHECK(accept.succeeded());
+            }
+         }
+         WHEN("Bob accepts the invite to a fractal")
+         {
+            bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
+
+            auto b = bob.with(userKeys).to<FractalSys>();
+            b.claim(invPub);
+            b.accept(invPub);
+
+            THEN("Bob is a member of the fractal")
+            {
+               auto member = a.getMember(bob, fractal).returnVal();
+               CHECK(member.has_value());
+               CHECK(member->inviter == alice.id);
+            }
             THEN("No one else can join using that invite")
             THEN("The invite no longer exists in invite-sys") {}
          }
@@ -103,7 +199,9 @@ SCENARIO("Meetings start/end time & registration")
       {
          THEN("No one may register outside one hour before the scheduled meeting time") {}
          THEN("Anyone may register for a meeting up to 1 hour before the scheduled time") {}
-         THEN("No one may call the meetingStarted action before the meeting start time is reached")
+         THEN(
+             "No one may call the meetingStarted action before the meeting start time is "
+             "reached")
          {
          }
          THEN("Anyone may call the meetingStarted action after the meeting start time is reached")
