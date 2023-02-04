@@ -63,14 +63,7 @@ namespace UserService
 
          auto secondary() const { return std::tie(inviter, pubkey); }
       };
-      PSIO_REFLECT(InviteRecord,
-                   pubkey,
-                   inviter,
-                   actor,
-                   expiry,
-                   newAccountToken,
-                   state,
-                   method(secondary));
+      PSIO_REFLECT(InviteRecord, pubkey, inviter, actor, expiry, newAccountToken, state);
       using InviteTable =
           psibase::Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::secondary>;
 
@@ -81,7 +74,6 @@ namespace UserService
       };
       PSIO_REFLECT(NewAccountRecord, name, invitee);
       using NewAccTable = psibase::Table<NewAccountRecord, &NewAccountRecord::name>;
-
 
    }  // namespace Invite
 }  // namespace UserService

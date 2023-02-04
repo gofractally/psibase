@@ -43,7 +43,7 @@ void InviteSys::init()
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
-   // Register serveSys handler
+   // Register with proxy
    to<SystemService::ProxySys>().registerServer(InviteSys::service);
 
    // Configure manual debit for self on Token and NFT
@@ -402,17 +402,6 @@ void InviteSys::checkClaim(AccountNumber actor, PublicKey pubkey)
    check(not isExpired(pubkey), "this invite is expired");
 }
 
-struct SimpleInvite
-{
-   std::string   pubkey;
-   AccountNumber inviter;
-   AccountNumber actor;
-   uint32_t      expiry;
-   bool          newAccountToken;
-   uint8_t       state;
-};
-PSIO_REFLECT(SimpleInvite, pubkey, inviter, actor, expiry, newAccountToken, state);
-
 auto inviteSys = QueryableService<InviteSys::Tables, InviteSys::Events>{InviteSys::service};
 struct Queries
 {
@@ -423,16 +412,9 @@ struct Queries
 
    auto getInvite(string pubkey) const
    {
-      // TODO: return InviteRecord directly when gql handles public keys
-      auto inv = InviteSys::Tables(InviteSys::service)
-                     .open<InviteTable>()
-                     .get(publicKeyFromString(pubkey));
-
-      if (inv)
-         return std::optional<SimpleInvite>(
-             {pubkey, inv->inviter, inv->actor, inv->expiry, inv->newAccountToken, inv->state});
-
-      return optional<SimpleInvite>{};
+      return InviteSys::Tables(InviteSys::service)
+          .open<InviteTable>()
+          .get(publicKeyFromString(pubkey));
    }
 
    auto getInviter(psibase::AccountNumber user)
