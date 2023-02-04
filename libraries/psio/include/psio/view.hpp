@@ -72,6 +72,8 @@ namespace psio
        get_packed_offsets((typename psio::reflect<T>::struct_tuple_type*)nullptr,
                           psio::reflect<T>::definitionWillNotChange ? 0 : 2);
 
+   inline const char empty_optional[4] = {1, 0, 0, 0};
+
    template <typename Ch>
    struct frac_proxy_view : view_base<Ch>
    {
@@ -85,6 +87,19 @@ namespace psio
              view<std::conditional_t<std::is_const_v<Ch>, const member_type, member_type>>;
 
          constexpr uint32_t offset = fixed_offsets<class_type>[idx];
+
+         if constexpr (is_packable<member_type>::is_optional &&
+                       !psio::reflect<class_type>::definitionWillNotChange)
+         {
+            std::uint16_t fixed_size;
+            std::uint32_t pos = 0;
+            (void)unpack_numeric<false>(&fixed_size, this->data, pos, 2);
+            if (fixed_size <= offset)
+            {
+               // The const_cast is safe because only a non-empty optional can be modified through a view.
+               return result_type{prevalidated{const_cast<Ch*>(empty_optional)}};
+            }
+         }
 
          auto out_ptr = this->data + offset;
 
@@ -344,7 +359,22 @@ namespace psio
    {
       using member_type = std::tuple_element_t<I, T>;
       using result_type = view<member_type>;
-      auto out_ptr = static_cast<view_base<T>&>(v).data + fixed_offsets<std::remove_cv_t<T>>[I];
+
+      constexpr auto offset = fixed_offsets<std::remove_cv_t<T>>[I];
+
+      if constexpr (is_packable<std::remove_cv_t<member_type>>::is_optional)
+      {
+         std::uint16_t fixed_size;
+         std::uint32_t pos = 0;
+         (void)unpack_numeric<false>(&fixed_size, static_cast<view_base<T>&>(v).data, pos, 2);
+         if (fixed_size <= offset)
+         {
+            // The const_cast is safe because only a non-empty optional can be modified through a view.
+            return result_type{prevalidated{const_cast<char_ptr<member_type>>(empty_optional)}};
+         }
+      }
+
+      auto out_ptr = static_cast<view_base<T>&>(v).data + offset;
 
       if constexpr (is_packable<std::remove_cv_t<member_type>>::is_optional ||
                     !is_packable<std::remove_cv_t<member_type>>::is_variable_size)

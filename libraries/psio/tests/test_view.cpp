@@ -54,18 +54,21 @@ TEST_CASE("u8 view", "[view]")
 
 TEST_CASE("tuple view", "[view]")
 {
-   std::tuple t{std::uint8_t(42), std::optional{std::uint8_t{43}}, std::vector{std::uint8_t{44}}};
+   std::tuple t{std::uint8_t(42), std::optional{std::uint8_t{43}}, std::vector{std::uint8_t{44}},
+                std::optional<std::uint8_t>{}};
    test_view(t,
              [&](auto v)
              {
                 CHECK(get<0>(v) == 42);
                 CHECK(*get<1>(v) == 43);
                 CHECK(get<2>(v).front() == 44);
+                CHECK(!get<3>(v));
                 CHECK(v.unpack() == t);
-                auto [v0, v1, v2] = v;
+                auto [v0, v1, v2, v3] = v;
                 CHECK(v0 == 42);
                 CHECK(*v1 == 43);
                 CHECK(v2.front() == 44);
+                CHECK(!v3);
              });
    test_mutate(
        t,
@@ -76,32 +79,38 @@ TEST_CASE("tuple view", "[view]")
           get<2>(v).front() = 0xEE;
        },
        std::tuple{std::uint8_t(0xCC), std::optional{std::uint8_t{0xDD}},
-                  std::vector{std::uint8_t{0xEE}}});
+                  std::vector{std::uint8_t{0xEE}}, std::optional<std::uint8_t>{}});
 }
 
 struct struct0
 {
-   std::uint8_t v0;
-   std::uint8_t v1;
-   friend bool  operator==(const struct0&, const struct0&) = default;
+   std::uint8_t                v0;
+   std::optional<std::uint8_t> v1;
+   std::vector<std::uint8_t>   v2;
+   std::optional<std::uint8_t> v3;
+   friend bool                 operator==(const struct0&, const struct0&) = default;
 };
-PSIO_REFLECT(struct0, v0, v1)
+PSIO_REFLECT(struct0, v0, v1, v2, v3)
 
 TEST_CASE("struct view", "[view]")
 {
-   test_view(struct0{42, 127},
+   test_view(struct0{42, 43, {44}},
              [](auto v)
              {
                 CHECK(v.v0() == 42);
-                CHECK(v.v1() == 127);
+                CHECK(*v.v1() == 43);
+                CHECK(v.v2().front() == 44);
+                CHECK(!v.v3());
              });
    test_mutate(
+       struct0{0, 0, {0}},
        [](auto v)
        {
-          v.v0() = 0xFF;
-          v.v1() = 0xCC;
+          v.v0()         = 0xFF;
+          *v.v1()        = 0xCC;
+          v.v2().front() = 0xBB;
        },
-       struct0{0xFF, 0xCC});
+       struct0{0xFF, 0xCC, {0xBB}});
 }
 
 TEST_CASE("optional view", "[view]")
@@ -130,14 +139,14 @@ TEST_CASE("optional view", "[view]")
              {
                 CHECK(v.has_value());
                 CHECK(v->v0() == 42);
-                CHECK(v->v1() == 127);
+                CHECK(*v->v1() == 127);
              });
    test_mutate(
-       std::optional{struct0{}},
+       std::optional{struct0{0, 0}},
        [](auto v)
        {
-          v->v0() = 0xCC;
-          v->v1() = 0xFF;
+          v->v0()  = 0xCC;
+          *v->v1() = 0xFF;
        },
        std::optional{struct0{0xCC, 0xFF}});
 }
@@ -242,6 +251,6 @@ TEST_CASE("shared_view_ptr view", "[view]")
              {
                 CHECK(!!v);
                 CHECK(v->v0() == 42);
-                CHECK(v->v1() == 127);
+                CHECK(*v->v1() == 127);
              });
 }

@@ -2803,6 +2803,8 @@ namespace psibase::loggers
       {
          obj.impl.reset(new Config::Impl);
       }
+      // Ensure that the format and filter parsers are initialized
+      log_config::instance();
       from_json_object(stream,
                        [&](std::string_view key)
                        {

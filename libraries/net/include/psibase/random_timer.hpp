@@ -6,6 +6,12 @@
 
 namespace psibase::net
 {
+   template <typename T>
+   struct random_source
+   {
+      using type = std::random_device;
+   };
+
    /**
     * This timer triggers a callback when a randomly chosen duration within
     * a range passes without the timer having been restarted.
@@ -60,6 +66,6 @@ namespace psibase::net
       duration                                    _duration;
       time_point                                  _expiration;
       std::function<void(const std::error_code&)> _callback;
-      std::random_device                          _rng;
+      typename random_source<Timer>::type         _rng;
    };
 }  // namespace psibase::net
