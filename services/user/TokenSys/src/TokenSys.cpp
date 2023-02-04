@@ -102,9 +102,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    auto tokenIdx   = tokenTable.getIndex<0>();
    auto nftService = to<NftSys>();
 
-   // Todo - replace with auto incrementing when available
    TID newId = (tokenIdx.begin() == tokenIdx.end()) ? 1 : (*(--tokenIdx.end())).id + 1;
-
    Precision::fracpack_validate(precision);  // Todo remove if/when happens automatically
    check(TokenRecord::isValidKey(newId), invalidTokenId);
    check(maxSupply.value > 0, supplyGt0);

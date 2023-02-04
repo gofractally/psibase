@@ -22,6 +22,7 @@ namespace UserService
       constexpr std::string_view onlyWhitelisted = "Only whitelisted accounts can create invites";
       constexpr std::string_view noBlacklisted = "Blacklisted accounts cannot create invites";
       constexpr std::string_view whitelistIsSet = "Cannot modify blacklist while whitelist is set";
+      constexpr std::string_view accAlreadyExists = "Account already exists. This should never happen.";
 
       // AuthInviteSys
       constexpr std::string_view restrictedService =

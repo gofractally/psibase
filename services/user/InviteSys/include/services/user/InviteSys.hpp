@@ -29,6 +29,7 @@ namespace UserService
                                                UserEventTable,
                                                ServiceEventTable,
                                                InitTable,
+                                               NewAccTable,
                                                psibase::WebContentTable>;
          /// "invite-sys"
          static constexpr auto service = SystemService::AccountSys::inviteService;
@@ -89,6 +90,21 @@ namespace UserService
          /// record corresponding to the provided 'pubkey' public key
          std::optional<InviteRecord> getInvite(psibase::PublicKey pubkey);
 
+         /// Called synchronously by other services to query whether the invite
+         /// record corresponding to the provided `pubkey` public key is expired
+         bool isExpired(psibase::PublicKey pubkey);
+
+         /// Called synchronously by other services to query whether the specified
+         /// actor should be allowed to claim the invite specified by the `pubkey`
+         /// public key.
+         ///
+         /// To be considered a valid interaction, the following criteria must be met:
+         /// * The invite must exist
+         /// * The invite must be in the accepted state
+         /// * The invite actor must be the same as the specified `actor` parameter
+         /// * The invite must not be expired
+         void checkClaim(psibase::AccountNumber actor, psibase::PublicKey pubkey);
+
          /// Called by the proxy-sys system service when an HttpRequest
          /// is directed at this invite service
          std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
@@ -137,6 +153,8 @@ namespace UserService
          method(delInvite, inviteKey),
          method(delExpired, maxDeleted),
          method(getInvite, pubkey),
+         method(isExpired, pubkey),
+         method(checkClaim, actor, pubkey),
          method(serveSys, request),
          method(storeSys, path, contentType, content),
          method(setWhitelist, accounts),
