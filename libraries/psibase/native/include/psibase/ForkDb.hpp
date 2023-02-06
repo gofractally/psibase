@@ -453,8 +453,13 @@ namespace psibase
          // Also consider the block currently being built, if it exists
          if (blockContext)
          {
-            if (!blockContext->needGenesisAction &&
+            if (  // We should always abandon an unbooted chain
+                !blockContext->needGenesisAction &&
+                // If the previous head block is no longer viable, we need
+                // to abort the pending block regardless of block ordering.
                 byOrderIndex.find(head->order()) != byOrderIndex.end() &&
+                // The block id of the pending block is still unknown.  Only
+                // keep the pending block if it is definitely better than new_head.
                 new_head->order() < std::tuple(blockContext->current.header.term,
                                                blockContext->current.header.blockNum,
                                                Checksum256{}))

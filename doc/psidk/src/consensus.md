@@ -57,14 +57,14 @@ BFT consensus has the following properties:
 
 ### Block Production
 
-Blocks are produced by the leader. Leader selection is round-robin.
+Blocks are produced by the leader. Leader selection is round-robin. The producer should build off a chain that includes the best block that has been prepared by 2f+1 producers.
 
 ### Irreversibility
 
 - Blocks are ordered first by term, then by block height.
 - Blocks go through two rounds of confirmation, prepare and commit. Each producer broadcasts its confirmations to all other producer nodes.
 - A producer can only commit a block that has been prepared by 2f+1 producers.
-- If a producer commits a block A it can only prepare a conflicting block B that is better than A if at least 2f+1 nodes have already prepared an ancestor of B that is better than A.
+- If a producer commits a block A, it can only prepare a conflicting block B that is better than A if at least 2f+1 nodes have already prepared an ancestor of B that is better than A.
 - A block is considered irreversible if it has been committed by 2f+1 nodes.
 
 ### View Change
@@ -100,4 +100,4 @@ The leader is selected from the old producers. The new producers commit, but do 
 
 ### BFT → BFT
 
-The leader is selected from the old producers. Committing a block and advancing irreversibility require quorums of both the old and the new producers. Switching forks is permitted if a quorum of either the old or the new producers have prepared the new fork.
+The leader is selected from the old producers. Committing a block and advancing irreversibility require quorums of both the old and the new producers. Switching forks after a commit is permitted if a quorum of either the old or the new producers have prepared the new fork.

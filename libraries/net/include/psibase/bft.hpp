@@ -568,6 +568,7 @@ namespace psibase::net
                {
                   stop_leader();
                   _state = producer_state::follower;
+                  Base::switch_fork();
                }
             }
          }
@@ -628,6 +629,9 @@ namespace psibase::net
             {
                best_prepared = state->order();
                chain().set_subtree(state);
+               // Fork switch handled by caller. It cannot be handled
+               // here because we might already by in the process of
+               // switching forks
             }
             if (can_commit(state))
             {
@@ -709,7 +713,6 @@ namespace psibase::net
                verify_commit(state);
                // This is possible if we receive the commits before the corresponding prepares
                chain().set_subtree(state);
-               Base::switch_fork();
             }
             else if (chain().commit(state->blockNum()))
             {
@@ -875,6 +878,7 @@ namespace psibase::net
          validate_producer(state, msg.data->producer(), msg.data->signer());
          // TODO: should we update the sender's view here? same for commit.
          on_prepare(state, msg.data->producer(), msg);
+         Base::switch_fork();
       }
       void recv(peer_id peer, const SignedMessage<CommitMessage>& msg)
       {
@@ -885,6 +889,7 @@ namespace psibase::net
          }
          validate_producer(state, msg.data->producer(), msg.data->signer());
          on_commit(state, msg.data->producer(), msg);
+         Base::switch_fork();
       }
 
       void recv(peer_id peer, const ViewChangeMessage& msg)

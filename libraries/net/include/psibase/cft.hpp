@@ -167,7 +167,7 @@ namespace psibase::net
             if (active_producers[0]->size() == 0 && !active_producers[1])
             {
                _election_timer.cancel();
-               stop_leader();
+               stop_leader("Stopping boot block production");
                _state = producer_state::unknown;
             }
          }
@@ -297,19 +297,21 @@ namespace psibase::net
       {
          if (term > current_term)
          {
-            if (_state == producer_state::leader)
-            {
-               match_index[0].clear();
-               match_index[1].clear();
-               stop_leader();
-               randomize_timer();
-            }
             votes_for_me[0].clear();
             votes_for_me[1].clear();
             current_term = term;
             chain().setTerm(current_term);
             voted_for = null_producer;
-            if (_state == producer_state::leader || _state == producer_state::candidate)
+            if (_state == producer_state::leader)
+            {
+               match_index[0].clear();
+               match_index[1].clear();
+               stop_leader();
+               _state = producer_state::follower;
+               randomize_timer();
+               Base::switch_fork();
+            }
+            else if (_state == producer_state::candidate)
             {
                _state = producer_state::follower;
             }
