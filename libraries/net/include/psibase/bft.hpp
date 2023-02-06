@@ -595,6 +595,33 @@ namespace psibase::net
          }
       }
 
+      void do_view_change(AccountNumber producer, const Claim& claim, TermNum term)
+      {
+         if (producer_views.empty())
+         {
+            // Not a producer
+            return;
+         }
+         // ignore unexpected view changes. We can fail to recognize a valid
+         // view change due to being ahead or behind other nodes.
+         if (auto expected = active_producers[0]->getClaim(producer))
+         {
+            if (*expected == claim)
+            {
+               set_producer_view(term, producer);
+               auto view_copy = producer_views;
+               auto offset    = active_producers[0]->size() * 2 / 3;
+               // if > 1/3 are ahead of current view trigger view change
+               std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
+               if (view_copy[offset] > current_term)
+               {
+                  set_view(view_copy[offset]);
+                  start_timer();
+               }
+            }
+         }
+      }
+
       // track best committed, best prepared, best prepared on different fork
       bool can_prepare(const BlockHeaderState* state)
       {
@@ -649,6 +676,7 @@ namespace psibase::net
             if (state->order() > best_prepared)
             {
                best_prepared = state->order();
+               set_view(state->info.header.term);
                chain().set_subtree(state);
                // Fork switch handled by caller. It cannot be handled
                // here because we might already by in the process of
@@ -665,14 +693,14 @@ namespace psibase::net
          const auto& id = state->blockId();
          assert(chain().in_best_chain(state->xid()));
          best_prepare = state->order();
-         for_each_key(
-             [&](const auto& key)
-             {
-                auto message = network().sign_message(
-                    PrepareMessage{.block_id = id, .producer = self, .signer = key});
-                on_prepare(state, self, message);
-                network().multicast_producers(message);
-             });
+         for_each_key(state,
+                      [&](const auto& key)
+                      {
+                         auto message = network().sign_message(
+                             PrepareMessage{.block_id = id, .producer = self, .signer = key});
+                         on_prepare(state, self, message);
+                         network().multicast_producers(message);
+                      });
       }
       void save_commit_data(const BlockHeaderState* state)
       {
@@ -733,6 +761,7 @@ namespace psibase::net
             {
                verify_commit(state);
                // This is possible if we receive the commits before the corresponding prepares
+               set_view(state->info.header.term);
                chain().set_subtree(state);
             }
             else if (chain().commit(state->blockNum()))
@@ -744,14 +773,14 @@ namespace psibase::net
       void do_commit(const BlockHeaderState* state, AccountNumber producer)
       {
          const auto& id = state->blockId();
-         for_each_key(
-             [&](const auto& key)
-             {
-                auto message = network().sign_message(
-                    CommitMessage{.block_id = id, .producer = self, .signer = key});
-                on_commit(state, self, message);
-                network().multicast_producers(message);
-             });
+         for_each_key(state,
+                      [&](const auto& key)
+                      {
+                         auto message = network().sign_message(
+                             CommitMessage{.block_id = id, .producer = self, .signer = key});
+                         on_commit(state, self, message);
+                         network().multicast_producers(message);
+                      });
       }
       std::optional<std::vector<char>> makeBlockData(const BlockHeaderState* state)
       {
@@ -905,7 +934,7 @@ namespace psibase::net
             return;
          }
          validate_producer(state, msg.data->producer(), msg.data->signer());
-         // TODO: should we update the sender's view here? same for commit.
+         do_view_change(msg.data->producer(), msg.data->signer(), state->info.header.term);
          on_prepare(state, msg.data->producer(), msg);
          Base::switch_fork();
       }
@@ -917,35 +946,14 @@ namespace psibase::net
             return;
          }
          validate_producer(state, msg.data->producer(), msg.data->signer());
+         do_view_change(msg.data->producer(), msg.data->signer(), state->info.header.term);
          on_commit(state, msg.data->producer(), msg);
          Base::switch_fork();
       }
 
       void recv(peer_id peer, const ViewChangeMessage& msg)
       {
-         if (producer_views.empty())
-         {
-            // Not a producer
-            return;
-         }
-         // ignore unexpected view changes. We can fail to recognize a valid
-         // view change due to being ahead or behind other nodes.
-         if (auto expected = active_producers[0]->getClaim(msg.producer))
-         {
-            if (*expected == msg.signer)
-            {
-               set_producer_view(msg.term, msg.producer);
-               auto view_copy = producer_views;
-               auto offset    = active_producers[0]->size() * 2 / 3;
-               // if > 1/3 are ahead of current view trigger view change
-               std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
-               if (view_copy[offset] > current_term)
-               {
-                  set_view(view_copy[offset]);
-                  start_timer();
-               }
-            }
-         }
+         do_view_change(msg.producer, msg.signer, msg.term);
       }
    };
 

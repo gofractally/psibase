@@ -324,6 +324,23 @@ namespace psibase::net
             }
          }
       }
+      template <typename F>
+      void for_each_key(const BlockHeaderState* state, F&& f)
+      {
+         auto claim0 = state->producers->getClaim(self);
+         if (claim0)
+         {
+            f(*claim0);
+         }
+         if (state->nextProducers)
+         {
+            auto claim1 = state->nextProducers->getClaim(self);
+            if (claim1 && claim0 != claim1)
+            {
+               f(*claim1);
+            }
+         }
+      }
 
       // \pre _state == leader
       // \pre no pending block
