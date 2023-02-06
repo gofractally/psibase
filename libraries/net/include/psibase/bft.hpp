@@ -757,6 +757,10 @@ namespace psibase::net
       {
          if (state->producers->algorithm == ConsensusAlgorithm::bft)
          {
+            // This may be empty if the last committed block is not BFT.
+            // In that case, the block data is never required, because
+            // a block that changes consensus cannot come before the
+            // current consensus goes live.
             return chain().getBlockData(chain().get_block_id(state->info.header.commitNum));
          }
          else
@@ -845,6 +849,10 @@ namespace psibase::net
                // once we track the verify service code in the block headers.
                auto verifyState = chain().get_state(chain().get_block_id(chain().commit_index()));
                verifyIrreversibleSignature(verifyState->revision, data, committed);
+               if (committed->producers->algorithm == ConsensusAlgorithm::bft)
+               {
+                  chain().setBlockData(committed->blockId(), *aux);
+               }
                // Ensure that the committed block is a candidate for the best block
                set_view(committed->info.header.term);
                if (!chain().in_best_chain(committed->xid()))

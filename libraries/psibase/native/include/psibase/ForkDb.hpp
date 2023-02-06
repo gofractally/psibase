@@ -623,7 +623,23 @@ namespace psibase
       {
          auto newCommitIndex = std::max(std::min(num, head->blockNum()), commitIndex);
          auto result         = newCommitIndex != commitIndex;
-         commitIndex         = newCommitIndex;
+         for (auto i = commitIndex; i < newCommitIndex; ++i)
+         {
+            auto id    = get_block_id(i);
+            auto state = get_state(id);
+            // A block that needs proof of irreversibility is not necessarily
+            // committed itself.
+            if (state->needsIrreversibleSignature() && !getBlockData(id))
+            {
+               auto pos = blocks.find(id);
+               assert(pos != blocks.end());
+               if (pos->second->auxConsensusData())
+               {
+                  setBlockData(id, *pos->second->auxConsensusData());
+               }
+            }
+         }
+         commitIndex = newCommitIndex;
          return result;
       }
 
