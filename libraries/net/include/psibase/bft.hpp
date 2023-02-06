@@ -396,6 +396,14 @@ namespace psibase::net
          return Base::is_sole_producer();
       }
 
+      std::size_t get_leader_index(TermNum term)
+      {
+         if (auto num_producers = active_producers[0]->size())
+            return term % num_producers;
+         else
+            return 0;
+      }
+
       static bool is_leader(const ProducerSet& producers, TermNum term, AccountNumber prod)
       {
          auto num_producers = producers.size();
@@ -533,6 +541,17 @@ namespace psibase::net
              });
       }
 
+      // Skip terms whose leaders have already advanced to a later view
+      TermNum skip_advanced_leaders(TermNum new_term)
+      {
+         // Skip terms whose leaders have already advanced
+         while (producer_views[get_leader_index(new_term)] > new_term)
+         {
+            ++new_term;
+         }
+         return new_term;
+      }
+
       void increase_view()
       {
          auto threshold = producer_views.size() * 2 / 3 + 1;
@@ -540,7 +559,7 @@ namespace psibase::net
                            [current_term = current_term](auto v)
                            { return v >= current_term; }) >= threshold)
          {
-            set_view(current_term + 1);
+            set_view(skip_advanced_leaders(current_term + 1));
          }
          else
          {
@@ -613,9 +632,11 @@ namespace psibase::net
                auto offset    = active_producers[0]->size() * 2 / 3;
                // if > 1/3 are ahead of current view trigger view change
                std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
-               if (view_copy[offset] > current_term)
+               auto new_term = std::max(view_copy[offset], current_term);
+               new_term      = skip_advanced_leaders(new_term);
+               if (new_term > current_term)
                {
-                  set_view(view_copy[offset]);
+                  set_view(new_term);
                   start_timer();
                }
             }

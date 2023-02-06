@@ -73,7 +73,7 @@ Each producer maintains a view change timer to detect failure in the leader. The
 
 - After initiating a view change, a producer will not restart the view change timer until it sees 2f+1 view change messages.
 - Consecutive view changes during which the chain does not make progress, cause the view change timeout to increase by a flat amount for each view change after the first.
-- A view change will trigger immediately if at least f+1 producers are in a later term. This view change is independent of the view change timer and may skip terms.
+- A view change will trigger immediately if the leader of the current term or at least f+1 other producers are in a later term. This view change is independent of the view change timer and may skip terms.
 
 ### Messages
 

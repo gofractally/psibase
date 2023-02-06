@@ -182,7 +182,7 @@ void add_producers(NodeSet<N>& nodes, const Consensus& consensus)
        consensus);
 }
 
-TEST_CASE("producer schedule change", "[combined]")
+TEST_CASE("joint consensus", "[combined]")
 {
    TEST_START(logger);
 
@@ -211,4 +211,48 @@ TEST_CASE("producer schedule change", "[combined]")
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
    CHECK(!final_state->nextProducers);
    CHECK(*final_state->producers == ProducerSet(change));
+}
+
+TEST_CASE("joint consensus crash", "[combined]")
+{
+   TEST_START(logger);
+
+   auto [start, change] = GENERATE(from_range(transitions));
+   INFO("initial consensus: " << start);
+   INFO("changed consensus: " << change);
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+   add_producers(nodes, start);
+   nodes.connect_all();
+   boot(nodes.getBlockContext(), start);
+   runFor(ctx, 15s);
+
+   timer_type    timer(ctx);
+   global_random rng;
+   setProducers(nodes.getBlockContext(), change);
+   add_producers(nodes, change);
+   nodes.partition(NetworkPartition::subset(rng));
+   loop(timer, 10s, [&]() { nodes.partition(NetworkPartition::subset(rng)); });
+
+   runFor(ctx, 2min);
+   timer.cancel();
+   ctx.poll();
+
+   nodes.connect_all();
+   runFor(ctx, 15s);
+
+   auto final_state = nodes[0].chain().get_head_state();
+   for (const auto& node : nodes.nodes)
+      CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
+   // Verify that the final block looks sane
+   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   CHECK(final_time <= mock_clock::now());
+   CHECK(final_time >= mock_clock::now() - 2s);
+   CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
+   CHECK(!final_state->nextProducers);
+   // Whether the change actually happens depends on how the network is partitioned
+   // TODO: Once we have better transaction handling, the change should always
+   // take effect.
+   CHECK_THAT((std::vector{ProducerSet(start), ProducerSet(change)}),
+              Catch::Matchers::VectorContains(*final_state->producers));
 }
