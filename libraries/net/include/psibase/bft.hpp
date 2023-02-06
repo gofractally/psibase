@@ -409,6 +409,7 @@ namespace psibase::net
       void cancel()
       {
          _new_term_timer.cancel();
+         producer_views.clear();
          Base::cancel();
       }
       void set_producers(
@@ -417,14 +418,19 @@ namespace psibase::net
          if (prods.first->algorithm != ConsensusAlgorithm::bft)
          {
             _new_term_timer.cancel();
+            producer_views.clear();
             return Base::set_producers(std::move(prods));
          }
          bool start_bft =
-             active_producers[0] && active_producers[0]->algorithm != ConsensusAlgorithm::bft;
+             !active_producers[0] || active_producers[0]->algorithm != ConsensusAlgorithm::bft;
          if (start_bft)
          {
             PSIBASE_LOG(logger, info) << "Switching consensus: BFT";
             Base::cancel();
+            if (_state == producer_state::candidate)
+            {
+               _state = producer_state::follower;
+            }
          }
          bool new_producers = !active_producers[0] || *active_producers[0] != *prods.first;
          if ((_state == producer_state::leader || _state == producer_state::follower) &&
@@ -461,15 +467,27 @@ namespace psibase::net
             }
             set_producer_view(current_term, self);
          }
-         else if (_state != producer_state::shutdown)
+         else
          {
-            if (_state != producer_state::nonvoting)
+            producer_views.clear();
+            if (_state != producer_state::shutdown)
             {
-               PSIBASE_LOG(logger, info) << "Node is non-voting";
-               _new_term_timer.cancel();
-               stop_leader();
+               if (_state != producer_state::nonvoting)
+               {
+                  PSIBASE_LOG(logger, info) << "Node is non-voting";
+                  _new_term_timer.cancel();
+                  stop_leader();
+               }
+               _state = producer_state::nonvoting;
             }
-            _state = producer_state::nonvoting;
+         }
+         if (_state == producer_state::leader || _state == producer_state::follower)
+         {
+            assert(producer_views.size() == active_producers[0]->size());
+         }
+         else
+         {
+            assert(producer_views.empty());
          }
       }
 
@@ -541,8 +559,11 @@ namespace psibase::net
             PSIBASE_LOG(logger, info) << "view change: " << term;
             current_term = term;
             chain().setTerm(current_term);
-            broadcast_current_term();
-            set_producer_view(term, self);
+            if (_state == producer_state::leader || _state == producer_state::follower)
+            {
+               broadcast_current_term();
+               set_producer_view(term, self);
+            }
          }
       }
 
