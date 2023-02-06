@@ -342,6 +342,38 @@ namespace psibase::net
          }
       }
 
+      void validate_producer(BlockHeaderState* state, AccountNumber producer, const Claim& claim)
+      {
+         bool found = false;
+         if (auto claim0 = state->producers->getClaim(producer))
+         {
+            found = true;
+            if (claim == *claim0)
+            {
+               return;
+            }
+         }
+         if (state->nextProducers)
+         {
+            if (auto claim1 = state->nextProducers->getClaim(producer))
+            {
+               found = true;
+               if (claim == *claim1)
+               {
+                  return;
+               }
+            }
+         }
+         if (!found)
+         {
+            throw std::runtime_error(producer.str() + " is not an active producer");
+         }
+         else
+         {
+            throw std::runtime_error("Wrong key for " + producer.str());
+         }
+      }
+
       // \pre _state == leader
       // \pre no pending block
       // \post pending block

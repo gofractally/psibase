@@ -107,6 +107,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
+      using Base::validate_producer;
       using typename Base::producer_state;
       enum class confirm_type
       {
@@ -347,39 +348,6 @@ namespace psibase::net
          auto pos = confirmations.find(state->blockId());
          return pos != confirmations.end() &&
                 (pos->second.confirmed(confirm_type::commit) || pos->second.committedByBlock);
-      }
-
-      void validate_producer(BlockHeaderState* state, AccountNumber producer, const Claim& claim)
-      {
-         bool found           = false;
-         const auto& [p0, p1] = get_producers(state);
-         if (auto claim0 = p0->getClaim(producer))
-         {
-            found = true;
-            if (claim == *claim0)
-            {
-               return;
-            }
-         }
-         if (p1)
-         {
-            if (auto claim1 = p1->getClaim(producer))
-            {
-               found = true;
-               if (claim == *claim1)
-               {
-                  return;
-               }
-            }
-         }
-         if (!found)
-         {
-            throw std::runtime_error(producer.str() + " is not an active producer");
-         }
-         else
-         {
-            throw std::runtime_error("Wrong key for " + producer.str());
-         }
       }
 
       using message_type = boost::mp11::mp_push_back<typename Base::message_type,

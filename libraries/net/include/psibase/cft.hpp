@@ -87,6 +87,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
+      using Base::validate_producer;
       using typename Base::producer_state;
 
       template <typename ExecutionContext>
@@ -395,9 +396,17 @@ namespace psibase::net
          {
             return;
          }
-         // TODO: validate against BlockHeaderState instead. Doing so would allow us to distinguish
-         // out-dated messages from invalid messages.
-         validate_producer(response.follower_id, response.signer);
+         if (response.head_num < chain().commit_index())
+         {
+            return;
+         }
+         auto  id    = chain().get_block_id(response.head_num);
+         auto* state = chain().get_state(id);
+         if (!state)
+         {
+            return;
+         }
+         validate_producer(state, response.follower_id, response.signer);
          update_term(response.term);
          if (response.term == current_term)
          {
