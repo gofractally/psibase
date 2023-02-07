@@ -239,7 +239,7 @@ TEST_CASE("joint consensus crash", "[combined]")
    ctx.poll();
 
    nodes.connect_all();
-   runFor(ctx, 15s);
+   runFor(ctx, 30s);
 
    auto final_state = nodes[0].chain().get_head_state();
    for (const auto& node : nodes.nodes)
