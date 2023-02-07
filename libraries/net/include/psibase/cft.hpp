@@ -371,6 +371,7 @@ namespace psibase::net
          chain().setTerm(current_term);
          voted_for = self;
          votes_for_me[0].clear();
+         votes_for_me[1].clear();
          if (active_producers[0]->isProducer(self) || active_producers[0]->size() == 0)
          {
             votes_for_me[0].push_back(self);
