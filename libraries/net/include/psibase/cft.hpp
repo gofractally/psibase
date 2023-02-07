@@ -402,7 +402,7 @@ namespace psibase::net
          }
          auto  id    = chain().get_block_id(response.head_num);
          auto* state = chain().get_state(id);
-         if (!state)
+         if (!state || state->info.header.term != response.term)
          {
             return;
          }
