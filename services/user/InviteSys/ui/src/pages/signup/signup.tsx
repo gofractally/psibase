@@ -10,6 +10,7 @@ import { Button, Heading, Input, Text } from "components";
 import { isAccountAvailable } from "store/queries/isAccountTaken";
 import { parsePrivateKey } from "store/queries/usePrivateKey";
 import { useParam } from "store";
+import { addAccount } from "store/queries/fetchUser";
 
 interface Inputs {
     account_name: string;
@@ -40,11 +41,6 @@ export const SignUp = () => {
             accountName: string;
             publicKey: string;
         }) => {
-
-            // const { publicKey } = parsePrivateKey(token);
-            console.log('mutation', { token, accountName, publicKey })
-            
-            // Token is a private key, so we need to convert it to a public key
             const tokenKeyPair = privateStringToKeyPair(token);
             const tokenPublicKey = publicKeyPairToString(tokenKeyPair);
 
@@ -63,12 +59,14 @@ export const SignUp = () => {
     });
 
     const onConfirm: SubmitHandler<Inputs> = async (data: Inputs) => {
-        const token = useParam('token')
+        const token = useParam('token');
 
         const privateKey = data.password;
-        const { publicKey, isValid } = parsePrivateKey(privateKey);
-        acceptCreate({ accountName: data.account_name, publicKey, token: token! })
+        const { publicKey } = parsePrivateKey(privateKey);
+        acceptCreate({ accountName: data.account_name, publicKey, token: token! });
+        const res = await addAccount(data.account_name, { privateKey, publicKey });
 
+        console.log(res, 'was back!!');
         // setFormSubmitted(true);
         // setGeneralError("");
 
@@ -111,6 +109,11 @@ export const SignUp = () => {
         },
     });
 
+    const onContinue = () => {
+        // TODO navigate to fractally
+        console.log('i should navigate to fractally..')
+    };
+
     const onCopy = async (field: keyof Inputs) => {
         try {
             const { clipboard } = window.navigator;
@@ -140,7 +143,7 @@ export const SignUp = () => {
         );
     }
 
-    return <Success form={form} onCopy={onCopy} />;
+    return <Success form={form} onCopy={onCopy} onContinue={onContinue} />;
 };
 
 const CreateAccount = ({
@@ -342,6 +345,7 @@ const Success = ({
 }: {
     form: UseFormReturn<Inputs, any>;
     onCopy: (field: keyof Inputs) => Promise<void>;
+    onContinue: () => void;
 }) => {
     const {
         register,

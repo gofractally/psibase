@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchUser } from "store/queries/fetchUser";
+import { fetchAvailableUsers, fetchUser } from "store/queries/fetchUser";
 
 export const useUser = () => useQuery(["currentUser"], fetchUser);
+export const userUsers = () =>
+  useQuery(["users"], fetchAvailableUsers, { placeholderData: [] });

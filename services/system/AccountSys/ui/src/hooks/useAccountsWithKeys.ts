@@ -32,10 +32,11 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
 
     useEffect(() => {
 
-        fetchAccounts().then(accounts => setAccounts(currentAccounts => {
+        fetchAccounts().then(accounts => {
+            setAccounts(currentAccounts => {
             const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys')).filter(account => account.authService === 'auth-any-sys');
             return uniqueAccounts([...currentAccounts, ...userAccounts])
-        }));
+        })});
 
         Promise.all(keyPairs
             .filter(keyPair => keyPair.publicKey)

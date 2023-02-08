@@ -140,31 +140,44 @@ export function Qry(name?: string) {
     };
 }
 
+interface Claim {
+    claim: {
+        service: string;
+        rawData: string;
+    },
+    pubkey: string;
+};
+
+const generateClaimFromPrivateKey = (privateKey: string): Claim => {
+    const keyPair = publicStringToKeyPair(privateKey);
+    if (!keyPair) {
+        throw new Error("Invalid private key");
+    }
+
+    const pubkey = publicKeyPairToString(keyPair);
+    const keyBytes = publicKeyPairToFracpack(keyPair);
+
+    return {
+        claim: {
+            service: "verifyec-sys",
+            rawData: uint8ArrayToHex(keyBytes),
+        }, 
+        pubkey
+    };
+}
+
 export class PsiboardService extends Service {
 
     @Qry()
-    async getClaim(params) {
-        if (["acceptCreate", "accept"].includes(params.method)) {
-            console.info("HANDLE ACCEPT invite-sys params >>>", params, window.location);
+    async getClaim(params): Promise<Claim | null> {
+
+        // We only generate claims for the `acceptCreated` and `accept` action
+        const isRelevantMethod = ["acceptCreate", "accept"].includes(params.method);
+        if (isRelevantMethod) {
             const token = params.data.inviteKey;
-            const keyPair = publicStringToKeyPair(token);
-            if (!keyPair) {
-                throw new Error("Invalid invite token");
-            }
-
-            const keyBytes = publicKeyPairToFracpack(keyPair);
-            const pubkey = publicKeyPairToString(keyPair);
-
-            return {
-                claim: {
-                    service: "verifyec-sys",
-                    rawData: uint8ArrayToHex(keyBytes),
-                }, 
-                pubkey
-            };
-        }
+            return generateClaimFromPrivateKey(token);
+        };
         
-        // We only generate claims for the `acceptCreated` action
         // Applet Queries are REQUIRED to return a value, hence null here
         return null;
     }
