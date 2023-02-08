@@ -144,8 +144,8 @@ export class PsiboardService extends Service {
 
     @Qry()
     async getClaim(params) {
-        if (params.method === "acceptCreate") {
-            console.info("HANDLE ACCEPT CREATE!! invite-sys params >>>", params, window.location);
+        if (["acceptCreate", "accept"].includes(params.method)) {
+            console.info("HANDLE ACCEPT invite-sys params >>>", params, window.location);
             const token = params.data.inviteKey;
             const keyPair = publicStringToKeyPair(token);
             if (!keyPair) {
