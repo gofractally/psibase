@@ -5,6 +5,7 @@ import { userUsers, useUser } from "store/hooks/useUser";
 import { useInviteToken } from "store/queries/usePrivateKey";
 import { useInitilize } from "store/hooks/useInitialize";
 import { useGenerateLink } from "store/hooks/useGenerateLink";
+import { Link } from "react-router-dom";
 
 export const Options = () => {
   useInitilize(psiboardApplet);
@@ -15,7 +16,7 @@ export const Options = () => {
   const { data: currentUser } = useUser();
   const { data: users, error: usersError } = userUsers();
 
-  const { isValid: isInviteValid, error } = useInviteToken(token);
+  const { isValid: isInviteValid, error, isLoading } = useInviteToken(token);
   const {
     data: inviteLink,
     mutate: generateLink,
@@ -23,9 +24,7 @@ export const Options = () => {
     error: inviteError,
   } = useGenerateLink();
 
-  const isSignedIn = true;
-
-  console.log({ users, usersError });
+  const isSignedIn = (users || []).length > 0;
 
   return (
     <>
@@ -35,56 +34,63 @@ export const Options = () => {
             {isSignedIn ? "Choose an account" : "Sign in"}
           </Heading>
           <Text size="base" className="mb-2">
-            To continue to {appletName} new one
+            To continue to {appletName}
           </Text>
         </header>
-        {isSignedIn ? (
+        {isSignedIn && isInviteValid ? (
           <div className="border-y border-gray-300">
             {users?.map((account) => (
-              <div
-                key={account}
-                className="flex cursor-pointer items-center justify-between px-3 py-5 hover:bg-gray-100"
-              >
-                <Text span className="font-medium">
-                  {account}
-                </Text>
-                <Icon
-                  type="chevron-right"
-                  size="xs"
-                  className="text-gray-500"
-                />
-              </div>
+              <Link to={`/select-account?account=${account}&token=${token}`}>
+                <div
+                  key={account}
+                  className="flex cursor-pointer items-center justify-between px-3 py-5 hover:bg-gray-100"
+                >
+                  <Text span className="font-medium">
+                    {account}
+                  </Text>
+                  <Icon
+                    type="chevron-right"
+                    size="xs"
+                    className="text-gray-500"
+                  />
+                </div>
+              </Link>
             ))}
           </div>
         ) : null}
       </section>
-      <section className="bg-gray-50 p-3">
-        <Text size="base">
-          {isSignedIn ? "Or s" : "S"}ign in with an existing psibase account.
-        </Text>
-        {/* TODO: Get styles for "go" button type for other states (hover, pressed, disabled, etc.) */}
-        <Button
-          size="xl"
-          type={isSignedIn ? "primary" : "cta_fractally"}
-          href="/sign-in"
-          title="Sign in"
-        >
-          Sign in
-        </Button>
-      </section>
       {isInviteValid && (
-        <section className="bg-gray-50 p-3">
-          <Text size="base">Or create a new psibase account and sign in.</Text>
-          {/* TODO: Get styles for "go" button type for other states (hover, pressed, disabled, etc.) */}
-          <Button
-            size="xl"
-            type="primary"
-            href={`/sign-up?token=${token}`}
-            title="Create account"
-          >
-            Create account and sign in
-          </Button>
-        </section>
+        <>
+          <section className="bg-gray-50 p-3">
+            <Text size="base">
+              {isSignedIn ? "Or s" : "S"}ign in with an existing psibase
+              account.
+            </Text>
+            {/* TODO: Get styles for "go" button type for other states (hover, pressed, disabled, etc.) */}
+            <Button
+              size="xl"
+              type={isSignedIn ? "primary" : "cta_fractally"}
+              href="/sign-in"
+              title="Sign in"
+            >
+              Sign in
+            </Button>
+          </section>
+          <section className="bg-gray-50 p-3">
+            <Text size="base">
+              Or create a new psibase account and sign in.
+            </Text>
+            {/* TODO: Get styles for "go" button type for other states (hover, pressed, disabled, etc.) */}
+            <Button
+              size="xl"
+              type="primary"
+              href={`/sign-up?token=${token}`}
+              title="Create account"
+            >
+              Create account and sign in
+            </Button>
+          </section>
+        </>
       )}
       {currentUser && (
         <section className="bg-gray-50 p-3">
