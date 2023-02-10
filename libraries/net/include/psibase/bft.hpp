@@ -582,12 +582,13 @@ namespace psibase::net
          }
       }
 
-      void do_view_change(AccountNumber producer, const Claim& claim, TermNum term)
+      // Returns true if the view change was valid
+      bool do_view_change(AccountNumber producer, const Claim& claim, TermNum term)
       {
          if (producer_views.empty())
          {
             // Not a producer
-            return;
+            return false;
          }
          // ignore unexpected view changes. We can fail to recognize a valid
          // view change due to being ahead or behind other nodes.
@@ -607,8 +608,10 @@ namespace psibase::net
                   set_view(new_term);
                   start_timer();
                }
+               return true;
             }
          }
+         return false;
       }
 
       // track best committed, best prepared, best prepared on different fork
@@ -922,6 +925,10 @@ namespace psibase::net
          {
             return;
          }
+         if (state->producers->algorithm != ConsensusAlgorithm::bft)
+         {
+            return;
+         }
          validate_producer(state, msg.data->producer(), msg.data->signer());
          do_view_change(msg.data->producer(), msg.data->signer(), state->info.header.term);
          on_prepare(state, msg.data->producer(), msg);
@@ -934,6 +941,10 @@ namespace psibase::net
          {
             return;
          }
+         if (state->producers->algorithm != ConsensusAlgorithm::bft)
+         {
+            return;
+         }
          validate_producer(state, msg.data->producer(), msg.data->signer());
          do_view_change(msg.data->producer(), msg.data->signer(), state->info.header.term);
          on_commit(state, msg.data->producer(), msg);
@@ -942,7 +953,17 @@ namespace psibase::net
 
       void recv(peer_id peer, const ViewChangeMessage& msg)
       {
-         do_view_change(msg.producer, msg.signer, msg.term);
+         if (do_view_change(msg.producer, msg.signer, msg.term) && msg.term < current_term)
+         {
+            // If we receive an out-dated view, notify the sender of our view
+            for_each_key(
+                [&](const auto& k)
+                {
+                   network().async_send_block(
+                       peer, ViewChangeMessage{.term = current_term, .producer = self, .signer = k},
+                       [](const std::error_code&) {});
+                });
+         }
       }
    };
 
