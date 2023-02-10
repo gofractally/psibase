@@ -41,7 +41,8 @@ namespace triedent
 
    void database::create(std::filesystem::path dir, config cfg)
    {
-      if (std::filesystem::exists(dir))
+      if (std::filesystem::exists(std::filesystem::symlink_status(dir / "db")) ||
+          std::filesystem::exists(std::filesystem::symlink_status(dir / "data")))
          throw std::runtime_error("directory already exists: " + dir.generic_string());
 
       std::filesystem::create_directories(dir);
