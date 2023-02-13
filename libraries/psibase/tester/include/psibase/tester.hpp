@@ -91,7 +91,7 @@ namespace psibase
          auto actionTrace = getTopAction(t, 0);
          if (actionTrace.rawRetval.size() != 0)
          {
-            _return = psio::convert_from_frac<ReturnType>(actionTrace.rawRetval);
+            _return = psio::from_frac<ReturnType>(actionTrace.rawRetval);
          }
       }
 

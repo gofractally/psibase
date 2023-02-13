@@ -39,12 +39,7 @@ namespace psibase
       }
       else if (prods.size() == 0)
       {
-         if (!status.nextConsensus)
-         {
-            return true;
-         }
-         auto& nextProds = getProducers(std::get<0>(*status.nextConsensus));
-         return nextProds.size() == 1 && nextProds.front().name == producer;
+         return true;
       }
       return false;
    }
@@ -148,7 +143,7 @@ namespace psibase
           .sender  = {},
           .service = transactionServiceNum,
           .method  = MethodNumber("startBlock"),
-          .rawData = {},
+          .rawData = psio::to_frac(std::tuple()),
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
@@ -181,7 +176,7 @@ namespace psibase
       {
          auto& nextConsensus = std::get<0>(*status->nextConsensus);
          auto& prods         = std::visit(
-                     [](auto& c) -> auto& { return c.producers; }, nextConsensus);
+             [](auto& c) -> auto& { return c.producers; }, nextConsensus);
          // Special case: If no producers are specified, use the producers of the current block
          if (prods.empty())
          {
@@ -323,7 +318,7 @@ namespace psibase
          check(enableUndo || commit, "neither enableUndo or commit is set");
 
          // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
-         check(!commit || !(trx.transaction->tapos()->flags().get() & Tapos::do_not_broadcast_flag),
+         check(!commit || !(trx.transaction->tapos().flags() & Tapos::do_not_broadcast_flag),
                "cannot commit a do_not_broadcast transaction");
 
          // if !enableUndo then BlockContext becomes unusable if transaction fails.

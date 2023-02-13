@@ -153,7 +153,7 @@ namespace psibase
          auto s = kvGetRaw(db, psio::convert_to_key(key));
          if (!s)
             return std::nullopt;
-         return psio::convert_from_frac<V>(psio::input_stream(s->pos, s->end));
+         return psio::from_frac<V>(psio::prevalidated{s->pos, s->end});
       }
 
       template <typename V, typename K>

@@ -13,8 +13,8 @@ namespace SystemService
    /// - Else if the request references an unregistered subdomain, then route the request to `psispace-sys`.
    /// - Else route the request to [CommonSys]; this handles the chain's main domain.
    ///
-   /// See [C++ Web Services](../cpp-service/reference/web-services.md) or
-   /// [Rust Web Services](../rust-service/reference/web-services.md) for more detail, including how to write services
+   /// See [C++ Web Services](../services/cpp-service/reference/web-services.md) or
+   /// [Rust Web Services](../services/rust-service/reference/web-services.md) for more detail, including how to write services
    /// which serve HTTP requests.
    ///
    /// #### serve export (not an action)

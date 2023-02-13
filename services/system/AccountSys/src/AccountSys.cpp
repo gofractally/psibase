@@ -22,7 +22,7 @@ namespace SystemService
 
       uint32_t totalAccounts = 0;
       auto     codeIndex     = psibase::TableIndex<psibase::CodeRow, std::tuple<>>{
-                  psibase::CodeRow::db, psio::convert_to_key(codePrefix()), false};
+          psibase::CodeRow::db, psio::convert_to_key(codePrefix()), false};
       if constexpr (enable_print)
          writeConsole("initial accounts: ");
       for (auto it = codeIndex.begin(); it != codeIndex.end(); ++it)
@@ -88,7 +88,7 @@ namespace SystemService
       statusTable.put(*status);
    }
 
-   void AccountSys::setAuthCntr(psibase::AccountNumber authService)
+   void AccountSys::setAuthServ(psibase::AccountNumber authService)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
@@ -102,12 +102,12 @@ namespace SystemService
       accountTable.put(*account);
    }
 
-   bool AccountSys::exists(AccountNumber num)
+   bool AccountSys::exists(AccountNumber name)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
-      return accountIndex.get(num) != std::nullopt;
+      return accountIndex.get(name) != std::nullopt;
    }
 
 }  // namespace SystemService

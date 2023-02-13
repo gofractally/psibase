@@ -67,7 +67,7 @@ format = [{TimeStamp}] {Message}
 
 - `-a` or `--api` tells it which api endpoint to connect to. This defaults to `http://psibase.127.0.0.1.sslip.io:8080/`.
 - `boot` boots an empty chain; see below
-- `deploy` deploys a service; see [Basic Service](../cpp-service/basic/)
+- `deploy` deploys a service; see [Basic Service](../services/cpp-service/basic/)
 
 ## Booting a chain
 
@@ -130,6 +130,6 @@ psinode's database is portable between machines. Copying the database may be fas
 
 ## SIGANY
 
-`psinode` uses `triedent` as its database. triedent locks a large amount of space in memory-mapped files, plus psinode reserves a lot of memory for executing many WASMs simultaneously. This makes psinode a tempting target for Linux's out-of-memory (OOM) killer, which strikes suddenly with `SIGKILL`. Triedent works to make its database robust against this, but not against kernel crashes, filesystem corruption, or power outages. If the OOM killer strikes, psinode's database should survive. If your machine looses power, or you use a remote filesystem, remote block store, or distributed block store, then psinode's database is vulnerable to undetectable corruption. Be especially cautious about using Kubernetes; it has a nasty habit of yanking volumes before the kernel has finished flushing a stopped container's memory-mapped files, causing corruption.
+`psinode` uses `triedent` as its database. triedent locks a large amount of space in memory-mapped files, plus psinode reserves a lot of memory for executing many WASMs simultaneously. This makes psinode a tempting target for Linux's out-of-memory (OOM) killer, which strikes suddenly with `SIGKILL`. Triedent works to make its database robust against this, but not against kernel crashes, filesystem corruption, or power outages. If the OOM killer strikes, psinode's database should survive. If your machine loses power, or you use a remote filesystem, remote block store, or distributed block store, then psinode's database is vulnerable to undetectable corruption. Be especially cautious about using Kubernetes; it has a nasty habit of yanking volumes before the kernel has finished flushing a stopped container's memory-mapped files, causing corruption.
 
 Since it's near-impossible to do SIGKILL coverage testing, we're going with a more aggressive option for now. During beta, psinode doesn't gracefully shutdown for SIGINT or SIGHUP. Instead, these kill psinode as aggressively as SIGKILL does. There may be a delay. This isn't psinode cleaning after itself; this is the kernel saving psinode's memory-mapped files.

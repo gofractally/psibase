@@ -23,7 +23,7 @@ macro_rules! method {
     };
 }
 
-const ACCOUNTS: [AccountNumber; 24] = [
+const ACCOUNTS: [AccountNumber; 26] = [
     account_sys::SERVICE,
     account!("alice"),
     auth_ec_sys::SERVICE,
@@ -33,6 +33,8 @@ const ACCOUNTS: [AccountNumber; 24] = [
     common_sys::SERVICE,
     account!("doc-sys"),
     account!("explore-sys"),
+    account!("fractal-sys"),
+    account!("core-frac-sys"),
     account!("invite-sys"),
     nft_sys::SERVICE,
     producer_sys::SERVICE,
@@ -119,7 +121,7 @@ fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
 }
 
 fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
-    account_sys::Wrapper::pack_from(account).setAuthCntr(auth_service)
+    account_sys::Wrapper::pack_from(account).setAuthServ(auth_service)
 }
 
 fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
@@ -160,7 +162,9 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sgc!("auth-any-sys", 0, "AuthAnySys.wasm"),
         sgc!("auth-inv-sys", 0, "AuthInviteSys.wasm"),
         sgc!("common-sys", 0, "CommonSys.wasm"),
+        sgc!("core-frac-sys", 0, "CoreFractalSys.wasm"),
         sgc!("explore-sys", 0, "ExploreSys.wasm"),
+        sgc!("fractal-sys", 0, "FractalSys.wasm"),
         sgc!("invite-sys", 0, "InviteSys.wasm"),
         sgc!("nft-sys", 0, "NftSys.wasm"),
         sgc!("producer-sys", 2, "ProducerSys.wasm"),

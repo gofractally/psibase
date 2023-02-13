@@ -108,8 +108,8 @@ if(BUILD_DOC)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid.min.js)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid-init.js)
-    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/cpp-service/*.cpp)
-    file(GLOB_RECURSE doc-cmake doc/src/cpp-service/*/CMakeLists.txt)
+    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/services/cpp-service/*.cpp)
+    file(GLOB_RECURSE doc-cmake doc/src/services/cpp-service/*/CMakeLists.txt)
     file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
     file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
     add_custom_command(
@@ -197,7 +197,9 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm                ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm                    ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm               ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm                       ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm                  ${BOOT_IMAGE}
@@ -246,7 +248,7 @@ endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
-    add_subdirectory(doc/psidk/src/cpp-service doc-examples)
+    add_subdirectory(doc/psidk/src/services/cpp-service doc-examples)
 endif()
 
 include(CPackComponent)

@@ -33,14 +33,14 @@ namespace psibase
    Action getCurrentAction()
    {
       auto data = getResult(raw::getCurrentAction());
-      return psio::convert_from_frac<Action>(data);
+      return psio::from_frac<Action>(psio::prevalidated{data});
    }
 
    psio::shared_view_ptr<Action> getCurrentActionView()
    {
       psio::shared_view_ptr<Action> ptr(psio::size_tag{raw::getCurrentAction()});
       raw::getResult(ptr.data(), ptr.size(), 0);
-      check(ptr.validate_all_known(), "invalid action format");
+      check(ptr.validate_strict(), "invalid action format");
       return ptr;
    }
 

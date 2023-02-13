@@ -279,7 +279,7 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
                         bin.resize(size);
                         return bin.data();
                      });
-   return psio::convert_from_frac<TransactionTrace>(bin);
+   return psio::from_frac<TransactionTrace>(bin);
 }
 
 [[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(Transaction    trx,

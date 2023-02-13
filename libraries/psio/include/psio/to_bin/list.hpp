@@ -1,6 +1,6 @@
 #pragma once
-#include <psio/to_bin.hpp>
 #include <list>
+#include <psio/to_bin.hpp>
 
 namespace psio
 {

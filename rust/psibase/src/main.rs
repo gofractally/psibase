@@ -199,7 +199,7 @@ fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
 }
 
 fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
-    account_sys::Wrapper::pack_from(account).setAuthCntr(auth_service)
+    account_sys::Wrapper::pack_from(account).setAuthServ(auth_service)
 }
 
 #[derive(Serialize, Deserialize, Pack, Unpack)]

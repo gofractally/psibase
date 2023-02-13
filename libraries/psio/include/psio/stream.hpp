@@ -107,6 +107,8 @@ namespace psio
       std::vector<char>& data;
       vector_stream(std::vector<char>& data) : data(data) {}
 
+      void about_to_write(size_t amount) { data.reserve(data.size() + amount); }
+
       void write(char ch) { data.push_back(ch); }
 
       void write(const void* src, size_t size)
@@ -120,6 +122,14 @@ namespace psio
       {
          write(&v, sizeof(v));
       }
+
+      template <typename T>
+      void rewrite_raw(size_t offset, const T& v)
+      {
+         memcpy(data.data() + offset, &v, sizeof(v));
+      }
+
+      size_t written() const { return data.size(); }
    };
 
    struct fixed_buf_stream
@@ -129,6 +139,8 @@ namespace psio
       char* end;
 
       fixed_buf_stream(char* pos, size_t size) : begin(pos), pos{pos}, end{pos + size} {}
+
+      void about_to_write(size_t amount) {}
 
       void write(char ch)
       {
@@ -151,6 +163,12 @@ namespace psio
          write(&v, sizeof(v));
       }
 
+      template <typename T>
+      void rewrite_raw(size_t offset, const T& v)
+      {
+         memcpy(begin + offset, &v, sizeof(v));
+      }
+
       void skip(int32_t s)
       {
          if ((pos + s > end) or (pos + s < begin))
@@ -160,6 +178,7 @@ namespace psio
 
       size_t remaining() const { return end - pos; }
       size_t consumed() const { return pos - begin; }
+      size_t written() const { return pos - begin; }
    };
 
    /**
@@ -170,6 +189,8 @@ namespace psio
       char* begin;
       char* pos;
       char* end;
+
+      void about_to_write(size_t amount) {}
 
       fast_buf_stream(char* pos, size_t size) : begin(pos), pos{pos}, end{pos + size} {}
 
@@ -187,15 +208,24 @@ namespace psio
          write(&v, sizeof(v));
       }
 
+      template <typename T>
+      void rewrite_raw(size_t offset, const T& v)
+      {
+         memcpy(begin + offset, &v, sizeof(v));
+      }
+
       void skip(int32_t s) { pos += s; }
 
       size_t remaining() const { return end - pos; }
       size_t consumed() const { return pos - begin; }
+      size_t written() const { return pos - begin; }
    };
 
    struct size_stream
    {
       size_t size = 0;
+
+      void about_to_write(size_t amount) {}
 
       void write(char ch) { ++size; }
       void write(const void* src, size_t size) { this->size += size; }
@@ -206,7 +236,13 @@ namespace psio
          size += sizeof(v);
       }
 
-      void skip(int32_t s) { size += s; }
+      template <typename T>
+      void rewrite_raw(size_t offset, const T& v)
+      {
+      }
+
+      void   skip(int32_t s) { size += s; }
+      size_t written() const { return size; }
    };
 
    template <typename S>

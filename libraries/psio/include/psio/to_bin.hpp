@@ -107,7 +107,8 @@ namespace psio
       varuint32_to_bin(obj.size(), stream);
       if constexpr (has_bitwise_serialization<T>())
       {
-         stream.write(reinterpret_cast<const char*>(obj.data()), obj.size() * sizeof(T));
+         if (!obj.empty())
+            stream.write(reinterpret_cast<const char*>(obj.data()), obj.size() * sizeof(T));
       }
       else
       {

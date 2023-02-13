@@ -15,7 +15,9 @@
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
 #include <services/user/AuthInviteSys.hpp>
+#include <services/user/CoreFractalSys.hpp>
 #include <services/user/ExploreSys.hpp>
+#include <services/user/FractalSys.hpp>
 #include <services/user/InviteSys.hpp>
 #include <services/user/NftSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
@@ -50,6 +52,8 @@ DefaultTestChain::DefaultTestChain(
    from(UserService::TokenSys::service).to<UserService::TokenSys>().init();
    from(UserService::SymbolSys::service).to<UserService::SymbolSys>().init();
    from(UserService::Invite::InviteSys::service).to<UserService::Invite::InviteSys>().init();
+   from(UserService::Fractal::FractalSys::service).to<UserService::Fractal::FractalSys>().init();
+   from(UserService::Fractal::CoreFractalSys::service).to<UserService::Fractal::CoreFractalSys>().init();
 
    for (const auto& c : additionalServices)
    {
@@ -179,6 +183,18 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .flags   = 0,
                                                 .code    = readWholeFile("AuthInviteSys.wasm"),
                                             },
+                                            {
+                                                .service =
+                                                    UserService::Fractal::FractalSys::service,
+                                                .flags = 0,
+                                                .code  = readWholeFile("FractalSys.wasm"),
+                                            },
+                                            {
+                                                .service =
+                                                    UserService::Fractal::CoreFractalSys::service,
+                                                .flags = 0,
+                                                .code  = readWholeFile("CoreFractalSys.wasm"),
+                                            },
                                         },
                                 }),
                     }}),
@@ -237,7 +253,7 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
    auto trace = pushTransaction(makeTransaction({
        asys.newAccount(name, AuthAnySys::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthCntr(AuthEcSys::service),
+       asys.from(name).setAuthServ(AuthEcSys::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -251,13 +267,15 @@ AccountNumber DefaultTestChain::add_ec_account(const char*      name,
    return add_ec_account(AccountNumber(name), public_key, show);
 }
 
-void DefaultTestChain::setAuthEc(AccountNumber name, const PublicKey& pubkey, bool show /* = false */)
+void DefaultTestChain::setAuthEc(AccountNumber    name,
+                                 const PublicKey& pubkey,
+                                 bool             show /* = false */)
 {
    auto n  = name.str();
    auto t1 = from(name).to<AuthEcSys>().setKey(pubkey);
    check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
-   auto t2 = from(name).to<AccountSys>().setAuthCntr(AuthEcSys::service);
-   check(psibase::show(show, t2.trace()) == "", "Failed to setAuthCntr for " + n);
+   auto t2 = from(name).to<AccountSys>().setAuthServ(AuthEcSys::service);
+   check(psibase::show(show, t2.trace()) == "", "Failed to setAuthServ for " + n);
 }
 
 AccountNumber DefaultTestChain::addService(AccountNumber acc,

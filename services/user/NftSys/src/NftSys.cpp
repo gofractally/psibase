@@ -8,7 +8,7 @@
 using namespace psibase;
 using namespace UserService;
 using namespace Errors;
-using psio::const_view;
+using psio::view;
 using std::nullopt;
 using std::optional;
 using std::string;
@@ -24,7 +24,7 @@ namespace
 
 NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
 {
-   MethodNumber m{action->method()->value().get()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
@@ -86,7 +86,7 @@ void NftSys::burn(NID nftId)
    Tables().open<NftHolderTable>().put(holder);
 }
 
-void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<String> memo)
+void NftSys::credit(NID nftId, psibase::AccountNumber receiver, view<const String> memo)
 {
    auto                   record          = getNft(nftId);
    psibase::AccountNumber sender          = getSender();
@@ -132,7 +132,7 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, const_view<Strin
    Tables().open<NftHolderTable>().put(receiverHolder);
 }
 
-void NftSys::uncredit(NID nftId, const_view<String> memo)
+void NftSys::uncredit(NID nftId, view<const String> memo)
 {
    auto                   record       = getNft(nftId);
    psibase::AccountNumber sender       = getSender();
@@ -156,7 +156,7 @@ void NftSys::uncredit(NID nftId, const_view<String> memo)
    Tables().open<CreditTable>().erase(nftId);
 }
 
-void NftSys::debit(NID nftId, const_view<String> memo)
+void NftSys::debit(NID nftId, view<const String> memo)
 {
    auto record       = getNft(nftId);
    auto debitor      = getSender();
