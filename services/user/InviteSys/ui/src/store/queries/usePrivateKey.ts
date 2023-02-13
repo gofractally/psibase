@@ -3,6 +3,7 @@ import {
   privateStringToKeyPair,
   publicKeyPairToString,
 } from "common/keyConversions.mjs";
+import { postGraphQLGetJson } from "common/rpc.mjs";
 
 export const parsePrivateKey = (
   privateKey: string | null
@@ -24,8 +25,14 @@ export const parsePrivateKey = (
   }
 };
 
-const wait = (ms: number = 1000) =>
+const wait = (ms: number = 1000): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+const queryInviteKey = (publicKey: string): string => `{
+    getInvite(pubkey: "${publicKey}")
+}`;
+  
+export const fetchInvite = (publicKey: string) => postGraphQLGetJson("/graphql", queryInviteKey(publicKey));
 
 export const useInviteToken = (privateKey: string | null) => {
   const publicKey = parsePrivateKey(privateKey);
@@ -34,7 +41,9 @@ export const useInviteToken = (privateKey: string | null) => {
   const { data, error, isLoading } = useQuery(
     ["redemption", privateKey],
     async () => {
-      await wait(1000);
+      console.log('xxx', publicKey.publicKey)
+      const res = await fetchInvite(publicKey.publicKey);
+      console.log(res, 'was the res!');
       return true;
     },
     {
