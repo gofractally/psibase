@@ -39,12 +39,7 @@ namespace psibase
       }
       else if (prods.size() == 0)
       {
-         if (!status.nextConsensus)
-         {
-            return true;
-         }
-         auto& nextProds = getProducers(std::get<0>(*status.nextConsensus));
-         return nextProds.size() == 1 && nextProds.front().name == producer;
+         return true;
       }
       return false;
    }
@@ -185,7 +180,7 @@ namespace psibase
          // Special case: If no producers are specified, use the producers of the current block
          if (prods.empty())
          {
-            prods.emplace_back(current.header.producer, Claim{});
+            prods.push_back({current.header.producer, Claim{}});
          }
 
          status->current.newConsensus = current.header.newConsensus = nextConsensus;

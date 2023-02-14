@@ -15,7 +15,9 @@
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
 #include <services/user/AuthInviteSys.hpp>
+#include <services/user/CoreFractalSys.hpp>
 #include <services/user/ExploreSys.hpp>
+#include <services/user/FractalSys.hpp>
 #include <services/user/InviteSys.hpp>
 #include <services/user/NftSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
@@ -50,6 +52,8 @@ DefaultTestChain::DefaultTestChain(
    from(UserService::TokenSys::service).to<UserService::TokenSys>().init();
    from(UserService::SymbolSys::service).to<UserService::SymbolSys>().init();
    from(UserService::Invite::InviteSys::service).to<UserService::Invite::InviteSys>().init();
+   from(UserService::Fractal::FractalSys::service).to<UserService::Fractal::FractalSys>().init();
+   from(UserService::Fractal::CoreFractalSys::service).to<UserService::Fractal::CoreFractalSys>().init();
 
    for (const auto& c : additionalServices)
    {
@@ -178,6 +182,18 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .service = UserService::AuthInviteSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("AuthInviteSys.wasm"),
+                                            },
+                                            {
+                                                .service =
+                                                    UserService::Fractal::FractalSys::service,
+                                                .flags = 0,
+                                                .code  = readWholeFile("FractalSys.wasm"),
+                                            },
+                                            {
+                                                .service =
+                                                    UserService::Fractal::CoreFractalSys::service,
+                                                .flags = 0,
+                                                .code  = readWholeFile("CoreFractalSys.wasm"),
                                             },
                                         },
                                 }),

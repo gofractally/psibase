@@ -64,7 +64,7 @@ jobs:
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
           echo =====
-          ${DOCKER} bash -c "cd build && ctest -j $(nproc)"
+          ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc)"
           echo =====
           ls -la ${GITHUB_WORKSPACE}
           echo =====

@@ -69,7 +69,7 @@ namespace triedent
    }
    void managed_ring::create(std::filesystem::path filename, uint8_t logsize)
    {
-      if (std::filesystem::exists(filename))
+      if (std::filesystem::exists(std::filesystem::symlink_status(filename)))
          throw std::runtime_error("file already exists: " + filename.generic_string());
 
       if (logsize < 27)
@@ -125,7 +125,7 @@ namespace triedent
 
    void ring_allocator::create(std::filesystem::path dir, config cfg)
    {
-      if (std::filesystem::exists(dir))
+      if (std::filesystem::exists(std::filesystem::symlink_status(dir)))
          throw std::runtime_error("directory already exists: " + dir.generic_string());
 
       std::filesystem::create_directories(dir);

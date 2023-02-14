@@ -77,6 +77,7 @@ namespace psibase::net
       using Base::_state;
       using Base::active_producers;
       using Base::chain;
+      using Base::consensus;
       using Base::current_term;
       using Base::for_each_key;
       using Base::is_producer;
@@ -86,6 +87,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
+      using Base::validate_producer;
       using typename Base::producer_state;
 
       template <typename ExecutionContext>
@@ -160,6 +162,15 @@ namespace psibase::net
                match_index[1].clear();
                match_index[1].resize(prods.second->size());
             }
+            // Before boot, every node can be be a leader. This is the only time when
+            // it is possble to have multiple leaders. Exit leader mode and start a new
+            // election.
+            if (active_producers[0]->size() == 0 && !active_producers[1])
+            {
+               _election_timer.cancel();
+               stop_leader("Stopping boot block production");
+               _state = producer_state::unknown;
+            }
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
@@ -202,7 +213,7 @@ namespace psibase::net
          }
       }
 
-      void on_fork_switch(BlockHeader* new_head)
+      void on_fork_switch(const BlockHeader* new_head)
       {
          if (is_cft() && _state == producer_state::follower && new_head->term == current_term &&
              new_head->blockNum > chain().commit_index())
@@ -261,7 +272,7 @@ namespace psibase::net
          }
          if (chain().commit(jointCommitIndex))
          {
-            set_producers(chain().getProducers());
+            consensus().set_producers(chain().getProducers());
          }
       }
       BlockNum update_match_index(producer_id producer, BlockNum confirmed, std::size_t group)
@@ -287,19 +298,21 @@ namespace psibase::net
       {
          if (term > current_term)
          {
-            if (_state == producer_state::leader)
-            {
-               match_index[0].clear();
-               match_index[1].clear();
-               stop_leader();
-               randomize_timer();
-            }
             votes_for_me[0].clear();
             votes_for_me[1].clear();
             current_term = term;
             chain().setTerm(current_term);
             voted_for = null_producer;
-            if (_state == producer_state::leader || _state == producer_state::candidate)
+            if (_state == producer_state::leader)
+            {
+               match_index[0].clear();
+               match_index[1].clear();
+               stop_leader();
+               _state = producer_state::follower;
+               randomize_timer();
+               Base::switch_fork();
+            }
+            else if (_state == producer_state::candidate)
             {
                _state = producer_state::follower;
             }
@@ -358,6 +371,7 @@ namespace psibase::net
          chain().setTerm(current_term);
          voted_for = self;
          votes_for_me[0].clear();
+         votes_for_me[1].clear();
          if (active_producers[0]->isProducer(self) || active_producers[0]->size() == 0)
          {
             votes_for_me[0].push_back(self);
@@ -383,9 +397,17 @@ namespace psibase::net
          {
             return;
          }
-         // TODO: validate against BlockHeaderState instead. Doing so would allow us to distinguish
-         // out-dated messages from invalid messages.
-         validate_producer(response.follower_id, response.signer);
+         if (response.head_num < chain().commit_index())
+         {
+            return;
+         }
+         auto  id    = chain().get_block_id(response.head_num);
+         auto* state = chain().get_state(id);
+         if (!state || state->info.header.term != response.term)
+         {
+            return;
+         }
+         validate_producer(state, response.follower_id, response.signer);
          update_term(response.term);
          if (response.term == current_term)
          {

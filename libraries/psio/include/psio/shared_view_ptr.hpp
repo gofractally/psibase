@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psio/from_json.hpp>
 #include <psio/view.hpp>
 
 #include <cassert>
@@ -178,15 +179,19 @@ namespace psio
    template <typename T, typename S>
    void to_json(const shared_view_ptr<T>& value, S& stream)
    {
-      to_json(value.unpack(), stream);
+      to_json_hex(value.data(), value.size(), stream);
    }
 
    template <typename T, typename S>
    void from_json(shared_view_ptr<T>& value, S& stream)
    {
-      T tmp;
-      from_json(tmp, stream);
-      value = shared_view_ptr<T>{std::move(tmp)};
+      auto s = stream.get_string();
+      if (s.size() & 1)
+         abort_error(from_json_error::expected_hex_string);
+      shared_view_ptr<T> tmp{size_tag{s.size() / 2}};
+      if (!unhex(tmp.data(), s.begin(), s.end()))
+         abort_error(from_json_error::expected_hex_string);
+      value = std::move(tmp);
    }
 
    template <typename T>

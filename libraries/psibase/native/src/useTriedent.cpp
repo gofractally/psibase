@@ -185,7 +185,7 @@ namespace psibase
                          uint64_t                     cool_addr_bits,
                          uint64_t                     cold_addr_bits)
       {
-         if (!std::filesystem::exists(dir))
+         if (!std::filesystem::exists(dir / "db"))
          {
             // std::cout << "Creating " << dir << "\n";
             triedent::database::create(  //

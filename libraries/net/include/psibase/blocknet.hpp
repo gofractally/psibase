@@ -114,6 +114,10 @@ namespace psibase::net
       TermNum                      current_term = 0;
 
       producer_state _state = producer_state::unknown;
+      // Counts the total number of times block production has been stopped.
+      // This is used to allow the timer callback to know when the block
+      // that it is trying to produce has been aborted.
+      std::uint64_t _leader_cancel = 0;
 
       Timer                     _block_timer;
       std::chrono::milliseconds _timeout        = std::chrono::seconds(3);
@@ -288,13 +292,18 @@ namespace psibase::net
          if (self != prod)
          {
             self = prod;
-            // Re-evaluates producer state
-            // This may leave the leader running even if it changed names.
-            // I believe that this is safe because the fact that it's
-            // still the same node guarantees that the hand-off is atomic.
+            // If set_producer_id is called before load_producers, active_producers
+            // may not be initialized yet.
             if (active_producers[0])
             {
+               // Re-evaluates producer state
+               // This may leave the leader running even if it changed names.
+               // I believe that this is safe because the fact that it's
+               // still the same node guarantees that the hand-off is atomic.
                consensus().set_producers({active_producers[0], active_producers[1]});
+               // set_producers may abort the current block,
+               // if we are no longer an active producer
+               switch_fork();
             }
          }
       }
@@ -315,7 +324,59 @@ namespace psibase::net
             }
          }
       }
+      template <typename F>
+      void for_each_key(const BlockHeaderState* state, F&& f)
+      {
+         auto claim0 = state->producers->getClaim(self);
+         if (claim0)
+         {
+            f(*claim0);
+         }
+         if (state->nextProducers)
+         {
+            auto claim1 = state->nextProducers->getClaim(self);
+            if (claim1 && claim0 != claim1)
+            {
+               f(*claim1);
+            }
+         }
+      }
 
+      void validate_producer(BlockHeaderState* state, AccountNumber producer, const Claim& claim)
+      {
+         bool found = false;
+         if (auto claim0 = state->producers->getClaim(producer))
+         {
+            found = true;
+            if (claim == *claim0)
+            {
+               return;
+            }
+         }
+         if (state->nextProducers)
+         {
+            if (auto claim1 = state->nextProducers->getClaim(producer))
+            {
+               found = true;
+               if (claim == *claim1)
+               {
+                  return;
+               }
+            }
+         }
+         if (!found)
+         {
+            throw std::runtime_error(producer.str() + " is not an active producer");
+         }
+         else
+         {
+            throw std::runtime_error("Wrong key for " + producer.str());
+         }
+      }
+
+      // \pre _state == leader
+      // \pre no pending block
+      // \post pending block
       void start_leader()
       {
          assert(_state == producer_state::leader);
@@ -328,61 +389,66 @@ namespace psibase::net
          auto block_start = std::max(head_time + _block_interval,
                                      floor2(Timer::clock_type::now(), _block_interval));
          _block_timer.expires_at(block_start + _block_interval);
-         // TODO: consensus should be responsible for most of the block header
-         auto commit_index = is_sole_producer() ? head->blockNum + 1 : chain().commit_index();
+         auto commit_index = chain().commit_index();
          chain().start_block(
              TimePointSec{static_cast<uint32_t>(
                  duration_cast<std::chrono::seconds>(block_start.time_since_epoch()).count())},
              self, current_term, commit_index);
          _block_timer.async_wait(
-             [this](const std::error_code& ec)
+             [this, saved_leader_cancel = _leader_cancel](const std::error_code& ec)
              {
-                if (ec || _state != producer_state::leader)
-                {
-                   PSIBASE_LOG(consensus().logger, info) << "Stopping block production";
-                   chain().abort_block();
-                }
-                else if (_state == producer_state::leader)
+                if (_leader_cancel == saved_leader_cancel)
                 {
                    if (auto* b = chain().finish_block([this](const BlockHeaderState* state)
                                                       { return consensus().makeBlockData(state); }))
                    {
-                      consensus().on_produce_block(b);
-                      consensus().set_producers(chain().getProducers());
-                      consensus().on_fork_switch(&b->info.header);
-                      do_gc();
-                   }
-                   // finish_block might convert us to nonvoting
-                   if (_state == producer_state::leader)
-                   {
+                      // Calling start_leader first allows the other functions
+                      // to rely on the invariant that there is an active block
+                      // iff _state == leader.
                       start_leader();
+                      // on_produce_block and on_fork_switch should both run
+                      // before set_producers, because they should see the
+                      // producers of this of this block.
+                      consensus().on_produce_block(b);
+                      consensus().on_fork_switch(&b->info.header);
+                      consensus().set_producers(chain().getProducers());
+                      // do_gc needs to run after on_fork_switch, because
+                      // on_fork_switch is responsible for cleaning up any
+                      // pointers that will become dangling.
+                      do_gc();
                    }
                    else
                    {
-                      PSIBASE_LOG(consensus().logger, info) << "Stopping block production";
+                      start_leader();
                    }
                 }
              });
       }
 
-      void stop_leader()
+      // \pre common invariants
+      // \post no pending block
+      void stop_leader(const char* log_message = "Stopping block production")
       {
          if (_state == producer_state::leader)
          {
+            ++_leader_cancel;
             _block_timer.cancel();
+            PSIBASE_LOG(consensus().logger, info) << log_message;
+            chain().abort_block();
          }
       }
 
+      // \pre common invariants
       void async_shutdown()
       {
          // TODO: if we are the current leader, finish the
          // current block and try to hand off leadership before
          // shutting down.
-         _state = producer_state::shutdown;
          stop_leader();
+         _state = producer_state::shutdown;
       }
 
-      // The block broadcast algorithm is most independent of consensus.
+      // The block broadcast algorithm is mostly independent of consensus.
       // The primary potential variation is whether a block is forwarded
       // before or after validation.
 
@@ -416,7 +482,7 @@ namespace psibase::net
       // Note: this needs to run before orphaned blocks in the old fork
       // are pruned.  It must remove references to blocks that are not
       // part of the new best fork.
-      void on_fork_switch(BlockHeader* new_head)
+      void on_fork_switch(const BlockHeader* new_head)
       {
          // TODO: how do we handle a fork switch during connection startup?
          for (auto& peer : _peers)
@@ -467,7 +533,6 @@ namespace psibase::net
 
       void recv(peer_id origin, const BlockMessage& request)
       {
-         // TODO: should the leader ever accept a block from another source?
          if (auto state = chain().insert(request.block))
          {
             try
@@ -491,11 +556,17 @@ namespace psibase::net
       void switch_fork()
       {
          chain().async_switch_fork(
-             [this](BlockHeader* h)
+             [this](const BlockInfo& head)
              {
                 // TODO: only run set_producers when the producers actually changed
                 consensus().set_producers(chain().getProducers());
-                consensus().on_fork_switch(h);
+                if (_state == producer_state::leader &&
+                    chain().getBlockContext()->current.header.previous != head.blockId)
+                {
+                   stop_leader("Pending block aborted because the head block changed");
+                   start_leader();
+                }
+                consensus().on_fork_switch(&head.header);
                 do_gc();
              },
              [this](BlockHeaderState* state) { consensus().on_accept_block(state); });
@@ -513,7 +584,21 @@ namespace psibase::net
       void                             on_accept_block(const BlockHeaderState*) {}
       void                             post_send_block(peer_id, const Checksum256&) {}
       void                             on_erase_block(const Checksum256&) {}
-      void                             set_producers(const auto&) {}
-      void                             cancel() {}
+      void                             set_producers(auto prods)
+      {
+         if (prods.first->size() != 0 || prods.second)
+            throw std::runtime_error("Consensus algorithm not available");
+         active_producers[0] = std::move(prods.first);
+         active_producers[1] = std::move(prods.second);
+
+         if (_state != producer_state::leader)
+         {
+            _state = producer_state::leader;
+            PSIBASE_LOG(logger, info)
+                << "Starting block production for term " << current_term << " as " << self.str();
+            start_leader();
+         }
+      }
+      void cancel() {}
    };
 }  // namespace psibase::net

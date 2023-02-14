@@ -107,6 +107,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
+      using Base::validate_producer;
       using typename Base::producer_state;
       enum class confirm_type
       {
@@ -272,7 +273,8 @@ namespace psibase::net
       std::vector<TermNum> producer_views;
 
       Timer                     _new_term_timer;
-      std::chrono::milliseconds _timeout = std::chrono::seconds(10);
+      std::chrono::milliseconds _timeout       = std::chrono::seconds(10);
+      std::chrono::milliseconds _timeout_delta = std::chrono::seconds(5);
 
       template <typename ExecutionContext>
       explicit basic_bft_consensus(ExecutionContext& ctx) : Base(ctx), _new_term_timer(ctx)
@@ -348,39 +350,6 @@ namespace psibase::net
                 (pos->second.confirmed(confirm_type::commit) || pos->second.committedByBlock);
       }
 
-      void validate_producer(BlockHeaderState* state, AccountNumber producer, const Claim& claim)
-      {
-         bool found           = false;
-         const auto& [p0, p1] = get_producers(state);
-         if (auto claim0 = p0->getClaim(producer))
-         {
-            found = true;
-            if (claim == *claim0)
-            {
-               return;
-            }
-         }
-         if (p1)
-         {
-            if (auto claim1 = p1->getClaim(producer))
-            {
-               found = true;
-               if (claim == *claim1)
-               {
-                  return;
-               }
-            }
-         }
-         if (!found)
-         {
-            throw std::runtime_error(producer.str() + " is not an active producer");
-         }
-         else
-         {
-            throw std::runtime_error("Wrong key for " + producer.str());
-         }
-      }
-
       using message_type = boost::mp11::mp_push_back<typename Base::message_type,
                                                      PrepareMessage,
                                                      CommitMessage,
@@ -393,6 +362,14 @@ namespace psibase::net
             return *idx == current_term % num_producers;
          }
          return Base::is_sole_producer();
+      }
+
+      std::size_t get_leader_index(TermNum term)
+      {
+         if (auto num_producers = active_producers[0]->size())
+            return term % num_producers;
+         else
+            return 0;
       }
 
       static bool is_leader(const ProducerSet& producers, TermNum term, AccountNumber prod)
@@ -408,6 +385,7 @@ namespace psibase::net
       void cancel()
       {
          _new_term_timer.cancel();
+         producer_views.clear();
          Base::cancel();
       }
       void set_producers(
@@ -416,14 +394,19 @@ namespace psibase::net
          if (prods.first->algorithm != ConsensusAlgorithm::bft)
          {
             _new_term_timer.cancel();
+            producer_views.clear();
             return Base::set_producers(std::move(prods));
          }
          bool start_bft =
-             active_producers[0] && active_producers[0]->algorithm != ConsensusAlgorithm::bft;
+             !active_producers[0] || active_producers[0]->algorithm != ConsensusAlgorithm::bft;
          if (start_bft)
          {
             PSIBASE_LOG(logger, info) << "Switching consensus: BFT";
             Base::cancel();
+            if (_state == producer_state::candidate)
+            {
+               _state = producer_state::follower;
+            }
          }
          bool new_producers = !active_producers[0] || *active_producers[0] != *prods.first;
          if ((_state == producer_state::leader || _state == producer_state::follower) &&
@@ -460,15 +443,27 @@ namespace psibase::net
             }
             set_producer_view(current_term, self);
          }
-         else if (_state != producer_state::shutdown)
+         else
          {
-            if (_state != producer_state::nonvoting)
+            producer_views.clear();
+            if (_state != producer_state::shutdown)
             {
-               PSIBASE_LOG(logger, info) << "Node is non-voting";
-               _new_term_timer.cancel();
-               stop_leader();
+               if (_state != producer_state::nonvoting)
+               {
+                  PSIBASE_LOG(logger, info) << "Node is non-voting";
+                  _new_term_timer.cancel();
+                  stop_leader();
+               }
+               _state = producer_state::nonvoting;
             }
-            _state = producer_state::nonvoting;
+         }
+         if (_state == producer_state::leader || _state == producer_state::follower)
+         {
+            assert(producer_views.size() == active_producers[0]->size());
+         }
+         else
+         {
+            assert(producer_views.empty());
          }
       }
 
@@ -476,13 +471,18 @@ namespace psibase::net
       {
          if (_state == producer_state::follower || _state == producer_state::leader)
          {
-            // TODO: increase timeout if no progress since last timeout
             _new_term_timer.expires_after(_timeout);
             _new_term_timer.async_wait(
                 [this, old_term = current_term](const std::error_code& ec)
                 {
                    if (!ec && old_term == current_term)
                    {
+                      auto committed = chain().get_block_by_num(chain().commit_index());
+                      if (committed && committed->block().header().term() < current_term)
+                      {
+                         // If we have not committed a block in the current term, increase the block timer
+                         _timeout += _timeout_delta;
+                      }
                       increase_view();
                       start_timer();
                    }
@@ -509,6 +509,17 @@ namespace psibase::net
              });
       }
 
+      // Skip terms whose leaders have already advanced to a later view
+      TermNum skip_advanced_leaders(TermNum new_term)
+      {
+         // Skip terms whose leaders have already advanced
+         while (producer_views[get_leader_index(new_term)] > new_term)
+         {
+            ++new_term;
+         }
+         return new_term;
+      }
+
       void increase_view()
       {
          auto threshold = producer_views.size() * 2 / 3 + 1;
@@ -516,7 +527,7 @@ namespace psibase::net
                            [current_term = current_term](auto v)
                            { return v >= current_term; }) >= threshold)
          {
-            set_view(current_term + 1);
+            set_view(skip_advanced_leaders(current_term + 1));
          }
          else
          {
@@ -535,8 +546,11 @@ namespace psibase::net
             PSIBASE_LOG(logger, info) << "view change: " << term;
             current_term = term;
             chain().setTerm(current_term);
-            broadcast_current_term();
-            set_producer_view(term, self);
+            if (_state == producer_state::leader || _state == producer_state::follower)
+            {
+               broadcast_current_term();
+               set_producer_view(term, self);
+            }
          }
       }
 
@@ -562,9 +576,42 @@ namespace psibase::net
                {
                   stop_leader();
                   _state = producer_state::follower;
+                  Base::switch_fork();
                }
             }
          }
+      }
+
+      // Returns true if the view change was valid
+      bool do_view_change(AccountNumber producer, const Claim& claim, TermNum term)
+      {
+         if (producer_views.empty())
+         {
+            // Not a producer
+            return false;
+         }
+         // ignore unexpected view changes. We can fail to recognize a valid
+         // view change due to being ahead or behind other nodes.
+         if (auto expected = active_producers[0]->getClaim(producer))
+         {
+            if (*expected == claim)
+            {
+               set_producer_view(term, producer);
+               auto view_copy = producer_views;
+               auto offset    = active_producers[0]->size() * 2 / 3;
+               // if > 1/3 are ahead of current view trigger view change
+               std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
+               auto new_term = std::max(view_copy[offset], current_term);
+               new_term      = skip_advanced_leaders(new_term);
+               if (new_term > current_term)
+               {
+                  set_view(new_term);
+                  start_timer();
+               }
+               return true;
+            }
+         }
+         return false;
       }
 
       // track best committed, best prepared, best prepared on different fork
@@ -605,7 +652,7 @@ namespace psibase::net
          }
          return false;
       }
-      void on_fork_switch(BlockHeader* head)
+      void on_fork_switch(const BlockHeader* head)
       {
          if (!chain().in_best_chain(orderToXid(best_prepare)))
          {
@@ -621,7 +668,11 @@ namespace psibase::net
             if (state->order() > best_prepared)
             {
                best_prepared = state->order();
+               set_view(state->info.header.term);
                chain().set_subtree(state);
+               // Fork switch handled by caller. It cannot be handled
+               // here because we might already by in the process of
+               // switching forks
             }
             if (can_commit(state))
             {
@@ -634,14 +685,14 @@ namespace psibase::net
          const auto& id = state->blockId();
          assert(chain().in_best_chain(state->xid()));
          best_prepare = state->order();
-         for_each_key(
-             [&](const auto& key)
-             {
-                auto message = network().sign_message(
-                    PrepareMessage{.block_id = id, .producer = self, .signer = key});
-                on_prepare(state, self, message);
-                network().multicast_producers(message);
-             });
+         for_each_key(state,
+                      [&](const auto& key)
+                      {
+                         auto message = network().sign_message(
+                             PrepareMessage{.block_id = id, .producer = self, .signer = key});
+                         on_prepare(state, self, message);
+                         network().multicast_producers(message);
+                      });
       }
       void save_commit_data(const BlockHeaderState* state)
       {
@@ -702,8 +753,8 @@ namespace psibase::net
             {
                verify_commit(state);
                // This is possible if we receive the commits before the corresponding prepares
+               set_view(state->info.header.term);
                chain().set_subtree(state);
-               Base::switch_fork();
             }
             else if (chain().commit(state->blockNum()))
             {
@@ -714,19 +765,23 @@ namespace psibase::net
       void do_commit(const BlockHeaderState* state, AccountNumber producer)
       {
          const auto& id = state->blockId();
-         for_each_key(
-             [&](const auto& key)
-             {
-                auto message = network().sign_message(
-                    CommitMessage{.block_id = id, .producer = self, .signer = key});
-                on_commit(state, self, message);
-                network().multicast_producers(message);
-             });
+         for_each_key(state,
+                      [&](const auto& key)
+                      {
+                         auto message = network().sign_message(
+                             CommitMessage{.block_id = id, .producer = self, .signer = key});
+                         on_commit(state, self, message);
+                         network().multicast_producers(message);
+                      });
       }
       std::optional<std::vector<char>> makeBlockData(const BlockHeaderState* state)
       {
          if (state->producers->algorithm == ConsensusAlgorithm::bft)
          {
+            // This may be empty if the last committed block is not BFT.
+            // In that case, the block data is never required, because
+            // a block that changes consensus cannot come before the
+            // current consensus goes live.
             return chain().getBlockData(chain().get_block_id(state->info.header.commitNum));
          }
          else
@@ -815,6 +870,10 @@ namespace psibase::net
                // once we track the verify service code in the block headers.
                auto verifyState = chain().get_state(chain().get_block_id(chain().commit_index()));
                verifyIrreversibleSignature(verifyState->revision, data, committed);
+               if (committed->producers->algorithm == ConsensusAlgorithm::bft)
+               {
+                  chain().setBlockData(committed->blockId(), *aux);
+               }
                // Ensure that the committed block is a candidate for the best block
                set_view(committed->info.header.term);
                if (!chain().in_best_chain(committed->xid()))
@@ -866,9 +925,14 @@ namespace psibase::net
          {
             return;
          }
+         if (state->producers->algorithm != ConsensusAlgorithm::bft)
+         {
+            return;
+         }
          validate_producer(state, msg.data->producer(), msg.data->signer());
-         // TODO: should we update the sender's view here? same for commit.
+         do_view_change(msg.data->producer(), msg.data->signer(), state->info.header.term);
          on_prepare(state, msg.data->producer(), msg);
+         Base::switch_fork();
       }
       void recv(peer_id peer, const SignedMessage<CommitMessage>& msg)
       {
@@ -877,34 +941,28 @@ namespace psibase::net
          {
             return;
          }
+         if (state->producers->algorithm != ConsensusAlgorithm::bft)
+         {
+            return;
+         }
          validate_producer(state, msg.data->producer(), msg.data->signer());
+         do_view_change(msg.data->producer(), msg.data->signer(), state->info.header.term);
          on_commit(state, msg.data->producer(), msg);
+         Base::switch_fork();
       }
 
       void recv(peer_id peer, const ViewChangeMessage& msg)
       {
-         if (producer_views.empty())
+         if (do_view_change(msg.producer, msg.signer, msg.term) && msg.term < current_term)
          {
-            // Not a producer
-            return;
-         }
-         // ignore unexpected view changes. We can fail to recognize a valid
-         // view change due to being ahead or behind other nodes.
-         if (auto expected = active_producers[0]->getClaim(msg.producer))
-         {
-            if (*expected == msg.signer)
-            {
-               set_producer_view(msg.term, msg.producer);
-               auto view_copy = producer_views;
-               auto offset    = active_producers[0]->size() * 2 / 3;
-               // if > 1/3 are ahead of current view trigger view change
-               std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
-               if (view_copy[offset] > current_term)
-               {
-                  set_view(view_copy[offset]);
-                  start_timer();
-               }
-            }
+            // If we receive an out-dated view, notify the sender of our view
+            for_each_key(
+                [&](const auto& k)
+                {
+                   network().async_send_block(
+                       peer, ViewChangeMessage{.term = current_term, .producer = self, .signer = k},
+                       [](const std::error_code&) {});
+                });
          }
       }
    };
