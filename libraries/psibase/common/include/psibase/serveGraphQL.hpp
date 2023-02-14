@@ -94,6 +94,7 @@ namespace psibase
    {
       Node        node;
       std::string cursor;
+      PSIO_REFLECT(Edge, node, cursor)
    };
 
    template <typename Node, psio::FixedString EdgeName>
@@ -101,49 +102,6 @@ namespace psibase
    {
       return EdgeName.c_str();
    }
-
-   struct ReflectEdge
-   {
-      static constexpr bool is_defined = true;
-      static constexpr bool is_struct  = true;
-      template <typename L>
-      constexpr inline static void for_each(L&& lambda)
-      {
-         {
-            auto off = ~uint64_t(0);
-            (void)lambda(psio::meta{.name = "node", .offset = off, .number = 0 + 1},
-                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::node)
-                         { return &psio::remove_cvref_t<decltype(*p)>::node; });
-         }
-         {
-            auto off = ~uint64_t(0);
-            (void)lambda(psio::meta{.name = "cursor", .offset = off, .number = 1 + 1},
-                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::cursor)
-                         { return &psio::remove_cvref_t<decltype(*p)>::cursor; });
-         }
-      }
-      template <typename L>
-      inline static bool get_by_name(uint64_t n, L&& lambda)
-      {
-         switch (n)
-         {
-            case psio::hash_name("node"):
-               (void)lambda(psio::meta{.name = "node", .number = 0 + 1},
-                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::node)
-                            { return &psio::remove_cvref_t<decltype(*p)>::node; });
-               return true;
-            case psio::hash_name("cursor"):
-               (void)lambda(psio::meta{.name = "cursor", .number = 1 + 1},
-                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::cursor)
-                            { return &psio::remove_cvref_t<decltype(*p)>::cursor; });
-               return true;
-         }
-         return false;
-      }
-   };  // ReflectEdge
-
-   template <typename Node, psio::FixedString EdgeName>
-   ReflectEdge get_reflect_impl(const Edge<Node, EdgeName>&);
 
    /// GraphQL support for paging
    ///
@@ -157,6 +115,7 @@ namespace psibase
 
       std::vector<Edge> edges;
       PageInfo          pageInfo;
+      PSIO_REFLECT(Connection, edges, pageInfo)
    };
 
    template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
@@ -164,49 +123,6 @@ namespace psibase
    {
       return ConnectionName.c_str();
    }
-
-   struct ReflectConnection
-   {
-      static constexpr bool is_defined = true;
-      static constexpr bool is_struct  = true;
-      template <typename L>
-      constexpr inline static void for_each(L&& lambda)
-      {
-         {
-            auto off = ~uint64_t(0);
-            (void)lambda(psio::meta{.name = "edges", .offset = off, .number = 0 + 1},
-                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::edges)
-                         { return &psio::remove_cvref_t<decltype(*p)>::edges; });
-         }
-         {
-            auto off = ~uint64_t(0);
-            (void)lambda(psio::meta{.name = "pageInfo", .offset = off, .number = 1 + 1},
-                         [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::pageInfo)
-                         { return &psio::remove_cvref_t<decltype(*p)>::pageInfo; });
-         }
-      }
-      template <typename L>
-      inline static bool get_by_name(uint64_t n, L&& lambda)
-      {
-         switch (n)
-         {
-            case psio::hash_name("edges"):
-               (void)lambda(psio::meta{.name = "edges", .number = 0 + 1},
-                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::edges)
-                            { return &psio::remove_cvref_t<decltype(*p)>::edges; });
-               return true;
-            case psio::hash_name("pageInfo"):
-               (void)lambda(psio::meta{.name = "pageInfo", .number = 1 + 1},
-                            [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::pageInfo)
-                            { return &psio::remove_cvref_t<decltype(*p)>::pageInfo; });
-               return true;
-         }
-         return false;
-      }
-   };  // ReflectConnection
-
-   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
-   ReflectConnection get_reflect_impl(const Connection<Node, ConnectionName, EdgeName>&);
 
    /// GraphQL Pagination through TableIndex
    ///
@@ -560,14 +476,13 @@ namespace psibase
       DbId          db;
       uint64_t      eventId;
       AccountNumber service;
-
-      struct Reflect
-      {
-         static constexpr psio::FixedString name      = psio::reflect<Events>::name;
-         static constexpr bool              is_struct = false;
-      };
-      friend Reflect get_reflect_impl(const EventDecoder&);
    };
+
+   template <typename Events>
+   auto get_type_name(const EventDecoder<Events>*)
+   {
+      return psio::get_type_name<Events>();
+   }
 
    template <typename Events>
    auto get_gql_name(EventDecoder<Events>*)
@@ -742,10 +657,22 @@ namespace psibase
              },
              input_stream, output_stream, error, true);
 
-      psio::input_stream stream(v->data(), v->size());
+      std::uint32_t pos = 0;
+
+      auto fracunpack = [&](auto& value)
+      {
+         bool has_unknown = false;
+         bool known_end;
+         if (!psio::is_packable<std::remove_reference_t<decltype(value)>>::template unpack<true,
+                                                                                           false>(
+                 &value, has_unknown, known_end, v->data(), pos, v->size()))
+            check(false, "Invalid frac encoding");
+         check(known_end,
+               "The end of the object must be known in order to decode consecutive packed objects");
+      };
 
       AccountNumber service;
-      fracunpack(service, stream);
+      fracunpack(service);
       if (service != decoder.service)
          return gql_query(
              EventDecoderStatus{
@@ -760,7 +687,7 @@ namespace psibase
              input_stream, output_stream, error, true);
 
       MethodNumber type;
-      fracunpack(type, stream);
+      fracunpack(type);
 
       bool ok    = true;
       bool found = false;
@@ -772,10 +699,11 @@ namespace psibase
              static_assert(MT::isFunction);
              using TT = decltype(psio::tuple_remove_view(
                  std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
-             if (psio::fracvalidate<TT>(stream.pos, stream.end).valid)
+             std::span<char> eventData{v->data() + pos, v->data() + v->size()};
+             if (psio::fracpack_validate<TT>(eventData))
              {
                 found      = true;
-                auto value = psio::convert_from_frac<TT>(stream);
+                auto value = psio::from_frac<TT>(psio::prevalidated{eventData});
                 ok = gql_query_decoder_value(decoder, type, value, input_stream, output_stream,
                                              error,
                                              {meta.param_names.begin(), meta.param_names.end()});
@@ -799,13 +727,12 @@ namespace psibase
    }  // gql_query(EventDecoder)
 
    template <typename T>
-   concept EventType = requires(T events)
-   {
-      typename decltype(events)::History;
-      // Don't require Ui and Merkle for now
-      //typename decltype(events)::Ui;
-      //typename decltype(events)::Merkle;
-   };
+   concept EventType = requires(T events) {
+                          typename decltype(events)::History;
+                          // Don't require Ui and Merkle for now
+                          //typename decltype(events)::Ui;
+                          //typename decltype(events)::Merkle;
+                       };
 
    /// GraphQL support for decoding multiple events
    ///
@@ -924,62 +851,9 @@ namespace psibase
          return result;
       }
 
-      struct Reflect
-      {
-         static constexpr bool is_defined = true;
-         static constexpr bool is_struct  = true;
-         template <typename L>
-         constexpr inline static void for_each(L&& lambda)
-         {
-            lambda(
-                psio::meta{
-                    .name        = "history",
-                    .param_names = {"ids"},
-                },
-                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::history)
-                { return &psio::remove_cvref_t<decltype(*p)>::history; });
-            lambda(
-                psio::meta{
-                    .name        = "ui",
-                    .param_names = {"ids"},
-                },
-                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::ui)
-                { return &psio::remove_cvref_t<decltype(*p)>::ui; });
-            lambda(
-                psio::meta{
-                    .name        = "merkle",
-                    .param_names = {"ids"},
-                },
-                [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::merkle)
-                { return &psio::remove_cvref_t<decltype(*p)>::merkle; });
-         }
-         template <typename L>
-         inline static bool get_by_name(uint64_t n, L&& lambda)
-         {
-            switch (n)
-            {
-               case psio::hash_name(BOOST_PP_STRINGIZE(history)):
-                  (void)lambda(psio::meta{.name = "history", .param_names = {"ids"}},
-                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::history)
-                               { return &psio::remove_cvref_t<decltype(*p)>::history; });
-                  break;
-               case psio::hash_name(BOOST_PP_STRINGIZE(ui)):
-                  (void)lambda(psio::meta{.name = "ui", .param_names = {"ids"}},
-                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::ui)
-                               { return &psio::remove_cvref_t<decltype(*p)>::ui; });
-                  break;
-               case psio::hash_name(BOOST_PP_STRINGIZE(merkle)):
-                  (void)lambda(psio::meta{.name = "merkle", .param_names = {"ids"}},
-                               [](auto p) -> decltype(&psio::remove_cvref_t<decltype(*p)>::merkle)
-                               { return &psio::remove_cvref_t<decltype(*p)>::merkle; });
-                  break;
-            }
-            return false;
-         }
-      };  // Reflect
+      PSIO_REFLECT(EventQuery, method(history, ids), method(ui, ids), method(merkle, ids))
 
-      friend Reflect get_reflect_impl(const EventQuery&);
-      friend auto    get_type_name(EventQuery*) { return psio::get_type_name<Events>(); }
+      friend auto get_type_name(EventQuery*) { return psio::get_type_name<Events>(); }
    };  // EventQuery
 
    /// GraphQL support for a linked list of events
@@ -1127,8 +1001,8 @@ namespace psibase
    {
       using Decoder    = EventDecoder<Events>;
       using Connection = psibase::Connection<  //
-          Decoder, psio::reflect<Decoder>::name + "Connection",
-          psio::reflect<Decoder>::name + "Edge">;
+          Decoder, psio::reflect<Events>::name + "Connection",
+          psio::reflect<Events>::name + "Edge">;
       Connection result;
       result.pageInfo.hasNextPage = true;
       bool excludeFirst           = false;
@@ -1157,10 +1031,23 @@ namespace psibase
             result.pageInfo.hasNextPage = false;
             break;
          }
-         psio::input_stream stream(v->data(), v->size());
+
+         std::uint32_t pos = 0;
+
+         auto fracunpack = [&](auto& value)
+         {
+            bool has_unknown = false;
+            bool known_end;
+            if (!psio::is_packable<std::remove_reference_t<decltype(value)>>::template unpack<
+                    true, false>(&value, has_unknown, known_end, v->data(), pos, v->size()))
+               check(false, "Invalid frac encoding");
+            check(known_end,
+                  "The end of the object must be known in order to decode consecutive packed "
+                  "objects");
+         };
 
          AccountNumber c;
-         fracunpack(c, stream);
+         fracunpack(c);
          if (c != service)
          {
             result.pageInfo.hasNextPage = false;
@@ -1168,7 +1055,7 @@ namespace psibase
          }
 
          MethodNumber type;
-         fracunpack(type, stream);
+         fracunpack(type);
 
          bool found = false;
          psio::reflect<Events>::get_by_name(
@@ -1180,9 +1067,10 @@ namespace psibase
                 using TT = decltype(psio::tuple_remove_view(
                     std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
                 // TODO: EventDecoder validates and unpacks this again
-                if (psio::fracvalidate<TT>(stream.pos, stream.end).valid)
+                std::span<const char> eventData{v->data() + pos, v->data() + v->size()};
+                if (psio::fracpack_validate<TT>(eventData))
                 {
-                   auto value = psio::convert_from_frac<TT>(stream);
+                   auto value = psio::from_frac<TT>(psio::prevalidated{eventData});
                    get_event_field<0>(  //
                        value, fieldName, {}, {meta.param_names.begin(), meta.param_names.end()},
                        [&](auto _, const auto& field)

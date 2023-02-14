@@ -1,3 +1,5 @@
+#define OPENSSL_SUPPRESS_DEPRECATED
+
 #include <psibase/crypto.hpp>
 
 #include <openssl/sha.h>
@@ -126,8 +128,11 @@ namespace psibase
    Checksum256 sha256(const char* data, size_t length)
    {
       //std::array<unsigned char, 256 / 8> result;
+      SHA256_CTX ctx;
+      SHA256_Init(&ctx);
+      SHA256_Update(&ctx, (const unsigned char*)data, length);
       Checksum256 result;
-      SHA256((const unsigned char*)data, length, (unsigned char*)result.data());
+      SHA256_Final((unsigned char*)result.data(), &ctx);
       return result;
    }
 

@@ -1,8 +1,8 @@
 #include <secp256k1_preallocated.h>
-#include <services/system/VerifyEcSys.hpp>
 #include <psibase/check.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/from_bin.hpp>
+#include <services/system/VerifyEcSys.hpp>
 
 using namespace psibase;
 
@@ -26,14 +26,13 @@ extern "C" [[clang::export_name("verify")]] void verify()
    check(context, "VerifyEcSys not fully built");
 
    auto act  = getCurrentAction();
-   auto data = psio::convert_from_frac<VerifyArgs>(act.rawData);
+   auto data = psio::from_frac<VerifyArgs>(act.rawData);
 
-   check(psio::fracvalidate<PublicKey>(data.claim.rawData).valid_and_known(),
-         "Claim has invalid format");
-   auto pub_key = psio::convert_from_frac<PublicKey>(data.claim.rawData);
+   check(psio::fracpack_validate_strict<PublicKey>(data.claim.rawData), "Claim has invalid format");
+   auto pub_key = psio::from_frac<PublicKey>(psio::prevalidated{data.claim.rawData});
 
-   check(psio::fracvalidate<Signature>(data.proof).valid_and_known(), "Proof has invalid format");
-   auto sig = psio::convert_from_frac<Signature>(data.proof);
+   check(psio::fracpack_validate_strict<Signature>(data.proof), "Proof has invalid format");
+   auto sig = psio::from_frac<Signature>(psio::prevalidated{data.proof});
 
    auto* k1_pub_key = std::get_if<0>(&pub_key.data);
    auto* k1_sig     = std::get_if<0>(&sig.data);

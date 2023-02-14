@@ -26,15 +26,13 @@ SCENARIO("Minting & burning nfts")
 {
    GIVEN("An empty chain with registered users Alice and Bob")
    {
-      DefaultTestChain t({{NftSys::service, "NftSys.wasm"}});
+      DefaultTestChain t;
 
       auto alice = t.from(t.add_account("alice"_a));
       auto bob   = t.from(t.add_account("bob"_a));
 
       auto a = alice.to<NftSys>();
       auto b = bob.to<NftSys>();
-
-      a.init();
 
       THEN("Alice can mint an NFT")
       {
@@ -44,7 +42,7 @@ SCENARIO("Minting & burning nfts")
          AND_THEN("The NFT exists")
          {
             NftRecord expected{
-                .id     = 1,         // First minted NFT (skipping 0)
+                .id     = 2,         // Second minted NFT (first is the system token)
                 .issuer = alice.id,  //
                 .owner  = alice.id   //
             };
@@ -53,27 +51,24 @@ SCENARIO("Minting & burning nfts")
 
             // Todo - Use simple comparison if/when eventHead is removed from the record.
             //CHECK(nft == expected);
-            CHECK((nft.id == expected.id             //
-                   && nft.issuer == expected.issuer  //
-                   && nft.owner == expected.owner));
+
+            CHECK(nft.id == expected.id);
+            CHECK(nft.issuer == expected.issuer);
+            CHECK(nft.owner == expected.owner);
          }
       }
       WHEN("Alice mints an NFT")
       {
-         t.startBlock();
-         auto mint = a.mint();
-         t.startBlock();
+         auto mint  = a.mint();
          auto mint2 = a.mint();
          auto nft1  = a.getNft(mint.returnVal()).returnVal();
 
-         t.startBlock();
          THEN("Alice can burn the NFT")
          {  //
             CHECK(a.burn(nft1.id).succeeded());
 
             AND_THEN("The NFT no longer exists")
             {  //
-               t.startBlock();
                CHECK(a.getNft(nft1.id).failed(nftBurned));
             }
          }
@@ -88,7 +83,6 @@ SCENARIO("Minting & burning nfts")
          AND_WHEN("Alice mints a second NFT")
          {
             auto mint3 = a.mint();
-            t.startBlock();
 
             THEN("The NFT is identical in every way, except the ID is incremented")
             {
@@ -107,17 +101,15 @@ SCENARIO("Transferring NFTs")
 {
    GIVEN("A chain with registered users Alice, Bob, and Charlie")
    {
-      DefaultTestChain t({{NftSys::service, "NftSys.wasm"}});
+      DefaultTestChain t;
 
-      auto alice   = t.from(t.add_account("alice"));
+      auto alice   = t.from(t.add_account("alice"_a));
       auto bob     = t.from(t.add_account("bob"));
       auto charlie = t.from(t.add_account("charlie"));
 
       auto a = alice.to<NftSys>();
       auto b = bob.to<NftSys>();
       auto c = charlie.to<NftSys>();
-
-      a.init();
 
       THEN("Bob is configured to use auto-debit by default")
       {
@@ -131,10 +123,11 @@ SCENARIO("Transferring NFTs")
 
       THEN("Alice is unable to credit, uncredit, or debit a non-existent NFT")
       {
-         CHECK(a.credit(1, bob, "memo").failed(nftDNE));
-         CHECK(a.uncredit(1, "memo").failed(nftDNE));
-         CHECK(a.debit(1, "memo").failed(nftDNE));
-         CHECK(a.debit(1, "memo").failed(nftDNE));
+         NID invalidId = 99;
+         CHECK(a.credit(invalidId, bob, "memo").failed(nftDNE));
+         CHECK(a.uncredit(invalidId, "memo").failed(nftDNE));
+         CHECK(a.debit(invalidId, "memo").failed(nftDNE));
+         CHECK(a.debit(invalidId, "memo").failed(nftDNE));
       }
       AND_GIVEN("Alice has minted an NFT")
       {
@@ -159,28 +152,6 @@ SCENARIO("Transferring NFTs")
          THEN("Alice may credit the NFT to Bob")
          {
             CHECK(a.credit(nft.id, bob, "memo").succeeded());
-         }
-         THEN("Alice may credit the NFT to Bob with an acceptably long memo")
-         {
-            string validMemo =
-                "0123456789ABCDEF"
-                "0123456789ABCDEF"
-                "0123456789ABCDEF"
-                "0123456789ABCDEF"
-                "0123456789ABCDEF";
-            CHECK(a.credit(nft.id, bob, validMemo).succeeded());
-         }
-         THEN("Alice may not credit the NFT to Bob with an unacceptably long memo")
-         {
-            string invalidMemo =
-                "0123456789ABCDEF"
-                "0123456789ABCDEF"
-                "0123456789ABCDEF"
-                "0123456789ABCDEF"
-                "0123456789ABCDEF"
-                "1";
-            //CHECK(a.credit(nft.id, bob, invalidMemo).failed(String::error_invalid));
-            // TODO
          }
          WHEN("Alice credits the NFT to Bob")
          {
@@ -250,7 +221,6 @@ SCENARIO("Transferring NFTs")
                   }
                   THEN("Bob may not debit the NFT again")
                   {
-                     t.startBlock();
                      CHECK(b.debit(nft.id, "memo").failed(debitRequiresCredit));
                   }
                }
@@ -260,7 +230,6 @@ SCENARIO("Transferring NFTs")
 
                   THEN("No one can debit or uncredit the NFT")
                   {
-                     t.startBlock();
                      CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
                      CHECK(b.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
                      CHECK(c.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
@@ -271,7 +240,6 @@ SCENARIO("Transferring NFTs")
                   }
                   THEN("Alice may credit the NFT again")
                   {
-                     t.startBlock();
                      CHECK(a.credit(nft.id, bob, "memo").succeeded());
                   }
                }

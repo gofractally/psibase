@@ -165,7 +165,8 @@ namespace psio
             varuint64_from_bin(size, stream);
             stream.check_available(size * sizeof(T));
             v.resize(size);
-            stream.read(reinterpret_cast<char*>(v.data()), size * sizeof(T));
+            if (size)
+               stream.read(reinterpret_cast<char*>(v.data()), size * sizeof(T));
          }
          else
          {
@@ -173,7 +174,8 @@ namespace psio
             varuint32_from_bin(size, stream);
             stream.check_available(size * sizeof(T));
             v.resize(size);
-            stream.read(reinterpret_cast<char*>(v.data()), size * sizeof(T));
+            if (size)
+               stream.read(reinterpret_cast<char*>(v.data()), size * sizeof(T));
          }
       }
       else

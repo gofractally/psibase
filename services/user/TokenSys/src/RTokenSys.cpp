@@ -57,7 +57,7 @@ struct TokenQuery
       return tokenSys.index<TokenTable, 0>();
    }
 
-   auto userConf(AccountNumber user, psibase::NamedBit flag) const
+   auto userConf(AccountNumber user, psibase::EnumElement flag) const
    {
       return to<TokenSys>().getUserConf(user, flag);
    }
@@ -106,7 +106,7 @@ optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
 void RTokenSys::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content),
+   storeContent(std::move(path), std::move(contentType), std::move(content),
                 ServiceTables<WebContentTable>{getReceiver()});
 }
 

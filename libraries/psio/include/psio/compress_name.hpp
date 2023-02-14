@@ -73,7 +73,7 @@ namespace psio
          {
             auto cumulative_frequency = model_cf[m_last_byte];
             prob p                    = {cumulative_frequency[c], cumulative_frequency[c + 1],
-                      cumulative_frequency[model_width]};
+                                         cumulative_frequency[model_width]};
             update(c);
             return p;
          }
@@ -104,8 +104,8 @@ namespace psio
 
          static constexpr uint32_t symbol_count      = 27;
          static constexpr char    symbol_to_char[27] = {0,   'e', 'a', 'i', 'o', 't', 'n', 'r', 's',
-                                                     'l', 'c', 'u', 'h', 'd', 'p', 'm', 'y', 'g',
-                                                     'b', 'f', 'w', 'v', 'k', 'z', 'x', 'q', 'j'};
+                                                        'l', 'c', 'u', 'h', 'd', 'p', 'm', 'y', 'g',
+                                                        'b', 'f', 'w', 'v', 'k', 'z', 'x', 'q', 'j'};
          static constexpr uint8_t char_to_symbol[256] = {
              0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0,  0,  0,  0,
              0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 0,  0,  0,  0,
@@ -420,7 +420,6 @@ namespace psio
          code_value high  = func_model::MAX_CODE;
          code_value low   = 0;
          code_value value = 0;
-         int        count = 0;
          for (int i = 0; (i < func_model::code_value_bits) and not_eof; i++)
          {
             value <<= 1;
@@ -429,7 +428,6 @@ namespace psio
          while (not_eof)
          {
             code_value range = high - low + 1;
-            ++count;
 
             if (range == 0)
                return "RUNTIME LOGIC ERROR";

@@ -9,6 +9,7 @@
 #include <memory>
 #include <psibase/SignedMessage.hpp>
 #include <psibase/log.hpp>
+#include <psibase/message_serializer.hpp>
 #include <psibase/net_base.hpp>
 #include <psio/fracpack.hpp>
 #include <queue>
@@ -17,10 +18,7 @@
 namespace psibase::net
 {
    template <typename T, typename Derived>
-   concept has_recv = requires(Derived& d, const T& msg)
-   {
-      d.consensus().recv(0, msg);
-   };
+   concept has_recv = requires(Derived& d, const T& msg) { d.consensus().recv(0, msg); };
 
    // message type 0 is reserved to ensure that message signatures
    // are disjoint from block signatures.
@@ -44,7 +42,7 @@ namespace psibase::net
 
    // This requires all producers to be peers
    template <typename Derived>
-   struct direct_routing
+   struct direct_routing : message_serializer<Derived>
    {
       auto& peers() { return static_cast<Derived*>(this)->peers(); }
       auto& chain() { return static_cast<Derived*>(this)->chain(); }
@@ -65,7 +63,7 @@ namespace psibase::net
       void async_send_block(peer_id id, const Msg& msg, F&& f)
       {
          PSIBASE_LOG(peers().logger(id), debug) << "Sending message: " << msg.to_string();
-         peers().async_send(id, serialize_message(msg), std::forward<F>(f));
+         peers().async_send(id, this->serialize_message(msg), std::forward<F>(f));
       }
       // Sends a message to each peer in a list
       // each peer will receive the message only once even if it is duplicated in the input list.
@@ -74,7 +72,7 @@ namespace psibase::net
       {
          std::sort(dest.begin(), dest.end());
          dest.erase(std::unique(dest.begin(), dest.end()), dest.end());
-         auto serialized_message = serialize_message(msg);
+         auto serialized_message = this->serialize_message(msg);
          for (auto peer : dest)
          {
             PSIBASE_LOG(peers().logger(peer), debug) << "Sending message: " << msg.to_string();
@@ -144,48 +142,13 @@ namespace psibase::net
          }
          return true;
       }
-      template <typename Msg>
-      static std::vector<char> serialize_unsigned_message(const Msg& msg)
-      {
-         static_assert(Msg::type < 128);
-         std::vector<char> result(psio::fracpack_size(msg) + 1);
-         result[0] = Msg::type;
-         psio::fast_buf_stream s(result.data() + 1, result.size() - 1);
-         psio::fracpack(msg, s);
-         return result;
-      }
-      template <NeedsSignature Msg>
-      SignedMessage<Msg> sign_message(const Msg& msg)
-      {
-         auto  raw   = serialize_unsigned_message(msg);
-         Claim claim = msg.signer;
-         auto  sig   = chain().sign({raw.data(), raw.size()}, claim);
-         return {msg, sig};
-      }
-      template <typename Msg>
-      std::vector<char> serialize_signed_message(const Msg& msg)
-      {
-         // TODO: avoid serializing the message twice
-         return serialize_unsigned_message(sign_message(msg));
-      }
-      template <typename Msg>
-      auto serialize_message(const Msg& msg)
-      {
-         return serialize_unsigned_message(msg);
-      }
-      template <NeedsSignature Msg>
-      auto serialize_message(const Msg& msg)
-      {
-         return serialize_signed_message(msg);
-      }
       template <typename T>
       void try_recv_impl(peer_id peer, psio::input_stream& s)
       {
          try
          {
             using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-            check(psio::fracvalidate<message_type>(s.pos, s.end).valid, "Invalid message");
-            return recv(peer, psio::convert_from_frac<message_type>(s));
+            return recv(peer, psio::from_frac<message_type>({s.pos, s.end}));
          }
          catch (std::exception& e)
          {

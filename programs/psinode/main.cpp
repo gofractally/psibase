@@ -137,6 +137,69 @@ void validate(boost::any& v, const std::vector<std::string>& values, autoconnect
    }
 }
 
+struct byte_size
+{
+   std::size_t value;
+};
+
+void validate(boost::any& v, const std::vector<std::string>& values, byte_size*, int)
+{
+   boost::program_options::validators::check_first_occurrence(v);
+   std::string_view s = boost::program_options::validators::get_single_string(values);
+
+   byte_size result;
+   auto      err = std::from_chars(s.begin(), s.end(), result.value);
+   if (err.ec != std::errc())
+   {
+      throw std::runtime_error("Expected number");
+   }
+   s = {err.ptr, s.end()};
+   if (!s.empty())
+   {
+      s = s.substr(std::min(s.find_first_not_of(" \t"), s.size()));
+      if (s == "B")
+      {
+      }
+      else if (s == "KiB" || s == "K")
+      {
+         result.value <<= 10;
+      }
+      else if (s == "MiB" || s == "M")
+      {
+         result.value <<= 20;
+      }
+      else if (s == "GiB" || s == "G")
+      {
+         result.value <<= 30;
+      }
+      else if (s == "TiB" || s == "T")
+      {
+         result.value <<= 40;
+      }
+      else if (s == "KB")
+      {
+         result.value *= 1000;
+      }
+      else if (s == "MB")
+      {
+         result.value *= 1000000;
+      }
+      else if (s == "GB")
+      {
+         result.value *= 1000000000;
+      }
+      else if (s == "TB")
+      {
+         result.value *= 1000000000000;
+      }
+      else
+      {
+         throw std::runtime_error("Unknown unit: " + std::string(s));
+      }
+   }
+   v = result;
+};
+
 std::filesystem::path get_prefix()
 {
    auto prefix = std::filesystem::read_symlink("/proc/self/exe").parent_path();
@@ -154,6 +217,10 @@ std::filesystem::path parse_path(std::string_view             s,
    if (s.starts_with("$PREFIX"))
    {
       return get_prefix() / std::filesystem::path(s.substr(7)).relative_path();
+   }
+   else if (s.empty())
+   {
+      return std::filesystem::path();
    }
    else
    {
@@ -207,6 +274,8 @@ void load_service(const native_service& config,
 {
    auto  host    = config.host.ends_with('.') ? config.host + root_host : config.host;
    auto& service = services[config.host];
+   if (config.root.empty())
+      return;
    for (const auto& entry : std::filesystem::recursive_directory_iterator{config.root})
    {
       auto                 extension = entry.path().filename().extension().native();
@@ -271,7 +340,7 @@ namespace psibase
             throw std::runtime_error("Not implemented: keys from service " + key.service.str());
          }
          auto result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
-             key.service, psio::convert_from_frac<PrivateKey>(key.rawData));
+             key.service, psio::from_frac<PrivateKey>(key.rawData));
          v = std::shared_ptr<Prover>(std::move(result));
       }
       else
@@ -320,7 +389,9 @@ struct transaction_queue
    }
 
 #define CATCH_IGNORE \
-   catch (...) {}
+   catch (...)       \
+   {                 \
+   }
 
 bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 {
@@ -328,8 +399,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
    {
       // TODO: verify no extra data
       // TODO: view
-      auto transactions =
-          psio::convert_from_frac<std::vector<SignedTransaction>>(entry.packed_signed_trx);
+      auto transactions = psio::from_frac<std::vector<SignedTransaction>>(entry.packed_signed_trx);
       TransactionTrace trace;
 
       try
@@ -426,7 +496,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
    {
       // TODO: verify no extra data
       // TODO: view
-      auto             trx = psio::convert_from_frac<SignedTransaction>(entry.packed_signed_trx);
+      auto             trx = psio::from_frac<SignedTransaction>(entry.packed_signed_trx);
       TransactionTrace trace;
 
       try
@@ -669,6 +739,144 @@ struct Perf
    TransactionStats        transactions;
 };
 PSIO_REFLECT(Perf, timestamp, memory, tasks, transactions)
+
+void write_om_descriptor(std::string_view name,
+                         std::string_view type,
+                         std::string_view unit,
+                         std::string_view help,
+                         auto&            stream)
+{
+   stream.write("# TYPE ", 7);
+   stream.write(name.data(), name.size());
+   stream.write(' ');
+   stream.write(type.data(), type.size());
+   stream.write('\n');
+
+   if (!unit.empty())
+   {
+      stream.write("# UNIT ", 7);
+      stream.write(name.data(), name.size());
+      stream.write(' ');
+      stream.write(unit.data(), unit.size());
+      stream.write('\n');
+   }
+
+   stream.write("# HELP ", 7);
+   stream.write(name.data(), name.size());
+   stream.write(' ');
+   stream.write(help.data(), help.size());
+   stream.write('\n');
+}
+
+void write_om_mem(std::string_view name, std::int64_t v, auto& stream)
+{
+   std::string_view prefix = "psinode_memory_bytes{category=";
+   stream.write(prefix.data(), prefix.size());
+   to_json(name, stream);
+   stream.write("} ", 2);
+   auto value = std::to_string(v);
+   stream.write(value.data(), value.size());
+   stream.write('\n');
+}
+
+void write_om_mem(const Perf& perf, auto& stream)
+{
+   write_om_descriptor("psinode_memory_bytes", "gauge", "bytes", "Resident Memory", stream);
+   write_om_mem("database", perf.memory.database, stream);
+   write_om_mem("code", perf.memory.code, stream);
+   write_om_mem("data", perf.memory.data, stream);
+   write_om_mem("wasm_code", perf.memory.wasmCode, stream);
+   write_om_mem("wasm_memory", perf.memory.wasmMemory, stream);
+   write_om_mem("unclassified", perf.memory.unclassified, stream);
+}
+
+std::string usec_as_sec(std::int64_t time)
+{
+   return std::to_string(time) + "e-6";
+}
+
+void write_om_sample(std::string_view name, std::string_view value, auto& stream)
+{
+   stream.write(name.data(), name.size());
+   stream.write(' ');
+   stream.write(value.data(), value.size());
+   stream.write('\n');
+}
+
+void write_om_task_sample(std::string_view  name,
+                          const ThreadInfo& task,
+                          std::string_view  value,
+                          auto&             stream)
+{
+   stream.write(name.data(), name.size());
+   stream.write("{group=", 7);
+   to_json(task.group, stream);
+   stream.write(",task=", 6);
+   to_json(std::to_string(task.id), stream);
+   stream.write("} ", 2);
+   stream.write(value.data(), value.size());
+   stream.write('\n');
+}
+
+void write_om_tasks(const Perf& perf, auto& stream)
+{
+   write_om_descriptor("psinode_cpu_user_seconds", "counter", "seconds", "CPU Time (User)", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_cpu_user_seconds_total", task, usec_as_sec(task.user), stream);
+   }
+   write_om_descriptor("psinode_cpu_system_seconds", "counter", "seconds", "CPU Time (System)",
+                       stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_cpu_system_seconds_total", task, usec_as_sec(task.system),
+                           stream);
+   }
+   write_om_descriptor("psinode_page_faults", "counter", "", "Page Faults", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_page_faults_total", task, std::to_string(task.pageFaults),
+                           stream);
+   }
+   write_om_descriptor("psinode_read_bytes", "counter", "bytes", "Bytes Read", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_read_bytes_total", task, std::to_string(task.read), stream);
+   }
+   write_om_descriptor("psinode_written_bytes", "counter", "bytes", "Bytes Written", stream);
+   for (const auto& task : perf.tasks)
+   {
+      write_om_task_sample("psinode_written_bytes_total", task, std::to_string(task.written),
+                           stream);
+   }
+}
+
+void write_om_transaction_stats(const TransactionStats& stats, auto& stream)
+{
+   write_om_descriptor("psinode_transactions_submitted", "counter", "", "Total Transactions",
+                       stream);
+   write_om_sample("psinode_transactions_submitted_total", std::to_string(stats.total), stream);
+   write_om_descriptor("psinode_transactions_succeeded", "counter", "", "Succeeded Transactions",
+                       stream);
+   write_om_sample("psinode_transactions_succeeded_total", std::to_string(stats.succeeded), stream);
+   write_om_descriptor("psinode_transactions_failed", "counter", "", "Failed Transactions", stream);
+   write_om_sample("psinode_transactions_failed_total", std::to_string(stats.failed), stream);
+   write_om_descriptor("psinode_transactions_skipped", "counter", "", "Skipped Transactions",
+                       stream);
+   write_om_sample("psinode_transactions_skipped_total", std::to_string(stats.skipped), stream);
+   write_om_descriptor("psinode_transactions_unprocessed", "gauge", "", "Pending Transactions",
+                       stream);
+   write_om_sample("psinode_transactions_unprocessed", std::to_string(stats.unprocessed), stream);
+}
+
+template <typename S>
+void to_openmetrics_text(const Perf& perf, S& stream)
+{
+   write_om_mem(perf, stream);
+   write_om_tasks(perf, stream);
+   write_om_transaction_stats(perf.transactions, stream);
+   stream.write("# EOF\n", 6);
+}
 
 std::int64_t read_as_microseconds(std::istream& is, long clk_tck)
 {
@@ -945,6 +1153,36 @@ Perf get_perf(const SharedState& state, const TransactionStats& transactions)
    return result;
 }
 
+inline constexpr std::size_t ceil_log2(std::size_t v)
+{
+   std::size_t result = 0;
+   while ((std::size_t(1) << result) < v)
+   {
+      ++result;
+   }
+   return result;
+}
+
+struct DbConfig
+{
+   DbConfig(byte_size cache, byte_size total)
+   {
+      constexpr std::size_t average_object_size = 256;
+      max_objects                               = total.value / average_object_size;
+      cool_addr_bits = warm_addr_bits = hot_addr_bits =
+          std::max(ceil_log2(cache.value / 2), std::size_t(27));
+      auto used = (std::size_t(3) << hot_addr_bits);
+      if (used > total.value)
+         used = total.value;
+      cold_addr_bits = std::max(ceil_log2(total.value - used), std::size_t(27));
+   }
+   uint64_t max_objects    = 1'000'000'000ul;
+   uint64_t hot_addr_bits  = 32;
+   uint64_t warm_addr_bits = 32;
+   uint64_t cool_addr_bits = 32;
+   uint64_t cold_addr_bits = 38;
+};
+
 struct TLSConfig
 {
    std::string              certificate;
@@ -1074,6 +1312,7 @@ template <typename Derived>
 using consensus = basic_consensus<Derived, timer_type>;
 
 void run(const std::string&              db_path,
+         const DbConfig&                 db_conf,
          AccountNumber                   producer,
          std::shared_ptr<CompoundProver> prover,
          const std::vector<std::string>& peers,
@@ -1092,8 +1331,10 @@ void run(const std::string&              db_path,
    ExecutionContext::registerHostFunctions();
 
    // TODO: configurable WasmCache size
-   auto sharedState =
-       std::make_shared<psibase::SharedState>(SharedDatabase{db_path, true}, WasmCache{128});
+   auto sharedState = std::make_shared<psibase::SharedState>(
+       SharedDatabase{db_path, true, db_conf.max_objects, db_conf.hot_addr_bits,
+                      db_conf.warm_addr_bits, db_conf.cool_addr_bits, db_conf.cold_addr_bits},
+       WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
    auto queue       = std::make_shared<transaction_queue>();
@@ -1333,6 +1574,24 @@ void run(const std::string&              db_path,
              });
       };
 
+      http_config->get_metrics =
+          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
+      {
+         TransactionStats trx;
+         {
+            std::lock_guard lock{transactionStatsMutex};
+            trx = transactionStats;
+         }
+         callback(
+             [result = get_perf(*sharedState, trx)]() mutable
+             {
+                std::vector<char>   data;
+                psio::vector_stream stream(data);
+                to_openmetrics_text(result, stream);
+                return data;
+             });
+      };
+
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {
          boost::asio::post(chainContext,
@@ -1403,6 +1662,11 @@ void run(const std::string&              db_path,
               &connect_one, callback = std::move(callback)]() mutable
              {
                 std::optional<http::services_t> new_services;
+                for (auto& entry : config.services)
+                {
+                   entry.root =
+                       parse_path(entry.root.native(), std::filesystem::current_path() / db_path);
+                }
                 if (services != config.services || host != config.host)
                 {
                    new_services.emplace();
@@ -1529,7 +1793,7 @@ void run(const std::string&              db_path,
                    if (key.rawData)
                    {
                       result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
-                          key.service, psio::convert_from_frac<PrivateKey>(*key.rawData));
+                          key.service, psio::from_frac<PrivateKey>(*key.rawData));
                    }
                    else
                    {
@@ -1584,7 +1848,15 @@ void run(const std::string&              db_path,
    }
    else
    {
-      server_work.reset();
+      PSIBASE_LOG(loggers::generic::get(), notice)
+          << "The server is not configured to accept connections on any interface. Use --listen "
+             "<port> to add a listener.";
+      boost::asio::post(chainContext,
+                        [&server_work, &timer]
+                        {
+                           server_work.reset();
+                           timer.cancel();
+                        });
    }
 
    node.set_producer_id(producer);
@@ -1699,6 +1971,8 @@ int main(int argc, char* argv[])
    std::vector<std::string>    root_ca;
    std::string                 tls_cert;
    std::string                 tls_key;
+   byte_size                   db_cache_size;
+   byte_size                   db_size;
 
    namespace po = boost::program_options;
 
@@ -1722,6 +1996,13 @@ int main(int argc, char* argv[])
        "Serve static content from directory using the specified virtual host name");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
+   opt("database-size", po::value(&db_size)->default_value({std::size_t(1) << 38}, "256 GiB"),
+       "The maximum size of the database. Must be at least 512 MiB. Warning: this will not modify "
+       "an existing database. This option is subject to change.");
+   opt("database-cache-size",
+       po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
+       "The amount of RAM reserved for the database cache. Must be at least 256 MiB. Warning: this "
+       "will not modify an existing database. This option is subject to change.");
 #ifdef PSIBASE_ENABLE_SSL
    opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
        "A list of trusted Certification Authorities in PEM format");
@@ -1806,8 +2087,9 @@ int main(int argc, char* argv[])
          restart.shutdownRequested = false;
          restart.shouldRestart     = true;
          restart.soft              = true;
-         run(db_path, AccountNumber{producer}, keys, peers, autoconnect, enable_incoming_p2p, host,
-             listen, services, admin, root_ca, tls_cert, tls_key, leeway_us, restart);
+         run(db_path, DbConfig{db_cache_size, db_size}, AccountNumber{producer}, keys, peers,
+             autoconnect, enable_incoming_p2p, host, listen, services, admin, root_ca, tls_cert,
+             tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

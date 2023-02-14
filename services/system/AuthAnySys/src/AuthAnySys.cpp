@@ -16,6 +16,12 @@ namespace SystemService
       if (enable_print)
          psibase::print("auth_check\n");
    }
+
+   void AuthAnySys::canAuthUserSys(psibase::AccountNumber user)
+   {
+      if (enable_print)
+         psibase::print("user_check\n");
+   }
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::AuthAnySys)

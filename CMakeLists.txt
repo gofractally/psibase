@@ -40,11 +40,11 @@ option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 include(GNUInstallDirs)
 
 if(DEFINED WASI_SDK_PREFIX)
-    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
+    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL FILES_MATCHING PATTERN libc.a EXCLUDE)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     ExternalProject_Add(wasi-sdk
-        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-14/wasi-sdk-14.0-linux.tar.gz
-        URL_HASH SHA256=8c8ebb7f71dcccbb8b1ab384499a53913b0b6d1b7b3281c3d70165e0f002e821
+        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-17/wasi-sdk-17.0-linux.tar.gz
+        URL_HASH SHA256=8778a476af7898a51db9b78395687cc9c8b69702850da77a763711e832614dac
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
         INSTALL_COMMAND ""
@@ -52,7 +52,7 @@ elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     ExternalProject_Get_Property(wasi-sdk SOURCE_DIR)
     set(WASI_SDK_PREFIX ${SOURCE_DIR})
     set(wasm-deps wasi-sdk)
-    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI)
+    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI FILES_MATCHING PATTERN libc.a EXCLUDE)
 endif()
 
 if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
@@ -108,8 +108,8 @@ if(BUILD_DOC)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid.min.js)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid-init.js)
-    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/cpp-service/*.cpp)
-    file(GLOB_RECURSE doc-cmake doc/src/cpp-service/*/CMakeLists.txt)
+    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/services/cpp-service/*.cpp)
+    file(GLOB_RECURSE doc-cmake doc/src/services/cpp-service/*/CMakeLists.txt)
     file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
     file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
     add_custom_command(
@@ -195,8 +195,12 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm                ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm                    ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm               ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm                   ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm                       ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm                  ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm                     ${BOOT_IMAGE}
@@ -244,7 +248,7 @@ endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
-    add_subdirectory(doc/psidk/src/cpp-service doc-examples)
+    add_subdirectory(doc/psidk/src/services/cpp-service doc-examples)
 endif()
 
 include(CPackComponent)

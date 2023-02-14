@@ -12,7 +12,7 @@ If enabled, the node will accept p2p connections at the websocket endpoint `/nat
 
 ### Block Producer Name
 
-The name that the server uses to produce blocks. It must be a valid [account name](../cpp-service/reference/magic-numbers.html#psibaseaccountnumber). The node will only produce blocks when its producer name is one of the currently active producers specified by the chain. To disable block production, the producer name can be left blank.
+The name that the server uses to produce blocks. It must be a valid [account name](../services/cpp-service/reference/magic-numbers.html#psibaseaccountnumber). The node will only produce blocks when its producer name is one of the currently active producers specified by the chain. To disable block production, the producer name can be left blank.
 
 ### Host
 

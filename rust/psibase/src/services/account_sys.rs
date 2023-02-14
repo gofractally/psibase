@@ -16,7 +16,7 @@ mod service {
     }
 
     #[action]
-    fn setAuthCntr(authService: AccountNumber) {
+    fn setAuthServ(authService: AccountNumber) {
         unimplemented!()
     }
 

@@ -19,7 +19,7 @@ add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE @ROOT_BINARY_DIR@/wasm/boost)
 
 add_library(catch2 INTERFACE)
-target_include_directories(catch2 INTERFACE @ROOT_BINARY@/wasm/catch2/include)
+target_include_directories(catch2 INTERFACE @ROOT_BINARY_DIR@/wasm/catch2/include)
 target_compile_options(catch2 INTERFACE -DCATCH_CONFIG_NO_POSIX_SIGNALS -DCATCH_CONFIG_DISABLE_EXCEPTIONS)
 
 function(add_libs suffix)

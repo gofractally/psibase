@@ -53,7 +53,7 @@ namespace SystemService
    {
       auto act = getCurrentAction();
       // TODO: use a view
-      auto req = psio::convert_from_frac<HttpRequest>(act.rawData);
+      auto req = psio::from_frac<HttpRequest>(act.rawData);
 
       std::string serviceName;
 

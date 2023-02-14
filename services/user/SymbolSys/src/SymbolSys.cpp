@@ -39,7 +39,7 @@ namespace PricingDefaults
 
 SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
 {
-   MethodNumber m{action->method()->value().get()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
@@ -54,7 +54,7 @@ void SymbolSys::init()
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
-   // Configure manualDebit
+   // Configure manualDebit for self on Token and NFT
    to<TokenSys>().setUserConf("manualDebit"_m, true);
    to<NftSys>().setUserConf("manualDebit"_m, true);
 

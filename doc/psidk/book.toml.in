@@ -21,4 +21,7 @@ additional-js = ["mermaid.min.js", "mermaid-init.js"]
 [output.html.playground]
 runnable = false
 
+[output.html.fold]
+enable = true
+
 #[output.linkcheck]

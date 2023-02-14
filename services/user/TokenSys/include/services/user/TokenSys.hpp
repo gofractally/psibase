@@ -3,6 +3,7 @@
 #include <psibase/String.hpp>
 #include <psibase/psibase.hpp>
 
+#include <services/system/CommonTables.hpp>
 #include <services/user/symbolTables.hpp>
 #include <services/user/tokenErrors.hpp>
 #include <services/user/tokenTables.hpp>
@@ -25,35 +26,35 @@ namespace UserService
 
       TID create(Precision precision, Quantity maxSupply);
 
-      void mint(TID tokenId, Quantity amount, psio::const_view<psibase::String> memo);
+      void mint(TID tokenId, Quantity amount, psio::view<const psibase::String> memo);
 
       //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
       //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
 
       void burn(TID tokenId, Quantity amount);
 
-      void setUserConf(psibase::NamedBit flag, bool enable);
-      void setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable);
+      void setUserConf(psibase::EnumElement flag, bool enable);
+      void setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable);
 
       void credit(TID                               tokenId,
                   psibase::AccountNumber            receiver,
                   Quantity                          amount,
-                  psio::const_view<psibase::String> memo);
+                  psio::view<const psibase::String> memo);
 
       void uncredit(TID                               tokenId,
                     psibase::AccountNumber            receiver,
                     Quantity                          maxAmount,
-                    psio::const_view<psibase::String> memo);
+                    psio::view<const psibase::String> memo);
 
       void debit(TID                               tokenId,
                  psibase::AccountNumber            sender,
                  Quantity                          amount,
-                 psio::const_view<psibase::String> memo);
+                 psio::view<const psibase::String> memo);
 
       void recall(TID                               tokenId,
                   psibase::AccountNumber            from,
                   Quantity                          amount,
-                  psio::const_view<psibase::String> memo);
+                  psio::view<const psibase::String> memo);
 
       void mapSymbol(TID tokenId, SID symbolId);
 
@@ -66,8 +67,8 @@ namespace UserService
                                        psibase::AccountNumber creditor,
                                        psibase::AccountNumber debitor);
       TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
-      bool                getUserConf(psibase::AccountNumber account, psibase::NamedBit flag);
-      bool                getTokenConf(TID tokenId, psibase::NamedBit flag);
+      bool                getUserConf(psibase::AccountNumber account, psibase::EnumElement flag);
+      bool                getTokenConf(TID tokenId, psibase::EnumElement flag);
 
      private:
       void checkAccountValid(psibase::AccountNumber account);
@@ -77,7 +78,7 @@ namespace UserService
       struct Events
       {
          using Account    = psibase::AccountNumber;
-         using StringView = psio::const_view<psibase::String>;
+         using StringView = psio::view<const psibase::String>;
 
          // clang-format off
          struct History
@@ -85,8 +86,8 @@ namespace UserService
             void created(uint64_t prevEvent, TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
             void minted(uint64_t prevEvent, TID tokenId, Account minter, Quantity amount, StringView memo) {}
             void burned(uint64_t prevEvent, TID tokenId, Account burner, Quantity amount) {}
-            void userConfSet(uint64_t prevEvent, Account account, psibase::NamedBit flag, bool enable) {}
-            void tokenConfSet(uint64_t prevEvent, TID tokenId, Account setter, psibase::NamedBit flag, bool enable) {}
+            void userConfSet(uint64_t prevEvent, Account account, psibase::EnumElement flag, bool enable) {}
+            void tokenConfSet(uint64_t prevEvent, TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
             void symbolMapped(uint64_t prevEvent, TID tokenId, Account account, SID symbolId) {}
             // TODO: time is redundant with which block the event was written in
             void transferred(uint64_t prevEvent, TID tokenId, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, StringView memo) {}

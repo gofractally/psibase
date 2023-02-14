@@ -45,8 +45,7 @@ namespace psibase::loggers
             l.unlock();
             boost::asio::dispatch(
                 ctx,
-                [this, f = std::move(f), &current]()
-                {
+                [this, f = std::move(f), &current]() {
                    f(std::error_code(), std::span<const char>{current.data(), current.size()});
                 });
          }

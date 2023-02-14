@@ -1975,9 +1975,11 @@ dependencies = [
 name = "psispace-sys"
 version = "0.1.0"
 dependencies = [
+ "async-graphql",
  "fracpack",
  "psibase",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

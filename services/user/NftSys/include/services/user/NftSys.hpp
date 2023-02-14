@@ -3,6 +3,7 @@
 #include <psibase/String.hpp>
 #include <psibase/psibase.hpp>
 
+#include <services/system/CommonTables.hpp>
 #include <services/user/nftErrors.hpp>
 #include <services/user/nftTables.hpp>
 
@@ -22,10 +23,10 @@ namespace UserService
       void burn(NID nftId);
       void credit(NID                               nftId,
                   psibase::AccountNumber            receiver,
-                  psio::const_view<psibase::String> memo);
-      void uncredit(NID nftId, psio::const_view<psibase::String> memo);
-      void debit(NID nftId, psio::const_view<psibase::String> memo);
-      void setUserConf(psibase::NamedBit flag, bool enable);
+                  psio::view<const psibase::String> memo);
+      void uncredit(NID nftId, psio::view<const psibase::String> memo);
+      void debit(NID nftId, psio::view<const psibase::String> memo);
+      void setUserConf(psibase::EnumElement flag, bool enable);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 
@@ -34,19 +35,19 @@ namespace UserService
       NftHolderRecord getNftHolder(psibase::AccountNumber account);
       CreditRecord    getCredRecord(NID nftId);
       bool            exists(NID nftId);
-      bool            getUserConf(psibase::AccountNumber account, psibase::NamedBit flag);
+      bool            getUserConf(psibase::AccountNumber account, psibase::EnumElement flag);
 
      public:
       struct Events
       {
          using Account    = psibase::AccountNumber;
-         using StringView = psio::const_view<psibase::String>;
+         using StringView = psio::view<const psibase::String>;
          // clang-format off
          struct History
          {
             void minted(uint64_t prevEvent, NID nftId, Account issuer) {}
             void burned(uint64_t prevEvent, NID nftId) {}
-            void userConfSet(uint64_t prevEvent, Account account, psibase::NamedBit flag, bool enable) {}
+            void userConfSet(uint64_t prevEvent, Account account, psibase::EnumElement flag, bool enable) {}
             void credited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, StringView memo) {}
             void uncredited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, StringView memo) {}
             void transferred(uint64_t prevEvent, NID nftId, Account creditor, Account debitor, StringView memo) {}

@@ -128,12 +128,19 @@ namespace SystemService
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
-      // TODO: add a method to allow the auth service to verify
-      //       that it's OK with being the auth service for a
-      //       particular account. AccountSys would call it.
+      /// Verify that a particular user is allowed to use a
+      /// particular auth service. Allows auth services to use user
+      /// whitelists.
+      ///
+      /// Called by AccountSys.
+      ///
+      /// * `user`:  The user being checked
+      // TODO: Return error message instead?
+      void canAuthUserSys(psibase::AccountNumber user);
    };
    PSIO_REFLECT(AuthInterface,
-                method(checkAuthSys, flags, requester, action, allowedActions, claims))
+                method(checkAuthSys, flags, requester, action, allowedActions, claims),
+                method(canAuthUserSys, user))
 
    struct TransactionSysStatus
    {

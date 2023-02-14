@@ -1,123 +1,132 @@
 #include <psibase/cft.hpp>
+
 #include <psibase/fork_database.hpp>
+#include <psibase/log.hpp>
 #include <psibase/mock_routing.hpp>
 #include <psibase/mock_timer.hpp>
 #include <psibase/node.hpp>
 
 #include <boost/asio/io_context.hpp>
-#include <boost/asio/steady_timer.hpp>
 
-#include "mapdb.hpp"
+#include <filesystem>
+#include <random>
 
-#define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
+
+#include "test_util.hpp"
 
 using namespace psibase::net;
 using namespace psibase;
 using namespace psibase::test;
+using namespace std::literals::chrono_literals;
 
-template <typename Derived>
-struct null_link
+using node_type = node<null_link, mock_routing, cft_consensus, ForkDb>;
+
+TEST_CASE("cft crash", "[cft]")
 {
-};
+   TEST_START(logger);
 
-using timer_type = mock_timer;
-//using timer_type = boost::asio::steady_timer;
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
 
-template <typename Derived>
-using cft_consensus = basic_cft_consensus<Derived, timer_type>;
+   setup<CftConsensus>(nodes, {"a", "b", "c"});
 
-template <typename Timer, typename F>
-void loop(Timer& timer, F&& f)
-{
-   using namespace std::literals::chrono_literals;
-   timer.expires_after(10s);
-   timer.async_wait(
-       [&timer, f](const std::error_code& e)
-       {
-          if (!e)
-          {
-             f();
-             loop(timer, f);
-          }
-       });
+   timer_type    timer(ctx);
+   global_random rng;
+   loop(timer, 10s, [&]() { nodes.partition(NetworkPartition::subset(rng)); });
+   // This should result in a steady stream of empty blocks
+   runFor(ctx, 5min);
+   timer.cancel();
+   ctx.poll();
+
+   PSIBASE_LOG(logger, info) << "Final sync";
+   // Make all nodes active
+   nodes.connect_all();
+   runFor(ctx, 10s);
+
+   auto final_state = nodes[0].chain().get_head_state();
+   // Verify that all three chains are consistent
+   CHECK(final_state->blockId() == nodes[1].chain().get_head_state()->blockId());
+   CHECK(final_state->blockId() == nodes[2].chain().get_head_state()->blockId());
+   // Verify that the final block looks sane
+   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   CHECK(final_time <= mock_clock::now());
+   CHECK(final_time >= mock_clock::now() - 2s);
+   CHECK(final_state->info.header.commitNum == final_state->info.header.blockNum - 2);
 }
 
-TEST_CASE("")
+std::vector<std::tuple<std::vector<std::string_view>, std::size_t>> cft_quorum = {
+    {{"a"}, 1},
+    {{"a", "b"}, 2},
+    {{"a", "b", "c"}, 2},
+    {{"a", "b", "c", "d"}, 3},
+    {{"a", "b", "c", "d", "e"}, 3},
+    {{"a", "b", "c", "d", "e", "f"}, 4},
+    {{"a", "b", "c", "d", "e", "f", "g"}, 4},
+};
+
+TEST_CASE("cft quorum", "[cft]")
 {
-   using chain_type = fork_database<block_header<timer_type::time_point>,
-                                    block_header_state<timer_type::time_point>, mapdb>;
-   using node_type  = node<null_link, mock_routing, cft_consensus, chain_type>;
+   TEST_START(logger);
+
+   auto [prods, count] = GENERATE(from_range(cft_quorum));
+   auto activeProds    = prods;
+   activeProds.resize(count);
+
    boost::asio::io_context ctx;
-   mock_network<node_type> network(ctx);
-   node_type               a(ctx), b(ctx), c(ctx);
-   network.add(&a);
-   network.add(&b);
-   network.add(&c);
-   a.set_producer_id(1);
-   b.set_producer_id(2);
-   c.set_producer_id(3);
-   a.set_producers({1, 2, 3});
-   b.set_producers({1, 2, 3});
-   c.set_producers({1, 2, 3});
-   a.add_peer(&b);
-   a.add_peer(&c);
-   b.add_peer(&c);
-   int        active_set = 7;
-   timer_type timer(ctx);
-   auto       adjust_node = [&](node_type* n, bool old_state, bool new_state)
+   NodeSet<node_type>      nodes(ctx);
+
+   setup<CftConsensus>(nodes, prods);
+   nodes.partition(activeProds);
+   runFor(ctx, 20s);
+
+   auto final_state = nodes[0].chain().get_head_state();
+   for (const auto& node : nodes.nodes)
    {
-      if (old_state && !new_state)
-      {
-         std::cout << "stop node " << n->producer_name() << std::endl;
-         network.remove(n);
-      }
-      else if (!old_state && new_state)
-      {
-         std::cout << "start node " << n->producer_name() << std::endl;
-         network.add(n);
-      }
-   };
-   auto adjust_connection = [&](node_type* n1, node_type* n2, bool old_state, bool new_state)
-   {
-      if (old_state && !new_state)
-      {
-         n1->remove_peer(n2);
-      }
-      else if (!old_state && new_state)
-      {
-         n1->add_peer(n2);
-      }
-   };
-   std::random_device rng;
-   loop(timer,
-        [&]()
-        {
-           std::uniform_int_distribution<> dist(0, 7);
-           auto                            next_set = dist(rng);
-           //adjust_node(&a, active_set & 1, next_set & 1);
-           //adjust_node(&b, active_set & 2, next_set & 2);
-           //adjust_node(&c, active_set & 4, next_set & 4);
-           std::cout << "active nodes:";
-           for (int i = 0; i < 3; ++i)
-           {
-              if (next_set & (1 << i))
-              {
-                 std::cout << " " << (i + 1);
-              }
-           }
-           std::cout << std::endl;
-           adjust_connection(&a, &b, (active_set & 3) == 3, (next_set & 3) == 3);
-           adjust_connection(&a, &c, (active_set & 5) == 5, (next_set & 5) == 5);
-           adjust_connection(&b, &c, (active_set & 6) == 6, (next_set & 6) == 6);
-           active_set = next_set;
-        });
-   // This should result in a steady stream of empty blocks
-   while (true)
-   {
-      ctx.run();
-      ctx.restart();
-      using namespace std::literals::chrono_literals;
-      mock_clock::advance(100ms);
+      if (count == 1 || !node->node.network()._peers.empty())
+         CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
+      else
+         CHECK(node->chain().get_head_state()->blockId() == Checksum256{});
    }
+   // Verify that the final block looks sane
+   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   CHECK(final_time <= mock_clock::now());
+   CHECK(final_time >= mock_clock::now() - 2s);
+   CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
+}
+
+TEST_CASE("cft partition", "[cft]")
+{
+   TEST_START(logger);
+
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+
+   setup<CftConsensus>(nodes, {"a", "b", "c", "d"});
+
+   timer_type    timer(ctx);
+   global_random rng;
+   loop(timer, 20s, [&]() { nodes.partition(NetworkPartition::split(rng)); });
+   // This may advance the chain, because some information is propagated
+   // between nodes as the network is repartitioned, but since a quorum is
+   // never simultaneously connected, the chain should not be expected
+   // to advance.
+   runFor(ctx, 10min);
+   ctx.poll();
+   timer.cancel();
+   ctx.poll();
+
+   PSIBASE_LOG(logger, info) << "Final sync";
+   // Make all nodes active
+   nodes.connect_all();
+   runFor(ctx, 20s);
+
+   auto final_state = nodes[0].chain().get_head_state();
+   for (const auto& node : nodes.nodes)
+      CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
+   // Verify that the final block looks sane
+   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   CHECK(final_time <= mock_clock::now());
+   CHECK(final_time >= mock_clock::now() - 2s);
+   CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
 }

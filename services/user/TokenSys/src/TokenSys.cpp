@@ -11,8 +11,9 @@
 using namespace UserService;
 using namespace UserService::Errors;
 using namespace psibase;
-using psio::const_view;
+using psio::view;
 using SystemService::AccountSys;
+using SystemService::ServiceMethod;
 using SystemService::TransactionSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
@@ -35,20 +36,20 @@ namespace
 
    namespace userConfig
    {
-      constexpr auto manualDebit = psibase::NamedBit{"manualDebit"};
+      constexpr auto manualDebit = psibase::EnumElement{"manualDebit"};
    }
 
    namespace tokenConfig
    {
-      constexpr auto unrecallable = psibase::NamedBit{"unrecallable"};
-      constexpr auto untradeable  = psibase::NamedBit{"untradeable"};
+      constexpr auto unrecallable = psibase::EnumElement{"unrecallable"};
+      constexpr auto untradeable  = psibase::EnumElement{"untradeable"};
    }  // namespace tokenConfig
 
 }  // namespace
 
 TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
 {
-   MethodNumber m{action->method()->value().get()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().getIndex<0>().get(SingletonKey{});
@@ -67,9 +68,17 @@ void TokenSys::init()
    auto tokService = to<TokenSys>();
    auto nftService = to<NftSys>();
 
-   // Configure manual debit for self and NFT
+   // Configure manual debit for self on Token and NFT
    tokService.setUserConf(userConfig::manualDebit, true);
    nftService.setUserConf(userConfig::manualDebit, true);
+
+   // Configure manual debit for Nft on Token
+   std::tuple<EnumElement, bool> params{userConfig::manualDebit, true};
+   Action                        setUsrConf{.sender  = NftSys::service,
+                                            .service = TokenSys::service,
+                                            .method  = "setUserConf"_m,
+                                            .rawData = psio::convert_to_frac(params)};
+   to<TransactionSys>().runAs(std::move(setUsrConf), std::vector<ServiceMethod>{});
 
    // Create system token
    auto tid = tokService.create(Precision{8}, Quantity{1'000'000'000e8});
@@ -93,9 +102,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    auto tokenIdx   = tokenTable.getIndex<0>();
    auto nftService = to<NftSys>();
 
-   // Todo - replace with auto incrementing when available
    TID newId = (tokenIdx.begin() == tokenIdx.end()) ? 1 : (*(--tokenIdx.end())).id + 1;
-
    Precision::fracpack_validate(precision);  // Todo remove if/when happens automatically
    check(TokenRecord::isValidKey(newId), invalidTokenId);
    check(maxSupply.value > 0, supplyGt0);
@@ -119,7 +126,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    return newId;
 }
 
-void TokenSys::mint(TID tokenId, Quantity amount, const_view<String> memo)
+void TokenSys::mint(TID tokenId, Quantity amount, view<const String> memo)
 {
    auto sender  = getSender();
    auto token   = getToken(tokenId);
@@ -166,11 +173,11 @@ void TokenSys::burn(TID tokenId, Quantity amount)
    Tables().open<TokenHolderTable>().put(holder);
 }
 
-void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
+void TokenSys::setUserConf(psibase::EnumElement flag, bool enable)
 {
    auto sender  = getSender();
    auto holder  = getTokenHolder(sender);
-   auto flagBit = TokenHolderRecord::Configurations::getIndex(flag);
+   auto flagBit = TokenHolderRecord::Configurations::value(flag);
 
    check(not holder.config.get(flagBit) == enable, redundantUpdate);
 
@@ -180,7 +187,7 @@ void TokenSys::setUserConf(psibase::NamedBit flag, bool enable)
    Tables().open<TokenHolderTable>().put(holder);
 }
 
-void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
+void TokenSys::setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable)
 {
    check(isSenderIssuer(tokenId), missingRequiredAuth);
    if (flag == tokenConfig::unrecallable)
@@ -189,7 +196,7 @@ void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
    }
 
    auto token     = getToken(tokenId);
-   auto flagIndex = TokenRecord::Configurations::getIndex(flag);
+   auto flagIndex = TokenRecord::Configurations::value(flag);
 
    token.eventHead =
        emit().history().tokenConfSet(token.eventHead, tokenId, getSender(), flag, enable);
@@ -198,7 +205,7 @@ void TokenSys::setTokenConf(TID tokenId, psibase::NamedBit flag, bool enable)
    Tables().open<TokenTable>().put(token);
 }
 
-void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, const_view<String> memo)
+void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, view<const String> memo)
 {
    auto sender      = getSender();
    auto balance     = getBalance(tokenId, sender);
@@ -217,7 +224,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
    auto balanceTable = Tables().open<BalanceTable>();
    balanceTable.put(balance);
 
-   auto manualDebitFlag = TokenHolderConfig::getIndex(userConfig::manualDebit);
+   auto manualDebitFlag = TokenHolderConfig::value(userConfig::manualDebit);
    bool manualDebitBit  = getTokenHolder(receiver).config.get(manualDebitFlag);
    if (manualDebitBit)
    {
@@ -247,7 +254,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, cons
 void TokenSys::uncredit(TID                tokenId,
                         AccountNumber      receiver,
                         Quantity           maxAmount,
-                        const_view<String> memo)
+                        view<const String> memo)
 {
    auto sender          = getSender();
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
@@ -271,7 +278,7 @@ void TokenSys::uncredit(TID                tokenId,
    Tables().open<BalanceTable>().put(creditorBalance);
 }
 
-void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
+void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, view<const String> memo)
 {
    auto receiver        = getSender();  //The action sender is the token receiver
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
@@ -305,12 +312,12 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_v
    Tables().open<TokenHolderTable>().put(receiverHolder);
 }
 
-void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, const_view<String> memo)
+void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, view<const String> memo)
 {
    auto sender          = getSender();
    auto token           = getToken(tokenId);
    auto fromBalance     = getBalance(tokenId, from);
-   auto unrecallableBit = TokenRecord::Configurations::getIndex(tokenConfig::unrecallable);
+   auto unrecallableBit = TokenRecord::Configurations::value(tokenConfig::unrecallable);
    auto time            = to<TransactionSys>().currentBlock().time;
 
    check(isSenderIssuer(tokenId), missingRequiredAuth);
@@ -450,7 +457,7 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
    return record;
 }
 
-bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit flag)
+bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::EnumElement flag)
 {
    auto holder = Tables().open<TokenHolderTable>().getIndex<0>().get(account);
    if (holder.has_value() == false)
@@ -459,14 +466,14 @@ bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::NamedBit fla
    }
    else
    {
-      return (*holder).config.get(TokenHolderConfig::getIndex(flag));
+      return (*holder).config.get(TokenHolderConfig::value(flag));
    }
 }
 
-bool TokenSys::getTokenConf(TID tokenId, psibase::NamedBit flag)
+bool TokenSys::getTokenConf(TID tokenId, psibase::EnumElement flag)
 {
    auto token     = getToken(tokenId);
-   auto flagIndex = TokenRecord::Configurations::getIndex(flag);
+   auto flagIndex = TokenRecord::Configurations::value(flag);
 
    return token.config.get(flagIndex);
 }

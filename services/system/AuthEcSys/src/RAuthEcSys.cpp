@@ -10,6 +10,7 @@
 #include <string_view>
 
 using namespace psibase;
+using std::move;
 using std::optional;
 using std::string;
 using std::string_view;
@@ -20,7 +21,7 @@ namespace SystemService
 
    struct AuthEcQuery
    {
-      auto accWithKey(psibase::PublicKey      key,
+      auto accWithKey(PublicKey               key,
                       optional<AccountNumber> gt,
                       optional<AccountNumber> ge,
                       optional<AccountNumber> lt,
@@ -47,24 +48,30 @@ namespace SystemService
              idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last, before,
              after);
       }
+
+      auto account(AccountNumber name) const
+      {
+         AuthEcSys::Tables db{AuthEcSys::service};
+         auto              account = db.open<AuthEcSys::AuthTable>().get(name);
+
+         return account.value_or(AuthRecord{});
+      }
    };
-   PSIO_REFLECT(AuthEcQuery, method(accWithKey, key, gt, ge, lt, le, first, last, before, after))
+   PSIO_REFLECT(AuthEcQuery,
+                method(accWithKey, key, gt, ge, lt, le, first, last, before, after),
+                method(account, name)
+                //
+   );
 
    std::optional<HttpReply> RAuthEcSys::serveSys(HttpRequest request)
    {
-      if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
+      if (auto result = serveContent(request, Tables{getReceiver()}))
          return result;
 
       if (auto result = serveGraphQL(request, AuthEcQuery{}))
          return result;
 
-      if (auto result = servePackAction<AuthEcSys>(request))
-         return result;
-
-      if (auto result = serveRestEndpoints(request))
-         return result;
-
-      if (auto result = psibase::serveSimpleUI<AuthEcSys, true>(request))
+      if (auto result = serveSimpleUI<AuthEcSys, true>(request))
          return result;
 
       return std::nullopt;
@@ -73,63 +80,8 @@ namespace SystemService
 
    void RAuthEcSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
-      psibase::check(getSender() == getReceiver(), "wrong sender");
-      psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
-                            Tables{getReceiver()});
-   }
-
-   std::optional<HttpReply> RAuthEcSys::serveRestEndpoints(HttpRequest& request)
-   {
-      auto to_json = [](const auto& obj)
-      {
-         auto json = psio::convert_to_json(obj);
-         return HttpReply{
-             .contentType = "application/json",
-             .body        = {json.begin(), json.end()},
-         };
-      };
-
-      if (request.method == "GET")
-      {
-         if (request.target.starts_with("/accwithkey"))
-         {
-            auto pubkeyParam = request.target.substr(string("/accwithkey/").size());
-
-            check(pubkeyParam.find('/') == string::npos, "invalid public key: " + pubkeyParam);
-
-            AuthEcSys::Tables db{AuthEcSys::service};
-            auto              authIdx = db.open<AuthEcSys::AuthTable>().getIndex<1>();
-
-            auto pubkey = publicKeyFromString(string_view{pubkeyParam});
-
-            std::vector<AuthRecord> auths;
-            for (auto itr = authIdx.lower_bound(pubkey); itr != authIdx.end(); ++itr)
-            {
-               auto obj = *itr;
-               if (obj.pubkey != pubkey)
-                  break;
-               auths.push_back(obj);
-            }
-
-            return to_json(auths);
-         }
-
-         if (request.target.starts_with("/account"))
-         {
-            auto accountParam = request.target.substr(string("/account/").size());
-
-            check(accountParam.find('/') == string::npos, "invalid account name: " + accountParam);
-
-            psibase::AccountNumber acc{accountParam};
-
-            AuthEcSys::Tables db{AuthEcSys::service};
-            auto              account = db.open<AuthEcSys::AuthTable>().getIndex<0>().get(acc);
-
-            return to_json(account.value_or(SystemService::AuthRecord()));
-         }
-      }
-
-      return std::nullopt;
+      check(getSender() == getReceiver(), "wrong sender");
+      storeContent(move(path), move(contentType), move(content), Tables{getReceiver()});
    }
 
    // getKeys
