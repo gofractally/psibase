@@ -1,0 +1,4 @@
+#!/bin/sh
+
+shift
+@AFL_CLANG_LTO@ "$@"

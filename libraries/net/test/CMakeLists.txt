@@ -35,6 +35,18 @@ add_test(
     COMMAND test_consensus "[bft]"
 )
 
+find_program(AFL_CLANG_LTO afl-clang-lto++)
+
+if (AFL_CLANG_LTO)
+    configure_file(afl-clang-lto++.in afl-clang-lto++ USE_SOURCE_PERMISSIONS)
+
+    add_executable(bft_fuzz bft_fuzz.cpp test_util.cpp)
+    target_include_directories(bft_fuzz PUBLIC ../include)
+    target_link_libraries(bft_fuzz PUBLIC catch2 psibase services_system)
+    set_property(TARGET bft_fuzz PROPERTY CXX_COMPILER_LAUNCHER /usr/bin/env;AFL_LLVM_ALLOWLIST=${CMAKE_CURRENT_SOURCE_DIR}/bft_fuzz.txt;${CMAKE_CURRENT_BINARY_DIR}/afl-clang-lto++)
+    set_property(TARGET bft_fuzz PROPERTY CXX_LINKER_LAUNCHER /usr/bin/env;AFL_LLVM_ALLOWLIST=${CMAKE_CURRENT_SOURCE_DIR}/bft_fuzz.txt;${CMAKE_CURRENT_BINARY_DIR}/afl-clang-lto++)
+endif()
+
 #add_executable(test_direct_routing test_direct_routing.cpp mock_timer.cpp)
 #target_include_directories(test_direct_routing PUBLIC ../include)
 #target_link_libraries(test_direct_routing PUBLIC psio catch2)

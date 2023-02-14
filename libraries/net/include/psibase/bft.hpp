@@ -69,6 +69,7 @@ namespace psibase::net
       AccountNumber             producer;
       Claim                     signer;
 
+      friend bool operator==(const ViewChangeMessage&, const ViewChangeMessage&) = default;
       std::string to_string() const
       {
          return "view change: term=" + std::to_string(term) + " producer=" + producer.str();
