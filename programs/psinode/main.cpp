@@ -770,7 +770,7 @@ void write_om_descriptor(std::string_view name,
 
 void write_om_mem(std::string_view name, std::int64_t v, auto& stream)
 {
-   std::string_view prefix = "psinode_memory{category=";
+   std::string_view prefix = "psinode_memory_bytes{category=";
    stream.write(prefix.data(), prefix.size());
    to_json(name, stream);
    stream.write("} ", 2);
@@ -781,7 +781,7 @@ void write_om_mem(std::string_view name, std::int64_t v, auto& stream)
 
 void write_om_mem(const Perf& perf, auto& stream)
 {
-   write_om_descriptor("psinode_memory", "gauge", "bytes", "Resident Memory", stream);
+   write_om_descriptor("psinode_memory_bytes", "gauge", "bytes", "Resident Memory", stream);
    write_om_mem("database", perf.memory.database, stream);
    write_om_mem("code", perf.memory.code, stream);
    write_om_mem("data", perf.memory.data, stream);
@@ -820,15 +820,17 @@ void write_om_task_sample(std::string_view  name,
 
 void write_om_tasks(const Perf& perf, auto& stream)
 {
-   write_om_descriptor("psinode_cpu_user", "counter", "seconds", "CPU Time (User)", stream);
+   write_om_descriptor("psinode_cpu_user_seconds", "counter", "seconds", "CPU Time (User)", stream);
    for (const auto& task : perf.tasks)
    {
-      write_om_task_sample("psinode_cpu_user_total", task, usec_as_sec(task.user), stream);
+      write_om_task_sample("psinode_cpu_user_seconds_total", task, usec_as_sec(task.user), stream);
    }
-   write_om_descriptor("psinode_cpu_system", "counter", "seconds", "CPU Time (System)", stream);
+   write_om_descriptor("psinode_cpu_system_seconds", "counter", "seconds", "CPU Time (System)",
+                       stream);
    for (const auto& task : perf.tasks)
    {
-      write_om_task_sample("psinode_cpu_system_total", task, usec_as_sec(task.system), stream);
+      write_om_task_sample("psinode_cpu_system_seconds_total", task, usec_as_sec(task.system),
+                           stream);
    }
    write_om_descriptor("psinode_page_faults", "counter", "", "Page Faults", stream);
    for (const auto& task : perf.tasks)
@@ -836,15 +838,16 @@ void write_om_tasks(const Perf& perf, auto& stream)
       write_om_task_sample("psinode_page_faults_total", task, std::to_string(task.pageFaults),
                            stream);
    }
-   write_om_descriptor("psinode_read", "counter", "bytes", "Bytes Read", stream);
+   write_om_descriptor("psinode_read_bytes", "counter", "bytes", "Bytes Read", stream);
    for (const auto& task : perf.tasks)
    {
-      write_om_task_sample("psinode_read_total", task, std::to_string(task.read), stream);
+      write_om_task_sample("psinode_read_bytes_total", task, std::to_string(task.read), stream);
    }
-   write_om_descriptor("psinode_written", "counter", "bytes", "Bytes Written", stream);
+   write_om_descriptor("psinode_written_bytes", "counter", "bytes", "Bytes Written", stream);
    for (const auto& task : perf.tasks)
    {
-      write_om_task_sample("psinode_written_total", task, std::to_string(task.written), stream);
+      write_om_task_sample("psinode_written_bytes_total", task, std::to_string(task.written),
+                           stream);
    }
 }
 
