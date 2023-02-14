@@ -24,11 +24,15 @@ namespace psio
       struct any
       {
         public:
-         any(){};
+         any();
          template <typename T>
-         any(const T& v) : _value(v)
-         {
-         }
+         any(const T& v);
+
+         any(const any&);
+         any(any&&);
+         any& operator=(const any&);
+         any& operator=(any&&);
+         ~any();
 
          template <typename T>
          const T* get_if() const
@@ -109,6 +113,18 @@ namespace psio
       PSIO_REFLECT(entry, key, value)
       PSIO_REFLECT_TYPENAME(null_t)
       PSIO_REFLECT(error_t, what)
+
+      inline any::any(){};
+      template <typename T>
+      any::any(const T& v) : _value(v)
+      {
+      }
+
+      inline any::any(const any&)            = default;
+      inline any::any(any&&)                 = default;
+      inline any& any::operator=(const any&) = default;
+      inline any& any::operator=(any&&)      = default;
+      inline any::~any()                     = default;
 
       inline any any::operator[](const std::string_view& key) const
       {

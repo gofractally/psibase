@@ -180,7 +180,7 @@ namespace psibase
          // Special case: If no producers are specified, use the producers of the current block
          if (prods.empty())
          {
-            prods.emplace_back(current.header.producer, Claim{});
+            prods.push_back({current.header.producer, Claim{}});
          }
 
          status->current.newConsensus = current.header.newConsensus = nextConsensus;
