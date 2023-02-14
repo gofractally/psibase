@@ -288,6 +288,7 @@ namespace psibase::http
       accept_p2p_websocket_t   accept_p2p_websocket   = {};
       shutdown_t               shutdown               = {};
       get_config_t             get_perf               = {};
+      get_config_t             get_metrics            = {};
       get_peers_t              get_peers              = {};
       connect_t                connect                = {};
       connect_t                disconnect             = {};
