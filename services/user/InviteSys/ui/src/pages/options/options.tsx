@@ -1,7 +1,7 @@
 import { psiboardApplet } from "service";
 import { Button, Heading, Icon, Text } from "components";
 import { useParam } from "store";
-import { userUsers, useUser } from "store/hooks/useUser";
+import { useUsers, useUser } from "store/hooks/useUser";
 import { useInviteToken } from "store/queries/usePrivateKey";
 import { useInitilize } from "store/hooks/useInitialize";
 import { useGenerateLink } from "store/hooks/useGenerateLink";
@@ -14,9 +14,13 @@ export const Options = () => {
   const appletName = useParam("applet");
 
   const { data: currentUser } = useUser();
-  const { data: users, error: usersError } = userUsers();
+  const { data: users, error: usersError } = useUsers();
 
-  const { isValid: isInviteValid, error, isLoading } = useInviteToken(token);
+  const {
+    isValid: isInviteValid,
+    error: tokenError,
+    isLoading,
+  } = useInviteToken(token);
   const {
     data: inviteLink,
     mutate: generateLink,
@@ -25,6 +29,19 @@ export const Options = () => {
   } = useGenerateLink();
 
   const isSignedIn = (users || []).length > 0;
+
+  if (tokenError)
+    return (
+      <Text size="base" className="mb-2 text-red-500">
+        {tokenError}
+      </Text>
+    );
+
+  if (isLoading) {
+    <Text size="base" className="mb-2">
+      Loading..
+    </Text>;
+  }
 
   return (
     <>

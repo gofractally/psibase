@@ -22,6 +22,8 @@ interface execArgs {
     transaction?: any;
 }
 
+const CURRENT_USER = "currentUser";
+
 const claimApplets: Map<string, AppletId> = new Map();
 
 class KeyStore {
@@ -97,8 +99,6 @@ class KeyStore {
             }));
             const existingAccountsToRemain = keypairsWithoutStaleAccounts;
 
-            console.log({ existingAccountsToRemain });
-
             const combined = [...existingAccountsToRemain, ...incomingAccounts];
             const pureUniqueKeyPairs = combined
                 .map(
@@ -115,19 +115,16 @@ class KeyStore {
                 );
 
             const fresh = pureUniqueKeyPairs.map(
-                (keyPair): KeyPairWithAccounts => {
-                    return {
-                        ...keyPair,
-                        knownAccounts: combined.flatMap((kp) =>
-                            kp.publicKey === keyPair.publicKey
-                                ? kp.knownAccounts || []
-                                : []
-                        ),
-                    };
-                }
+                (keyPair): KeyPairWithAccounts => ({
+                    ...keyPair,
+                    knownAccounts: combined.flatMap((kp) =>
+                        kp.publicKey === keyPair.publicKey
+                            ? kp.knownAccounts || []
+                            : []
+                    ),
+                })
             );
 
-            console.log("adding accounts", incomingAccounts);
             this.setKeyStore(fresh);
         }
     }
@@ -232,7 +229,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                 exec: (params: any) => {
                     // TODO - Get the actual logged in user
                     return JSON.parse(
-                        window.localStorage.getItem("currentUser") || ""
+                        window.localStorage.getItem(CURRENT_USER) || ""
                     );
                 },
             },

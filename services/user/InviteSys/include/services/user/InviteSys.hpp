@@ -108,7 +108,6 @@ namespace UserService
          /// Called by the proxy-sys system service when an HttpRequest
          /// is directed at this invite service
          std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
-         void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
          /// Used to store UI files and other `content` at the specified `path`.
          void storeSys(std::string path, std::string contentType, std::vector<char> content);

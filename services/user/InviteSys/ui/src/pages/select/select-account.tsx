@@ -8,8 +8,7 @@ export const SelectAccount = () => {
   const account = useParam("account");
   const token = useParam("token");
 
-  const { isValid, publicKey } = useInviteToken(token);
-  console.log({ token, publicKey, isValid });
+  const { isValid, publicKey, error: tokenError } = useInviteToken(token);
 
   const {
     error,
@@ -29,7 +28,7 @@ export const SelectAccount = () => {
     },
   });
 
-  if (!isValid) return <div className="text-red-500">Token is not valid!</div>;
+  if (!isValid) return <div className="text-red-500">Token is not valid! {tokenError}</div>;
   if (error) return <div className="text-red-500">{JSON.stringify(error)}</div>;
 
   return (
