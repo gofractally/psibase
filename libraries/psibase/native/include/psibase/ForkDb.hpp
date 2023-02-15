@@ -639,6 +639,14 @@ namespace psibase
                }
             }
          }
+         // ensure that only descendants of the committed block
+         // are considered when searching for the best block.
+         // The subtree should not be changed if it is already ahead
+         // of the committed block.
+         if (std::get<1>(byOrderIndex.begin()->first) < newCommitIndex)
+         {
+            set_subtree(get_state(get_block_id(newCommitIndex)));
+         }
          commitIndex = newCommitIndex;
          return result;
       }
@@ -671,6 +679,8 @@ namespace psibase
                auto state_iter = states.find(iter->first);
                if (state_iter != states.end())
                {
+                  // TODO: is removal from byOrderIndex still needed here
+                  // now that commit updates byOrderIndex?
                   byOrderIndex.erase(state_iter->second.order());
                   states.erase(state_iter);
                }
