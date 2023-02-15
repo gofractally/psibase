@@ -766,6 +766,10 @@ namespace psibase::http
          }
          else if (req.target() == "/native/admin/perf" && server.http_config->get_perf)
          {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::get)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "GET"));
@@ -774,6 +778,25 @@ namespace psibase::http
                 server.http_config->get_perf,
                 [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
                 { session->queue_(ok(make_result(), "application/json")); });
+         }
+         else if (req.target() == "/native/admin/metrics" && server.http_config->get_metrics)
+         {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() != bhttp::verb::get)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+            run_native_handler(
+                server.http_config->get_metrics,
+                [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
+                {
+                   session->queue_(
+                       ok(make_result(),
+                          "application/openmetrics-text; version=1.0.0; charset=utf-8"));
+                });
          }
          else if (req.target() == "/native/admin/peers" && server.http_config->get_peers)
          {
