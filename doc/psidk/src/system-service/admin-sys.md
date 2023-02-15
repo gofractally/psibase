@@ -62,7 +62,7 @@ The easiest way to run these services is to use docker containers, since we prep
 Update the `prometheus.yml` file to have the correct target of your psinode instance. Eg: if it's running locally, outside of your docker network, you can leave as is and add a new built-in service in psinode config, then restart it:
 
 ```
-service = host.docker.internal:$PREFIX/share/psibase/services/admin-sys
+service = host.docker.internal:
 ```
 
 If the psinode is running in another docker, just make sure you have access to that network and update the target properly. You will not need the builtin service conf.
@@ -127,15 +127,6 @@ wget https://github.com/fstab/grok_exporter/releases/download/v1.0.0.RC5/grok_ex
 unzip grok_exporter-*.zip
 cd grok_exporter-*
 ./grok_exporter --config=./grok-exporter.yml
-```
-
-Json exporter is used to transform the `/native/admin/perf` endpoint to ready to be consumed metrics.
-
-```sh
-wget https://github.com/prometheus-community/json_exporter/releases/download/v0.5.0/json_exporter-0.5.0.linux-amd64.tar.gz
-tar -xzvf json_exporter-0.5.0.linux-amd64.tar.gz
-cd json_exporter-*
-./json_exporter --config.file ../../prometheus/json-exporter.yml
 ```
 
 Node exporter collects metrics from the node (not being used in our dashboard for now).

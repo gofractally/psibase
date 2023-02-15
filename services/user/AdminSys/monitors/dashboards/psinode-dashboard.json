@@ -220,7 +220,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "sum(rate(psinode_transactions_total[$__rate_interval]))",
+          "expr": "sum(rate(psinode_transactions_submitted_total[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -353,7 +353,7 @@
               }
             ]
           },
-          "unit": "µs"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -384,11 +384,24 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "sum by(group) (rate(psinode_tasks_user[$__rate_interval]))",
+          "expr": "sum by(group) (rate(psinode_cpu_user_seconds_total[$__rate_interval]))",
           "interval": "",
-          "legendFormat": "{{group}}",
+          "legendFormat": "User {{group}}",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus_main"
+          },
+          "editorMode": "builder",
+          "expr": "sum by(group) (rate(psinode_cpu_system_seconds_total[$__rate_interval]))",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Sys {{group}}",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "CPU Usage/s",
@@ -479,7 +492,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "psinode_memory_code",
+          "expr": "psinode_memory_bytes{category=\"code\"}",
           "interval": "",
           "legendFormat": "Code",
           "range": true,
@@ -491,7 +504,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "psinode_memory_data",
+          "expr": "psinode_memory_bytes{category=\"data\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "Data",
@@ -504,7 +517,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "psinode_memory_database",
+          "expr": "psinode_memory_bytes{category=\"database\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "DB",
@@ -517,7 +530,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "psinode_memory_wasm_code",
+          "expr": "psinode_memory_bytes{category=\"wasm_code\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "WASM Code",
@@ -530,7 +543,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "psinode_memory_wasm_memory",
+          "expr": "psinode_memory_bytes{category=\"wasm_memory\"}",
           "hide": false,
           "legendFormat": "WASM Memory",
           "range": true,
@@ -542,7 +555,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "psinode_memory_unclassified",
+          "expr": "psinode_memory_bytes{category=\"unclassified\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "Unclassified",
@@ -640,7 +653,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "rate(psinode_transactions_succeeded[$__rate_interval])",
+          "expr": "rate(psinode_transactions_succeeded_total[$__rate_interval])",
           "interval": "",
           "legendFormat": "Succeeded",
           "range": true,
@@ -652,7 +665,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "rate(psinode_transactions_skipped[$__rate_interval])",
+          "expr": "rate(psinode_transactions_skipped_total[$__rate_interval])",
           "hide": false,
           "interval": "",
           "legendFormat": "Skipped",
@@ -680,7 +693,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "rate(psinode_transactions_failed[$__rate_interval])",
+          "expr": "rate(psinode_transactions_failed_total[$__rate_interval])",
           "hide": false,
           "interval": "",
           "legendFormat": "Failed",
@@ -776,9 +789,9 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "sum by(group) (rate(psinode_tasks_read[$__rate_interval]))",
+          "expr": "sum by(group) (rate(psinode_read_bytes_total[$__rate_interval]))",
           "interval": "",
-          "legendFormat": "{{group}} read",
+          "legendFormat": "Read {{group}}",
           "range": true,
           "refId": "A"
         },
@@ -788,10 +801,10 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "sum by(group) (rate(psinode_tasks_written[$__rate_interval]))",
+          "expr": "sum by(group) (rate(psinode_written_bytes_total[$__rate_interval]))",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{group}} written",
+          "legendFormat": "Writ. {{group}}",
           "range": true,
           "refId": "B"
         }
@@ -883,7 +896,7 @@
             "uid": "prometheus_main"
           },
           "editorMode": "builder",
-          "expr": "sum by(group) (rate(psinode_tasks_page_faults[$__rate_interval]))",
+          "expr": "sum by(group) (rate(psinode_page_faults_total[$__rate_interval]))",
           "interval": "",
           "legendFormat": "{{group}}",
           "range": true,
@@ -1007,13 +1020,13 @@
     "list": []
   },
   "time": {
-      "from": "now-1h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Psinode Dashboards",
   "uid": "psinode-dashboard",
-  "version": 23,
+  "version": 10,
   "weekStart": ""
 }

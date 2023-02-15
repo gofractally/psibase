@@ -7,7 +7,6 @@ services:
       dockerfile: exporters.Dockerfile
     volumes:
       - ./grok-exporter.yml:/root/grok-exporter.yml
-      - ./json-exporter.yml:/root/json-exporter.yml
       - ./patterns:/root/grok-patterns
       - ./supervisord.conf:/root/supervisord.conf
 

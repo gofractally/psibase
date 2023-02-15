@@ -9,19 +9,9 @@ scrape_configs:
 
   - job_name: "psinode_perf"
     scrape_interval: 1s
-    metrics_path: /probe
-    params:
-      module: [default]
+    metrics_path: /native/admin/metrics
     static_configs:
-      - targets:
-          - "http://host.docker.internal:8080/native/admin/perf" # TODO: make the host dynamic
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: exporters:7979
+      - targets: ["host.docker.internal:8080"]
 
   - job_name: "prometheus"
     scrape_interval: 5s
