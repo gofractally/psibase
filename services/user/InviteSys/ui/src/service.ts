@@ -256,7 +256,7 @@ export class PsiboardService extends Service {
   }
 
   @Op()
-  createAccount({
+  async createAccount({
     token,
     accountName,
     publicKey,

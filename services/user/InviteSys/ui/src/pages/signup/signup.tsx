@@ -50,9 +50,6 @@ export const SignUp = () => {
                 publicKey
             });
         },
-        onError: () => {
-            console.log('errored..')
-        }, 
         onSuccess: () => {
             setStep("success");
         }
@@ -139,7 +136,7 @@ export const SignUp = () => {
 
     if (step === "confirm") {
         return (
-            <ConfirmAccount form={form} onBack={onBack} onConfirm={onConfirm} />
+            <ConfirmAccount error={error ? String(error) : ''} form={form} onBack={onBack} onConfirm={onConfirm} />
         );
     }
 
@@ -207,7 +204,7 @@ const CreateAccount = ({
                         })}
                         errorText={errors.password?.message}
                     />
-                    <Text size="sm" className="text-red-500">
+                    <Text size="sm" className="text-orange-500">
                         NOTE: Your password cannot be recovered or reset. If you
                         lose it, you will have to create a new account. Keep
                         your password safe.
@@ -247,10 +244,12 @@ const ConfirmAccount = ({
     form,
     onBack,
     onConfirm,
+    error
 }: {
     form: UseFormReturn<Inputs, any>;
     onBack: () => void;
     onConfirm: SubmitHandler<Inputs>;
+    error: string
 }) => {
     const {
         register,
@@ -303,7 +302,7 @@ const ConfirmAccount = ({
                         autoComplete="current-password"
                         type="password"
                     />
-                    <Text size="sm" className="text-red-500">
+                    <Text size="sm" className="text-orange-500">
                         NOTE: Your password cannot be recovered or reset. If you
                         lose it, you will have to create a new account. Keep
                         your password safe.
@@ -333,6 +332,7 @@ const ConfirmAccount = ({
                             Create your account
                         </Button>
                     </div>
+                    {error && <Text className="text-red-500">{error}</Text>}
                 </form>
             </section>
         </>

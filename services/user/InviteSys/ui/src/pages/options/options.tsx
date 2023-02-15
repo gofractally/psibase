@@ -55,7 +55,7 @@ export const Options = () => {
           </Text>
         </header>
         {isSignedIn && isInviteValid ? (
-          <div className="border-y border-gray-300">
+          <div className="border-y border-gray-300 overflow-y-auto h-64">
             {users?.map((account) => (
               <Link to={`/select-account?account=${account}&token=${token}`}>
                 <div
@@ -104,7 +104,7 @@ export const Options = () => {
               href={`/sign-up?token=${token}`}
               title="Create account"
             >
-              Create account and sign in
+              Create account
             </Button>
           </section>
         </>

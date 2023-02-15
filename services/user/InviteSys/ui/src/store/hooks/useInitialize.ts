@@ -23,5 +23,7 @@ export const useInitilize = (service: Service) => {
 const checkAndSaveInviteToken = () => {
   const accountSys = new AppletId("account-sys", "");
   const keyPair = extractInviteTokenKeyPair();
-  operation(accountSys, "storeKey", keyPair);
+  if (keyPair) {
+    operation(accountSys, "storeKey", keyPair);
+  }
 };
