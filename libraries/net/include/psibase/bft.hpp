@@ -761,6 +761,10 @@ namespace psibase::net
             {
                start_timer();
             }
+            if (state->order() > best_prepared)
+            {
+               best_prepared = state->order();
+            }
          }
       }
       void do_commit(const BlockHeaderState* state, AccountNumber producer)
@@ -806,6 +810,10 @@ namespace psibase::net
             if (state->singleProducer())
             {
                chain().commit(state->info.header.commitNum);
+               if (state->order() > best_prepared)
+               {
+                  best_prepared = state->order();
+               }
             }
             // When a block outside the current best chain is committed, we
             // can't commit it immediately, because the best committed block
@@ -891,6 +899,10 @@ namespace psibase::net
                else if (chain().commit(data.blockNum))
                {
                   start_timer();
+               }
+               if (committed->order() > best_prepared)
+               {
+                  best_prepared = committed->order();
                }
             }
             else
