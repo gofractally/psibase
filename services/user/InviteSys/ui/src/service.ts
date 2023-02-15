@@ -265,7 +265,7 @@ export class PsiboardService extends Service {
     accountName: string;
     publicKey: string;
   }) {
-    this.acceptCreate(token, accountName, publicKey);
+    return this.acceptCreate(token, accountName, publicKey);
   }
 
   @Op()
