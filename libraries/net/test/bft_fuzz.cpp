@@ -32,13 +32,14 @@ namespace psibase::test
             {
                f(make_error_code(boost::asio::error::operation_aborted));
             }
-            impl->callbacks.clear();         }
+            impl->callbacks.clear();
+         }
       }
       void expire_one_timer(auto& rng)
       {
          if (!timer_queue.empty())
          {
-            auto idx = rng() % timer_queue.size();
+            auto              idx  = rng() % timer_queue.size();
             mock_timer::impl* head = timer_queue.front().get();
             {
                mock_current_time = std::max(mock_current_time, head->deadline);
@@ -53,7 +54,7 @@ namespace psibase::test
          }
       }
    }  // namespace
-   
+
    mock_clock::time_point mock_clock::now()
    {
       std::lock_guard l{queue_mutex};
@@ -112,7 +113,7 @@ namespace psibase::test
    {
       return 0;
    }
-}
+}  // namespace psibase::test
 
 using namespace psibase;
 using namespace psibase::net;
@@ -121,75 +122,74 @@ using namespace psibase::test;
 
 struct Network;
 
-   template <typename Derived>
-   struct fuzz_routing : message_serializer<Derived>
+template <typename Derived>
+struct fuzz_routing : message_serializer<Derived>
+{
+   explicit fuzz_routing(boost::asio::io_context& ctx) : ctx(ctx)
    {
-      explicit fuzz_routing(boost::asio::io_context& ctx) : ctx(ctx)
+      logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
+   }
+   void send(const auto& message)
+   {
+      PSIBASE_LOG(logger, debug) << "Send message: " << message.to_string() << std::endl;
+      [&message](auto* n) { n->recv(message); }(_network);
+   }
+   template <typename Msg, typename F>
+   void async_send_block(peer_id id, const Msg& msg, F&& f)
+   {
+      if (peer != id)
       {
-         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
+         throw std::runtime_error("unknown peer");
       }
-      void send(const auto& message)
+      send(msg);
+      ctx.post([f]() { f(std::error_code()); });
+   }
+   template <typename Msg>
+   void multicast_producers(const Msg& msg)
+   {
+      send(msg);
+   }
+   template <typename Msg>
+   void sendto(producer_id producer, const Msg& msg)
+   {
+      send(msg);
+   }
+   // make a copy of the argument in case it gets invalidated by
+   // vector reallocation.
+   void recv(auto message)
+   {
+      PSIBASE_LOG(logger, debug) << "Receive message: " << message.to_string() << std::endl;
+      try
       {
-         PSIBASE_LOG(logger, debug)
-             << "Send message: "
-             << message.to_string() << std::endl;
-         [&message](auto* n) {n->recv(message);}(_network);
+         static_cast<Derived*>(this)->consensus().recv(peer, message);
       }
-      template <typename Msg, typename F>
-      void async_send_block(peer_id id, const Msg& msg, F&& f)
+      catch (std::exception& e)
       {
-         if (peer != id)
-         {
-            throw std::runtime_error("unknown peer");
-         }
-         send(msg);
-         ctx.post([f]() { f(std::error_code()); });
+         PSIBASE_LOG(logger, warning) << e.what();
       }
-      template <typename Msg>
-      void multicast_producers(const Msg& msg)
-      {
-         send(msg);
-      }
-      template <typename Msg>
-      void sendto(producer_id producer, const Msg& msg)
-      {
-         send(msg);
-      }
-      void recv(const auto& message)
-      {
-         PSIBASE_LOG(logger, debug)
-             << "Receive message: "
-             << message.to_string() << std::endl;
-         try
-         {
-            static_cast<Derived*>(this)->consensus().recv(peer, message);
-         } catch(std::exception& e)
-         {
-            PSIBASE_LOG(logger, warning) << e.what();
-         }
-      }
-      void recv(const shared_view_ptr<SignedBlock>& message)
-      {
-         recv(BlockMessage{message});
-      }
-      void init(Network* network)
-      {
-         _network = network;
-         static_cast<Derived*>(this)->consensus().connect(peer);
-      }
-      boost::asio::io_context&     ctx;
-      static constexpr peer_id     peer = 0;
-      Network*                     _network = nullptr;
-      loggers::common_logger       logger;
-   };
+   }
+   void recv(const shared_view_ptr<SignedBlock>& message) { recv(BlockMessage{message}); }
+   void init(Network* network)
+   {
+      _network = network;
+      static_cast<Derived*>(this)->consensus().connect(peer);
+   }
+   boost::asio::io_context& ctx;
+   static constexpr peer_id peer     = 0;
+   Network*                 _network = nullptr;
+   loggers::common_logger   logger;
+};
 
-using node_type  = node<null_link, fuzz_routing, bft_consensus, ForkDb>;
+using node_type = node<null_link, fuzz_routing, bft_consensus, ForkDb>;
 
-struct end_of_test {};
+struct end_of_test
+{
+};
 
 struct FuzzNode
 {
-   explicit FuzzNode(Network* network, SystemContext* sysContext, AccountNumber name) : node(ctx, sysContext)
+   explicit FuzzNode(Network* network, SystemContext* sysContext, AccountNumber name)
+       : node(ctx, sysContext)
    {
       auto attr = boost::log::attributes::constant(name.str());
       node.chain().getBlockLogger().add_attribute("Host", attr);
@@ -200,59 +200,82 @@ struct FuzzNode
       node.set_producer_id(name);
       node.load_producers();
       node.network().init(network);
-      ctx.post([this](){
-         node.network().recv(HelloRequest{});
-         node.network().recv(HelloResponse{});
-      });
+      ctx.post(
+          [this]()
+          {
+             node.network().recv(HelloRequest{});
+             node.network().recv(HelloResponse{});
+          });
       ctx.poll();
    }
    boost::asio::io_context ctx;
-   node_type node;
-   auto poll_one()
-   {
-      return ctx.poll_one();
-   }
+   node_type               node;
+   auto                    poll_one() { return ctx.poll_one(); }
 };
 
 struct Network
 {
    explicit Network(SystemContext* ctx) : systemContext(ctx) {}
-   template<typename Engine>
+   template <typename Engine>
    void do_step(Engine& rng)
    {
-      switch(rng() % 14)
+      switch (rng() % 32)
       {
-      case 0: case 7: case 8:
+         case 0:
+         case 7:
+         case 8:
+         case 21:
+         case 22:
+         case 23:
+         case 24:
+         case 27:
+         case 28:
          {
             nodes[rng() % nodes.size()]->poll_one();
             break;
          }
-      case 1: case 9: case 10:
+         case 1:
+         case 9:
+         case 10:
+         case 14:
+         case 15:
+         case 17:
+         case 18:
+         case 19:
+         case 20:
+         case 29:
+         case 30:
+         case 31:
          {
             forward_message(rng, nodes[rng() % nodes.size()]);
             break;
          }
-      case 2:
+         case 2:
          {
             build_block(choose_block(rng));
             break;
          }
-      case 3: case 11:
+         case 3:
+         case 11:
          {
             add_prepare(choose_block(rng));
             break;
          }
-      case 4: case 12:
+         case 4:
+         case 12:
          {
             add_commit(choose_block(rng));
             break;
          }
-      case 5:
+         case 5:
          {
             add_view_change(rng);
             break;
          }
-      case 6: case 13:
+         case 6:
+         case 13:
+         case 25:
+         case 26:
          {
             psibase::test::expire_one_timer(rng);
             break;
@@ -262,20 +285,20 @@ struct Network
 
    void forward_message(auto& rng, const auto& node)
    {
-      switch(rng() % 4)
+      switch (rng() % 4)
       {
-      case 0:
-         forward_message(rng, node, blocks);
-         break;
-      case 1:
-         forward_message(rng, node, prepares);
-         break;
-      case 2:
-         forward_message(rng, node, commits);
-         break;
-      case 3:
-         forward_message(rng, node, view_changes);
-         break;
+         case 0:
+            forward_message(rng, node, blocks);
+            break;
+         case 1:
+            forward_message(rng, node, prepares);
+            break;
+         case 2:
+            forward_message(rng, node, commits);
+            break;
+         case 3:
+            forward_message(rng, node, view_changes);
+            break;
       }
    }
 
@@ -338,14 +361,16 @@ struct Network
    {
       if (blocks.empty())
          return;
-      auto block = blocks[idx];
-      BlockInfo info{block->block()};
+      auto        block = blocks[idx];
+      BlockInfo   info{block->block()};
       SignedBlock newBlock;
       newBlock.block.header.previous = info.blockId;
       newBlock.block.header.blockNum = info.header.blockNum + 1;
-      newBlock.block.header.time.seconds = std::chrono::duration_cast<std::chrono::seconds>(mock_clock::now().time_since_epoch()).count();
-      newBlock.block.header.producer = producer;
-      newBlock.block.header.term = view;
+      newBlock.block.header.time.seconds =
+          std::chrono::duration_cast<std::chrono::seconds>(mock_clock::now().time_since_epoch())
+              .count();
+      newBlock.block.header.producer  = producer;
+      newBlock.block.header.term      = view;
       newBlock.block.header.commitNum = info.header.commitNum;
       recv(BlockMessage{newBlock});
    }
@@ -361,7 +386,7 @@ struct Network
 
    void recv(const SignedMessage<PrepareMessage>& message)
    {
-      if(!has_message(message, prepares))
+      if (!has_message(message, prepares))
          prepares.push_back(message);
    }
 
@@ -380,17 +405,20 @@ struct Network
    void recv(const HelloRequest&) {}
    void recv(const HelloResponse&) {}
 
-   template<typename T>
-   static bool has_message(const SignedMessage<T>& message, const std::vector<SignedMessage<T>>& vec)
+   template <typename T>
+   static bool has_message(const SignedMessage<T>&              message,
+                           const std::vector<SignedMessage<T>>& vec)
    {
-      for(const auto& m : vec)
+      for (const auto& m : vec)
       {
-         if (message.data.size() == m.data.size() && std::memcmp(m.data.data(), message.data.data(), m.data.size()) == 0)
+         if (message.data.size() == m.data.size() &&
+             std::memcmp(m.data.data(), message.data.data(), m.data.size()) == 0)
             return true;
       }
       return false;
    }
-   static bool has_message(const ViewChangeMessage& message, const std::vector<ViewChangeMessage>& vec)
+   static bool has_message(const ViewChangeMessage&              message,
+                           const std::vector<ViewChangeMessage>& vec)
    {
       return std::find(vec.begin(), vec.end(), message) != vec.end();
    }
@@ -400,17 +428,17 @@ struct Network
       nodes.push_back(std::make_unique<FuzzNode>(this, systemContext, AccountNumber(name)));
    }
 
-   std::vector<shared_view_ptr<SignedBlock>> blocks;
-   std::set<Checksum256> blockIds;
+   std::vector<shared_view_ptr<SignedBlock>>  blocks;
+   std::set<Checksum256>                      blockIds;
    std::vector<SignedMessage<PrepareMessage>> prepares;
-   std::vector<SignedMessage<CommitMessage>> commits;
-   std::vector<bool> prepared_blocks;
-   std::vector<bool> commited_blocks;
-   std::vector<ViewChangeMessage> view_changes;
-   std::vector<std::unique_ptr<FuzzNode>> nodes;
-   AccountNumber producer{"mallory"};
-   TermNum view = 0;
-   SystemContext* systemContext;
+   std::vector<SignedMessage<CommitMessage>>  commits;
+   std::vector<bool>                          prepared_blocks;
+   std::vector<bool>                          commited_blocks;
+   std::vector<ViewChangeMessage>             view_changes;
+   std::vector<std::unique_ptr<FuzzNode>>     nodes;
+   AccountNumber                              producer{"mallory"};
+   TermNum                                    view = 0;
+   SystemContext*                             systemContext;
 };
 
 struct ConsoleLog
@@ -455,7 +483,7 @@ struct bufrng
    using result_type = unsigned short;
    static constexpr unsigned short min() { return 0; }
    static constexpr unsigned short max() { return 255; }
-   unsigned short operator()()
+   unsigned short                  operator()()
    {
       unsigned short result;
       if (end - ptr < 1)
@@ -470,23 +498,23 @@ struct bufrng
 
 #ifndef __AFL_FUZZ_TESTCASE_LEN
 #include <iostream>
-namespace {
-  std::size_t fuzz_len;
+namespace
+{
+   std::size_t fuzz_len;
 #define __AFL_FUZZ_TESTCASE_LEN ::fuzz_len
-  unsigned char fuzz_buf[1024000];
+   unsigned char fuzz_buf[1024000];
 #define __AFL_FUZZ_TESTCASE_BUF ::fuzz_buf
-  #define __AFL_FUZZ_INIT() void dummy()
-#define __AFL_LOOP(x) (fuzz_len = (std::cin.read((char*)::fuzz_buf, sizeof(::fuzz_buf)), std::cin.gcount()))
-  #define __AFL_INIT() ((void)0)
-}
-#endif
-
+#define __AFL_LOOP(x) \
+   (fuzz_len = (std::cin.read((char*)::fuzz_buf, sizeof(::fuzz_buf)), std::cin.gcount()))
+}  // namespace
+#else
 __AFL_FUZZ_INIT();
+#endif
 
 int main(int argc, const char** argv)
 {
    Loggers logConfig;
-   for(int i = 1; i < argc; ++i)
+   for (int i = 1; i < argc; ++i)
    {
       if (std::string_view("--log-filter") == argv[i])
       {
@@ -497,29 +525,42 @@ int main(int argc, const char** argv)
          }
          logConfig.stderr.filter = argv[i];
       }
+      else if (std::string_view("--help") == argv[i] || std::string_view("-h") == argv[i])
+      {
+         std::cerr << "Usage: " << argv[0]
+                   << " [--help] [--log-filter <filter>]\n\n"
+#ifdef __AFL_COMPILER
+                      "AFL++ instrumented binary\n\n"
+#endif
+                      "Reads random bytes from stdin to control a simulation of a\n"
+                      "four producer network with one malicious producer."
+                   << std::endl;
+         return 2;
+      }
    }
    ExecutionContext::registerHostFunctions();
    init_logging(logConfig);
 
    TempDatabase db;
-   auto systemContext = db.getSystemContext();
+   auto         systemContext = db.getSystemContext();
    {
       Network network(systemContext.get());
       network.add_node("alice");
-      boot<BftConsensus>(network.nodes.front()->node.chain().getBlockContext(), {"alice", "bob", "carol", "mallory"});
-      auto zero_rng = [](){ return 0; };
+      boot<BftConsensus>(network.nodes.front()->node.chain().getBlockContext(),
+                         {"alice", "bob", "carol", "mallory"});
+      auto zero_rng = []() { return 0; };
       // The only active timer should be the block timer
       assert(timer_queue.size() == 1);
       expire_one_timer(zero_rng);
       network.nodes[0]->ctx.poll();
    }
-   auto initialHead = systemContext->sharedDatabase.getHead();
+   auto initialHead  = systemContext->sharedDatabase.getHead();
    auto initialState = systemContext->sharedDatabase.createWriter()->get_top_root();
    auto initialClock = mock_current_time;
 
-   unsigned char *buf = __AFL_FUZZ_TESTCASE_BUF;
+   unsigned char* buf = __AFL_FUZZ_TESTCASE_BUF;
 
-   while(__AFL_LOOP(1000))
+   while (__AFL_LOOP(1000))
    {
       int len = __AFL_FUZZ_TESTCASE_LEN;
       {
@@ -539,12 +580,14 @@ int main(int argc, const char** argv)
       {
          bufrng rng{buf, buf + len};
          //std::mt19937 rng;
-         while(true)
+         while (true)
          {
             network.do_step(rng);
          }
       }
-      catch(end_of_test&) {}
+      catch (end_of_test&)
+      {
+      }
       // Check consistency
       for (const auto& node1 : network.nodes)
       {
@@ -555,7 +598,8 @@ int main(int argc, const char** argv)
             auto min_commit = std::min(commit1, commit2);
             if (min_commit > 1)
             {
-               assert(node1->node.chain().get_block_id(min_commit) == node1->node.chain().get_block_id(min_commit));
+               assert(node1->node.chain().get_block_id(min_commit) ==
+                      node1->node.chain().get_block_id(min_commit));
             }
          }
       }
