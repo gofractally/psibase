@@ -186,7 +186,9 @@ TEST_CASE("joint consensus", "[combined]")
 {
    TEST_START(logger);
 
-   auto [start, change] = GENERATE(from_range(transitions));
+   auto dataIndex = GENERATE_INDEX(transitions);
+   INFO("data-index: " << dataIndex);
+   auto [start, change] = transitions.at(dataIndex);
    INFO("initial consensus: " << start);
    INFO("changed consensus: " << change);
    boost::asio::io_context ctx;
@@ -217,7 +219,9 @@ TEST_CASE("joint consensus crash", "[combined]")
 {
    TEST_START(logger);
 
-   auto [start, change] = GENERATE(from_range(transitions));
+   auto dataIndex = GENERATE_INDEX(transitions);
+   INFO("data-index: " << dataIndex);
+   auto [start, change] = transitions.at(dataIndex);
    INFO("initial consensus: " << start);
    INFO("changed consensus: " << change);
    boost::asio::io_context ctx;

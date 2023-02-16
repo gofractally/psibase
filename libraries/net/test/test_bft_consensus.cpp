@@ -71,7 +71,9 @@ TEST_CASE("bft quorum", "[bft]")
 {
    TEST_START(logger);
 
-   auto [prods, count] = GENERATE(from_range(bft_quorum));
+   auto dataIndex = GENERATE_INDEX(bft_quorum);
+   INFO("data-index: " << dataIndex);
+   auto [prods, count] = bft_quorum.at(dataIndex);
    auto activeProds    = prods;
    activeProds.resize(count);
 

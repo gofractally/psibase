@@ -69,7 +69,9 @@ TEST_CASE("cft quorum", "[cft]")
 {
    TEST_START(logger);
 
-   auto [prods, count] = GENERATE(from_range(cft_quorum));
+   auto dataIndex = GENERATE_INDEX(cft_quorum);
+   INFO("data-index: " << dataIndex);
+   auto [prods, count] = cft_quorum.at(dataIndex);
    auto activeProds    = prods;
    activeProds.resize(count);
 

@@ -24,12 +24,11 @@ struct Loggers
 };
 PSIO_REFLECT(Loggers, stderr);
 
-extern std::vector<std::pair<Consensus, Consensus>> transitions;
+std::optional<std::size_t> dataIndex;
 
 int main(int argc, const char* const* argv)
 {
-   Loggers                    logConfig;
-   std::optional<std::size_t> dataIndex;
+   Loggers logConfig;
 
    ExecutionContext::registerHostFunctions();
 
@@ -48,12 +47,6 @@ int main(int argc, const char* const* argv)
 
    if (auto seed = session.configData().rngSeed)
       psibase::test::global_random::set_global_seed(seed);
-
-   if (dataIndex)
-   {
-      if (*dataIndex < transitions.size())
-         transitions = {transitions[*dataIndex]};
-   }
 
    loggers::configure(psio::convert_from_json<loggers::Config>(psio::convert_to_json(logConfig)));
 
