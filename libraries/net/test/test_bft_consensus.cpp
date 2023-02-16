@@ -175,6 +175,7 @@ TEST_CASE("bft latency", "[bft]")
 
 TEST_CASE("commit before prepare", "[bft]")
 {
+   TEST_START(logger);
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
    auto                    producers = makeAccounts({"a", "b", "c", "d"});
@@ -201,4 +202,17 @@ TEST_CASE("commit before prepare", "[bft]")
    send(makePrepare(block1, "b"));
    send(makePrepare(block1, "c"));
    send(makePrepare(block1, "d"));
+}
+
+TEST_CASE("view change update head", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+   auto                  boot_block = node.head();
+   auto                  block1     = makeBlock(boot_block, "b", 4);
+   node.send(block1);
+   CHECK(node.head().blockId == boot_block.blockId);
+   node.send(makeViewChange("b", 4));
+   node.send(makeViewChange("c", 4));
+   CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
 }

@@ -966,6 +966,7 @@ namespace psibase::net
 
       void recv(peer_id peer, const ViewChangeMessage& msg)
       {
+         auto saved_term = current_term;
          if (do_view_change(msg.producer, msg.signer, msg.term) && msg.term < current_term)
          {
             // If we receive an out-dated view, notify the sender of our view
@@ -976,6 +977,10 @@ namespace psibase::net
                        peer, ViewChangeMessage{.term = current_term, .producer = self, .signer = k},
                        [](const std::error_code&) {});
                 });
+         }
+         if (current_term != saved_term)
+         {
+            Base::switch_fork();
          }
       }
    };

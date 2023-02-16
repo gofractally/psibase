@@ -378,6 +378,30 @@ ViewChangeMessage             makeViewChange(std::string_view producer, psibase:
 
 void runFor(boost::asio::io_context& ctx, psibase::test::mock_clock::duration total_time);
 
+template <typename Node>
+struct SingleNode
+{
+   SingleNode(const std::vector<psibase::AccountNumber>& producers)
+   {
+      nodes.add(makeAccounts({"a", "main"}));
+      nodes.partition(NetworkPartition::all());
+      boot<psibase::BftConsensus>(nodes.getBlockContext(), producers);
+      runFor(ctx, std::chrono::seconds(1));
+   }
+   SingleNode(const std::vector<std::string_view>& producers) : SingleNode(makeAccounts(producers))
+   {
+   }
+   boost::asio::io_context ctx;
+   NodeSet<Node>           nodes{ctx};
+
+   void send(auto&& message)
+   {
+      nodes[1].sendto(nodes[0].producer_name(), message);
+      ctx.poll();
+   };
+   auto head() { return nodes[0].chain().get_head_state()->info; }
+};
+
 #define TEST_START(logger)                                                              \
    psibase::loggers::common_logger logger;                                              \
    logger.add_attribute("Host", boost::log::attributes::constant(std::string{"main"})); \
