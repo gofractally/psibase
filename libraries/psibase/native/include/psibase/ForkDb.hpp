@@ -532,6 +532,8 @@ namespace psibase
          verifyBc.start(b.header.time);
          for (const auto& trx : b.transactions)
          {
+            check(trx.proofs.size() == trx.transaction->claims().size(),
+                  "proofs and claims must have same size");
             for (std::size_t i = 0; i < trx.proofs.size(); ++i)
             {
                TransactionTrace trace;

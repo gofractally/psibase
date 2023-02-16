@@ -505,6 +505,8 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             trace.error = "Need genesis block; use 'psibase boot' to boot chain";
          else
          {
+            check(trx.proofs.size() == trx.transaction->claims().size(),
+                  "proofs and claims must have same size");
             // All proofs execute as of the state at block begin. This will allow
             // consistent parallel execution of all proofs within a block during
             // replay. Proofs don't have direct database access, but they do rely
