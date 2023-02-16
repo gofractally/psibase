@@ -217,7 +217,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
         return (
             <label
                 htmlFor={props.id}
-                className="flex place-items-center gap-4 bg-gray-100 p-3 font-medium text-gray-700"
+                className="flex place-items-center gap-4 p-3 font-medium text-gray-700"
             >
                 <input
                     type="checkbox"
@@ -240,7 +240,7 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>((props, ref) => {
     return (
         <label
             htmlFor={props.id}
-            className="flex place-items-center gap-4 bg-gray-100 p-3 font-medium text-gray-700"
+            className="flex place-items-center gap-4 p-3 font-medium text-gray-700"
         >
             <input type="radio" ref={ref} {...props} />
             <div className="flex-1">{props.label}</div>

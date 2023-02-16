@@ -1,0 +1,35 @@
+global:
+  config_version: 3
+input:
+  type: stdin
+  # type: file
+  # path: /root/psibase.log
+  # readall: false
+imports:
+  - type: grok_patterns
+    dir: ./grok-patterns
+metrics:
+  - type: counter
+    name: psinode_http_requests_total
+    help: Total number of http requests to psinode
+    # Log example: [2023-01-13T14:48:45.819Z] [info] [127.0.0.1:36808]: Handled HTTP request: GET localhost:8080/native/admin/status 200 8
+    # match: "Handled HTTP request: %{WORD:http_method} %{URIHOST:http_host}%{URIPATH:http_path} %{WORD:http_status_code}"
+    # WS Example: {"Message":"Handled HTTP request","Host":"TABLET-9TPQLCUJ","Process":"psinode","ProcessId":6376,"TimeStamp":"2023-01-17T02:20:35.613Z","Severity":"info","RemoteEndpoint":"127.0.0.1:59740","Request":{"Method":"GET","Target":"/native/admin/perf","Host":"host.docker.internal:8080"},"Response":{"Status":200,"Bytes":921 }}
+    match: 'Handled HTTP request%{GREEDYDATA}Method":"%{WORD:http_method}"%{GREEDYDATA}Target":"%{URIPATH:http_path}"%{GREEDYDATA}Host":"%{URIHOST:http_host}"%{GREEDYDATA}Status":%{WORD:http_status_code}'
+    labels:
+      http_method: "{{.http_method}}"
+      http_status_code: "{{.http_status_code}}"
+      http_path: "{{.http_host}}{{.http_path}}"
+  - type: counter
+    name: psinode_produced_blocks_total
+    help: Total number of produced blocks
+    # Log example: [2023-01-17T02:56:06.000Z] [info]: Produced block 0001795843133941B7E9C51EFFB507BAEB18B24FF5926688CBA6C62BD4594070
+    # match: 'Produced block'
+    # WS Example: {"Message":"Produced block","Host":"TABLET-9TPQLCUJ","Process":"psinode","ProcessId":6376,"TimeStamp":"2023-01-17T02:20:35.000Z","Severity":"info","BlockId":"00017105F6E4259754B8D3258B454CFA56CC0223C4F02CD822D50185ABA2D0E9","BlockHeader":{"previous":"0001710413A31909BC3BF07798819C8E0FC174779011B344165E92D0E0F30609","blockNum":94469,"time":"2023-01-17T02:20:34.000Z","producer":"testchain","term":14,"commitNum":94469,"newConsensus":null}}
+    match: 'Produced block%{GREEDYDATA}producer":"%{WORD:producer}'
+    labels:
+      producer: "{{.producer}}"
+
+server:
+  protocol: http
+  port: 9144

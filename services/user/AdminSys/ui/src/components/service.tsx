@@ -1,6 +1,7 @@
-import { useForm, RegisterOptions } from "react-hook-form";
+import { RegisterOptions } from "react-hook-form";
 import Button from "./button";
 import "../styles/service.css";
+import { newId } from "../configuration/utils";
 
 type ServiceConfig = {
     host: string;
@@ -15,7 +16,6 @@ export type ServiceProps = {
     getValues: () => ServiceConfig;
     index: number;
     services: any;
-    newId: () => string;
 };
 
 function emptyService(s: ServiceConfig) {
@@ -27,7 +27,6 @@ export const Service = ({
     getValues,
     index,
     services,
-    newId,
 }: ServiceProps) => {
     const isEnd = index == services.fields.length - 1;
     const fixLastRow = (e: any) => {
@@ -57,7 +56,11 @@ export const Service = ({
                 />
             </td>
             {!isEnd && (
-                <Button onClick={() => services.remove(index)}>Remove</Button>
+                <td>
+                    <Button onClick={() => services.remove(index)}>
+                        Remove
+                    </Button>
+                </td>
             )}
         </tr>
     );

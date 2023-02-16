@@ -20,12 +20,13 @@ export interface ButtonProps {
     form?: string;
 }
 
-export type ButtonSize = "xs" | "sm" | "base" | "lg";
+export type ButtonSize = "xs" | "sm" | "base" | "lg" | "xl";
 const SIZE_CLASS: { [key in ButtonSize]: string } = {
     xs: "py-1.5 px-2.5",
     sm: "py-2 px-4",
     base: "py-2 px-5",
     lg: "py-2.5 px-6",
+    xl: "py-4 px-8",
 };
 
 const TEXT_SIZE: { [key in ButtonSize]: TextSize } = {
@@ -33,6 +34,7 @@ const TEXT_SIZE: { [key in ButtonSize]: TextSize } = {
     sm: "sm",
     base: "base",
     lg: "lg",
+    xl: "xl",
 };
 
 export type ButtonType = "primary" | "secondary" | "outline" | "link" | "icon";
@@ -88,7 +90,7 @@ export const Button = ({
     target,
     title,
     dataTestId,
-    form
+    form,
 }: ButtonProps) => {
     const baseClass = "inline-block text-center no-underline";
     const widthClass = fullWidth ? "w-full" : "";
