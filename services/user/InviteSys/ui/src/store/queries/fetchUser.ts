@@ -11,7 +11,7 @@ export const fetchUser = async (): Promise<string> => {
 
 export const fetchAvailableUsers = async (): Promise<string[]> => {
   const accountSys = new AppletId("account-sys");
-  const users = await query<void, string[]>(accountSys, "getAccounts");
+  const users = await query<void, string[]>(accountSys, "getKeyStoreAccounts");
   return users;
 };
 

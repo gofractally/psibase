@@ -173,4 +173,15 @@ declare module "common/rpc.mjs" {
     ): Promise<GqlResponse>;
 
     function uint8ArrayToHex(data: Uint8Array): string;
+
+    // TODO: remove and use the proper rpc.d.ts
+    type Claim = {
+        service: string;
+        rawData: string; // hex bytes
+    };
+
+    type WrappedClaim = {
+        claim: Claim;
+        pubkey: string; // Public key string
+    };
 }

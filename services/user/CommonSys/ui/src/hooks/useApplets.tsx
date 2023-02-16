@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AppletId,
     executeCallback,
+    GetClaimParams,
     MessageTypes,
+    packAndDigestTransaction,
     packAndPushSignedTransaction,
     storeCallback,
     verifyFields,
+    WrappedClaim,
 } from "common/rpc.mjs";
 
 import {
@@ -28,6 +31,9 @@ const SERVICE_NAME = "common-sys";
 const ACCOUNT_SYS = new AppletId("account-sys", "");
 const COMMON_SYS = new AppletId(SERVICE_NAME);
 const ACTIVE_APPLET = getAppletInURL();
+const CLAIM_APPLETS: Map<string, AppletId> = new Map([
+    ["auth-ec-sys", new AppletId("auth-ec-sys", "")],
+]);
 
 type AppletsMap = {
     [appletPath: string]: NewAppletState;
@@ -221,20 +227,138 @@ export const useApplets = () => {
                 injectSender(transactions, currentUser)
             );
 
-            const { errors, response: signedTransaction } = await sendQuery(
+            const claimParams: GetClaimParams[] = Array.from(
+                transaction.actions.map((action: any) => ({
+                    service: action.service,
+                    sender: action.sender,
+                    method: action.method,
+                    data: action.data,
+                }))
+            );
+            console.info("claimParams >>>", claimParams);
+
+            const accountsQueryResponse = await sendQuery(
                 COMMON_SYS,
                 ACCOUNT_SYS,
-                "getAuthedTransaction",
-                { transaction }
+                "getAccounts"
             );
-            if (!signedTransaction) {
-                console.error("There is no signed transaction", {
-                    signedTransaction,
-                    errors,
-                });
-                throw new Error(`No signed transaction returned: ${errors}`);
+
+            interface AccountWithAuth {
+                accountNum: string;
+                authService: string;
             }
 
+            const accounts =
+                accountsQueryResponse.response as AccountWithAuth[];
+
+            const accountsMap = accounts.reduce((acc, account) => {
+                acc.set(account.accountNum, account);
+                return acc;
+            }, new Map<string, AccountWithAuth>());
+
+            const actionSenderClaims = claimParams
+                .filter((action: any) => action.sender)
+                .map((claimParams) => {
+                    // For now we only support `auth-ec-sys`
+                    if (
+                        accountsMap.get(claimParams.sender)?.authService !==
+                        "auth-ec-sys"
+                    ) {
+                        return undefined;
+                    }
+
+                    return sendQuery(
+                        COMMON_SYS,
+                        CLAIM_APPLETS.get("auth-ec-sys")!,
+                        "getClaim",
+                        claimParams
+                    )
+                        .then((q) => q.response)
+                        .catch((error) => {
+                            console.error(
+                                "error getting sender claim from authService for params",
+                                claimParams,
+                                error
+                            );
+                            return undefined;
+                        });
+                })
+                .filter((item) => item) as Promise<WrappedClaim>[];
+
+            const actionAppClaims = claimParams
+                .filter((action: any) => action.service)
+                .map((claimParams) => {
+                    if (!CLAIM_APPLETS.has(claimParams.service)) {
+                        CLAIM_APPLETS.set(
+                            claimParams.service,
+                            new AppletId(claimParams.service, "")
+                        );
+                    }
+
+                    return sendQuery(
+                        COMMON_SYS,
+                        CLAIM_APPLETS.get(claimParams.service)!,
+                        "getClaim",
+                        claimParams
+                    )
+                        .then((q) => q.response)
+                        .catch((error) => {
+                            console.info(
+                                "applet did not retrieve any claim",
+                                claimParams,
+                                error
+                            );
+                            return undefined;
+                        });
+                })
+                .filter((item) => item) as Promise<WrappedClaim>[];
+
+            const claimRequests: WrappedClaim[] = await Promise.all([
+                // Sender claims
+                ...actionSenderClaims,
+                // Application claims
+                ...actionAppClaims,
+            ]);
+            console.info("claimRequests >>>", claimRequests);
+
+            const claims = claimRequests.filter(
+                (claim, idx) =>
+                    claim &&
+                    // ignore duplicates
+                    idx ===
+                        claimRequests.findIndex(
+                            (c) => c.pubkey === claim.pubkey
+                        )
+            );
+            console.info("claims >>>", claims);
+
+            const { transactionHex, digest: trxDigest } =
+                await packAndDigestTransaction("", {
+                    ...transaction,
+                    claims: claims.map((c: WrappedClaim) => c.claim),
+                });
+
+            const proofsPromises = await Promise.all(
+                claims.map(async (claim: WrappedClaim) => {
+                    try {
+                        const { response } = await sendQuery(
+                            COMMON_SYS,
+                            ACCOUNT_SYS,
+                            "getProof",
+                            { claim, trxDigest }
+                        );
+                        return response?.proof;
+                    } catch (e) {
+                        console.error("error getting proof", e);
+                        return undefined;
+                    }
+                })
+            );
+
+            const proofs = proofsPromises.filter((item) => item);
+            console.info("proofs!!! >>>", proofs);
+
+            const signedTransaction = { transaction: transactionHex, proofs };
             return signedTransaction;
         },
         [sendQuery, getCurrentUser]

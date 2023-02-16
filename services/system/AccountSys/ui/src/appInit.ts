@@ -2,19 +2,19 @@ import {
     initializeApplet,
     action,
     operation,
-    query,
     setOperations,
     setQueries,
     getJson,
     AppletId,
-    packAndDigestTransaction,
     uint8ArrayToHex,
+    WrappedClaim,
 } from "common/rpc.mjs";
 import {
     privateStringToKeyPair,
     signatureToFracpack,
 } from "common/keyConversions.mjs";
 import { AccountWithKey, KeyPair, KeyPairWithAccounts } from "./App";
+import { fetchAccounts } from "./helpers";
 
 interface execArgs {
     name?: any;
@@ -24,11 +24,39 @@ interface execArgs {
 
 const CURRENT_USER = "currentUser";
 
-const claimApplets: Map<string, AppletId> = new Map();
+interface GetProofParams {
+    claim: WrappedClaim;
+    trxDigest: number[];
+}
 
 class KeyStore {
     getKeyStore(): KeyPairWithAccounts[] {
         return JSON.parse(window.localStorage.getItem("keyPairs") || "[]");
+    }
+
+    findKeyPairForPublicKey(
+        publicKey: string
+    ): KeyPairWithAccounts | undefined {
+        const keyStore = this.getKeyStore();
+        return (
+            keyStore.find((keyPair) => keyPair.publicKey == publicKey) ||
+            undefined
+        );
+    }
+
+    getProof({ claim, trxDigest }: GetProofParams) {
+        const keyPair = this.findKeyPairForPublicKey(claim.pubkey);
+        if (!keyPair) {
+            return undefined;
+        }
+
+        const k = privateStringToKeyPair(keyPair.privateKey);
+        const packedSignature = signatureToFracpack({
+            keyType: k.keyType,
+            signature: k.keyPair.sign(trxDigest),
+        });
+
+        return uint8ArrayToHex(packedSignature);
     }
 
     setKeyStore(keyStore: KeyPairWithAccounts[]): void {
@@ -136,7 +164,6 @@ export const initAppFn = (setAppInitialized: () => void) =>
     initializeApplet(async () => {
         const thisApplet = await getJson<string>("/common/thisservice");
         const accountSysApplet = new AppletId(thisApplet, "");
-        claimApplets.set("auth-ec-sys", new AppletId("auth-ec-sys", ""));
 
         setOperations([
             {
@@ -234,140 +261,24 @@ export const initAppFn = (setAppInitialized: () => void) =>
                 },
             },
             {
-                id: "getAccounts",
+                id: "getKeyStoreAccounts",
                 exec: () => {
                     return keystore.getAccounts();
                 },
             },
             {
-                id: "getAuthedTransaction",
-                exec: async ({ transaction }: execArgs): Promise<any> => {
-                    console.info("transaction >>>", transaction);
-
-                    interface AccountWithAuthService {
-                        accountNum: string;
-                        authService: string;
-                    }
-
-                    interface GetClaimParams {
-                        service: string;
-                        sender: string;
-                        method: string;
-                        params: any;
-                    }
-
-                    const [accounts] = await Promise.all([
-                        // query<null, string>(
-                        //     accountSysApplet,
-                        //     "getLoggedInUser"
-                        // ),
-                        getJson<AccountWithAuthService[]>("/accounts"),
-                    ]);
-                    console.info("accounts >>>", accounts);
-                    const accountsMap = accounts.reduce((acc, account) => {
-                        acc.set(account.accountNum, account);
-                        return acc;
-                    }, new Map<string, AccountWithAuthService>());
-                    console.info("accountsMap >>>", accountsMap);
-
-                    // TODO: optimize by removing any duplicates
-                    const claimParams: GetClaimParams[] = Array.from(
-                        transaction.actions.map((action: any) => ({
-                            service: action.service,
-                            sender: action.sender,
-                            method: action.method,
-                            data: action.data,
-                        }))
-                    );
-                    console.info("claimParams >>>", claimParams);
-
-                    const claimRequests = [
-                        // Sender claims
-                        ...claimParams
-                            .filter((action: any) => action.sender)
-                            .map((claimParams) => {
-                                // For now we only support `auth-ec-sys`
-                                if (
-                                    accountsMap.get(claimParams.sender)
-                                        ?.authService !== "auth-ec-sys"
-                                ) {
-                                    return undefined;
-                                }
-
-                                return query(
-                                    claimApplets.get("auth-ec-sys")!,
-                                    "getClaim",
-                                    claimParams
-                                ).catch((error) => {
-                                    console.error(
-                                        "error getting sender claim from authService for params",
-                                        claimParams,
-                                        error
-                                    );
-                                    return undefined;
-                                });
-                            })
-                            .filter((claimRequest) => claimRequest),
-                        // Application claims
-                        ...claimParams
-                            .filter((action: any) => action.service)
-                            .map((claimParams) => {
-                                if (!claimApplets.has(claimParams.service)) {
-                                    claimApplets.set(
-                                        claimParams.service,
-                                        new AppletId(claimParams.service, "")
-                                    );
-                                }
-
-                                return query(
-                                    claimApplets.get(claimParams.service)!,
-                                    "getClaim",
-                                    claimParams
-                                ).catch((error) => {
-                                    console.info(
-                                        "applet did not retrieve any claim",
-                                        claimParams,
-                                        error
-                                    );
-                                    return undefined;
-                                });
-                            })
-                            .filter((claimRequest) => claimRequest),
-                    ];
-                    console.info("claimRequests >>>", claimRequests);
-
-                    const claims = (await Promise.all(claimRequests)).filter(
-                        (claim: any) => claim
-                    );
-                    console.info("claims >>>", claims);
-                    // TODO: remove duplicates?
-
-                    const { transactionHex, digest } =
-                        await packAndDigestTransaction("", {
-                            ...transaction,
-                            claims: claims.map((c: any) => c.claim),
-                        });
-                    console.info("trx >>>", transactionHex, digest);
-
-                    // TODO: migrate to keyvault
-                    const keys = keystore.getKeyStore();
-
-                    const proofs = claims
-                        .map((claim: any) =>
-                            keys.find((key) => key.publicKey === claim.pubkey)
-                        )
-                        .filter((key) => key)
-                        .map((key) => {
-                            const k = privateStringToKeyPair(key!.privateKey);
-                            const packedSignature = signatureToFracpack({
-                                keyType: k.keyType,
-                                signature: k.keyPair.sign(digest),
-                            });
-                            return uint8ArrayToHex(packedSignature);
-                        });
-                    console.info("proofs >>>", proofs);
-
-                    return { transaction: transactionHex, proofs };
+                id: "getProof",
+                exec: async (params: GetProofParams): Promise<any> => {
+                    console.info("getproof received!!", params);
+                    const proof = keystore.getProof(params);
+                    console.info("generated proof", proof);
+                    return { proof };
+                },
+            },
+            {
+                id: "getAccounts",
+                exec: () => {
+                    return fetchAccounts();
                 },
             },
         ]);
