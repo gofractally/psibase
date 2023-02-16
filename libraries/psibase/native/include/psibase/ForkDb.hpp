@@ -416,6 +416,8 @@ namespace psibase
                iter = byOrderIndex.erase(iter);
             }
          }
+         // TODO: This can trigger if 2f+1 producers prepare an invalid
+         // block. We try to set the subtree even through it is blacklisted.
          assert(!byOrderIndex.empty());
       }
 

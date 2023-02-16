@@ -34,7 +34,12 @@ using timer_type = psibase::test::mock_timer;
 
 using psibase::net::basic_bft_consensus;
 using psibase::net::basic_cft_consensus;
+using psibase::net::BlockMessage;
 using psibase::net::blocknet;
+using psibase::net::CommitMessage;
+using psibase::net::PrepareMessage;
+using psibase::net::SignedMessage;
+using psibase::net::ViewChangeMessage;
 
 template <typename Derived>
 using cft_consensus = basic_cft_consensus<blocknet<Derived, timer_type>, timer_type>;
@@ -299,6 +304,8 @@ std::ostream& operator<<(std::ostream& os, const NodeSet<Node>& nodes)
 void pushTransaction(psibase::BlockContext* ctx, psibase::Transaction trx);
 void setProducers(psibase::BlockContext* ctc, const psibase::Consensus& producers);
 
+psibase::Transaction setProducers(const psibase::Consensus& producers);
+
 std::vector<psibase::AccountNumber> makeAccounts(
     const std::vector<std::string_view>& producer_names);
 
@@ -338,6 +345,36 @@ void setup(NodeSet<N>& nodes, const std::vector<std::string_view>& producer_name
       producers.push_back(psibase::AccountNumber{prod});
    setup<C>(nodes, producers);
 }
+
+struct BlockArg
+{
+   BlockArg(const psibase::BlockInfo& info) : info(info) {}
+   BlockArg(const BlockMessage& msg) : info(msg.block->block()) {}
+                      operator psibase::BlockInfo() const { return info; }
+   psibase::BlockInfo info;
+};
+
+BlockMessage makeBlock(const BlockArg& prev, std::string_view producer, psibase::TermNum view);
+BlockMessage makeBlock(const BlockArg&             prev,
+                       std::string_view            producer,
+                       psibase::TermNum            view,
+                       const psibase::Transaction& trx);
+BlockMessage makeBlock(const BlockArg&     prev,
+                       std::string_view    producer,
+                       psibase::TermNum    view,
+                       const BlockMessage& irreversible);
+BlockMessage makeBlock(const BlockArg&                   info,
+                       std::string_view                  producer,
+                       psibase::TermNum                  view,
+                       const psibase::net::BlockConfirm& irreversible);
+
+psibase::net::BlockConfirm makeBlockConfirm(const BlockArg&                      committed,
+                                            const std::vector<std::string_view>& prods,
+                                            const std::vector<std::string_view>& next_prods);
+
+SignedMessage<PrepareMessage> makePrepare(const BlockMessage& block, std::string_view producer);
+SignedMessage<CommitMessage>  makeCommit(const BlockMessage& block, std::string_view producer);
+ViewChangeMessage             makeViewChange(std::string_view producer, psibase::TermNum view);
 
 void runFor(boost::asio::io_context& ctx, psibase::test::mock_clock::duration total_time);
 

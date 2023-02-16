@@ -173,47 +173,6 @@ TEST_CASE("bft latency", "[bft]")
    }
 }
 
-BlockMessage build_block(const BlockInfo& info, std::string_view producer, TermNum view)
-{
-   SignedBlock newBlock;
-   newBlock.block.header.previous     = info.blockId;
-   newBlock.block.header.blockNum     = info.header.blockNum + 1;
-   newBlock.block.header.time.seconds = info.header.time.seconds + 1;
-   newBlock.block.header.producer     = AccountNumber{producer};
-   newBlock.block.header.term         = view;
-   newBlock.block.header.commitNum    = info.header.commitNum;
-   return BlockMessage{newBlock};
-}
-
-BlockMessage build_block(const BlockMessage& prev, std::string_view producer, TermNum view)
-{
-   BlockInfo info{prev.block->block()};
-   return build_block(info, producer, view);
-}
-
-template <NeedsSignature T>
-auto sign(T&& message)
-{
-   return SignedMessage<std::remove_cvref_t<T>>{std::forward<T>(message)};
-}
-
-auto make_prepare(const BlockMessage& block, std::string_view producer)
-{
-   BlockInfo info{block.block->block()};
-   return sign(PrepareMessage{info.blockId, AccountNumber{producer}});
-}
-
-auto make_commit(const BlockMessage& block, std::string_view producer)
-{
-   BlockInfo info{block.block->block()};
-   return sign(CommitMessage{info.blockId, AccountNumber{producer}});
-}
-
-auto make_view_change(std::string_view producer, TermNum view)
-{
-   return ViewChangeMessage{view, AccountNumber{producer}};
-}
-
 TEST_CASE("commit before prepare", "[bft]")
 {
    boost::asio::io_context ctx;
@@ -224,23 +183,22 @@ TEST_CASE("commit before prepare", "[bft]")
    boot<BftConsensus>(nodes.getBlockContext(), producers);
    runFor(ctx, 1s);
 
-   auto& control = nodes.nodes[1]->node;
-   auto  send    = [&](auto&& message)
+   auto send = [&](auto&& message)
    {
-      control.sendto(AccountNumber{"a"}, message);
+      nodes[1].sendto(AccountNumber{"a"}, message);
       ctx.poll();
    };
-   auto boot_block = control.chain().get_head_state()->info;
+   auto boot_block = nodes[0].chain().get_head_state()->info;
 
-   auto block1 = build_block(boot_block, "b", 4);
-   auto block2 = build_block(boot_block, "c", 5);
+   auto block1 = makeBlock(boot_block, "b", 4);
+   auto block2 = makeBlock(boot_block, "c", 5);
    send(block1);
    send(block2);
 
-   send(make_commit(block2, "b"));
-   send(make_commit(block2, "c"));
-   send(make_commit(block2, "d"));
-   send(make_prepare(block1, "b"));
-   send(make_prepare(block1, "c"));
-   send(make_prepare(block1, "d"));
+   send(makeCommit(block2, "b"));
+   send(makeCommit(block2, "c"));
+   send(makeCommit(block2, "d"));
+   send(makePrepare(block1, "b"));
+   send(makePrepare(block1, "c"));
+   send(makePrepare(block1, "d"));
 }

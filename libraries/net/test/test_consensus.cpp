@@ -256,3 +256,37 @@ TEST_CASE("joint consensus crash", "[combined]")
    CHECK_THAT((std::vector{ProducerSet(start), ProducerSet(change)}),
               Catch::Matchers::VectorContains(*final_state->producers));
 }
+
+TEST_CASE("fork at commit consensus change", "[combined]")
+{
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+   auto                    producers = makeAccounts({"a", "b", "c", "d"});
+   nodes.add(makeAccounts({"a", "h"}));
+   nodes.partition(NetworkPartition::all());
+   boot<BftConsensus>(nodes.getBlockContext(), producers);
+   runFor(ctx, 1s);
+
+   auto send = [&](auto&& message)
+   {
+      nodes[1].sendto(AccountNumber{"a"}, message);
+      ctx.poll();
+   };
+   auto boot_block = nodes[0].chain().get_head_state()->info;
+
+   auto transition = makeBlock(boot_block, "d", 2, setProducers(cft("e", "f", "g")));
+   auto block1     = makeBlock(transition, "b", 4);
+   auto block2 =
+       makeBlock(transition, "c", 5, makeBlockConfirm(transition, {"b", "c", "d"}, {"e", "f"}));
+   auto block3 = makeBlock(block2, "e", 6, block2);
+   send(transition);
+   send(block1);
+
+   send(makePrepare(block1, "b"));
+   send(makePrepare(block1, "c"));
+   send(makePrepare(block1, "d"));
+
+   send(block2);
+   send(block3);
+   CHECK(nodes[0].chain().get_head_state()->blockId() == BlockInfo{block3.block->block()}.blockId);
+}

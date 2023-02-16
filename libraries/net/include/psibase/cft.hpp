@@ -239,6 +239,23 @@ namespace psibase::net
             {
                _election_timer.restart();
             }
+            if (state->info.header.commitNum > chain().commit_index())
+            {
+               // Find the committed block
+               auto committed = state;
+               while (committed->blockNum() > state->info.header.commitNum)
+               {
+                  committed = chain().get_state(committed->info.header.previous);
+                  // Since state is valid and is ahead of commitIndex, all
+                  // the states [commitNum, blockNum] definitely exist.
+                  assert(committed);
+               }
+               // Ensure that the committed block is considered viable
+               if (!chain().in_best_chain(committed->xid()))
+               {
+                  chain().set_subtree(committed);
+               }
+            }
          }
          return Base::on_accept_block_header(state);
       }
