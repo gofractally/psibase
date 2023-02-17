@@ -348,6 +348,27 @@ void setup(NodeSet<N>& nodes, const std::vector<std::string_view>& producer_name
    setup<C>(nodes, producers);
 }
 
+template <typename C>
+psibase::Consensus makeConsensus(std::initializer_list<psibase::AccountNumber> names)
+{
+   C consensus;
+   for (auto account : names)
+   {
+      consensus.producers.push_back({psibase::AccountNumber{account}});
+   }
+   return consensus;
+}
+
+auto cft(auto... args)
+{
+   return makeConsensus<psibase::CftConsensus>({psibase::AccountNumber(args)...});
+}
+
+auto bft(auto... args)
+{
+   return makeConsensus<psibase::BftConsensus>({psibase::AccountNumber(args)...});
+}
+
 struct BlockArg
 {
    BlockArg(const psibase::BlockInfo& info) : info(info) {}
@@ -396,12 +417,20 @@ struct SingleNode
    boost::asio::io_context ctx;
    NodeSet<Node>           nodes{ctx};
 
+   void addClient()
+   {
+      nodes.add(psibase::AccountNumber{"client"});
+      NodeSet<Node>::adjust_connection(nodes[0], nodes[2], true, {});
+   }
    void send(auto&& message)
    {
       nodes[1].sendto(nodes[0].producer_name(), message);
       ctx.poll();
    };
+   void send0(auto&& message) { nodes[1].sendto(nodes[0].producer_name(), message); }
+   void poll() { ctx.poll(); }
    auto head() { return nodes[0].chain().get_head_state()->info; }
+   auto clientHead() { return nodes[2].chain().get_head_state()->info; }
 };
 
 #define TEST_START(logger)                                                              \

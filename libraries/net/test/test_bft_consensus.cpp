@@ -261,6 +261,32 @@ TEST_CASE("fork before invalid 2", "[bft]")
    CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
 }
 
+//     --- A --- B
+// root
+//     ------------ C --- X
+TEST_CASE("truncated fork switch", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+   //
+   auto root    = node.head();
+   auto block1a = makeBlock(root, "b", 4);
+   auto block1b = makeBlock(block1a, "b", 4);
+   auto block2  = makeBlock(root, "c", 5, setProducers(bft("a", "b", "c")));
+   auto invalid = makeBlock(block2, "c", 5, Transaction{.actions = {Action{}}});
+   node.addClient();
+   node.send(block1a);
+   node.send(makeViewChange("b", 4));
+   node.send(makeViewChange("c", 4));
+   node.send0(block1b);
+   node.send0(block2);
+   node.send0(invalid);
+   node.send0(makeViewChange("b", 5));
+   node.send0(makeViewChange("c", 5));
+   node.poll();
+   CHECK(node.head().blockId == BlockInfo{block2.block->block()}.blockId);
+}
+
 //           --- B
 // root --- X
 //           --- A

@@ -73,27 +73,6 @@ namespace psibase
    }
 }  // namespace psibase
 
-template <typename C>
-Consensus makeConsensus(std::initializer_list<AccountNumber> names)
-{
-   C consensus;
-   for (auto account : names)
-   {
-      consensus.producers.push_back({AccountNumber{account}});
-   }
-   return consensus;
-}
-
-auto cft(auto... args)
-{
-   return makeConsensus<CftConsensus>({AccountNumber(args)...});
-}
-
-auto bft(auto... args)
-{
-   return makeConsensus<BftConsensus>({AccountNumber(args)...});
-}
-
 std::vector<std::pair<Consensus, Consensus>> transitions = {
     {cft("a"), cft("b")},
     {cft("a"), cft("a", "b", "c")},

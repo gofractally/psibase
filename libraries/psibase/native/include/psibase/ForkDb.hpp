@@ -448,70 +448,78 @@ namespace psibase
       template <typename F, typename Accept>
       void async_switch_fork(F&& callback, Accept&& on_accept_block)
       {
-         auto pos =
-             byOrderIndex.lower_bound(std::tuple(currentTerm + 1, BlockNum(0), Checksum256{}));
-         --pos;
-         auto new_head = get_state(pos->second);
-         // Also consider the block currently being built, if it exists
-         if (blockContext)
+         auto original_head = head;
+         while (true)
          {
-            if (  // We should always abandon an unbooted chain
-                !blockContext->needGenesisAction &&
-                // If the previous head block is no longer viable, we need
-                // to abort the pending block regardless of block ordering.
-                byOrderIndex.find(head->order()) != byOrderIndex.end() &&
-                // The block id of the pending block is still unknown.  Only
-                // keep the pending block if it is definitely better than new_head.
-                new_head->order() < std::tuple(blockContext->current.header.term,
-                                               blockContext->current.header.blockNum,
-                                               Checksum256{}))
+            auto pos =
+                byOrderIndex.lower_bound(std::tuple(currentTerm + 1, BlockNum(0), Checksum256{}));
+            --pos;
+            auto new_head = get_state(pos->second);
+            // Also consider the block currently being built, if it exists
+            if (blockContext)
             {
-               return;
-            }
-         }
-         if (head != new_head)
-         {
-            for (auto i = new_head->blockNum() + 1; i <= head->blockNum(); ++i)
-            {
-               // TODO: this should not be an assert, because it depends on other nodes behaving correctly
-               assert(i > commitIndex);
-               byBlocknumIndex.erase(i);
-            }
-            auto id = new_head->blockId();
-            for (auto i = new_head->blockNum(); i > head->blockNum(); --i)
-            {
-               byBlocknumIndex.insert({i, id});
-               id = get_prev_id(id);
-            }
-            for (auto iter = byBlocknumIndex.upper_bound(
-                          std::min(new_head->blockNum(), head->blockNum())),
-                      begin = byBlocknumIndex.begin();
-                 iter != begin;)
-            {
-               --iter;
-               if (iter->second == id)
+               if (  // We should always abandon an unbooted chain
+                   !blockContext->needGenesisAction &&
+                   // If the previous head block is no longer viable, we need
+                   // to abort the pending block regardless of block ordering.
+                   byOrderIndex.find(head->order()) != byOrderIndex.end() &&
+                   // The block id of the pending block is still unknown.  Only
+                   // keep the pending block if it is definitely better than new_head.
+                   new_head->order() < std::tuple(blockContext->current.header.term,
+                                                  blockContext->current.header.blockNum,
+                                                  Checksum256{}))
                {
-                  if (execute_fork(iter, byBlocknumIndex.end(), on_accept_block))
-                  {
-                     break;
-                  }
-                  else
-                  {
-                     // If execute fork fails, the trial head block and possibly
-                     // others are removed from byOrderIndex and byBlocknumIndex.
-                     // Start over.
-                     return async_switch_fork(
-                         static_cast<decltype(callback)>(callback),
-                         static_cast<decltype(on_accept_block)>(on_accept_block));
-                  }
+                  return;
                }
-               assert(iter->first > commitIndex);
-               iter->second = id;
-               id           = get_prev_id(id);
             }
-            head = new_head;
-            assert(!!head->revision);
+            if (trySetHead(new_head, std::forward<Accept>(on_accept_block)))
+               break;
+         }
+         if (head != original_head)
+         {
             callback(head->info);
+         }
+      }
+      template <typename Accept>
+      bool trySetHead(BlockHeaderState* new_head, Accept&& on_accept_block)
+      {
+         if (head == new_head)
+            return true;
+         for (auto i = new_head->blockNum() + 1; i <= head->blockNum(); ++i)
+         {
+            // TODO: this should not be an assert, because it depends on other nodes behaving correctly
+            assert(i > commitIndex);
+            byBlocknumIndex.erase(i);
+         }
+         auto id = new_head->blockId();
+         for (auto i = new_head->blockNum(); i > head->blockNum(); --i)
+         {
+            byBlocknumIndex.insert({i, id});
+            id = get_prev_id(id);
+         }
+         for (auto iter = byBlocknumIndex.upper_bound(
+                       std::min(new_head->blockNum(), head->blockNum())),
+                   begin = byBlocknumIndex.begin();
+              ;)
+         {
+            assert(iter != begin);
+            --iter;
+            if (iter->second == id)
+            {
+               if (execute_fork(iter, byBlocknumIndex.end(), on_accept_block))
+               {
+                  head = new_head;
+                  assert(!!head->revision);
+                  return true;
+               }
+               else
+               {
+                  return false;
+               }
+            }
+            assert(iter->first > commitIndex);
+            iter->second = id;
+            id           = get_prev_id(id);
          }
       }
       // TODO: somehow prevent poisoning the cache if a malicious peer

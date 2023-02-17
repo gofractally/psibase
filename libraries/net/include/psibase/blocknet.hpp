@@ -465,8 +465,9 @@ namespace psibase::net
          if (peer.last_sent.num() != chain().get_head()->blockNum)
          {
             auto next_block_id = chain().get_block_id(peer.last_sent.num() + 1);
-            peer.last_sent     = {next_block_id, peer.last_sent.num() + 1};
-            auto next_block    = chain().get(next_block_id);
+            assert(next_block_id != Checksum256());
+            peer.last_sent  = {next_block_id, peer.last_sent.num() + 1};
+            auto next_block = chain().get(next_block_id);
 
             network().async_send_block(peer.id, BlockMessage{next_block},
                                        [this, &peer](const std::error_code& e)
@@ -558,6 +559,10 @@ namespace psibase::net
          chain().async_switch_fork(
              [this](const BlockInfo& head)
              {
+                {
+                   PSIBASE_LOG_CONTEXT_BLOCK(head.header, head.blockId);
+                   PSIBASE_LOG(logger, debug) << "New head block";
+                }
                 // TODO: only run set_producers when the producers actually changed
                 consensus().set_producers(chain().getProducers());
                 if (_state == producer_state::leader &&
