@@ -218,3 +218,66 @@ TEST_CASE("view change update head", "[bft]")
    node.send(makeViewChange("c", 4));
    CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
 }
+
+//     ------- B
+// root
+//     --- A ----- X
+TEST_CASE("fork before invalid 1", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+   // The final block is ordered between the parent of the
+   // invalid block and the invalid block
+   auto root    = node.head();
+   auto block1  = makeBlock(root, "b", 4);
+   auto block2  = makeBlock(root, "c", 5);
+   auto invalid = makeBlock(block1, "d", 6, Transaction{.actions = {Action{}}});
+   node.send(block1);
+   node.send(block2);
+   node.send(invalid);
+   node.send(makeViewChange("b", 6));
+   node.send(makeViewChange("c", 6));
+   CHECK(node.head().blockId == BlockInfo{block2.block->block()}.blockId);
+}
+
+//     ------- B
+// root
+//     --- X ----- A
+TEST_CASE("fork before invalid 2", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+   // The final block is ordered between the invalid block
+   // and a descendant of the invalid block
+   auto root    = node.head();
+   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
+   auto block1  = makeBlock(root, "c", 5);
+   auto block2  = makeBlock(invalid, "d", 6);
+   node.send(invalid);
+   node.send(block1);
+   node.send(block2);
+   node.send(makeViewChange("b", 6));
+   node.send(makeViewChange("c", 6));
+   CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
+}
+
+//           --- B
+// root --- X
+//           --- A
+TEST_CASE("fork after invalid", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+   // If there are multiple forks that descend from an invalid
+   // block, they should all get blacklisted.
+   auto root    = node.head();
+   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
+   auto block1  = makeBlock(invalid, "b", 4);
+   auto block2  = makeBlock(invalid, "c", 5);
+   node.send(invalid);
+   node.send(block1);
+   node.send(block2);
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
+   CHECK(node.head().blockId == root.blockId);
+}

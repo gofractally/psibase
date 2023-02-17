@@ -510,6 +510,7 @@ namespace psibase
                id           = get_prev_id(id);
             }
             head = new_head;
+            assert(!!head->revision);
             callback(head->info);
          }
       }
@@ -591,6 +592,7 @@ namespace psibase
                {
                   byBlocknumIndex.erase(iter, end);
                   blacklist_subtree(nextState);
+                  head = prev;
                   return false;
                }
                systemContext->sharedDatabase.setHead(*writer, nextState->revision);
@@ -807,6 +809,7 @@ namespace psibase
             auto [state_iter, ins2] = states.try_emplace(id, *head, info, revision);
             byOrderIndex.insert({state_iter->second.order(), id});
             head = &state_iter->second;
+            assert(!!head->revision);
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
             auto proof = getBlockProof(revision, blockContext->current.header.blockNum);
             blocks.try_emplace(id, SignedBlock{blockContext->current, proof, makeData(head)});
@@ -863,6 +866,7 @@ namespace psibase
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
             byOrderIndex.insert({head->order(), head->blockId()});
             head->revision = systemContext->sharedDatabase.getHead();
+            assert(!!head->revision);
          }
          else
          {
@@ -902,6 +906,7 @@ namespace psibase
                if (!head)
                {
                   head = &state_iter->second;
+                  assert(!!head->revision);
                   PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
                   PSIBASE_LOG(logger, debug) << "Read head block";
                }
