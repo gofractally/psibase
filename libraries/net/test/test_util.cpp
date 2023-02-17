@@ -35,7 +35,16 @@ std::filesystem::path randomDirName(std::string_view name)
 TempDir::TempDir(std::string_view name) : path(randomDirName(name)) {}
 TempDir::~TempDir()
 {
-   std::filesystem::remove_all(path);
+   reset();
+}
+
+void TempDir::reset()
+{
+   if (!path.empty())
+   {
+      std::filesystem::remove_all(path);
+      path.clear();
+   }
 }
 
 std::vector<char> readWholeFile(const std::filesystem::path& name)

@@ -70,6 +70,7 @@ struct TempDir
 {
    explicit TempDir(std::string_view name);
    ~TempDir();
+   void                  reset();
    std::filesystem::path path;
 };
 
@@ -104,6 +105,7 @@ struct TempDatabase
              psibase::SharedDatabase{dir.path.native(), true, 1'000'000ul, 27, 27, 27, 27},
              psibase::WasmCache{16})}
    {
+      dir.reset();
    }
    auto    getSystemContext() { return sharedState->getSystemContext(); }
    TempDir dir;
