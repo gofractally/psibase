@@ -119,4 +119,21 @@ declare module "common/rpc.mjs" {
     ): Promise<GqlResponse>;
 
     function uint8ArrayToHex(data: Uint8Array): string;
+
+    interface GetClaimParams {
+        service: string;
+        sender: string;
+        method: string;
+        params: any;
+    }
+
+    type Claim = {
+        service: string;
+        rawData: string; // hex bytes
+    };
+
+    type WrappedClaim = {
+        claim: Claim;
+        pubkey: string; // Public key string
+    };
 }

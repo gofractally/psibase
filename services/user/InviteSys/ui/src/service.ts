@@ -10,6 +10,7 @@ import {
   operation,
   query,
   uint8ArrayToHex,
+  WrappedClaim,
 } from "common/rpc.mjs";
 
 const OPERATIONS_KEY = "OPERATIONS_KEY";
@@ -170,15 +171,7 @@ export function Qry(name?: string) {
   };
 }
 
-interface Claim {
-  claim: {
-    service: string;
-    rawData: string;
-  };
-  pubkey: string;
-}
-
-const generateClaimFromPrivateKey = (privateKey: string): Claim => {
+const generateClaimFromPrivateKey = (privateKey: string): WrappedClaim => {
   const keyPair = publicStringToKeyPair(privateKey);
   if (!keyPair) {
     throw new Error("Invalid private key");
@@ -204,7 +197,7 @@ export class PsiboardService extends Service {
   }
 
   @Qry()
-  async getClaim(params): Promise<Claim | null> {
+  async getClaim(params): Promise<WrappedClaim | null> {
     // We only generate claims for the `acceptCreated` and `accept` action
     const isRelevantMethod = ["acceptCreate", "accept"].includes(params.method);
     console.log("is relevant?", { isRelevantMethod });
