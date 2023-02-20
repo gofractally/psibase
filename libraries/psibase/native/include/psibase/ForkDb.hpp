@@ -462,7 +462,7 @@ namespace psibase
                    !blockContext->needGenesisAction &&
                    // If the previous head block is no longer viable, we need
                    // to abort the pending block regardless of block ordering.
-                   byOrderIndex.find(head->order()) != byOrderIndex.end() &&
+                   byOrderIndex.find(original_head->order()) != byOrderIndex.end() &&
                    // The block id of the pending block is still unknown.  Only
                    // keep the pending block if it is definitely better than new_head.
                    new_head->order() < std::tuple(blockContext->current.header.term,

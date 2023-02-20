@@ -12,7 +12,7 @@ using namespace psibase;
 struct ConsoleLog
 {
    std::string type   = "console";
-   std::string filter = "Severity >= warning";
+   std::string filter = "Severity > critical";
    std::string format =
        "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {BlockId}: {BlockHeader}}";
 };

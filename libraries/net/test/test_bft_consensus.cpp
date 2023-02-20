@@ -310,6 +310,35 @@ TEST_CASE("fork after invalid", "[bft]")
    CHECK(node.head().blockId == root.blockId);
 }
 
+//     --- A --- X
+// root
+//     ------------ B --- P
+TEST_CASE("producer fork 1", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root    = node.head();
+   auto fork1   = makeBlock(root, "b", 4);
+   auto invalid = makeBlock(fork1, "b", 4, Transaction{.actions = {Action{}}});
+   // start block production for "a"
+   node.send(makeViewChange("b", 7));
+   node.send(makeViewChange("c", 7));
+   CHECK(!!node.nodes[0].chain().getBlockContext());
+   runFor(node.ctx, 1s);
+   node.send(fork1);
+   node.send(invalid);
+   // Force switch to fork 1
+   node.send(makePrepare(fork1, "b"));
+   node.send(makePrepare(fork1, "c"));
+   node.send(makePrepare(fork1, "d"));
+   CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
+   runFor(node.ctx, 1s);
+   // The block should be built off fork1
+   CHECK(node.head().header.previous == BlockInfo{fork1.block->block()}.blockId);
+   CHECK(node.head().header.producer.str() == "a");
+}
+
 TEST_CASE("better block after commit", "[bft]")
 {
    TEST_START(logger);
