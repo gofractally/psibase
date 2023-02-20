@@ -469,6 +469,12 @@ namespace psibase
                                                   blockContext->current.header.blockNum,
                                                   Checksum256{}))
                {
+                  if (original_head != head)
+                  {
+                     bool res = trySetHead(original_head, std::forward<Accept>(on_accept_block));
+                     // We were already on this fork, so we know that it's definitely good.
+                     assert(res);
+                  }
                   return;
                }
             }

@@ -339,6 +339,36 @@ TEST_CASE("producer fork 1", "[bft]")
    CHECK(node.head().header.producer.str() == "a");
 }
 
+//     ------ B --- X
+// root
+//     --- A --- P
+TEST_CASE("producer cancel fork switch")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root    = node.head();
+   auto fork1   = makeBlock(root, "b", 4);
+   auto fork2   = makeBlock(root, "c", 5);
+   auto invalid = makeBlock(fork2, "a", 7, Transaction{.actions = {Action{}}});
+   node.send(fork1);
+   node.send(makeViewChange("b", 4));
+   node.send(makeViewChange("c", 4));
+   // start block production for "a"
+   node.send(makeViewChange("b", 7));
+   node.send(makeViewChange("c", 7));
+   // We should not switch forks, because the pending block is better fork2
+   node.send(fork2);
+   CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
+   // We should still not switch forks, because invalid gets discarded after it fails
+   node.send(invalid);
+   CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
+   // The next block should be built off fork1
+   runFor(node.ctx, 1s);
+   CHECK(node.head().header.previous == BlockInfo{fork1.block->block()}.blockId);
+   CHECK(node.head().header.producer.str() == "a");
+}
+
 TEST_CASE("better block after commit", "[bft]")
 {
    TEST_START(logger);
