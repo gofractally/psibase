@@ -86,8 +86,6 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
             const keypairsWithoutStaleAccounts = easier.map(keyPair => ({ ...keyPair, knownAccounts: keyPair.knownAccounts.filter(account => !accountNumsCovered.some(a => a == account)) }))
             const [existingAccountsToRemain, accountsToDrop] = partition(keypairsWithoutStaleAccounts, (keyPair) => keyPair.knownAccounts.length > 0);
 
-            console.log({ existingAccountsToRemain, accountsToDrop })
-
             const combined = [...existingAccountsToRemain, ...incomingAccounts];
             const pureUniqueKeyPairs = combined.map(({ privateKey, publicKey }): KeyPair => ({ privateKey, publicKey })).filter((keyPair, index, arr) => arr.findIndex(kp => kp.publicKey === keyPair.publicKey) === index)
 

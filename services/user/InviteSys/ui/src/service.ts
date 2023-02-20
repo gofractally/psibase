@@ -110,7 +110,6 @@ export function Op(name?: string) {
         .then((appletId) => operation(appletId, id, ...args))
         .then((res) => {
           if (resIsQueryResponse(res)) {
-            console.log("is thing");
             return res.transactionSubmittedPromise;
           } else {
             console.log("is not this thing");
@@ -192,7 +191,6 @@ const generateClaimFromPrivateKey = (privateKey: string): WrappedClaim => {
 export class PsiboardService extends Service {
   @Qry()
   async fetchInvite(publicKey: string) {
-    console.log({ publicKey }, "xx");
     return this.getInvite(publicKey);
   }
 
@@ -200,11 +198,10 @@ export class PsiboardService extends Service {
   async getClaim(params): Promise<WrappedClaim | null> {
     // We only generate claims for the `acceptCreated` and `accept` action
     const isRelevantMethod = ["acceptCreate", "accept"].includes(params.method);
-    console.log("is relevant?", { isRelevantMethod });
     if (isRelevantMethod) {
       const token = params.data.inviteKey;
       const claim = generateClaimFromPrivateKey(token);
-      console.log("passing back claim of", claim);
+      console.log("passing back claim of", claim, "for", params.method);
       return claim;
     }
 
@@ -219,8 +216,6 @@ export class PsiboardService extends Service {
 
   @Action("invite-sys")
   getInvite(pubkey: string) {
-    console.log({ pubkey }, "xx");
-
     return { pubkey };
   }
 
@@ -231,13 +226,11 @@ export class PsiboardService extends Service {
 
   @Action("invite-sys")
   accept(inviteKey: string) {
-    console.log(`running action... with the key of ${inviteKey}`);
     return { inviteKey };
   }
 
   @Action("invite-sys")
   createInvite(inviteKey: string) {
-    console.log({ inviteKey }, "TX");
     return {
       inviteKey,
     };
