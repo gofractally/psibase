@@ -264,6 +264,8 @@ TEST_CASE("fork before invalid 2", "[bft]")
 //     --- A --- B
 // root
 //     ------------ C --- X
+//
+// This test switches from B to C in between sending A and B to a peer.
 TEST_CASE("truncated fork switch", "[bft]")
 {
    TEST_START(logger);
@@ -306,4 +308,59 @@ TEST_CASE("fork after invalid", "[bft]")
    node.send(makeViewChange("b", 5));
    node.send(makeViewChange("c", 5));
    CHECK(node.head().blockId == root.blockId);
+}
+
+TEST_CASE("better block after commit", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+   // fork2 should be excluded after fork1 is prepared
+   auto root  = node.head();
+   auto fork1 = makeBlock(root, "b", 4);
+   auto fork2 = makeBlock(root, "c", 5);
+   node.send(makeViewChange("b", 4));
+   node.send(makeViewChange("c", 4));
+   node.send(fork1);
+   node.send(makePrepare(fork1, "b"));
+   node.send(makePrepare(fork1, "c"));
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
+   node.send(fork2);
+   CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
+}
+
+TEST_CASE("return to previous fork", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root   = node.head();
+   auto fork1  = makeBlock(root, "b", 4);
+   auto fork2  = makeBlock(root, "c", 5);
+   auto fork1b = makeBlock(fork1, "b", 4);
+   node.send(makeViewChange("b", 4));
+   node.send(makeViewChange("c", 4));
+   node.send(fork1);
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
+   node.send(fork2);
+   CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
+   // return to the worse fork
+   node.send(fork1b);
+   node.send(makePrepare(fork1, "b"));
+   node.send(makePrepare(fork1, "c"));
+   node.send(makePrepare(fork1b, "b"));
+   node.send(makePrepare(fork1b, "c"));
+   CHECK(node.head().blockId == BlockInfo{fork1b.block->block()}.blockId);
+   // Must not generate commit for fork1b because this conflicts
+   // with the prepare for fork2.  Note that c's commit also violates
+   // the protocol, so we have to consider it to be the one adversary node..
+   node.send(makeCommit(fork1b, "c"));
+   node.send(makeCommit(fork1b, "d"));
+
+   node.send(makePrepare(fork2, "b"));
+   node.send(makePrepare(fork2, "c"));
+
+   // should switch to fork 2
+   CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
 }

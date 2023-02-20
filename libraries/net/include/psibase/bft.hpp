@@ -643,7 +643,7 @@ namespace psibase::net
             return false;
          }
          // have threshold prepares AND have not prepared a better conflicting block
-         if (chain().in_best_chain(state->xid()))
+         if (chain().in_best_chain(state->xid()) && chain().in_best_chain(orderToXid(best_prepare)))
          {
             return state->order() > alt_prepare;
          }
@@ -652,14 +652,6 @@ namespace psibase::net
             return state->order() > best_prepare;
          }
          return false;
-      }
-      void on_fork_switch(const BlockHeader* head)
-      {
-         if (!chain().in_best_chain(orderToXid(best_prepare)))
-         {
-            alt_prepare = best_prepare;
-         }
-         Base::on_fork_switch(head);
       }
       void on_prepare(const BlockHeaderState* state, AccountNumber producer, const auto& msg)
       {
@@ -685,7 +677,14 @@ namespace psibase::net
       {
          const auto& id = state->blockId();
          assert(chain().in_best_chain(state->xid()));
-         best_prepare = state->order();
+         if (state->order() > best_prepare)
+         {
+            if (!chain().in_best_chain(orderToXid(best_prepare)))
+            {
+               alt_prepare = best_prepare;
+            }
+            best_prepare = state->order();
+         }
          for_each_key(state,
                       [&](const auto& key)
                       {
