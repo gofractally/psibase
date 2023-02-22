@@ -50,6 +50,10 @@ namespace psibase
       return {ConsensusAlgorithm::bft, c.producers};
    }
 
+   struct consensus_failure
+   {
+   };
+
    struct ProducerSet
    {
       ConsensusAlgorithm                               algorithm;
@@ -259,6 +263,9 @@ namespace psibase
    {
      public:
       using id_type = Checksum256;
+      // \return a pointer to the header state for the block or null if the block
+      // was not inserted for any reason.
+      // \post if the block was successfully inserted, a fork switch is required.
       const BlockHeaderState* insert(const psio::shared_view_ptr<SignedBlock>& b)
       {
          BlockInfo info(b->block());
@@ -300,6 +307,13 @@ namespace psibase
          }
          return nullptr;
       }
+      // \pre The block must not be in the current chain and
+      // must not have any children. Practially speaking, this
+      // function can only be called immediately after insert,
+      // before any fork switch.
+      // \post This removes the need for a fork switch if the
+      // the erased block is the only reason why a fork switch
+      // is needed.
       void erase(const BlockHeaderState* state)
       {
          assert(!in_best_chain(state->xid()));
@@ -307,7 +321,9 @@ namespace psibase
          blocks.erase(state->blockId());
          states.erase(state->blockId());
       }
-      BlockHeader*                       get_head() const { return &head->info.header; }
+      // \pre A fork switch is not required
+      BlockHeader* get_head() const { return &head->info.header; }
+      // \pre A fork switch is not required
       const BlockHeaderState*            get_head_state() const { return head; }
       psio::shared_view_ptr<SignedBlock> get(const id_type& id) const
       {
@@ -333,6 +349,7 @@ namespace psibase
             return nullptr;
          }
       }
+      // \pre A fork switch is not required
       Checksum256 get_block_id(BlockNum num) const
       {
          auto iter = byBlocknumIndex.find(num);
@@ -355,6 +372,7 @@ namespace psibase
             }
          }
       }
+      // \pre A fork switch is not required
       psio::shared_view_ptr<SignedBlock> get_block_by_num(BlockNum num) const
       {
          auto iter = byBlocknumIndex.find(num);
@@ -378,6 +396,7 @@ namespace psibase
             }
          }
       }
+      // \pre id represents a known block
       auto get_prev_id(const id_type& id)
       {
          return Checksum256(get(id)->block().header().previous());
@@ -385,9 +404,18 @@ namespace psibase
 
       void setTerm(TermNum term) { currentTerm = term; }
 
-      // If root is non-null, the head block must be a descendant of root
-      void set_subtree(const BlockHeaderState* root)
+      // \post fork switch needed
+      // \post only blocks that are descendents of root will be considered
+      // as the head block
+      void set_subtree(const BlockHeaderState* root, const char* reason)
       {
+         assert(root->info.header.term <= currentTerm);
+         if (root->invalid)
+         {
+            PSIBASE_LOG_CONTEXT_BLOCK(root->info.header, root->blockId());
+            PSIBASE_LOG(logger, critical) << "Consensus failure: invalid block " << reason;
+            throw consensus_failure{};
+         }
          if (byOrderIndex.find(root->order()) == byOrderIndex.end())
          {
             // The new root is not a descendant of the current root.
@@ -416,8 +444,6 @@ namespace psibase
                iter = byOrderIndex.erase(iter);
             }
          }
-         // TODO: This can trigger if 2f+1 producers prepare an invalid
-         // block. We try to set the subtree even through it is blacklisted.
          assert(!byOrderIndex.empty());
       }
 
@@ -453,6 +479,12 @@ namespace psibase
          {
             auto pos =
                 byOrderIndex.lower_bound(std::tuple(currentTerm + 1, BlockNum(0), Checksum256{}));
+            if (pos == byOrderIndex.begin())
+            {
+               PSIBASE_LOG(logger, critical) << "Consensus failure: failed to switch forks, "
+                                                "because there is no viable head block";
+               throw consensus_failure{};
+            }
             --pos;
             auto new_head = get_state(pos->second);
             // Also consider the block currently being built, if it exists
@@ -491,11 +523,17 @@ namespace psibase
       {
          if (head == new_head)
             return true;
-         for (auto i = new_head->blockNum() + 1; i <= head->blockNum(); ++i)
+         if (new_head->blockNum() < head->blockNum())
          {
-            // TODO: this should not be an assert, because it depends on other nodes behaving correctly
-            assert(i > commitIndex);
-            byBlocknumIndex.erase(i);
+            if (new_head->blockNum() < commitIndex)
+            {
+               PSIBASE_LOG_CONTEXT_BLOCK(new_head->info.header, new_head->blockId());
+               PSIBASE_LOG(logger, critical)
+                   << "Consensus failure: multiple conflicting forks confirmed";
+               throw consensus_failure{};
+            }
+            byBlocknumIndex.erase(byBlocknumIndex.find(new_head->blockNum() + 1),
+                                  byBlocknumIndex.end());
          }
          auto id = new_head->blockId();
          for (auto i = new_head->blockNum(); i > head->blockNum(); --i)
@@ -523,7 +561,13 @@ namespace psibase
                   return false;
                }
             }
-            assert(iter->first > commitIndex);
+            if (iter->first <= commitIndex)
+            {
+               PSIBASE_LOG_CONTEXT_BLOCK(new_head->info.header, new_head->blockId());
+               PSIBASE_LOG(logger, critical)
+                   << "Consensus failure: multiple conflicting forks confirmed";
+               throw consensus_failure{};
+            }
             iter->second = id;
             id           = get_prev_id(id);
          }
@@ -665,7 +709,9 @@ namespace psibase
          // of the committed block.
          if (std::get<1>(byOrderIndex.begin()->first) < newCommitIndex)
          {
-            set_subtree(get_state(get_block_id(newCommitIndex)));
+            // no error is possible, because the committed block is in the
+            // current chain.
+            set_subtree(get_state(get_block_id(newCommitIndex)), "");
          }
          commitIndex = newCommitIndex;
          return result;

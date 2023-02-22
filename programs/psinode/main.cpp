@@ -2150,6 +2150,11 @@ int main(int argc, char* argv[])
       }
       return 0;
    }
+   catch (consensus_failure&)
+   {
+      PSIBASE_LOG(psibase::loggers::generic::get(), critical)
+          << "Exiting because of consensus failure";
+   }
    catch (std::exception& e)
    {
       PSIBASE_LOG(psibase::loggers::generic::get(), error) << e.what();

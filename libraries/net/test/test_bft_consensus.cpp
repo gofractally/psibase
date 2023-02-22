@@ -423,3 +423,119 @@ TEST_CASE("return to previous fork", "[bft]")
    // should switch to fork 2
    CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
 }
+
+// -----------------------------------------------------
+// The following test cases excercise messages sequences
+// in which more than f producers violate the protocol.
+// While the protocol specifies that the result is
+// undefined, a node should not crash.
+// -----------------------------------------------------
+
+// The invalid block is attempted and flagged before the fork switch
+TEST_CASE("invalid prepared block 1", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root    = node.head();
+   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
+   node.send(invalid);
+   node.send(makeViewChange("b", 4));
+   node.send(makeViewChange("c", 4));
+   node.send(makePrepare(invalid, "b"));
+   node.send(makePrepare(invalid, "c"));
+   CHECK_THROWS_AS(node.send(makePrepare(invalid, "d")), consensus_failure);
+}
+
+// The invalid block is executed at the fork switch
+TEST_CASE("invalid prepared block 2", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root    = node.head();
+   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
+   auto block1  = makeBlock(root, "c", 5);
+   node.send(block1);
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
+   node.send(invalid);
+   node.send(makePrepare(invalid, "b"));
+   node.send(makePrepare(invalid, "c"));
+   CHECK_THROWS_AS(node.send(makePrepare(invalid, "d")), consensus_failure);
+}
+
+TEST_CASE("invalid committed block", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root    = node.head();
+   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
+   node.send(invalid);
+   node.send(makeViewChange("b", 4));
+   node.send(makeViewChange("c", 4));
+   node.send(makeCommit(invalid, "b"));
+   node.send(makeCommit(invalid, "c"));
+   CHECK_THROWS_AS(node.send(makeCommit(invalid, "d")), consensus_failure);
+}
+
+TEST_CASE("double commit 1", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root   = node.head();
+   auto block1 = makeBlock(root, "b", 4);
+   auto block2 = makeBlock(root, "c", 5);
+   node.send(block1);
+   node.send(block2);
+
+   node.send(makeCommit(block1, "b"));
+   node.send(makeCommit(block1, "c"));
+   node.send(makeCommit(block1, "d"));
+
+   node.send(makeCommit(block2, "b"));
+   node.send(makeCommit(block2, "c"));
+   // At the time of writing, this throws. However, if block2 is
+   // pruned, the commits will simply be ignored.
+   try
+   {
+      node.send(makeCommit(block2, "d"));
+   }
+   catch (consensus_failure&)
+   {
+   }
+   CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
+}
+
+TEST_CASE("double commit 2", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root    = node.head();
+   auto block1a = makeBlock(root, "b", 4);
+   auto block1b = makeBlock(block1a, "b", 4);
+   auto block2  = makeBlock(root, "c", 5);
+   node.send(block1a);
+   node.send(block1b);
+   node.send(block2);
+
+   node.send(makeCommit(block1b, "b"));
+   node.send(makeCommit(block1b, "c"));
+   node.send(makeCommit(block1b, "d"));
+
+   node.send(makeCommit(block2, "b"));
+   node.send(makeCommit(block2, "c"));
+   // At the time of writing, this throws. However, if block2 is
+   // pruned, the commits will simply be ignored.
+   try
+   {
+      node.send(makeCommit(block2, "d"));
+   }
+   catch (consensus_failure&)
+   {
+   }
+   CHECK(node.head().blockId == BlockInfo{block1b.block->block()}.blockId);
+}

@@ -253,7 +253,7 @@ namespace psibase::net
                // Ensure that the committed block is considered viable
                if (!chain().in_best_chain(committed->xid()))
                {
-                  chain().set_subtree(committed);
+                  chain().set_subtree(committed, "made irreversible by a subsequent block");
                }
             }
          }

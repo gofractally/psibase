@@ -662,7 +662,7 @@ namespace psibase::net
             {
                best_prepared = state->order();
                set_view(state->info.header.term);
-               chain().set_subtree(state);
+               chain().set_subtree(state, "prepared by a quorum of producers");
                // Fork switch handled by caller. It cannot be handled
                // here because we might already by in the process of
                // switching forks
@@ -754,7 +754,7 @@ namespace psibase::net
                verify_commit(state);
                // This is possible if we receive the commits before the corresponding prepares
                set_view(state->info.header.term);
-               chain().set_subtree(state);
+               chain().set_subtree(state, "committed by a quorum of producers");
             }
             else if (chain().commit(state->blockNum()))
             {
@@ -887,7 +887,7 @@ namespace psibase::net
                if (!chain().in_best_chain(committed->xid()))
                {
                   verify_commit(committed);
-                  chain().set_subtree(committed);
+                  chain().set_subtree(committed, "made irreversible by a subsequent block");
                   // fork switch will be handled by the caller
                   auto [iter, _] = confirmations.try_emplace(committed->blockId(), state->producers,
                                                              state->nextProducers);
