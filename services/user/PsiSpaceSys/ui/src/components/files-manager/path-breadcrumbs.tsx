@@ -62,14 +62,13 @@ export const FolderBreadcrumb = ({
     label,
 }: FolderBreadcrumbProps) => {
     return pathLink ? (
-        <a
-            href="#"
+        <button
             onClick={() => {
                 onClick(pathLink);
             }}
         >
             {label}
-        </a>
+        </button>
     ) : (
         <span>{label}</span>
     );

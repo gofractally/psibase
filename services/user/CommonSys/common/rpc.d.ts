@@ -20,6 +20,13 @@ declare module "common/rpc.mjs" {
         OperationResponse: "OperationResponse",
         TransactionReceipt: "TransactionReceipt",
         SetActiveAccount: "SetActiveAccount",
+        ChangeHistory: "ChangeHistory",
+    };
+
+    type ChangeHistoryPayload = {
+        href: string;
+        pathname: string;
+        search: string;
     };
 
     declare class AppletId {
@@ -42,15 +49,17 @@ declare module "common/rpc.mjs" {
         getAppletName(): Promise<string>;
         getAppletId(): Promise<AppletId>;
 
-        public get operations(): Operation[]
-        public get queries(): Operation[]
-
+        public get operations(): Operation[];
+        public get queries(): Operation[];
     }
 
-    function Action(target: any, key: string, descriptor: any): void
-    function Op(name?: string): (target: any, key: string, descriptor: any) => void
-    function Qry(name?: string): (target: any, key: string, descriptor: any) => void
-
+    function Action(target: any, key: string, descriptor: any): void;
+    function Op(
+        name?: string
+    ): (target: any, key: string, descriptor: any) => void;
+    function Qry(
+        name?: string
+    ): (target: any, key: string, descriptor: any) => void;
 
     function getCurrentApplet(): Promise<string>;
 

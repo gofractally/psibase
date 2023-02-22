@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AppletId,
+    ChangeHistoryPayload,
     executeCallback,
     MessageTypes,
     packAndPushSignedTransaction,
@@ -436,6 +437,27 @@ export const useApplets = () => {
         [setCurrentUser]
     );
 
+    const handleChangeHistory = useCallback(
+        async (applet: AppletId, payload: ChangeHistoryPayload) => {
+            // Set history only if the applet is the active one
+            if (ACTIVE_APPLET.name === applet.name) {
+                // Trim the leading slash because we can't load applets with "/" in their name
+                const appletPath =
+                    payload.pathname === "/" ? "" : payload.pathname;
+
+                // Build full applet subpath
+                const appletSubpath = `${appletPath}${payload.search}`;
+
+                // Set the new applet subpath
+                const newPath = `/applet/${applet.name}${appletSubpath}`;
+
+                console.info("ChangeHistory", newPath);
+                window.history.replaceState(undefined, "", newPath);
+            }
+        },
+        []
+    );
+
     const messageRouting = useMemo(
         () => ({
             [MessageTypes.Operation]: {
@@ -462,6 +484,10 @@ export const useApplets = () => {
                 fields: ["account"],
                 handle: handleSetActiveUser,
             },
+            [MessageTypes.ChangeHistory]: {
+                fields: ["href", "pathname", "search"],
+                handle: handleChangeHistory,
+            },
         }),
         [
             handleOperation,
@@ -469,6 +495,7 @@ export const useApplets = () => {
             handleQuery,
             handleQueryResponse,
             handleSetActiveUser,
+            handleChangeHistory,
         ]
     );
 

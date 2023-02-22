@@ -341,6 +341,7 @@ export const MessageTypes = {
     OperationResponse: "OperationResponse",
     TransactionReceipt: "TransactionReceipt",
     SetActiveAccount: "SetActiveAccount",
+    ChangeHistory: "ChangeHistory", // Fired when the applet history changes
 };
 
 export class AppletId {
@@ -517,7 +518,9 @@ const messageRouting = [
                     responsePayload.errors.push(e);
                 }
             } else {
-                responsePayload.errors.push(`Service ${contractName} has no operation "${identifier}"`);
+                responsePayload.errors.push(
+                    `Service ${contractName} has no operation "${identifier}"`
+                );
             }
 
             sendToParent({
@@ -547,7 +550,9 @@ const messageRouting = [
                         responsePayload.errors.push(e);
                     }
                 } else {
-                    responsePayload.errors.push(`Service ${contractName} has no query "${identifier}"`);
+                    responsePayload.errors.push(
+                        `Service ${contractName} has no query "${identifier}"`
+                    );
                 }
             } catch (e) {
                 console.error("fail to process query message", e);
@@ -589,7 +594,7 @@ const messageRouting = [
     },
 ];
 
-export async function initializeApplet(initializer = () => { }) {
+export async function initializeApplet(initializer = () => {}) {
     await redirectIfAccessedDirectly();
 
     const rootUrl = await siblingUrl(null, null, null);
@@ -627,8 +632,44 @@ export async function initializeApplet(initializer = () => { }) {
 
     await import("/common/iframeResizer.contentWindow.js");
 
+    console.info("setting up applet event listeners popstate");
+    let currentHref = document.location.href;
+    const body = document.querySelector("body");
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach(() => {
+            if (currentHref !== document.location.href) {
+                console.info(">>> observed href mutation");
+                sendHistoryChange();
+                currentHref = document.location.href;
+            }
+        });
+    });
+    observer.observe(body, { childList: true, subtree: true });
+
+    // required to detect back button
+    window.onpopstate = (_event) => {
+        if (currentHref !== document.location.href) {
+            console.info(">>> observed popstate href mutation");
+            sendHistoryChange();
+            currentHref = document.location.href;
+        }
+    };
+
     await initializer();
 }
+
+const sendHistoryChange = () => {
+    const { pathname, href, search } = document.location;
+    console.info("sending change history message", {
+        href,
+        pathname,
+        search,
+    });
+    sendToParent({
+        type: MessageTypes.ChangeHistory,
+        payload: { href, pathname, search },
+    });
+};
 
 function set({ targetArray, newElements }, caller) {
     let valid = newElements.every((e) => {
@@ -747,14 +788,14 @@ export function query(appletId, name, params = {}) {
     return queryPromise;
 }
 
-const OPERATIONS_KEY = 'OPERATIONS_KEY'
-const QUERIES_KEY = 'QUERIES_KEY'
+const OPERATIONS_KEY = "OPERATIONS_KEY";
+const QUERIES_KEY = "QUERIES_KEY";
 
 /**
  * Description: Class to blueprint the applets contract + operations.
  */
 export class Service {
-    cachedApplet = '';
+    cachedApplet = "";
 
     constructor() {
         this.applet();
@@ -777,13 +818,12 @@ export class Service {
     }
 
     get operations() {
-        return this[OPERATIONS_KEY] || []
+        return this[OPERATIONS_KEY] || [];
     }
 
     get queries() {
-        return this[QUERIES_KEY] || []
+        return this[QUERIES_KEY] || [];
     }
-
 }
 
 export function Action(target, key, descriptor) {
@@ -791,13 +831,15 @@ export function Action(target, key, descriptor) {
     descriptor.value = function (...args) {
         const result = originalMethod.apply(this, args);
         const parent = Object.getPrototypeOf(this);
-        return (parent.getAppletName()).then(appletName => action(appletName, key, result))
-    }
-};
+        return parent
+            .getAppletName()
+            .then((appletName) => action(appletName, key, result));
+    };
+}
 
 /**
  * Description: @Op Operation decorator which helps build { id: .., exec: () => ..}
- * 
+ *
  *
  * @param {String} name - The optional id of the operation, will otherwise default to the method name.
  */
@@ -806,26 +848,30 @@ export function Op(name) {
         const id = name ? name : key;
         const op = {
             exec: descriptor.value.bind(target),
-            id
+            id,
         };
         const isExistingArray = OPERATIONS_KEY in target;
         if (isExistingArray) {
-            target[OPERATIONS_KEY].push(op)
+            target[OPERATIONS_KEY].push(op);
         } else {
-            target[OPERATIONS_KEY] = [op]
+            target[OPERATIONS_KEY] = [op];
         }
 
         descriptor.value = function (...args) {
-            const parent = 'getAppletId' in Object.getPrototypeOf(this) ? Object.getPrototypeOf(this) : Object.getPrototypeOf(Object.getPrototypeOf(this))
-            return parent.getAppletId().then(appletId => operation(appletId, id, ...args))
-        }
+            const parent =
+                "getAppletId" in Object.getPrototypeOf(this)
+                    ? Object.getPrototypeOf(this)
+                    : Object.getPrototypeOf(Object.getPrototypeOf(this));
+            return parent
+                .getAppletId()
+                .then((appletId) => operation(appletId, id, ...args));
+        };
     };
 }
 
-
 /**
  * Description: @Qry Query decorator which helps build { id: .., exec: () => ..}
- * 
+ *
  *
  * @param {String} name - The optional id of the query, will otherwise default to the method name.
  */
@@ -834,19 +880,24 @@ export function Qry(name) {
         const id = name ? name : key;
         const op = {
             exec: descriptor.value.bind(target),
-            id
+            id,
         };
         const isExistingArray = QUERIES_KEY in target;
         if (isExistingArray) {
-            target[QUERIES_KEY].push(op)
+            target[QUERIES_KEY].push(op);
         } else {
-            target[QUERIES_KEY] = [op]
+            target[QUERIES_KEY] = [op];
         }
 
         descriptor.value = function (...args) {
-            const parent = 'getAppletId' in Object.getPrototypeOf(this) ? Object.getPrototypeOf(this) : Object.getPrototypeOf(Object.getPrototypeOf(this))
-            return parent.getAppletId().then(appletId => query(appletId, id, ...args))
-        }
+            const parent =
+                "getAppletId" in Object.getPrototypeOf(this)
+                    ? Object.getPrototypeOf(this)
+                    : Object.getPrototypeOf(Object.getPrototypeOf(this));
+            return parent
+                .getAppletId()
+                .then((appletId) => query(appletId, id, ...args));
+        };
     };
 }
 
