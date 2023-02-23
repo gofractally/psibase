@@ -235,7 +235,6 @@ export const useApplets = () => {
                     data: action.data,
                 }))
             );
-            console.info("claimParams >>>", claimParams);
 
             const accountsQueryResponse = await sendQuery(
                 COMMON_SYS,
@@ -319,7 +318,6 @@ export const useApplets = () => {
                 // Application claims
                 ...actionAppClaims,
             ]);
-            console.info("claimRequests >>>", claimRequests);
 
             const claims = claimRequests.filter(
                 (claim, idx) =>
@@ -330,7 +328,6 @@ export const useApplets = () => {
                             (c) => c.pubkey === claim.pubkey
                         )
             );
-            console.info("claims >>>", claims);
 
             const { transactionHex, digest: trxDigest } =
                 await packAndDigestTransaction("", {
@@ -356,7 +353,6 @@ export const useApplets = () => {
             );
 
             const proofs = proofsPromises.filter((item) => item);
-            console.info("proofs!!! >>>", proofs);
 
             const signedTransaction = { transaction: transactionHex, proofs };
             return signedTransaction;
@@ -365,22 +361,23 @@ export const useApplets = () => {
     );
 
     const executeTransaction = useCallback(async () => {
-        if (pendingTransactionId.current === 0) {
-            console.error(
-                "returning now as there is no pending transaction happening"
-            );
-            return;
-        }
+        const isNoPendingTransaction = pendingTransactionId.current === 0;
+        if (isNoPendingTransaction) return;
 
         const pendingTransaction =
             pendingTransactions.current[pendingTransactionId.current];
+        const { actions } = pendingTransaction;
+
+        if (actions.length == 0) {
+            return;
+        }
 
         const transactionReceipt: TransactionReceipt = {
             trace: {},
             errors: [],
         };
+
         try {
-            const { actions } = pendingTransaction;
             const signedTransaction = await signTransaction(actions);
 
             const trace = await packAndPushSignedTransaction(
@@ -538,6 +535,7 @@ export const useApplets = () => {
         async (sender: AppletId, payload: any) => {
             const { callbackId, response, errors } = payload;
 
+            console.log("returning the response of oepration,", { ...payload });
             await executeCallback(callbackId, { sender, response, errors });
 
             ClientOps.opReturned(sender);
