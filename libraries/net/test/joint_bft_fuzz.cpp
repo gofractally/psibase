@@ -1,8 +1,6 @@
 #include "fuzz.hpp"
 #include "test_util.hpp"
 
-#include <triedent/database.hpp>
-
 // the central node can take the following actions:
 // - single step another node's io_context
 // - advance a node's clock
@@ -46,6 +44,10 @@ struct Network : NetworkBase<node_type>
             break;
          }
          case 1:
+         {
+            set_consensus(rng);
+            break;
+         }
          case 9:
          case 10:
          case 14:
@@ -93,6 +95,36 @@ struct Network : NetworkBase<node_type>
          }
       }
    }
+   void set_consensus(auto& rng)
+   {
+      auto new_consensus = consensus_change[rng() % consensus_change.size()];
+      if (rng() & 1)
+      {
+         if (!blocks.empty())
+         {
+            recv(makeBlock(blocks[choose_block(rng)], producer.str(), view,
+                           setProducers(new_consensus)));
+         }
+      }
+      else
+      {
+         for (auto& node : nodes)
+         {
+            if (BlockContext* bctx = node->node.chain().getBlockContext())
+            {
+               try
+               {
+                  setProducers(bctx, new_consensus);
+                  break;
+               }
+               catch (std::exception& e)
+               {
+               }
+            }
+         }
+      }
+   }
+   std::vector<Consensus> consensus_change;
 };
 
 __AFL_FUZZ_INIT();
@@ -101,69 +133,41 @@ int main(int argc, const char** argv)
 {
    handleArgs(argc, argv);
 
-   TempDatabase db;
-   auto         systemContext = db.getSystemContext();
-   {
-      Network network(systemContext.get());
-      network.add_node("alice");
-      boot<BftConsensus>(network.nodes.front()->node.chain().getBlockContext(),
-                         {"alice", "bob", "carol", "mallory"});
-      unsigned char a[1] = {};
-      bufrng        zero_rng{a, a + sizeof(a)};
-      expire_one_timer(zero_rng);
-      network.nodes[0]->ctx.poll();
-   }
-   auto initialHead  = systemContext->sharedDatabase.getHead();
-   auto initialState = systemContext->sharedDatabase.createWriter()->get_top_root();
-   auto initialClock = mock_clock::now();
-
    unsigned char* buf = __AFL_FUZZ_TESTCASE_BUF;
 
    while (__AFL_LOOP(1000))
    {
-      int len = __AFL_FUZZ_TESTCASE_LEN;
+      int            len = __AFL_FUZZ_TESTCASE_LEN;
+      StaticDatabase db{bft("alice", "bob", "carol", "mallory")};
 
-      for (int i = 0; i < 4; ++i)
+      Network network(db);
+      network.add_node("alice");
+      network.add_node("bob");
+      network.add_node("carol");
+      network.add_node("d");
+      network.add_node("e");
+      network.add_node("f");
+      network.add_node("x");
+      network.add_node("y");
+      network.add_node("z");
+      network.consensus_change.push_back(bft("d", "e", "f", "mallory"));
+      network.consensus_change.push_back(bft("x", "y", "z", "mallory"));
+
+      try
       {
+         bufrng rng{buf, buf + len};
+         //std::mt19937 rng;
+         while (true)
          {
-            auto writer = systemContext->sharedDatabase.createWriter();
-            systemContext->sharedDatabase.setHead(*writer, initialHead);
-            writer->set_top_root(initialState);
-         }
-         reset_mock_time(initialClock);
-
-         Network network(systemContext.get());
-         network.add_node("alice");
-         network.add_node("bob");
-         network.add_node("carol");
-
-         try
-         {
-            bufrng rng{buf, buf + len};
-            //std::mt19937 rng;
-            while (true)
-            {
-               network.do_step(rng);
-            }
-         }
-         catch (end_of_test&)
-         {
-         }
-         // Check consistency
-         for (const auto& node1 : network.nodes)
-         {
-            auto commit1 = node1->node.chain().commit_index();
-            for (const auto& node2 : network.nodes)
-            {
-               auto commit2    = node2->node.chain().commit_index();
-               auto min_commit = std::min(commit1, commit2);
-               if (min_commit > 1)
-               {
-                  assert(node1->node.chain().get_block_id(min_commit) ==
-                         node1->node.chain().get_block_id(min_commit));
-               }
-            }
+            network.do_step(rng);
          }
       }
+      catch (end_of_test&)
+      {
+      }
+      // Check consistency
+      network.assert_consistent_commit();
+      network.deliver_all();
+      network.assert_matching_head();
    }
 }

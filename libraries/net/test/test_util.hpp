@@ -373,7 +373,8 @@ struct BlockArg
 {
    BlockArg(const psibase::BlockInfo& info) : info(info) {}
    BlockArg(const BlockMessage& msg) : info(msg.block->block()) {}
-                      operator psibase::BlockInfo() const { return info; }
+   operator psibase::BlockInfo() const { return info; }
+   BlockArg(const psio::shared_view_ptr<psibase::SignedBlock>& block) : info(block->block()) {}
    psibase::BlockInfo info;
 };
 

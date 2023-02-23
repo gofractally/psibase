@@ -2,3 +2,5 @@ fun:_ZN7psibase3net19basic_bft_consensus*
 fun:_ZN7psibase3net8blocknet*
 fun:_ZN7psibase6ForkDb*
 src:bft_fuzz.cpp
+src:joint_bft_fuzz.cpp
+src:fuzz.hpp

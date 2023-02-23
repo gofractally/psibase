@@ -35,9 +35,13 @@ add_test(
     COMMAND test_consensus "[bft]"
 )
 
-add_executable(bft_fuzz bft_fuzz.cpp test_util.cpp)
+add_executable(bft_fuzz bft_fuzz.cpp test_util.cpp fuzz.cpp)
 target_include_directories(bft_fuzz PUBLIC ../include)
 target_link_libraries(bft_fuzz PUBLIC catch2 psibase services_system)
+
+add_executable(joint_bft_fuzz joint_bft_fuzz.cpp test_util.cpp fuzz.cpp)
+target_include_directories(joint_bft_fuzz PUBLIC ../include)
+target_link_libraries(joint_bft_fuzz PUBLIC catch2 psibase services_system)
 
 set(PSIBASE_FUZZER "None" CACHE STRING "The fuzzer framework to use. Possible values: AFL None")
 
@@ -46,8 +50,10 @@ if (${PSIBASE_FUZZER} STREQUAL "AFL")
 
     configure_file(afl-clang-lto++.in afl-clang-lto++ USE_SOURCE_PERMISSIONS)
 
-    set_property(TARGET bft_fuzz PROPERTY CXX_COMPILER_LAUNCHER /usr/bin/env;AFL_LLVM_ALLOWLIST=${CMAKE_CURRENT_SOURCE_DIR}/bft_fuzz.txt;${CMAKE_CURRENT_BINARY_DIR}/afl-clang-lto++)
-    set_property(TARGET bft_fuzz PROPERTY CXX_LINKER_LAUNCHER /usr/bin/env;AFL_LLVM_ALLOWLIST=${CMAKE_CURRENT_SOURCE_DIR}/bft_fuzz.txt;${CMAKE_CURRENT_BINARY_DIR}/afl-clang-lto++)
+    foreach(target bft_fuzz joint_bft_fuzz)
+        set_property(TARGET ${target} PROPERTY CXX_COMPILER_LAUNCHER /usr/bin/env;AFL_LLVM_ALLOWLIST=${CMAKE_CURRENT_SOURCE_DIR}/bft_fuzz.txt;${CMAKE_CURRENT_BINARY_DIR}/afl-clang-lto++)
+        set_property(TARGET ${target} PROPERTY CXX_LINKER_LAUNCHER /usr/bin/env;AFL_LLVM_ALLOWLIST=${CMAKE_CURRENT_SOURCE_DIR}/bft_fuzz.txt;${CMAKE_CURRENT_BINARY_DIR}/afl-clang-lto++)
+     endforeach()
 endif()
 
 #add_executable(test_direct_routing test_direct_routing.cpp mock_timer.cpp)
