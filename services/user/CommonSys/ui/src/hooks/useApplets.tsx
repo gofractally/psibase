@@ -535,7 +535,6 @@ export const useApplets = () => {
         async (sender: AppletId, payload: any) => {
             const { callbackId, response, errors } = payload;
 
-            console.log("returning the response of oepration,", { ...payload });
             await executeCallback(callbackId, { sender, response, errors });
 
             ClientOps.opReturned(sender);
