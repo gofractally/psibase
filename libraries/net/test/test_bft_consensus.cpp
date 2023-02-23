@@ -424,6 +424,47 @@ TEST_CASE("return to previous fork", "[bft]")
    CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
 }
 
+TEST_CASE("new consensus at view change", "[bft]")
+{
+   TEST_START(logger);
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+
+   setup<BftConsensus>(nodes, {"a", "b", "c", "d"});
+   runFor(nodes.ctx, 1s);
+   nodes.partition(NetworkPartition{});
+   // This should be long enough to trigger a view change
+   runFor(nodes.ctx, 15s);
+   nodes.partition(NetworkPartition::all());
+   // Advance in increments of 1s to ensure that the first block
+   // in the new view contains the new producers.
+   nodes.ctx.poll();
+   while (true)
+   {
+      if (auto ctx = nodes.getBlockContext())
+      {
+         setProducers(ctx, bft("e", "f", "g", "h"));
+         runFor(nodes.ctx, 1s);
+         break;
+      }
+      assert(!"Actually, the producers should come to an agreement immediately");
+      runFor(nodes.ctx, 1s);
+   }
+   // Verify that the test case is actually testing the condition
+   // that we want to test.
+   REQUIRE(!!nodes[0].chain().get_head()->newConsensus);
+   REQUIRE(nodes[0].chain().get_head()->term >
+           nodes[0].chain().get_state((nodes[0].chain().get_head()->previous))->info.header.term);
+
+   nodes.add(makeAccounts({"e", "f", "g", "h"}));
+   nodes.partition(NetworkPartition::all());
+   runFor(nodes.ctx, 30s);
+
+   auto final_state = nodes[0].chain().get_head_state();
+   for (const auto& node : nodes.nodes)
+      CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
+}
+
 // -----------------------------------------------------
 // The following test cases excercise messages sequences
 // in which more than f producers violate the protocol.

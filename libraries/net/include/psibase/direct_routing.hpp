@@ -17,9 +17,6 @@
 
 namespace psibase::net
 {
-   template <typename T, typename Derived>
-   concept has_recv = requires(Derived& d, const T& msg) { d.consensus().recv(0, msg); };
-
    // message type 0 is reserved to ensure that message signatures
    // are disjoint from block signatures.
    // message types 1-31 are used for routing messages
@@ -88,6 +85,12 @@ namespace psibase::net
             producer_peers.push_back(peer);
          }
          async_multicast(std::move(producer_peers), msg);
+      }
+      template <typename Msg>
+      void multicast(const Msg& msg)
+      {
+         // TODO: send to non-producers as well
+         multicast_producers(msg);
       }
       template <typename Msg>
       void sendto(producer_id prod, const Msg& msg)

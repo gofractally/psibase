@@ -262,16 +262,20 @@ namespace psibase::net
          }
       };
 
+      struct view_info
+      {
+         TermNum                                         term;
+         std::optional<SignedMessage<ViewChangeMessage>> best_message;
+      };
+
       std::map<Checksum256, block_info> confirmations;
+      std::vector<view_info>            producer_views[2];
 
       using BlockOrder = decltype(std::declval<BlockHeaderState>().order());
 
       BlockOrder best_prepared = {};
       BlockOrder best_prepare  = {};
       BlockOrder alt_prepare   = {};
-
-      // Stores a record of the last view change seen for each producer
-      std::vector<TermNum> producer_views;
 
       Timer                     _new_term_timer;
       std::chrono::milliseconds _timeout       = std::chrono::seconds(10);
@@ -386,7 +390,8 @@ namespace psibase::net
       void cancel()
       {
          _new_term_timer.cancel();
-         producer_views.clear();
+         producer_views[0].clear();
+         producer_views[1].clear();
          Base::cancel();
       }
       void set_producers(
@@ -395,7 +400,8 @@ namespace psibase::net
          if (prods.first->algorithm != ConsensusAlgorithm::bft)
          {
             _new_term_timer.cancel();
-            producer_views.clear();
+            producer_views[0].clear();
+            producer_views[1].clear();
             return Base::set_producers(std::move(prods));
          }
          bool start_bft =
@@ -410,13 +416,12 @@ namespace psibase::net
             }
          }
          bool new_producers = !active_producers[0] || *active_producers[0] != *prods.first;
-         if ((_state == producer_state::leader || _state == producer_state::follower) &&
-             (start_bft || new_producers))
+         if (start_bft || new_producers)
          {
             // TODO: start tracking views of joint producers early. Not necessary for safety,
             // but will help reduce unnecessary delays on a producer change.
-            producer_views.clear();
-            producer_views.resize(prods.first->size());
+            producer_views[0].clear();
+            producer_views[0].resize(prods.first->size());
          }
          if (new_producers)
          {
@@ -431,7 +436,6 @@ namespace psibase::net
             {
                PSIBASE_LOG(logger, info) << "Node is active producer";
                _state = producer_state::follower;
-               producer_views.resize(active_producers[0]->size());
                start_timer();
             }
             else if (start_bft)
@@ -440,13 +444,11 @@ namespace psibase::net
             }
             if (start_bft || new_producers)
             {
-               broadcast_current_term();
+               sync_current_term();
             }
-            set_producer_view(current_term, self);
          }
          else
          {
-            producer_views.clear();
             if (_state != producer_state::shutdown)
             {
                if (_state != producer_state::nonvoting)
@@ -458,14 +460,7 @@ namespace psibase::net
                _state = producer_state::nonvoting;
             }
          }
-         if (_state == producer_state::leader || _state == producer_state::follower)
-         {
-            assert(producer_views.size() == active_producers[0]->size());
-         }
-         else
-         {
-            assert(producer_views.empty());
-         }
+         assert(producer_views[0].size() == active_producers[0]->size());
       }
 
       void start_timer()
@@ -494,19 +489,21 @@ namespace psibase::net
       // returns true if a quorum of producers are believed to be in the current term.
       bool is_term_ready() const
       {
-         auto threshold = producer_views.size() * 2 / 3 + 1;
-         return std::count_if(producer_views.begin(), producer_views.end(),
-                              [current_term = current_term](auto v)
-                              { return v == current_term; }) >= threshold;
+         auto threshold = producer_views[0].size() * 2 / 3 + 1;
+         return std::count_if(producer_views[0].begin(), producer_views[0].end(),
+                              [current_term = current_term](const auto& v)
+                              { return v.term == current_term; }) >= threshold;
       }
 
-      void broadcast_current_term()
+      void sync_current_term()
       {
          for_each_key(
              [&](const auto& k)
              {
-                network().multicast_producers(
+                auto msg = network().sign_message(
                     ViewChangeMessage{.term = current_term, .producer = self, .signer = k});
+                set_producer_view(msg);
+                network().multicast_producers(msg);
              });
       }
 
@@ -514,7 +511,7 @@ namespace psibase::net
       TermNum skip_advanced_leaders(TermNum new_term)
       {
          // Skip terms whose leaders have already advanced
-         while (producer_views[get_leader_index(new_term)] > new_term)
+         while (producer_views[0][get_leader_index(new_term)].term > new_term)
          {
             ++new_term;
          }
@@ -523,20 +520,12 @@ namespace psibase::net
 
       void increase_view()
       {
-         auto threshold = producer_views.size() * 2 / 3 + 1;
-         if (std::count_if(producer_views.begin(), producer_views.end(),
-                           [current_term = current_term](auto v)
-                           { return v >= current_term; }) >= threshold)
+         auto threshold = producer_views[0].size() * 2 / 3 + 1;
+         if (std::count_if(producer_views[0].begin(), producer_views[0].end(),
+                           [current_term = current_term](const auto& v)
+                           { return v.term >= current_term; }) >= threshold)
          {
             set_view(skip_advanced_leaders(current_term + 1));
-         }
-         else
-         {
-            // Periodically resend view changes if we're stuck. This is
-            // required because peers might drop the regular view change
-            // message for a new producer schedule if they receive it before
-            // they're ready for it.
-            broadcast_current_term();
          }
       }
 
@@ -549,17 +538,80 @@ namespace psibase::net
             chain().setTerm(current_term);
             if (_state == producer_state::leader || _state == producer_state::follower)
             {
-               broadcast_current_term();
-               set_producer_view(term, self);
+               sync_current_term();
             }
          }
       }
 
-      void set_producer_view(TermNum term, AccountNumber prod)
+      const SignedMessage<ViewChangeMessage>* get_newer_view(
+          const SignedMessage<ViewChangeMessage>& msg)
       {
-         if (auto idx = active_producers[0]->getIndex(prod))
+         if (auto result = get_newer_view(0, msg))
+            return result;
+         if (active_producers[1])
+            return get_newer_view(1, msg);
+         return nullptr;
+      }
+
+      const SignedMessage<ViewChangeMessage>* get_newer_view(
+          int                                     group,
+          const SignedMessage<ViewChangeMessage>& msg)
+      {
+         if (producer_views[group].empty())
+            return nullptr;
+         if (auto idx = active_producers[group]->getIndex(msg.data->producer(), msg.data->signer()))
          {
-            producer_views[*idx] = std::max(term, producer_views[*idx]);
+            auto& view = producer_views[group][*idx];
+            if (view.best_message && view.best_message->data->term() > msg.data->term())
+            {
+               return &*view.best_message;
+            }
+         }
+         return nullptr;
+      }
+
+      bool set_producer_view(TermNum term, AccountNumber prod, const Claim& claim)
+      {
+         bool r0 = set_producer_view(0, term, prod, claim);
+         bool r1 = set_producer_view(1, term, prod, claim);
+         return r0 || r1;
+      }
+
+      bool set_producer_view(const SignedMessage<ViewChangeMessage>& msg)
+      {
+         bool r0 = set_producer_view(0, msg);
+         bool r1 = set_producer_view(1, msg);
+         return r0 || r1;
+      }
+
+      bool set_producer_view(int group, const SignedMessage<ViewChangeMessage>& msg)
+      {
+         return set_producer_view(group, msg.data->term(), msg.data->producer(), msg.data->signer(),
+                                  &msg);
+      }
+
+      bool set_producer_view(int                                     group,
+                             TermNum                                 term,
+                             AccountNumber                           prod,
+                             const Claim&                            claim,
+                             const SignedMessage<ViewChangeMessage>* msg = nullptr)
+      {
+         if (producer_views[group].empty())
+            return false;
+         bool result = false;
+         if (auto idx = active_producers[group]->getIndex(prod, claim))
+         {
+            auto& view = producer_views[group][*idx];
+            if (view.term < term)
+            {
+               view.term = term;
+               result    = true;
+            }
+            if (msg && (!view.best_message || view.best_message->data->term() < msg->data->term()))
+            {
+               view.best_message = *msg;
+               result            = true;
+            }
             if (_state == producer_state::follower)
             {
                if (is_leader() && is_term_ready())
@@ -581,38 +633,34 @@ namespace psibase::net
                }
             }
          }
+         return result;
       }
 
-      // Returns true if the view change was valid
-      bool do_view_change(AccountNumber producer, const Claim& claim, TermNum term)
+      void do_view_change(AccountNumber producer, const Claim& claim, TermNum term)
       {
-         if (producer_views.empty())
+         if (set_producer_view(term, producer, claim))
          {
-            // Not a producer
-            return false;
+            check_view_change_threshold();
          }
-         // ignore unexpected view changes. We can fail to recognize a valid
-         // view change due to being ahead or behind other nodes.
-         if (auto expected = active_producers[0]->getClaim(producer))
+      }
+
+      void check_view_change_threshold()
+      {
+         std::vector<TermNum> view_copy;
+         for (const auto& [term, _] : producer_views[0])
          {
-            if (*expected == claim)
-            {
-               set_producer_view(term, producer);
-               auto view_copy = producer_views;
-               auto offset    = active_producers[0]->size() * 2 / 3;
-               // if > 1/3 are ahead of current view trigger view change
-               std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
-               auto new_term = std::max(view_copy[offset], current_term);
-               new_term      = skip_advanced_leaders(new_term);
-               if (new_term > current_term)
-               {
-                  set_view(new_term);
-                  start_timer();
-               }
-               return true;
-            }
+            view_copy.push_back(term);
          }
-         return false;
+         auto offset = active_producers[0]->size() * 2 / 3;
+         // if > 1/3 are ahead of current view trigger view change
+         std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
+         auto new_term = std::max(view_copy[offset], current_term);
+         new_term      = skip_advanced_leaders(new_term);
+         if (new_term > current_term)
+         {
+            set_view(new_term);
+            start_timer();
+         }
       }
 
       // track best committed, best prepared, best prepared on different fork
@@ -963,19 +1011,19 @@ namespace psibase::net
          Base::switch_fork();
       }
 
-      void recv(peer_id peer, const ViewChangeMessage& msg)
+      void recv(peer_id peer, const SignedMessage<ViewChangeMessage>& msg)
       {
          auto saved_term = current_term;
-         if (do_view_change(msg.producer, msg.signer, msg.term) && msg.term < current_term)
+         if (set_producer_view(msg))
          {
-            // If we receive an out-dated view, notify the sender of our view
-            for_each_key(
-                [&](const auto& k)
-                {
-                   network().async_send_block(
-                       peer, ViewChangeMessage{.term = current_term, .producer = self, .signer = k},
-                       [](const std::error_code&) {});
-                });
+            check_view_change_threshold();
+            // If this is a new view, notify our peers
+            network().multicast(msg);
+         }
+         if (const auto* response = get_newer_view(msg))
+         {
+            // If we have a newer view than the sender, reply with our view
+            network().async_send_block(peer, *response, [](const std::error_code&) {});
          }
          if (current_term != saved_term)
          {

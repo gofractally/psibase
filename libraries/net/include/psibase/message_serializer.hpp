@@ -10,6 +10,9 @@
 
 namespace psibase::net
 {
+   template <typename T, typename Derived>
+   concept has_recv = requires(Derived& d, const T& msg) { d.consensus().recv(0, msg); };
+
    template <typename Derived>
    struct message_serializer
    {

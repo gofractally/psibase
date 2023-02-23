@@ -40,9 +40,21 @@ namespace psibase::net
                        << static_cast<Derived*>(iter->second.ptr)->producer_name().str() << "->"
                        << static_cast<Derived*>(this)->producer_name().str() << ": "
                        << msg.to_string() << std::endl;
-                   static_cast<Derived*>(this)->recv(origin, msg);
+                   static_cast<Derived*>(this)->recv(origin, maybe_sign_message(msg));
                 }
              });
+      }
+      template <typename T>
+      static auto maybe_sign_message(const T& message)
+      {
+         if constexpr (has_recv<SignedMessage<T>, Derived>)
+         {
+            return SignedMessage<T>{message};
+         }
+         else
+         {
+            return message;
+         }
       }
       void send(const peer_info& peer, const auto& message)
       {
@@ -70,6 +82,11 @@ namespace psibase::net
       }
       template <typename Msg>
       void multicast_producers(const Msg& msg)
+      {
+         multicast(msg);
+      }
+      template <typename Msg>
+      void multicast(const Msg& msg)
       {
          for (const auto& [id, peer] : _peers)
          {
