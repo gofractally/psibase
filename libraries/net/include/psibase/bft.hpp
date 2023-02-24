@@ -968,12 +968,12 @@ namespace psibase::net
          Base::connect(peer);
          if (active_producers[0]->algorithm == ConsensusAlgorithm::bft)
          {
-            if (auto claim = active_producers[0]->getClaim(self))
+            for (const auto& [term, msg] : producer_views[0])
             {
-               network().async_send_block(
-                   peer,
-                   ViewChangeMessage{.term = current_term, .producer = self, .signer = *claim},
-                   [](const std::error_code&) {});
+               if (msg)
+               {
+                  network().async_send_block(peer, *msg, [](const std::error_code&) {});
+               }
             }
          }
       }
@@ -1022,6 +1022,8 @@ namespace psibase::net
          }
          if (const auto* response = get_newer_view(msg))
          {
+            assert(response->data->producer().unpack() == msg.data->producer().unpack());
+            assert(response->data->term() > msg.data->term());
             // If we have a newer view than the sender, reply with our view
             network().async_send_block(peer, *response, [](const std::error_code&) {});
          }
