@@ -31,8 +31,7 @@ namespace psio
    template <typename P>
    struct view_buffer
    {
-      P           data;
-      friend auto operator<=>(const view_buffer&, const view_buffer&) = default;
+      P data;
    };
 
    template <typename T>
@@ -444,8 +443,15 @@ namespace psio
       {
          return (rhs.data - lhs.data) / is_packable<std::remove_cv_t<T>>::fixed_size;
       }
-      friend constexpr auto operator<=>(const view_iterator&, const view_iterator&) = default;
-      reference             operator*() const
+      friend constexpr bool operator==(const view_iterator& lhs, const view_iterator& rhs)
+      {
+         return lhs.data == rhs.data;
+      }
+      friend constexpr auto operator<=>(const view_iterator& lhs, const view_iterator& rhs)
+      {
+         return lhs.data <=> rhs.data;
+      }
+      reference operator*() const
       {
          if constexpr (is_packable<value_type>::is_optional ||
                        !is_packable<value_type>::is_variable_size)
