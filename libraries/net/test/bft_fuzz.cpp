@@ -101,69 +101,33 @@ int main(int argc, const char** argv)
 {
    handleArgs(argc, argv);
 
-   TempDatabase db;
-   auto         systemContext = db.getSystemContext();
-   {
-      Network network(systemContext.get());
-      network.add_node("alice");
-      boot<BftConsensus>(network.nodes.front()->node.chain().getBlockContext(),
-                         {"alice", "bob", "carol", "mallory"});
-      unsigned char a[1] = {};
-      bufrng        zero_rng{a, a + sizeof(a)};
-      expire_one_timer(zero_rng);
-      network.nodes[0]->ctx.poll();
-   }
-   auto initialHead  = systemContext->sharedDatabase.getHead();
-   auto initialState = systemContext->sharedDatabase.createWriter()->get_top_root();
-   auto initialClock = mock_clock::now();
-
    unsigned char* buf = __AFL_FUZZ_TESTCASE_BUF;
 
    while (__AFL_LOOP(1000))
    {
-      int len = __AFL_FUZZ_TESTCASE_LEN;
+      int            len = __AFL_FUZZ_TESTCASE_LEN;
+      StaticDatabase db{bft("alice", "bob", "carol", "mallory")};
 
-      for (int i = 0; i < 4; ++i)
+      Network network(db);
+      network.add_node("alice");
+      network.add_node("bob");
+      network.add_node("carol");
+
+      try
       {
+         bufrng rng{buf, buf + len};
+         //std::mt19937 rng;
+         while (true)
          {
-            auto writer = systemContext->sharedDatabase.createWriter();
-            systemContext->sharedDatabase.setHead(*writer, initialHead);
-            writer->set_top_root(initialState);
-         }
-         reset_mock_time(initialClock);
-
-         Network network(systemContext.get());
-         network.add_node("alice");
-         network.add_node("bob");
-         network.add_node("carol");
-
-         try
-         {
-            bufrng rng{buf, buf + len};
-            //std::mt19937 rng;
-            while (true)
-            {
-               network.do_step(rng);
-            }
-         }
-         catch (end_of_test&)
-         {
-         }
-         // Check consistency
-         for (const auto& node1 : network.nodes)
-         {
-            auto commit1 = node1->node.chain().commit_index();
-            for (const auto& node2 : network.nodes)
-            {
-               auto commit2    = node2->node.chain().commit_index();
-               auto min_commit = std::min(commit1, commit2);
-               if (min_commit > 1)
-               {
-                  assert(node1->node.chain().get_block_id(min_commit) ==
-                         node1->node.chain().get_block_id(min_commit));
-               }
-            }
+            network.do_step(rng);
          }
       }
+      catch (end_of_test&)
+      {
+      }
+      // Check consistency
+      network.assert_consistent_commit();
+      network.deliver_all();
+      network.assert_matching_head();
    }
 }
