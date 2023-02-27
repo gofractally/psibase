@@ -240,8 +240,6 @@ namespace triedent
       ring_allocator::cache_level_type level;
 
       bool                                _slow  = false;
-      FILE*                               _cfile = nullptr;
-      int                                 _cfileno;
       header*                             _head;
       object_header*                      _begin;
       object_header*                      _end;
