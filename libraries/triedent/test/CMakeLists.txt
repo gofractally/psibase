@@ -1,4 +1,4 @@
-add_executable(triedent-tests triedent-tests.cpp temp_directory.cpp)
+add_executable(triedent-tests triedent-tests.cpp test_mapping.cpp temp_directory.cpp)
 target_link_libraries(triedent-tests PUBLIC catch2 triedent)
 target_include_directories(triedent-tests PUBLIC ${Boost_INCLUDE_DIRS})
 set_target_properties(triedent-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
