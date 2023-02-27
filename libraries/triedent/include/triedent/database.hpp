@@ -495,10 +495,6 @@ namespace triedent
          database_memory() { top_root.store(0); }
       };
 
-      static std::atomic<int>      _read_thread_number;
-      static thread_local uint32_t _thread_num;
-      static std::atomic<uint32_t> _write_thread_rev;
-
       std::unique_ptr<ring_allocator>     _ring;
       std::filesystem::path               _db_dir;
       std::unique_ptr<bip::file_mapping>  _file;

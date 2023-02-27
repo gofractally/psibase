@@ -12,9 +12,6 @@ namespace triedent
    template <typename T>
    using bip_offset_ptr = bip::offset_ptr<T>;
 
-   std::atomic<int>      database::_read_thread_number = 0;
-   thread_local uint32_t database::_thread_num         = 0;
-
    database::database(std::filesystem::path dir, access_mode allow_write, bool allow_slow)
    {
       _active_sessions.push_back(&_root_release_session);
