@@ -48,7 +48,7 @@ set(PSIBASE_FUZZER "None" CACHE STRING "The fuzzer framework to use. Possible va
 if (${PSIBASE_FUZZER} STREQUAL "AFL")
     find_program(AFL_CLANG_LTO afl-clang-lto++ REQUIRED)
 
-    configure_file(afl-clang-lto++.in afl-clang-lto++ USE_SOURCE_PERMISSIONS)
+    configure_file(afl-clang-lto++.in afl-clang-lto++ USE_SOURCE_PERMISSIONS @ONLY)
 
     foreach(target bft_fuzz joint_bft_fuzz)
         set_property(TARGET ${target} PROPERTY CXX_COMPILER_LAUNCHER /usr/bin/env;AFL_LLVM_ALLOWLIST=${CMAKE_CURRENT_SOURCE_DIR}/bft_fuzz.txt;${CMAKE_CURRENT_BINARY_DIR}/afl-clang-lto++)

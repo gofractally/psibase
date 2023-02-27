@@ -205,7 +205,8 @@ namespace
          systemContext->sharedDatabase.setHead(*writer, revision);
          initialHead  = revision;
          initialState = writer->get_top_root();
-         initialClock = mock_clock::now() + 1s;
+         psibase::test::mock_current_time += 1s;
+         initialClock = mock_clock::now();
       }
       void reset()
       {

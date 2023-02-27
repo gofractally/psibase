@@ -1,4 +1,14 @@
 #!/bin/sh
 
 shift
-@AFL_CLANG_LTO@ "$@"
+
+args=("$@")
+if [ -v AFL_DONT_OPTIMIZE ]; then
+    for ((i=0; i<"${#args[@]}";++i)); do
+        case ${args[i]} in
+            -O*) unset args[i]; break;;
+        esac
+    done
+fi
+
+@AFL_CLANG_LTO@ "${args[@]}"

@@ -9,6 +9,7 @@
 // - prepare any existing block
 // - commit any existing block
 // - generate a view change
+// - (This fuzzer only): Send a setConsensus transaction
 
 using namespace psibase;
 using namespace psibase::net;
