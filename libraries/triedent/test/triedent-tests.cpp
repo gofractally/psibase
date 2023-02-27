@@ -1,5 +1,8 @@
-#include <random>
 #include <triedent/database.hpp>
+
+#include "temp_directory.hpp"
+
+#include <random>
 
 template <typename S, typename T>
 S& operator<<(S& stream, const std::optional<T>& obj)
@@ -23,18 +26,17 @@ std::optional<std::string_view> osv(const std::optional<std::vector<char>>& v)
       return std::nullopt;
 }
 
-auto createDb()
+auto createDb(const database::config& cfg = database::config{
+                  .max_objects = 10000ull,
+                  .hot_pages   = 30,
+                  .warm_pages  = 30,
+                  .cool_pages  = 30,
+                  .cold_pages  = 30,
+              })
 {
-   std::filesystem::remove_all("testdb");
-   database::create("testdb", database::config{
-                                  .max_objects = 10000ull,
-                                  .hot_pages   = 30,
-                                  .warm_pages  = 30,
-                                  .cool_pages  = 30,
-                                  .cold_pages  = 30,
-                              });
-   return std::make_shared<database>(  //
-       "testdb", database::read_write, true);
+   temp_directory dir("triedent-test");
+   database::create(dir.path, cfg);
+   return std::make_shared<database>(dir.path, database::read_write, true);
 }
 
 TEST_CASE("key round trip")
@@ -74,4 +76,37 @@ TEST_CASE("accidental inner removal")
            std::optional{std::string_view{"value 1"}});
    REQUIRE(osv(session->get(root, {"\x00\x01\x03", 3})) ==
            std::optional{std::string_view{"value 2"}});
+}
+
+TEST_CASE("many refs")
+{
+   // This should be larger than the maximum node refcount
+   constexpr int count   = 16384;
+   auto          db      = createDb(database::config{
+                     .max_objects = 100000ull,
+                     .hot_pages   = 27,
+                     .warm_pages  = 27,
+                     .cool_pages  = 27,
+                     .cold_pages  = 27,
+   });
+   auto          session = db->start_write_session();
+   auto          root    = session->get_top_root();
+   auto          child   = root;
+   session->upsert(child, {"k", 1}, {"v", 1});
+   for (int i = 0; i < count; ++i)
+   {
+      char key[sizeof(i)];
+      std::memcpy(&key, &i, sizeof(i));
+      session->upsert(root, {key, sizeof(key)}, {&child, 1});
+   }
+   session->set_top_root(root);
+   for (int i = 0; i < count; ++i)
+   {
+      char key[sizeof(i)];
+      std::memcpy(&key, &i, sizeof(i));
+      std::vector<std::shared_ptr<triedent::root>> r;
+      session->get(root, {key, sizeof(key)}, nullptr, &r);
+      REQUIRE(r.size() == 1);
+      REQUIRE(osv(session->get(r.front(), {"k", 1})) == std::optional{std::string_view{"v", 1}});
+   }
 }
