@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <boost/format.hpp>
-#include <consthash/all.hxx>
 #include <fstream>
 #include <iostream>
 #include <map>

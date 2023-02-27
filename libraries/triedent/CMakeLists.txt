@@ -18,7 +18,7 @@ endif()
 
 add_executable(mermaid src/mermaid.cpp)
 target_link_libraries(mermaid PUBLIC Boost::program_options triedent)
-target_include_directories(mermaid PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../psio/consthash/include)
+target_include_directories(mermaid PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set_target_properties(mermaid PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
 add_subdirectory(test)
