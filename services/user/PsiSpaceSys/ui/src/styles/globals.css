@@ -61,7 +61,8 @@ body {
         font-size: 0.889rem;
     }
 
-    a {
+    a,
+    button {
         @apply underline hover:text-blue-700;
     }
 

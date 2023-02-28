@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { wait } from "../../helpers";
 import { executeRemove, executeUpload } from "../../operations";
@@ -28,6 +29,7 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
     const [newFiles, setNewFiles] = useState<UploadingFile[]>([]);
     const [pathFiles, setPathFiles] = useState<NamedAccountFile[]>([]);
     const [pathFolders, setPathFolders] = useState<string[]>([]);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const extractedPath = extractPathContent(path, accountFiles);
@@ -138,8 +140,10 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
         setNewFiles(updatedNewFiles);
     };
 
-    const handleFolderClick = (folderName: string) => {
-        setPath(`${path}${folderName}/`);
+    const handleFolderClick = (folderName: string, isAbsolute?: boolean) => {
+        const newPath = isAbsolute ? folderName : `${path}${folderName}/`;
+        navigate(`?path=${newPath}`);
+        setPath(newPath);
     };
 
     const handleFileClick = (file: NamedAccountFile) => {
@@ -159,7 +163,7 @@ export const FilesManager = ({ account }: FilesManagerProps) => {
                 <PathBreadcrumbs
                     account={account}
                     path={path}
-                    onPathChange={setPath}
+                    onPathChange={(path) => handleFolderClick(path, true)}
                 />
             </div>
 
