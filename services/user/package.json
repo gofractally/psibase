@@ -1,0 +1,37 @@
+{
+    "name": "toolbox-monorepo",
+    "description": "ƒractally toolbox monorepo",
+    "author": "ƒractally LLC",
+    "license": "MIT",
+    "private": true,
+    "workspaces": [
+        "packages/*",
+        "apps/*"
+    ],
+    "scripts": {
+        "doctoc": "doctoc --title '**Table of contents**' README.md apps/toolbox/README.md apps/fractally/README.md apps/psiboard/README.md",
+        "clean": "lerna run clean",
+        "build:rpc": "lerna run build:rpc --stream",
+        "build:fractally": "lerna run build:fractally --stream",
+        "build:psiboard": "lerna run build:psiboard --stream",
+        "build:toolbox": "lerna run build:toolbox --stream",
+        "build:ui": "lerna run build:ui --stream",
+        "start": "lerna run start --stream",
+        "test": "lerna run test --stream",
+        "pub": "lerna publish",
+        "lint": "eslint --ext js,ts,tsx ."
+    },
+    "devDependencies": {
+        "@nighttrax/eslint-config-tsx": "~10.0.0-beta.0",
+        "@trivago/prettier-plugin-sort-imports": "^4.0.0",
+        "doctoc": "~2.1.0",
+        "eslint": "~8.7.0",
+        "eslint-config-prettier": "^8.3.0",
+        "eslint-plugin-import": "~2.25.0",
+        "lerna": "~4.0.0",
+        "prettier": "^2.5.1",
+        "prettier-plugin-tailwindcss": "^0.1.8",
+        "typescript": "~4.5.0",
+        "@vue/compiler-sfc": "^3.0.0"
+    }
+}

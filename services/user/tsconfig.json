@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.build.json",
+
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@toolbox/components/*": ["packages/components/src/*"],
+            "@toolbox/*": ["packages/*/src"]
+        },
+        "noEmit": true
+    }
+}
