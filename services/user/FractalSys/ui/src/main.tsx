@@ -15,7 +15,7 @@ import { v4 as uuid } from "uuid";
 
 import { DrawerLayout } from "components/layouts";
 import { config } from "config";
-import { Account, Home, Meeting, Test } from "pages";
+import { Account, Home, Meeting } from "pages";
 import { CreateFractal } from "pages/create-fractal/create-fractal";
 import { Home as FractalHome, Invite, Join, Members } from "pages/fractal";
 import { FractalSidebar } from "pages/fractal/fractal-sidebar";
@@ -53,7 +53,6 @@ const router = createBrowserRouter(
             </Route>
             <Route path="/create" element={<CreateFractal />} />
             <Route path="/account" element={<Account />} />
-            <Route path="/test" element={<Test />} />
             <Route path="*" element={<Navigate to={randomMeeting} replace />} />
         </Route>
     )
