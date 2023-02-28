@@ -1,3 +1,4 @@
 packages:
-    - "packages/**"
+    - "components/**"
     - "apps/**"
+    - "FractalSys/ui/**"

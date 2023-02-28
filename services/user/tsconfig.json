@@ -4,8 +4,7 @@
     "compilerOptions": {
         "baseUrl": ".",
         "paths": {
-            "@toolbox/components/*": ["packages/components/src/*"],
-            "@toolbox/*": ["packages/*/src"]
+            "@toolbox/components/*": ["components/src/*"],
         },
         "noEmit": true
     }

@@ -5,7 +5,7 @@ const formReset = require("@tailwindcss/forms");
 module.exports = {
     content: [
         "./src/**/*.{js,ts,jsx,tsx}",
-        "../../packages/components/src/**/*.{js,ts,jsx,tsx}",
+        "../../components/src/**/*.{js,ts,jsx,tsx}",
     ],
     darkMode: "media",
     theme: {
