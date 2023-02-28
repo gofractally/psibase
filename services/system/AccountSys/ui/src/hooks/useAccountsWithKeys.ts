@@ -32,10 +32,11 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
 
     useEffect(() => {
 
-        fetchAccounts().then(accounts => setAccounts(currentAccounts => {
+        fetchAccounts().then(accounts => {
+            setAccounts(currentAccounts => {
             const userAccounts = accounts.filter(account => !account.accountNum.includes('-sys')).filter(account => account.authService === 'auth-any-sys');
             return uniqueAccounts([...currentAccounts, ...userAccounts])
-        }));
+        })});
 
         Promise.all(keyPairs
             .filter(keyPair => keyPair.publicKey)
@@ -84,8 +85,6 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
             const easier = keyPairs.map((keyPair) => ({ ...keyPair, knownAccounts: (keyPair.knownAccounts || []) }))
             const keypairsWithoutStaleAccounts = easier.map(keyPair => ({ ...keyPair, knownAccounts: keyPair.knownAccounts.filter(account => !accountNumsCovered.some(a => a == account)) }))
             const [existingAccountsToRemain, accountsToDrop] = partition(keypairsWithoutStaleAccounts, (keyPair) => keyPair.knownAccounts.length > 0);
-
-            console.log({ existingAccountsToRemain, accountsToDrop })
 
             const combined = [...existingAccountsToRemain, ...incomingAccounts];
             const pureUniqueKeyPairs = combined.map(({ privateKey, publicKey }): KeyPair => ({ privateKey, publicKey })).filter((keyPair, index, arr) => arr.findIndex(kp => kp.publicKey === keyPair.publicKey) === index)

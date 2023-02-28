@@ -193,6 +193,14 @@ export async function packTransaction(baseUrl, transaction) {
     );
 }
 
+export async function packAndDigestTransaction(baseUrl, transaction) {
+    const packedBytes = new Uint8Array(
+        await packTransaction(baseUrl, transaction)
+    );
+    const digest = new hashJs.sha256().update(packedBytes).digest();
+    return { transactionHex: uint8ArrayToHex(packedBytes), digest };
+}
+
 export async function packSignedTransaction(baseUrl, signedTransaction) {
     if (typeof signedTransaction.transaction !== "string")
         signedTransaction = {

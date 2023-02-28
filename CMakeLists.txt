@@ -217,6 +217,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm                  ${BOOT_IMAGE}
 
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist    ${BOOT_IMAGE}/AccountSys/ui/dist
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui          ${BOOT_IMAGE}/AuthEcSys/ui
         COMMAND         bash -c "cp -a ${COMMON_SYS}/common/*.mjs                               ${BOOT_IMAGE}/CommonSys/common/"
         COMMAND         bash -c "cp -a ${COMMON_SYS}/common/fonts/*                             ${BOOT_IMAGE}/CommonSys/common/fonts/"
         COMMAND         cp -a ${COMMON_SYS}/ui/vanilla/common.index.html                        ${BOOT_IMAGE}/CommonSys/ui/vanilla

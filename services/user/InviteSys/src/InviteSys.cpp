@@ -450,6 +450,9 @@ PSIO_REFLECT(Queries,
 
 auto InviteSys::serveSys(HttpRequest request) -> std::optional<HttpReply>
 {
+   if (auto result = serveContent(request, Tables{getReceiver()}))
+      return result;
+
    if (auto result = serveSimpleUI<InviteSys, true>(request))
       return result;
 
