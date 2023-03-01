@@ -147,7 +147,7 @@ export default ({ mode }) => {
             svgr({ exportAsDefault: true }),
             react(),
             mdPlugin({ mode: [Mode.HTML] }),
-            psibase({ serviceName: "alice", server: true, env: process.env }),
+            psibase({ serviceName: "fractal-sys", server: true, env: process.env }),
         ],
         resolve: {
             // These aliases are the second stage of translation when locating a local resource.
