@@ -7,7 +7,7 @@
     "scripts": {
         "dev": "vite",
         "test": "vitest",
-        "build:fractally": "tsc && vite build",
+        "build": "tsc && vite build",
         "start": "vite preview"
     },
     "dependencies": {
