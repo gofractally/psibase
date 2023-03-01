@@ -460,9 +460,12 @@ const redirectIfAccessedDirectly = async () => {
                 0,
                 window.location.hostname.indexOf(".")
             );
-            window.location.replace(
-                await siblingUrl(null, "", "/applet/" + applet)
-            );
+            const appletUrl = await siblingUrl(null, "", "/applet/" + applet);
+            const appletUrlFull =
+                appletUrl +
+                (window.location.search || "") +
+                (window.location.hash || "");
+            window.location.replace(appletUrlFull);
         }
     } catch (e) {
         // The browser blocked access to window.top due to the same origin policy,
