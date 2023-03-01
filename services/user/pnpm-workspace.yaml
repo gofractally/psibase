@@ -1,4 +1,0 @@
-packages:
-    - "components/**"
-    - "apps/**"
-    - "FractalSys/ui/**"

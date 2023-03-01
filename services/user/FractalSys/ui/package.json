@@ -1,5 +1,5 @@
 {
-    "name": "@toolbox/fractally",
+    "name": "fractal-sys",
     "private": true,
     "version": "0.0.0",
     "author": "ƒractally LLC",
@@ -18,7 +18,7 @@
         "@headlessui/react": "^1.6.4",
         "@rollup/plugin-alias": "^4.0.2",
         "@tanstack/react-query": "^4.20.4",
-        "@toolbox/components": "*",
+        "@toolbox/components": "1.0.0",
         "classnames": "^2.3.1",
         "dayjs": "^1.11.7",
         "history": "^5.3.0",
