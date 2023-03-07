@@ -24,9 +24,18 @@ namespace triedent
             return PROT_READ;
          }
       }
+
+      void try_pin(bool* pinned, void* base, std::size_t size)
+      {
+         if (*pinned)
+         {
+            *pinned = ::mlock(base, size) == 0;
+         }
+      }
    }  // namespace
 
-   mapping::mapping(const std::filesystem::path& file, access_mode mode) : _mode(mode)
+   mapping::mapping(const std::filesystem::path& file, access_mode mode, bool pin)
+       : _mode(mode), _pinned(pin)
    {
       int flags = O_CLOEXEC;
       if (mode == access_mode::read_write)
@@ -60,6 +69,7 @@ namespace triedent
              addr != MAP_FAILED)
          {
             _data = addr;
+            try_pin(&_pinned, addr, _size);
          }
          else
          {
@@ -71,13 +81,12 @@ namespace triedent
 
    mapping::~mapping()
    {
-      gc();
       if (auto p = _data.load())
          ::munmap(p, _size);
       ::close(_fd);
    }
 
-   void mapping::resize(std::size_t new_size)
+   std::shared_ptr<void> mapping::resize(std::size_t new_size)
    {
       if (new_size < _size)
       {
@@ -85,14 +94,24 @@ namespace triedent
       }
       else if (new_size == _size)
       {
-         return;
+         return nullptr;
       }
-      // Do this first, even though it somewhat complicated the
-      // rollback logic, because it can throw
-      _old.emplace_back(_data.load(), _size);
+      struct munmapper
+      {
+         ~munmapper()
+         {
+            if (addr)
+            {
+               ::munmap(addr, size);
+            }
+         }
+         void*       addr = nullptr;
+         std::size_t size;
+      };
+      // Do this first, because it can throw
+      auto result = std::make_shared<munmapper>();
       if (::ftruncate(_fd, new_size) < 0)
       {
-         _old.pop_back();
          throw std::system_error{errno, std::generic_category()};
       }
 #ifdef MAP_FIXED_NOREPLACE
@@ -104,10 +123,9 @@ namespace triedent
              ::mmap(end, new_size - _size, prot, MAP_SHARED | MAP_FIXED_NOREPLACE, _fd, _size);
          if (addr == end)
          {
-            _data = addr;
+            try_pin(&_pinned, end, new_size - _size);
             _size = new_size;
-            _old.pop_back();
-            return;
+            return nullptr;
          }
          else
          {
@@ -122,24 +140,17 @@ namespace triedent
       // Move the mapping to a new location
       if (auto addr = ::mmap(nullptr, new_size, prot, MAP_SHARED, _fd, 0); addr != MAP_FAILED)
       {
-         _data = addr;
-         _size = new_size;
+         result->addr = _data.load();
+         result->size = _size;
+         _data        = addr;
+         _size        = new_size;
+         try_pin(&_pinned, addr, _size);
+         return std::shared_ptr<void>(std::move(result), result->addr);
       }
       else
       {
-         _old.pop_back();
          throw std::system_error{errno, std::generic_category()};
       }
-   }
-
-   void mapping::gc() noexcept
-   {
-      for (auto [addr, size] : _old)
-      {
-         if (addr)
-            ::munmap(addr, size);
-      }
-      _old.clear();
    }
 
 }  // namespace triedent

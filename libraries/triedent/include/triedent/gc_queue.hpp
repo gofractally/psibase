@@ -82,6 +82,36 @@ namespace triedent
       std::vector<std::shared_ptr<void>> _queue;
    };
 
+   using gc_session = gc_queue::session;
+
+   template <typename T>
+   class relocker
+   {
+     public:
+      relocker(std::unique_lock<T>& l) : _lock(l) { _lock.unlock(); }
+      ~relocker() { _lock.lock(); }
+
+     private:
+      std::unique_lock<T>& _lock;
+   };
+
+   template <bool UniqueLock>
+   struct session_lock_impl
+   {
+      using type = session_lock_impl;
+      session_lock_impl(std::unique_lock<gc_queue::session>&) {}
+      session_lock_impl(std::lock_guard<gc_queue::session>&) {}
+   };
+
+   template <>
+   struct session_lock_impl<true>
+   {
+      using type = std::unique_lock<gc_queue::session>&;
+   };
+
+   template <bool UniqueLock = false>
+   using session_lock_ref = typename session_lock_impl<UniqueLock>::type;
+
    inline void gc_queue::session::lock()
    {
       _sequence.store(_queue->_end.load());

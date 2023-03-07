@@ -2,8 +2,8 @@
 
 #include <atomic>
 #include <filesystem>
+#include <memory>
 #include <utility>
-#include <vector>
 
 namespace triedent
 {
@@ -18,38 +18,41 @@ namespace triedent
    //
    // The file must not be resized by another process
    //
-   // resize, size, and gc may not be called concurrently
-   // data may be called concurrently with itself, resize, size, or gc.
-   // After calling resize, gc must not be run until all current accesses are complete.
+   // resize and size may not be called concurrently
+   // data may be called concurrently with itself, resize, or size
+   // The pointer returned by resize must be retained until all accesses to the previous data complete.
    //
-   // More formally,
+   // Formally,
    //
    // Given
-   //   - G is a call to gc
-   //   - R is a call to resize such that R happens before G
+   //   - R is a call to resize that returns a non-null pointer
+   //   - X is the destruction of the last copy of the result of R
    //   - D is a call to data
    //   - A is a memory access to the region referenced by the result of D
-   // then, the behavior is undefined unless A happens before G OR R happens before D
+   // then, the behavior is undefined unless A happens before X OR R happens before D
    //
    class mapping
    {
      public:
-      mapping(const std::filesystem::path& file, access_mode mode);
+      mapping(const std::filesystem::path& file, access_mode mode, bool pin = false);
       ~mapping();
-      // Sets the size of the file to new_size.  A call to resize
-      // should eventually be followed by a call to gc.
+      // Sets the size of the file to new_size.
+      //
+      // If data is invalidated, returns a shared_ptr that owns the
+      // previous data. Otherwise returns null.
+      //
       // exception safety: strong
-      void resize(std::size_t new_size);
-      // Cleans up garbage created by the most recent resize.
-      void        gc() noexcept;
-      void*       data() { return _data.load(); }
-      std::size_t size() const { return _size; }
+      std::shared_ptr<void> resize(std::size_t new_size);
+      void*                 data() { return _data.load(); }
+      const void*           data() const { return _data.load(); }
+      std::size_t           size() const { return _size; }
+      bool                  pinned() const { return _pinned; }
 
      private:
-      std::atomic<void*>                         _data;
-      std::size_t                                _size;
-      int                                        _fd;
-      access_mode                                _mode;
-      std::vector<std::pair<void*, std::size_t>> _old;
+      std::atomic<void*> _data;
+      std::size_t        _size;
+      int                _fd;
+      access_mode        _mode;
+      bool               _pinned;
    };
 }  // namespace triedent

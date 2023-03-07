@@ -202,8 +202,7 @@ namespace psibase
          {
             // std::cout << "Open existing " << dir << "\n";
          }
-         trie   = std::make_shared<triedent::database>(dir.c_str(), triedent::database::read_write,
-                                                     allowSlow);
+         trie   = std::make_shared<triedent::database>(dir.c_str(), triedent::database::read_write);
          auto s = trie->start_write_session();
          head   = loadRevision(*s, s->get_top_root(), revisionHeadKey);
       }

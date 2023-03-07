@@ -1,6 +1,8 @@
 #pragma once
+#include <triedent/cache_allocator.hpp>
 #include <triedent/debug.hpp>
-#include <triedent/ring_alloc.hpp>
+
+#include <cstring>
 
 namespace triedent
 {
@@ -11,7 +13,9 @@ namespace triedent
    using key_type   = std::string;
    using value_type = key_type;
 
-   object_id bump_refcount_or_copy(ring_allocator& ra, object_id id);
+   object_id bump_refcount_or_copy(cache_allocator& ra,
+                                   std::unique_lock<gc_session>&,
+                                   object_id id);
 
    class node
    {
@@ -47,54 +51,122 @@ namespace triedent
       inline value_view data() const { return value_view(data_ptr(), data_size()); }
       inline key_view   key() const { return key_view(key_ptr(), key_size()); }
 
-      inline static std::pair<location_lock, value_node*> make(ring_allocator& a,
-                                                               key_view        key,
-                                                               value_view      val,
-                                                               node_type       type,
-                                                               bool            bump_root_refs)
+      inline static std::pair<location_lock, value_node*> make(
+          cache_allocator&              a,
+          std::unique_lock<gc_session>& session,
+          key_view                      key,
+          value_view                    val,
+          node_type                     type)
       {
          assert(val.size() < 0xffffff - key.size() - sizeof(value_node));
          uint32_t alloc_size = sizeof(value_node) + key.size() + val.size();
-         auto     r          = a.alloc(alloc_size, type);
+         auto     r          = a.alloc(session, alloc_size, type);
          if constexpr (debug_nodes)
             std::cout << r.first.get_id().id << ": construct value_node: type=" << (int)type
                       << std::endl;
-         return std::make_pair(std::move(r.first),
-                               new (r.second) value_node(a, key, val, bump_root_refs));
+         return std::make_pair(std::move(r.first), new (r.second) value_node(a, key, val));
       }
 
-     private:
-      value_node(ring_allocator& ra, key_view key, value_view val, bool bump_root_refs)
+      // If id is non-null, it must refer to a source object that is being copied
+      // Otherwise, key and value must be pointers to external memory
+      inline static std::pair<location_lock, value_node*> clone(
+          cache_allocator&              a,
+          std::unique_lock<gc_session>& session,
+          object_id                     id,
+          key_view                      key,
+          std::uint32_t                 key_offset,
+          value_view                    val,
+          node_type                     type)
       {
-         _key_size = key.size();
-         memcpy(key_ptr(), key.data(), key_size());
-         if (bump_root_refs)
+         if (id && type == node_type::roots)
          {
-            if constexpr (debug_nodes)
-            {
-               std::cout << "value_node(): key_size=" << (int)_key_size
-                         << " data_size=" << (int)val.size()
-                         << " bump roots=" << val.size() / sizeof(object_id) << "\n    ";
-               auto n   = val.size() / sizeof(object_id);
-               auto src = reinterpret_cast<const object_id*>(val.data());
-               while (n--)
-                  std::cout << src++->id << " ";
-               std::cout << std::endl;
-            }
-            assert(val.size() % sizeof(object_id) == 0);
-            auto n    = val.size() / sizeof(object_id);
-            auto src  = reinterpret_cast<const object_id*>(val.data());
-            auto dest = roots();
-            while (n--)
-               *dest++ = bump_refcount_or_copy(ra, *src++);
+            return clone_roots(a, session, id, key, key_offset, val, type);
          }
          else
          {
-            if constexpr (debug_nodes)
-               std::cout << "value_node(): key_size=" << (int)_key_size
-                         << " data_size=" << val.size() << std::endl;
-            memcpy(data_ptr(), val.data(), val.size());
+            return clone_bytes(a, session, id, key, key_offset, val, type);
          }
+      }
+
+      inline static std::pair<location_lock, value_node*> clone_bytes(
+          cache_allocator&              a,
+          std::unique_lock<gc_session>& session,
+          object_id                     id,
+          key_view                      key,
+          std::uint32_t                 key_offset,
+          value_view                    val,
+          node_type                     type)
+      {
+         if (key_offset != std::uint32_t(-1))
+            key = key.substr(key_offset);
+         assert(val.size() < 0xffffff - key.size() - sizeof(value_node));
+         uint32_t alloc_size = sizeof(value_node) + key.size() + val.size();
+         // alloc invalidates key and val
+         auto r = a.alloc(session, alloc_size, type);
+         if (id)
+         {
+            auto ptr = get(a, session, id);
+            if (key_offset != std::uint32_t(-1))
+            {
+               key = ptr->key().substr(key_offset);
+            }
+            val = ptr->data();
+         }
+         if constexpr (debug_nodes)
+            std::cout << r.first.get_id().id << ": construct value_node: type=" << (int)type
+                      << std::endl;
+         return std::make_pair(std::move(r.first), new (r.second) value_node(a, key, val));
+      }
+      inline static std::pair<location_lock, value_node*> clone_roots(
+          cache_allocator&              a,
+          std::unique_lock<gc_session>& session,
+          object_id                     id,
+          key_view                      key,
+          std::uint32_t                 key_offset,
+          value_view                    val,
+          node_type                     type)
+      {
+         const std::size_t value_size = val.size();
+         if (key_offset != std::uint32_t(-1))
+            key = key.substr(key_offset);
+         assert(value_size <= 0xffffff - key.size() - sizeof(value_node));
+         uint32_t          alloc_size = sizeof(value_node) + key.size() + value_size;
+         const std::size_t n          = val.size() / sizeof(object_id);
+         object_id         roots[n + 1];  // add 1 to avoid zero-size VLA
+         std::memcpy(&roots, val.data(), val.size());
+         // copy_node or alloc invalidates key and val
+         for (std::size_t i = 0; i < n; ++i)
+         {
+            roots[i] = bump_refcount_or_copy(a, session, roots[i]);
+         }
+         auto r = a.alloc(session, alloc_size, type);
+         {
+            if (key_offset != std::uint32_t(-1))
+            {
+               auto ptr = get(a, session, id);
+               key      = ptr->key().substr(key_offset);
+            }
+            val = {reinterpret_cast<const char*>(&roots[0]), value_size};
+         }
+         if constexpr (debug_nodes)
+            std::cout << r.first.get_id().id << ": construct value_node: type=" << (int)type
+                      << std::endl;
+         return std::make_pair(std::move(r.first), new (r.second) value_node(a, key, val));
+      }
+
+     private:
+      static value_node* get(cache_allocator& a, session_lock_ref<> session, object_id id)
+      {
+         auto [ptr, type, ref] = a.get_cache<false>(session, id);
+         return reinterpret_cast<value_node*>(ptr);
+      }
+      value_node(cache_allocator& ra, key_view key, value_view val)
+      {
+         _key_size = key.size();
+         if (!key.empty())
+            std::memcpy(key_ptr(), key.data(), key_size());
+         if (!val.empty())
+            std::memcpy(data_ptr(), val.data(), val.size());
       }
       //  uint32_t sizes;
       uint8_t _key_size;
@@ -124,16 +196,22 @@ namespace triedent
       inline int8_t  reverse_lower_bound(uint8_t b) const;
       inline uint8_t upper_bound(uint8_t b) const;
 
-      inline static std::pair<location_lock, inner_node*> make(ring_allocator&   a,
-                                                               const inner_node& in,
-                                                               key_view          prefix,
-                                                               object_id         val,
-                                                               uint64_t          branches);
+      inline static std::pair<location_lock, inner_node*> clone(
+          cache_allocator&              a,
+          std::unique_lock<gc_session>& session,
+          object_id                     id,
+          const inner_node*             in,
+          key_view                      key,
+          std::uint32_t                 key_offset,
+          object_id                     value,
+          std::uint64_t                 branches);
 
-      inline static std::pair<location_lock, inner_node*> make(ring_allocator& a,
-                                                               key_view        prefix,
-                                                               object_id       val,
-                                                               uint64_t        branches);
+      inline static std::pair<location_lock, inner_node*> make(
+          cache_allocator&              a,
+          std::unique_lock<gc_session>& session,
+          key_view                      prefix,
+          object_id                     val,
+          uint64_t                      branches);
 
       inline bool has_branch(uint32_t b) const { return _present_bits & (1ull << b); }
 
@@ -149,12 +227,16 @@ namespace triedent
       }
 
      private:
-      inner_node(object_id         id,
-                 ring_allocator&   a,
-                 const inner_node& in,
-                 key_view          prefix,
-                 object_id         val,
-                 uint64_t          branches);
+      static inner_node* get(cache_allocator& a, session_lock_ref<> session, object_id id)
+      {
+         auto [ptr, type, ref] = a.get_cache<false>(session, id);
+         return reinterpret_cast<inner_node*>(ptr);
+      }
+      inner_node(object_id  id,
+                 key_view   prefix,
+                 object_id  val,
+                 uint64_t   branches,
+                 object_id* children);
       inner_node(object_id id, key_view prefix, object_id val, uint64_t branches);
 
       uint8_t   _prefix_length = 0;  // mirrors value nodes to signal type and prefix length
@@ -165,30 +247,69 @@ namespace triedent
    } __attribute__((packed));
    static_assert(sizeof(inner_node) == 3 + 5 + 8, "unexpected padding");
 
-   inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator&   a,
-                                                                 const inner_node& in,
-                                                                 key_view          prefix,
-                                                                 object_id         val,
-                                                                 uint64_t          branches)
+   inline std::pair<location_lock, inner_node*> inner_node::clone(
+       cache_allocator&              a,
+       std::unique_lock<gc_session>& session,
+       object_id                     id,
+       const inner_node*             in,
+       key_view                      key,
+       std::uint32_t                 key_offset,
+       object_id                     value,
+       std::uint64_t                 branches)
    {
-      uint32_t alloc_size =
-          sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
-      auto p  = a.alloc(alloc_size, node_type::inner);
-      auto id = p.first.get_id();
+      if (key_offset != std::uint32_t(-1))
+         key = key.substr(key_offset);
+      const std::size_t n          = std::popcount(branches);
+      uint32_t          alloc_size = sizeof(inner_node) + key.size() + n * sizeof(object_id);
+      object_id         children[n + 1];
+      if (in->_present_bits == branches)
+      {
+         std::memcpy(&children[0], in->children(), sizeof(children));
+      }
+      else
+      {
+         auto       remaining_branches = branches;
+         auto       in_branches        = in->_present_bits;
+         object_id* child_iter         = children;
+         while (remaining_branches)
+         {
+            auto fb     = std::countr_zero(remaining_branches);
+            auto mask   = (1ull << fb);
+            *child_iter = (in_branches & mask) ? in->branch(fb) : object_id{};
+            ++child_iter;
+            remaining_branches ^= mask;
+         }
+      }
+      // invalidates in and prefix
+      value = bump_refcount_or_copy(a, session, value);
+      for (std::size_t i = 0; i < n; ++i)
+      {
+         children[i] = bump_refcount_or_copy(a, session, children[i]);
+      }
+      auto p = a.alloc(session, alloc_size, node_type::inner);
+      if (key_offset != std::uint32_t(-1))
+      {
+         in  = get(a, session, id);
+         key = in->key().substr(key_offset);
+      }
+
+      auto newid = p.first.get_id();
       if constexpr (debug_nodes)
-         std::cout << id.id << ": construct inner_node" << std::endl;
+         std::cout << newid.id << ": construct inner_node" << std::endl;
       return std::make_pair(std::move(p.first),
-                            new (p.second) inner_node(id, a, in, prefix, val, branches));
+                            new (p.second) inner_node(newid, key, value, branches, children));
    }
 
-   inline std::pair<location_lock, inner_node*> inner_node::make(ring_allocator& a,
-                                                                 key_view        prefix,
-                                                                 object_id       val,
-                                                                 uint64_t        branches)
+   inline std::pair<location_lock, inner_node*> inner_node::make(
+       cache_allocator&              a,
+       std::unique_lock<gc_session>& session,
+       key_view                      prefix,
+       object_id                     val,
+       uint64_t                      branches)
    {
       uint32_t alloc_size =
           sizeof(inner_node) + prefix.size() + std::popcount(branches) * sizeof(object_id);
-      auto p  = a.alloc(alloc_size, node_type::inner);
+      auto p  = a.alloc(session, alloc_size, node_type::inner);
       auto id = p.first.get_id();
       if constexpr (debug_nodes)
          std::cout << id.id << ": construct inner_node" << std::endl;
@@ -205,18 +326,17 @@ namespace triedent
    {
       if constexpr (debug_nodes)
          std::cout << id.id << ": inner_node(): value=" << val.id << std::endl;
-      memset(children(), 0, sizeof(object_id) * num_branches());
-      memcpy(key_ptr(), prefix.data(), prefix.size());
+      std::memset(children(), 0, sizeof(object_id) * num_branches());
+      std::memcpy(key_ptr(), prefix.data(), prefix.size());
    }
    /*
     *  Constructs a copy of in with the branches selected by 'branches'
     */
-   inline inner_node::inner_node(object_id         id,
-                                 ring_allocator&   a,
-                                 const inner_node& in,
-                                 key_view          prefix,
-                                 object_id         val,
-                                 uint64_t          branches)
+   inline inner_node::inner_node(object_id  id,
+                                 key_view   prefix,
+                                 object_id  val,
+                                 uint64_t   branches,
+                                 object_id* new_children)
        : _prefix_length(prefix.size()),
          _reserved_a(0),
          _reserved_b(0),
@@ -225,45 +345,8 @@ namespace triedent
    {
       if constexpr (debug_nodes)
          std::cout << id.id << ": inner_node(): value=" << val.id << std::endl;
-      if (in._present_bits == branches)
-      {
-         // memcpy( (char*)children(), (char*)in.children(), num_branches()*sizeof(object_id) );
-         auto c  = children();
-         auto ic = in.children();
-         auto e  = c + num_branches();
-         while (c != e)
-         {
-            if constexpr (debug_nodes)
-               std::cout << id.id << ": inner_node(copy): bump child " << ic->id << std::endl;
-            *c = bump_refcount_or_copy(a, *ic);
-            ++c;
-            ++ic;
-         }
-      }
-      else
-      {
-         auto common_branches = in._present_bits & _present_bits;
-         auto fb              = std::countr_zero(common_branches);
-         while (fb < 64)
-         {
-            if constexpr (debug_nodes)
-               std::cout << id.id << ": inner_node(copy): bump child " << in.branch(fb).id
-                         << std::endl;
-            branch(fb) = bump_refcount_or_copy(a, in.branch(fb));
-            common_branches ^= 1ull << fb;
-            fb = std::countr_zero(common_branches);
-         }
-
-         auto null_branches = (in._present_bits & branches) ^ branches;
-         fb                 = std::countr_zero(null_branches);
-         while (fb < 64)
-         {
-            branch(fb).id = 0;
-            null_branches ^= 1ull << fb;
-            fb = std::countr_zero(null_branches);
-         }
-      }
-      memcpy(key_ptr(), prefix.data(), prefix.size());
+      std::memcpy(children(), new_children, num_branches() * sizeof(object_id));
+      std::memcpy(key_ptr(), prefix.data(), prefix.size());
 
       //assert(not is_value_node());
    }
@@ -312,7 +395,7 @@ namespace triedent
       return b >= 63 ? 64 : std::countr_zero(_present_bits & mask);
    }
 
-   inline void release_node(ring_allocator& ra, object_id obj)
+   inline void release_node(cache_allocator& ra, object_id obj)
    {
       if (!obj)
          return;
@@ -349,25 +432,30 @@ namespace triedent
       }
    }
 
-   inline location_lock copy_node(ring_allocator& ra, object_id id, char* ptr, node_type type)
+   inline location_lock copy_node(cache_allocator&              ra,
+                                  std::unique_lock<gc_session>& session,
+                                  object_id                     id,
+                                  void*                         ptr,
+                                  node_type                     type)
    {
       if (type != node_type::inner)
       {
-         auto src = reinterpret_cast<value_node*>(ptr);
-         auto [lock, dest] =
-             value_node::make(ra, src->key(), src->data(), type, type == node_type::roots);
+         auto src          = reinterpret_cast<value_node*>(ptr);
+         auto [lock, dest] = value_node::clone(ra, session, id, src->key(), 0, src->data(), type);
          return std::move(lock);
       }
       else
       {
-         auto src          = reinterpret_cast<inner_node*>(ptr);
-         auto [lock, dest] = inner_node::make(
-             ra, *src, src->key(), bump_refcount_or_copy(ra, src->value()), src->branches());
+         auto src = reinterpret_cast<inner_node*>(ptr);
+         auto [lock, dest] =
+             inner_node::clone(ra, session, id, src, src->key(), 0, src->value(), src->branches());
          return std::move(lock);
       }
    }
 
-   inline object_id bump_refcount_or_copy(ring_allocator& ra, object_id id)
+   inline object_id bump_refcount_or_copy(cache_allocator&              ra,
+                                          std::unique_lock<gc_session>& session,
+                                          object_id                     id)
    {
       if (!id)
          return id;
@@ -375,7 +463,7 @@ namespace triedent
          std::cout << id.id << ": bump_refcount_or_copy" << std::endl;
       if (ra.bump_count(id))
          return id;
-      auto [ptr, type, ref] = ra.get_cache<false>(id);
-      return copy_node(ra, id, ptr, type).into_unlock_unchecked();
+      auto [ptr, type, ref] = ra.get_cache<false>(session, id);
+      return copy_node(ra, session, id, ptr, type).into_unlock_unchecked();
    }
 }  // namespace triedent
