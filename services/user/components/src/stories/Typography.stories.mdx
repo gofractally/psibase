@@ -1,0 +1,54 @@
+import { Canvas, Meta, Typeset } from "@storybook/addon-docs";
+
+<Meta title="Deprecated/Examples/Typography" />
+
+export const typography = {
+    type: {
+        primary: "Raleway, sans-serif",
+    },
+    weight: {
+        regular: "400",
+        medium: "500",
+        semibold: "600",
+        bold: "700",
+    },
+    size: {
+        s1: 12,
+        s2: 14,
+        s3: 16,
+        m1: 20,
+        m2: 24,
+        m3: 28,
+        l1: 32,
+        l2: 40,
+        l3: 48,
+    },
+};
+
+export const SampleText =
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
+
+# Typography
+
+**Font:** Raleway
+
+**Weights:** 400(regular), 500(medium), 600(semibold), 700(bold)
+
+<Canvas>
+    <Typeset
+        fontSizes={[
+            Number(typography.size.s1),
+            Number(typography.size.s2),
+            Number(typography.size.s3),
+            Number(typography.size.m1),
+            Number(typography.size.m2),
+            Number(typography.size.m3),
+            Number(typography.size.l1),
+            Number(typography.size.l2),
+            Number(typography.size.l3),
+        ]}
+        fontWeight={typography.weight.black}
+        sampleText={SampleText}
+        fontFamily={typography.type.primary}
+    />
+</Canvas>

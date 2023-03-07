@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+    @apply h-full;
+    touch-action: manipulation;
+}
+
+body {
+    @apply text-gray-900;
+    font-variant-numeric: lining-nums;
+    font-weight: 400;
+    @apply h-full w-full overflow-hidden;
+}
+#root {
+    /* @apply min-h-screen; */
+    @apply h-full w-full overflow-hidden;
+}
+
+@layer base {
+    p {
+        margin-bottom: 1rem;
+        @apply text-lg;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        @apply font-semibold;
+    }
+
+    h1 {
+        @apply text-5xl md:text-6xl;
+    }
+
+    h2 {
+        @apply text-4xl md:text-5xl;
+    }
+
+    h3 {
+        @apply text-3xl md:text-4xl;
+    }
+
+    h4 {
+        @apply text-2xl md:text-3xl md:tracking-[-0.02em];
+    }
+
+    h5 {
+        @apply text-xl md:text-2xl;
+    }
+
+    h6 {
+        @apply text-lg leading-6 md:text-xl md:leading-7;
+    }
+
+    small,
+    .text_small {
+        font-size: 0.889rem;
+    }
+
+    a {
+        @apply underline hover:text-blue-700;
+    }
+
+    .font-mono,
+    .font-mono.font-normal {
+        font-weight: 410;
+    }
+
+    .font-mono.font-medium {
+        font-weight: 460;
+    }
+
+    .font-mono.font-semibold {
+        font-weight: 560;
+    }
+
+    .font-mono.font-bold {
+        font-weight: 640;
+    }
+}
+
+.sidebar-hr {
+    @apply mx-2 rounded-full border border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-100;
+}
+
+.sidebar-icon {
+    @apply relative mx-auto mt-2 mb-2 
+    flex h-12 w-12 cursor-pointer items-center  
+  justify-center rounded-3xl bg-gray-400 
+  text-green-500 shadow-lg
+    transition-all duration-300
+    ease-linear hover:rounded-xl hover:bg-gray-700
+    hover:text-white dark:bg-gray-800;
+}
+
+.sidebar-icon-active {
+    @apply rounded-xl bg-gray-700 hover:text-white;
+}
+
+.sidebar-tooltip {
+    @apply absolute left-14 m-2 w-auto min-w-max origin-left scale-0 rounded-md
+    bg-gray-900 p-2 
+    text-xs font-bold 
+    text-white shadow-md transition-all duration-100;
+}
+
+.ReactModal__Content {
+    @media (min-width: 640px) {
+        width: 624px;
+    }
+    @media (min-width: 640px) and (min-height: 792px) {
+        height: auto;
+    }
+}

@@ -1,0 +1,30 @@
+.Account {
+
+  svg {
+    display: inline;
+  }
+
+  .Icon {
+    display: inline;
+    vertical-align: text-top;
+    margin-left: 0.4rem;
+    color: #94A3B8;
+  }
+
+  .EditIconAvatar {
+    position: relative;
+    top: 2px;
+  }
+
+}
+
+.AddUserName {
+  p {
+    text-align: left;
+  }
+}
+
+.AddUserName .Container, .Account .Container {
+  width: 350px;
+  margin: 0 auto;
+}

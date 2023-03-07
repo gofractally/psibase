@@ -1,0 +1,20 @@
+import { Meta, Canvas, Story } from "@storybook/addon-docs";
+import ConfirmSendDialog from "../../ui/wallet/ConfirmSendDialog";
+import { Card } from "../../ui/Card";
+
+<Meta
+    title="Deprecated/Examples/Confirm Send Dialog"
+    component={ConfirmSendDialog}
+/>
+
+# ConfirmSendDialog Example
+
+<Canvas>
+    <Story name="Confirm Send Dialog">
+        <Card>
+            <ConfirmSendDialog
+                onBackClick={() => console.log("Back button click")}
+            />
+        </Card>
+    </Story>
+</Canvas>
