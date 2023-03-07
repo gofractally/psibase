@@ -3,6 +3,7 @@ import { Button } from "components";
 import { useParam } from "store";
 import { useMutation } from "@tanstack/react-query";
 import { psiboardApplet } from "service";
+import { AppletId, operation } from "common/rpc.mjs";
 
 export const SelectAccount = () => {
   const account = useParam("account");
@@ -17,7 +18,9 @@ export const SelectAccount = () => {
     isSuccess,
     isLoading,
   } = useMutation({
-    mutationFn: (publicKey: string) => {
+    mutationFn: async ({ publicKey, privateKey}: { publicKey: string, privateKey: string }) => {
+      const accountSys = new AppletId("account-sys", "");
+      await operation(accountSys, "storeKey", { privateKey, publicKey });
       return psiboardApplet.acceptInvite(publicKey);
     },
     onError: (error) => {
@@ -35,7 +38,7 @@ export const SelectAccount = () => {
     <div>
       <div>Accept invite from fractally with account {account}?</div>
       <div className="w-full text-center pt-4">
-        <Button type="primary" onClick={() => accept(publicKey)}>
+        <Button type="primary" onClick={() => accept({ publicKey, privateKey: token! })}>
           {isLoading ? "Loading" : isSuccess ? "Continue" : "Accept Invite"}
         </Button>
       </div>

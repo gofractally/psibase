@@ -13,17 +13,9 @@ import { extractInviteTokenKeyPair } from "store/token";
 export const useInitilize = (service: Service) => {
   useEffect(() => {
     initializeApplet(async () => {
-      checkAndSaveInviteToken();
       setQueries(service.queries);
       setOperations(service.operations);
     });
   }, []);
 };
 
-const checkAndSaveInviteToken = () => {
-  const accountSys = new AppletId("account-sys", "");
-  const keyPair = extractInviteTokenKeyPair();
-  if (keyPair) {
-    operation(accountSys, "storeKey", keyPair);
-  }
-};

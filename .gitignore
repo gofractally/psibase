@@ -19,3 +19,4 @@ node_modules
 temp
 dist
 vite.config.ts.timestamp-*.mjs
+.pnpm-store

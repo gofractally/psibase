@@ -8,7 +8,8 @@
         "dev": "vite",
         "test": "vitest",
         "build": "tsc && vite build",
-        "start": "vite preview"
+        "start": "vite preview",
+        "deploy": "psibase upload-tree invite-sys / dist"
     },
     "dependencies": {
         "@dnd-kit/core": "^6.0.3",
