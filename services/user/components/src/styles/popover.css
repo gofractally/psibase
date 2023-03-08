@@ -1,0 +1,16 @@
+.react-tiny-popover-container {
+  z-index: 100;
+}
+
+.PopoverPanel {
+  h1 {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 2rem;
+    color: #ffffff;
+  }
+ .PopoverContent > p {
+    font-size: 14px;
+    line-height: 1.4rem;
+  }
+}
