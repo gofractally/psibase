@@ -46,7 +46,7 @@ namespace triedent
       auto start_session() { return gc_queue::session{_gc}; }
 
       bool          bump_count(object_id id) { return _obj_ids.bump_count(id); }
-      location_lock lock(object_id id) { return _obj_ids.spin_lock(id); }
+      location_lock lock(object_id id) { return _obj_ids.lock(id); }
 
       // WARNING: alloc temporarily unlocks the session, which invalidates
       // all existing pointers to allocated objects
@@ -104,6 +104,11 @@ namespace triedent
       const ring_allocator& cool() const { return _levels[cool_cache]; }
       const ring_allocator& cold() const { return _levels[cold_cache]; }
 
+      object_header* get_object(object_location loc)
+      {
+         return _levels[loc.cache].get_object(loc.offset);
+      }
+
       gc_queue       _gc;
       object_db      _obj_ids;
       ring_allocator _levels[4];
@@ -120,12 +125,12 @@ namespace triedent
       if (num_bytes > 0xffffff - 8) [[unlikely]]
          throw std::runtime_error("obj too big");
 
-      auto lock = _obj_ids.alloc(session, type);
-      // lock does not control any valid memory yet
-      auto ptr = hot().allocate(session, lock.get_id(), num_bytes,
-                                [&](void*, object_location loc) { lock.move(loc); });
+      object_id i = _obj_ids.alloc(session, type);
+      hot().allocate(session, i, num_bytes,
+                     [&](void*, object_location loc) { _obj_ids.init(i, loc); });
 
-      return {std::move(lock), ptr};
+      auto lock = _obj_ids.lock(i);
+      return {std::move(lock), get_object(_obj_ids.get(i))->data()};
    }
 
    inline std::pair<void*, node_type> cache_allocator::release(id i)
@@ -148,7 +153,7 @@ namespace triedent
          if (loc.cache != hot_cache && obj->size <= 4096)
          {
             // MUST NOT wait for free memory while holding a location lock
-            if (auto copy = try_move_object(hot(), _obj_ids.spin_lock(i), obj->data(), obj->size))
+            if (auto copy = try_move_object(hot(), _obj_ids.lock(i), obj->data(), obj->size))
             {
                return {copy, {loc.type}, loc.ref};
             }

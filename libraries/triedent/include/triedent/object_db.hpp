@@ -21,15 +21,13 @@ namespace triedent
    struct object_info
    {
       explicit constexpr object_info(std::uint64_t x)
-          : _offset(x >> 18),
-            cache((x >> 16) & 3),
-            type(static_cast<node_type>((x >> 14) & 3)),
-            position_lock((x >> 13) & 1),
+          : _offset(x >> 19),
+            cache((x >> 17) & 3),
+            type(static_cast<node_type>((x >> 15) & 3)),
             ref(x & (0x1FFF))
       {
       }
-      std::uint64_t          ref : 13;
-      std::uint64_t          position_lock : 1;
+      std::uint64_t          ref : 15;
       node_type              type : 2;
       std::uint64_t          cache : 2;
       std::uint64_t          _offset : 45;
@@ -42,10 +40,26 @@ namespace triedent
       }
       constexpr std::uint64_t to_int() const
       {
-         return ref | (position_lock << 13) | (static_cast<std::uint8_t>(type) << 14) |
-                (cache << 16) | (_offset << 18);
+         return ref | (static_cast<std::uint8_t>(type) << 15) | (cache << 17) | (_offset << 19);
       }
       constexpr operator object_location() const { return {.offset = _offset * 8, .cache = cache}; }
+   };
+
+   struct mutex_group
+   {
+      static constexpr std::size_t count = 64;
+      static constexpr std::size_t align = 64;
+      explicit mutex_group() : _items(new item[count]) {}
+      struct alignas(align) item
+      {
+         std::mutex m;
+      };
+      std::mutex& operator()(void* base, void* ptr) const
+      {
+         auto diff = reinterpret_cast<std::uintptr_t>(ptr) - reinterpret_cast<std::uintptr_t>(base);
+         return _items[(diff / align) % count].m;
+      }
+      std::unique_ptr<item[]> _items;
    };
 
    class object_db;
@@ -55,27 +69,17 @@ namespace triedent
       friend object_db;
 
      private:
-      object_db* db = nullptr;
-      uint64_t   id = 0;
-      void       unlock();
+      location_lock(std::unique_lock<std::mutex> lock, object_db* db, object_id id)
+          : lock{std::move(lock)}, db{db}, id{id.id}
+      {
+      }
+      std::unique_lock<std::mutex> lock;
+      object_db*                   db = nullptr;
+      uint64_t                     id = 0;
 
      public:
-      location_lock()                     = default;
-      location_lock(const location_lock&) = delete;
-      location_lock(location_lock&& src) { *this = std::move(src); }
-      ~location_lock() { unlock(); }
-
-      location_lock& operator=(const location_lock&) = delete;
-      location_lock& operator=(location_lock&& src)
-      {
-         unlock();
-         db     = src.db;
-         id     = src.id;
-         src.db = nullptr;
-         return *this;
-      }
-
       object_id get_id() const { return {.id = id}; }
+      explicit  operator bool() const { return lock.owns_lock(); }
 
       void move(object_location loc) const;
 
@@ -83,7 +87,8 @@ namespace triedent
       object_id into_unlock_unchecked()
       {
          object_id result = {.id = id};
-         unlock();
+         if (lock)
+            lock.unlock();
          db = nullptr;
          id = 0;
          return result;
@@ -129,65 +134,40 @@ namespace triedent
       // A thread which holds a location_lock may:
       // * Move the object to another location
       // * Modify the object if it's not already exposed to reader threads
-#if 0
-      std::optional<location_lock> try_lock(object_id id, object_location loc)
+
+      // If matched is false, then id does not point to loc
+      std::optional<location_lock> try_lock(object_id id, object_location loc, bool* matched)
       {
-         if(std::unique_lock l{get_mutex(id), std::try_to_lock}; l.owns_lock())
+         auto* h      = header();
+         auto& atomic = h->objects[id.id];
+         // If the object has already been moved, don't bother locking
+         if (object_info{atomic.load()} != loc)
          {
-            if (object_info{header()->objects[id.id].load()} == loc)
+            *matched = false;
+         }
+         else if (std::unique_lock l{_location_mutexes(h, &atomic), std::try_to_lock})
+         {
+            if (object_info{atomic.load()} == loc)
             {
-               return location_lock{std::move(l), this, id.id};
+               *matched = true;
+               return location_lock{std::move(l), this, id};
             }
+            else
+            {
+               *matched = false;
+            }
+         }
+         else
+         {
+            *matched = true;
          }
          return std::nullopt;
       }
-#endif
-
-      // Acquires the lock if another thread does not hold the lock and
-      // id points to loc.
-      std::optional<location_lock> try_lock(object_id id, object_location loc, bool* matched)
+      location_lock lock(object_id id)
       {
-         auto& atomic = header()->objects[id.id];
-         auto  obj    = atomic.load();
-         do
-         {
-            auto info = object_info{obj};
-            if (info.ref == 0 || info != loc)
-            {
-               *matched = false;
-               return std::nullopt;
-            }
-            if (info.position_lock)
-            {
-               *matched = true;
-               return std::nullopt;
-            }
-         } while (!atomic.compare_exchange_weak(obj, obj | position_lock_mask));
-
-         *matched = true;
-         location_lock lock;
-         lock.db = this;
-         lock.id = id.id;
-         return lock;
-      }
-
-      location_lock spin_lock(object_id id)
-      {
-         auto& atomic = header()->objects[id.id];
-         auto  obj    = atomic.load();
-         do
-         {
-            if (obj & position_lock_mask)
-            {
-               obj = atomic.load();
-               continue;
-            }
-         } while (!atomic.compare_exchange_weak(obj, obj | position_lock_mask));
-
-         location_lock lock;
-         lock.db = this;
-         lock.id = id.id;
-         return lock;
+         auto* h      = header();
+         auto& atomic = h->objects[id.id];
+         return location_lock{std::unique_lock{_location_mutexes(h, &atomic)}, this, id};
       }
 
       static void move(const location_lock& lock, object_location loc)
@@ -200,11 +180,18 @@ namespace triedent
          lock.db->debug(lock.id, "move");
       }
 
-     private:
-      void unlock(uint64_t id) { header()->objects[id] &= ~position_lock_mask; }
+      // The id must not be accessible to any thread
+      // besides the creator.
+      void init(object_id id, object_location loc)
+      {
+         auto&       atomic = header()->objects[id.id];
+         object_info info{atomic.load()};
+         assert(info.to_int() == obj_val(info.type, 1));
+         info.set_location(loc);
+         atomic.store(info.to_int());
+      }
 
-     public:
-      location_lock alloc(std::unique_lock<gc_session>&, node_type type);
+      object_id alloc(std::unique_lock<gc_session>&, node_type type);
 
       object_info release(object_id id);
 
@@ -233,18 +220,16 @@ namespace triedent
       }
 
      private:
-      static constexpr uint64_t position_lock_mask = 1 << 13;
-      static constexpr uint64_t ref_count_mask     = (1ull << 13) - 1;
+      static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
 
-      // 0-12     ref_count
-      // 13       position_lock
-      // 14-15    type           or next_ptr
-      // 16-17    cache          or next_ptr
-      // 18-63    offset         or next_ptr
+      // 0-14     ref_count
+      // 15-16    type           or next_ptr
+      // 17-18    cache          or next_ptr
+      // 19-63    offset         or next_ptr
 
       // clang-format off
-      static uint64_t    extract_next_ptr(uint64_t x)   { return x >> 14; }
-      static uint64_t    create_next_ptr(uint64_t x)    { return x << 14; }
+      static uint64_t    extract_next_ptr(uint64_t x)   { return x >> 15; }
+      static uint64_t    create_next_ptr(uint64_t x)    { return x << 15; }
       // clang-format on
 
       static uint64_t obj_val(node_type type, uint16_t ref)
@@ -273,6 +258,7 @@ namespace triedent
       gc_queue&          _gc;
       mapping            _region;
       mutable std::mutex _region_mutex;
+      mutex_group        _location_mutexes;
 
       object_db_header* header() { return reinterpret_cast<object_db_header*>(_region.data()); }
 
@@ -324,16 +310,9 @@ namespace triedent
       if (_header->max_unallocated.id > (existing_size - sizeof(object_db_header)) / 8 - 1)
          throw std::runtime_error("File size is smaller than required by the header: " +
                                   idfile.native());
-
-      // Objects may have been locked for move when process was SIGKILLed. If any objects
-      // were locked because they were being written to, their root will not be reachable
-      // from database_memory::_root_revision, and will be leaked. Mermaid can clean this
-      // leak.
-      for (uint64_t i = 0; i <= _header->max_allocated.id; ++i)
-         _header->objects[i] &= ~position_lock_mask;
    }
 
-   inline location_lock object_db::alloc(std::unique_lock<gc_session>& session, node_type type)
+   inline object_id object_db::alloc(std::unique_lock<gc_session>& session, node_type type)
    {
       std::lock_guard l{_region_mutex};
       auto            _header = header();
@@ -359,14 +338,11 @@ namespace triedent
          ++_header->max_allocated.id;
          auto  r   = _header->max_allocated;
          auto& obj = _header->objects[r.id];
-         obj.store(obj_val(type, 1) | position_lock_mask);  // init ref count 1
+         obj.store(obj_val(type, 1));  // init ref count 1
          assert(r.id != 0);
 
-         location_lock lock;
-         lock.db = this;
-         lock.id = r.id;
-         debug(lock.id, "alloc");
-         return lock;
+         debug(r.id, "alloc");
+         return r;
       }
       else
       {
@@ -378,13 +354,10 @@ namespace triedent
              ff, extract_next_ptr(_header->objects[ff].load())))
          {
          }
-         _header->objects[ff].store(obj_val(type, 1) | position_lock_mask);  // init ref count 1
+         _header->objects[ff].store(obj_val(type, 1));  // init ref count 1
 
-         location_lock lock;
-         lock.db = this;
-         lock.id = ff;
-         debug(lock.id, "alloc");
-         return lock;
+         debug(ff, "alloc");
+         return {ff};
       }
    }
 
@@ -515,10 +488,5 @@ namespace triedent
    inline void location_lock::move(object_location loc) const
    {
       object_db::move(*this, loc);
-   }
-   inline void location_lock::unlock()
-   {
-      if (db)
-         db->unlock(id);
    }
 };  // namespace triedent
