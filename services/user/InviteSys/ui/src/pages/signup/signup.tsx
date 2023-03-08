@@ -11,6 +11,7 @@ import { isAccountAvailable } from "store/queries/isAccountTaken";
 import { parsePrivateKey } from "store/queries/usePrivateKey";
 import { useParam } from "store";
 import { addAccount } from "store/queries/fetchUser";
+import { AppletId, operation } from "common/rpc.mjs";
 
 interface Inputs {
     account_name: string;
@@ -43,6 +44,8 @@ export const SignUp = () => {
         }) => {
             const tokenKeyPair = privateStringToKeyPair(token);
             const tokenPublicKey = publicKeyPairToString(tokenKeyPair);
+            const accountSys = new AppletId("account-sys", "");
+            await operation(accountSys, "storeKey", { privateKey: token, publicKey: tokenPublicKey });
 
             return psiboardApplet.createAccount({ 
                 token: tokenPublicKey, 
