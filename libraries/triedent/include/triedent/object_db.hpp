@@ -101,7 +101,10 @@ namespace triedent
      public:
       using object_id = triedent::object_id;
 
-      object_db(gc_queue& gc, std::filesystem::path idfile, access_mode mode);
+      object_db(gc_queue&             gc,
+                std::filesystem::path idfile,
+                access_mode           mode,
+                bool                  allow_gc = false);
       static void create(std::filesystem::path idfile, uint64_t max_id);
 
       // Bumps the reference count by 1 if possible
@@ -111,7 +114,8 @@ namespace triedent
          auto  obj    = atomic.load();
          do
          {
-            // All 1's isn't used; that helps detect bugs (e.g. decrementing 0)
+            // All 1's isn't used; that leaves room for gc to add 1
+            // and also helps detect bugs (e.g. decrementing 0)
             if ((obj & ref_count_mask) == ref_count_mask - 1)
             {
                debug(id.id, "bump failed; need copy");
@@ -219,9 +223,6 @@ namespace triedent
      public:
       location_lock alloc(std::unique_lock<gc_session>&, node_type type);
 
-      // TODO: remove
-      void dangerous_retain(object_id id);
-
       object_info release(object_id id);
 
       uint16_t ref(object_id id);
@@ -231,35 +232,15 @@ namespace triedent
       void print_stats();
       void validate(object_id i)
       {
-         if (i.id > header()->first_unallocated.id)
+         if (i.id > header()->max_allocated.id)
             throw std::runtime_error("invalid object id discovered: " + std::to_string(i.id));
       }
 
-      /**
-       * Sets all non-zero refs to c
-       */
-      void reset_all_ref_counts(uint16_t c)
-      {
-         for (auto& o : std::span{header()->objects + 1, header()->first_unallocated.id})
-         {
-            auto i = o.load();
-            if (i & ref_count_mask)
-            {
-               i &= ~ref_count_mask;
-               i |= c & ref_count_mask;
-               o.store(i);
-            }
-         }
-      }
-      void adjust_all_ref_counts(int16_t c)
-      {
-         for (auto& o : std::span{header()->objects + 1, header()->first_unallocated.id})
-         {
-            auto i = o.load();
-            if (i & ref_count_mask)
-               o.store(i + c);
-         }
-      }
+      // returns true if this is the first time the object has been retained
+      // during this gc operation.
+      bool gc_retain(object_id id);
+      void gc_start();
+      void gc_finish();
 
       bool                  pinned() const { return _region.pinned(); }
       std::span<const char> span() const
@@ -293,15 +274,18 @@ namespace triedent
          return result.to_int();
       }
 
-      // TODO: rename first_unallocated
       struct object_db_header
       {
-         std::atomic<uint64_t> first_free;         // free list
-         object_id             first_unallocated;  // high water mark
-         object_id             max_unallocated;    // end of file
+         std::uint32_t              magic;
+         std::atomic<std::uint32_t> flags;
+         std::atomic<uint64_t>      first_free;       // free list
+         object_id                  max_allocated;    // high water mark
+         object_id                  max_unallocated;  // end of file
 
          std::atomic<uint64_t> objects[];
       };
+
+      static constexpr std::uint32_t running_gc_flag = (1 << 8);
 
       gc_queue&          _gc;
       mapping            _region;
@@ -332,13 +316,16 @@ namespace triedent
       mapping mr(idfile, access_mode::read_write, false);
       mr.resize(idfile_size);
 
-      auto header                  = reinterpret_cast<object_db_header*>(mr.data());
-      header->first_unallocated.id = 0;
+      auto header              = reinterpret_cast<object_db_header*>(mr.data());
+      header->max_allocated.id = 0;
       header->first_free.store(0);
       header->max_unallocated.id = (idfile_size - sizeof(object_db_header)) / 8 - 1;
    }
 
-   inline object_db::object_db(gc_queue& gc, std::filesystem::path idfile, access_mode mode)
+   inline object_db::object_db(gc_queue&             gc,
+                               std::filesystem::path idfile,
+                               access_mode           mode,
+                               bool                  allow_gc)
        : _gc(gc), _region(idfile, mode, true)
    {
       if (_region.size() == 0)
@@ -348,8 +335,8 @@ namespace triedent
 
          _region.resize(round_to_page(idfile_size));
 
-         auto header                  = reinterpret_cast<object_db_header*>(_region.data());
-         header->first_unallocated.id = 0;
+         auto header              = reinterpret_cast<object_db_header*>(_region.data());
+         header->max_allocated.id = 0;
          header->first_free.store(0);
          header->max_unallocated.id = (idfile_size - sizeof(object_db_header)) / 8 - 1;
       }
@@ -361,6 +348,9 @@ namespace triedent
 
       auto _header = header();
 
+      if (!allow_gc && mode == access_mode::read_write && (_header->flags.load() & running_gc_flag))
+         throw std::runtime_error("garbage collection in progress");
+
       if (_header->max_unallocated.id != (existing_size - sizeof(object_db_header)) / 8 - 1)
          throw std::runtime_error("file corruption detected: " + idfile.generic_string());
 
@@ -368,7 +358,7 @@ namespace triedent
       // were locked because they were being written to, their root will not be reachable
       // from database_memory::_root_revision, and will be leaked. Mermaid can clean this
       // leak.
-      for (uint64_t i = 0; i <= _header->first_unallocated.id; ++i)
+      for (uint64_t i = 0; i <= _header->max_allocated.id; ++i)
          _header->objects[i] &= ~position_lock_mask;
    }
 
@@ -376,9 +366,10 @@ namespace triedent
    {
       std::lock_guard l{_region_mutex};
       auto            _header = header();
+      assert(!(_header->flags.load() & running_gc_flag));
       if (_header->first_free.load() == 0)
       {
-         if (_header->first_unallocated.id >= _header->max_unallocated.id)
+         if (_header->max_allocated.id >= _header->max_unallocated.id)
          {
             auto new_size = _region.size() + round_to_page(_header->max_unallocated.id * 2);
             if constexpr (debug_id)
@@ -394,8 +385,8 @@ namespace triedent
                _gc.push(cleanup);
             }
          }
-         ++_header->first_unallocated.id;
-         auto  r   = _header->first_unallocated;
+         ++_header->max_allocated.id;
+         auto  r   = _header->max_allocated;
          auto& obj = _header->objects[r.id];
          obj.store(obj_val(type, 1) | position_lock_mask);  // init ref count 1
          assert(r.id != 0);
@@ -426,28 +417,56 @@ namespace triedent
       }
    }
 
-   inline void object_db::dangerous_retain(object_id id)
+   inline bool object_db::gc_retain(object_id id)
    {
-      auto _header = header();
-      assert(id.id <= _header->first_unallocated.id);
-      if (id.id > _header->first_unallocated.id) [[unlikely]]
+      auto h = header();
+      assert(h->flags.load() & running_gc_flag);
+      if (id.id > h->max_allocated.id) [[unlikely]]
          throw std::runtime_error("invalid object id, outside allocated range");
 
-      auto& obj = _header->objects[id.id];
-      assert(ref(id) > 0);
-      assert(ref(id) != ref_count_mask);
+      auto& obj       = h->objects[id.id];
+      auto  ref_count = ref(id);
+      if (ref_count == 0)
+         throw std::runtime_error("reference to deleted object found");
+      if (ref_count == ref_count_mask)
+         throw std::runtime_error("too many references to object id");
 
-      /*
-      auto cur_ref = obj.load() & ref_count_mask;
-
-      if( cur_ref == 0 )[[unlikely]]  
-         throw std::runtime_error( "cannot retain an object at 0" );
-      
-      if( cur_ref == ref_count_mask )[[unlikely]] 
-         throw std::runtime_error( "too many references" );
-         */
-
+      // This can set the reference count to ref_count_max, which is otherwise illegal
       obj.fetch_add(1);
+      return ref_count == 1;
+   }
+
+   inline void object_db::gc_start()
+   {
+      auto h = header();
+      h->flags.store(h->flags.load() | running_gc_flag);
+      for (auto& o : std::span{h->objects + 1, h->max_allocated.id})
+      {
+         auto i = o.load();
+         if (i & ref_count_mask)
+         {
+            o.store((i & ~ref_count_mask) | 1);
+         }
+      }
+   }
+
+   inline void object_db::gc_finish()
+   {
+      auto h = this->header();
+      assert(h->flags.load() & running_gc_flag);
+      // rebuild the free list with low ids at the top
+      auto* last_free = &h->first_free;
+      for (auto& o : std::span{h->objects + 1, h->max_allocated.id})
+      {
+         auto i = o.load();
+         if ((i & ref_count_mask) > 1)
+            o.store(i - 1);
+         else
+            last_free->store(create_next_ptr(&o - h->objects));
+      }
+      last_free->store(0);
+
+      h->flags.store((h->flags.load() & ~running_gc_flag));
    }
 
    /**
@@ -457,7 +476,8 @@ namespace triedent
    {
       debug(id.id, "about to release");
 
-      auto  _header   = header();
+      auto _header = header();
+      assert(!(_header->flags.load() & running_gc_flag));
       auto& obj       = _header->objects[id.id];
       auto  val       = obj.fetch_sub(1) - 1;
       auto  new_count = (val & ref_count_mask);
@@ -516,7 +536,7 @@ namespace triedent
       std::cerr << std::setw(12) << std::left << (" " + std::to_string(total)) << "|";
       std::cerr << std::endl;
       /*
-      TRIEDENT_DEBUG("first unallocated  ", _header->first_unallocated.id);
+      TRIEDENT_DEBUG("first unallocated  ", _header->max_allocated.id);
       TRIEDENT_DEBUG("total objects: ", total, " zero ref: ", zero_ref, "  non zero: ", total - zero_ref);
       */
    }

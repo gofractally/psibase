@@ -386,8 +386,11 @@ namespace triedent
       using string_view = std::string_view;
       using id          = object_id;
 
-      database(const std::filesystem::path& dir, const config& cfg, access_mode allow_write);
-      database(const std::filesystem::path& dir, access_mode allow_write);
+      database(const std::filesystem::path& dir,
+               const config&                cfg,
+               access_mode                  mode,
+               bool                         allow_gc = false);
+      database(const std::filesystem::path& dir, access_mode mode, bool allow_gc = false);
       ~database();
 
       static void create(std::filesystem::path dir, config);
@@ -979,8 +982,8 @@ namespace triedent
 
             if (new_b != cur_b)
             {
-               release(cur_b);
                new_in->branch(b) = new_b;
+               release(cur_b);
             }
 
             return new_in;
@@ -1507,9 +1510,9 @@ namespace triedent
 
          if (unique)
          {
-            auto locked = lock(in);
-            release(locked->value());
-            locked->set_value(id());
+            auto prev = in->value();
+            lock(in)->set_value(id());
+            release(prev);
             return root;
          }
          else
@@ -1533,8 +1536,8 @@ namespace triedent
          in.reload(ring(), session);
          if (new_b and unique)
          {
-            release(cur_b);
             lock(in)->branch(b) = new_b;
+            release(cur_b);
             return root;
          }
          if (new_b)  // update branch
@@ -1680,46 +1683,37 @@ namespace triedent
    {
       if (not r)
          return;
-      int cur_ref_count = ring().ref(r);
 
-      // TODO: rework recursive_retain to fix up overflow; will require
-      //       cloning nodes and tracking the clones. Or just detect
-      //       and give up.
-      ring().dangerous_retain(r);
-
-      if (cur_ref_count > 1)  // 1 is the default ref when resetting all
-         return;              // retaining this node indirectly retains all children
+      if (!ring().gc_retain(r))
+         return;  // retaining this node indirectly retains all children
 
       auto dr = get_by_id(l, r);
-      if (not dr.is_leaf_node())
+      if (dr.type() == node_type::inner)
       {
          auto& in = dr.as_inner_node();
-
          recursive_retain(l, in.value());
-
-         auto* c = in.children();
-         auto* e = c + in.num_branches();
-         while (c != e)
+         for (auto child : std::span{in.children(), in.num_branches()})
          {
-            recursive_retain(l, *c);
-            ++e;
+            recursive_retain(l, child);
          }
       }
-
-      // TODO: leaves which point to roots
+      else if (dr.type() == node_type::roots)
+      {
+         auto& rt = dr.as_value_node();
+         for (auto child : std::span{rt.roots(), rt.num_roots()})
+         {
+            recursive_retain(l, child);
+         }
+      }
    }
 
    inline void write_session::start_collect_garbage()
    {
-      ring().reset_all_ref_counts(1);
+      ring().gc_start();
    }
    inline void write_session::end_collect_garbage()
    {
-      ring().adjust_all_ref_counts(-1);
-      // TODO: Counts fell to 0 without being added to free list.
-      //       Since there might be cases where SIGKILL also cause
-      //       this, we probably need to rebuild the free list
-      //       from scratch.
+      ring().gc_finish();
    }
 
    template <typename AccessMode>

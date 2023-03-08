@@ -6,9 +6,10 @@ namespace triedent
 {
    cache_allocator::cache_allocator(const std::filesystem::path& dir,
                                     const config&                cfg,
-                                    access_mode                  mode)
+                                    access_mode                  mode,
+                                    bool                         allow_gc)
        : _gc{256},
-         _obj_ids(_gc, dir / "obj_ids", access_mode::read_write),
+         _obj_ids(_gc, dir / "obj_ids", access_mode::read_write, allow_gc),
          _levels{ring_allocator{dir / "hot", cfg.hot_bytes, hot_cache, mode, true},
                  ring_allocator{dir / "warm", cfg.warm_bytes, warm_cache, mode, true},
                  ring_allocator{dir / "cool", cfg.cool_bytes, cool_cache, mode, true},

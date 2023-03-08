@@ -91,7 +91,7 @@ int main(int argc, char** argv)
 
       if (vm.count("gc"))
       {
-         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write, true);
          auto s  = db->start_write_session();
          s->start_collect_garbage();
          s->recursive_retain();

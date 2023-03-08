@@ -3,7 +3,10 @@
 
 namespace triedent
 {
-   database::database(const std::filesystem::path& dir, const config& cfg, access_mode mode)
+   database::database(const std::filesystem::path& dir,
+                      const config&                cfg,
+                      access_mode                  mode,
+                      bool                         allow_gc)
        : _ring{dir / "data",
                {
                    .max_ids    = cfg.max_objects,
@@ -12,7 +15,8 @@ namespace triedent
                    .cool_bytes = 1ull << cfg.cool_pages,
                    .cold_bytes = 1ull << cfg.cold_pages,
                },
-               mode},
+               mode,
+               allow_gc},
          _file{dir / "db", mode},
          _root_release_session{_ring}
    {
@@ -25,8 +29,8 @@ namespace triedent
       _dbm = reinterpret_cast<database_memory*>(_file.data());
    }
 
-   database::database(const std::filesystem::path& dir, access_mode mode)
-       : database(dir, config{}, mode)
+   database::database(const std::filesystem::path& dir, access_mode mode, bool allow_gc)
+       : database(dir, config{}, mode, allow_gc)
    {
    }
 

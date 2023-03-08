@@ -37,7 +37,10 @@ namespace triedent
          uint64_t cold_bytes = 1000 * 1000ull;
       };
 
-      cache_allocator(const std::filesystem::path& path, const config& cfg, access_mode mode);
+      cache_allocator(const std::filesystem::path& path,
+                      const config&                cfg,
+                      access_mode                  mode,
+                      bool                         allow_gc = false);
       ~cache_allocator();
 
       auto start_session() { return gc_queue::session{_gc}; }
@@ -76,12 +79,9 @@ namespace triedent
          return {_obj_ids.span(), hot().span(), warm().span(), cool().span(), cold().span()};
       }
 
-      void dangerous_retain(object_id i) { return _obj_ids.dangerous_retain(i); }
-      /**
-       * Sets all non-zero refs to c
-       */
-      void reset_all_ref_counts(uint16_t c) { _obj_ids.reset_all_ref_counts(c); }
-      void adjust_all_ref_counts(int16_t c) { _obj_ids.adjust_all_ref_counts(c); }
+      bool gc_retain(object_id i) { return _obj_ids.gc_retain(i); }
+      void gc_start() { _obj_ids.gc_start(); }
+      void gc_finish() { _obj_ids.gc_finish(); }
 
       void validate(id i) { _obj_ids.validate(i); }
 

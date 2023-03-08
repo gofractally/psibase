@@ -174,6 +174,56 @@ TEST_CASE("erase")
    }
 }
 
+TEST_CASE("recover")
+{
+   temp_directory dir("triedent-test");
+   database::create(dir.path, database::config{128, 27, 27, 27, 27});
+   {
+      auto db = std::make_shared<database>(dir.path, access_mode::read_write);
+      std::shared_ptr<triedent::root> root;
+      auto                            session = db->start_write_session();
+      session->upsert(root, "abc"s, "v0"s);
+      session->upsert(root, "abcd"s, "v1"s);
+      session->upsert(root, "abce"s, "v2"s);
+      std::shared_ptr<triedent::root> top_root;
+      session->upsert(top_root, ""s, std::span{&root, 1});
+      session->set_top_root(top_root);
+   }
+   {
+      auto db      = std::make_shared<database>(dir.path, access_mode::read_write, true);
+      auto session = db->start_write_session();
+      session->start_collect_garbage();
+   }
+   // An interrupted gc may leave reference counts too low.
+   // Access MUST be forbidden until gc is finished to prevent
+   // corruption.
+   CHECK_THROWS(std::make_shared<database>(dir.path, access_mode::read_write));
+   {
+      auto db      = std::make_shared<database>(dir.path, access_mode::read_write, true);
+      auto session = db->start_write_session();
+      session->start_collect_garbage();
+      session->recursive_retain();
+      session->end_collect_garbage();
+   }
+   {
+      auto db      = std::make_shared<database>(dir.path, access_mode::read_write);
+      auto session = db->start_write_session();
+      auto root    = session->get_top_root();
+      std::vector<std::shared_ptr<triedent::root>> roots;
+      REQUIRE(session->get(root, ""s, nullptr, &roots));
+      REQUIRE(roots.size() == 1);
+      root = roots.front();
+      CHECK(osv(session->get(root, "abc"s)) == osv("v0"));
+      CHECK(osv(session->get(root, "abcd"s)) == osv("v1"));
+      CHECK(osv(session->get(root, "abce"s)) == osv("v2"));
+      // clear all objects: This should trigger an assert
+      // if any reference counts were too low.
+      roots.clear();
+      root.reset();
+      session->set_top_root(nullptr);
+   }
+}
+
 TEST_CASE("many refs")
 {
    // This should be larger than the maximum node refcount
