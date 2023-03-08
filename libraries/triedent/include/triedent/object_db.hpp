@@ -105,7 +105,6 @@ namespace triedent
                 std::filesystem::path idfile,
                 access_mode           mode,
                 bool                  allow_gc = false);
-      static void create(std::filesystem::path idfile, uint64_t max_id);
 
       // Bumps the reference count by 1 if possible
       bool bump_count(object_id id)
@@ -130,22 +129,6 @@ namespace triedent
       // A thread which holds a location_lock may:
       // * Move the object to another location
       // * Modify the object if it's not already exposed to reader threads
-      std::optional<location_lock> try_lock(object_id id)
-      {
-         auto& atomic = header()->objects[id.id];
-         auto  obj    = atomic.load();
-         do
-         {
-            if (obj & position_lock_mask)
-               return std::nullopt;
-         } while (!atomic.compare_exchange_weak(obj, obj | position_lock_mask));
-
-         location_lock lock;
-         lock.db = this;
-         lock.id = id.id;
-         return lock;
-      }
-
 #if 0
       std::optional<location_lock> try_lock(object_id id, object_location loc)
       {
