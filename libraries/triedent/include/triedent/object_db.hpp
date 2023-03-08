@@ -282,7 +282,7 @@ namespace triedent
          object_id                  max_allocated;    // high water mark
          object_id                  max_unallocated;  // end of file
 
-         std::atomic<uint64_t> objects[];
+         std::atomic<uint64_t> objects[0];
       };
 
       static constexpr std::uint32_t running_gc_flag = (1 << 8);
@@ -305,23 +305,6 @@ namespace triedent
       }
    };
 
-   inline void object_db::create(std::filesystem::path idfile, uint64_t max_id)
-   {
-      if (std::filesystem::exists(idfile))
-         throw std::runtime_error("file already exists: " + idfile.generic_string());
-
-      // std::cerr << "creating " << idfile << std::endl;
-      auto idfile_size = sizeof(object_db_header) + max_id * 8;
-
-      mapping mr(idfile, access_mode::read_write, false);
-      mr.resize(idfile_size);
-
-      auto header              = reinterpret_cast<object_db_header*>(mr.data());
-      header->max_allocated.id = 0;
-      header->first_free.store(0);
-      header->max_unallocated.id = (idfile_size - sizeof(object_db_header)) / 8 - 1;
-   }
-
    inline object_db::object_db(gc_queue&             gc,
                                std::filesystem::path idfile,
                                access_mode           mode,
@@ -335,24 +318,29 @@ namespace triedent
 
          _region.resize(round_to_page(idfile_size));
 
-         auto header              = reinterpret_cast<object_db_header*>(_region.data());
-         header->max_allocated.id = 0;
-         header->first_free.store(0);
-         header->max_unallocated.id = (idfile_size - sizeof(object_db_header)) / 8 - 1;
+         new (_region.data()) object_db_header{
+             .magic           = file_magic,
+             .flags           = file_type_index,
+             .first_free      = 0,
+             .max_allocated   = {0},
+             .max_unallocated = {(idfile_size - sizeof(object_db_header)) / 8 - 1}};
       }
 
       auto existing_size = _region.size();
 
-      // std::cerr << "mapping '" << idfile << "' in "  //
-      //           << (allow_write ? "read/write" : "read only") << " mode\n";
-
       auto _header = header();
+
+      if (_header->magic != file_magic)
+         throw std::runtime_error("Not a triedent file: " + idfile.native());
+      if ((_header->flags & file_type_mask) != file_type_index)
+         throw std::runtime_error("Not a triedent obj_ids file: " + idfile.native());
 
       if (!allow_gc && mode == access_mode::read_write && (_header->flags.load() & running_gc_flag))
          throw std::runtime_error("garbage collection in progress");
 
-      if (_header->max_unallocated.id != (existing_size - sizeof(object_db_header)) / 8 - 1)
-         throw std::runtime_error("file corruption detected: " + idfile.generic_string());
+      if (_header->max_unallocated.id > (existing_size - sizeof(object_db_header)) / 8 - 1)
+         throw std::runtime_error("File size is smaller than required by the header: " +
+                                  idfile.native());
 
       // Objects may have been locked for move when process was SIGKILLed. If any objects
       // were locked because they were being written to, their root will not be reachable
