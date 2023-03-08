@@ -114,7 +114,24 @@ namespace triedent
 
    inline void gc_queue::session::lock()
    {
-      _sequence.store(_queue->_end.load());
+      while (true)
+      {
+         // if the second load sees the value written by P or a later push, then P happens before L
+         // if the second load sees a value written by an earlier push, then
+         // - the second load is before P in seq_cst
+         // - the store is sequenced before the second load
+         // - P happens before W (by definition)
+         // - therefore the store is before W in seq_cst (store < load2 < P < W)
+         //
+         // Therefore, if W is before store in seq_cst, then P happens before L
+         auto val = _queue->_end.load();
+         _sequence.store(val);
+         if (_queue->_end.load() == val)
+         {
+            return;
+         }
+         unlock();
+      }
    }
    inline void gc_queue::session::unlock()
    {
