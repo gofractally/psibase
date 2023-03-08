@@ -515,15 +515,16 @@ export async function getContractName() {
 const messageRouting = [
     {
         type: MessageTypes.Operation,
-        fields: ["identifier", "params", "callbackId"],
+        fields: ["identifier", "params", "callbackId", "sender"],
         route: async (payload) => {
-            const { identifier, params, callbackId } = payload;
+            const { identifier, params, callbackId, sender } = payload;
             const responsePayload = { callbackId, response: null, errors: [] };
             const contractName = await getContractName();
             const op = registeredOperations.find((o) => o.id === identifier);
             if (op) {
                 try {
-                    const res = await op.exec(params);
+                    const msgMetadata = { sender };
+                    const res = await op.exec(params, msgMetadata);
                     if (res !== undefined) responsePayload.response = res;
                 } catch (e) {
                     responsePayload.errors.push(e);
@@ -544,9 +545,9 @@ const messageRouting = [
     },
     {
         type: MessageTypes.Query,
-        fields: ["identifier", "params", "callbackId"],
+        fields: ["identifier", "params", "callbackId", "sender"],
         route: async (payload) => {
-            const { identifier, params, callbackId } = payload;
+            const { identifier, params, callbackId, sender } = payload;
             const responsePayload = { callbackId, response: null, errors: [] };
 
             try {
@@ -556,7 +557,11 @@ const messageRouting = [
                 );
                 if (query) {
                     try {
-                        responsePayload.response = await query.exec(params);
+                        const msgMetadata = { sender };
+                        responsePayload.response = await query.exec(
+                            params,
+                            msgMetadata
+                        );
                     } catch (e) {
                         responsePayload.errors.push(e);
                     }

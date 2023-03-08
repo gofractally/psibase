@@ -143,4 +143,8 @@ declare module "common/rpc.mjs" {
         claim: Claim;
         pubkey: string; // Public key string
     };
+
+    type MessageMetadata = {
+        sender: string;
+    }
 }
