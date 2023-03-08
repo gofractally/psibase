@@ -21,16 +21,14 @@ namespace triedent
    struct object_info
    {
       explicit constexpr object_info(std::uint64_t x)
-          : _offset(x >> 19),
-            cache((x >> 17) & 3),
-            type(static_cast<node_type>((x >> 15) & 3)),
-            ref(x & (0x1FFF))
+          : _offset(x >> 19), cache((x >> 17) & 3), _type((x >> 15) & 3), ref(x & (0x7FFF))
       {
       }
       std::uint64_t          ref : 15;
-      node_type              type : 2;
+      std::uint64_t          _type : 2;
       std::uint64_t          cache : 2;
       std::uint64_t          _offset : 45;
+      node_type              type() const { return static_cast<node_type>(_type); }
       std::uint64_t          offset() const { return _offset * 8; }
       constexpr object_info& set_location(object_location loc)
       {
@@ -40,7 +38,7 @@ namespace triedent
       }
       constexpr std::uint64_t to_int() const
       {
-         return ref | (static_cast<std::uint8_t>(type) << 15) | (cache << 17) | (_offset << 19);
+         return ref | (_type << 15) | (cache << 17) | (_offset << 19);
       }
       constexpr operator object_location() const { return {.offset = _offset * 8, .cache = cache}; }
    };
@@ -186,7 +184,7 @@ namespace triedent
       {
          auto&       atomic = header()->objects[id.id];
          object_info info{atomic.load()};
-         assert(info.to_int() == obj_val(info.type, 1));
+         assert(info.to_int() == obj_val(info.type(), 1));
          info.set_location(loc);
          atomic.store(info.to_int());
       }
@@ -238,7 +236,7 @@ namespace triedent
          // This is distinct from any valid offset
          result._offset = (1ull << 45) - 1;
          result.ref     = ref;
-         result.type    = type;
+         result._type   = static_cast<std::uint64_t>(type);
          return result.to_int();
       }
 
@@ -268,7 +266,7 @@ namespace triedent
          {
             auto obj = object_info{header()->objects[id].load()};
             std::cout << id << ": " << msg << ":"
-                      << " ref=" << obj.ref << " type=" << (int)obj.type << " cache=" << obj.cache
+                      << " ref=" << obj.ref << " type=" << obj._type << " cache=" << obj.cache
                       << " offset=" << obj.offset() << std::endl;
          }
       }

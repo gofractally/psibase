@@ -137,7 +137,7 @@ namespace triedent
    {
       auto l = _obj_ids.release(i);
       return {(l.ref > 0 ? nullptr : (char*)_levels[l.cache].get_object(l.offset())->data()),
-              {l.type}};
+              {l.type()}};
    }
 
    // The returned pointer will remain valid until the session lock is released
@@ -155,12 +155,12 @@ namespace triedent
             // MUST NOT wait for free memory while holding a location lock
             if (auto copy = try_move_object(hot(), _obj_ids.lock(i), obj->data(), obj->size))
             {
-               return {copy, {loc.type}, loc.ref};
+               return {copy, {loc.type()}, loc.ref};
             }
          }
       }
 
-      return {obj->data(), {loc.type}, static_cast<std::uint16_t>(loc.ref)};
+      return {obj->data(), {loc.type()}, static_cast<std::uint16_t>(loc.ref)};
    }
 
 }  // namespace triedent

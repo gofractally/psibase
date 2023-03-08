@@ -227,7 +227,7 @@ TEST_CASE("recover")
 TEST_CASE("many refs")
 {
    // This should be larger than the maximum node refcount
-   constexpr int count   = 16384;
+   constexpr int count   = 32768 + 1;
    auto          db      = createDb(database::config{
                      .max_objects = 100000ull,
                      .hot_pages   = 27,
