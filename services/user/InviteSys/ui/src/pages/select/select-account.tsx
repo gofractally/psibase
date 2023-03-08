@@ -27,6 +27,7 @@ export const SelectAccount = () => {
       console.log("errored..", error);
     },
     onSuccess: (data) => {
+      window.open()
       console.log("success fired!", data);
     },
   });
