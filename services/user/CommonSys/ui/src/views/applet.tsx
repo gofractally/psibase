@@ -42,7 +42,7 @@ export const Applet = ({ applet, handleMessage }: Props) => {
             let url = await appletId.url();
 
             // If we're on the applet page, add the query params to the applet url
-            if (window.location.pathname === `/applet/${appletId}`) {
+            if (window.location.pathname.startsWith(`/applet/${appletId}`)) {
                 const queryParams = window.location.search;
                 url += queryParams;
             }
@@ -66,29 +66,24 @@ export const Applet = ({ applet, handleMessage }: Props) => {
         [appletId, handleMessage]
     );
 
-    useEffect(() => {
-        if (appletSrc && appletId) {
-            console.info(`Initializing applet ${appletId}: ${appletSrc}`);
-            // Configure iFrameResizer
-            const iFrame = document.getElementById(iFrameId);
-            if (iFrame) {
-                // TODO - Fix error: Failed to execute 'postMessage' on 'DOMWindow'
-                //        https://github.com/gofractally/psibase/issues/107
-                (window as any).iFrameResize(
-                    {
-                        // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
-                        // log: true,
-                        checkOrigin: true,
-                        autoResize: false,
-                        scrolling: true,
-                        onMessage: doHandleMessage,
-                        onInit,
-                    },
-                    "#" + iFrameId
-                )[0].iFrameResizer;
-            }
+    const initializeIFrame = () => {
+        // Configure iFrameResizer
+        const iFrame = document.getElementById(iFrameId);
+        if (iFrame) {
+            (window as any).iFrameResize(
+                {
+                    // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
+                    // log: true,
+                    checkOrigin: true,
+                    autoResize: false,
+                    scrolling: true,
+                    onMessage: doHandleMessage,
+                    onInit,
+                },
+                "#" + iFrameId
+            )[0].iFrameResizer;
         }
-    }, [appletSrc, appletId, onInit, iFrameId, doHandleMessage]);
+    };
 
     return appletId && appletSrc ? (
         <iframe
@@ -97,6 +92,7 @@ export const Applet = ({ applet, handleMessage }: Props) => {
             src={appletSrc}
             allow="camera;microphone"
             title={appletId.name}
+            onLoad={initializeIFrame}
             frameBorder="0"
         />
     ) : null;
