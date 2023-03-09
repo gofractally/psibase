@@ -80,17 +80,6 @@ namespace triedent
       explicit  operator bool() const { return lock.owns_lock(); }
 
       void move(object_location loc) const;
-
-      // Unlock and move ownership of id to caller. Doesn't modify reference count.
-      object_id into_unlock_unchecked()
-      {
-         object_id result = {.id = id};
-         if (lock)
-            lock.unlock();
-         db = nullptr;
-         id = 0;
-         return result;
-      }
    };  // location_lock
 
    /**

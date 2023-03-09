@@ -464,6 +464,6 @@ namespace triedent
       if (ra.bump_count(id))
          return id;
       auto [ptr, type, ref] = ra.get_cache<false>(session, id);
-      return copy_node(ra, session, id, ptr, type).into_unlock_unchecked();
+      return copy_node(ra, session, id, ptr, type).get_id();
    }
 }  // namespace triedent
