@@ -4,6 +4,7 @@
 #include <system_error>
 
 #include <fcntl.h>
+#include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -38,17 +39,24 @@ namespace triedent
        : _mode(mode), _pinned(pin)
    {
       int flags = O_CLOEXEC;
+      int flock_operation;
       if (mode == access_mode::read_write)
       {
          flags |= O_RDWR;
          flags |= O_CREAT;
+         flock_operation = LOCK_EX;
       }
       else
       {
          flags |= O_RDONLY;
+         flock_operation = LOCK_SH;
       }
       _fd = ::open(file.native().c_str(), flags, 0644);
       if (_fd == -1)
+      {
+         throw std::system_error{errno, std::generic_category()};
+      }
+      if (::flock(_fd, flock_operation | LOCK_NB) != 0)
       {
          throw std::system_error{errno, std::generic_category()};
       }

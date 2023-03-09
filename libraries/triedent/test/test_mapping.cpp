@@ -76,3 +76,20 @@ TEST_CASE("extend mapping unaligned")
       prev = i;
    }
 }
+
+TEST_CASE("file access")
+{
+   temp_directory dir("triedent-test");
+   {
+      CHECK_THROWS(mapping(dir.path, read_only));
+   }
+   {
+      mapping m{dir.path, read_write};
+      CHECK_THROWS(mapping{dir.path, read_write});
+      CHECK_THROWS(mapping{dir.path, read_only});
+   }
+   {
+      mapping m1{dir.path, read_only};
+      mapping m2{dir.path, read_only};
+   }
+}
