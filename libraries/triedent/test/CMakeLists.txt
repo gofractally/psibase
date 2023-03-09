@@ -2,6 +2,7 @@ add_executable(triedent-tests
     triedent-tests.cpp
     test_mapping.cpp
     test_gc_queue.cpp
+    test_location_lock.cpp
     test_object_db.cpp
     test_ring_allocator.cpp
     test_cache_allocator.cpp

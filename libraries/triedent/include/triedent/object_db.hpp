@@ -11,6 +11,7 @@
 #include <triedent/debug.hpp>
 #include <triedent/file_fwd.hpp>
 #include <triedent/gc_queue.hpp>
+#include <triedent/location_lock.hpp>
 #include <triedent/mapping.hpp>
 #include <triedent/object_fwd.hpp>
 
@@ -47,40 +48,14 @@ namespace triedent
    {
       static constexpr std::size_t count = 64;
       static constexpr std::size_t align = 64;
-      explicit mutex_group() : _items(new item[count]) {}
-      struct alignas(align) item
-      {
-         std::mutex m;
-      };
-      std::mutex& operator()(void* base, void* ptr) const
+      explicit mutex_group() : _items(new location_mutex[count]) {}
+      location_mutex& operator()(void* base, void* ptr) const
       {
          auto diff = reinterpret_cast<std::uintptr_t>(ptr) - reinterpret_cast<std::uintptr_t>(base);
-         return _items[(diff / align) % count].m;
+         return _items[(diff / align) % count];
       }
-      std::unique_ptr<item[]> _items;
+      std::unique_ptr<location_mutex[]> _items;
    };
-
-   class object_db;
-
-   class location_lock
-   {
-      friend object_db;
-
-     private:
-      location_lock(std::unique_lock<std::mutex> lock, object_db* db, object_id id)
-          : lock{std::move(lock)}, db{db}, id{id.id}
-      {
-      }
-      std::unique_lock<std::mutex> lock;
-      object_db*                   db = nullptr;
-      uint64_t                     id = 0;
-
-     public:
-      object_id get_id() const { return {.id = id}; }
-      explicit  operator bool() const { return lock.owns_lock(); }
-
-      void move(object_location loc) const;
-   };  // location_lock
 
    /**
     * Assignes unique ids to objects, tracks their reference counts,
@@ -132,12 +107,12 @@ namespace triedent
          {
             *matched = false;
          }
-         else if (std::unique_lock l{_location_mutexes(h, &atomic), std::try_to_lock})
+         else if (location_lock l{_location_mutexes(h, &atomic), id, std::try_to_lock})
          {
             if (object_info{atomic.load()} == loc)
             {
                *matched = true;
-               return location_lock{std::move(l), this, id};
+               return std::move(l);
             }
             else
             {
@@ -154,17 +129,17 @@ namespace triedent
       {
          auto* h      = header();
          auto& atomic = h->objects[id.id];
-         return location_lock{std::unique_lock{_location_mutexes(h, &atomic)}, this, id};
+         return location_lock{_location_mutexes(h, &atomic), id};
       }
 
-      static void move(const location_lock& lock, object_location loc)
+      void move(const location_lock& lock, object_location loc)
       {
-         auto& atomic = lock.db->header()->objects[lock.id];
+         auto& atomic = header()->objects[lock.get_id().id];
          auto  obj    = atomic.load();
          while (!atomic.compare_exchange_weak(obj, object_info{obj}.set_location(loc).to_int()))
          {
          }
-         lock.db->debug(lock.id, "move");
+         debug(lock.get_id().id, "move");
       }
 
       // The id must not be accessible to any thread
@@ -472,8 +447,4 @@ namespace triedent
       */
    }
 
-   inline void location_lock::move(object_location loc) const
-   {
-      object_db::move(*this, loc);
-   }
 };  // namespace triedent

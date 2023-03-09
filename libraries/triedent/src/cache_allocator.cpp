@@ -89,7 +89,7 @@ namespace triedent
                          [&](void* ptr, object_location loc)
                          {
                             std::memcpy(ptr, data, size);
-                            lock.move(loc);
+                            _obj_ids.move(lock, loc);
                          });
    }
 }  // namespace triedent
