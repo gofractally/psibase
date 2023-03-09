@@ -363,7 +363,12 @@ export class AppletId {
     }
 
     get fullPath() {
-        const suffix = this.subPath !== "" ? "/" + this.subPath : "";
+        const suffix =
+            this.subPath && this.subPath !== ""
+                ? this.subPath.startsWith("/")
+                    ? this.subPath
+                    : "/" + this.subPath
+                : "";
         return this.name + suffix;
     }
 

@@ -1,15 +1,11 @@
-import { psiboardApplet } from "service";
 import { Button, Heading, Icon, Text } from "components";
 import { useParam } from "store";
 import { useUsers, useUser } from "store/hooks/useUser";
 import { useInviteToken } from "store/queries/usePrivateKey";
-import { useInitilize } from "store/hooks/useInitialize";
 import { useGenerateLink } from "store/hooks/useGenerateLink";
 import { Link } from "react-router-dom";
 
 export const Options = () => {
-  useInitilize(psiboardApplet);
-
   const token = useParam("token");
   const appletName = useParam("applet");
 
@@ -56,8 +52,11 @@ export const Options = () => {
         </header>
         {isSignedIn && isInviteValid ? (
           <div className="border-y border-gray-300 overflow-y-auto h-64">
-            {users?.map((account) => (
-              <Link to={`/select-account?account=${account}&token=${token}`}>
+            {users?.map((account, idx) => (
+              <Link
+                key={`acc-${idx}`}
+                to={`/select-account?account=${account}&token=${token}`}
+              >
                 <div
                   key={account}
                   className="flex cursor-pointer items-center justify-between px-3 py-5 hover:bg-gray-100"
