@@ -63,7 +63,7 @@ namespace triedent
             bool matched;
             if (auto lock = _obj_ids.try_lock({.id = o->id}, loc, &matched))
             {
-               return try_move_object(to, *lock, o->data(), o->size) != nullptr;
+               return try_move_object(to, lock, o->data(), o->size) != nullptr;
             }
             return !matched;
          };

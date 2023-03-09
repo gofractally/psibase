@@ -4,7 +4,6 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
-#include <optional>
 #include <span>
 #include <vector>
 
@@ -98,7 +97,7 @@ namespace triedent
       // * Modify the object if it's not already exposed to reader threads
 
       // If matched is false, then id does not point to loc
-      std::optional<location_lock> try_lock(object_id id, object_location loc, bool* matched)
+      location_lock try_lock(object_id id, object_location loc, bool* matched)
       {
          auto* h      = header();
          auto& atomic = h->objects[id.id];
@@ -112,7 +111,7 @@ namespace triedent
             if (object_info{atomic.load()} == loc)
             {
                *matched = true;
-               return std::move(l);
+               return l;
             }
             else
             {
@@ -123,7 +122,7 @@ namespace triedent
          {
             *matched = true;
          }
-         return std::nullopt;
+         return location_lock{};
       }
       location_lock lock(object_id id)
       {
