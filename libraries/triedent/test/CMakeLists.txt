@@ -5,6 +5,7 @@ add_executable(triedent-tests
     test_location_lock.cpp
     test_object_db.cpp
     test_ring_allocator.cpp
+    test_region_allocator.cpp
     test_cache_allocator.cpp
     temp_directory.cpp)
 target_link_libraries(triedent-tests PUBLIC catch2 triedent)

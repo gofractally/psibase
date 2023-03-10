@@ -7,6 +7,7 @@ add_library(triedent
     src/mapping.cpp
     src/gc_queue.cpp
     src/ring_allocator.cpp
+    src/region_allocator.cpp
     src/cache_allocator.cpp)
 target_include_directories(triedent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
 target_link_libraries(triedent PUBLIC Threads::Threads)
