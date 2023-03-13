@@ -12,8 +12,8 @@ namespace triedent
          _obj_ids(_gc, dir / "obj_ids", access_mode::read_write, allow_gc),
          _levels{ring_allocator{dir / "hot", cfg.hot_bytes, hot_cache, mode, true},
                  ring_allocator{dir / "warm", cfg.warm_bytes, warm_cache, mode, true},
-                 ring_allocator{dir / "cool", cfg.cool_bytes, cool_cache, mode, true},
-                 ring_allocator{dir / "cold", cfg.cold_bytes, cold_cache, mode, false}}
+                 ring_allocator{dir / "cool", cfg.cool_bytes, cool_cache, mode, true}},
+         _cold{_gc, _obj_ids, dir / "cold", mode}
    {
       _swap_thread = std::thread(
           [this]()
@@ -63,7 +63,12 @@ namespace triedent
             bool matched;
             if (auto lock = _obj_ids.try_lock({.id = o->id}, loc, &matched))
             {
-               return try_move_object(to, lock, o->data(), o->size) != nullptr;
+               return to.allocate(lock.get_id(), o->size,
+                                  [&](void* ptr, object_location loc)
+                                  {
+                                     std::memcpy(ptr, o->data(), o->size);
+                                     _obj_ids.move(lock, loc);
+                                  }) != nullptr;
             }
             return !matched;
          };
@@ -85,11 +90,17 @@ namespace triedent
                                           void*                data,
                                           std::uint32_t        size)
    {
-      return to.allocate(lock.get_id(), size,
-                         [&](void* ptr, object_location loc)
-                         {
-                            std::memcpy(ptr, data, size);
-                            _obj_ids.move(lock, loc);
-                         });
+      auto info   = _obj_ids.get(lock.get_id());
+      auto result = to.allocate(lock.get_id(), size,
+                                [&](void* ptr, object_location loc)
+                                {
+                                   std::memcpy(ptr, data, size);
+                                   _obj_ids.move(lock, loc);
+                                });
+      if (info.cache == cold_cache)
+      {
+         _cold.deallocate(info);
+      }
+      return result;
    }
 }  // namespace triedent

@@ -24,7 +24,7 @@ TEST_CASE("region_allocator")
          std::unique_lock l{session};
          auto             id = obj_ids.alloc(l, node_type::bytes);
          l.unlock();
-         a.allocate(s.size(),
+         a.allocate(id, s.size(),
                     [&](void* ptr, object_location loc)
                     {
                        std::memcpy(ptr, s.data(), s.size());

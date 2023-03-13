@@ -395,6 +395,7 @@ namespace triedent
       //   }
       if (new_count == 0)
       {
+         // TODO: release/move conflict will break things in interesting ways
          // the invariant is first_free->object with id that points to next free
          // 1. update object to point to next free
          // 2. then attempt to update first free

@@ -2,6 +2,7 @@
 
 #include <triedent/gc_queue.hpp>
 #include <triedent/object_db.hpp>
+#include <triedent/region_allocator.hpp>
 #include <triedent/ring_allocator.hpp>
 
 #include <array>
@@ -94,24 +95,27 @@ namespace triedent
 
       void swap_loop();
 
-      ring_allocator& hot() { return _levels[hot_cache]; }
-      ring_allocator& warm() { return _levels[warm_cache]; }
-      ring_allocator& cool() { return _levels[cool_cache]; }
-      ring_allocator& cold() { return _levels[cold_cache]; }
+      ring_allocator&   hot() { return _levels[hot_cache]; }
+      ring_allocator&   warm() { return _levels[warm_cache]; }
+      ring_allocator&   cool() { return _levels[cool_cache]; }
+      region_allocator& cold() { return _cold; }
 
-      const ring_allocator& hot() const { return _levels[hot_cache]; }
-      const ring_allocator& warm() const { return _levels[warm_cache]; }
-      const ring_allocator& cool() const { return _levels[cool_cache]; }
-      const ring_allocator& cold() const { return _levels[cold_cache]; }
+      const ring_allocator&   hot() const { return _levels[hot_cache]; }
+      const ring_allocator&   warm() const { return _levels[warm_cache]; }
+      const ring_allocator&   cool() const { return _levels[cool_cache]; }
+      const region_allocator& cold() const { return _cold; }
 
       object_header* get_object(object_location loc)
       {
+         if (loc.cache == cold_cache)
+            return _cold.get_object(loc.offset);
          return _levels[loc.cache].get_object(loc.offset);
       }
 
-      gc_queue       _gc;
-      object_db      _obj_ids;
-      ring_allocator _levels[4];
+      gc_queue         _gc;
+      object_db        _obj_ids;
+      ring_allocator   _levels[3];
+      region_allocator _cold;
 
       std::atomic<bool> _done{false};
       std::thread       _swap_thread;
@@ -136,6 +140,10 @@ namespace triedent
    inline std::pair<void*, node_type> cache_allocator::release(id i)
    {
       auto l = _obj_ids.release(i);
+      if (l.ref == 0 && l.cache == cold_cache)
+      {
+         cold().deallocate(l);
+      }
       return {(l.ref > 0 ? nullptr : (char*)_levels[l.cache].get_object(l.offset())->data()),
               {l.type()}};
    }
@@ -146,7 +154,7 @@ namespace triedent
                                                                      id                 i)
    {
       auto loc = _obj_ids.get(i);
-      auto obj = _levels[loc.cache].get_object(loc.offset());
+      auto obj = get_object(loc);
 
       if constexpr (CopyToHot)
       {
