@@ -8,6 +8,7 @@ import { AppletId, operation } from "common/rpc.mjs";
 export const SelectAccount = () => {
   const account = useParam("account");
   const token = useParam("token");
+  const ref = useParam('ref');
 
   const { isValid, publicKey, error: tokenError } = useInviteToken(token);
 
@@ -27,7 +28,7 @@ export const SelectAccount = () => {
       console.log("errored..", error);
     },
     onSuccess: (data) => {
-      window.open()
+      window.open(`http://psibase.127.0.0.1.sslip.io:8081/applet/fractal-sys?token=${token}`)
       console.log("success fired!", data);
     },
   });

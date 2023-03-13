@@ -11,6 +11,7 @@ export const Options = () => {
   useInitilize(psiboardApplet);
 
   const token = useParam("token");
+  const ref = useParam("ref");
   const appletName = useParam("applet");
 
   const { data: currentUser } = useUser();
@@ -57,7 +58,9 @@ export const Options = () => {
         {isSignedIn && isInviteValid ? (
           <div className="border-y border-gray-300 overflow-y-auto h-64">
             {users?.map((account) => (
-              <Link to={`/select-account?account=${account}&token=${token}`}>
+              <Link
+                to={`/select-account?account=${account}&token=${token}&ref=${ref}`}
+              >
                 <div
                   key={account}
                   className="flex cursor-pointer items-center justify-between px-3 py-5 hover:bg-gray-100"
@@ -101,7 +104,7 @@ export const Options = () => {
             <Button
               size="xl"
               type="primary"
-              href={`/sign-up?token=${token}`}
+              href={`/sign-up?token=${token}&ref=${ref}`}
               title="Create account"
             >
               Create account
