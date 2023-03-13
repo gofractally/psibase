@@ -3,9 +3,9 @@ import { genKeyPair, KeyType } from "common/keyConversions.mjs";
 import { psiboardApplet } from "service";
 
 const appletAddress = async(name?: string) => {
-    const appletName = name || await psiboardApplet.getAppletName()
+    const appletName = await psiboardApplet.getAppletName()
     const removedSubdomain = window.location.host.split('.').filter(text => text !== appletName).join('.');
-    const result = `${window.location.protocol}//${removedSubdomain}/applet/${appletName}`
+    const result = `${window.location.protocol}//${removedSubdomain}/applet/${name || appletName}`
     return result;
 }
 
