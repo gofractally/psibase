@@ -1,10 +1,16 @@
 import { useState } from "react";
+// import {
+//     initializeApplet,
+//     AppletId,
+//     query,
+//     setOperations,
+// } from "common/rpc.mjs";
 import {
     initializeApplet,
     AppletId,
     query,
     setOperations,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 
 import useEffectOnce from "./hooks/useEffectOnce";
 import { operations } from "./operations";
