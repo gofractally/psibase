@@ -31,7 +31,7 @@
         {
             "label": "testnet",
             "type": "shell",
-            "command": "mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .. && make -j $(nproc) && ./psitest launchTestChain-test-debug.wasm -s -r compact",
+            "command": "mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX=\"psidk\" .. && make install && ./psitest launchTestChain-test-debug.wasm -s -r compact",
             "group": {
                 "kind": "build",
             },
