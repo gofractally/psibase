@@ -20,6 +20,7 @@ import {
   RouterProvider,
   createBrowserRouter,
   createRoutesFromElements,
+  redirect,
 } from "react-router-dom";
 import { fractalApplet } from "service";
 import { StateProvider } from "store";
@@ -41,6 +42,11 @@ const menuItems: NavLinkItemProps[] = [
   { iconType: "signup", to: "meeting", children: "Meeting" },
 ];
 
+export const useParam = (key: string) => {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(key);
+};
+
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/" element={<DrawerLayout />}>
@@ -48,6 +54,14 @@ const router = createBrowserRouter(
         <Route path="home" element={<Home />} />
         <Route path="meetings" element={<MeetingSelection />} />
       </Route>
+      <Route
+        path="/accept"
+        loader={async(params) => {
+          const token = new URL(params.request.url).searchParams.get('token');
+          console.log(token, 'is the token we should go for...');
+          return redirect('/fractal/1');
+        }}
+      />
       <Route
         path="/fractal/:fractalID/*"
         element={<FractalSidebar menuItems={menuItems} />}

@@ -12,6 +12,7 @@ import { parsePrivateKey } from "store/queries/usePrivateKey";
 import { useParam } from "store";
 import { addAccount } from "store/queries/fetchUser";
 import { AppletId, operation } from "common/rpc.mjs";
+import { appletAddress } from "store/appletAddress";
 
 interface Inputs {
     account_name: string;
@@ -23,6 +24,10 @@ export const SignUp = () => {
     const [step, setStep] = useState<"create" | "confirm" | "success">(
         "create"
     );
+
+    const ref = useParam('ref');
+    const token = useParam('token');
+
 
     const onCreate = (e: React.FormEvent) => {
         setStep("confirm");
@@ -59,7 +64,6 @@ export const SignUp = () => {
     });
 
     const onConfirm: SubmitHandler<Inputs> = async (data: Inputs) => {
-        const token = useParam('token');
 
         const privateKey = data.password;
         const { publicKey } = parsePrivateKey(privateKey);
@@ -109,9 +113,11 @@ export const SignUp = () => {
         },
     });
 
-    const onContinue = () => {
-        // TODO navigate to fractally
-        console.log('i should navigate to fractally..')
+    const onContinue = async () => {
+        const rootAddress = await appletAddress(ref!);
+        const url = new URL(rootAddress+ '/accept');
+        url.searchParams.append("token", token!);
+        window.open(url.toString())
     };
 
     const onCopy = async (field: keyof Inputs) => {
@@ -345,6 +351,7 @@ const ConfirmAccount = ({
 const Success = ({
     form,
     onCopy,
+    onContinue
 }: {
     form: UseFormReturn<Inputs, any>;
     onCopy: (field: keyof Inputs) => Promise<void>;
@@ -392,6 +399,7 @@ const Success = ({
                     // isLoading={formSubmitted}
                     // disabled={formSubmitted}
                     fullWidth
+                    onClick={onContinue}
                 >
                     Continue to app
                 </Button>
