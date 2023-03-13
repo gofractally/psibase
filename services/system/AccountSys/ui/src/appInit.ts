@@ -8,6 +8,7 @@ import {
     AppletId,
     uint8ArrayToHex,
     WrappedClaim,
+    MessageMetadata,
 } from "common/rpc.mjs";
 import {
     privateStringToKeyPair,
@@ -268,10 +269,18 @@ export const initAppFn = (setAppInitialized: () => void) =>
             },
             {
                 id: "getProof",
-                exec: async (params: GetProofParams): Promise<any> => {
-                    console.info("getproof received!!", params);
+                exec: async (
+                    params: GetProofParams,
+                    metadata: MessageMetadata
+                ): Promise<any> => {
+                    if (metadata.sender !== "common-sys") {
+                        console.error(
+                            "Security error: only common-sys can get proofs"
+                        );
+                        return { proof: undefined };
+                    }
+
                     const proof = keystore.getProof(params);
-                    console.info("generated proof", proof);
                     return { proof };
                 },
             },

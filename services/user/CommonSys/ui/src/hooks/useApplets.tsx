@@ -198,7 +198,7 @@ export const useApplets = () => {
                 MessageTypes.Query,
                 sender,
                 receiver,
-                { identifier, params },
+                { identifier, params, sender: sender.name },
                 true
             );
         },
@@ -464,7 +464,7 @@ export const useApplets = () => {
                     MessageTypes.Operation,
                     sender,
                     receiver,
-                    { identifier: name, params },
+                    { identifier: name, params, sender: sender.name },
                     true
                 );
                 reply.response = reply.response ?? {};
