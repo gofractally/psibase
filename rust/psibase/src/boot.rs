@@ -310,6 +310,7 @@ pub fn create_boot_transactions(
                 "CommonSys/ui/vanilla/common.index.html"
             ),
             store_common!("keyConversions.mjs", js),
+            store_common!("common-lib.js", js),
             store_common!("rpc.mjs", js),
             store_common!("SimpleUI.mjs", js),
             store_common!("useGraphQLQuery.mjs", js),

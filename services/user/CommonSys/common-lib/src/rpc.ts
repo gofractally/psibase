@@ -77,7 +77,7 @@ export async function getText(url: string) {
     return res.text();
 }
 
-export async function getJson(url: string) {
+export async function getJson<T = any>(url: string): Promise<T> {
     const res = await get(url, { headers: { Accept: "application/json" } });
     return res.json();
 }
