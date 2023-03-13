@@ -1,6 +1,10 @@
 import { useInitialize } from "./hooks/useInitialize";
 import "./styles/globals.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  privateStringToKeyPair,
+  publicKeyPairToString,
+} from "common/keyConversions.mjs";
 import { DrawerLayout } from "components/layouts";
 import { NavLinkItemProps } from "components/navigation/nav-link-item";
 import { config } from "config";
@@ -25,6 +29,9 @@ import {
 import { fractalApplet } from "service";
 import { StateProvider } from "store";
 import { v4 as uuid } from "uuid";
+
+export const privateToPublic = (privateKey: string): string =>
+  publicKeyPairToString(privateStringToKeyPair(privateKey));
 
 if (config.isProduction && !config.isSsr) {
   LogRocket.init("fractally/fractally");
@@ -56,10 +63,18 @@ const router = createBrowserRouter(
       </Route>
       <Route
         path="/accept"
-        loader={async(params) => {
-          const token = new URL(params.request.url).searchParams.get('token');
-          console.log(token, 'is the token we should go for...');
-          return redirect('/fractal/1');
+        loader={async (params) => {
+          const token = new URL(params.request.url).searchParams.get("token");
+          console.log(token, "is the token we should go for...");
+          const publicKey = privateToPublic(token!);
+          try {
+            // await fractalApplet.makeIdentify();
+          } catch (e) {}
+
+          const res = await fractalApplet.acceptInvite({ publicKey });
+          console.log(res, "was the res on acceptInvite");
+
+          return redirect("/fractal/1");
         }}
       />
       <Route

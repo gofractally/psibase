@@ -182,6 +182,11 @@ export class FractalService extends Service {
   }
 
   @Action(fractalSys)
+  createIdentity() {
+    return {}
+  }
+
+  @Action(fractalSys)
   reject(inviteKey: PublicKey): ActionRes {
     return { inviteKey };
   }
@@ -204,6 +209,16 @@ export class FractalService extends Service {
   @Action(fractalSys)
   newIdentity(name: AccountNumber, requireNew: boolean): ActionRes {
     return { name, requireNew };
+  }
+
+  @Op()
+  async acceptInvite({ publicKey }: { publicKey: string}) {
+    this.accept(publicKey);
+  }
+
+  @Op()
+  async makeIdentity() {
+    this.createIdentity();
   }
 
   @Op()
