@@ -142,7 +142,7 @@ if(BUILD_JS)
     file(GLOB_RECURSE common_lib_sources ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/src/*)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
-        DEPENDS ${sources}
+        DEPENDS ${common_lib_sources}
         COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib && yarn && yarn build
     )
     add_custom_target(CommonSysLib_js
