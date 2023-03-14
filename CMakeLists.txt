@@ -139,7 +139,7 @@ if(BUILD_JS)
     file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
     
     # Builds the Common Sys Lib
-    file(GLOB_RECURSE common_lib_sources ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/src/*)
+    file(GLOB common_lib_sources ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/src/*)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
         DEPENDS ${common_lib_sources}
@@ -155,7 +155,7 @@ if(BUILD_JS)
         file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
         add_custom_command(
             OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
-            DEPENDS ${sources} ${common} ${common-fonts}
+            DEPENDS ${sources} ${common} ${common-fonts} CommonSysLib_js
             COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
         )
         add_custom_target(
