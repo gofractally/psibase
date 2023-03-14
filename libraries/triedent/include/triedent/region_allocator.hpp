@@ -16,10 +16,9 @@ namespace triedent
    // - All allocation is done from the current region
    // - There may be an empty region designated as the next region
    // When the current region becomes full
-   // - If there is no next region, extend the file
-   // - Otherwise set current region = next region
-   // - If any region is less than half full, evacuate the least full region
-   //   and make it the next region
+   // - If there are no free regions, extend the file
+   // - Otherwise set current region to the first free region
+   // - If any region is less than half full, queue evacuation of the least full region
    class region_allocator
    {
      public:
@@ -29,17 +28,25 @@ namespace triedent
                        access_mode                  mode,
                        std::uint64_t                initial_size = 64 * 1024 * 1024);
       ~region_allocator();
-      // MUST NOT hold a session lock
+      // MUST NOT hold a session lock because it may push to gc_queue
       void* allocate(object_id id, std::uint32_t size, auto&& init)
       {
-         std::uint64_t   used_size = alloc_size(size);
-         std::lock_guard l{_mutex};
-         auto            result = allocate_impl(id, size, used_size);
-         auto            loc    = object_location{.offset = _h->alloc_pos, .cache = _level};
-         _h->alloc_pos += used_size;
-         init(result, loc);
+         std::uint64_t         used_size = alloc_size(size);
+         void*                 result;
+         std::shared_ptr<void> cleanup;
+         {
+            std::lock_guard l{_mutex};
+            result   = allocate_impl(id, size, used_size, cleanup);
+            auto loc = object_location{.offset = _h->alloc_pos, .cache = _level};
+            _h->alloc_pos += used_size;
+            init(result, loc);
+         }
+         if (cleanup)
+            _gc.push(cleanup);
          return result;
       }
+      // MUST hold a session lock from before object_db::release to ensure that
+      // the location has not been re-used
       void           deallocate(object_location loc);
       object_header* get_object(std::uint64_t offset)
       {
@@ -56,8 +63,11 @@ namespace triedent
       {
          return ((size + 7) & -8) + sizeof(object_header);
       }
-      void* allocate_impl(object_id id, std::uint32_t size, std::uint32_t used_size);
-      void  deallocate(std::uint64_t region, std::uint32_t used_size);
+      void*                          allocate_impl(object_id     id,
+                                                   std::uint32_t size,
+                                                   std::uint32_t used_size,
+                                                   std::shared_ptr<void>&);
+      void                           deallocate(std::uint64_t region, std::uint64_t used_size);
       static constexpr std::uint64_t max_regions   = 64;
       static constexpr std::uint64_t max_queue     = 32;
       static constexpr std::uint64_t page_size     = 4096;
@@ -93,7 +103,7 @@ namespace triedent
 
       static std::pair<std::uint64_t, std::uint64_t> get_smallest_region(header::data* h);
       std::optional<std::uint64_t>                   get_free_region(std::size_t num_regions);
-      void          start_new_region(header::data* old, header::data* next);
+      void          start_new_region(header::data* old, header::data* next, std::shared_ptr<void>&);
       void          double_region_size(header::data* old_data, header::data* new_data);
       static void   copy_header_data(header::data* old, header::data* next);
       std::uint64_t evacuate_region(queue_item& item);
@@ -105,6 +115,7 @@ namespace triedent
       bool run_one();
       void run();
 
+      void queue_available(std::bitset<max_regions> pending, std::uint64_t region_size);
       void make_available(std::uint64_t region);
       void reevaluate_free();
 
@@ -117,6 +128,7 @@ namespace triedent
       char*         _base;
 
       std::bitset<max_regions>      _free_regions;
+      std::bitset<max_regions>      _pending_free_regions;
       std::uint64_t                 _queue_pos;
       std::uint64_t                 _queue_front;
       std::condition_variable       _pop_cond;

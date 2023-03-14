@@ -37,9 +37,13 @@ namespace triedent
       }
       _pop_cond.notify_one();
       _thread.join();
+      _gc.poll();
    }
 
-   void* region_allocator::allocate_impl(object_id id, std::uint32_t size, std::uint32_t used_size)
+   void* region_allocator::allocate_impl(object_id              id,
+                                         std::uint32_t          size,
+                                         std::uint32_t          used_size,
+                                         std::shared_ptr<void>& cleanup)
    {
       auto alloc_pos = _h->alloc_pos;
       auto available = (_h->current_region + 1) * _h->region_size - _h->alloc_pos;
@@ -54,7 +58,7 @@ namespace triedent
          deallocate(_h->current_region, available + pending_write);
          // switch to the next region
          auto next_index = _header->current.load() ^ 1;
-         start_new_region(_h, &_header->regions[next_index]);
+         start_new_region(_h, &_header->regions[next_index], cleanup);
          _h        = &_header->regions[next_index];
          alloc_pos = _h->alloc_pos;
          _header->current.store(next_index);
@@ -81,14 +85,17 @@ namespace triedent
       auto object_used = sizeof(object_header) + get_object(loc)->data_capacity();
       deallocate(region, object_used);
    }
-   void region_allocator::deallocate(std::uint64_t region, std::uint32_t used_size)
+   void region_allocator::deallocate(std::uint64_t region, std::uint64_t used_size)
    {
       auto total_used = _h->region_used[region].load();
-      assert(used_size <= total_used);
-      _h->region_used[region].store(total_used - used_size);
-      if (total_used == used_size)
+      if (total_used != 0)
       {
-         make_available(region);
+         assert(used_size <= total_used);
+         _h->region_used[region].store(total_used - used_size);
+         if (total_used == used_size)
+         {
+            make_available(region);
+         }
       }
    }
    std::pair<std::uint64_t, std::uint64_t> region_allocator::get_smallest_region(header::data* h)
@@ -113,11 +120,16 @@ namespace triedent
       for (std::size_t i = 0; i < num_regions; ++i)
       {
          if (_free_regions.test(i))
+         {
+            assert(_h->region_used[i].load() == 0);
             return i;
+         }
       }
       return std::nullopt;
    }
-   void region_allocator::start_new_region(header::data* old, header::data* next)
+   void region_allocator::start_new_region(header::data*          old,
+                                           header::data*          next,
+                                           std::shared_ptr<void>& cleanup)
    {
       auto num_regions = old->num_regions;
       if (auto next_region = get_free_region(num_regions))
@@ -135,7 +147,7 @@ namespace triedent
          {
             copy_header_data(old, next);
          }
-         _gc.push(_file.resize(_file.size() + next->region_size));
+         cleanup = _file.resize(_file.size() + next->region_size);
          _header = reinterpret_cast<header*>(_file.data());
          _base   = _header->base();
          next->region_used[next->num_regions].store(next->region_size);
@@ -281,7 +293,8 @@ namespace triedent
       item.dest_begin.store(alloc_pos);
       alloc_pos += used;
       _h->alloc_pos = alloc_pos;
-      _h->region_used[region].store(_h->region_used[region].load() + pending_write);
+      _h->region_used[_h->current_region].store(_h->region_used[_h->current_region].load() +
+                                                pending_write);
       item.dest_end.store(alloc_pos);
       _queue_pos = (_queue_pos + 1) % max_queue;
       _pop_cond.notify_one();
@@ -291,18 +304,22 @@ namespace triedent
    bool region_allocator::run_one()
    {
       std::unique_lock l{_mutex};
-      _pop_cond.wait(
-          l, [this]
-          { return _done || _queue_front != _queue_pos || is_used(_header->queue[_queue_front]); });
+      _pop_cond.wait(l,
+                     [this]
+                     {
+                        return _done || _queue_front != _queue_pos ||
+                               is_used(_header->queue[_queue_front]) ||
+                               _pending_free_regions.count() != 0;
+                     });
       if (_done)
-      {
          return false;
-      }
-      auto& item   = _header->queue[_queue_front];
-      _queue_front = (_queue_front + 1) % max_queue;
-      l.unlock();
+
+      auto& item = _header->queue[_queue_front];
+      if (_queue_front != _queue_pos || is_used(item))
+         _queue_front = (_queue_front + 1) % max_queue;
       if (is_used(item))
       {
+         l.unlock();
          auto orig_src  = item.src_begin.load();
          auto orig_dest = item.dest_begin.load();
          auto end       = evacuate_region(item);
@@ -337,6 +354,7 @@ namespace triedent
                // If we fully evacuate a region, reset the amount to 0.
                if (item.src_begin.load() - orig_src == _h->region_size)
                {
+                  assert(src_used < pending_write);
                   src_used = 0;
                }
                else
@@ -350,38 +368,63 @@ namespace triedent
                }
             }
          }
+         assert(used >= pending_write + extra);
          _h->region_used[dest_region].store(used - pending_write - extra);
          if (used == pending_write + extra)
          {
             make_available(dest_region);
          }
       }
+      auto pending     = _pending_free_regions;
+      auto region_size = _h->region_size;
+      _pending_free_regions.reset();
+      l.unlock();
+      if (pending.count() != 0)
+         queue_available(pending, region_size);
       return true;
    }
 
-   void region_allocator::make_available(std::uint64_t region)
+   // Called WITHOUT holding a lock
+   void region_allocator::queue_available(std::bitset<max_regions> pending,
+                                          std::uint64_t            region_size)
    {
-      struct make_region_available
+      struct make_available
       {
-         ~make_region_available()
+         ~make_available()
          {
             std::lock_guard l{_self->_mutex};
             if (_self->_h->region_size == region_size)
             {
                // duplicate free would be disasterous
-               assert(!_self->_free_regions.test(region));
-               _self->_free_regions.set(region);
+               assert((_self->_free_regions & free).none());
+               for (std::uint64_t i = 0; i < max_regions; ++i)
+               {
+                  if (free.test(i))
+                  {
+                     assert(_self->_h->region_used[i].load() == 0);
+                  }
+               }
+               _self->_free_regions |= free;
             }
          }
-         region_allocator* _self;
-         std::uint64_t     region;
-         std::uint64_t     region_size;
+         region_allocator*        _self;
+         std::bitset<max_regions> free;
+         std::uint64_t            region_size;
       };
-      _gc.push(std::make_shared<make_region_available>(this, region, _h->region_size));
+      _gc.push(std::make_shared<make_available>(this, pending, region_size));
+   }
+
+   void region_allocator::make_available(std::uint64_t region)
+   {
+      assert(!_pending_free_regions.test(region));
+      assert(!_free_regions.test(region));
+      _pending_free_regions.set(region);
+      _pop_cond.notify_one();
    }
 
    void region_allocator::reevaluate_free()
    {
+      _pending_free_regions.reset();
       for (std::size_t i = 0, end = _h->num_regions; i != end; ++i)
       {
          if (_h->region_used[i] == 0 && !_free_regions.test(i))
