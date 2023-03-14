@@ -31,6 +31,9 @@ namespace UserService
          void createIdentity();
 
          /// todo
+         void setDispName(std::string displayName);
+
+         /// todo
          void invite(psibase::AccountNumber fractal, psibase::PublicKey pubkey);
 
          /// Allows a user to claim ownership of an invite.
@@ -95,6 +98,7 @@ namespace UserService
          method(init),
 
          method(createIdentity),
+         method(setDispName, displayName),
 
          method(invite, fractal, pubkey),
          method(claim, inviteKey),

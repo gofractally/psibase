@@ -65,6 +65,21 @@ void FractalSys::newIdentity(AccountNumber name, bool requireNew)
    }
 }
 
+void FractalSys::setDispName(string displayName)
+{
+   auto identityTable = Tables().open<IdentityTable>();
+   auto identity      = identityTable.get(getSender());
+   check(identity.has_value(), "identity DNE");
+
+   const size_t maxDisplayNameLength = 20;
+   check(displayName.length() < maxDisplayNameLength, "display name too long");
+
+   identity->displayName = displayName;
+   identityTable.put(*identity);
+
+   // Todo - emit event
+}
+
 void FractalSys::invite(AccountNumber fractal, PublicKey pubkey)
 {
    auto fractalTable = Tables().open<FractalTable>();

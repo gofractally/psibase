@@ -85,10 +85,12 @@ namespace UserService
       {
          psibase::AccountNumber name;
 
+         std::string displayName;
+
          uint64_t eventHead;
          // Todo - metadata / profile
       };
-      PSIO_REFLECT(IdentityRecord, name, eventHead);
+      PSIO_REFLECT(IdentityRecord, name, displayName, eventHead);
       using IdentityTable = psibase::Table<IdentityRecord, &IdentityRecord::name>;
 
    }  // namespace Fractal
