@@ -135,10 +135,31 @@ namespace triedent
       {
          auto& atomic = header()->objects[lock.get_id().id];
          auto  obj    = atomic.load();
+         assert(object_info{obj}.ref != 0);
          while (!atomic.compare_exchange_weak(obj, object_info{obj}.set_location(loc).to_int()))
          {
          }
          debug(lock.get_id().id, "move");
+      }
+
+      bool compare_and_move(const location_lock& lock,
+                            object_location      expected,
+                            object_location      loc)
+      {
+         auto& atomic = header()->objects[lock.get_id().id];
+         auto  obj    = atomic.load();
+         while (true)
+         {
+            object_info info{obj};
+            if (info.ref == 0 || info != expected)
+               return false;
+            info.set_location(loc);
+            if (atomic.compare_exchange_weak(obj, info.to_int()))
+            {
+               debug(lock.get_id().id, "move");
+               return true;
+            }
+         }
       }
 
       // The id must not be accessible to any thread
@@ -395,7 +416,6 @@ namespace triedent
       //   }
       if (new_count == 0)
       {
-         // TODO: release/move conflict will break things in interesting ways
          // the invariant is first_free->object with id that points to next free
          // 1. update object to point to next free
          // 2. then attempt to update first free

@@ -138,11 +138,14 @@ namespace triedent
          auto result  = get_obj(alloc_p);
          auto offset  = split_p(alloc_p).first;
          new (result) object_header{.size = size, .id = id.id};
-         init(result->data(), object_location{.offset = offset, .cache = _level});
          // Updating alloc_p makes the new object visible to swap.
          // The object_header must be written first, although the
          // mutex protects us in every case except a crash.
          _header->alloc_p.store(next(alloc_p, result));
+         // init should run after alloc_p is updated, so that the
+         // memory won't vanish after a crash. The mutex prevents
+         // swap from seeing the new alloc_p too soon.
+         init(result->data(), object_location{.offset = offset, .cache = _level});
          return result->data();
       }
       // \pre _free_mutex must be held

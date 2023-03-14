@@ -35,8 +35,9 @@ namespace triedent
          std::uint64_t   used_size = alloc_size(size);
          std::lock_guard l{_mutex};
          auto            result = allocate_impl(id, size, used_size);
-         init(result, object_location{.offset = _h->alloc_pos, .cache = _level});
+         auto            loc    = object_location{.offset = _h->alloc_pos, .cache = _level};
          _h->alloc_pos += used_size;
+         init(result, loc);
          return result;
       }
       void           deallocate(object_location loc);

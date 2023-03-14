@@ -31,7 +31,11 @@ namespace triedent
 
    region_allocator::~region_allocator()
    {
-      _done = true;
+      {
+         std::lock_guard l{_mutex};
+         _done = true;
+      }
+      _pop_cond.notify_one();
       _thread.join();
    }
 
@@ -192,8 +196,17 @@ namespace triedent
                void* new_location = _base + dest;
                std::memcpy(new_location, p, object_size);
                item.dest_begin.store(dest + object_size);
-               _obj_ids.move(lock, object_location{.offset = dest, .cache = _level});
-               dest += object_size;
+               if (_obj_ids.compare_and_move(lock, loc,
+                                             object_location{.offset = dest, .cache = _level}))
+               {
+                  dest += object_size;
+               }
+               else
+               {
+                  // Reverting the allocation on failure is necessary to ensure that
+                  // region_used is always an upper bound of the actual used size.
+                  item.dest_begin.store(dest);
+               }
             }
          }
          begin += (sizeof(object_header) + p->data_capacity());
@@ -281,7 +294,7 @@ namespace triedent
       _pop_cond.wait(
           l, [this]
           { return _done || _queue_front != _queue_pos || is_used(_header->queue[_queue_front]); });
-      if (!_done)
+      if (_done)
       {
          return false;
       }

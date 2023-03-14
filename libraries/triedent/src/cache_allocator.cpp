@@ -64,10 +64,10 @@ namespace triedent
             if (auto lock = _obj_ids.try_lock({.id = o->id}, loc, &matched))
             {
                return to.allocate(lock.get_id(), o->size,
-                                  [&](void* ptr, object_location loc)
+                                  [&](void* ptr, object_location newloc)
                                   {
                                      std::memcpy(ptr, o->data(), o->size);
-                                     _obj_ids.move(lock, loc);
+                                     _obj_ids.compare_and_move(lock, loc, newloc);
                                   }) != nullptr;
             }
             return !matched;
