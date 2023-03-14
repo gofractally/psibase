@@ -322,31 +322,13 @@ optional<MembershipRecord> FractalSys::getMember(AccountNumber account, AccountN
    return Tables().open<MemberTable>().get(MembershipKey{account, fractal});
 }
 
-struct SimpleInviteRecord
-{
-   psibase::PublicKey     key;
-   psibase::AccountNumber creator;
-   psibase::AccountNumber fractal;
-   psibase::AccountNumber recipient;
-};
-PSIO_REFLECT(SimpleInviteRecord, key, creator, fractal, recipient);
-
-struct SimpleFractalRecord
-{
-   psibase::AccountNumber name;
-   psibase::AccountNumber type;
-   std::string            displayName;
-   psibase::AccountNumber founder;
-};
-PSIO_REFLECT(SimpleFractalRecord, name, type, displayName, founder);
-
 // TODO - rename queryableservice and delete table management from it. It should just help with events.
 auto fractalSys = QueryableService<FractalSys::Tables, FractalSys::Events>{FractalSys::service};
 struct Queries
 {
-   auto getIdentity(AccountNumber name) const
+   auto getIdentity(AccountNumber user) const
    {  //
-      return FractalSys::Tables(FractalSys::service).open<Fractal::IdentityTable>().get(name);
+      return FractalSys::Tables(FractalSys::service).open<Fractal::IdentityTable>().get(user);
    }
 
    auto getInvite(PublicKey pubkey) const
@@ -354,43 +336,43 @@ struct Queries
       return FractalSys::Tables(FractalSys::service).open<Fractal::InviteTable>().get(pubkey);
    }
 
-   auto getMember(AccountNumber account, AccountNumber fractal) const
+   auto getMember(AccountNumber user, AccountNumber fractal) const
    {  //
-      MembershipKey key{account, fractal};
+      MembershipKey key{user, fractal};
       return FractalSys::Tables(FractalSys::service).open<Fractal::MemberTable>().get(key);
    }
 
-   // auto getMember2(AccountNumber           account,
-   //                 optional<AccountNumber> gt,
-   //                 optional<AccountNumber> ge,
-   //                 optional<AccountNumber> lt,
-   //                 optional<AccountNumber> le,
-   //                 optional<uint32_t>      first,
-   //                 optional<uint32_t>      last,
-   //                 optional<string>        before,
-   //                 optional<string>        after) const
-   // {
-   //    auto idx = FractalSys::Tables{FractalSys::service}
-   //                   .open<Fractal::MemberTable>()
-   //                   .getIndex<0>()
-   //                   .subindex(account);
+   auto getFractals(AccountNumber           user,
+                    optional<AccountNumber> gt,
+                    optional<AccountNumber> ge,
+                    optional<AccountNumber> lt,
+                    optional<AccountNumber> le,
+                    optional<uint32_t>      first,
+                    optional<uint32_t>      last,
+                    optional<string>        before,
+                    optional<string>        after) const
+   {
+      auto idx = FractalSys::Tables{FractalSys::service}
+                     .open<Fractal::MemberTable>()
+                     .getIndex<1>()
+                     .subindex(user);
 
-   //    auto convert = [](const auto& opt)
-   //    {
-   //       optional<tuple<AccountNumber>> ret;
-   //       if (opt)
-   //          ret.emplace(std::make_tuple(opt.value()));
-   //       return ret;
-   //    };
+      auto convert = [](const auto& opt)
+      {
+         optional<tuple<AccountNumber>> ret;
+         if (opt)
+            ret.emplace(std::make_tuple(opt.value()));
+         return ret;
+      };
 
-   //    return makeConnection<Connection<MembershipRecord, "MemConnection", "MemEdge">>(
-   //        idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last, before,
-   //        after);
-   // }
+      return makeConnection<Connection<MembershipRecord, "MemConnection", "MemEdge">>(
+          idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last, before,
+          after);
+   }
 
-   auto getFractal(AccountNumber name) const
+   auto getFractal(AccountNumber fractal) const
    {  //
-      return FractalSys::Tables(FractalSys::service).open<Fractal::FractalTable>().get(name);
+      return FractalSys::Tables(FractalSys::service).open<Fractal::FractalTable>().get(fractal);
    }
 
    auto getFractalType(AccountNumber service) const
@@ -423,10 +405,11 @@ struct Queries
    }
 };
 PSIO_REFLECT(Queries,  //
-             method(getIdentity, name),
+             method(getIdentity, user),
              method(getInvite, pubkey),
-             method(getMember, account, fractal),
-             method(getFractal, name),
+             method(getMember, user, fractal),
+             method(getFractals, user, gt, ge, lt, le, first, last, before, after),
+             method(getFractal, fractal),
              method(getFractalType, service),
              //
              method(events),

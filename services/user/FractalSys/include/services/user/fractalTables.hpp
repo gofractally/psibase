@@ -44,7 +44,7 @@ namespace UserService
 
          uint64_t eventHead;
 
-         auto secondary() const { return std::tie(type, account); }
+         auto byType() const { return std::tie(type, account); }
       };
       PSIO_REFLECT(FractalRecord,
                    account,
@@ -56,7 +56,7 @@ namespace UserService
                    languageCode,
                    eventHead);
       using FractalTable =
-          psibase::Table<FractalRecord, &FractalRecord::account, &FractalRecord::secondary>;
+          psibase::Table<FractalRecord, &FractalRecord::account, &FractalRecord::byType>;
 
       struct MembershipKey
       {
