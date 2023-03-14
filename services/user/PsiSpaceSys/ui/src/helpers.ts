@@ -1,4 +1,4 @@
-import { getJson, postGraphQLGetJson } from "common/rpc.mjs";
+import { getJson, postGraphQLGetJson } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
 
 export const getThisApplet = async (): Promise<string> =>

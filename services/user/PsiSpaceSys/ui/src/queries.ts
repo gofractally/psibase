@@ -1,5 +1,5 @@
-import { postGraphQLGetJson } from "common/rpc.mjs";
 import { useEffect, useMemo, useState } from "react";
+import { postGraphQLGetJson } from "@psibase/common-lib";
 
 import { useGraphQLQuery, wait } from "./helpers";
 

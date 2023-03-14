@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { siblingUrl, getJson } from "common/rpc.mjs";
+import { siblingUrl, getJson } from "@psibase/common-lib";
 
 import { wait } from "../helpers";
 import useEffectOnce from "../hooks/useEffectOnce";
@@ -15,7 +15,11 @@ export interface TokenBalance {
 }
 
 const fetchTokens = async (account: string) => {
-    const url = await siblingUrl(null, "token-sys", `api/balances/${account}`);
+    const url = await siblingUrl(
+        undefined,
+        "token-sys",
+        `api/balances/${account}`
+    );
     return getJson<TokenBalance[]>(url);
 };
 

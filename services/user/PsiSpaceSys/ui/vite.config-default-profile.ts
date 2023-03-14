@@ -4,7 +4,28 @@ import path from "path";
 import alias from "@rollup/plugin-alias";
 import svgr from "vite-plugin-svgr";
 
-const psibase = (appletContract: string) => {
+const psibase = (appletContract: string, isServing?: boolean) => {
+    const buildAliases = [
+        {
+            find: "/common/iframeResizer.contentWindow.js",
+            replacement: path.resolve(
+                "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
+            ),
+        },
+        {
+            // bundle non-external (above) common files except fonts (which should only be referenced)
+            find: /^\/common(?!\/(?:fonts))(.*)$/,
+            replacement: path.resolve("../../CommonSys/common$1"),
+        },
+    ];
+
+    if (isServing) {
+        buildAliases.push({
+            find: "@psibase/common-lib",
+            replacement: path.resolve("../../CommonSys/common-lib/src"),
+        });
+    }
+
     return [
         {
             name: "psibase",
@@ -18,6 +39,7 @@ const psibase = (appletContract: string) => {
                                 "/common/rootdomain.mjs",
                                 "/common/rpc.mjs",
                                 "/common/iframeResizer.js",
+                                "/common/common-lib.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
                             output: {
@@ -50,21 +72,7 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: [
-                            {
-                                find: "/common/iframeResizer.contentWindow.js",
-                                replacement: path.resolve(
-                                    "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
-                                ),
-                            },
-                            {
-                                // bundle non-external (above) common files except fonts (which should only be referenced)
-                                find: /^\/common(?!\/(?:fonts))(.*)$/,
-                                replacement: path.resolve(
-                                    "../../CommonSys/common$1"
-                                ),
-                            },
-                        ],
+                        alias: buildAliases,
                     },
                 };
             },
@@ -72,6 +80,10 @@ const psibase = (appletContract: string) => {
         alias({
             entries: [
                 { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
+                {
+                    find: "@psibase/common-lib",
+                    replacement: "/common/common-lib.js",
+                },
             ],
         }),
     ];
