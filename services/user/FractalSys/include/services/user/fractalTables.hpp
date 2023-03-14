@@ -36,6 +36,7 @@ namespace UserService
          psibase::AccountNumber account;
          psibase::AccountNumber type;
          psibase::AccountNumber founder;
+         psibase::TimePointSec  creationTime;
 
          std::string displayName;
          std::string description;
@@ -49,6 +50,7 @@ namespace UserService
                    account,
                    type,
                    founder,
+                   creationTime,
                    displayName,
                    description,
                    languageCode,

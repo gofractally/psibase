@@ -1,4 +1,5 @@
 #include <services/system/ProxySys.hpp>
+#include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/FractalSys.hpp>
 #include <services/user/InviteSys.hpp>
@@ -12,6 +13,7 @@ using std::optional;
 using std::string;
 using std::tuple;
 using std::vector;
+using SystemService::TransactionSys;
 
 FractalSys::FractalSys(psio::shared_view_ptr<psibase::Action> action)
 {
@@ -251,7 +253,9 @@ void FractalSys::newFractal(AccountNumber account, AccountNumber type)
 
    auto sender = getSender();
 
-   FractalRecord newFractal{.account = account, .type = type, .founder = sender};
+   auto          time = to<TransactionSys>().currentBlock().time;
+   FractalRecord newFractal{
+       .account = account, .type = type, .founder = sender, .creationTime = time};
    table.put(newFractal);
 
    // Creator of the new fractal is the first member.
