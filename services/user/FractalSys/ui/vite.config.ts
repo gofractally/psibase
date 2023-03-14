@@ -52,11 +52,11 @@ const psibase = (options: Options) => {
             ...httpServerConfig,
             https: {
                 key: fs.readFileSync(
-                    "./psibase.127.0.0.1.sslip.io+1-key.pem",
+                    "../../../../psibase.127.0.0.1.sslip.io+1-key.pem",
                     "utf8"
                 ),
                 cert: fs.readFileSync(
-                    "./psibase.127.0.0.1.sslip.io+1.pem",
+                    "../../../../psibase.127.0.0.1.sslip.io+1.pem",
                     "utf8"
                 ),
             },
