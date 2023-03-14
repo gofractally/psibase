@@ -56,9 +56,10 @@ namespace UserService
          void registerType();
 
          /// todo
-         void newFractal(psibase::AccountNumber name,
-                         psibase::AccountNumber type,
-                         std::string            prettyName);
+         void newFractal(psibase::AccountNumber fractalAccount, psibase::AccountNumber type);
+         void setFracName(psibase::AccountNumber fractalAccount, std::string displayName);
+         void setFracDesc(psibase::AccountNumber fractalAccount, std::string description);
+         void setFracLang(psibase::AccountNumber fractalAccount, std::string languageCode);
 
          auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
          void storeSys(std::string path, std::string contentType, std::vector<char> content);
@@ -106,7 +107,10 @@ namespace UserService
          method(reject, inviteKey),
 
          method(registerType),
-         method(newFractal, name, type, prettyName),
+         method(newFractal, name, type),
+         method(setFracName, fractalAccount, displayName),
+         method(setFracDesc, fractalAccount, description),
+         method(setFracLang, fractalAccount, languageCode),
 
          method(serveSys, request),
          method(storeSys, path, contentType, content),

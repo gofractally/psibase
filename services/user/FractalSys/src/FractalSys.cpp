@@ -10,6 +10,7 @@ using std::move;
 using std::nullopt;
 using std::optional;
 using std::string;
+using std::tuple;
 using std::vector;
 
 FractalSys::FractalSys(psio::shared_view_ptr<psibase::Action> action)
@@ -240,25 +241,71 @@ void FractalSys::registerType()
    // TODO - emit event
 }
 
-void FractalSys::newFractal(AccountNumber name, AccountNumber type, string prettyName)
+void FractalSys::newFractal(AccountNumber account, AccountNumber type)
 {
    auto table  = Tables().open<FractalTable>();
-   auto record = table.get(name);
+   auto record = table.get(account);
    check(not record.has_value(), "fractal already exists");
-   check(prettyName.length() < 40, "prettyName too long");
 
-   auto          sender = getSender();
-   FractalRecord newFractal{name, type, prettyName, sender, 0};
+   // Todo - Create the account and set its auth
 
+   auto sender = getSender();
+
+   FractalRecord newFractal{.account = account, .type = type, .founder = sender};
    table.put(newFractal);
 
    // Creator of the new fractal is the first member.
-   MembershipRecord firstMember{MembershipKey{sender, name}, psibase::AccountNumber{0}, 0};
+   MembershipRecord firstMember{MembershipKey{sender, account}, psibase::AccountNumber{0}, 0};
    Tables().open<MemberTable>().put(firstMember);
 
    // Todo - check that type exists
 
    // Todo - emit event
+}
+
+void FractalSys::setFracName(AccountNumber fractalAccount, std::string displayName)
+{
+   // Todo - verify that sender has permission to update the fractal config
+   check(displayName.length() < 40, "displayName too long");
+
+   auto table  = Tables().open<FractalTable>();
+   auto record = table.get(fractalAccount);
+   check(record.has_value(), "fractal DNE");
+
+   record->displayName = displayName;
+   table.put(*record);
+
+   // Todo - emit event
+}
+
+void FractalSys::setFracDesc(psibase::AccountNumber fractalAccount, std::string description)
+{
+   // Todo - verify that sender has permission to update the fractal config
+   check(description.length() < 1040, "Description is too long");
+
+   auto table  = Tables().open<FractalTable>();
+   auto record = table.get(fractalAccount);
+   check(record.has_value(), "fractal DNE");
+
+   record->description = description;
+   table.put(*record);
+
+   // Todo - emit event
+}
+
+void FractalSys::setFracLang(psibase::AccountNumber fractalAccount, std::string languageCode)
+{
+   // Todo - verify that sender has permission to update the fractal config
+   check(languageCode.length() == 3, "language code invalid");
+
+   auto table  = Tables().open<FractalTable>();
+   auto record = table.get(fractalAccount);
+   check(record.has_value(), "fractal DNE");
+
+   record->languageCode = languageCode;
+   table.put(*record);
+
+   // Emit event
 }
 
 optional<IdentityRecord> FractalSys::getIdentity(AccountNumber name)
@@ -284,10 +331,10 @@ struct SimpleFractalRecord
 {
    psibase::AccountNumber name;
    psibase::AccountNumber type;
-   std::string            prettyName;
+   std::string            displayName;
    psibase::AccountNumber founder;
 };
-PSIO_REFLECT(SimpleFractalRecord, name, type, prettyName, founder);
+PSIO_REFLECT(SimpleFractalRecord, name, type, displayName, founder);
 
 // TODO - rename queryableservice and delete table management from it. It should just help with events.
 auto fractalSys = QueryableService<FractalSys::Tables, FractalSys::Events>{FractalSys::service};
@@ -308,6 +355,34 @@ struct Queries
       MembershipKey key{account, fractal};
       return FractalSys::Tables(FractalSys::service).open<Fractal::MemberTable>().get(key);
    }
+
+   // auto getMember2(AccountNumber           account,
+   //                 optional<AccountNumber> gt,
+   //                 optional<AccountNumber> ge,
+   //                 optional<AccountNumber> lt,
+   //                 optional<AccountNumber> le,
+   //                 optional<uint32_t>      first,
+   //                 optional<uint32_t>      last,
+   //                 optional<string>        before,
+   //                 optional<string>        after) const
+   // {
+   //    auto idx = FractalSys::Tables{FractalSys::service}
+   //                   .open<Fractal::MemberTable>()
+   //                   .getIndex<0>()
+   //                   .subindex(account);
+
+   //    auto convert = [](const auto& opt)
+   //    {
+   //       optional<tuple<AccountNumber>> ret;
+   //       if (opt)
+   //          ret.emplace(std::make_tuple(opt.value()));
+   //       return ret;
+   //    };
+
+   //    return makeConnection<Connection<MembershipRecord, "MemConnection", "MemEdge">>(
+   //        idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last, before,
+   //        after);
+   // }
 
    auto getFractal(AccountNumber name) const
    {  //
