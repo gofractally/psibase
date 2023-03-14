@@ -38,14 +38,13 @@ SCENARIO("Creating a fractal")
       THEN("Alice can create a fractal")
       {
          a.createIdentity();
-         auto createFractal =
-             a.newFractal("astronauts"_a, CoreFractalSys::service, "Astronaut Club");
+         auto createFractal = a.newFractal("astronauts"_a, CoreFractalSys::service);
          CHECK(createFractal.succeeded());
       }
       WHEN("Alice creates a fractal")
       {
          a.createIdentity();
-         a.newFractal("astronauts"_a, CoreFractalSys::service, "Astronaut Club");
+         a.newFractal("astronauts"_a, CoreFractalSys::service);
 
          THEN("Bob cannot create a fractal with the same name")
          {
@@ -53,8 +52,7 @@ SCENARIO("Creating a fractal")
             auto b   = bob.to<FractalSys>();
             b.createIdentity();
 
-            auto newFrac =
-                b.newFractal("astronauts"_a, CoreFractalSys::service, "Astronaut Club 2!");
+            auto newFrac = b.newFractal("astronauts"_a, CoreFractalSys::service);
             CHECK(newFrac.failed("already exists"));
          }
       }
@@ -75,7 +73,7 @@ SCENARIO("Inviting people to a fractal")
 
       auto a = alice.to<FractalSys>();
       a.createIdentity();
-      a.newFractal(fractal, CoreFractalSys::service, "Astronaut Club");
+      a.newFractal(fractal, CoreFractalSys::service);
 
       THEN("Alice can invite a user to the fractal")
       {
