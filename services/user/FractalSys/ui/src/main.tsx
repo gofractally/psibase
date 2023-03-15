@@ -67,8 +67,10 @@ const router = createBrowserRouter(
           const token = new URL(params.request.url).searchParams.get("token");
           console.log(token, "is the token we should go for...");
           const publicKey = privateToPublic(token!);
-          
-          await fractalApplet.claim(publicKey);
+          // trigger the claim
+          // fetch the invite to navigate to correct fractal
+          // 
+          await fractalApplet.claimInvite({ publicKey });
           const res = await fractalApplet.acceptInvite({ publicKey });
           console.log(res, "was the res on acceptInvite");
 

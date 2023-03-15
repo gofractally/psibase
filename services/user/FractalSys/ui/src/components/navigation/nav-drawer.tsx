@@ -13,12 +13,12 @@ const SideBarIcon = ({
     to,
     isActive = false,
 }: {
-    icon: string;
+    icon?: string;
     text: string;
     to: string;
     isActive?: boolean;
 }) => {
-    const isUrl = icon.toLowerCase().startsWith("http");
+    const isUrl = icon && icon.toLowerCase().startsWith("http");
     return (
         <NavLink
             to={to}
@@ -32,9 +32,9 @@ const SideBarIcon = ({
             <>
                 {isUrl ? (
                     <img src={icon} alt="" />
-                ) : (
+                ) : icon ? (
                     <Icon type={icon as IconType} />
-                )}
+                ): <h1 className="font-light tracking-tighter uppercase text-2xl decoration-0">{text.slice(0,2)}</h1>}
                 <span className="sidebar-tooltip group-hover:scale-100">
                     {text}
                 </span>
@@ -57,9 +57,10 @@ export const NavDrawer = ({ children }: { children: JSX.Element }) => {
         : undefined;
     const parsedFractals = fractals?.map((fractal) => ({
         ...fractal,
-        isNavActive: fractal.id === currentFractalId,
+        isNavActive: fractal.key.fractal === currentFractalId,
     }));
 
+    console.log({ parsedFractals })
     return (
         <nav className="relative flex flex-col select-none h-full overscroll-contain border-r border-r-gray-700 font-semibold text-white">
             <div className="flex h-full">
@@ -69,11 +70,10 @@ export const NavDrawer = ({ children }: { children: JSX.Element }) => {
                         <Divider />
                         {parsedFractals?.map((fractal) => (
                             <SideBarIcon
-                                key={fractal.id}
+                                key={fractal.key.fractal}
                                 isActive={fractal.isNavActive}
-                                to={`/fractal/${fractal.id}/home`}
-                                icon={fractal.image}
-                                text={fractal.name}
+                                to={`/fractal/${fractal.key.fractal}/home`}
+                                text={fractal.key.fractal}
                             />
                         ))}
                     </div>

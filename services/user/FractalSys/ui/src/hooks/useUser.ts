@@ -5,6 +5,7 @@ import { AppletId, initializeApplet, query } from "@psibase/common-lib";
 import { UserData } from "pages/meeting/types";
 import { useGlobalStore } from "store";
 import { setUser } from "store/actions";
+import { fetchFractals } from "./useParticipatingFractals";
 
 const noAvatarUrl =
     "https://images.hive.blog/p/X37EMQ9WSwsMkbaFFVtss2tEEKpVvbqx1wBjz6fCwXa41QNVwbz8YG8D7SsNDaVSpEJmfwUkNU9b82DE4zrWrusmgafrs2L25RaS7?width=128&height=128";
@@ -24,6 +25,7 @@ export const useUser = () => {
 
         const user = (await getLoggedInUser()) as string;
         dispatch(setUser(user, user, noAvatarUrl));
+        fetchFractals(user).then(x => console.log(x, 'came back'));
         return user;
     };
 

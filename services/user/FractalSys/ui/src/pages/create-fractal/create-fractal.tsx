@@ -26,9 +26,7 @@ const useCreateFractal = () => {
 
   return useMutation({
     mutationFn: async (name: string) => {
-      const x= genKeyPair(KeyType.k1)
-      console.log(name, "is the name", x);
-      await fractalApplet.createFractal({ name, prettyName: name, type: "1" });
+      await fractalApplet.createFractal({ name, type: "1" });
     },
     onSuccess: async (_, param) => {
       queryClient.invalidateQueries(["fractals", user?.participantId]);
@@ -84,9 +82,9 @@ export const CreateFractal = () => {
           </div>
           <div>
             <button
-              disabled={isLoading}
+              disabled={isLoading || name == ''}
               onClick={() => createFractal(name)}
-              className="rounded-lg bg-blue-500 text-white p-4"
+              className="rounded-lg bg-blue-500 text-white p-4 disabled:bg-blue-400"
             >
               {isLoading
                 ? "Loading.."

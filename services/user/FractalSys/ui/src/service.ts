@@ -175,9 +175,8 @@ export class FractalService extends Service {
   newFractal(
     name: AccountNumber,
     type: AccountNumber,
-    prettyName: string
   ): ActionRes {
-    return { name, type, prettyName };
+    return { name, type };
   }
 
   @Action(fractalSys)
@@ -210,9 +209,14 @@ export class FractalService extends Service {
     return { name, requireNew };
   }
 
+
+  @Op()
+  async claimInvite({ publicKey }: { publicKey: string }) {
+    this.claim(publicKey)
+  }
+
   @Op()
   async acceptInvite({ publicKey }: { publicKey: string}) {
-    await this.claim(publicKey);
     this.accept(publicKey);
   }
 
@@ -236,13 +240,11 @@ export class FractalService extends Service {
   async createFractal({
     name,
     type,
-    prettyName,
   }: {
     name: AccountNumber;
     type: AccountNumber;
-    prettyName: string;
   }) {
-    this.newFractal(name, type, prettyName);
+    this.newFractal(name, type);
   }
 }
 
