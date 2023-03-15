@@ -144,8 +144,7 @@ namespace triedent
       {
          cold().deallocate(l);
       }
-      return {(l.ref > 0 ? nullptr : (char*)_levels[l.cache].get_object(l.offset())->data()),
-              {l.type()}};
+      return {(l.ref > 0 ? nullptr : (char*)get_object(l)->data()), {l.type()}};
    }
 
    // The returned pointer will remain valid until the session lock is released
