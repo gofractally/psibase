@@ -12,14 +12,38 @@ interface Options {
   server?: boolean;
   serviceName: string;
   env: any;
+  isServing: boolean;
 }
 
 const psibase = (options: Options) => {
-  const { serviceName, server } = {
+  const { serviceName, server, isServing } = {
     server: true,
     ...options,
   };
   if (!serviceName) throw new Error("Must have a service name");
+
+
+  const buildAliases = [
+    {
+        find: "/common/iframeResizer.contentWindow.js",
+        replacement: path.resolve(
+            "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
+        ),
+    },
+    {
+        // bundle non-external (above) common files except fonts (which should only be referenced)
+        find: /^\/common(?!\/(?:fonts))(.*)$/,
+        replacement: path.resolve("../../CommonSys/common$1"),
+    },
+];
+
+if (isServing) {
+    buildAliases.push({
+        find: "@psibase/common-lib",
+        replacement: path.resolve("../../CommonSys/common-lib/src"),
+    });
+}
+
   const runLocalHttpsDev =
     (options.env.VITE_SECURE_LOCAL_DEV as string) === "true";
 
@@ -88,6 +112,7 @@ const psibase = (options: Options) => {
                 "/common/rootdomain.mjs",
                 "/common/rpc.mjs",
                 "/common/iframeResizer.js",
+                "/common/common-lib.js"
               ],
               makeAbsoluteExternalsRelative: false,
               output: {
@@ -100,19 +125,7 @@ const psibase = (options: Options) => {
             server: serverConfig,
           }),
           resolve: {
-            alias: [
-              {
-                find: "/common/iframeResizer.contentWindow.js",
-                replacement: path.resolve(
-                  "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
-                ),
-              },
-              {
-                // bundle non-external (above) common files except fonts (which should only be referenced)
-                find: /^\/common(?!\/(?:fonts))(.*)$/,
-                replacement: path.resolve("../../CommonSys/common$1"),
-              },
-            ],
+            alias: buildAliases,
           },
         };
       },
@@ -130,21 +143,25 @@ const psibase = (options: Options) => {
             runLocalHttpsDev ? "s" : ""
           }://psibase.127.0.0.1.sslip.io:8080/common/rpc.mjs`,
         },
+        {
+          find: "@psibase/common-lib",
+          replacement: "/common/common-lib.js",
+      },
       ],
     }),
   ];
 };
 
-export default ({ mode }) => {
+export default ({ mode, command }) => {
   process.env = { ...process.env, ...loadEnv(mode, process.cwd()) };
   // https://vitejs.dev/config/
   return defineConfig({
     plugins: [
-      tsconfigPaths(),
+      tsconfigPaths({ projects: ["./tsconfig.build.json"] }),      
       svgr({ exportAsDefault: true }),
       react(),
       mdPlugin({ mode: [Mode.HTML] }),
-      psibase({ serviceName: "fractal-sys", server: true, env: process.env }),
+      psibase({ serviceName: "fractal-sys", server: true, env: process.env, isServing: command === 'serve' }),
     ],
     resolve: {
       // These aliases are the second stage of translation when locating a local resource.
@@ -152,6 +169,7 @@ export default ({ mode }) => {
       // Then these aliasses will replace the result.
       alias: {
         "@toolbox/components": "@toolbox/components/src",
+        // '@psibase/common-lib': '@psibase/common-lib/src',
         process: "process/browser",
       },
     },

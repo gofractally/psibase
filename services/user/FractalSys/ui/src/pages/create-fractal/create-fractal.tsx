@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { Input } from "@toolbox/components/ui";
-import { genKeyPair, KeyType } from "common/keyConversions.mjs";
+import { genKeyPair, KeyType } from "@psibase/common-lib";
 import { Con } from "components/layouts/con";
 import { useUser } from "hooks";
 import { useFractal, fetchFractal } from "hooks/useParticipatingFractals";
@@ -26,7 +26,8 @@ const useCreateFractal = () => {
 
   return useMutation({
     mutationFn: async (name: string) => {
-      console.log(name, "is the name");
+      const x= genKeyPair(KeyType.k1)
+      console.log(name, "is the name", x);
       await fractalApplet.createFractal({ name, prettyName: name, type: "1" });
     },
     onSuccess: async (_, param) => {
@@ -77,6 +78,7 @@ export const CreateFractal = () => {
             <Input
               disabled={isLoading || isSuccess}
               value={name}
+              // @ts-ignore
               onChange={(x) => setName(x.target.value)}
             />
           </div>

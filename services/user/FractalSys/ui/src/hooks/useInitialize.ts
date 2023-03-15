@@ -1,4 +1,4 @@
-import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
+import { initializeApplet, setOperations, setQueries } from "@psibase/common-lib";
 import { useEffect } from "react";
 import { Service } from "service";
 

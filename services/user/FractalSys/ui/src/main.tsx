@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   privateStringToKeyPair,
   publicKeyPairToString,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
 import { DrawerLayout } from "components/layouts";
 import { NavLinkItemProps } from "components/navigation/nav-link-item";
 import { config } from "config";
@@ -67,10 +67,8 @@ const router = createBrowserRouter(
           const token = new URL(params.request.url).searchParams.get("token");
           console.log(token, "is the token we should go for...");
           const publicKey = privateToPublic(token!);
-          try {
-            // await fractalApplet.makeIdentify();
-          } catch (e) {}
-
+          
+          await fractalApplet.claim(publicKey);
           const res = await fractalApplet.acceptInvite({ publicKey });
           console.log(res, "was the res on acceptInvite");
 

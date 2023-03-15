@@ -4,8 +4,7 @@ import {
   getJson,
   operation,
   query,
-  uint8ArrayToHex,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 
 const OPERATIONS_KEY = "OPERATIONS_KEY";
 const QUERIES_KEY = "QUERIES_KEY";

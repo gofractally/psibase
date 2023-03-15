@@ -1,6 +1,6 @@
 import { mockDelay } from "./mockDelay";
 import { useQuery } from "@tanstack/react-query";
-import { postGraphQLGetJson } from "common/rpc.mjs";
+import { postGraphQLGetJson } from "@psibase/common-lib";
 import { fractals } from "dataDump";
 
 interface FractalListItem {
@@ -28,7 +28,7 @@ const queryFractal = (name: string): string => `{
 
 export const fetchFractal = async (name: string) => {
   const query = queryFractal(name);
-  return postGraphQLGetJson<{ data: { derp: string } }>("/graphql", query);
+  return postGraphQLGetJson("/graphql", query);
 };
 
 export const useParticipatingFractals = (username?: string) => {

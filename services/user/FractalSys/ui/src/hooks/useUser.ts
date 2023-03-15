@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { AppletId, initializeApplet, query } from "common/rpc.mjs";
+import { AppletId, initializeApplet, query } from "@psibase/common-lib";
 
 import { UserData } from "pages/meeting/types";
 import { useGlobalStore } from "store";
