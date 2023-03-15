@@ -1,4 +1,4 @@
-import { operation } from "common/rpc.mjs";
+import { operation } from "@psibase/common-lib";
 import { psiSpaceContract, UploadFileParam } from "./contracts";
 
 export type UploadFilesOperationPayload = {

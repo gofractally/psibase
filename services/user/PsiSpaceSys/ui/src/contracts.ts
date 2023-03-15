@@ -1,4 +1,4 @@
-import { action, AppletId, getJson, siblingUrl } from "common/rpc.mjs";
+import { action, AppletId, getJson } from "@psibase/common-lib";
 
 class Contract {
     protected cachedApplet?: string;

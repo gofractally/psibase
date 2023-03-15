@@ -1,4 +1,4 @@
-import { uint8ArrayToHex } from "common/rpc.mjs";
+import { uint8ArrayToHex } from "@psibase/common-lib";
 import JSZip from "jszip";
 import mime from "mime";
 

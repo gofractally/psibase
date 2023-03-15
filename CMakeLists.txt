@@ -137,13 +137,25 @@ if(BUILD_JS)
     list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
     file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
     file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
+    
+    # Builds the Common Sys Lib
+    file(GLOB common_lib_sources ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/src/*)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
+        DEPENDS ${common_lib_sources}
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib && yarn && yarn build
+    )
+    add_custom_target(CommonSysLib_js
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
+    )
+
     foreach(ENTRY ${JS_DIRS})
         string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
         string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
         file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
         add_custom_command(
             OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
-            DEPENDS ${sources} ${common} ${common-fonts}
+            DEPENDS ${sources} ${common} ${common-fonts} CommonSysLib_js
             COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
         )
         add_custom_target(
@@ -218,6 +230,7 @@ if(BUILD_RUST)
 
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist    ${BOOT_IMAGE}/AccountSys/ui/dist
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui          ${BOOT_IMAGE}/AuthEcSys/ui
+        COMMAND         bash -c "cp ${COMMON_SYS}/common-lib/dist/common-lib.js  ${BOOT_IMAGE}/CommonSys/common/common-lib.js"
         COMMAND         bash -c "cp -a ${COMMON_SYS}/common/*.mjs                               ${BOOT_IMAGE}/CommonSys/common/"
         COMMAND         bash -c "cp -a ${COMMON_SYS}/common/fonts/*                             ${BOOT_IMAGE}/CommonSys/common/fonts/"
         COMMAND         cp -a ${COMMON_SYS}/ui/vanilla/common.index.html                        ${BOOT_IMAGE}/CommonSys/ui/vanilla

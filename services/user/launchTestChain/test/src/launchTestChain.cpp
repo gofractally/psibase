@@ -5,6 +5,8 @@
 #include <psibase/testUtils.hpp>
 #include <services/system/commonErrors.hpp>
 
+#include "services/user/CoreFractalSys.hpp"
+#include "services/user/FractalSys.hpp"
 #include "services/user/RTokenSys.hpp"
 #include "services/user/SymbolSys.hpp"
 #include "services/user/TokenSys.hpp"
@@ -53,6 +55,10 @@ SCENARIO("Testing default psibase chain")
 
    auto create = alice.to<TokenSys>().create(4, 1'000'000e4);
    alice.to<TokenSys>().mint(create.returnVal(), 100e4, memo);
+
+   // Create a fractal
+   alice.to<Fractal::FractalSys>().createIdentity();
+   alice.to<Fractal::FractalSys>().newFractal("astronauts"_a, Fractal::CoreFractalSys::service);
 
    // Make a couple blocks
    t.finishBlock();
