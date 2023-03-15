@@ -213,6 +213,7 @@ export class FractalService extends Service {
 
   @Op()
   async acceptInvite({ publicKey }: { publicKey: string}) {
+    await this.claim(publicKey);
     this.accept(publicKey);
   }
 
