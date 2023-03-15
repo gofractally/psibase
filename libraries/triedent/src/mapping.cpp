@@ -58,6 +58,7 @@ namespace triedent
       }
       if (::flock(_fd, flock_operation | LOCK_NB) != 0)
       {
+         ::close(_fd);
          throw std::system_error{errno, std::generic_category()};
       }
       struct stat statbuf[1];
