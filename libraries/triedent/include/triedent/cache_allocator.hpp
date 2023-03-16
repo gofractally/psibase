@@ -87,8 +87,9 @@ namespace triedent
       void validate(id i) { _obj_ids.validate(i); }
 
      private:
-      bool  swap();
-      void* try_move_object(ring_allocator&      to,
+      bool  swap(gc_session&);
+      void* try_move_object(session_lock_ref<>   session,
+                            ring_allocator&      to,
                             const location_lock& lock,
                             void*                data,
                             std::uint32_t        size);
@@ -160,7 +161,8 @@ namespace triedent
          if (loc.cache != hot_cache && obj->size <= 4096)
          {
             // MUST NOT wait for free memory while holding a location lock
-            if (auto copy = try_move_object(hot(), _obj_ids.lock(i), obj->data(), obj->size))
+            if (auto copy =
+                    try_move_object(session, hot(), _obj_ids.lock(i), obj->data(), obj->size))
             {
                return {copy, {loc.type()}, loc.ref};
             }

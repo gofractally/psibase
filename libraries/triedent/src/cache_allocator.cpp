@@ -34,7 +34,8 @@ namespace triedent
    {
       while (!_done.load())
       {
-         if (!swap())
+         gc_session session{_gc};
+         if (!swap(session))
          {
             // TODO: Stop busy waiting
             using namespace std::chrono_literals;
@@ -43,13 +44,14 @@ namespace triedent
       }
    }
 
-   bool cache_allocator::swap()
+   bool cache_allocator::swap(gc_session& session)
    {
       constexpr uint64_t target   = 1024 * 1024 * 40ull;
       bool               did_work = false;
       auto               do_swap  = [&](auto& from, auto& to)
       {
-         auto move_one = [&](object_header* o, object_location loc)
+         std::unique_lock sl{session};
+         auto             move_one = [&](object_header* o, object_location loc)
          {
             // When a block is initialized, id and o point to
             // each other. The block is valid as long as this
@@ -60,17 +62,17 @@ namespace triedent
             //   be made to point to it again until after the block
             //   is removed from the swap queue.
             //
-            bool matched;
-            if (auto lock = _obj_ids.try_lock({.id = o->id}, loc, &matched))
+            if (auto lock = _obj_ids.lock({.id = o->id}, loc))
             {
-               return to.allocate(lock.get_id(), o->size,
-                                  [&](void* ptr, object_location newloc)
-                                  {
-                                     std::memcpy(ptr, o->data(), o->size);
-                                     _obj_ids.compare_and_move(lock, loc, newloc);
-                                  }) != nullptr;
+               void* p = to.try_allocate(sl, lock.get_id(), o->size,
+                                         [&](void* ptr, object_location newloc)
+                                         {
+                                            std::memcpy(ptr, o->data(), o->size);
+                                            _obj_ids.compare_and_move(lock, loc, newloc);
+                                         });
+               return p != nullptr;
             }
-            return !matched;
+            return true;
          };
          if (auto p = from.swap(std::min(target, from.capacity()), move_one))
          {
@@ -78,26 +80,27 @@ namespace triedent
             did_work = true;
          }
       };
-      do_swap(hot(), warm());
-      do_swap(warm(), cool());
       do_swap(cool(), cold());
+      do_swap(warm(), cool());
+      do_swap(hot(), warm());
       _gc.poll();
       return did_work;
    }
 
-   void* cache_allocator::try_move_object(ring_allocator&      to,
+   void* cache_allocator::try_move_object(session_lock_ref<>   session,
+                                          ring_allocator&      to,
                                           const location_lock& lock,
                                           void*                data,
                                           std::uint32_t        size)
    {
       auto info   = _obj_ids.get(lock.get_id());
-      auto result = to.allocate(lock.get_id(), size,
-                                [&](void* ptr, object_location loc)
-                                {
-                                   std::memcpy(ptr, data, size);
-                                   _obj_ids.move(lock, loc);
-                                });
-      if (info.cache == cold_cache)
+      auto result = to.try_allocate(session, lock.get_id(), size,
+                                    [&](void* ptr, object_location loc)
+                                    {
+                                       std::memcpy(ptr, data, size);
+                                       _obj_ids.move(lock, loc);
+                                    });
+      if (result && info.cache == cold_cache)
       {
          _cold.deallocate(info);
       }

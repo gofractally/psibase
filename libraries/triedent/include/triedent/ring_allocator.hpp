@@ -106,7 +106,7 @@ namespace triedent
       // memory, returns null.
       // The init function will be executed before the new object becomes available to swap.
       template <typename F>
-      void* allocate(object_id id, std::size_t size, F&& init);
+      void* try_allocate(session_lock_ref<>, object_id id, std::size_t size, F&& init);
 
       // \pre offset is an offset that was previously returned by allocate.
       //
@@ -268,7 +268,7 @@ namespace triedent
    }
 
    template <typename F>
-   void* ring_allocator::allocate(object_id id, std::size_t size, F&& init)
+   void* ring_allocator::try_allocate(session_lock_ref<>, object_id id, std::size_t size, F&& init)
    {
       uint64_t used_size = alloc_size(size);
 

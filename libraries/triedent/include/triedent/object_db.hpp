@@ -124,6 +124,21 @@ namespace triedent
          }
          return location_lock{};
       }
+      location_lock lock(object_id id, object_location loc)
+      {
+         auto* h      = header();
+         auto& atomic = h->objects[id.id];
+         // If the object has already been moved, don't bother locking
+         if (object_info{atomic.load()} == loc)
+         {
+            location_lock l{_location_mutexes(h, &atomic), id};
+            if (object_info{atomic.load()} == loc)
+            {
+               return l;
+            }
+         }
+         return location_lock{};
+      }
       location_lock lock(object_id id)
       {
          auto* h      = header();

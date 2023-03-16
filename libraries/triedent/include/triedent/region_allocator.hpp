@@ -28,8 +28,10 @@ namespace triedent
                        access_mode                  mode,
                        std::uint64_t                initial_size = 64 * 1024 * 1024);
       ~region_allocator();
-      // MUST NOT hold a session lock because it may push to gc_queue
-      void* allocate(object_id id, std::uint32_t size, auto&& init)
+      void* try_allocate(std::unique_lock<gc_session>& session,
+                         object_id                     id,
+                         std::uint32_t                 size,
+                         auto&&                        init)
       {
          std::uint64_t         used_size = alloc_size(size);
          void*                 result;
@@ -42,7 +44,10 @@ namespace triedent
             init(result, loc);
          }
          if (cleanup)
+         {
+            relocker rl{session};
             _gc.push(cleanup);
+         }
          return result;
       }
       // MUST hold a session lock from before object_db::release to ensure that

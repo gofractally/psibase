@@ -28,13 +28,12 @@ TEST_CASE("region_allocator")
       {
          std::unique_lock l{session};
          auto             id = obj_ids.alloc(l, node_type::bytes);
-         l.unlock();
-         a.allocate(id, s.size(),
-                    [&](void* ptr, object_location loc)
-                    {
-                       std::memcpy(ptr, s.data(), s.size());
-                       obj_ids.init(id, loc);
-                    });
+         a.try_allocate(l, id, s.size(),
+                        [&](void* ptr, object_location loc)
+                        {
+                           std::memcpy(ptr, s.data(), s.size());
+                           obj_ids.init(id, loc);
+                        });
          ids.push_back(id);
       }
       gc.poll();
@@ -69,14 +68,13 @@ TEST_CASE("region_allocator threaded")
       auto                            idx = dist(rng);
       std::unique_lock                l{session};
       auto                            id = obj_ids.alloc(l, node_type::bytes);
-      l.unlock();
-      const auto& s = data[idx];
-      a.allocate(id, s.size(),
-                 [&](void* ptr, object_location loc)
-                 {
-                    std::memcpy(ptr, s.data(), s.size());
-                    obj_ids.init(id, loc);
-                 });
+      const auto&                     s  = data[idx];
+      a.try_allocate(l, id, s.size(),
+                     [&](void* ptr, object_location loc)
+                     {
+                        std::memcpy(ptr, s.data(), s.size());
+                        obj_ids.init(id, loc);
+                     });
       std::lock_guard l2{mutex};
       if (auto old = ids[idx])
       {
