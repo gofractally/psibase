@@ -96,43 +96,16 @@ namespace triedent
       // * Move the object to another location
       // * Modify the object if it's not already exposed to reader threads
 
-      // If matched is false, then id does not point to loc
-      location_lock try_lock(object_id id, object_location loc, bool* matched)
-      {
-         auto* h      = header();
-         auto& atomic = h->objects[id.id];
-         // If the object has already been moved, don't bother locking
-         if (object_info{atomic.load()} != loc)
-         {
-            *matched = false;
-         }
-         else if (location_lock l{_location_mutexes(h, &atomic), id, std::try_to_lock})
-         {
-            if (object_info{atomic.load()} == loc)
-            {
-               *matched = true;
-               return l;
-            }
-            else
-            {
-               *matched = false;
-            }
-         }
-         else
-         {
-            *matched = true;
-         }
-         return location_lock{};
-      }
+      // Only acquire the lock if id points to loc
       location_lock lock(object_id id, object_location loc)
       {
          auto* h      = header();
          auto& atomic = h->objects[id.id];
          // If the object has already been moved, don't bother locking
-         if (object_info{atomic.load()} == loc)
+         if (object_info info{atomic.load()}; info.ref != 0 && info == loc)
          {
             location_lock l{_location_mutexes(h, &atomic), id};
-            if (object_info{atomic.load()} == loc)
+            if (object_info info{atomic.load()}; info.ref != 0 && info == loc)
             {
                return l;
             }

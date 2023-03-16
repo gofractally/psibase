@@ -210,31 +210,26 @@ namespace triedent
          object_location loc{.offset = begin, .cache = _level};
          object_id       id{p->id};
          auto            info = _obj_ids.get(id);
-         if (info.ref && info == loc)
+         if (auto lock = _obj_ids.lock(id, loc))
          {
-            auto lock = _obj_ids.lock(id);
-            info      = _obj_ids.get(id);
-            if (info.ref && info == loc)
+            auto object_size = sizeof(object_header) + p->data_capacity();
+            if (object_size > dest_end - dest)
             {
-               auto object_size = sizeof(object_header) + p->data_capacity();
-               if (object_size > dest_end - dest)
-               {
-                  break;
-               }
-               void* new_location = _base + dest;
-               std::memcpy(new_location, p, object_size);
-               item.dest_begin.store(dest + object_size);
-               if (_obj_ids.compare_and_move(lock, loc,
-                                             object_location{.offset = dest, .cache = _level}))
-               {
-                  dest += object_size;
-               }
-               else
-               {
-                  // Reverting the allocation on failure is necessary to ensure that
-                  // region_used is always an upper bound of the actual used size.
-                  item.dest_begin.store(dest);
-               }
+               break;
+            }
+            void* new_location = _base + dest;
+            std::memcpy(new_location, p, object_size);
+            item.dest_begin.store(dest + object_size);
+            if (_obj_ids.compare_and_move(lock, loc,
+                                          object_location{.offset = dest, .cache = _level}))
+            {
+               dest += object_size;
+            }
+            else
+            {
+               // Reverting the allocation on failure is necessary to ensure that
+               // region_used is always an upper bound of the actual used size.
+               item.dest_begin.store(dest);
             }
          }
          begin += (sizeof(object_header) + p->data_capacity());
