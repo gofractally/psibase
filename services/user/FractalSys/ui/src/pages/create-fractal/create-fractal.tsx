@@ -3,10 +3,9 @@ import { useMutation } from "@tanstack/react-query";
 import { Input } from "@toolbox/components/ui";
 import { Con } from "components/layouts/con";
 import { useUser } from "hooks";
-import {
-  FractalList,
-} from "hooks/useParticipatingFractals";
+import { FractalList } from "hooks/useParticipatingFractals";
 import { queryClient } from "main";
+import { generateName } from "nameGenerator";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fractalApplet } from "service";
@@ -54,32 +53,32 @@ const useCreateFractal = () => {
         languageCode,
         displayName,
       });
-      const newFractal: FractalList = {
-        inviter: "",
-        key: {
-          account: user?.participantId,
-          fractal: name,
-        },
-        rewardShares: "0",
-      };
+      // const newFractal: FractalList = {
+      //   inviter: "",
+      //   key: {
+      //     account: user?.participantId,
+      //     fractal: name,
+      //   },
+      //   rewardShares: "0",
+      // };
 
-      const fractalsKey = ["fractals", user?.participantId];
-      queryClient.setQueryData(fractalsKey, (fractals: FractalList[]) => [
-        ...fractals,
-        newFractal,
-      ]);
-      queryClient.invalidateQueries(fractalsKey);
-      queryClient.setQueryData(["fractal", { name }], {
-        account: { name },
-        type: "",
-        founder: user?.participantId,
-        creationTime: new Date().toISOString(),
-        displayName: displayName || "",
-        description: description || "",
-        languageCode: languageCode || "",
-        eventHead: "0",
-      });
-      navigate(`/fractal/${name}/home`);
+      // const fractalsKey = ["fractals", user?.participantId];
+      // queryClient.setQueryData(fractalsKey, (fractals: FractalList[]) => [
+      //   ...fractals,
+      //   newFractal,
+      // ]);
+      // queryClient.invalidateQueries(fractalsKey);
+      // queryClient.setQueryData(["fractal", { name }], {
+      //   account: { name },
+      //   type: "",
+      //   founder: user?.participantId,
+      //   creationTime: new Date().toISOString(),
+      //   displayName: displayName || "",
+      //   description: description || "",
+      //   languageCode: languageCode || "",
+      //   eventHead: "0",
+      // });
+      // navigate(`/fractal/${name}/home`);
     },
   });
 };
@@ -122,8 +121,8 @@ export const CreateFractal = () => {
   const { mutateAsync: createInvite } = useCreateInvite();
 
   const test = async () => {
-    const numbers = parseInt((Math.random() * 1000).toString());
-    const name = "whatever" + numbers;
+    const { name, displayName } = generateName();
+    console.log("creating fractal", displayName, `(${name})`);
     const res = await fractalApplet.createFractal({ name, type: "0" });
     console.log("passed", res);
   };
