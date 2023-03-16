@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -63,6 +64,10 @@ namespace triedent
       // \pre The thread calling poll MUST NOT hold a lock on any associated session.
       void poll();
 
+      // Removes some elements from the queue. Blocks until at least
+      // one element is removed.
+      void run();
+
      private:
       auto      make_sequence_order(size_type end);
       size_type next(size_type pos);
@@ -77,6 +82,7 @@ namespace triedent
       std::mutex                         _session_mutex;
       std::vector<session*>              _sessions;
       std::mutex                         _queue_mutex;
+      std::condition_variable            _queue_cond;
       std::atomic<size_type>             _end;
       std::size_t                        _size;
       std::vector<std::shared_ptr<void>> _queue;

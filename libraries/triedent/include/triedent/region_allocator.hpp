@@ -72,6 +72,7 @@ namespace triedent
       static constexpr std::uint64_t max_queue     = 32;
       static constexpr std::uint64_t page_size     = 4096;
       static constexpr std::uint64_t pending_write = 1ull << 48;
+      static constexpr std::uint64_t pending_clear = 1ull << 56;
       struct queue_item
       {
          std::atomic<std::uint64_t> dest_begin;
@@ -101,8 +102,8 @@ namespace triedent
       };
       static_assert(sizeof(header) < page_size);
 
-      static std::pair<std::uint64_t, std::uint64_t> get_smallest_region(header::data* h);
-      std::optional<std::uint64_t>                   get_free_region(std::size_t num_regions);
+      std::pair<std::uint64_t, std::uint64_t> get_smallest_region(header::data* h);
+      std::optional<std::uint64_t>            get_free_region(std::size_t num_regions);
       void          start_new_region(header::data* old, header::data* next, std::shared_ptr<void>&);
       void          double_region_size(header::data* old_data, header::data* new_data);
       static void   copy_header_data(header::data* old, header::data* next);
@@ -112,7 +113,7 @@ namespace triedent
       //
       void load_queue();
       bool push_queue(std::uint64_t region, std::uint64_t used);
-      bool run_one();
+      bool run_one(gc_session&);
       void run();
 
       void queue_available(std::bitset<max_regions> pending, std::uint64_t region_size);
@@ -129,6 +130,7 @@ namespace triedent
 
       std::bitset<max_regions>      _free_regions;
       std::bitset<max_regions>      _pending_free_regions;
+      std::bitset<max_regions>      _queued_free_regions;
       std::uint64_t                 _queue_pos;
       std::uint64_t                 _queue_front;
       std::condition_variable       _pop_cond;

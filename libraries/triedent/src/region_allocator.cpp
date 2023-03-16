@@ -3,6 +3,8 @@
 namespace triedent
 {
 
+   static constexpr bool debug_alloc = false;
+
    region_allocator::region_allocator(gc_queue&                    gc,
                                       object_db&                   obj_ids,
                                       const std::filesystem::path& path,
@@ -63,6 +65,11 @@ namespace triedent
          alloc_pos = _h->alloc_pos;
          _header->current.store(next_index);
 
+         if (debug_alloc)
+         {
+            std::cout << "starting region: " << _h->current_region << std::endl;
+         }
+
          if (_header->regions[0].region_size != _header->regions[1].region_size)
             reevaluate_free();
 
@@ -94,6 +101,10 @@ namespace triedent
          _h->region_used[region].store(total_used - used_size);
          if (total_used == used_size)
          {
+            if (debug_alloc)
+            {
+               std::cout << "region is empty: " << region << std::endl;
+            }
             make_available(region);
          }
       }
@@ -104,7 +115,8 @@ namespace triedent
       std::uint64_t min_pos = 0;
       for (std::size_t i = 0; i < h->num_regions; ++i)
       {
-         if (h->region_used[i] != 0)
+         if (h->region_used[i] != 0 && !_pending_free_regions.test(i) &&
+             !_queued_free_regions.test(i))
          {
             if (h->region_used[i] < min)
             {
@@ -171,6 +183,10 @@ namespace triedent
              old_data->region_used[2 * i].load() + old_data->region_used[2 * i + 1].load();
          new_data->region_used[i].store(new_used);
       }
+      if (debug_alloc)
+      {
+         std::cout << "increased region size: " << new_data->region_size << std::endl;
+      }
    }
    void region_allocator::copy_header_data(header::data* old, header::data* next)
    {
@@ -229,7 +245,11 @@ namespace triedent
 
    bool region_allocator::is_used(const queue_item& item)
    {
-      return item.dest_end.load() > item.dest_begin.load();
+      // dest reaches its end first if all elements were copied by evacuate_region
+      // src reaches its end first if some elements were deleted or moved
+      //  after the evacuation was scheduled
+      return item.src_end.load() > item.src_begin.load() ||
+             item.dest_end.load() > item.dest_begin.load();
    }
 
    void region_allocator::load_queue()
@@ -256,10 +276,18 @@ namespace triedent
       {
          if (is_used(item))
          {
-            auto& used = _h->region_used[item.dest_begin.load() / _h->region_size];
-            auto  val  = used.load();
-            val += pending_write;
-            used.store(val);
+            {
+               auto& used = _h->region_used[item.src_begin.load() / _h->region_size];
+               auto  val  = used.load();
+               val += pending_clear;
+               used.store(val);
+            }
+            {
+               auto& used = _h->region_used[item.dest_begin.load() / _h->region_size];
+               auto  val  = used.load();
+               val += pending_write;
+               used.store(val);
+            }
          }
       }
       // mark current_region as pending again
@@ -281,31 +309,36 @@ namespace triedent
       std::uint64_t pos = _queue_pos;
       if (is_used(_header->queue[_queue_pos]))
       {
+         if (debug_alloc)
+         {
+            std::cout << "queue is full" << std::endl;
+         }
          return false;
       }
       auto& item = _header->queue[_queue_pos];
       // Ensure that the item will not be considered used until
       // the final store to dest_end.
-      item.dest_end.store(0);
+      item.src_end.store(0);
       item.src_begin.store(region * _h->region_size);
-      item.src_end.store((region + 1) * _h->region_size);
       auto alloc_pos = _h->alloc_pos;
       item.dest_begin.store(alloc_pos);
       alloc_pos += used;
       _h->alloc_pos = alloc_pos;
+      _h->region_used[region].store(_h->region_used[region] + pending_clear);
       _h->region_used[_h->current_region].store(_h->region_used[_h->current_region].load() +
                                                 pending_write);
       item.dest_end.store(alloc_pos);
+      item.src_end.store((region + 1) * _h->region_size);
       _queue_pos = (_queue_pos + 1) % max_queue;
       _pop_cond.notify_one();
       return true;
    }
 
-   bool region_allocator::run_one()
+   bool region_allocator::run_one(gc_session& session)
    {
       std::unique_lock l{_mutex};
       _pop_cond.wait(l,
-                     [this]
+                     [&]
                      {
                         return _done || _queue_front != _queue_pos ||
                                is_used(_header->queue[_queue_front]) ||
@@ -314,11 +347,18 @@ namespace triedent
       if (_done)
          return false;
 
+      std::unique_lock sl{session};
+
       auto& item = _header->queue[_queue_front];
       if (_queue_front != _queue_pos || is_used(item))
          _queue_front = (_queue_front + 1) % max_queue;
       if (is_used(item))
       {
+         if (debug_alloc)
+         {
+            std::cout << "evacuating region: " << item.src_begin.load() / _h->region_size
+                      << std::endl;
+         }
          l.unlock();
          auto orig_src  = item.src_begin.load();
          auto orig_dest = item.dest_begin.load();
@@ -346,8 +386,8 @@ namespace triedent
          }
          // Decrement the size of the source buffer and queue it for re-use
          {
-            auto src_used = _h->region_used[src_region].load();
-            assert(copied <= src_used);
+            auto src_used = _h->region_used[src_region].load() - pending_clear;
+            assert(copied <= (src_used % pending_write));
             if (src_used != 0)
             {
                // after a crash, region_used might not get decremented.
@@ -355,11 +395,13 @@ namespace triedent
                if (item.src_begin.load() - orig_src == _h->region_size)
                {
                   assert(src_used < pending_write);
+                  assert(item.src_begin.load() == item.src_end.load());
                   src_used = 0;
                }
                else
                {
                   src_used -= copied;
+                  item.src_begin.store(item.src_end.load());
                }
                _h->region_used[src_region].store(src_used);
                if (src_used == 0)
@@ -374,10 +416,17 @@ namespace triedent
          {
             make_available(dest_region);
          }
+         if (debug_alloc)
+         {
+            std::cout << "finished evacuating region: " << src_region << "->" << dest_region
+                      << std::endl;
+         }
       }
       auto pending     = _pending_free_regions;
       auto region_size = _h->region_size;
+      _queued_free_regions |= _pending_free_regions;
       _pending_free_regions.reset();
+      sl.unlock();
       l.unlock();
       if (pending.count() != 0)
          queue_available(pending, region_size);
@@ -397,6 +446,7 @@ namespace triedent
             {
                // duplicate free would be disasterous
                assert((_self->_free_regions & free).none());
+               assert((_self->_queued_free_regions & free) == free);
                for (std::uint64_t i = 0; i < max_regions; ++i)
                {
                   if (free.test(i))
@@ -404,6 +454,7 @@ namespace triedent
                      assert(_self->_h->region_used[i].load() == 0);
                   }
                }
+               _self->_queued_free_regions &= ~free;
                _self->_free_regions |= free;
             }
          }
@@ -436,7 +487,8 @@ namespace triedent
 
    void region_allocator::run()
    {
-      while (run_one())
+      gc_session session{_gc};
+      while (run_one(session))
       {
       }
    }

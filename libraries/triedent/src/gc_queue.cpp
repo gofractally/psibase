@@ -62,6 +62,10 @@ namespace triedent
       _queue[end] = std::move(element);
       _end.store(next(end));
       ++_size;
+      if (_size == 1)
+      {
+         _queue_cond.notify_one();
+      }
    }
 
    void gc_queue::poll()
@@ -71,6 +75,15 @@ namespace triedent
       auto            start = (end + _queue.size() - _size) % _queue.size();
       // _queue.size() is distinct from any valid sequence
       do_run(start, wait(_queue.size(), end));
+   }
+
+   void gc_queue::run()
+   {
+      std::unique_lock l{_queue_mutex};
+      _queue_cond.wait(l, [&] { return _size != 0; });
+      auto end   = _end.load();
+      auto start = (end + _queue.size() - _size) % _queue.size();
+      do_run(start, wait(start, end));
    }
 
    // returns the (circular) index after pos.
