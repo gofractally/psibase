@@ -14,7 +14,10 @@ export const FractalSidebar = ({
 
   return (
     <MainLayout>
-      <Sidebar menuItems={menuItems} title={data?.name || ""} />
+      <Sidebar
+        menuItems={menuItems}
+        title={data?.displayName || data?.account || ""}
+      />
     </MainLayout>
   );
 };

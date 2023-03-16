@@ -23,7 +23,7 @@ export const Sidebar = ({ menuItems = [], title = 'Title' }: SidebarProps) => {
             <Heading
                 tag="h1"
                 styledAs="h4"
-                className="p-2 h-30"
+                className="p-2 h-30 capitalize"
             >
                 {title}
             </Heading>

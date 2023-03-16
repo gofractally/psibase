@@ -1,32 +1,26 @@
-import { mockDelay } from "./mockDelay";
-import { useQuery } from "@tanstack/react-query";
 import { postGraphQLGetJson } from "@psibase/common-lib";
-import { fractals } from "dataDump";
-
-interface FractalListItem {
-  id: string;
-  name: string;
-  image: string;
-}
+import { useQuery } from "@tanstack/react-query";
 
 export const useFractal = (fractalId?: string) => {
-  return useQuery(
-    ["fractal", fractalId],
-    mockDelay(fractals.find((x) => x.id === fractalId)!),
-    { enabled: !!fractalId }
-  );
+  return useQuery(["fractal", fractalId], () => fetchFractal(fractalId), {
+    enabled: !!fractalId,
+  });
 };
 
 const queryFractal = (name: string): string => `{
-    getFractal(name: "${name}") {
-      name
+  
+    getFractal(fractal: "${name}") {
+      account
       type
-      prettyName
       founder
+      creationTime
+      displayName
+      description
+      languageCode
+      eventHead
     }
+
 }`;
-
-
 
 const queryFractals = (user: string): string => `{
   getFractals(user: "${user}") {
@@ -48,29 +42,49 @@ interface VectorResponse<T = any> {
   data: {
     [key: string]: {
       edges: {
-        node: T
-      }[]
-    }
-  }
+        node: T;
+      }[];
+    };
+  };
 }
 
-interface Fractal { inviter: string, rewardShares: string, key: { account: string, fractal: string } }
-
-export const gq = async<T = any>(query: string) => postGraphQLGetJson<T>("/graphql", query);
-
-export const fetchFractal = async (name: string) => gq(queryFractal(name));
-
-export const fetchFractals = async(username: string): Promise<Fractal[]> => {  
-  const res = await gq<VectorResponse<Fractal>>(queryFractals(username));
-  return res.data.getFractals!.edges.flatMap(edge => edge.node).filter(x => x.key.fractal)
+export interface FractalList {
+  inviter: string;
+  rewardShares: string;
+  key: { account: string; fractal: string };
 }
+interface FractalDetail {
+  account: string;
+  type: string;
+  founder: string;
+  creationTime: string;
+  displayName: string;
+  description: string;
+  launguageCode: string;
+  eventHead: string;
+}
+
+export const gq = async <T = any>(query: string) =>
+  postGraphQLGetJson<T>("/graphql", query);
+
+export const fetchFractal = async (name: string) => {
+  const res = await gq<{ data: { getFractal: FractalDetail } }>(
+    queryFractal(name)
+  );
+  return res.data.getFractal;
+};
+
+export const fetchFractals = async (
+  username: string
+): Promise<FractalList[]> => {
+  const res = await gq<VectorResponse<FractalList>>(queryFractals(username));
+  return res.data
+    .getFractals!.edges.flatMap((edge) => edge.node)
+    .filter((x) => x.key.fractal);
+};
 
 export const useParticipatingFractals = (username?: string) => {
-  return useQuery(
-    ["fractals", username],
-    () => fetchFractals(username!),
-    {
-      enabled: !!username,
-    }
-  );
+  return useQuery(["fractals", username], () => fetchFractals(username!), {
+    enabled: !!username,
+  });
 };

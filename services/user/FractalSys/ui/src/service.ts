@@ -63,7 +63,7 @@ export function Action(
       const result = originalMethod.apply(this, args);
       const theSender = sender(result);
 
-      console.log({
+      console.log('calling action...', {
         application: serviceName,
         actionName: key,
         params: result,
@@ -170,7 +170,42 @@ type ActionRes = { [key: string]: any } | undefined;
 
 const fractalSys: string = "fractal-sys";
 
+interface FractalSettings {
+  name: AccountNumber
+  displayName?: string;
+  description?: string;
+  languageCode?: string;
+}
+
+interface CreateFractalParams extends FractalSettings {
+    name: AccountNumber;
+    type: AccountNumber;
+}
+
+const keyToAction: { [key: string]: string } = {
+  displayName: 'setFracName',
+  description: 'setFracDesc',
+  languageCode: 'setFracLang'
+}
+
 export class FractalService extends Service {
+
+
+  @Action(fractalSys)
+  setFracName(fractalAccount: AccountNumber, displayName: string) {
+    return { fractalAccount, displayName }
+  }
+
+  @Action(fractalSys)
+  setFracDesc(fractalAccount: AccountNumber, description: string) {
+    return { fractalAccount, description }
+  }
+
+  @Action(fractalSys)
+  setFracLang(fractalAccount: AccountNumber, languageCode: string) {
+    return { fractalAccount, languageCode }
+  }
+
   @Action(fractalSys)
   newFractal(
     name: AccountNumber,
@@ -237,15 +272,23 @@ export class FractalService extends Service {
   }
 
   @Op()
-  async createFractal({
-    name,
-    type,
-  }: {
-    name: AccountNumber;
-    type: AccountNumber;
-  }) {
-    this.newFractal(name, type);
+  async createFractal(params: CreateFractalParams) {
+    this.newFractal(params.name, params.type);
+    // await new Promise(resolve => setTimeout(resolve, 2000))
+    // this.updateFractal(params)
+  }
+
+  @Op()
+  async updateFractal(settings: FractalSettings) {
+
+    for (const key in settings) {
+      const method = keyToAction[key];
+      if (method) {
+        await this[method](settings.name, settings[key])
+      }
+    }
   }
 }
+
 
 export const fractalApplet = new FractalService();
