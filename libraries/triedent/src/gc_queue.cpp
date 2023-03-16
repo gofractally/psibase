@@ -15,20 +15,6 @@ namespace triedent
       _queue->_sessions.erase(std::find(_queue->_sessions.begin(), _queue->_sessions.end(), this));
    }
 
-   gc_queue::size_type gc_queue::session::wait(size_type value)
-   {
-      auto old = _sequence.load();
-      do
-      {
-         if (old != value)
-         {
-            return old;
-         }
-      } while (!_sequence.compare_exchange_weak(old, value | wait_bit));
-      _sequence.wait(value | wait_bit);
-      return _sequence.load();
-   }
-
    auto gc_queue::make_sequence_order(size_type end)
    {
       return [this, end](size_type sequence) -> size_type
@@ -50,14 +36,26 @@ namespace triedent
 
    void gc_queue::push(std::shared_ptr<void> element)
    {
-      std::lock_guard l{_queue_mutex};
-      auto            end   = _end.load();
-      auto            start = (end + _queue.size() - _size) % _queue.size();
+      std::unique_lock l{_queue_mutex};
+      auto             end   = _end.load();
+      auto             start = (end + _queue.size() - _size) % _queue.size();
       // always leave one empty element, to ensure that
       // session._sequence == _end is unambiguous.
-      if (_size == _queue.size() - 1)
+      while (_size == _queue.size() - 1)
       {
-         do_run(start, wait(start, end));
+         auto end_ready = start_wait(start, end);
+         if (end_ready == start)
+         {
+            assert(_waiting);
+            _queue_cond.wait(l);
+            end   = _end.load();
+            start = (end + _queue.size() - _size) % _queue.size();
+         }
+         else
+         {
+            do_run(start, end_ready);
+            break;
+         }
       }
       _queue[end] = std::move(element);
       _end.store(next(end));
@@ -73,17 +71,31 @@ namespace triedent
       std::lock_guard l{_queue_mutex};
       auto            end   = _end.load();
       auto            start = (end + _queue.size() - _size) % _queue.size();
-      // _queue.size() is distinct from any valid sequence
-      do_run(start, wait(_queue.size(), end));
+      // _queue.size() is distinct from any sequence that
+      // a session can hold (including npos)
+      do_run(start, start_wait(_queue.size(), end));
    }
 
    void gc_queue::run()
    {
       std::unique_lock l{_queue_mutex};
       _queue_cond.wait(l, [&] { return _size != 0; });
-      auto end   = _end.load();
-      auto start = (end + _queue.size() - _size) % _queue.size();
-      do_run(start, wait(start, end));
+      while (true)
+      {
+         auto end   = _end.load();
+         auto start = (end + _queue.size() - _size) % _queue.size();
+         end        = start_wait(start, end);
+         if (!_waiting)
+         {
+            do_run(start, end);
+            return;
+         }
+         _queue_cond.wait(l);
+         if (_size == 0)
+         {
+            return;
+         }
+      }
    }
 
    // returns the (circular) index after pos.
@@ -113,7 +125,7 @@ namespace triedent
    // \post
    // for each index in [start, R):
    //   either U happens before W or P happens before L
-   gc_queue::size_type gc_queue::wait(size_type start, size_type end)
+   gc_queue::size_type gc_queue::start_wait(size_type start, size_type end)
    {
       std::size_t     lowest_sequence = end;
       auto            order           = make_sequence_order(end);
@@ -130,7 +142,15 @@ namespace triedent
          auto seq = session->_sequence.load();
          if (seq == start)
          {
-            seq = session->wait(start);
+            if (_waiting)
+            {
+               return start;
+            }
+            if (session->_sequence.compare_exchange_strong(seq, start | wait_bit))
+            {
+               _waiting = true;
+               return start;
+            }
          }
          if (order(seq) < order(lowest_sequence))
          {

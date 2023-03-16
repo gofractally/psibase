@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cassert>
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
@@ -34,7 +35,10 @@ namespace triedent
       using size_type = std::uint32_t;
 
      public:
-      explicit gc_queue(std::size_t max_size) : _end(0), _size(0), _queue(max_size + 1) {}
+      explicit gc_queue(std::size_t max_size)
+          : _end(0), _size(0), _queue(max_size + 1), _waiting{false}
+      {
+      }
       // A single session may not be accessed concurrently
       class session
       {
@@ -45,7 +49,6 @@ namespace triedent
          void unlock();
 
         private:
-         size_type wait(size_type value);
          friend class gc_queue;
          std::atomic<size_type> _sequence;
          gc_queue*              _queue;
@@ -73,10 +76,15 @@ namespace triedent
       size_type next(size_type pos);
       // requires _queue_mutex to be locked
       void do_run(size_type start, size_type end);
-      // blocks until no sessions are locking start
-      // returns the lowest lock.
-      size_type                  wait(size_type start, size_type end);
-      static constexpr size_type npos     = ~size_type(0);
+      // If any session is locking start, sets _waiting and ensures
+      //   that there is a session that will notify _queue_cond.
+      // returns the lowest sequence that is locked
+      size_type start_wait(size_type start, size_type end);
+      // Indicates an unlocked session
+      static constexpr size_type npos = ~size_type(0);
+      // At most one locked session has its wait_bit set.
+      // If waiting is true, then a session will eventually
+      // notify _queue_cond.
       static constexpr size_type wait_bit = ~(npos >> 1);
       friend class session;
       std::mutex                         _session_mutex;
@@ -86,6 +94,7 @@ namespace triedent
       std::atomic<size_type>             _end;
       std::size_t                        _size;
       std::vector<std::shared_ptr<void>> _queue;
+      bool                               _waiting;
    };
 
    using gc_session = gc_queue::session;
@@ -122,6 +131,7 @@ namespace triedent
    {
       while (true)
       {
+         assert(_sequence.load() == npos);
          // if the second load sees the value written by P or a later push, then P happens before L
          // if the second load sees a value written by an earlier push, then
          // - the second load is before P in seq_cst
@@ -141,15 +151,16 @@ namespace triedent
    }
    inline void gc_queue::session::unlock()
    {
-      auto value = _sequence.load();
-      bool notify;
-      do
+      auto value = _sequence.exchange(npos);
+      assert(value != npos);
+      if (value & wait_bit)
       {
-         notify = value & wait_bit;
-      } while (!_sequence.compare_exchange_weak(value, npos));
-      if (notify)
-      {
-         _sequence.notify_one();
+         {
+            std::lock_guard l{_queue->_queue_mutex};
+            assert(_queue->_waiting);
+            _queue->_waiting = false;
+         }
+         _queue->_queue_cond.notify_all();
       }
    }
 }  // namespace triedent
