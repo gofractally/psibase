@@ -28,7 +28,11 @@ namespace triedent
       _h      = &_header->regions[_header->current.load()];
       _base   = _header->base();
       load_queue();
-      _thread = std::thread{[this] { run(); }};
+      _thread = std::thread{[this]
+                            {
+                               pthread_setname_np(pthread_self(), "swap");
+                               run();
+                            }};
    }
 
    region_allocator::~region_allocator()
