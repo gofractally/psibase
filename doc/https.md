@@ -1,10 +1,10 @@
 # HTTPS
 
-Some web technologies require a secure context when not operating over `localhost`. This includes things link clipboard access and WebRTC--two technologies used within the `FractalSys` applet. For this reason, we need a means of running psinode with an SSL.
+Some web technologies require a secure context when not operating over `localhost`. This includes things like clipboard access and WebRTC--two technologies used within the `FractalSys` applet. For this reason, we need a means of running psinode with an SSL.
 
 ## Generating certs on local machine
 
-1. Install `mkcert` locally
+1. Install `mkcert` locally on your host machine
    - on MacOS: `brew install mkcert nss`
    - on Linux:
      - `apt-get update; apt install libnss3-tools -y`
@@ -47,7 +47,7 @@ filter = Severity >= info
 format = [{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}
 ```
 
-3. Start `psinode` with: `psinode psinode_db_secure`
+3. From the `psibase` directory, start `psinode` with: `psinode psinode_db_secure`
 4. Boot the chain with: `psibase -a http://psibase.127.0.0.1.sslip.io:8079 boot -p firstproducer --no-doc`
 
 If you're running `psinode` within a container, commands sent to psinode via the `psibase` command locally within the container must be sent to port `8079` without SSL. The node should now be accessible outside the container (assuming the ports are properly exposed) at `https://psibase.127.0.0.1.sslip.io:8080`.
