@@ -1,16 +1,5 @@
-import "./styles/globals.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { DrawerLayout } from "components/layouts";
-import { config } from "config";
-import LogRocket from "logrocket";
-import { Account, CreateFractal, Home, Meeting } from "pages";
-import { Home as FractalHome, Invite, Join, Members } from "pages/fractal";
-import { FractalSidebar } from "pages/fractal/fractal-sidebar";
-import { HomeSidebar } from "pages/home/home-sidebar";
-import { MeetingSelection } from "pages/meeting/meeting-selection";
 import React from "react";
 import ReactDOM from "react-dom";
-import Modal from "react-modal";
 import {
     Navigate,
     Route,
@@ -18,8 +7,22 @@ import {
     createBrowserRouter,
     createRoutesFromElements,
 } from "react-router-dom";
-import { StateProvider } from "store";
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import LogRocket from "logrocket";
+import Modal from "react-modal";
 import { v4 as uuid } from "uuid";
+
+import { DrawerLayout } from "components/layouts";
+import { config } from "config";
+import { Account, CreateFractal, Home, Meeting } from "pages";
+import { Home as FractalHome, Invite, Join, Members } from "pages/fractal";
+import { FractalSidebar } from "pages/fractal/fractal-sidebar";
+import { HomeSidebar } from "pages/home/home-sidebar";
+import { MeetingSelection } from "pages/meeting/meeting-selection";
+import { StateProvider } from "store";
+
+import "./styles/globals.css";
 
 if (config.isProduction && !config.isSsr) {
     LogRocket.init("fractally/fractally");

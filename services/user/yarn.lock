@@ -2530,7 +2530,7 @@
     "@tanstack/query-core" "4.24.10"
     use-sync-external-store "^1.2.0"
 
-"@trivago/prettier-plugin-sort-imports@^4.0.0":
+"@trivago/prettier-plugin-sort-imports@^4.1.1":
   version "4.1.1"
   resolved "https://registry.yarnpkg.com/@trivago/prettier-plugin-sort-imports/-/prettier-plugin-sort-imports-4.1.1.tgz#71c3c1ae770c3738b6fc85710714844477574ffd"
   integrity sha512-dQ2r2uzNr1x6pJsuh/8x0IRA3CBUB+pWEW3J/7N98axqt7SQSm+2fy0FLNXvXGg77xEDC7KHxJlHfLYyi7PDcw==

@@ -1,9 +1,11 @@
+import React, { HTMLProps, forwardRef } from "react";
+
+import classNames from "classnames";
+
 import { Text } from ".";
 import "../styles/inputs.css";
 import Button from "./Button";
 import { Icon, IconType } from "./Icon";
-import classNames from "classnames";
-import React, { forwardRef, HTMLProps } from "react";
 
 export const Label: React.FC<{
     htmlFor: string;

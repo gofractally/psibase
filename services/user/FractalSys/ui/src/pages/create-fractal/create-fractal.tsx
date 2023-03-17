@@ -1,3 +1,8 @@
+import { useState } from "react";
+
+import { useForm } from "react-hook-form";
+import type { SubmitHandler } from "react-hook-form";
+
 import {
     Button,
     Heading,
@@ -6,9 +11,6 @@ import {
     TextArea,
 } from "@toolbox/components/ui";
 import { Con } from "components/layouts/con";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import type { SubmitHandler } from "react-hook-form";
 
 enum Step {
     FractalInfo,
