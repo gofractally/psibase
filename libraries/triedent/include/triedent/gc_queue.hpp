@@ -67,9 +67,15 @@ namespace triedent
       // \pre The thread calling poll MUST NOT hold a lock on any associated session.
       void poll();
 
-      // Removes some elements from the queue. Blocks until at least
-      // one element is removed.
-      void run();
+      // Clears the queue
+      // \pre There are no active sessions
+      void flush();
+
+      // Processes the queue until done becomes true
+      void run(std::atomic<bool>* done);
+
+      // Wakes up threads that are blocked in run
+      void notify_run();
 
      private:
       auto      make_sequence_order(size_type end);

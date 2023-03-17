@@ -52,7 +52,9 @@ namespace triedent
       }
       // MUST hold a session lock from before object_db::release to ensure that
       // the location has not been re-used
-      void           deallocate(object_location loc);
+      void deallocate(object_location loc);
+      // stops all background threads
+      void           stop();
       object_header* get_object(std::uint64_t offset)
       {
          return reinterpret_cast<object_header*>(_base + offset);

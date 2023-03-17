@@ -171,16 +171,10 @@ TEST_CASE("region_allocator threaded")
              }
           });
    }
-   threads.emplace_back(
-       [&]
-       {
-          while (!done.load())
-          {
-             gc.run();
-          }
-       });
+   threads.emplace_back([&] { gc.run(&done); });
    std::this_thread::sleep_for(100ms);
    done.store(true);
+   gc.notify_run();
    gc.push(std::make_shared<int>(0));
    threads.clear();
    CHECK(!failed.load());

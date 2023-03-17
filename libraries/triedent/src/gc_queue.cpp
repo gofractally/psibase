@@ -76,26 +76,39 @@ namespace triedent
       do_run(start, start_wait(_queue.size(), end));
    }
 
-   void gc_queue::run()
+   void gc_queue::flush()
+   {
+      assert(_sessions.empty());
+      std::lock_guard l{_queue_mutex};
+      auto            end   = _end.load();
+      auto            start = (end + _queue.size() - _size) % _queue.size();
+      do_run(start, end);
+   }
+
+   void gc_queue::run(std::atomic<bool>* done)
    {
       std::unique_lock l{_queue_mutex};
-      _queue_cond.wait(l, [&] { return _size != 0; });
-      while (true)
+      while (!done->load())
       {
+         _queue_cond.wait(l, [&] { return done->load() || _size != 0; });
          auto end   = _end.load();
          auto start = (end + _queue.size() - _size) % _queue.size();
          end        = start_wait(start, end);
          if (!_waiting)
          {
             do_run(start, end);
-            return;
          }
-         _queue_cond.wait(l);
-         if (_size == 0)
+         else
          {
-            return;
+            _queue_cond.wait(l, [&] { return done->load(); });
          }
       }
+   }
+
+   void gc_queue::notify_run()
+   {
+      std::lock_guard{_queue_mutex};
+      _queue_cond.notify_all();
    }
 
    // returns the (circular) index after pos.

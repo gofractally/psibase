@@ -120,6 +120,7 @@ namespace triedent
 
       std::atomic<bool> _done{false};
       std::thread       _swap_thread;
+      std::thread       _gc_thread;
    };
 
    inline std::pair<location_lock, void*> cache_allocator::alloc(  //

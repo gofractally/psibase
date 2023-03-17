@@ -50,13 +50,21 @@ namespace triedent
 
    region_allocator::~region_allocator()
    {
+      stop();
+      _gc.flush();
+   }
+
+   void region_allocator::stop()
+   {
+      if (!_done)
       {
-         std::lock_guard l{_mutex};
-         _done = true;
+         {
+            std::lock_guard l{_mutex};
+            _done = true;
+         }
+         _pop_cond.notify_one();
+         _thread.join();
       }
-      _pop_cond.notify_one();
-      _thread.join();
-      _gc.poll();
    }
 
    void* region_allocator::allocate_impl(object_id              id,

@@ -22,13 +22,22 @@ namespace triedent
              pthread_setname_np(pthread_self(), "swap");
              swap_loop();
           });
+      _gc_thread = std::thread{[this]
+                               {
+                                  pthread_setname_np(pthread_self(), "swap");
+                                  _gc.run(&_done);
+                               }};
    }
 
    cache_allocator::~cache_allocator()
    {
       _done.store(true);
       hot().notify_swap();
+      _gc.notify_run();
       _swap_thread.join();
+      _cold.stop();
+      _gc_thread.join();
+      _gc.flush();
    }
 
    void cache_allocator::swap_loop()
