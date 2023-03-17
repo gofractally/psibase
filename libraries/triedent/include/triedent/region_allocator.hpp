@@ -87,6 +87,8 @@ namespace triedent
       };
       struct header
       {
+         std::uint32_t magic;
+         std::uint32_t flags;
          struct data
          {
             // TODO: alloc_pos should be atomic.

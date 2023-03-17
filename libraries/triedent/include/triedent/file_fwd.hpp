@@ -9,6 +9,7 @@ namespace triedent
    inline constexpr std::uint32_t file_type_database_root = 1;
    inline constexpr std::uint32_t file_type_index         = 2;
    inline constexpr std::uint32_t file_type_data          = 3;
+   inline constexpr std::uint32_t file_type_cold          = 4;
 
    inline constexpr std::size_t round_to_page(std::size_t arg)
    {

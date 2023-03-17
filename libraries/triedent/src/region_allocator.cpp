@@ -15,7 +15,9 @@ namespace triedent
       if (_file.size() == 0)
       {
          _file.resize(page_size + initial_size);
-         new (_file.data()) header{.regions = {{.region_size    = initial_size,
+         new (_file.data()) header{.magic   = file_magic,
+                                   .flags   = (_level << 8) | file_type_cold,
+                                   .regions = {{.region_size    = initial_size,
                                                 .alloc_pos      = 0,
                                                 .num_regions    = 1,
                                                 .current_region = 0,
@@ -27,6 +29,17 @@ namespace triedent
       _header = reinterpret_cast<header*>(_file.data());
       _h      = &_header->regions[_header->current.load()];
       _base   = _header->base();
+
+      if (_header->magic != file_magic)
+         throw std::runtime_error("Not a triedent file: " + path.native());
+      if ((_header->flags & file_type_mask) != file_type_cold)
+         throw std::runtime_error("Not a triedent cold data file: " + path.native());
+      if ((_header->flags >> 8) != _level)
+         throw std::runtime_error("Unexpected level in data file: " + path.native());
+      if (page_size + _h->region_size * _h->num_regions > _file.size())
+         throw std::runtime_error("File size is smaller than required by the header: " +
+                                  path.native());
+
       load_queue();
       _thread = std::thread{[this]
                             {
