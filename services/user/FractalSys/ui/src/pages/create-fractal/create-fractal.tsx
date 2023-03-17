@@ -20,10 +20,15 @@ interface FractalConfig {
     name: string;
     slug: string;
     description: string;
-    lang: string;
+    language: string;
 }
 
 export const CreateFractal = () => {
+    // TODO: Hook up to contract for fractal creation
+    // TODO: Use react-hook-form validation to enforce field-level constraints
+    // TODO: Populate select field with proper language options
+    // TODO: Add drag-and-drop code-of-conduct field
+    // TODO: Add support for next step(s)
     const [currentStep, setCurrentStep] = useState<Step>(Step.FractalInfo);
 
     const {
@@ -35,7 +40,7 @@ export const CreateFractal = () => {
             name: "",
             slug: "",
             description: "",
-            lang: "en-us",
+            language: "en-us",
         },
     });
 
@@ -83,14 +88,18 @@ export const CreateFractal = () => {
                             required:
                                 "Enter a few sentences to describe your fractal",
                         })}
+                        errorText={errors.description?.message}
                         type="text"
                         placeholder="Description"
+                        rows={4}
                     />
                     <Select
-                        {...register("lang", {
+                        label="Language"
+                        {...register("language", {
                             required:
                                 "Select a language for your fractal meetings",
                         })}
+                        errorText={errors.language?.message}
                     >
                         <option value="en-us">EN-English</option>
                         <option value="es-es">ES-Spanish</option>
