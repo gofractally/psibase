@@ -27,28 +27,24 @@ namespace triedent
    cache_allocator::~cache_allocator()
    {
       _done.store(true);
+      hot().notify_swap();
       _swap_thread.join();
    }
 
    void cache_allocator::swap_loop()
    {
-      while (!_done.load())
+      gc_session session{_gc};
+      while (swap(session))
       {
-         gc_session session{_gc};
-         if (!swap(session))
-         {
-            // TODO: Stop busy waiting
-            using namespace std::chrono_literals;
-            std::this_thread::sleep_for(10us);
-         }
       }
    }
 
    bool cache_allocator::swap(gc_session& session)
    {
-      constexpr uint64_t target   = 1024 * 1024 * 40ull;
-      bool               did_work = false;
-      auto               do_swap  = [&](auto& from, auto& to)
+      constexpr uint64_t      target     = 1024 * 1024 * 40ull;
+      constexpr std::uint64_t min_target = 1024 * 1024 * 33ull;
+      bool                    did_work   = false;
+      auto                    do_swap    = [&](auto& from, auto& to)
       {
          std::unique_lock sl{session};
          auto             move_one = [&](object_header* o, object_location loc)
@@ -80,11 +76,18 @@ namespace triedent
             did_work = true;
          }
       };
+      hot().wait_swap(min_target, &_done);
+      if (_done.load())
+         return false;
       do_swap(cool(), cold());
+      if (_done.load())
+         return false;
       do_swap(warm(), cool());
+      if (_done.load())
+         return false;
       do_swap(hot(), warm());
       _gc.poll();
-      return did_work;
+      return true;
    }
 
    void* cache_allocator::try_move_object(session_lock_ref<>   session,

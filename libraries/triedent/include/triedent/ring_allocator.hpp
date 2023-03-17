@@ -36,8 +36,8 @@ namespace triedent
    // Thread safety:
    //
    // - allocate can run concurrently
-   // - swap can run concurrently with allocate
-   // - two calls to swap MUST NOT run concurrently
+   // - swap and swap_wait can run concurrently with allocate
+   // - two calls to swap or swap_wait MUST NOT run concurrently
    //
    // Representation notes:
    // - The three regions are represented by their boundaries. The pointers
@@ -57,7 +57,9 @@ namespace triedent
    //   about the contents of non-allocated memory.
    //
    // Synchronization notes:
-   // - swap_p is only accessed by swap.
+   // - swap_p is only written by swap. It can be read by allocate,
+   //   but the value only affects the behavior if the swap thread
+   //   is in wait_swap.
    // - alloc_p and end_free_p are protected by free_mutex.
    // - All other fields are immutable
    // - object headers are written while holding free_mutex,
@@ -92,6 +94,13 @@ namespace triedent
       // The target size should be no smaller than the maximum allocation size
       // including padding.
       std::shared_ptr<void> swap(std::uint64_t target, auto&& move_object);
+
+      // Blocks until potential_free_bytes becomes less than min_swap or done is true
+      // This MUST NOT be called concurrently with itself or swap.
+      void wait_swap(std::uint64_t min_swap, std::atomic<bool>* done);
+
+      // Wakes up a thread that is blocked in wait_swap
+      void notify_swap();
 
       // Blocking overload of allocate.
       // The session lock may be released and reaquired, invaliding any pointers
@@ -182,6 +191,10 @@ namespace triedent
       std::uint64_t potential_free_bytes()
       {
          std::lock_guard l{_free_mutex};
+         return potential_free_bytes_unlocked();
+      }
+      std::uint64_t potential_free_bytes_unlocked()
+      {
          auto [alloc_p, alloc_x] = split_p(_header->alloc_p.load());
          auto [swap_p, swap_x]   = split_p(_header->swap_p.load());
          if (alloc_x == swap_x)
@@ -226,6 +239,8 @@ namespace triedent
       header*                 _header;
       char*                   _base;
       std::uint64_t           _end_free_p;
+      std::condition_variable _swap_cond;
+      std::uint64_t           _free_min;
 
       std::uint8_t                   _level;
       static constexpr std::uint64_t _mask = ~std::uint64_t{0} >> 1;
@@ -264,7 +279,12 @@ namespace triedent
          _free_cond.wait(l, [&] { return check_contiguous_free_space(used_size); });
       }
 
-      return allocate_impl(size, used_size, id, init);
+      void* result = allocate_impl(size, used_size, id, init);
+      if (potential_free_bytes_unlocked() < _free_min)
+      {
+         _swap_cond.notify_one();
+      }
+      return result;
    }
 
    template <typename F>

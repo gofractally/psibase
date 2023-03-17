@@ -35,6 +35,23 @@ namespace triedent
       _end_free_p = _header->swap_p.load() ^ (_mask + 1);
    }
 
+   void ring_allocator::wait_swap(std::uint64_t min_bytes, std::atomic<bool>* done)
+   {
+      std::unique_lock l{_free_mutex};
+      _free_min = min_bytes;
+      _swap_cond.wait(l,
+                      [&] { return done->load() || potential_free_bytes_unlocked() < min_bytes; });
+      _free_min = 0;
+   }
+
+   void ring_allocator::notify_swap()
+   {
+      // The lock here is needed to synchronize-with wait_swap
+      // even through no data is accessed while holding the lock.
+      std::lock_guard{_free_mutex};
+      _swap_cond.notify_all();
+   }
+
    std::shared_ptr<void> ring_allocator::make_update_free(std::uint64_t bytes)
    {
       if (bytes == 0)
@@ -63,7 +80,7 @@ namespace triedent
                }
                _self->_end_free_p = end_free_p | end_free_x;
             }
-            _self->_free_cond.notify_one();
+            _self->_free_cond.notify_all();
          }
          ring_allocator* _self;
          std::uint64_t   _bytes;
