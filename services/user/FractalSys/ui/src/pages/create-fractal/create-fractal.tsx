@@ -5,9 +5,11 @@ import type { SubmitHandler } from "react-hook-form";
 
 import {
     Button,
+    FileInput,
     Heading,
     Input,
     Select,
+    Text,
     TextArea,
 } from "@toolbox/components/ui";
 import { Con } from "components/layouts/con";
@@ -23,6 +25,7 @@ interface FractalConfig {
     slug: string;
     description: string;
     language: string;
+    coc: FileList;
 }
 
 export const CreateFractal = () => {
@@ -37,14 +40,22 @@ export const CreateFractal = () => {
         register,
         handleSubmit,
         formState: { errors },
+        getValues,
+        watch,
     } = useForm<FractalConfig>({
         defaultValues: {
             name: "",
             slug: "",
             description: "",
             language: "en-us",
+            coc: undefined,
         },
     });
+
+    const watchCoc = watch("coc");
+    const cocFileName = watchCoc?.[0]?.name;
+
+    console.log(getValues());
 
     const onSubmit: SubmitHandler<FractalConfig> = async (
         data: FractalConfig
@@ -107,6 +118,27 @@ export const CreateFractal = () => {
                         <option value="es-es">ES-Spanish</option>
                         <option value="zh-cn">ZH-Chinese</option>
                     </Select>
+                    <div>
+                        <FileInput
+                            label={
+                                cocFileName
+                                    ? "Replace attached code of conduct file"
+                                    : "Attach a code of conduct"
+                            }
+                            {...register("coc")}
+                            accept=".pdf,.doc,.docx,.xml,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        />
+                        <Text>
+                            {cocFileName ? (
+                                <>
+                                    <span className="font-medium">
+                                        Attached:{" "}
+                                    </span>
+                                    {cocFileName}
+                                </>
+                            ) : null}
+                        </Text>
+                    </div>
                     <Button type="primary" isSubmit>
                         Submit
                     </Button>
