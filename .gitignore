@@ -21,3 +21,5 @@ dist
 vite.config.ts.timestamp-*.mjs
 .pnpm-store
 .env
+psibase.127.0.0.1.sslip.io*.pem
+psinode_db_secure
