@@ -555,7 +555,7 @@ namespace triedent
    inline deref<node> session<AccessMode>::get_by_id(session_lock_ref<> l, id i) const
    {
       auto [ptr, type, ref] =
-          ring().template get_cache<std::is_same_v<AccessMode, write_access>>(l, i);
+          ring().template get_cache<true>(l, i);
       return {i, ptr, type};
    }
 
@@ -563,7 +563,7 @@ namespace triedent
    inline deref<node> session<AccessMode>::get_by_id(session_lock_ref<> l, id i, bool& unique) const
    {
       auto [ptr, type, ref] =
-          ring().template get_cache<std::is_same_v<AccessMode, write_access>>(l, i);
+          ring().template get_cache<true>(l, i);
       unique &= ref == 1;
       return {i, ptr, type};
    }
