@@ -1,4 +1,6 @@
-import React, { forwardRef, HTMLProps } from "react";
+import React, { HTMLProps, forwardRef } from "react";
+
+import classNames from "classnames";
 
 import { Text } from ".";
 import "../styles/inputs.css";
@@ -61,7 +63,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
             <div className="relative">
                 <input
                     name={props.id}
-                    className={`Input w-full border bg-white px-3 py-4 text-lg text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500 ${borderColor}`}
+                    className={classNames(
+                        "Input w-full border bg-white px-3 py-4 text-lg text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500",
+                        borderColor
+                    )}
                     ref={ref}
                     {...inputProps}
                 />
@@ -82,7 +87,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
                     <Text
                         span
                         size="sm"
-                        className={`select-none font-semibold ${subTextColor}`}
+                        className={classNames(
+                            "select-none font-semibold",
+                            subTextColor
+                        )}
                     >
                         {subText}
                     </Text>
@@ -112,41 +120,133 @@ export const FileInput = forwardRef<HTMLInputElement, FileInputProps>(
 );
 
 export interface SelectProps extends HTMLProps<HTMLSelectElement> {
-    disabled?: boolean;
+    label?: string;
+    helperText?: string;
+    successText?: string;
+    errorText?: string;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     (props, ref) => {
+        const subText =
+            props.errorText ?? props.successText ?? props.helperText;
+        const hasError = Boolean(props.errorText);
+
+        const borderColor = hasError
+            ? "border-red-500"
+            : "border-gray-500 focus-visible:border-gray-400";
+
+        const subTextColor = hasError
+            ? "text-red-500"
+            : props.successText
+            ? "text-green-500"
+            : "";
+
         return (
-            <select
-                className={`mt-1 block w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-blue-500 sm:text-sm ${
-                    props.disabled ? "bg-gray-50" : ""
-                }`}
-                {...props}
-                ref={ref}
+            <fieldset
+                className="space-y-1 text-gray-500 disabled:text-gray-300"
+                disabled={props.disabled}
             >
-                {props.children}
-            </select>
+                {props.label && (
+                    <label htmlFor={props.id}>
+                        <Text
+                            span
+                            size="sm"
+                            className="select-none font-semibold"
+                        >
+                            {props.label}
+                        </Text>
+                    </label>
+                )}
+                <select
+                    className={classNames(
+                        "Input w-full border bg-white px-3 py-4 text-lg text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500",
+                        borderColor
+                    )}
+                    {...props}
+                    ref={ref}
+                >
+                    {props.children}
+                </select>
+                {subText && (
+                    <Text
+                        span
+                        size="sm"
+                        className={classNames(
+                            "select-none font-semibold",
+                            subTextColor
+                        )}
+                    >
+                        {subText}
+                    </Text>
+                )}
+            </fieldset>
         );
     }
 );
 
 export interface TextAreaWithLabelProps extends HTMLProps<HTMLTextAreaElement> {
-    disabled?: boolean;
+    label?: string;
+    helperText?: string;
+    successText?: string;
+    errorText?: string;
 }
 
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaWithLabelProps>(
     (props, ref) => {
+        const subText =
+            props.errorText ?? props.successText ?? props.helperText;
+        const hasError = Boolean(props.errorText);
+
+        const borderColor = hasError
+            ? "border-red-500"
+            : "border-gray-500 focus-visible:border-gray-400";
+
+        const subTextColor = hasError
+            ? "text-red-500"
+            : props.successText
+            ? "text-green-500"
+            : "";
+
         return (
-            <textarea
-                rows={3}
-                name={props.id}
-                className={`h-32 w-full resize-none border border-gray-300 bg-white py-1 px-3 text-base leading-6 text-gray-700 outline-none transition-colors duration-200 ease-in-out focus:border-orange-500 focus:ring-2 focus:ring-orange-200 ${
-                    props.disabled ? "bg-gray-50" : ""
-                }`}
-                ref={ref}
-                {...props}
-            />
+            <fieldset
+                className="space-y-1 text-gray-500 disabled:text-gray-300"
+                disabled={props.disabled}
+            >
+                {props.label && (
+                    <label htmlFor={props.id}>
+                        <Text
+                            span
+                            size="sm"
+                            className="select-none font-semibold"
+                        >
+                            {props.label}
+                        </Text>
+                    </label>
+                )}
+                <textarea
+                    rows={3}
+                    name={props.id}
+                    className={classNames(
+                        "Input block w-full resize-none border bg-white py-4 px-3 text-lg leading-6 text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus:ring-gray-500",
+                        borderColor
+                    )}
+                    ref={ref}
+                    {...props}
+                />
+                {subText && (
+                    <Text
+                        span
+                        size="sm"
+                        className={classNames(
+                            "select-none font-semibold",
+                            subTextColor
+                        )}
+                    >
+                        {subText}
+                    </Text>
+                )}
+            </fieldset>
         );
     }
 );

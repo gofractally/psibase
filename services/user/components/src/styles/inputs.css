@@ -1,8 +1,11 @@
-input.Input:disabled {
+input.Input:disabled,
+textarea.Input:disabled,
+select.Input:disabled {
     @apply cursor-not-allowed border-gray-300 bg-transparent text-gray-300 placeholder:text-gray-300;
 }
 
-input.Input:read-only:not(:disabled) {
+input.Input:read-only:not(:disabled),
+textarea.Input:read-only:not(:disabled) {
     @apply border-gray-50 bg-gray-50 focus-visible:ring-0;
 }
 
@@ -39,26 +42,26 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 /* Checkbox */
-input[type='checkbox'] {
-    border: 3.4px solid #64748B;
+input[type="checkbox"] {
+    border: 3.4px solid #64748b;
     background-color: transparent;
     border-radius: 5px;
 }
 
-input[type='checkbox']:checked {
+input[type="checkbox"]:checked {
     background-color: transparent;
     background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7.23657 8.7736C6.84604 8.38308 6.21288 8.38308 5.82235 8.7736C5.43183 9.16412 5.43183 9.79729 5.82235 10.1878L7.23657 8.7736ZM9.52946 12.4807L8.82235 13.1878C9.00996 13.3754 9.26442 13.4808 9.52973 13.4807C9.79504 13.4806 10.0494 13.3751 10.2369 13.1874L9.52946 12.4807ZM19.7075 3.70673C20.0978 3.31599 20.0975 2.68283 19.7067 2.29251C19.316 1.9022 18.6828 1.90254 18.2925 2.29327L19.7075 3.70673ZM20 10C20 9.44771 19.5523 9 19 9C18.4477 9 18 9.44771 18 10H20ZM1 17H0H1ZM3 1V0V1ZM14 2C14.5523 2 15 1.55228 15 1C15 0.447715 14.5523 0 14 0V2ZM5.82235 10.1878L8.82235 13.1878L10.2366 11.7736L7.23657 8.7736L5.82235 10.1878ZM18 10V17H20V10H18ZM18 17C18 17.2652 17.8946 17.5196 17.7071 17.7071L19.1213 19.1213C19.6839 18.5587 20 17.7957 20 17H18ZM17.7071 17.7071C17.5196 17.8946 17.2652 18 17 18V20C17.7957 20 18.5587 19.6839 19.1213 19.1213L17.7071 17.7071ZM17 18H3V20H17V18ZM3 18C2.73478 18 2.48043 17.8946 2.29289 17.7071L0.87868 19.1213C1.44129 19.6839 2.20435 20 3 20V18ZM2.29289 17.7071C2.10536 17.5196 2 17.2652 2 17H0C0 17.7957 0.31607 18.5587 0.87868 19.1213L2.29289 17.7071ZM2 17V3H0V17H2ZM2 3C2 2.73478 2.10536 2.48043 2.29289 2.29289L0.87868 0.87868C0.31607 1.44129 0 2.20435 0 3H2ZM2.29289 2.29289C2.48043 2.10536 2.73478 2 3 2V0C2.20435 0 1.44129 0.31607 0.87868 0.87868L2.29289 2.29289ZM3 2H14V0H3V2ZM10.2369 13.1874L19.7075 3.70673L18.2925 2.29327L8.82197 11.774L10.2369 13.1874Z' fill='%230F172A'/%3E%3C/svg%3E%0A");
     background-size: 100%;
     border: none !important;
 }
 
-input[type='checkbox']:active,
-input[type='checkbox']:focus,
-input[type='checkbox']:hover,
-input[type='checkbox']:checked:focus,
-input[type='checkbox']:checked:hover {
+input[type="checkbox"]:active,
+input[type="checkbox"]:focus,
+input[type="checkbox"]:hover,
+input[type="checkbox"]:checked:focus,
+input[type="checkbox"]:checked:hover {
     background-color: transparent;
     outline: none;
     box-shadow: none;
-    border: 3.4px solid #0F172A;
+    border: 3.4px solid #0f172a;
 }
