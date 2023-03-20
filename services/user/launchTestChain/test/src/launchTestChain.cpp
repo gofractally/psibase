@@ -22,7 +22,7 @@ namespace
 
 SCENARIO("Testing default psibase chain")
 {
-   DefaultTestChain t({}, 1'000'000'000ul, 32, 32, 32, 38);
+   DefaultTestChain t({}, 1ull << 32, 1ull << 32, 1ull << 32, 1ull << 32);
 
    auto tokenSysRpc = t.from(RTokenSys::service).to<RTokenSys>();
 

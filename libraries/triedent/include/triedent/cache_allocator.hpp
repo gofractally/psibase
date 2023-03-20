@@ -29,9 +29,12 @@ namespace triedent
      public:
       using id = object_id;
 
+      // cold_bytes can grow
+      // hot/warm/cool are fixed
+      // hot/warm/cool/cold MUST be more than twice the
+      // maximum allocation size.
       struct config
       {
-         uint64_t max_ids    = 100 * 1000 * 1000ull;
          uint64_t hot_bytes  = 1000 * 1000ull;
          uint64_t warm_bytes = 1000 * 1000ull;
          uint64_t cool_bytes = 1000 * 1000ull;

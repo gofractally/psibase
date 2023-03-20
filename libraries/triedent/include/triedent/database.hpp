@@ -372,15 +372,7 @@ namespace triedent
       friend root;
 
      public:
-      // TODO: rename *_pages
-      struct config
-      {
-         uint64_t max_objects = 1000 * 1000ull;
-         uint64_t hot_pages   = 32;
-         uint64_t warm_pages  = 32;
-         uint64_t cool_pages  = 32;
-         uint64_t cold_pages  = 32;
-      };
+      using config                     = cache_allocator::config;
       static constexpr auto read_write = access_mode::read_write;
       static constexpr auto read_only  = access_mode::read_only;
 

@@ -73,11 +73,10 @@ int main(int argc, char** argv)
       }
       if (vm.count("create"))
       {
-         database::create(db_dir, triedent::database::config{.max_objects = num_objects,
-                                                             .hot_pages   = hot_page_c,
-                                                             .warm_pages  = warm_page_c,
-                                                             .cool_pages  = cool_page_c,
-                                                             .cold_pages  = cold_page_c});
+         database::create(db_dir, triedent::database::config{.hot_bytes  = 1ull << hot_page_c,
+                                                             .warm_bytes = 1ull << warm_page_c,
+                                                             .cool_bytes = 1ull << cool_page_c,
+                                                             .cold_bytes = 1ull << cold_page_c});
       }
 
       if (vm.count("validate"))

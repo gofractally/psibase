@@ -7,16 +7,7 @@ namespace triedent
                       const config&                cfg,
                       access_mode                  mode,
                       bool                         allow_gc)
-       : _ring{dir / "data",
-               {
-                   .max_ids    = cfg.max_objects,
-                   .hot_bytes  = 1ull << cfg.hot_pages,
-                   .warm_bytes = 1ull << cfg.warm_pages,
-                   .cool_bytes = 1ull << cfg.cool_pages,
-                   .cold_bytes = 1ull << cfg.cold_pages,
-               },
-               mode,
-               allow_gc},
+       : _ring{dir / "data", cfg, mode, allow_gc},
          _file{dir / "db", mode},
          _root_release_session{_ring}
    {

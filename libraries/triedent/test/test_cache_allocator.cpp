@@ -19,10 +19,9 @@ TEST_CASE("cache_allocator")
 {
    temp_directory dir("triedent-test");
    std::filesystem::create_directories(dir.path);
-   cache_allocator a{
-       dir.path,
-       {.max_ids = 16, .hot_bytes = 128, .warm_bytes = 128, .cool_bytes = 128, .cold_bytes = 1024},
-       access_mode::read_write};
+   cache_allocator a{dir.path,
+                     {.hot_bytes = 128, .warm_bytes = 128, .cool_bytes = 128, .cold_bytes = 1024},
+                     access_mode::read_write};
    dir.reset();
 
    std::vector<std::pair<object_id, std::size_t>> known_ids;
@@ -91,10 +90,9 @@ TEST_CASE("cache_allocator long")
 {
    temp_directory dir("triedent-test");
    std::filesystem::create_directories(dir.path);
-   cache_allocator a{
-       dir.path,
-       {.max_ids = 1, .hot_bytes = 128, .warm_bytes = 128, .cool_bytes = 128, .cold_bytes = 128},
-       access_mode::read_write};
+   cache_allocator a{dir.path,
+                     {.hot_bytes = 128, .warm_bytes = 128, .cool_bytes = 128, .cold_bytes = 128},
+                     access_mode::read_write};
    dir.reset();
 
    std::vector<object_id> ids{data.size()};

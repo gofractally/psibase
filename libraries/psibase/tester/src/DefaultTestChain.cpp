@@ -32,12 +32,11 @@ using namespace SystemService;
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalServices,
-    uint64_t                                                  max_objects,
-    uint64_t                                                  hot_addr_bits,
-    uint64_t                                                  warm_addr_bits,
-    uint64_t                                                  cool_addr_bits,
-    uint64_t                                                  cold_addr_bits)
-    : TestChain{max_objects, hot_addr_bits, warm_addr_bits, cool_addr_bits, cold_addr_bits}
+    uint64_t                                                  hot_bytes,
+    uint64_t                                                  warm_bytes,
+    uint64_t                                                  cool_bytes,
+    uint64_t                                                  cold_bytes)
+    : TestChain{hot_bytes, warm_bytes, cool_bytes, cold_bytes}
 {
    startBlock();
    deploySystemServices();
@@ -53,7 +52,9 @@ DefaultTestChain::DefaultTestChain(
    from(UserService::SymbolSys::service).to<UserService::SymbolSys>().init();
    from(UserService::Invite::InviteSys::service).to<UserService::Invite::InviteSys>().init();
    from(UserService::Fractal::FractalSys::service).to<UserService::Fractal::FractalSys>().init();
-   from(UserService::Fractal::CoreFractalSys::service).to<UserService::Fractal::CoreFractalSys>().init();
+   from(UserService::Fractal::CoreFractalSys::service)
+       .to<UserService::Fractal::CoreFractalSys>()
+       .init();
 
    for (const auto& c : additionalServices)
    {

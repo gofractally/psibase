@@ -33,11 +33,10 @@ std::optional<std::string_view> osv(std::string_view s)
 }
 
 auto createDb(const database::config& cfg = database::config{
-                  .max_objects = 10000ull,
-                  .hot_pages   = 30,
-                  .warm_pages  = 30,
-                  .cool_pages  = 30,
-                  .cold_pages  = 30,
+                  .hot_bytes  = 1ull << 30,
+                  .warm_bytes = 1ull << 30,
+                  .cool_bytes = 1ull << 30,
+                  .cold_bytes = 1ull << 30,
               })
 {
    temp_directory dir("triedent-test");
@@ -177,7 +176,7 @@ TEST_CASE("erase")
 TEST_CASE("recover")
 {
    temp_directory dir("triedent-test");
-   database::create(dir.path, database::config{128, 27, 27, 27, 27});
+   database::create(dir.path, database::config{1ull << 27, 1ull << 27, 1ull << 27, 1ull << 27});
    {
       auto db = std::make_shared<database>(dir.path, access_mode::read_write);
       std::shared_ptr<triedent::root> root;
@@ -229,11 +228,10 @@ TEST_CASE("many refs")
    // This should be larger than the maximum node refcount
    constexpr int count   = 32768 + 1;
    auto          db      = createDb(database::config{
-                     .max_objects = 100000ull,
-                     .hot_pages   = 27,
-                     .warm_pages  = 27,
-                     .cool_pages  = 27,
-                     .cold_pages  = 27,
+                     .hot_bytes  = 1ull << 27,
+                     .warm_bytes = 1ull << 27,
+                     .cool_bytes = 1ull << 27,
+                     .cold_bytes = 1ull << 27,
    });
    auto          session = db->start_write_session();
    auto          root    = session->get_top_root();
