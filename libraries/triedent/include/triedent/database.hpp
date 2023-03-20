@@ -240,7 +240,7 @@ namespace triedent
                              std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
       inline id   retain(std::unique_lock<gc_session>&, id);
-      inline void release(id);
+      inline void release(session_lock_ref<> l, id);
 
       friend class database;
       std::shared_ptr<database> _db;
@@ -285,7 +285,7 @@ namespace triedent
 
      private:
       inline bool get_unique(std::shared_ptr<root>& r);
-      inline void update_root(std::shared_ptr<root>& r, object_id id);
+      inline void update_root(session_lock_ref<> l, std::shared_ptr<root>& r, object_id id);
 
       void recursive_retain(session_lock_ref<> l, object_id id);
 
@@ -339,7 +339,9 @@ namespace triedent
                              string_view                   key,
                              int&                          removed_size);
 
-      inline void modify_value(mutable_deref<value_node> mut, string_view val);
+      inline void modify_value(session_lock_ref<>        l,
+                               mutable_deref<value_node> mut,
+                               string_view               val);
       inline id   set_value(std::unique_lock<gc_session>& session,
                             deref<node>                   n,
                             bool                          unique,
@@ -397,7 +399,7 @@ namespace triedent
       auto span() const { return _ring.span(); }
 
      private:
-      inline void release(id);
+      inline void release(session_lock_ref<> l, id);
       inline void ensure_free_space();
 
       struct revision
@@ -442,7 +444,7 @@ namespace triedent
       {
          std::lock_guard<std::mutex> lock(db->_root_release_session_mutex);
          session_base::swap_guard    guard(db->_root_release_session);
-         db->release(id);
+         db->release(guard, id);
       }
    }
 
@@ -554,16 +556,14 @@ namespace triedent
    template <typename AccessMode>
    inline deref<node> session<AccessMode>::get_by_id(session_lock_ref<> l, id i) const
    {
-      auto [ptr, type, ref] =
-          ring().template get_cache<true>(l, i);
+      auto [ptr, type, ref] = ring().template get_cache<true>(l, i);
       return {i, ptr, type};
    }
 
    template <typename AccessMode>
    inline deref<node> session<AccessMode>::get_by_id(session_lock_ref<> l, id i, bool& unique) const
    {
-      auto [ptr, type, ref] =
-          ring().template get_cache<true>(l, i);
+      auto [ptr, type, ref] = ring().template get_cache<true>(l, i);
       unique &= ref == 1;
       return {i, ptr, type};
    }
@@ -581,20 +581,20 @@ namespace triedent
          auto id = r->id;
          r->id   = {};
          swap_guard g(*this);
-         release(id);
+         release(g, id);
       }
       r = {};
    }
 
    template <typename AccessMode>
-   inline void session<AccessMode>::release(id obj)
+   inline void session<AccessMode>::release(session_lock_ref<> l, id obj)
    {
-      _db->release(obj);
+      _db->release(l, obj);
    }
 
-   inline void database::release(id obj)
+   inline void database::release(session_lock_ref<> l, id obj)
    {
-      release_node(_ring, obj);
+      release_node(l, _ring, obj);
    }
 
    template <typename AccessMode>
@@ -640,7 +640,7 @@ namespace triedent
          std::cout << id.id << ": set_top_root: old=" << current << std::endl;
       id = retain(l, id);
       _db->_dbm->top_root.store(id.id);
-      release({current});
+      release(l, {current});
    }
 
    inline bool write_session::get_unique(std::shared_ptr<root>& r)
@@ -649,7 +649,9 @@ namespace triedent
       return r && r->db && !r->ancestor && r.use_count() == 1;
    }
 
-   inline void write_session::update_root(std::shared_ptr<root>& r, object_id id)
+   inline void write_session::update_root(session_lock_ref<>     l,
+                                          std::shared_ptr<root>& r,
+                                          object_id              id)
    {
       if (r && r->db && r->id == id)
       {
@@ -667,7 +669,7 @@ namespace triedent
          // bumped.
          if constexpr (debug_roots)
             std::cout << id.id << ": update_root replacing:" << r->id.id << std::endl;
-         release(r->id);
+         release(l, r->id);
          r->id = id;
       }
       else
@@ -824,7 +826,9 @@ namespace triedent
       }
    }
 
-   void write_session::modify_value(mutable_deref<value_node> mut, string_view val)
+   void write_session::modify_value(session_lock_ref<>        l,
+                                    mutable_deref<value_node> mut,
+                                    string_view               val)
    {
       if (mut.type() == node_type::roots)
       {
@@ -843,7 +847,7 @@ namespace triedent
          {
             auto prev = *dest;
             *dest++   = *src++;
-            release(prev);
+            release(l, prev);
          }
 
          if constexpr (debug_roots)
@@ -873,7 +877,7 @@ namespace triedent
       auto& vn = n.as_value_node();
       if (vn.data_size() == val.size())
       {
-         modify_value(lock(deref<value_node>(n)), val);
+         modify_value(session, lock(deref<value_node>(n)), val);
          return n;
       }
 
@@ -894,12 +898,12 @@ namespace triedent
             auto& vn = v.as_value_node();
             if (v.type() == type && vn.data_size() == val.size() && ring().ref(old_value) == 1)
             {
-               modify_value(lock(deref<value_node>(v)), val);
+               modify_value(session, lock(deref<value_node>(v)), val);
                return n;
             }
             else
             {
-               ring().release(old_value);
+               ring().release(session, old_value);
             }
          }
          object_id val_id = make_value(session, type, string_view(), val);
@@ -976,7 +980,7 @@ namespace triedent
             if (new_b != cur_b)
             {
                new_in->branch(b) = new_b;
-               release(cur_b);
+               release(session, cur_b);
             }
 
             return new_in;
@@ -990,7 +994,7 @@ namespace triedent
          {
             in.reload(ring(), session);
             lock(in)->branch(b) = new_b;
-            release(cur_b);
+            release(session, cur_b);
          }
          return root;
       }
@@ -1044,7 +1048,7 @@ namespace triedent
           add_child(l, get_id(r), get_unique(r), node_type::bytes,
                     to_key6({key.data(), key.size()}), {val.data(), val.size()}, old_size);
       assert(new_root.id);
-      update_root(r, new_root);
+      update_root(l, r, new_root);
       return old_size;
    }
 
@@ -1065,7 +1069,7 @@ namespace triedent
           l, get_id(r), get_unique(r), node_type::roots, to_key6({key.data(), key.size()}),
           {reinterpret_cast<const char*>(ids.data()), ids.size() * sizeof(object_id)}, old_size);
       assert(new_root.id);
-      update_root(r, new_root);
+      update_root(l, r, new_root);
       return old_size;
    }
 
@@ -1439,7 +1443,7 @@ namespace triedent
       int  removed_size = -1;
       auto new_root = remove_child(l, get_id(r), get_unique(r), to_key6({key.data(), key.size()}),
                                    removed_size);
-      update_root(r, new_root);
+      update_root(l, r, new_root);
       return removed_size;
    }
 
@@ -1505,7 +1509,7 @@ namespace triedent
          {
             auto prev = in->value();
             lock(in)->set_value(id());
-            release(prev);
+            release(session, prev);
             return root;
          }
          else
@@ -1530,7 +1534,7 @@ namespace triedent
          if (new_b and unique)
          {
             lock(in)->branch(b) = new_b;
-            release(cur_b);
+            release(session, cur_b);
             return root;
          }
          if (new_b)  // update branch
@@ -1538,7 +1542,7 @@ namespace triedent
             auto new_root =
                 clone_inner(session, in, *in, in->key(), 0, in->value(), in->branches());
             auto& new_br = new_root->branch(b);
-            release(new_br);
+            release(session, new_br);
             new_br = new_b;
             return new_root;
          }

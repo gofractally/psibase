@@ -62,7 +62,7 @@ namespace triedent
                                             std::size_t                          num_bytes,
                                             node_type                            type);
 
-      std::pair<void*, node_type> release(id i);
+      std::pair<void*, node_type> release(session_lock_ref<>, id i);
 
       // The returned pointer will remain valid until the session lock is released
       // get_cache is non-blocking.
@@ -142,7 +142,7 @@ namespace triedent
       return {std::move(lock), get_object(_obj_ids.get(i))->data()};
    }
 
-   inline std::pair<void*, node_type> cache_allocator::release(id i)
+   inline std::pair<void*, node_type> cache_allocator::release(session_lock_ref<>, id i)
    {
       auto l = _obj_ids.release(i);
       if (l.ref == 0 && l.cache == cold_cache)

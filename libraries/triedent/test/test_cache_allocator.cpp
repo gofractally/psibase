@@ -115,7 +115,7 @@ TEST_CASE("cache_allocator long")
       std::lock_guard l2{mutex};
       if (auto old = ids[idx])
       {
-         a.release(old);
+         a.release(l, old);
       }
       ids[idx] = id;
    };
@@ -133,7 +133,7 @@ TEST_CASE("cache_allocator long")
       if (id)
       {
          std::lock_guard l{session};
-         a.release(id);
+         a.release(l, id);
       }
    };
 
@@ -154,7 +154,7 @@ TEST_CASE("cache_allocator long")
          std::lock_guard l{session};
          auto [ptr, node_type, ref] = a.get_cache<true>(l, id);
          copy = std::string_view{(char*)ptr, cache_allocator::object_size(ptr)};
-         a.release(id);
+         a.release(l, id);
       }
       if (copy != data[idx])
       {

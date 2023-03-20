@@ -395,17 +395,17 @@ namespace triedent
       return b >= 63 ? 64 : std::countr_zero(_present_bits & mask);
    }
 
-   inline void release_node(cache_allocator& ra, object_id obj)
+   inline void release_node(session_lock_ref<> l, cache_allocator& ra, object_id obj)
    {
       if (!obj)
          return;
-      auto [ptr, type] = ra.release(obj);
+      auto [ptr, type] = ra.release(l, obj);
       if (ptr && type == node_type::inner)
       {
          auto& in = *reinterpret_cast<inner_node*>(ptr);
          if constexpr (debug_nodes)
             std::cout << obj.id << ": destroying; release value " << in.value().id << std::endl;
-         release_node(ra, in.value());
+         release_node(l, ra, in.value());
          auto nb  = in.num_branches();
          auto pos = in.children();
          auto end = pos + nb;
@@ -414,7 +414,7 @@ namespace triedent
             assert(*pos);
             if constexpr (debug_nodes)
                std::cout << obj.id << ": destroying; release child " << pos->id << std::endl;
-            release_node(ra, *pos);
+            release_node(l, ra, *pos);
             ++pos;
          }
       }
@@ -427,7 +427,7 @@ namespace triedent
          {
             if constexpr (debug_nodes)
                std::cout << obj.id << ": destroying; release root " << roots->id << std::endl;
-            release_node(ra, *roots++);
+            release_node(l, ra, *roots++);
          }
       }
    }
