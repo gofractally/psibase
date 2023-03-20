@@ -99,11 +99,7 @@ namespace triedent
             reevaluate_free();
 
          // Try to free some space
-         auto [smallest, small_size] = get_smallest_region(_h);
-         if (small_size < _h->region_size / 2)
-         {
-            push_queue(smallest, small_size);
-         }
+         queue_small_regions();
       }
       void* result = _base + _h->alloc_pos;
       auto  o      = new (result) object_header{.size = size, .id = id.id};
@@ -134,23 +130,38 @@ namespace triedent
          }
       }
    }
-   std::pair<std::uint64_t, std::uint64_t> region_allocator::get_smallest_region(header::data* h)
+   // Queues small regions for evacuation. The amount evacuated
+   // is bounded by half the current region size
+   void region_allocator::queue_small_regions()
    {
-      std::uint64_t min     = h->region_size;
-      std::uint64_t min_pos = 0;
-      for (std::size_t i = 0; i < h->num_regions; ++i)
+      header::data*                           h         = _h;
+      std::uint64_t                           threshold = h->region_size / 2;
+      std::pair<std::uint64_t, std::uint64_t> queue[max_regions];
+      std::uint64_t                           total = 0;
+      auto*                                   end   = queue;
+      for (std::uint64_t i = 0; i < h->num_regions; ++i)
       {
-         if (h->region_used[i] != 0 && !_pending_free_regions.test(i) &&
-             !_queued_free_regions.test(i))
+         auto used = h->region_used[i].load();
+         if (used != 0 && !_pending_free_regions.test(i) && !_queued_free_regions.test(i))
          {
-            if (h->region_used[i] < min)
+            if (used <= threshold)
             {
-               min     = h->region_used[i];
-               min_pos = i;
+               total += used;
+               *end++ = std::pair{i, used};
+               std::push_heap(queue, end);
+               if (total > threshold)
+               {
+                  std::pop_heap(queue, end);
+                  --end;
+                  total -= end->second;
+               }
             }
          }
       }
-      return {min_pos, min};
+      for (auto* iter = queue; iter != end; ++iter)
+      {
+         push_queue(iter->first, iter->second);
+      }
    }
    std::optional<std::uint64_t> region_allocator::get_free_region(std::size_t num_regions)
    {

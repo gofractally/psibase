@@ -203,7 +203,7 @@ TEST_CASE("cache_allocator long")
           });
    }
 #if 0
-   for(int i = 0; i < 1; ++i)
+   for(int i = 0; i < 1800; ++i)
    {
       std::this_thread::sleep_for(1s);
       std::cout << "db size:";

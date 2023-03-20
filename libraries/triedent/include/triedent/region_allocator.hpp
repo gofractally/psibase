@@ -111,8 +111,8 @@ namespace triedent
       };
       static_assert(sizeof(header) < page_size);
 
-      std::pair<std::uint64_t, std::uint64_t> get_smallest_region(header::data* h);
-      std::optional<std::uint64_t>            get_free_region(std::size_t num_regions);
+      void                         queue_small_regions();
+      std::optional<std::uint64_t> get_free_region(std::size_t num_regions);
       void          start_new_region(header::data* old, header::data* next, std::shared_ptr<void>&);
       void          double_region_size(header::data* old_data, header::data* new_data);
       static void   copy_header_data(header::data* old, header::data* next);
