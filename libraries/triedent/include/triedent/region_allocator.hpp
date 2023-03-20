@@ -57,7 +57,8 @@ namespace triedent
       void           stop();
       object_header* get_object(std::uint64_t offset)
       {
-         return reinterpret_cast<object_header*>(_base + offset);
+         return reinterpret_cast<object_header*>(reinterpret_cast<header*>(_file.data())->base() +
+                                                 offset);
       }
       object_header*        get_object(object_location loc) { return get_object(loc.offset); }
       std::span<const char> span() const
