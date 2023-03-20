@@ -13,18 +13,20 @@ const QUERIES_KEY = "QUERIES_KEY";
  * Description: Class to blueprint the applets contract + operations.
  */
 export class Service {
-  cachedApplet = "";
+  public cachedApplet = "";
 
   constructor() {
     this.applet();
   }
 
   async applet() {
-    if (this.cachedApplet) return this.cachedApplet;
-    const appletName = await getJson("/common/thisservice");
-    console.log(appletName, "is the applet name");
-    this.cachedApplet = appletName;
-    return appletName;
+    if (this.cachedApplet) {
+      return this.cachedApplet
+    } else {
+      const appletName = await getJson("/common/thisservice");
+      this.cachedApplet = appletName;
+      return appletName;
+    }
   }
 
   async getAppletName() {
@@ -188,7 +190,7 @@ const keyToAction: { [key: string]: string } = {
   languageCode: 'setFracLang'
 }
 
-export class FractalService extends Service {
+class FractalService extends Service {
 
 
   @Action(fractalSys)
@@ -211,6 +213,7 @@ export class FractalService extends Service {
     name: AccountNumber,
     type: AccountNumber,
   ): ActionRes {
+    console.log('inside action called');
     return { name, type };
   }
 
@@ -273,6 +276,7 @@ export class FractalService extends Service {
 
   @Op()
   async createFractal(params: CreateFractalParams) {
+    console.log('calling action...')
     this.newFractal(params.name, params.type);
     // await new Promise(resolve => setTimeout(resolve, 2000))
     // this.updateFractal(params)
