@@ -1,5 +1,7 @@
 #pragma once
 
+#include <triedent/debug.hpp>
+
 #include <atomic>
 #include <cassert>
 #include <condition_variable>

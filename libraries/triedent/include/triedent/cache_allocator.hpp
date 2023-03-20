@@ -165,11 +165,22 @@ namespace triedent
             if (auto copy =
                     try_move_object(session, hot(), _obj_ids.lock(i), obj->data(), obj->size))
             {
-               return {copy, {loc.type()}, loc.ref};
+               if constexpr (debug_cache)
+               {
+                  std::osyncstream(std::cout)
+                      << '[' << gettid() << "] "
+                      << "copied to hot: " << loc.cache << ":" << loc.offset() << std::endl;
+               }
+               return {copy, {loc.type()}, static_cast<std::uint16_t>(loc.ref)};
             }
          }
       }
 
+      if constexpr (debug_cache)
+      {
+         std::osyncstream(std::cout) << '[' << gettid() << "] "
+                                     << "read: " << loc.cache << ":" << loc.offset() << std::endl;
+      }
       return {obj->data(), {loc.type()}, static_cast<std::uint16_t>(loc.ref)};
    }
 

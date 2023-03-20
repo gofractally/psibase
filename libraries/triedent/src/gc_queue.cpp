@@ -130,6 +130,10 @@ namespace triedent
    {
       for (; start != end; start = next(start))
       {
+         if constexpr (debug_gc)
+         {
+            std::osyncstream(std::cout) << '[' << gettid() << "] run gc: " << start << std::endl;
+         }
          _queue[start].reset();
          --_size;
       }
@@ -152,7 +156,7 @@ namespace triedent
          // if wait sees a value written before L,
          // - W is before L's store in seq_cst
          // - therefore P happens before L (see lock)
-         auto seq = session->_sequence.load();
+         auto seq = session->_sequence.load() & ~wait_bit;
          if (seq == start)
          {
             if (_waiting)

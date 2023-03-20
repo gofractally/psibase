@@ -13,7 +13,7 @@ namespace triedent
          _levels{ring_allocator{dir / "hot", cfg.hot_bytes, hot_cache, mode, true},
                  ring_allocator{dir / "warm", cfg.warm_bytes, warm_cache, mode, true},
                  ring_allocator{dir / "cool", cfg.cool_bytes, cool_cache, mode, true}},
-         _cold{_gc, _obj_ids, dir / "cold", mode}
+         _cold{_gc, _obj_ids, dir / "cold", mode, cfg.cold_bytes}
    {
       _swap_thread = std::thread(
           [this]()

@@ -1,5 +1,7 @@
 #include <triedent/ring_allocator.hpp>
 
+#include <triedent/debug.hpp>
+
 namespace triedent
 {
    ring_allocator::ring_allocator(const std::filesystem::path& path,
@@ -79,6 +81,12 @@ namespace triedent
                   end_free_x ^= (_mask + 1);
                }
                _self->_end_free_p = end_free_p | end_free_x;
+               if constexpr (debug_gc)
+               {
+                  std::osyncstream(std::cout)
+                      << '[' << gettid() << "] "
+                      << "end_free_p: " << _self->_level << ":" << end_free_p << std::endl;
+               }
             }
             _self->_free_cond.notify_all();
          }
