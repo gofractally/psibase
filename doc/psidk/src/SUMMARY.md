@@ -52,3 +52,4 @@
 - [Standard Actions](standards/actions.md)
 - [Concepts](concepts.md)
   - [User onboarding](concepts/invites.md)
+  - [Disk storage](concepts/disk-storage.md)
