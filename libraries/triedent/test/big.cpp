@@ -96,7 +96,7 @@ int main(int argc, char** argv)
    uint64_t total = insert_count;  //2 * 1000 * 1000 * 1000;
    auto  _db = std::make_shared<triedent::database>(db_dir.c_str(), triedent::database::read_write);
    auto& db  = *_db;
-   db.print_stats();
+   db.print_stats(std::cerr);
    std::cerr << "\n";
    auto s    = db.start_write_session();
    auto root = s->get_top_root();
@@ -241,7 +241,7 @@ int main(int argc, char** argv)
 
          if (i % (status_count * 10) == 0 && false)
          {
-            db.print_stats();
+            db.print_stats(std::cerr);
             std::cerr << "\n";
          }
 
@@ -327,7 +327,7 @@ int main(int argc, char** argv)
    std::cerr << "\ninsert took:    " << std::chrono::duration<double, std::milli>(delta).count()
              << " ms\n";
    s->set_top_root(root);
-   db.print_stats();
+   db.print_stats(std::cerr);
    std::cerr << "\n";
 
    if (check_content)
