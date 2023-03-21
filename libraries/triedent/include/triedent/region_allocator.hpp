@@ -66,6 +66,9 @@ namespace triedent
          return {reinterpret_cast<const char*>(_file.data()), _file.size()};
       }
 
+      allocator_stats get_stats();
+      allocator_stats get_stats(auto&&) { return get_stats(); }
+
      private:
       static constexpr std::uint64_t alloc_size(std::size_t size)
       {

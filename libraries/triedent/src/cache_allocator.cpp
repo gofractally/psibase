@@ -15,18 +15,21 @@ namespace triedent
                  ring_allocator{dir / "cool", cfg.cool_bytes, cool_cache, mode, true}},
          _cold{_gc, _obj_ids, dir / "cold", mode, cfg.cold_bytes}
    {
-      _swap_thread = std::thread(
-          [this]()
-          {
-             thread_name("swap");
-             pthread_setname_np(pthread_self(), "swap");
-             swap_loop();
-          });
-      _gc_thread = std::thread{[this]
-                               {
-                                  pthread_setname_np(pthread_self(), "swap");
-                                  _gc.run(&_done);
-                               }};
+      if (mode == access_mode::read_write)
+      {
+         _swap_thread = std::thread(
+             [this]()
+             {
+                thread_name("swap");
+                pthread_setname_np(pthread_self(), "swap");
+                swap_loop();
+             });
+         _gc_thread = std::thread{[this]
+                                  {
+                                     pthread_setname_np(pthread_self(), "swap");
+                                     _gc.run(&_done);
+                                  }};
+      }
    }
 
    cache_allocator::~cache_allocator()
@@ -34,9 +37,11 @@ namespace triedent
       _done.store(true);
       hot().notify_swap();
       _gc.notify_run();
-      _swap_thread.join();
+      if (_swap_thread.joinable())
+         _swap_thread.join();
       _cold.stop();
-      _gc_thread.join();
+      if (_gc_thread.joinable())
+         _gc_thread.join();
       _gc.flush();
    }
 
@@ -118,4 +123,48 @@ namespace triedent
       }
       return result;
    }
+
+   namespace
+   {
+      std::string make_size(std::uint64_t val)
+      {
+         for (auto suffix : {"B", "KiB", "MiB", "GiB", "TiB", "PiB"})
+         {
+            if (val < 1024)
+            {
+               return std::to_string(val) + " " + suffix;
+            }
+            val /= 1024;
+         }
+         return std::to_string(val) + " EiB";
+      }
+   }  // namespace
+
+   void cache_allocator::print_stats(std::ostream& os, bool detail)
+   {
+      auto print_level = [&](auto& level)
+      {
+         auto stats = level.get_stats(
+             [&](object_id id, object_location loc)
+             {
+                auto info = _obj_ids.get(id);
+                return info.ref != 0 && info == loc;
+             });
+         os << "Used: " << make_size(stats.used_bytes) << std::endl;
+         os << "Free: " << make_size(stats.free_bytes) << std::endl;
+         os << "Capacity: " << make_size(stats.total_bytes) << std::endl;
+         os << "Available: " << make_size(stats.available_bytes) << std::endl;
+      };
+      os << "File: hot\n";
+      print_level(hot());
+      os << "File: warm\n";
+      print_level(warm());
+      os << "File: cool\n";
+      print_level(cool());
+      os << "File: cold\n";
+      print_level(cold());
+      os << "File: obj_ids\n";
+      _obj_ids.print_stats(os);
+   }
+
 }  // namespace triedent

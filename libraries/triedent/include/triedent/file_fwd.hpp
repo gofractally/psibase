@@ -24,4 +24,13 @@ namespace triedent
       cool_cache = 2,  // not pinned, copy to hot on access (disk cache)  25% of RAM
       cold_cache = 3   // not pinned, copy to hot on access (uncached) AS NEEDED DISK
    };
+
+   struct allocator_stats
+   {
+      std::uint64_t total_bytes;
+      std::uint64_t used_bytes;
+      std::uint64_t free_bytes;
+      std::uint64_t available_bytes;
+      std::uint64_t num_objects;
+   };
 }  // namespace triedent

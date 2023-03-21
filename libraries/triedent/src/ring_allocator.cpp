@@ -95,4 +95,5 @@ namespace triedent
       };
       return std::make_shared<update_free>(this, bytes);
    }
+
 }  // namespace triedent

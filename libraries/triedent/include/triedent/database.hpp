@@ -393,7 +393,7 @@ namespace triedent
       std::shared_ptr<write_session> start_write_session();
       std::shared_ptr<read_session>  start_read_session();
 
-      void print_stats(bool detail = false);
+      void print_stats(std::ostream& os, bool detail = false);
 
       bool is_slow() const { return _ring.is_slow(); }
       auto span() const { return _ring.span(); }

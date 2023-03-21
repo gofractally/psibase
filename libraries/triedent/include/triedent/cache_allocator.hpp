@@ -89,6 +89,8 @@ namespace triedent
 
       void validate(id i) { _obj_ids.validate(i); }
 
+      void print_stats(std::ostream& os, bool detail);
+
      private:
       bool  swap(gc_session&);
       void* try_move_object(session_lock_ref<>   session,

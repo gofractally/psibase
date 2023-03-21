@@ -38,8 +38,8 @@ namespace triedent
       (void)database{dir, cfg, access_mode::read_write};
    }
 
-   void database::print_stats(bool detail)
+   void database::print_stats(std::ostream& os, bool detail)
    {
-      //_ring.dump(detail);
+      _ring.print_stats(os, detail);
    }
 }  // namespace triedent

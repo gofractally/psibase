@@ -133,6 +133,10 @@ namespace triedent
          return {reinterpret_cast<const char*>(_file.data()), _file.size()};
       }
 
+      // NOT thread-safe
+      template <typename F>
+      allocator_stats get_stats(F&& is_live);
+
      private:
       // Returns the total memory required to allocate an object,
       // including the object header and any padding.
@@ -302,4 +306,32 @@ namespace triedent
          return nullptr;
       }
    }
+
+   template <typename F>
+   allocator_stats ring_allocator::get_stats(F&& is_live)
+   {
+      allocator_stats result{};
+      auto            swap_p  = _header->swap_p.load();
+      auto            alloc_p = _header->alloc_p.load();
+      result.total_bytes      = _header->size.load();
+      result.available_bytes  = potential_free_bytes_unlocked();
+      result.free_bytes       = result.available_bytes;
+      while (swap_p != alloc_p)
+      {
+         auto ptr = get_obj(swap_p);
+         auto loc = object_location{.offset = get_offset(swap_p), .cache = _level};
+         if (is_live(object_id{.id = ptr->id}, loc))
+         {
+            result.num_objects++;
+         }
+         else
+         {
+            result.free_bytes += sizeof(object_header) + ptr->data_capacity();
+         }
+         swap_p = next(swap_p, ptr);
+      }
+      result.used_bytes = result.total_bytes - result.free_bytes;
+      return result;
+   }
+
 }  // namespace triedent

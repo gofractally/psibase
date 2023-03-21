@@ -68,8 +68,8 @@ int main(int argc, char** argv)
       }
       if (vm.count("status"))
       {
-         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
-         db->print_stats(true);
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_only);
+         db->print_stats(std::cerr, true);
       }
       if (vm.count("create"))
       {

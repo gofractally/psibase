@@ -169,7 +169,7 @@ namespace triedent
 
       object_info get(object_id id);
 
-      void print_stats();
+      void print_stats(std::ostream& os);
       void validate(object_id i)
       {
          if (i.id > header()->max_allocated.id)
@@ -429,30 +429,17 @@ namespace triedent
       return object_info{header()->objects[id.id].load()};
    }
 
-   inline void object_db::print_stats()
+   inline void object_db::print_stats(std::ostream& os)
    {
       auto     _header      = header();
-      uint64_t zero_ref     = 0;
-      uint64_t total        = 0;
+      uint64_t total        = _header->max_allocated.id;
       uint64_t non_zero_ref = 0;
-      auto*    ptr          = _header->objects;
-      auto*    end          = _header->objects + _header->max_unallocated.id;
-      while (ptr != end)
+      for (auto& obj : std::span{_header->objects + 1, _header->max_allocated.id})
       {
-         zero_ref += 0 == (ptr->load() & ref_count_mask);
-         ++total;
-         ++ptr;
+         if (object_info{obj.load()}.ref)
+            ++non_zero_ref;
       }
-      std::cerr << std::setw(10) << std::left << "obj ids"
-                << "|";
-      std::cerr << std::setw(12) << std::left << (" " + std::to_string(total - zero_ref)) << "|";
-      std::cerr << std::setw(12) << std::left << (" " + std::to_string(zero_ref)) << "|";
-      std::cerr << std::setw(12) << std::left << (" " + std::to_string(total)) << "|";
-      std::cerr << std::endl;
-      /*
-      TRIEDENT_DEBUG("first unallocated  ", _header->max_allocated.id);
-      TRIEDENT_DEBUG("total objects: ", total, " zero ref: ", zero_ref, "  non zero: ", total - zero_ref);
-      */
+      os << "Used: " << std::to_string(non_zero_ref) << "/" << std::to_string(total) << std::endl;
    }
 
 };  // namespace triedent

@@ -40,12 +40,15 @@ namespace triedent
          throw std::runtime_error("File size is smaller than required by the header: " +
                                   path.native());
 
-      load_queue();
-      _thread = std::thread{[this]
-                            {
-                               pthread_setname_np(pthread_self(), "swap");
-                               run();
-                            }};
+      if (mode == access_mode::read_write)
+      {
+         load_queue();
+         _thread = std::thread{[this]
+                               {
+                                  pthread_setname_np(pthread_self(), "swap");
+                                  run();
+                               }};
+      }
    }
 
    region_allocator::~region_allocator()
@@ -63,7 +66,8 @@ namespace triedent
             _done = true;
          }
          _pop_cond.notify_one();
-         _thread.join();
+         if (_thread.joinable())
+            _thread.join();
       }
    }
 
@@ -522,6 +526,24 @@ namespace triedent
       while (run_one(session))
       {
       }
+   }
+
+   allocator_stats region_allocator::get_stats()
+   {
+      allocator_stats result{};
+      result.total_bytes              = _h->region_size * _h->num_regions;
+      std::uint64_t available_regions = 0;
+      for (std::uint64_t i = 0; i < _h->num_regions; ++i)
+      {
+         result.used_bytes += (_h->region_used[i].load() & (pending_write - 1));
+         if (_free_regions.test(i))
+            ++available_regions;
+      }
+      result.available_bytes = _h->region_size - (_h->alloc_pos % _h->region_size);
+      result.used_bytes -= result.available_bytes;
+      result.free_bytes = result.total_bytes - result.used_bytes;
+      result.available_bytes += _h->region_size * available_regions;
+      return result;
    }
 
 }  // namespace triedent
