@@ -423,26 +423,23 @@ namespace triedent
          {
             auto src_used = _h->region_used[src_region].load() - pending_clear;
             assert(copied <= (src_used % pending_write));
-            if (src_used != 0)
+            // after a crash, region_used might not get decremented.
+            // If we fully evacuate a region, reset the amount to 0.
+            if (item.src_begin.load() - orig_src == _h->region_size)
             {
-               // after a crash, region_used might not get decremented.
-               // If we fully evacuate a region, reset the amount to 0.
-               if (item.src_begin.load() - orig_src == _h->region_size)
-               {
-                  assert(src_used < pending_write);
-                  assert(item.src_begin.load() == item.src_end.load());
-                  src_used = 0;
-               }
-               else
-               {
-                  src_used -= copied;
-                  item.src_begin.store(item.src_end.load());
-               }
-               _h->region_used[src_region].store(src_used);
-               if (src_used == 0)
-               {
-                  make_available(src_region);
-               }
+               assert(src_used < pending_write);
+               assert(item.src_begin.load() == item.src_end.load());
+               src_used = 0;
+            }
+            else
+            {
+               src_used -= copied;
+               item.src_begin.store(item.src_end.load());
+            }
+            _h->region_used[src_region].store(src_used);
+            if (src_used == 0)
+            {
+               make_available(src_region);
             }
          }
          assert(used >= pending_write + extra);
