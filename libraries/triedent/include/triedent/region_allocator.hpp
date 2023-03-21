@@ -97,11 +97,10 @@ namespace triedent
          std::uint32_t flags;
          struct data
          {
-            // TODO: num_regions/current_region can be smaller
             std::uint64_t              region_size;
             std::atomic<std::uint64_t> alloc_pos;
-            std::uint64_t              num_regions;
-            std::uint64_t              current_region;
+            std::uint32_t              num_regions;
+            std::uint32_t              current_region;
             std::atomic<std::uint64_t> region_used[max_regions];
          };
          // current switches between the two elements of the array,
