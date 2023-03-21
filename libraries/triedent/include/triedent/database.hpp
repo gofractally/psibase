@@ -400,7 +400,6 @@ namespace triedent
 
      private:
       inline void release(session_lock_ref<> l, id);
-      inline void ensure_free_space();
 
       struct revision
       {
@@ -611,7 +610,6 @@ namespace triedent
 
    inline std::shared_ptr<root> write_session::get_top_root()
    {
-      _db->ensure_free_space();
       std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
       auto                        id = _db->_dbm->top_root.load();
       if (!id)
@@ -624,7 +622,6 @@ namespace triedent
 
    inline void write_session::set_top_root(const std::shared_ptr<root>& r)
    {
-      _db->ensure_free_space();
       std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
       auto                        current = _db->_dbm->top_root.load();
       auto                        id      = get_id(r);
@@ -1040,7 +1037,6 @@ namespace triedent
                                     std::span<const char>  key,
                                     std::span<const char>  val)
    {
-      _db->ensure_free_space();
       std::unique_lock<gc_session> l(*this);
 
       int  old_size = -1;
@@ -1056,7 +1052,6 @@ namespace triedent
                                     std::span<const char>                  key,
                                     std::span<const std::shared_ptr<root>> roots)
    {
-      _db->ensure_free_space();
       std::unique_lock<gc_session> l(*this);
 
       std::vector<object_id> ids;
@@ -1089,8 +1084,6 @@ namespace triedent
                                  std::vector<char>*                  result_bytes,
                                  std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      if constexpr (std::is_same_v<AccessMode, write_access>)
-         _db->ensure_free_space();
       swap_guard g(*this);
       return unguarded_get(g, r, get_id(r), to_key6({key.data(), key.size()}), result_bytes,
                            result_roots);
@@ -1187,8 +1180,6 @@ namespace triedent
        std::vector<char>*                  result_bytes,
        std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      if constexpr (std::is_same_v<AccessMode, write_access>)
-         _db->ensure_free_space();
       swap_guard        g(*this);
       std::vector<char> result_key6;
       if (!unguarded_get_greater_equal(g, r, get_id(r), to_key6({key.data(), key.size()}),
@@ -1271,8 +1262,6 @@ namespace triedent
                                            std::vector<char>*                  result_bytes,
                                            std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      if constexpr (std::is_same_v<AccessMode, write_access>)
-         _db->ensure_free_space();
       swap_guard        g(*this);
       std::vector<char> result_key6;
       if (!unguarded_get_less_than(g, r, get_id(r), to_key6({key.data(), key.size()}), result_key6,
@@ -1357,8 +1346,6 @@ namespace triedent
                                      std::vector<char>*                  result_bytes,
                                      std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      if constexpr (std::is_same_v<AccessMode, write_access>)
-         _db->ensure_free_space();
       swap_guard g(*this);
       auto       prefix_min = to_key6({prefix.data(), prefix.size()});
       auto       extra_bits = prefix_min.size() * 6 - prefix.size() * 8;
@@ -1437,7 +1424,6 @@ namespace triedent
 
    inline int write_session::remove(std::shared_ptr<root>& r, std::span<const char> key)
    {
-      _db->ensure_free_space();
       std::unique_lock<gc_session> l(*this);
 
       int  removed_size = -1;
@@ -1829,12 +1815,6 @@ namespace triedent
    inline key_view session_base::to_key6(key_view v) const
    {
       return triedent::to_key6(key_buf, v);
-   }
-   // TODO: Remove this as it isn't needed anymore and never quite
-   // worked correctly anyway.
-   inline void database::ensure_free_space()
-   {
-      //_ring->ensure_free_space();
    }
 
 }  // namespace triedent
