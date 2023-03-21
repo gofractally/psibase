@@ -403,6 +403,8 @@ namespace triedent
 
       struct database_memory
       {
+         std::uint32_t magic;
+         std::uint32_t flags;
          // top_root is protected by _root_change_mutex to prevent race conditions
          // which involve loading or storing top_root, bumping refcounts, decrementing
          // refcounts, cloning, and cleaning up node children when the refcount hits 0.
@@ -410,8 +412,6 @@ namespace triedent
          // However, making it atomic hopefully aids SIGKILL behavior, which is impacted
          // by instruction reordering and multi-instruction non-atomic writes.
          std::atomic<uint64_t> top_root;
-
-         database_memory() { top_root.store(0); }
       };
 
       cache_allocator  _ring;

@@ -14,10 +14,19 @@ namespace triedent
       if (_file.size() == 0)
       {
          _file.resize(sizeof(database_memory));
-         new (_file.data()) database_memory();
+         new (_file.data())
+             database_memory{.magic = file_magic, .flags = file_type_database_root, .top_root = 0};
       }
 
+      if (_file.size() != sizeof(database_memory))
+         throw std::runtime_error("Wrong size for file: " + (dir / "db").native());
+
       _dbm = reinterpret_cast<database_memory*>(_file.data());
+
+      if (_dbm->magic != file_magic)
+         throw std::runtime_error("Not a triedent file: " + (dir / "db").native());
+      if ((_dbm->flags & file_type_mask) != file_type_database_root)
+         throw std::runtime_error("Not a triedent db file: " + (dir / "db").native());
    }
 
    database::database(const std::filesystem::path& dir, access_mode mode, bool allow_gc)
