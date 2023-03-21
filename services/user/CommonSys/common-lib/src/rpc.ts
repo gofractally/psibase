@@ -135,7 +135,10 @@ export async function postTextGetJson(url: string, text: string) {
     return res.json();
 }
 
-export async function postGraphQLGetJson<T = any>(url: string, graphQL: string): Promise<T> {
+export async function postGraphQLGetJson<T = any>(
+    url: string,
+    graphQL: string
+): Promise<T> {
     const res = await postGraphQL(url, graphQL);
     return res.json();
 }
@@ -707,7 +710,7 @@ export async function initializeApplet(initializer = () => {}) {
 
     console.info("setting up applet event listeners popstate");
     let currentHref = document.location.href;
-const body = document.querySelector("body");
+    const body = document.querySelector("body");
     const observer = new MutationObserver((mutations) => {
         mutations.forEach(() => {
             if (currentHref !== document.location.href) {

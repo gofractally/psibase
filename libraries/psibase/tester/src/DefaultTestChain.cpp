@@ -373,6 +373,7 @@ void DefaultTestChain::registerSysRpc()
                           readWholeFile(comDir + "/ui/vanilla/common.index.html")),
 
        rpcCommon.storeSys("/common/rpc.mjs", js, readWholeFile(comDir + "/common/rpc.mjs")),
+       rpcCommon.storeSys("/common/common-lib.js", js, readWholeFile(comDir + "/common-lib/dist/common-lib.js")),
        rpcCommon.storeSys("/common/useGraphQLQuery.mjs", js,
                           readWholeFile(comDir + "/common/useGraphQLQuery.mjs")),
        rpcCommon.storeSys("/common/useLocalStorage.mjs", js,
