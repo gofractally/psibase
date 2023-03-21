@@ -76,8 +76,9 @@ namespace triedent
       {
          std::uint32_t magic;
          std::uint32_t flags;
-         // TODO: should we include a UUID as well?
+         // offset from the start of the file
          std::atomic<std::uint64_t> start;
+         // The size of the allocation region
          std::atomic<std::uint64_t> size;
          alignas(64) std::atomic<std::uint64_t> alloc_p;
          alignas(64) std::atomic<std::uint64_t> swap_p;
