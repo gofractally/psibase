@@ -67,7 +67,7 @@ int main(int argc, char** argv)
 
       if (vm.count("validate"))
       {
-         auto db   = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write);
+         auto db   = std::make_shared<database>(db_dir.c_str(), triedent::database::read_only);
          auto s    = db->start_write_session();
          auto root = s->get_top_root();
          s->validate(root);
