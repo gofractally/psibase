@@ -90,18 +90,10 @@ namespace triedent
       std::unique_lock l{_queue_mutex};
       while (!done->load())
       {
-         _queue_cond.wait(l, [&] { return done->load() || _size != 0; });
+         _queue_cond.wait(l, [&] { return done->load() || (_size != 0 && !_waiting); });
          auto end   = _end.load();
          auto start = (end + _queue.size() - _size) % _queue.size();
-         end        = start_wait(start, end);
-         if (!_waiting)
-         {
-            do_run(start, end);
-         }
-         else
-         {
-            _queue_cond.wait(l, [&] { return done->load(); });
-         }
+         do_run(start, start_wait(start, end));
       }
    }
 
