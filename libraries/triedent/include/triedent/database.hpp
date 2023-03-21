@@ -401,14 +401,6 @@ namespace triedent
      private:
       inline void release(session_lock_ref<> l, id);
 
-      struct revision
-      {
-         object_id _root;
-
-         // incremented when read session created, decremented when read session completes
-         std::atomic<uint32_t> _active_sessions;
-      };
-
       struct database_memory
       {
          // top_root is protected by _root_change_mutex to prevent race conditions
