@@ -123,8 +123,8 @@ namespace triedent
       {
          throw std::system_error{errno, std::generic_category()};
       }
-#ifdef MAP_FIXED_NOREPLACE
       auto prot = get_prot(_mode);
+#ifdef MAP_FIXED_NOREPLACE
       // Try to extend the existing mapping
       {
          auto end = (char*)_data.load() + _size;
