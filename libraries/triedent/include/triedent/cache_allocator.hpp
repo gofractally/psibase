@@ -173,7 +173,6 @@ namespace triedent
                if constexpr (debug_cache)
                {
                   std::osyncstream(std::cout)
-                      << '[' << gettid() << "] "
                       << "copied to hot: " << loc.cache << ":" << loc.offset() << std::endl;
                }
                return {copy, {loc.type()}, static_cast<std::uint16_t>(loc.ref)};
@@ -183,8 +182,7 @@ namespace triedent
 
       if constexpr (debug_cache)
       {
-         std::osyncstream(std::cout) << '[' << gettid() << "] "
-                                     << "read: " << loc.cache << ":" << loc.offset() << std::endl;
+         std::osyncstream(std::cout) << "read: " << loc.cache << ":" << loc.offset() << std::endl;
       }
       return {obj->data(), {loc.type()}, static_cast<std::uint16_t>(loc.ref)};
    }

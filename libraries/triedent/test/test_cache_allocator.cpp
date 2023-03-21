@@ -158,8 +158,7 @@ TEST_CASE("cache_allocator long")
       }
       if (copy != data[idx])
       {
-         std::osyncstream(std::cout)
-             << '[' << gettid() << "] " << copy << " != " << data[idx] << std::endl;
+         std::osyncstream(std::cout) << copy << " != " << data[idx] << std::endl;
          failed.store(true);
          done.store(true);
       }

@@ -84,7 +84,6 @@ namespace triedent
                if constexpr (debug_gc)
                {
                   std::osyncstream(std::cout)
-                      << '[' << gettid() << "] "
                       << "end_free_p: " << _self->_level << ":" << end_free_p << std::endl;
                }
             }
