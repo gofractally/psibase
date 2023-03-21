@@ -47,6 +47,7 @@ namespace triedent
       const void*           data() const { return _data.load(); }
       std::size_t           size() const { return _size; }
       bool                  pinned() const { return _pinned; }
+      access_mode           mode() const { return _mode; }
 
      private:
       std::atomic<void*> _data;

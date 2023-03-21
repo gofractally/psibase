@@ -607,6 +607,16 @@ namespace triedent
       if (!id)
          return {};
 
+      if (_db->_file.mode() == access_mode::read_only)
+      {
+         // If the file was opened in read_only mode, the root cannot be
+         // changed, so we don't need to increment the refcount.
+         auto result = std::make_shared<root>(root{_db, nullptr, {id}});
+         // Prevent ~root from decrementing the refcount
+         result->ancestor = std::shared_ptr<root>{std::shared_ptr<void>{}, result.get()};
+         return result;
+      }
+
       std::unique_lock<gc_session> l(*this);
       id = retain(l, {id}).id;
       return std::make_shared<root>(root{_db, nullptr, {id}});
