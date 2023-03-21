@@ -77,6 +77,14 @@ namespace psibase::net
    };
    PSIO_REFLECT(ViewChangeMessage, term, producer, signer)
 
+   struct RequestViewMessage
+   {
+      static constexpr unsigned type = 41;
+
+      std::string to_string() const { return "request view"; }
+   };
+   PSIO_REFLECT(RequestViewMessage);
+
    struct ProducerConfirm
    {
       AccountNumber     producer;
@@ -358,7 +366,8 @@ namespace psibase::net
       using message_type = boost::mp11::mp_push_back<typename Base::message_type,
                                                      PrepareMessage,
                                                      CommitMessage,
-                                                     ViewChangeMessage>;
+                                                     ViewChangeMessage,
+                                                     RequestViewMessage>;
       bool is_leader()
       {
          if (auto idx = active_producers[0]->getIndex(self))
@@ -422,6 +431,7 @@ namespace psibase::net
             // but will help reduce unnecessary delays on a producer change.
             producer_views[0].clear();
             producer_views[0].resize(prods.first->size());
+            network().multicast(RequestViewMessage{});
          }
          if (new_producers)
          {
@@ -533,7 +543,9 @@ namespace psibase::net
       {
          if (term > current_term)
          {
-            PSIBASE_LOG(logger, info) << "view change: " << term;
+            PSIBASE_LOG(logger, info)
+                << "view change: " << term << " "
+                << active_producers[0]->activeProducers.nth(get_leader_index(term))->first.str();
             current_term = term;
             chain().setTerm(current_term);
             if (_state == producer_state::leader || _state == producer_state::follower)
@@ -1030,6 +1042,20 @@ namespace psibase::net
          if (current_term != saved_term)
          {
             Base::switch_fork();
+         }
+      }
+
+      void recv(peer_id peer, const RequestViewMessage&)
+      {
+         if (active_producers[0]->algorithm == ConsensusAlgorithm::bft)
+         {
+            for (const auto& [term, msg] : producer_views[0])
+            {
+               if (msg)
+               {
+                  network().async_send_block(peer, *msg, [](const std::error_code&) {});
+               }
+            }
          }
       }
    };

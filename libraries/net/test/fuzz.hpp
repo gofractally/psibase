@@ -240,6 +240,8 @@ struct NetworkBase
       }
    }
 
+   void recv(const psibase::net::RequestViewMessage& message) {}
+
    void recv(const psibase::net::SignedMessage<psibase::net::PrepareMessage>& message)
    {
       if (!has_message(message, prepares))
