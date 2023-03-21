@@ -42,7 +42,7 @@ export const Join = () => {
                         You are invited
                     </Heading>
                     <Text>
-                        You are invited to the ƒractally {data?.name} fractal.
+                        You are invited to the ƒractally {data?.displayName} fractal.
                         You need a psibase account to continue.
                     </Text>
                     <Text>
@@ -83,7 +83,7 @@ export const Join = () => {
                         Enter your first and last name as you'd like it to
                         appear to other ƒractally members and submit your
                         profile to the{" "}
-                        <span className="italic">{data?.name}</span> fractal.
+                        <span className="italic">{data?.displayName}</span> fractal.
                     </Text>
                     <form
                         onSubmit={handleSubmit(onSubmitProfile)}
@@ -116,7 +116,7 @@ export const Join = () => {
                     </Heading>
                     <Text>
                         You are now a member of the{" "}
-                        <span className="font-bold">{data?.name}</span> fractal.
+                        <span className="font-bold">{data?.displayName}</span> fractal.
                     </Text>
                 </div>
             </Con>

@@ -421,10 +421,11 @@ PSIO_REFLECT(Queries,  //
 
 optional<HttpReply> FractalSys::serveSys(HttpRequest request)
 {
-   if (auto result = serveSimpleUI<FractalSys, true>(request))
-      return result;
 
    if (auto result = serveContent(request, Tables{}))
+      return result;
+
+   if (auto result = serveSimpleUI<FractalSys, true>(request))
       return result;
 
    if (auto result = serveGraphQL(request, Queries{}))

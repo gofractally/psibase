@@ -67,7 +67,7 @@ export const Invite = () => {
         ) : (
           <>
             <Heading tag="h2" styledAs="h4">
-              Invite to {data?.name}
+              Invite to {data?.displayName}
             </Heading>
             <Text>
               <span className="font-bold">Copy the link below and send it</span>{" "}
