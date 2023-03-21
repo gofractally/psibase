@@ -76,8 +76,8 @@ namespace triedent
                                          std::uint32_t          used_size,
                                          std::shared_ptr<void>& cleanup)
    {
-      auto alloc_pos = _h->alloc_pos;
-      auto available = (_h->current_region + 1) * _h->region_size - _h->alloc_pos;
+      auto alloc_pos = _h->alloc_pos.load();
+      auto available = (_h->current_region + 1) * _h->region_size - alloc_pos;
       if (used_size > available)
       {
          // create a dummy object in the remaining space
@@ -91,7 +91,7 @@ namespace triedent
          auto next_index = _header->current.load() ^ 1;
          start_new_region(_h, &_header->regions[next_index], cleanup);
          _h        = &_header->regions[next_index];
-         alloc_pos = _h->alloc_pos;
+         alloc_pos = _h->alloc_pos.load();
          _header->current.store(next_index);
 
          if (debug_alloc)
@@ -105,7 +105,7 @@ namespace triedent
          // Try to free some space
          queue_small_regions();
       }
-      void* result = _base + _h->alloc_pos;
+      void* result = _base + _h->alloc_pos.load();
       auto  o      = new (result) object_header{.size = size, .id = id.id};
       return o->data();
    }
@@ -208,7 +208,7 @@ namespace triedent
       }
       next->region_used[next->current_region].store(next->region_size + pending_write);
       _free_regions.reset(next->current_region);
-      next->alloc_pos = next->current_region * next->region_size;
+      next->alloc_pos.store(next->current_region * next->region_size);
    }
    void region_allocator::double_region_size(header::data* old_data, header::data* new_data)
    {
@@ -355,10 +355,10 @@ namespace triedent
       // the final store to dest_end.
       item.src_end.store(0);
       item.src_begin.store(region * _h->region_size);
-      auto alloc_pos = _h->alloc_pos;
+      auto alloc_pos = _h->alloc_pos.load();
       item.dest_begin.store(alloc_pos);
       alloc_pos += used;
-      _h->alloc_pos = alloc_pos;
+      _h->alloc_pos.store(alloc_pos);
       _h->region_used[region].store(_h->region_used[region] + pending_clear);
       _h->region_used[_h->current_region].store(_h->region_used[_h->current_region].load() +
                                                 pending_write);
@@ -536,7 +536,7 @@ namespace triedent
          if (_free_regions.test(i))
             ++available_regions;
       }
-      result.available_bytes = _h->region_size - (_h->alloc_pos % _h->region_size);
+      result.available_bytes = _h->region_size - (_h->alloc_pos.load() % _h->region_size);
       result.used_bytes -= result.available_bytes;
       result.free_bytes = result.total_bytes - result.used_bytes;
       result.available_bytes += _h->region_size * available_regions;

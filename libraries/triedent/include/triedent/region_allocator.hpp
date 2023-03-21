@@ -39,8 +39,8 @@ namespace triedent
          {
             std::lock_guard l{_mutex};
             result   = allocate_impl(id, size, used_size, cleanup);
-            auto loc = object_location{.offset = _h->alloc_pos, .cache = _level};
-            _h->alloc_pos += used_size;
+            auto loc = object_location{.offset = _h->alloc_pos.load(), .cache = _level};
+            _h->alloc_pos.store(_h->alloc_pos.load() + used_size);
             init(result, loc);
          }
          if (cleanup)
@@ -97,10 +97,9 @@ namespace triedent
          std::uint32_t flags;
          struct data
          {
-            // TODO: alloc_pos should be atomic.
             // TODO: num_regions/current_region can be smaller
             std::uint64_t              region_size;
-            std::uint64_t              alloc_pos;
+            std::atomic<std::uint64_t> alloc_pos;
             std::uint64_t              num_regions;
             std::uint64_t              current_region;
             std::atomic<std::uint64_t> region_used[max_regions];
