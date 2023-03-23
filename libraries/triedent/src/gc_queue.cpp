@@ -141,13 +141,18 @@ namespace triedent
       std::lock_guard l2{_session_mutex};
       for (const auto& session : _sessions)
       {
-         // if wait sees the value written by L
-         // - R is before the value written by L
-         // if wait sees the value written by U or a later lock or unlock,
-         // - U happens before W
-         // if wait sees a value written before L,
-         // - W is before L's store in seq_cst
-         // - therefore P happens before L (see lock)
+         // Let L be a call to lock
+         // Let U be the unlock corresponding to L
+         // Let P be the push for some resource, that happens before this wait
+         //
+         // If W sees the value written by L,
+         //   - If the value is from a push earlier than P, then then then the element is not popped - okay
+         //   - If the value is from P or a later push, then P happens before L (acquire/release) - okay
+         // If W sees the value written by U or a later lock or unlock
+         //   - U happens before W (acquire/release) - okay
+         // If W sees a value written before L
+         //   - W is before L in seq_cst (seq_cst load sees the most recent seq_cst store)
+         //   - Therefore P happens before L (see lock) - okay
          auto seq = session->_sequence.load() & ~wait_bit;
          if (seq == start)
          {

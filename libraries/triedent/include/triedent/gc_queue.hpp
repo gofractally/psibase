@@ -12,26 +12,35 @@
 
 namespace triedent
 {
-   // gc_queue serializes cleanup of various data structures.
+   // gc_queue is a utility to ensure correct cleanup of resources that are part
+   // of a single shared state. Cleanup of resources is correct when every access
+   // to a resource happens before that resource is destroyed.
    //
-   // Intended Usage:
-   // - Each thread should have its own session.
-   // - All accesses to a resource should be wrapped in lock/unlock.
-   //   Pointers must not be retained after unlock.
-   // - When removing a resource, first remove all references to it,
-   //   then push it onto the queue.
+   // Resources should be cleaned up using the following process:
+   // - Remove references to the resource from the shared state
+   // - Push the resource onto the queue
    //
-   // An element pushed onto the queue will not be destroyed until
-   // all active locks are released.
+   // Resources should be accessed as follows:
+   // - lock a session
+   // - access resources from the shared state
+   // - unlock the session
    //
-   // Formally,
+   // The gc_queue guarantees that an element pushed onto the queue will
+   // not be destroyed until all session locks that were active at the
+   // time of the push are released.
    //
    // Given
    //   - L and U are pair of calls to lock/unlock for a session
    //   - P is the call to push(element)
    //   - D is the destructor of element
    // Then gc_queue guarantees that:
-   //   Either U happens before D or P happens before L
+   //   - Either P happens before L or U happens before D.
+   //
+   // Both cases guarantee correctness:
+   // - If P happens before L, then the resource has been removed from the
+   //   shared state, and therefore will not be accessed.
+   // - If U happens before D, then the access happens before the destructor
+   //   and is therefore safe.
    class gc_queue
    {
       using size_type = std::uint32_t;
@@ -140,14 +149,22 @@ namespace triedent
       while (true)
       {
          assert(_sequence.load() == npos);
-         // if the second load sees the value written by P or a later push, then P happens before L
-         // if the second load sees a value written by an earlier push, then
-         // - the second load is before P in seq_cst
-         // - the store is sequenced before the second load
-         // - P happens before W (by definition)
-         // - therefore the store is before W in seq_cst (store < load2 < P < W)
+         // Let P be the push for some resource
+         // Let L be the second load here (the first load is speculative)
+         // Let W be the read of _sequence by a call to wait that is after P
          //
-         // Therefore, if W is before store in seq_cst, then P happens before L
+         // (Note: wait and push are both protected by the same mutex,
+         // and are therefore totally ordered. A call to wait cannot
+         // possibly destroy a resource that has not been pushed yet)
+         //
+         // (1) If L sees the value written by P or a later push, P happens before L (acquire/release)
+         // (2) If L sees the value written by an earlier push,
+         // (3)    - L is before P in seq_cst (seq_cst load sees the most recent seq_cst store)
+         // (4)    - The store is sequenced before L
+         // (5)    - P happens before W (by definition)
+         // (6)    - therefore the store is before W in seq_cst (store < L < P < W)
+         //
+         // Therefore if W is before the store in seq_cst, then P happens before L (denying (6) implies (1))
          auto val = _queue->_end.load();
          _sequence.store(val);
          if (_queue->_end.load() == val)
