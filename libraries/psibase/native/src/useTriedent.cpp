@@ -178,32 +178,36 @@ namespace psibase
       std::shared_ptr<const Revision> head;
 
       SharedDatabaseImpl(const std::filesystem::path& dir,
-                         bool                         allowSlow,
-                         uint64_t                     max_objects,
-                         uint64_t                     hot_addr_bits,
-                         uint64_t                     warm_addr_bits,
-                         uint64_t                     cool_addr_bits,
-                         uint64_t                     cold_addr_bits)
+                         uint64_t                     hot_bytes,
+                         uint64_t                     warm_bytes,
+                         uint64_t                     cool_bytes,
+                         uint64_t                     cold_bytes)
       {
+         // The largest object is 16 MiB
+         // Each file must be at least double this
+         constexpr std::uint64_t min_size = 32 * 1024 * 1024;
+         if (hot_bytes < min_size || warm_bytes < min_size || cool_bytes < min_size ||
+             cold_bytes < min_size)
+         {
+            throw std::runtime_error("Requested database size is too small");
+         }
          if (!std::filesystem::exists(dir / "db"))
          {
             // std::cout << "Creating " << dir << "\n";
             triedent::database::create(  //
                 dir,                     //
                 triedent::database::config{
-                    .max_objects = max_objects,
-                    .hot_pages   = hot_addr_bits,
-                    .warm_pages  = warm_addr_bits,
-                    .cool_pages  = cool_addr_bits,
-                    .cold_pages  = cold_addr_bits,
+                    .hot_bytes  = hot_bytes,
+                    .warm_bytes = warm_bytes,
+                    .cool_bytes = cool_bytes,
+                    .cold_bytes = cold_bytes,
                 });
          }
          else
          {
             // std::cout << "Open existing " << dir << "\n";
          }
-         trie   = std::make_shared<triedent::database>(dir.c_str(), triedent::database::read_write,
-                                                     allowSlow);
+         trie   = std::make_shared<triedent::database>(dir.c_str(), triedent::database::read_write);
          auto s = trie->start_write_session();
          head   = loadRevision(*s, s->get_top_root(), revisionHeadKey);
       }
@@ -235,19 +239,15 @@ namespace psibase
    };  // SharedDatabaseImpl
 
    SharedDatabase::SharedDatabase(const boost::filesystem::path& dir,
-                                  bool                           allowSlow,
-                                  uint64_t                       max_objects,
-                                  uint64_t                       hot_addr_bits,
-                                  uint64_t                       warm_addr_bits,
-                                  uint64_t                       cool_addr_bits,
-                                  uint64_t                       cold_addr_bits)
+                                  uint64_t                       hot_bytes,
+                                  uint64_t                       warm_bytes,
+                                  uint64_t                       cool_bytes,
+                                  uint64_t                       cold_bytes)
        : impl{std::make_shared<SharedDatabaseImpl>(dir.c_str(),
-                                                   allowSlow,
-                                                   max_objects,
-                                                   hot_addr_bits,
-                                                   warm_addr_bits,
-                                                   cool_addr_bits,
-                                                   cold_addr_bits)}
+                                                   hot_bytes,
+                                                   warm_bytes,
+                                                   cool_bytes,
+                                                   cold_bytes)}
    {
    }
 

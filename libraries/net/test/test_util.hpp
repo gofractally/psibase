@@ -102,7 +102,8 @@ struct TempDatabase
    TempDatabase()
        : dir("psibase-test"),
          sharedState{std::make_shared<psibase::SharedState>(
-             psibase::SharedDatabase{dir.path.native(), true, 1'000'000ul, 27, 27, 27, 27},
+             psibase::SharedDatabase{dir.path.native(), 1ull << 27, 1ull << 27, 1ull << 27,
+                                     1ull << 27},
              psibase::WasmCache{16})}
    {
       dir.reset();

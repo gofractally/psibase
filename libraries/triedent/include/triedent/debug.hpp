@@ -2,9 +2,12 @@
 #include <atomic>
 #include <iomanip>
 #include <iostream>
+#include <syncstream>
 
 namespace triedent
 {
+   static constexpr bool debug_cache = false;
+   static constexpr bool debug_gc    = false;
 
    struct scope
    {
