@@ -81,7 +81,10 @@ namespace psibase
       /// auto eventBArguments = reader.ui().updateDisplay(eventBNumber).unpack();
       /// auto eventCArguments = reader.merkle().credit(eventCNumber).unpack();
       /// ```
-      EventReader<DerivedService> events() const { return EventReader<DerivedService>(); }
+      EventReader<DerivedService> events() const
+      {
+         return EventReader<DerivedService>(DerivedService::service);
+      }
    };  // Service
 };     // namespace psibase
 

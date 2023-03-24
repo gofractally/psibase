@@ -159,15 +159,15 @@ namespace psibase
          };
 
          EventHeader header;
-         raw::getResult(&header, sizeof(header));
-         psibase::check(header.event_type == Name, "unexpected event type");
+         raw::getResult(reinterpret_cast<char*>(&header), sizeof(header), 0);
+         psibase::check(header.event_type == MethodNumber{Name}, "unexpected event type");
          psibase::check(header.sender == sender, "unexpected event sender");
 
          std::vector<char> tmp(size);
          raw::getResult(tmp.data(), tmp.size(), 0);
 
-         psio::shared_view_ptr<param_tuple> ptr(psio::size_tag{size - 8});
-         memcpy(ptr.data(), tmp.data() + 8, ptr.size());
+         psio::shared_view_ptr<param_tuple> ptr(psio::size_tag{size - sizeof(header)});
+         memcpy(ptr.data(), tmp.data() + sizeof(header), ptr.size());
          return ptr;
       }
    };
@@ -285,6 +285,10 @@ namespace psibase
       ///
       /// [Service::events] is a shortcut for constructing this.
       EventReader(DbId elog = psibase::DbId::historyEvent) : Base{getReceiver(), elog} {}
+      EventReader(AccountNumber sender, DbId elog = psibase::DbId::historyEvent)
+          : Base{sender, elog}
+      {
+      }
 
       /// Read Ui events
       ///
