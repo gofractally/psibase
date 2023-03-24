@@ -1167,22 +1167,15 @@ inline constexpr std::size_t ceil_log2(std::size_t v)
 
 struct DbConfig
 {
-   DbConfig(byte_size cache, byte_size total)
+   DbConfig(byte_size cache)
    {
-      constexpr std::size_t average_object_size = 256;
-      max_objects                               = total.value / average_object_size;
-      cool_addr_bits = warm_addr_bits = hot_addr_bits =
-          std::max(ceil_log2(cache.value / 2), std::size_t(27));
-      auto used = (std::size_t(3) << hot_addr_bits);
-      if (used > total.value)
-         used = total.value;
-      cold_addr_bits = std::max(ceil_log2(total.value - used), std::size_t(27));
+      cool_bytes = warm_bytes = hot_bytes = cache.value / 2;
+      cold_bytes                          = 64 * 1024 * 1024;
    }
-   uint64_t max_objects    = 1'000'000'000ul;
-   uint64_t hot_addr_bits  = 32;
-   uint64_t warm_addr_bits = 32;
-   uint64_t cool_addr_bits = 32;
-   uint64_t cold_addr_bits = 38;
+   uint64_t hot_bytes;
+   uint64_t warm_bytes;
+   uint64_t cool_bytes;
+   uint64_t cold_bytes;
 };
 
 struct TLSConfig
@@ -1334,8 +1327,8 @@ void run(const std::string&              db_path,
 
    // TODO: configurable WasmCache size
    auto sharedState = std::make_shared<psibase::SharedState>(
-       SharedDatabase{db_path, true, db_conf.max_objects, db_conf.hot_addr_bits,
-                      db_conf.warm_addr_bits, db_conf.cool_addr_bits, db_conf.cold_addr_bits},
+       SharedDatabase{db_path, db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes,
+                      db_conf.cold_bytes},
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
@@ -1998,12 +1991,9 @@ int main(int argc, char* argv[])
        "Serve static content from directory using the specified virtual host name");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
-   opt("database-size", po::value(&db_size)->default_value({std::size_t(1) << 38}, "256 GiB"),
-       "The maximum size of the database. Must be at least 512 MiB. Warning: this will not modify "
-       "an existing database. This option is subject to change.");
    opt("database-cache-size",
        po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
-       "The amount of RAM reserved for the database cache. Must be at least 256 MiB. Warning: this "
+       "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: this "
        "will not modify an existing database. This option is subject to change.");
 #ifdef PSIBASE_ENABLE_SSL
    opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
@@ -2089,9 +2079,9 @@ int main(int argc, char* argv[])
          restart.shutdownRequested = false;
          restart.shouldRestart     = true;
          restart.soft              = true;
-         run(db_path, DbConfig{db_cache_size, db_size}, AccountNumber{producer}, keys, peers,
-             autoconnect, enable_incoming_p2p, host, listen, services, admin, root_ca, tls_cert,
-             tls_key, leeway_us, restart);
+         run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, peers, autoconnect,
+             enable_incoming_p2p, host, listen, services, admin, root_ca, tls_cert, tls_key,
+             leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

@@ -30,12 +30,10 @@ namespace psibase
 
       SharedDatabase() = default;
       SharedDatabase(const boost::filesystem::path& dir,
-                     bool                           allowSlow,
-                     uint64_t                       max_objects    = 1'000'000'000ul,
-                     uint64_t                       hot_addr_bits  = 32,
-                     uint64_t                       warm_addr_bits = 32,
-                     uint64_t                       cool_addr_bits = 32,
-                     uint64_t                       cold_addr_bits = 38);
+                     uint64_t                       hot_addr_bits  = 1ull << 32,
+                     uint64_t                       warm_addr_bits = 1ull << 32,
+                     uint64_t                       cool_addr_bits = 1ull << 32,
+                     uint64_t                       cold_addr_bits = 1ull << 32);
       SharedDatabase(const SharedDatabase&) = default;
       SharedDatabase(SharedDatabase&&)      = default;
 
