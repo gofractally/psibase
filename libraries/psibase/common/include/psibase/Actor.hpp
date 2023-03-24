@@ -150,25 +150,19 @@ namespace psibase
       template <uint32_t idx, uint64_t Name, auto MemberPtr>
       auto call(EventNumber n) const
       {
-         auto size         = raw::getSequential(event_log, n);
          using param_tuple = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
-         struct EventHeader
+         AccountNumber service;
+         MethodNumber  type;
+         MethodNumber  expected_type{Name};
+         auto result = psibase::getSequential<param_tuple>(event_log, n, &sender, &expected_type,
+                                                           &service, &type);
+         if (!result)
          {
-            AccountNumber sender;
-            MethodNumber  event_type;
-         };
-
-         EventHeader header;
-         raw::getResult(reinterpret_cast<char*>(&header), sizeof(header), 0);
-         psibase::check(header.event_type == MethodNumber{Name}, "unexpected event type");
-         psibase::check(header.sender == sender, "unexpected event sender");
-
-         std::vector<char> tmp(size);
-         raw::getResult(tmp.data(), tmp.size(), 0);
-
-         psio::shared_view_ptr<param_tuple> ptr(psio::size_tag{size - sizeof(header)});
-         memcpy(ptr.data(), tmp.data() + sizeof(header), ptr.size());
-         return ptr;
+            psibase::check(type == MethodNumber{Name}, "unexpected event type");
+            psibase::check(service == sender, "unexpected event sender");
+            psibase::check(false, "event not found");
+         }
+         return std::move(*result);
       }
    };
 

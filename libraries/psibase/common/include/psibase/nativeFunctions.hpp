@@ -229,19 +229,30 @@ namespace psibase
       return raw::putSequential(db, value.pos, value.remaining());
    }
 
+   template <typename Type, NotOptional V = void>
+   struct SequentialRecord
+   {
+      AccountNumber service;
+      Type          type;
+      V             value;
+      PSIO_REFLECT(SequentialRecord, service, type, value);
+   };
+
+   template <typename Type>
+   struct SequentialRecord<Type, void>
+   {
+      AccountNumber service;
+      Type          type;
+      PSIO_REFLECT(SequentialRecord, service, type);
+   };
+
    /// Add a sequentially-numbered record
    ///
    /// Returns the id.
    template <typename Type, NotOptional V>
    uint64_t putSequential(DbId db, AccountNumber service, Type type, const V& value)
    {
-      std::vector<char>     packed(psio::fracpack_size(service) + psio::fracpack_size(type) +
-                                   psio::fracpack_size(value));
-      psio::fast_buf_stream stream(packed.data(), packed.size());
-      psio::to_frac(service, stream);
-      psio::to_frac(type, stream);
-      psio::to_frac(value, stream);
-      return putSequentialRaw(db, packed);
+      return putSequentialRaw(db, psio::to_frac(SequentialRecord<Type, V>{service, type, value}));
    }
 
    /// Remove a key-value pair if it exists
@@ -358,46 +369,23 @@ namespace psibase
                                          AccountNumber*       service      = nullptr,
                                          Type*                type         = nullptr)
    {
-      // TODO: this record format is seriously problematic.
-      // fracpack in general is not able to determine the end of an object,
-      // so simply appending components is not reliable. The layout
-      // also doesn't match any struct (except when V is fixed size),
-      // which makes reading unnecessarily complicated
-      std::optional<V> result;
-      auto             v = getSequentialRaw(db, id);
+      auto v = getSequentialRaw(db, id);
       if (!v)
-         return result;
+         return {};
 
-      std::uint32_t pos = 0;
+      auto [c, t] = psio::from_frac<SequentialRecord<Type>>(*v);
 
-      auto fracunpack = [&](auto& value)
-      {
-         bool has_unknown = false;
-         bool known_end;
-         if (!psio::is_packable<std::remove_reference_t<decltype(value)>>::template unpack<true,
-                                                                                           false>(
-                 &value, has_unknown, known_end, v->data(), pos, v->size()))
-            check(false, "Invalid frac encoding");
-      };
-
-      AccountNumber c;
-      fracunpack(c);
       if (service)
          *service = c;
       if (matchService && *matchService != c)
-         return result;
+         return {};
 
-      Type t;
-      fracunpack(t);
       if (type)
          *type = t;
       if (matchType && *matchType != t)
-         return result;
+         return {};
 
-      result.emplace();
-      // TODO: validate (allow opt-in or opt-out)
-      fracunpack(*result);
-      return result;
+      return psio::view<SequentialRecord<Type, V>>{*v}.value().unpack();
    }
 
    /// Get the first key-value pair which is greater than or equal to `key`

@@ -409,11 +409,13 @@ namespace psibase
              clearResult(*this);
              auto m = getDbWriteSequential(*this, db);
 
-             psio::input_stream v{value.data(), value.size()};
-             check(v.remaining() >= sizeof(AccountNumber::value),
-                   "value prefix must match service during write");
-             auto service = psio::from_bin<AccountNumber>(v);
-             check(service == code.codeNum, "value prefix must match service during write");
+             std::span<const char>     v{value.data(), value.size()};
+             std::tuple<AccountNumber> service;
+             if (!psio::from_frac(service, v) || std::get<0>(service) != code.codeNum)
+             {
+                check(false,
+                      "value of putSequential must have service account as its first member");
+             }
 
              auto&    dbStatus = transactionContext.blockContext.databaseStatus;
              uint64_t indexNumber;

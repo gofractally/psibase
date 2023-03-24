@@ -657,56 +657,37 @@ namespace psibase
              },
              input_stream, output_stream, error, true);
 
-      std::uint32_t pos = 0;
-
-      auto fracunpack = [&](auto& value)
-      {
-         bool has_unknown = false;
-         bool known_end;
-         if (!psio::is_packable<std::remove_reference_t<decltype(value)>>::template unpack<true,
-                                                                                           false>(
-                 &value, has_unknown, known_end, v->data(), pos, v->size()))
-            check(false, "Invalid frac encoding");
-         check(known_end,
-               "The end of the object must be known in order to decode consecutive packed objects");
-      };
-
-      AccountNumber service;
-      fracunpack(service);
-      if (service != decoder.service)
+      SequentialRecord<MethodNumber> header = {};
+      if (!psio::from_frac(header, *v) || header.service != decoder.service)
          return gql_query(
              EventDecoderStatus{
                  .event_db                = (uint32_t)decoder.db,
                  .event_id                = decoder.eventId,
                  .event_found             = true,
-                 .event_service           = service,
+                 .event_service           = header.service,
                  .event_supported_service = false,
-                 .event_type              = {},
+                 .event_type              = header.type,
                  .event_unpack_ok         = false,
              },
              input_stream, output_stream, error, true);
 
-      MethodNumber type;
-      fracunpack(type);
-
       bool ok    = true;
       bool found = false;
       psio::reflect<Events>::get_by_name(
-          type.value,
+          header.type.value,
           [&](auto meta, auto member)
           {
              using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
              static_assert(MT::isFunction);
-             using TT = decltype(psio::tuple_remove_view(
+             using TT                                     = decltype(psio::tuple_remove_view(
                  std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
-             std::span<char> eventData{v->data() + pos, v->data() + v->size()};
-             if (psio::fracpack_validate<TT>(eventData))
+             SequentialRecord<MethodNumber, TT> eventData = {};
+             if (psio::from_frac(eventData, *v))
              {
-                found      = true;
-                auto value = psio::from_frac<TT>(psio::prevalidated{eventData});
-                ok = gql_query_decoder_value(decoder, type, value, input_stream, output_stream,
-                                             error,
-                                             {meta.param_names.begin(), meta.param_names.end()});
+                found = true;
+                ok    = gql_query_decoder_value(decoder, header.type, eventData.value, input_stream,
+                                                output_stream, error,
+                                                {meta.param_names.begin(), meta.param_names.end()});
              }
           });
 
@@ -716,9 +697,9 @@ namespace psibase
                  .event_db                = (uint32_t)decoder.db,
                  .event_id                = decoder.eventId,
                  .event_found             = true,
-                 .event_service           = service,
+                 .event_service           = header.service,
                  .event_supported_service = true,
-                 .event_type              = type,
+                 .event_type              = header.type,
                  .event_unpack_ok         = false,
              },
              input_stream, output_stream, error, true);
@@ -1032,34 +1013,16 @@ namespace psibase
             break;
          }
 
-         std::uint32_t pos = 0;
-
-         auto fracunpack = [&](auto& value)
-         {
-            bool has_unknown = false;
-            bool known_end;
-            if (!psio::is_packable<std::remove_reference_t<decltype(value)>>::template unpack<
-                    true, false>(&value, has_unknown, known_end, v->data(), pos, v->size()))
-               check(false, "Invalid frac encoding");
-            check(known_end,
-                  "The end of the object must be known in order to decode consecutive packed "
-                  "objects");
-         };
-
-         AccountNumber c;
-         fracunpack(c);
-         if (c != service)
+         SequentialRecord<MethodNumber> header;
+         if (!psio::from_frac(header, *v) && header.service != service)
          {
             result.pageInfo.hasNextPage = false;
             break;
          }
 
-         MethodNumber type;
-         fracunpack(type);
-
          bool found = false;
          psio::reflect<Events>::get_by_name(
-             type.value,
+             header.type.value,
              [&](auto meta, auto member)
              {
                 using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
@@ -1067,12 +1030,12 @@ namespace psibase
                 using TT = decltype(psio::tuple_remove_view(
                     std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
                 // TODO: EventDecoder validates and unpacks this again
-                std::span<const char> eventData{v->data() + pos, v->data() + v->size()};
-                if (psio::fracpack_validate<TT>(eventData))
+                SequentialRecord<MethodNumber, TT> eventData;
+                if (psio::from_frac(eventData, *v))
                 {
-                   auto value = psio::from_frac<TT>(psio::prevalidated{eventData});
                    get_event_field<0>(  //
-                       value, fieldName, {}, {meta.param_names.begin(), meta.param_names.end()},
+                       eventData.value, fieldName, {},
+                       {meta.param_names.begin(), meta.param_names.end()},
                        [&](auto _, const auto& field)
                        {
                           if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(field)>>)
