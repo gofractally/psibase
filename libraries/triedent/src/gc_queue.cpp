@@ -36,9 +36,12 @@ namespace triedent
 
    void gc_queue::push(std::shared_ptr<void> element)
    {
-      std::unique_lock l{_queue_mutex};
-      auto             end   = _end.load();
-      auto             start = (end + _queue.size() - _size) % _queue.size();
+      // Destroyed after the mutex is unlocked because the destructor
+      // may execute arbitrary code
+      std::vector<std::shared_ptr<void>> popped_items;
+      std::unique_lock                   l{_queue_mutex};
+      auto                               end   = _end.load();
+      auto                               start = (end + _queue.size() - _size) % _queue.size();
       // always leave one empty element, to ensure that
       // session._sequence == _end is unambiguous.
       while (_size == _queue.size() - 1)
@@ -53,7 +56,7 @@ namespace triedent
          }
          else
          {
-            do_run(start, end_ready);
+            pop_some(popped_items, start, end_ready);
             break;
          }
       }
@@ -68,32 +71,38 @@ namespace triedent
 
    void gc_queue::poll()
    {
-      std::lock_guard l{_queue_mutex};
-      auto            end   = _end.load();
-      auto            start = (end + _queue.size() - _size) % _queue.size();
+      std::vector<std::shared_ptr<void>> popped_items;
+      std::lock_guard                    l{_queue_mutex};
+      auto                               end   = _end.load();
+      auto                               start = (end + _queue.size() - _size) % _queue.size();
       // _queue.size() is distinct from any sequence that
       // a session can hold (including npos)
-      do_run(start, start_wait(_queue.size(), end));
+      pop_some(popped_items, start, start_wait(_queue.size(), end));
    }
 
    void gc_queue::flush()
    {
       assert(_sessions.empty());
-      std::lock_guard l{_queue_mutex};
-      auto            end   = _end.load();
-      auto            start = (end + _queue.size() - _size) % _queue.size();
-      do_run(start, end);
+      std::vector<std::shared_ptr<void>> popped_items;
+      std::lock_guard                    l{_queue_mutex};
+      auto                               end   = _end.load();
+      auto                               start = (end + _queue.size() - _size) % _queue.size();
+      pop_some(popped_items, start, end);
    }
 
    void gc_queue::run(std::atomic<bool>* done)
    {
-      std::unique_lock l{_queue_mutex};
+      std::vector<std::shared_ptr<void>> popped_items;
+      std::unique_lock                   l{_queue_mutex};
       while (!done->load())
       {
          _queue_cond.wait(l, [&] { return done->load() || (_size != 0 && !_waiting); });
          auto end   = _end.load();
          auto start = (end + _queue.size() - _size) % _queue.size();
-         do_run(start, start_wait(start, end));
+         pop_some(popped_items, start, start_wait(start, end));
+         l.unlock();
+         popped_items.clear();
+         l.lock();
       }
    }
 
@@ -118,7 +127,7 @@ namespace triedent
    // \pre _queue_mutex is locked
    // \pre start is the beginning of the queue
    // \pre end is the result of a call to wait
-   void gc_queue::do_run(size_type start, size_type end)
+   void gc_queue::pop_some(std::vector<std::shared_ptr<void>>& out, size_type start, size_type end)
    {
       for (; start != end; start = next(start))
       {
@@ -126,7 +135,7 @@ namespace triedent
          {
             std::osyncstream(std::cout) << "run gc: " << start << std::endl;
          }
-         _queue[start].reset();
+         out.push_back(std::move(_queue[start]));
          --_size;
       }
    }

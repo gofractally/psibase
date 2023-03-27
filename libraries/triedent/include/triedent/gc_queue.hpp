@@ -68,9 +68,8 @@ namespace triedent
       // of the shared pointer until it is safe to destroy.
       //
       // push may block if the queue is full.
+      // Items are NOT guaranteed to be destroyed in order
       //
-      // \pre The destructor of element MUST NOT call any member of
-      //      this gc_queue or any associated session.
       // \pre The thread calling push MUST NOT hold a lock on any associated session.
       void push(std::shared_ptr<void> element);
       // Removes some elements from the queue.
@@ -92,7 +91,7 @@ namespace triedent
       auto      make_sequence_order(size_type end);
       size_type next(size_type pos);
       // requires _queue_mutex to be locked
-      void do_run(size_type start, size_type end);
+      void pop_some(std::vector<std::shared_ptr<void>>& out, size_type start, size_type end);
       // If any session is locking start, sets _waiting and ensures
       //   that there is a session that will notify _queue_cond.
       // returns the lowest sequence that is locked
