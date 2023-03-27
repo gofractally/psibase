@@ -232,17 +232,17 @@ namespace psibase
    template <typename Type, NotOptional V = void>
    struct SequentialRecord
    {
-      AccountNumber service;
-      Type          type;
-      V             value;
+      AccountNumber       service;
+      std::optional<Type> type;
+      std::optional<V>    value;
       PSIO_REFLECT(SequentialRecord, service, type, value);
    };
 
    template <typename Type>
    struct SequentialRecord<Type, void>
    {
-      AccountNumber service;
-      Type          type;
+      AccountNumber       service;
+      std::optional<Type> type;
       PSIO_REFLECT(SequentialRecord, service, type);
    };
 
@@ -380,9 +380,11 @@ namespace psibase
       if (matchService && *matchService != c)
          return {};
 
+      if (!t)
+         return {};
       if (type)
-         *type = t;
-      if (matchType && *matchType != t)
+         *type = *t;
+      if (matchType && *matchType != *t)
          return {};
 
       return psio::view<SequentialRecord<Type, V>>{*v}.value().unpack();

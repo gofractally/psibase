@@ -666,7 +666,7 @@ namespace psibase
                  .event_found             = true,
                  .event_service           = header.service,
                  .event_supported_service = false,
-                 .event_type              = header.type,
+                 .event_type              = *header.type,
                  .event_unpack_ok         = false,
              },
              input_stream, output_stream, error, true);
@@ -674,7 +674,7 @@ namespace psibase
       bool ok    = true;
       bool found = false;
       psio::reflect<Events>::get_by_name(
-          header.type.value,
+          header.type->value,
           [&](auto meta, auto member)
           {
              using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
@@ -685,9 +685,9 @@ namespace psibase
              if (psio::from_frac(eventData, *v))
              {
                 found = true;
-                ok    = gql_query_decoder_value(decoder, header.type, eventData.value, input_stream,
-                                                output_stream, error,
-                                                {meta.param_names.begin(), meta.param_names.end()});
+                ok = gql_query_decoder_value(decoder, *header.type, *eventData.value, input_stream,
+                                             output_stream, error,
+                                             {meta.param_names.begin(), meta.param_names.end()});
              }
           });
 
@@ -699,7 +699,7 @@ namespace psibase
                  .event_found             = true,
                  .event_service           = header.service,
                  .event_supported_service = true,
-                 .event_type              = header.type,
+                 .event_type              = *header.type,
                  .event_unpack_ok         = false,
              },
              input_stream, output_stream, error, true);
@@ -1022,7 +1022,7 @@ namespace psibase
 
          bool found = false;
          psio::reflect<Events>::get_by_name(
-             header.type.value,
+             header.type->value,
              [&](auto meta, auto member)
              {
                 using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
@@ -1034,7 +1034,7 @@ namespace psibase
                 if (psio::from_frac(eventData, *v))
                 {
                    get_event_field<0>(  //
-                       eventData.value, fieldName, {},
+                       *eventData.value, fieldName, {},
                        {meta.param_names.begin(), meta.param_names.end()},
                        [&](auto _, const auto& field)
                        {

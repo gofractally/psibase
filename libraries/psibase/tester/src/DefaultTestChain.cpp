@@ -47,11 +47,17 @@ DefaultTestChain::DefaultTestChain(
    setBlockProducers();
    registerSysRpc();
 
-   from(UserService::NftSys::service).to<UserService::NftSys>().init();
-   from(UserService::TokenSys::service).to<UserService::TokenSys>().init();
-   from(UserService::SymbolSys::service).to<UserService::SymbolSys>().init();
-   from(UserService::Invite::InviteSys::service).to<UserService::Invite::InviteSys>().init();
-   from(UserService::Fractal::FractalSys::service).to<UserService::Fractal::FractalSys>().init();
+   expect(from(UserService::NftSys::service).to<UserService::NftSys>().init().trace());
+   expect(from(UserService::TokenSys::service).to<UserService::TokenSys>().init().trace());
+   expect(from(UserService::SymbolSys::service).to<UserService::SymbolSys>().init().trace());
+   expect(from(UserService::Invite::InviteSys::service)
+              .to<UserService::Invite::InviteSys>()
+              .init()
+              .trace());
+   expect(from(UserService::Fractal::FractalSys::service)
+              .to<UserService::Fractal::FractalSys>()
+              .init()
+              .trace());
    from(UserService::Fractal::CoreFractalSys::service)
        .to<UserService::Fractal::CoreFractalSys>()
        .init();
