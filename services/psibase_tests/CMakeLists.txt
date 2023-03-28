@@ -13,7 +13,7 @@ function(add suffix)
     service(test_table "${suffix}" test_table.cpp)
     service(event-service "${suffix}" event-service.cpp)
 
-    add_executable(psibase-tests${suffix} test.cpp test-ec.cpp test_event.cpp)
+    add_executable(psibase-tests${suffix} test.cpp test-ec.cpp test_event.cpp test_crypto.cpp)
     target_include_directories(psibase-tests${suffix} PUBLIC include)
     target_link_libraries(psibase-tests${suffix} services_system${suffix} psitestlib${suffix} )
     set_target_properties(psibase-tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})

@@ -5,6 +5,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/print.hpp>
 #include <psibase/trace.hpp>
+#include <psio/to_hex.hpp>
 
 namespace psibase
 {
@@ -288,3 +289,12 @@ namespace psibase
    };  // TestChain
 
 }  // namespace psibase
+
+template <>
+struct Catch::StringMaker<psibase::Checksum256>
+{
+   static std::string convert(const psibase::Checksum256& obj)
+   {
+      return psio::hex(obj.begin(), obj.end());
+   }
+};

@@ -162,6 +162,29 @@ namespace psibase
       active = true;
    }
 
+   Checksum256 BlockContext::makeEventMerkleRoot()
+   {
+      Merkle m;
+      for (std::uint64_t i   = databaseStatus.blockMerkleEventNumber,
+                         end = databaseStatus.nextMerkleEventNumber;
+           i != end; ++i)
+      {
+         auto data = db.kvGetRaw(DbId::merkleEvent, psio::convert_to_key(i));
+         m.push(EventInfo{i, std::span{data->pos, data->end}});
+      }
+      return m.root();
+   }
+
+   Checksum256 BlockContext::makeTransactionMerkle()
+   {
+      Merkle m;
+      for (const SignedTransaction& trx : current.transactions)
+      {
+         m.push(TransactionInfo{trx});
+      }
+      return m.root();
+   }
+
    std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision(const Prover& prover,
                                                                         const Claim&  claim)
    {
@@ -196,9 +219,15 @@ namespace psibase
          status->current.commitNum = current.header.commitNum = current.header.blockNum;
       }
 
+      status->current.trxMerkleRoot = current.header.trxMerkleRoot = makeTransactionMerkle();
+      status->current.eventMerkleRoot = current.header.eventMerkleRoot = makeEventMerkleRoot();
+
       status->head = current;  // Also calculates blockId
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
+
+      databaseStatus.blockMerkleEventNumber = databaseStatus.nextMerkleEventNumber;
+      db.kvPut(DatabaseStatusRow::db, databaseStatus.key(), databaseStatus);
 
       // These values will be replaced at the start of the next block.
       // Changing the these here gives services running in RPC mode

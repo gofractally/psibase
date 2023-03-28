@@ -192,6 +192,7 @@ BlockMessage makeBlock(const BlockInfo&                   info,
    newBlock.block.header.producer     = AccountNumber{producer};
    newBlock.block.header.term         = view;
    newBlock.block.header.commitNum    = commitNum;
+   Merkle m;
    for (const auto& trx : trxs)
    {
       for (auto act : trx.transaction->actions())
@@ -204,8 +205,11 @@ BlockMessage makeBlock(const BlockInfo&                   info,
             newBlock.block.header.newConsensus = get<0>(params);
          }
       }
+      m.push(TransactionInfo{trx});
    }
-   newBlock.block.transactions = std::move(trxs);
+   newBlock.block.transactions           = std::move(trxs);
+   newBlock.block.header.trxMerkleRoot   = m.root();
+   newBlock.block.header.eventMerkleRoot = Checksum256{};
    if (auxData)
    {
       newBlock.auxConsensusData = psio::to_frac(*auxData);
