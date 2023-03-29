@@ -29,6 +29,8 @@ namespace psibase
       bool                                        allowDbRead;
       bool                                        allowDbWrite;
       bool                                        allowDbReadSubjective;
+      std::vector<std::vector<char>>              subjectiveData;
+      size_t                                      nextSubjectiveRead = 0;
 
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,

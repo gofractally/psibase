@@ -60,7 +60,7 @@ void pushTransaction(BlockContext* ctx, Transaction trx)
 {
    SignedTransaction strx{.transaction = trx};
    TransactionTrace  trace;
-   ctx->pushTransaction(strx, trace, std::nullopt);
+   ctx->pushTransaction(std::move(strx), trace, std::nullopt);
 }
 
 std::vector<psibase::AccountNumber> makeAccounts(
@@ -193,7 +193,7 @@ BlockMessage makeBlock(const BlockInfo&                   info,
    newBlock.block.header.term         = view;
    newBlock.block.header.commitNum    = commitNum;
    Merkle m;
-   for (const auto& trx : trxs)
+   for (auto& trx : trxs)
    {
       for (auto act : trx.transaction->actions())
       {
@@ -205,6 +205,7 @@ BlockMessage makeBlock(const BlockInfo&                   info,
             newBlock.block.header.newConsensus = get<0>(params);
          }
       }
+      trx.subjectiveData.emplace();
       m.push(TransactionInfo{trx});
    }
    newBlock.block.transactions           = std::move(trxs);

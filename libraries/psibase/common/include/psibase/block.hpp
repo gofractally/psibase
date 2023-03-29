@@ -114,8 +114,10 @@ namespace psibase
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
+
+      std::optional<std::vector<std::vector<char>>> subjectiveData;
    };
-   PSIO_REFLECT(SignedTransaction, transaction, proofs)
+   PSIO_REFLECT(SignedTransaction, transaction, proofs, subjectiveData)
 
    using TermNum = uint32_t;
 
@@ -168,7 +170,6 @@ namespace psibase
       // The merkle root of events generated while processing the block.
       // The leaves have type EventInfo.
       Checksum256 eventMerkleRoot;
-      // TODO: commit subjective data
 
       // If newConsensus is set, activates joint consensus on
       // this block. Joint consensus must not be active already.
@@ -190,14 +191,17 @@ namespace psibase
    {
       TransactionInfo(const SignedTransaction& trx)
           : transactionId(sha256(trx.transaction.data(), trx.transaction.size())),
-            signatureHash(sha256(trx.proofs))
+            signatureHash(sha256(trx.proofs)),
+            subjectiveDataHash((check(!!trx.subjectiveData, "Missing subjective data"),
+                                sha256(*trx.subjectiveData)))
       {
       }
       Checksum256 transactionId;
       // TODO: Is there ever a reason to prune an individual signature?
       Checksum256 signatureHash;
+      Checksum256 subjectiveDataHash;
    };
-   PSIO_REFLECT(TransactionInfo, transactionId, signatureHash)
+   PSIO_REFLECT(TransactionInfo, transactionId, signatureHash, subjectiveDataHash)
 
    struct EventInfo
    {
@@ -211,10 +215,9 @@ namespace psibase
    struct Block
    {
       BlockHeader                    header;
-      std::vector<SignedTransaction> transactions;  // TODO: move inside receipts
-      std::vector<std::vector<char>> subjectiveData;
+      std::vector<SignedTransaction> transactions;
    };
-   PSIO_REFLECT(Block, header, transactions, subjectiveData)
+   PSIO_REFLECT(Block, header, transactions)
 
    /// TODO: you have signed block headers, not signed blocks
    struct SignedBlock

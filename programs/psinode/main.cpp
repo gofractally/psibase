@@ -418,7 +418,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
                   // That state is empty, so there are no proof services installed.
                   trace.error = "Transactions in boot block may not have proofs";
                else
-                  bc.pushTransaction(trx, trace, std::nullopt);
+                  bc.pushTransaction(std::move(trx), trace, std::nullopt);
             }
          }
       }
@@ -567,7 +567,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             //       shadow bill, and once shadow billing is in place, failed
             //       transaction billing seems unnecessary.
 
-            bc.pushTransaction(trx, trace, initialWatchdogLimit);
+            bc.pushTransaction(std::move(trx), trace, initialWatchdogLimit);
          }
       }
       RETHROW_BAD_ALLOC

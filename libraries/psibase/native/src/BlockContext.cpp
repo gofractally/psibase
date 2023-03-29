@@ -125,8 +125,7 @@ namespace psibase
       check(src.header.previous == current.header.previous,
             "block previous does not match expected");
       check(src.header.blockNum == current.header.blockNum, "block num does not match expected");
-      current.transactions   = std::move(src.transactions);
-      current.subjectiveData = std::move(src.subjectiveData);
+      current.transactions = std::move(src.transactions);
       db.kvPut(StatusRow::db, status.key(), status);
       active = true;
    }
@@ -261,18 +260,16 @@ namespace psibase
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
          t.execVerifyProof(i);
-         if (!current.subjectiveData.empty())
+         if (!t.subjectiveData.empty())
             throw std::runtime_error("proof called a subjective service");
       }
       catch (const std::exception& e)
       {
-         current.subjectiveData.clear();
          trace.error = e.what();
          throw;
       }
       catch (...)
       {
-         current.subjectiveData.clear();
          throw;
       }
    }
@@ -288,38 +285,23 @@ namespace psibase
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
          t.checkFirstAuth();
-         current.subjectiveData.clear();
       }
       catch (const std::exception& e)
       {
-         current.subjectiveData.clear();
          trace.error = e.what();
-         throw;
-      }
-      catch (...)
-      {
-         current.subjectiveData.clear();
          throw;
       }
    }
 
-   void BlockContext::pushTransaction(const SignedTransaction&                 trx,
+   void BlockContext::pushTransaction(SignedTransaction&&                      trx,
                                       TransactionTrace&                        trace,
                                       std::optional<std::chrono::microseconds> initialWatchdogLimit,
                                       bool                                     enableUndo,
                                       bool                                     commit)
    {
-      auto subjectiveSize = current.subjectiveData.size();
-      try
-      {
-         exec(trx, trace, initialWatchdogLimit, enableUndo, commit);
-         current.transactions.push_back(std::move(trx));
-      }
-      catch (...)
-      {
-         current.subjectiveData.resize(subjectiveSize);
-         throw;
-      }
+      check(!trx.subjectiveData, "Subjective data should be set by the block producer");
+      trx.subjectiveData = exec(trx, trace, initialWatchdogLimit, enableUndo, commit);
+      current.transactions.push_back(std::move(trx));
    }
 
    // TODO: call callStartBlock() here? caller's responsibility?
@@ -328,18 +310,18 @@ namespace psibase
    {
       for (auto& trx : current.transactions)
       {
+         check(!!trx.subjectiveData, "Missing subjective data");
          TransactionTrace trace;
          exec(trx, trace, std::nullopt, false, true);
       }
-      check(nextSubjectiveRead == current.subjectiveData.size(),
-            "block has unread subjective data");
    }
 
-   void BlockContext::exec(const SignedTransaction&                 trx,
-                           TransactionTrace&                        trace,
-                           std::optional<std::chrono::microseconds> initialWatchdogLimit,
-                           bool                                     enableUndo,
-                           bool                                     commit)
+   std::vector<std::vector<char>> BlockContext::exec(
+       const SignedTransaction&                 trx,
+       TransactionTrace&                        trace,
+       std::optional<std::chrono::microseconds> initialWatchdogLimit,
+       bool                                     enableUndo,
+       bool                                     commit)
    {
       try
       {
@@ -362,11 +344,18 @@ namespace psibase
             t.setWatchdog(*initialWatchdogLimit);
          t.execTransaction();
 
+         if (!isProducing)
+         {
+            check(t.nextSubjectiveRead == trx.subjectiveData->size(),
+                  "transaction has unread subjective data");
+         }
+
          if (commit)
          {
             session.commit();
             active = true;
          }
+         return std::move(t.subjectiveData);
       }
       catch (const std::exception& e)
       {

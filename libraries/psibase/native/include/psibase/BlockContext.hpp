@@ -15,13 +15,12 @@ namespace psibase
       Database::Session session;
       Block             current;
       DatabaseStatusRow databaseStatus;
-      size_t            nextSubjectiveRead = 0;
-      bool              isProducing        = false;
-      bool              isReadOnly         = false;
-      bool              isGenesisBlock     = false;
-      bool              needGenesisAction  = false;
-      bool              started            = false;
-      bool              active             = false;
+      bool              isProducing       = false;
+      bool              isReadOnly        = false;
+      bool              isGenesisBlock    = false;
+      bool              needGenesisAction = false;
+      bool              started           = false;
+      bool              active            = false;
 
       BlockContext(SystemContext&                  systemContext,
                    std::shared_ptr<const Revision> revision,
@@ -52,7 +51,7 @@ namespace psibase
                           TransactionTrace&                        trace,
                           std::optional<std::chrono::microseconds> watchdogLimit);
 
-      void pushTransaction(const SignedTransaction&                 trx,
+      void pushTransaction(SignedTransaction&&                      trx,
                            TransactionTrace&                        trace,
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,
                            bool                                     enableUndo = true,
@@ -60,11 +59,12 @@ namespace psibase
 
       void execAllInBlock();
 
-      void exec(const SignedTransaction&                 trx,
-                TransactionTrace&                        trace,
-                std::optional<std::chrono::microseconds> initialWatchdogLimit,
-                bool                                     enableUndo,
-                bool                                     commit);
+      std::vector<std::vector<char>> exec(
+          const SignedTransaction&                 trx,
+          TransactionTrace&                        trace,
+          std::optional<std::chrono::microseconds> initialWatchdogLimit,
+          bool                                     enableUndo,
+          bool                                     commit);
 
       psibase::TimePointSec getHeadBlockTime();
    };  // BlockContext

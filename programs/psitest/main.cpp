@@ -748,7 +748,7 @@ struct callbacks
             trace = std::move(saveTrace);
          }
 
-         chain.blockContext->pushTransaction(signedTrx, trace, std::nullopt);
+         chain.blockContext->pushTransaction(std::move(signedTrx), trace, std::nullopt);
       }
       catch (const std::exception& e)
       {
