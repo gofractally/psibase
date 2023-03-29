@@ -114,8 +114,10 @@ namespace psibase
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
+
+      std::optional<std::vector<std::vector<char>>> subjectiveData;
    };
-   PSIO_REFLECT(SignedTransaction, transaction, proofs)
+   PSIO_REFLECT(SignedTransaction, transaction, proofs, subjectiveData)
 
    using TermNum = uint32_t;
 
@@ -147,7 +149,6 @@ namespace psibase
    }
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
-   // TODO: Producer & Rotation
    // TODO: Consensus fields
    // TODO: Protocol Activation? Main reason to put here is to support light-client validation.
    // TODO: Are we going to attempt to support light-client validation? Didn't seem to work out easy last time.
@@ -161,21 +162,62 @@ namespace psibase
       TermNum       term;
       BlockNum      commitNum;
 
+      // Holds a merkle root of the transactions in the block.
+      // This does not depend on execution, so that it can be
+      // verified early. The leaves of the tree have type
+      // TransactionInfo.
+      Checksum256 trxMerkleRoot;
+      // The merkle root of events generated while processing the block.
+      // The leaves have type EventInfo.
+      Checksum256 eventMerkleRoot;
+
       // If newConsensus is set, activates joint consensus on
       // this block. Joint consensus must not be active already.
       // Joint consensus ends after this block becomes irreversible.
       std::optional<Consensus> newConsensus;
    };
-   PSIO_REFLECT(BlockHeader, previous, blockNum, time, producer, term, commitNum, newConsensus)
+   PSIO_REFLECT(BlockHeader,
+                previous,
+                blockNum,
+                time,
+                producer,
+                term,
+                commitNum,
+                trxMerkleRoot,
+                eventMerkleRoot,
+                newConsensus)
+
+   struct TransactionInfo
+   {
+      TransactionInfo(const SignedTransaction& trx)
+          : transactionId(sha256(trx.transaction.data(), trx.transaction.size())),
+            signatureHash(sha256(trx.proofs)),
+            subjectiveDataHash((check(!!trx.subjectiveData, "Missing subjective data"),
+                                sha256(*trx.subjectiveData)))
+      {
+      }
+      Checksum256 transactionId;
+      // TODO: Is there ever a reason to prune an individual signature?
+      Checksum256 signatureHash;
+      Checksum256 subjectiveDataHash;
+   };
+   PSIO_REFLECT(TransactionInfo, transactionId, signatureHash, subjectiveDataHash)
+
+   struct EventInfo
+   {
+      std::uint64_t id;
+      // TODO: Should we use a hash instead of including the data directly?
+      std::span<const char> data;
+   };
+   PSIO_REFLECT(EventInfo)
 
    // TODO: switch fields to shared_view_ptr?
    struct Block
    {
       BlockHeader                    header;
-      std::vector<SignedTransaction> transactions;  // TODO: move inside receipts
-      std::vector<std::vector<char>> subjectiveData;
+      std::vector<SignedTransaction> transactions;
    };
-   PSIO_REFLECT(Block, header, transactions, subjectiveData)
+   PSIO_REFLECT(Block, header, transactions)
 
    /// TODO: you have signed block headers, not signed blocks
    struct SignedBlock
@@ -196,7 +238,7 @@ namespace psibase
       BlockInfo(const BlockInfo&) = default;
 
       // TODO: don't repack to compute sha
-      BlockInfo(const Block& b) : header{b.header}, blockId{sha256(b)}
+      BlockInfo(const Block& b) : header{b.header}, blockId{sha256(header)}
       {
          auto* src  = (const char*)&header.blockNum + sizeof(header.blockNum);
          auto* dest = blockId.data();

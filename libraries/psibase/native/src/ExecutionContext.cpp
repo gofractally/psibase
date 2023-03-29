@@ -299,9 +299,11 @@ namespace psibase
       auto& bc = impl->transactionContext.blockContext;
       if ((impl->code.flags & CodeRow::isSubjective) && !bc.isProducing)
       {
-         check(bc.nextSubjectiveRead < bc.current.subjectiveData.size(), "missing subjective data");
+         auto&       ctx = impl->transactionContext;
+         const auto& tx  = ctx.signedTransaction;
+         check(ctx.nextSubjectiveRead < tx.subjectiveData->size(), "missing subjective data");
          impl->currentActContext->actionTrace.rawRetval =
-             bc.current.subjectiveData[bc.nextSubjectiveRead++];
+             (*tx.subjectiveData)[ctx.nextSubjectiveRead++];
          return;
       }
 
@@ -311,7 +313,8 @@ namespace psibase
       });
 
       if ((impl->code.flags & CodeRow::isSubjective) && !(callerFlags & CodeRow::isSubjective))
-         bc.current.subjectiveData.push_back(impl->currentActContext->actionTrace.rawRetval);
+         impl->transactionContext.subjectiveData.push_back(
+             impl->currentActContext->actionTrace.rawRetval);
    }
 
    void ExecutionContext::execVerify(ActionContext& actionContext)

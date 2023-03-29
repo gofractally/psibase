@@ -101,4 +101,43 @@ namespace psibase
       return true;
    }
 
+   // The Merkle class incrementally constructs a merkle tree
+   //
+   // An empty tree is represented by the zero hash
+   // A leaf node is sha256(00 || frac(value))
+   // An internal node is sha256(01 || lhs || rhs)
+   //
+   // The tree has the minimum depth for a given number of elements, and left
+   // subtrees are filled first.
+   //
+   //  /\       /\     / \         /\
+   // 1  2     /\ 3   /   \       /  5
+   //         1 2    /\   /\     / \
+   //               1  2 3  4   /   \
+   //                          /\   /\
+   //                         1  2 3  4
+   struct Merkle
+   {
+      std::uint64_t            i = 0;
+      std::vector<Checksum256> stack;
+      // Returns the root of all the nodes that have been inserted so far
+      Checksum256 root() const;
+      // Appends a leaf node at the right edge of the tree
+      template <typename T>
+      void push(const T& value)
+      {
+         push_impl(hash_leaf(value));
+      }
+      template <typename T>
+      static Checksum256 hash_leaf(const T& value)
+      {
+         std::vector<char>   result{'\0'};
+         psio::vector_stream stream{result};
+         psio::to_frac(value, stream);
+         return sha256(result.data(), result.size());
+      }
+      void push_impl(const Checksum256& hash);
+   };
+   PSIO_REFLECT(Merkle, i, stack)
+
 }  // namespace psibase
