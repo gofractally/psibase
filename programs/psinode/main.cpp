@@ -232,7 +232,7 @@ void parse_config(native_service&              service,
                   std::string_view             str,
                   const std::filesystem::path& context = option_path)
 {
-   auto pos = str.find(':');
+   auto pos = str.starts_with('[') ? str.find("]:") : str.find(':');
    if (pos == std::string_view::npos)
    {
       service.root = parse_path(str, context);
@@ -243,6 +243,7 @@ void parse_config(native_service&              service,
    }
    else
    {
+      pos          = str.find(':', pos);
       service.host = str.substr(0, pos);
       service.root = parse_path(str.substr(pos + 1), context);
    }
@@ -273,7 +274,7 @@ void load_service(const native_service& config,
                   const std::string&    root_host)
 {
    auto  host    = config.host.ends_with('.') ? config.host + root_host : config.host;
-   auto& service = services[config.host];
+   auto& service = services[host];
    if (config.root.empty())
       return;
    for (const auto& entry : std::filesystem::recursive_directory_iterator{config.root})
