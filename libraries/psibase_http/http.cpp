@@ -1185,6 +1185,7 @@ namespace psibase::http
 
       beast::flat_buffer                 buffer;
       std::unique_ptr<net::steady_timer> _timer;
+      bool                               _closed = false;
       steady_clock::time_point           last_activity_timepoint;
 
       // The parser is stored in an optional container so we can
@@ -1215,27 +1216,27 @@ namespace psibase::http
          PSIBASE_LOG(logger, debug) << "Accepted connection";
          _timer.reset(new boost::asio::steady_timer(derived_session().stream.get_executor()));
          last_activity_timepoint = steady_clock::now();
-         start_socket_timer();
+         start_socket_timer(derived_session().shared_from_this());
          do_read();
       }
 
       SessionType& derived_session() { return static_cast<SessionType&>(*this); }
 
      private:
-      void start_socket_timer()
+      void start_socket_timer(std::shared_ptr<SessionType>&& self)
       {
          _timer->expires_after(server.http_config->idle_timeout_ms);
          _timer->async_wait(
-             [this](beast::error_code ec)
+             [this, self = std::move(self)](beast::error_code ec) mutable
              {
-                if (ec)
+                if (ec || _closed)
                 {
                    return;
                 }
                 auto session_duration = steady_clock::now() - last_activity_timepoint;
                 if (session_duration <= server.http_config->idle_timeout_ms)
                 {
-                   start_socket_timer();
+                   start_socket_timer(std::move(self));
                 }
                 else
                 {
@@ -1328,8 +1329,12 @@ namespace psibase::http
       void do_close()
       {
          // Send a TCP shutdown
-         derived_session().do_shutdown();
-         _timer->cancel();  // cancel connection timer.
+         if (!_closed)
+         {
+            derived_session().do_shutdown();
+            _timer->cancel();  // cancel connection timer.
+            _closed = true;
+         }
          // At this point the connection is closed gracefully
       }
       void do_shutdown()
