@@ -35,7 +35,7 @@ Three more options are important for connecting multiple nodes together in a net
 
 Options controlling native content (enabled in new nodes by default):
 
-- `--service` *host*:*path*: tells psinode to host static content from *path*.
+- `--service` *host*:*path*: tells psinode to host static content from *path*. Environment variables are not supported. The `$PREFIX` variable returns the path to the `bin/` directory containing the psinode binary or the path to the psinode binary (if not inside a `bin/` directory).
 - `--admin` `'builtin:*'` | `'*'` | *service*: tells psinode to enable the [admin API](../http.md#node-administrator-services)
 
 Options controlling TLS:
