@@ -14,6 +14,7 @@ export type LogConfig = {
     maxFiles?: string;
     path?: string;
     flush?: boolean;
+    command?: string;
 };
 
 export type NewLogInputs = {

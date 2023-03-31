@@ -25,6 +25,7 @@ export const Logger = ({ loggerKey, register, watch, remove }: LoggerProps) => {
                 <option value="console">Console</option>
                 <option value="file">File</option>
                 <option value="local">Local Socket</option>
+                <option value="pipe">Pipe</option>
             </Form.Select>
 
             <Form.Input label="Filter" {...register("filter")} />
@@ -65,6 +66,10 @@ export const Logger = ({ loggerKey, register, watch, remove }: LoggerProps) => {
             <Form.Input
                 label="Socket Path"
                 {...register("path", { disabled: type_ != "local" })}
+            />
+            <Form.Input
+                label="Command"
+                {...register("command", { disabled: type_ != "pipe" })}
             />
         </fieldset>
     );
