@@ -46,20 +46,6 @@ namespace
       return result;
    }
 
-   std::string editLine(std::string_view key, std::string_view value, std::string_view comment)
-   {
-      std::string result(key);
-      result += " = ";
-      result += escape(value);
-      if (!comment.empty())
-      {
-         result += " ";
-         result += comment;
-      }
-      result += "\n";
-      return result;
-   }
-
    std::string fullKey(std::string_view section, std::string_view key)
    {
       if (section.empty())
@@ -70,6 +56,25 @@ namespace
       {
          return std::string(section) + "." + std::string(key);
       }
+   }
+
+   std::string editLine(const ConfigFileOptions& opts,
+                        std::string_view         section,
+                        std::string_view         key,
+                        std::string_view         value)
+   {
+      std::string result(key);
+      result += " = ";
+      if (opts.expandValue((fullKey(section, key))))
+      {
+         result += escape(value);
+      }
+      else
+      {
+         result += value;
+      }
+      result += "\n";
+      return result;
    }
 
    std::string_view trim(std::string_view s)
@@ -385,7 +390,7 @@ void ConfigFile::edit(std::size_t location, std::string_view key, std::string_vi
 {
    auto [old_key, old_value, enabled] = parseLine(lines[location]);
    std::string& ins                   = insertions[location + 1];
-   if (eval(opts, key, old_value) != value)
+   if (!enabled || eval(opts, key, old_value) != value)
    {
       // Using old_key instead of key handles the case where a key is
       // defined outside its regular section
@@ -427,7 +432,7 @@ void ConfigFile::set(std::string_view section,
          line += comment;
          line += '\n';
       }
-      line += editLine(key, value, "");
+      line += editLine(opts, section, key, value);
    }
    else
    {
@@ -491,7 +496,7 @@ void ConfigFile::set(std::string_view                             section,
       }
       for (auto value : values)
       {
-         line += editLine(key, value, "");
+         line += editLine(opts, section, key, value);
       }
    }
    else
@@ -512,7 +517,7 @@ void ConfigFile::set(std::string_view                             section,
          auto iter = locations.find(normalize(value));
          if (iter == locations.end())
          {
-            insertions[insertPoint] += editLine(key, value, "");
+            insertions[insertPoint] += editLine(opts, section, key, value);
          }
          else
          {
