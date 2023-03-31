@@ -211,14 +211,16 @@ std::filesystem::path get_prefix()
 }
 
 std::filesystem::path option_path;
+ConfigFileOptions     config_options{.expandValue = [](std::string_view key)
+                                 {
+                                    // shell commands are processed by the shell. They should not go
+                                    // through another round of expansion.
+                                    return !key.ends_with(".command");
+                                 }};
 std::filesystem::path parse_path(std::string_view             s,
                                  const std::filesystem::path& context = option_path)
 {
-   if (s.starts_with("$PREFIX"))
-   {
-      return get_prefix() / std::filesystem::path(s.substr(7)).relative_path();
-   }
-   else if (s.empty())
+   if (s.empty())
    {
       return std::filesystem::path();
    }
@@ -1702,7 +1704,7 @@ void run(const std::string&              db_path,
                 }
                 {
                    auto       path = std::filesystem::path(db_path) / "config";
-                   ConfigFile file;
+                   ConfigFile file{config_options};
                    {
                       std::ifstream in(path);
                       file.parse(in);
@@ -1803,7 +1805,7 @@ void run(const std::string&              db_path,
                       prover->add(std::move(result));
 
                       auto       path = std::filesystem::path(db_path) / "config";
-                      ConfigFile file;
+                      ConfigFile file{config_options};
                       {
                          std::ifstream in(path);
                          file.parse(in);
@@ -1953,6 +1955,13 @@ const char usage[] = "USAGE: psinode [OPTIONS] database";
 
 int main(int argc, char* argv[])
 {
+   // Must run before any additional threads are started
+   {
+      auto prefix = get_prefix();
+      ::setenv("PREFIX", prefix.c_str(), 1);
+      ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
+   }
+
    std::string                 db_path;
    std::string                 producer = {};
    auto                        keys     = std::make_shared<CompoundProver>();
@@ -2034,7 +2043,7 @@ int main(int argc, char* argv[])
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
-            po::store(psibase::parse_config_file(in, cfg_opts, config_path), vm);
+            po::store(psibase::parse_config_file(in, cfg_opts, config_options, config_path), vm);
          }
          else if (!exists(config_path))
          {
@@ -2042,7 +2051,8 @@ int main(int argc, char* argv[])
             if (std::filesystem::is_regular_file(template_path))
             {
                std::ifstream in(template_path);
-               po::store(psibase::parse_config_file(in, cfg_opts, template_path), vm);
+               po::store(psibase::parse_config_file(in, cfg_opts, config_options, template_path),
+                         vm);
             }
          }
       }

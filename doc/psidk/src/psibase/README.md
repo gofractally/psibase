@@ -36,7 +36,7 @@ Three more options are important for connecting multiple nodes together in a net
 Options controlling native content (enabled in new nodes by default):
 
 - `--service` *host*:*path*: tells psinode to host static content from *path*.
-- `--admin` `'builtin:*'` | `'*'` | *service*: tells psinode to enable the [admin API](../http.md#node-administrator-services)
+- `--admin` `static:*'` | `'*'` | *service*: tells psinode to enable the [admin API](../http.md#node-administrator-services)
 
 Options controlling TLS:
 - `--tls-cert` *file*: A file containing the certificate chain that the server will use. The key must be specified as well using `--tls-key`. This certificate will be used both as a server certificate for incoming https connections and as a client certificate for outing p2p connections using https. The certificate should be a wildcard certificate, valid for both *host* and \*.*host*.
@@ -52,14 +52,17 @@ Example:
 producer = prod
 host     = 127.0.0.1.sslip.io
 listen   = 8080
-service  = localhost:$PREFIX/share/psibase/services/admin-sys
-admin    = builtin:*
+service  = localhost:$PSIBASE_DATADIR/services/admin-sys
+admin    = static:*
 
 [logger.stderr]
 type   = console
 filter = Severity >= info
 format = [{TimeStamp}] {Message}
 ```
+
+Environmental variables, double quotes, and backslash escapes can be used in the value of most options. `psinode` adds some variables to its environment:
+- `PSIBASE_DATADIR`: The directory containing data files used by `psinode`.  Usually `<install-prefix>/share/psibase`.
 
 ## psibase
 

@@ -6,10 +6,10 @@ p2p      = off
 # host     = 127.0.0.1.sslip.io
 # listen   = 8080
 # peer     = localhost:8080
-service  = localhost:$PREFIX/share/psibase/services/admin-sys
-service  = 127.0.0.1:$PREFIX/share/psibase/services/admin-sys
-service  = [::1]:$PREFIX/share/psibase/services/admin-sys
-service  = admin-sys.:$PREFIX/share/psibase/services/admin-sys
+service  = localhost:$PSIBASE_DATADIR/services/admin-sys
+service  = 127.0.0.1:$PSIBASE_DATADIR/services/admin-sys
+service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
+service  = admin-sys.:$PSIBASE_DATADIR/services/admin-sys
 admin    = static:*
 
 [logger.stderr]
