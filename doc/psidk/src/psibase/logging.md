@@ -101,6 +101,8 @@ The pipe logger sends log messages to the `stdin` of a subprocess. The format MU
 
 The command SHOULD exit after receiving EOF. If it fails to do so, a configuration change that updates the command may terminate the previous command with a signal.
 
+The value is passed literally to the shell without preprocessing by `psinode`.
+
 Examples:
 ```ini
 [logger.syslog]
@@ -114,7 +116,7 @@ command = nc --send-only --ssl-verify --ssl-cert logcert.pem --ssl-key logkey.pe
 [logger.alert]
 type    = pipe
 filter  = Severity >= error
-format  = "notify-send -a {Process} -i /usr/share/psibase/icons/psibase.svg '{Process} {Channel}' \"{Escape:$`\\\":{Message}}\"\n"
+format  = notify-send -a {Process} -i /usr/share/psibase/icons/psibase.svg '{Process} {Channel}' \"{Escape:$`\\\":{Message}}\"\n
 command = /bin/sh
 ```
 

@@ -52,7 +52,7 @@ Example:
 producer = prod
 host     = 127.0.0.1.sslip.io
 listen   = 8080
-service  = localhost:$PREFIX/share/psibase/services/admin-sys
+service  = localhost:$PSIBASE_DATADIR/services/admin-sys
 admin    = builtin:*
 
 [logger.stderr]
@@ -60,6 +60,9 @@ type   = console
 filter = Severity >= info
 format = [{TimeStamp}] {Message}
 ```
+
+Environmental variables, double quotes, and backslash escapes can be used in the value of most options. `psinode` adds some variables to its environment:
+- `PSIBASE_DATADIR`: The directory containing data files used by `psinode`.  Usually `<install-prefix>/share/psibase`.
 
 ## psibase
 
