@@ -423,18 +423,18 @@ pub fn create_boot_transactions(
         actions.append(&mut psispace_sys_files);
     }
 
+    let mut doc_actions = vec![
+        new_account_action(account_sys::SERVICE, account!("doc-sys")), //
+    ];
     if install_doc {
-        let mut doc_actions = vec![
-            new_account_action(account_sys::SERVICE, account!("doc-sys")), //
-        ];
         fill_dir(
             &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc"),
             &mut doc_actions,
             account!("doc-sys"),
             psispace_sys::SERVICE,
         );
-        actions.append(&mut doc_actions);
     }
+    actions.append(&mut doc_actions);
 
     if install_token_users {
         #[allow(clippy::inconsistent_digit_grouping)]
