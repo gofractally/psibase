@@ -1376,6 +1376,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "md2man"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "pulldown-cmark",
+]
+
+[[package]]
 name = "mdbook"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
