@@ -5,6 +5,7 @@ members = [
     "cargo-psibase",
     "fracpack",
     "gen-cpp-doc",
+    "md2man",
     "psibase_macros",
     "psibase",
     "test_contract",

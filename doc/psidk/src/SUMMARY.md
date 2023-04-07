@@ -5,6 +5,8 @@
   - [Linux](installation/linux.md)
   - [Rust](installation/rust.md)
 - [Command-line tools](psibase/README.md)
+  - [psibase](psibase/psibase.md)
+  - [psinode](psibase/psinode.md)
   - [Serving https](psibase/https.md)
   - [Logging](psibase/logging.md)
 - [Documentation](documentation.md)

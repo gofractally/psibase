@@ -1,0 +1,13 @@
+[package]
+name = "md2man"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition = "2021"
+publish = false
+description = "Generate man page from markdown"
+
+[dependencies]
+pulldown-cmark = "0.9"
+clap = {version = "3.1", features = ["derive"]}

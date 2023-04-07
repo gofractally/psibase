@@ -101,10 +101,17 @@ if(BUILD_DOC)
         BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
         INSTALL_COMMAND     ""
     )
+    ExternalProject_Add(
+        md2man
+        SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
+        CONFIGURE_COMMAND   ""
+        BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+        INSTALL_COMMAND     ""
+    )
     configure_file(doc/psidk/book.toml.in doc/psidk/book.toml)
     configure_file(doc/psidk/mermaid.min.js doc/psidk/mermaid.min.js COPYONLY)
     configure_file(doc/psidk/mermaid-init.js doc/psidk/mermaid-init.js COPYONLY)
-    file(GLOB_RECURSE doc-src ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/*.md)
+    file(GLOB_RECURSE doc-src ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/*.md)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid.min.js)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid-init.js)
@@ -121,6 +128,20 @@ if(BUILD_DOC)
         ${DOC_DEP}
         DEPENDS doc/psidk/book/index.html
     )
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
+        DEPENDS md2man doc/psidk/src/psibase/psinode.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/psibase/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
+    )
+    add_custom_target(psinode.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1 TYPE MAN COMPONENT ServerData)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
+        DEPENDS md2man doc/psidk/src/psibase/psibase.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/psibase/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
+    )
+    add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
 endif()
 
 set(JS_DIRS
