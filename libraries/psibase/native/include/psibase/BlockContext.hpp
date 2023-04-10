@@ -21,6 +21,8 @@ namespace psibase
       bool              needGenesisAction = false;
       bool              started           = false;
       bool              active            = false;
+      //
+      std::vector<BlockHeaderAuthAccount> origAuthServices;
 
       BlockContext(SystemContext&                  systemContext,
                    std::shared_ptr<const Revision> revision,

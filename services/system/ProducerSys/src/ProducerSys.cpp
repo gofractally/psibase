@@ -12,6 +12,33 @@ namespace
 
 namespace SystemService
 {
+   // Sets status.authServices to all the services referenced by
+   // status->Consensus or status->nextConsensus
+   static void setAuthServices(StatusRow& status)
+   {
+      status.authServices.clear();
+      std::vector<AccountNumber> accounts;
+      auto                       pushServices = [&](auto& consensus)
+      {
+         for (const auto& [name, auth] : consensus.producers)
+         {
+            accounts.push_back(auth.service);
+         }
+      };
+      std::visit(pushServices, status.consensus);
+      if (status.nextConsensus)
+      {
+         std::visit(pushServices, std::get<0>(*status.nextConsensus));
+      }
+      std::sort(accounts.begin(), accounts.end());
+      accounts.erase(std::unique(accounts.begin(), accounts.end()), accounts.end());
+      for (AccountNumber account : accounts)
+      {
+         auto code = psibase::kvGet<CodeRow>(CodeRow::db, codeKey(account));
+         check(!!code, "Unknown service account: " + account.str());
+         status.authServices.push_back({account, code->codeHash, code->vmType, code->vmVersion});
+      }
+   }
    void ProducerSys::setConsensus(psibase::Consensus consensus)
    {
       check(getSender() == getReceiver(), "sender must match service account");
@@ -24,6 +51,7 @@ namespace SystemService
           !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
           "Consensus update pending");
       status->nextConsensus = std::tuple(std::move(consensus), status->current.blockNum);
+      setAuthServices(*status);
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
@@ -44,6 +72,7 @@ namespace SystemService
                                              },
                                              status->consensus),
                                          status->current.blockNum);
+      setAuthServices(*status);
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 

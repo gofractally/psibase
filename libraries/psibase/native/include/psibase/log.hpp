@@ -85,17 +85,22 @@ namespace psibase
          std::shared_ptr<Impl> impl;
       };
 
+      inline auto scopedBlockHeader(const BlockHeader& header, const Checksum256& id)
+      {
+         BlockHeader result{header};
+         result.authCode.reset();
+         return std::tuple{
+             ::boost::log::add_scoped_thread_attribute(
+                 "BlockHeader", boost::log::attributes::constant<BlockHeader>(result)),
+             ::boost::log::add_scoped_thread_attribute(
+                 "BlockId", boost::log::attributes::constant< ::psibase::Checksum256>(id))};
+      }
+
    }  // namespace loggers
 
 #define PSIBASE_LOG(logger, log_level) BOOST_LOG_SEV(logger, psibase::loggers::level::log_level)
 
-#define PSIBASE_LOG_CONTEXT_BLOCK(header, id)                                                \
-   auto _psibase_log_ctx = ::std::tuple                                                      \
-   {                                                                                         \
-      ::boost::log::add_scoped_thread_attribute(                                             \
-          "BlockHeader", boost::log::attributes::constant< ::psibase::BlockHeader>(header)), \
-          ::boost::log::add_scoped_thread_attribute(                                         \
-              "BlockId", boost::log::attributes::constant< ::psibase::Checksum256>(id))      \
-   }
+#define PSIBASE_LOG_CONTEXT_BLOCK(header, id) \
+   auto _psibase_log_ctx = ::psibase::loggers::scopedBlockHeader(header, id)
 
 }  // namespace psibase

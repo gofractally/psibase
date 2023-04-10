@@ -3,6 +3,8 @@
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
+#include <algorithm>
+
 namespace psibase
 {
    using NativeTableNum = uint16_t;
@@ -28,11 +30,12 @@ namespace psibase
       std::optional<BlockInfo>                       head;
       Consensus                                      consensus;
       std::optional<std::tuple<Consensus, BlockNum>> nextConsensus;
+      std::vector<BlockHeaderAuthAccount>            authServices;
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus)
+   PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus, authServices)
 
    struct ConfigRow
    {
@@ -132,6 +135,18 @@ namespace psibase
       auto                  key() const { return codeByHashKey(codeHash, vmType, vmVersion); }
    };
    PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
+
+   inline auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
+   {
+      std::vector<decltype(codeByHashKey(Checksum256(), 0, 0))> result;
+      for (const auto& s : services)
+      {
+         result.push_back(codeByHashKey(s.codeHash, s.vmType, s.vmVersion));
+      }
+      std::sort(result.begin(), result.end());
+      result.erase(std::unique(result.begin(), result.end()), result.end());
+      return result;
+   }
 
    inline auto databaseStatusKey()
    {

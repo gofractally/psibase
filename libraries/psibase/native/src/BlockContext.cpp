@@ -64,6 +64,8 @@ namespace psibase
       }
       databaseStatus = *dbStatus;
 
+      origAuthServices = status->authServices;
+
       current.header.producer = producer;
       current.header.term     = term;
       if (status->head)
@@ -113,6 +115,7 @@ namespace psibase
          db.kvPut(StatusRow::db, status->key(), *status);
       started = true;
       active  = true;
+
       return *status;
    }
 
@@ -220,6 +223,24 @@ namespace psibase
 
       status->current.trxMerkleRoot = current.header.trxMerkleRoot = makeTransactionMerkle();
       status->current.eventMerkleRoot = current.header.eventMerkleRoot = makeEventMerkleRoot();
+
+      // TODO: always validate that authServices
+      if (status->authServices != origAuthServices)
+      {
+         current.header.authServices = status->authServices;
+         current.header.authCode.emplace();
+         auto               origKeys    = getCodeKeys(origAuthServices);
+         auto               currentKeys = getCodeKeys(status->authServices);
+         decltype(origKeys) addedKeys;
+         std::ranges::set_difference(currentKeys, origKeys, std::back_inserter(addedKeys));
+         for (const auto& key : addedKeys)
+         {
+            auto code = db.kvGet<CodeByHashRow>(CodeByHashRow::db, key);
+            check(!!code, "Missing code for auth service");
+            current.header.authCode->push_back(
+                {.vmType = code->vmType, .vmVersion = code->vmVersion, .code = code->code});
+         }
+      }
 
       status->head = current;  // Also calculates blockId
       if (isGenesisBlock)

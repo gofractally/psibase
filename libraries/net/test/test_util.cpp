@@ -7,6 +7,7 @@
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/ProducerSys.hpp>
 #include <services/system/TransactionSys.hpp>
+#include <services/system/VerifyEcSys.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -72,38 +73,45 @@ std::vector<psibase::AccountNumber> makeAccounts(
    return result;
 }
 
-void boot(BlockContext* ctx, const Consensus& producers)
+void boot(BlockContext* ctx, const Consensus& producers, bool ec)
 {
+   std::vector<GenesisService> services = {{
+                                               .service = TransactionSys::service,
+                                               .flags   = TransactionSys::serviceFlags,
+                                               .code    = readWholeFile("TransactionSys.wasm"),
+                                           },
+                                           {
+                                               .service = AccountSys::service,
+                                               .flags   = 0,
+                                               .code    = readWholeFile("AccountSys.wasm"),
+                                           },
+                                           {
+                                               .service = ProducerSys::service,
+                                               .flags   = ProducerSys::serviceFlags,
+                                               .code    = readWholeFile("ProducerSys.wasm"),
+                                           },
+                                           {
+                                               .service = AuthAnySys::service,
+                                               .flags   = 0,
+                                               .code    = readWholeFile("AuthAnySys.wasm"),
+                                           }};
+   if (ec)
+   {
+      services.push_back({
+          .service = VerifyEcSys::service,
+          .flags   = 0,
+          .code    = readWholeFile("VerifyEcSys.wasm"),
+      });
+   }
    // TransactionSys + ProducerSys + AuthAnySys + AccountSys
-   pushTransaction(
-       ctx,
-       Transaction{
-           //
-           .actions = {                                             //
-                       Action{.sender  = AccountNumber{"psibase"},  // ignored
-                              .service = AccountNumber{"psibase"},  // ignored
-                              .method  = MethodNumber{"boot"},
-                              .rawData = psio::convert_to_frac(GenesisActionData{
-                                  .services = {{
-                                                   .service = TransactionSys::service,
-                                                   .flags   = TransactionSys::serviceFlags,
-                                                   .code    = readWholeFile("TransactionSys.wasm"),
-                                               },
-                                               {
-                                                   .service = AccountSys::service,
-                                                   .flags   = 0,
-                                                   .code    = readWholeFile("AccountSys.wasm"),
-                                               },
-                                               {
-                                                   .service = ProducerSys::service,
-                                                   .flags   = ProducerSys::serviceFlags,
-                                                   .code    = readWholeFile("ProducerSys.wasm"),
-                                               },
-                                               {
-                                                   .service = AuthAnySys::service,
-                                                   .flags   = 0,
-                                                   .code    = readWholeFile("AuthAnySys.wasm"),
-                                               }}})}}});
+   pushTransaction(ctx,
+                   Transaction{                                                         //
+                               .actions = {                                             //
+                                           Action{.sender  = AccountNumber{"psibase"},  // ignored
+                                                  .service = AccountNumber{"psibase"},  // ignored
+                                                  .method  = MethodNumber{"boot"},
+                                                  .rawData = psio::convert_to_frac(
+                                                      GenesisActionData{.services = services})}}});
 
    pushTransaction(
        ctx,

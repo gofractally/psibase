@@ -148,6 +148,27 @@ namespace psibase
       return "Consensus";
    }
 
+   struct BlockHeaderAuthAccount
+   {
+      AccountNumber codeNum;
+
+      Checksum256 codeHash                                  = {};
+      uint8_t     vmType                                    = 0;
+      uint8_t     vmVersion                                 = 0;
+      friend bool operator==(const BlockHeaderAuthAccount&,
+                             const BlockHeaderAuthAccount&) = default;
+   };
+   PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
+
+   struct BlockHeaderCode
+   {
+      uint8_t vmType    = 0;
+      uint8_t vmVersion = 0;
+
+      std::vector<uint8_t> code = {};
+   };
+   PSIO_REFLECT(BlockHeaderCode, vmType, vmVersion, code);
+
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Consensus fields
    // TODO: Protocol Activation? Main reason to put here is to support light-client validation.
@@ -175,6 +196,15 @@ namespace psibase
       // this block. Joint consensus must not be active already.
       // Joint consensus ends after this block becomes irreversible.
       std::optional<Consensus> newConsensus;
+      // If this is specified, it should should contain the full set of
+      // of services that can be used for verifying block signatures.
+      std::optional<std::vector<BlockHeaderAuthAccount>> authServices;
+      // This contains the code for authServices
+      // It MUST contain all code that was added in this block
+      // It MUST NOT contain code that is not in authServices
+      // It MAY contain code that is unchanged from the previous block
+      // authCode MUST NOT be included when calculating a block hash.
+      std::optional<std::vector<BlockHeaderCode>> authCode;
    };
    PSIO_REFLECT(BlockHeader,
                 previous,
@@ -185,7 +215,9 @@ namespace psibase
                 commitNum,
                 trxMerkleRoot,
                 eventMerkleRoot,
-                newConsensus)
+                newConsensus,
+                authServices,
+                authCode)
 
    struct TransactionInfo
    {
@@ -237,6 +269,7 @@ namespace psibase
       BlockInfo()                 = default;
       BlockInfo(const BlockInfo&) = default;
 
+      // TODO: exclude authCode from sha
       // TODO: don't repack to compute sha
       BlockInfo(const Block& b) : header{b.header}, blockId{sha256(header)}
       {

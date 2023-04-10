@@ -10,6 +10,8 @@
 #include <psibase/db.hpp>
 #include <psibase/log.hpp>
 
+#include <ranges>
+
 namespace psibase
 {
 
@@ -126,6 +128,129 @@ namespace psibase
       }
    };
 
+   struct BlockAuthState
+   {
+      ConstRevisionPtr                    revision;
+      std::vector<BlockHeaderAuthAccount> services;
+
+      static auto makeCodeIndex(const BlockHeader* header)
+      {
+         using K = decltype(codeByHashKey(Checksum256(), 0, 0));
+         using R = boost::container::flat_map<K, const BlockHeaderCode*>;
+         R::sequence_type seq;
+         for (const auto& code : *header->authCode)
+         {
+            auto codeHash = sha256(code.code.data(), code.code.size());
+            auto key      = codeByHashKey(codeHash, code.vmType, code.vmVersion);
+            seq.push_back({key, &code});
+         }
+         R result;
+         result.adopt_sequence(std::move(seq));
+         return result;
+      }
+
+      static void writeServices(Database& db, const std::vector<BlockHeaderAuthAccount>& accounts)
+      {
+         for (const auto& account : accounts)
+         {
+            CodeRow row{.codeNum   = account.codeNum,
+                        .flags     = 0,
+                        .codeHash  = account.codeHash,
+                        .vmType    = account.vmType,
+                        .vmVersion = account.vmVersion};
+            db.kvPut(CodeRow::db, row.key(), row);
+         }
+      }
+
+      static void updateServices(Database&                                  db,
+                                 const std::vector<BlockHeaderAuthAccount>& oldServices,
+                                 const std::vector<BlockHeaderAuthAccount>& services)
+      {
+         std::vector<AccountNumber> removedAccounts;
+         auto codeNumView = std::views::transform([](auto& p) { return p.codeNum; });
+         std::ranges::set_difference(oldServices | codeNumView, services | codeNumView,
+                                     std::back_inserter(removedAccounts));
+         for (AccountNumber account : removedAccounts)
+         {
+            db.kvRemove(CodeRow::db, codeKey(account));
+         }
+         writeServices(db, services);
+      }
+
+      // Read state at revision
+      BlockAuthState(SystemContext*   systemContext,
+                     const WriterPtr& writer,
+                     Database&        db,
+                     const BlockInfo& info)
+      {
+         revision = systemContext->sharedDatabase.emptyRevision();
+         if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
+         {
+            Database dst{systemContext->sharedDatabase, revision};
+            services  = status->authServices;
+            auto keys = getCodeKeys(services);
+            for (const auto& key : keys)
+            {
+               if (auto row = db.kvGet<CodeByHashRow>(CodeByHashRow::db, key))
+               {
+                  dst.kvPut(CodeByHashRow::db, key, *row);
+               }
+               else
+               {
+                  check(false, "Missing code for auth service");
+               }
+            }
+            writeServices(dst, services);
+            revision = dst.getModifiedRevision();
+         }
+      }
+
+      BlockAuthState(SystemContext*        systemContext,
+                     const WriterPtr&      writer,
+                     const BlockAuthState& prev,
+                     const BlockHeader&    header)
+      {
+         if (header.authServices)
+         {
+            check(!!header.authCode, "code must be provided when changing auth services");
+            services                    = *header.authServices;
+            auto               prevKeys = getCodeKeys(prev.services);
+            auto               nextKeys = getCodeKeys(*header.authServices);
+            decltype(prevKeys) removed, added;
+            std::ranges::set_difference(prevKeys, nextKeys, std::back_inserter(removed));
+            std::ranges::set_difference(nextKeys, prevKeys, std::back_inserter(added));
+            auto code = makeCodeIndex(&header);
+            check(std::ranges::includes(nextKeys, code | std::views::transform([
+                                                  ](auto& arg) -> auto& { return arg.first; })),
+                  "Wrong code");
+            Database db{systemContext->sharedDatabase, prev.revision};
+            auto     session = db.startWrite(writer);
+            for (const auto& r : removed)
+            {
+               db.kvRemove(CodeByHashRow::db, r);
+            }
+            for (const auto& a : added)
+            {
+               const auto& [prefix, index, codeHash, vmType, vmVersion] = a;
+               auto iter                                                = code.find(a);
+               check(iter != code.end(), "Missing required code");
+               CodeByHashRow code{.codeHash  = codeHash,
+                                  .vmType    = vmType,
+                                  .vmVersion = vmVersion,
+                                  .numRefs   = 0,
+                                  .code      = iter->second->code};
+               db.kvPut(CodeByHashRow::db, a, code);
+            }
+            updateServices(db, prev.services, services);
+            revision = db.getModifiedRevision();
+         }
+         else
+         {
+            check(!header.authCode, "authCode unexpected");
+         }
+      }
+   };
+
    struct BlockHeaderState
    {
       BlockInfo info;
@@ -138,6 +263,8 @@ namespace psibase
       BlockNum nextProducersBlockNum;
       // Set to true if this block or an ancestor failed validation
       bool invalid = false;
+      // This can be lazy-initialized
+      mutable std::shared_ptr<BlockAuthState> authState;
       // TODO: track setcode of contracts used to verify producer signatures
       // in the BlockHeader. To make this work, we probably need to forbid
       // calls to other contracts and access to state.
@@ -170,7 +297,9 @@ namespace psibase
             }
          }
       }
-      BlockHeaderState(const BlockHeaderState& prev,
+      BlockHeaderState(SystemContext*          systemContext,
+                       const WriterPtr&        writer,
+                       const BlockHeaderState& prev,
                        const BlockInfo&        info,
                        ConstRevisionPtr        revision = nullptr)
           : info(info),
@@ -194,6 +323,34 @@ namespace psibase
             // Don't both detecting this case here.
             nextProducersBlockNum = info.header.blockNum;
          }
+         prev.getAuthState(systemContext, writer);
+         if (info.header.authServices)
+         {
+            authState = std::make_shared<BlockAuthState>(systemContext, writer, *prev.authState,
+                                                         info.header);
+         }
+         else
+         {
+            check(!info.header.authCode, "Unexpected authCode");
+            authState = prev.authState;
+         }
+      }
+      // TODO: figure out a better way to initialize authState.
+      // The main problem is that we don't want to make a complete
+      // copy of all the services for every uncommitted block, as
+      // that has the potential to blow up really fast.
+      // The other problem is that blocks are loaded in reverse
+      // order which makes initializing them in the normal way painful.
+      const BlockAuthState& getAuthState(SystemContext*   systemContext,
+                                         const WriterPtr& writer) const
+      {
+         if (!authState)
+         {
+            Database db{systemContext->sharedDatabase, revision};
+            auto     session = db.startRead();
+            authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info);
+         }
+         return *authState;
       }
       // Returns the claim for an immediate successor of this block
       std::optional<Claim> getNextProducerClaim(AccountNumber producer)
@@ -283,7 +440,17 @@ namespace psibase
          }
          if (auto* prev = get_state(info.header.previous))
          {
-            auto [pos, inserted] = states.try_emplace(info.blockId, *prev, info);
+            try
+            {
+               validateBlockSignature(prev, info, b->signature());
+            }
+            catch (...)
+            {
+               blocks.erase(iter);
+               throw;
+            }
+            auto [pos, inserted] =
+                states.try_emplace(info.blockId, systemContext, writer, *prev, info);
             assert(inserted);
             if (prev->invalid)
             {
@@ -576,7 +743,7 @@ namespace psibase
       // sends a correct block with the wrong signature.
       Claim validateBlockSignature(BlockHeaderState* prev, const BlockInfo& info, const auto& sig)
       {
-         BlockContext verifyBc(*systemContext, prev->revision);
+         BlockContext verifyBc(*systemContext, prev->getAuthState(systemContext, writer).revision);
          VerifyProver prover{verifyBc, sig};
          auto         claim = prev->getNextProducerClaim(info.header.producer);
          if (!claim)
@@ -864,9 +1031,10 @@ namespace psibase
             systemContext->sharedDatabase.setHead(*writer, revision);
             assert(head->blockId() == blockContext->current.header.previous);
             BlockInfo info;
-            info.header             = blockContext->current.header;
-            info.blockId            = id;
-            auto [state_iter, ins2] = states.try_emplace(id, *head, info, revision);
+            info.header  = blockContext->current.header;
+            info.blockId = id;
+            auto [state_iter, ins2] =
+                states.try_emplace(id, systemContext, writer, *head, info, revision);
             byOrderIndex.insert({state_iter->second.order(), id});
             head = &state_iter->second;
             assert(!!head->revision);
