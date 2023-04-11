@@ -22,7 +22,7 @@ namespace psibase
       bool              started           = false;
       bool              active            = false;
       //
-      std::vector<BlockHeaderAuthAccount> origAuthServices;
+      std::map<AccountNumber, bool> modifiedAuthAccounts;
 
       BlockContext(SystemContext&                  systemContext,
                    std::shared_ptr<const Revision> revision,

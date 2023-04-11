@@ -12,23 +12,16 @@ namespace
 
 namespace SystemService
 {
-   // Sets status.authServices to all the services referenced by
-   // status->Consensus or status->nextConsensus
-   static void setAuthServices(StatusRow& status)
+   // Verifies that all the auth services have the correct flags set
+   static void checkAuthServices(const std::vector<psibase::Producer>& producers)
    {
-      status.authServices.clear();
       std::vector<AccountNumber> accounts;
-      auto                       pushServices = [&](auto& consensus)
+      for (const auto& [name, auth] : producers)
       {
-         for (const auto& [name, auth] : consensus.producers)
+         if (auth != Claim{})
          {
             accounts.push_back(auth.service);
          }
-      };
-      std::visit(pushServices, status.consensus);
-      if (status.nextConsensus)
-      {
-         std::visit(pushServices, std::get<0>(*status.nextConsensus));
       }
       std::sort(accounts.begin(), accounts.end());
       accounts.erase(std::unique(accounts.begin(), accounts.end()), accounts.end());
@@ -36,22 +29,27 @@ namespace SystemService
       {
          auto code = psibase::kvGet<CodeRow>(CodeRow::db, codeKey(account));
          check(!!code, "Unknown service account: " + account.str());
-         status.authServices.push_back({account, code->codeHash, code->vmType, code->vmVersion});
+         check(code->flags & CodeRow::isAuthService,
+               "Service account " + account.str() + " cannot be used for block production");
       }
    }
+
    void ProducerSys::setConsensus(psibase::Consensus consensus)
    {
       check(getSender() == getReceiver(), "sender must match service account");
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
-      std::visit([](const auto& c)
-                 { check(!c.producers.empty(), "There must be at least one producer"); },
-                 consensus);
+      std::visit(
+          [](const auto& c)
+          {
+             check(!c.producers.empty(), "There must be at least one producer");
+             checkAuthServices(c.producers);
+          },
+          consensus);
       check(!!status, "Missing status row");
       check(
           !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
           "Consensus update pending");
       status->nextConsensus = std::tuple(std::move(consensus), status->current.blockNum);
-      setAuthServices(*status);
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
@@ -60,6 +58,7 @@ namespace SystemService
       check(getSender() == getReceiver(), "sender must match service account");
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
       check(!prods.empty(), "There must be at least one producer");
+      checkAuthServices(prods);
       check(!!status, "Missing status row");
       check(
           !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
@@ -72,7 +71,6 @@ namespace SystemService
                                              },
                                              status->consensus),
                                          status->current.blockNum);
-      setAuthServices(*status);
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 

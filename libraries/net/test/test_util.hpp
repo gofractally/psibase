@@ -233,7 +233,7 @@ struct NodeSet
    {
       for (auto producer : producers)
       {
-         add(producer, std::move(prover));
+         add(producer, prover);
       }
    }
    void partition(const NetworkPartition& groups, psibase::test::mock_clock::duration latency = {})

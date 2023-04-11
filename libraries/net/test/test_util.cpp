@@ -99,7 +99,7 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
    {
       services.push_back({
           .service = VerifyEcSys::service,
-          .flags   = 0,
+          .flags   = VerifyEcSys::serviceFlags,
           .code    = readWholeFile("VerifyEcSys.wasm"),
       });
    }

@@ -64,8 +64,6 @@ namespace psibase
       }
       databaseStatus = *dbStatus;
 
-      origAuthServices = status->authServices;
-
       current.header.producer = producer;
       current.header.term     = term;
       if (status->head)
@@ -224,13 +222,34 @@ namespace psibase
       status->current.trxMerkleRoot = current.header.trxMerkleRoot = makeTransactionMerkle();
       status->current.eventMerkleRoot = current.header.eventMerkleRoot = makeEventMerkleRoot();
 
-      // TODO: always validate that authServices
-      if (status->authServices != origAuthServices)
+      std::vector<BlockHeaderAuthAccount> modifiedAuthServices;
+      for (const auto& account : status->authServices)
       {
-         current.header.authServices = status->authServices;
+         if (modifiedAuthAccounts.find(account.codeNum) == modifiedAuthAccounts.end())
+         {
+            modifiedAuthServices.push_back(account);
+         }
+      }
+      for (const auto& [name, exists] : modifiedAuthAccounts)
+      {
+         if (exists)
+         {
+            auto row = db.kvGet<CodeRow>(CodeRow::db, codeKey(name));
+            assert(!!row);
+            modifiedAuthServices.push_back({.codeNum   = row->codeNum,
+                                            .codeHash  = row->codeHash,
+                                            .vmType    = row->vmType,
+                                            .vmVersion = row->vmVersion});
+         }
+      }
+      std::ranges::sort(modifiedAuthServices,
+                        [](const auto& lhs, const auto& rhs) { return lhs.codeNum < rhs.codeNum; });
+      if (modifiedAuthServices != status->authServices)
+      {
+         current.header.authServices = modifiedAuthServices;
          current.header.authCode.emplace();
-         auto               origKeys    = getCodeKeys(origAuthServices);
-         auto               currentKeys = getCodeKeys(status->authServices);
+         auto               origKeys    = getCodeKeys(status->authServices);
+         auto               currentKeys = getCodeKeys(modifiedAuthServices);
          decltype(origKeys) addedKeys;
          std::ranges::set_difference(currentKeys, origKeys, std::back_inserter(addedKeys));
          for (const auto& key : addedKeys)
@@ -240,6 +259,7 @@ namespace psibase
             current.header.authCode->push_back(
                 {.vmType = code->vmType, .vmVersion = code->vmVersion, .code = code->code});
          }
+         status->authServices = std::move(modifiedAuthServices);
       }
 
       status->head = current;  // Also calculates blockId

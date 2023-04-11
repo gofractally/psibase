@@ -359,6 +359,8 @@ namespace psio
          result = pos;
          pos += size;
       }
+
+      operator std::span<const char>() const { return {pos, end}; }
    };
 
    struct check_input_stream

@@ -99,6 +99,7 @@ namespace psibase
       static constexpr uint64_t allowWriteSubjective = uint64_t(1) << 3;
       static constexpr uint64_t canNotTimeOut        = uint64_t(1) << 4;
       static constexpr uint64_t canSetTimeLimit      = uint64_t(1) << 5;
+      static constexpr uint64_t isAuthService        = uint64_t(1) << 6;
 
       AccountNumber codeNum;
       uint64_t      flags = 0;  // Constants above
@@ -107,7 +108,7 @@ namespace psibase
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
 
-      static constexpr auto db = psibase::DbId::nativeUnconstrained;
+      static constexpr auto db = psibase::DbId::nativeConstrained;
       auto                  key() const { return codeKey(codeNum); }
    };
    PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
