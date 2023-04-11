@@ -1166,6 +1166,24 @@ namespace psibase
          return prover.prove(data, claim);
       }
 
+      // Verifies a signature on a message associated with a block.
+      // The signature is verified using the state at the end of
+      // the previous block
+      void verify(const Checksum256&       blockId,
+                  std::span<char>          data,
+                  const Claim&             claim,
+                  const std::vector<char>& signature)
+      {
+         auto stateIter = states.find(blockId);
+         check(stateIter != states.end(), "Unknown block");
+         stateIter = states.find(stateIter->second.info.header.previous);
+         check(stateIter != states.end(), "Previous block unknown");
+         BlockContext verifyBc(*systemContext,
+                               stateIter->second.getAuthState(systemContext, writer).revision);
+         VerifyProver prover{verifyBc, signature};
+         prover.prove(data, claim);
+      }
+
       void verify(std::span<char> data, const Claim& claim, const std::vector<char>& signature)
       {
          auto iter = byBlocknumIndex.find(commitIndex);
