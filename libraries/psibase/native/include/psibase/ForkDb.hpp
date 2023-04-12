@@ -263,16 +263,17 @@ namespace psibase
       BlockNum nextProducersBlockNum;
       // Set to true if this block or an ancestor failed validation
       bool invalid = false;
-      // This can be lazy-initialized
-      mutable std::shared_ptr<BlockAuthState> authState;
-      // TODO: track setcode of contracts used to verify producer signatures
-      // in the BlockHeader. To make this work, we probably need to forbid
-      // calls to other contracts and access to state.
+      // Holds the services that can be used to verify producer
+      // signatures for the next block.
+      std::shared_ptr<BlockAuthState> authState;
+      // Creates the initial state
       BlockHeaderState() : info()
       {
          info.header.blockNum = 1;
          producers            = std::make_shared<ProducerSet>();
       }
+      // This constructor is used to load a state from the database
+      // It should be followed by either initAuthState or loadAuthState
       BlockHeaderState(const BlockInfo& info,
                        SystemContext*   systemContext,
                        ConstRevisionPtr revision)
@@ -323,7 +324,15 @@ namespace psibase
             // Don't both detecting this case here.
             nextProducersBlockNum = info.header.blockNum;
          }
-         prev.getAuthState(systemContext, writer);
+         initAuthState(systemContext, writer, prev);
+      }
+      // initAuthState and loadAuthState should only be used when
+      // loading blocks from the database. initAuthState is preferred
+      // because it saves space.
+      void initAuthState(SystemContext*          systemContext,
+                         const WriterPtr&        writer,
+                         const BlockHeaderState& prev)
+      {
          if (info.header.authServices)
          {
             authState = std::make_shared<BlockAuthState>(systemContext, writer, *prev.authState,
@@ -335,22 +344,11 @@ namespace psibase
             authState = prev.authState;
          }
       }
-      // TODO: figure out a better way to initialize authState.
-      // The main problem is that we don't want to make a complete
-      // copy of all the services for every uncommitted block, as
-      // that has the potential to blow up really fast.
-      // The other problem is that blocks are loaded in reverse
-      // order which makes initializing them in the normal way painful.
-      const BlockAuthState& getAuthState(SystemContext*   systemContext,
-                                         const WriterPtr& writer) const
+      void loadAuthState(SystemContext* systemContext, const WriterPtr& writer)
       {
-         if (!authState)
-         {
-            Database db{systemContext->sharedDatabase, revision};
-            auto     session = db.startRead();
-            authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info);
-         }
-         return *authState;
+         Database db{systemContext->sharedDatabase, revision};
+         auto     session = db.startRead();
+         authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info);
       }
       // Returns the claim for an immediate successor of this block
       std::optional<Claim> getNextProducerClaim(AccountNumber producer)
@@ -743,7 +741,7 @@ namespace psibase
       // sends a correct block with the wrong signature.
       Claim validateBlockSignature(BlockHeaderState* prev, const BlockInfo& info, const auto& sig)
       {
-         BlockContext verifyBc(*systemContext, prev->getAuthState(systemContext, writer).revision);
+         BlockContext verifyBc(*systemContext, prev->authState->revision);
          VerifyProver prover{verifyBc, sig};
          auto         claim = prev->getNextProducerClaim(info.header.producer);
          if (!claim)
@@ -1143,6 +1141,23 @@ namespace psibase
             PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
             PSIBASE_LOG(logger, debug) << "Read last committed block";
          }
+         // Initialize AuthState. This is a separate step because it needs
+         // to run forwards, while the blocks are loaded in reverse order.
+         {
+            BlockHeaderState* prev = nullptr;
+            for (auto& [id, state] : states)
+            {
+               if (prev)
+               {
+                  state.initAuthState(systemContext, writer, *prev);
+               }
+               else
+               {
+                  state.loadAuthState(systemContext, writer);
+               }
+               prev = &state;
+            }
+         }
          // TODO: if this doesn't exist, the database is corrupt
          assert(!byBlocknumIndex.empty());
          commitIndex = byBlocknumIndex.begin()->first;
@@ -1178,8 +1193,7 @@ namespace psibase
          check(stateIter != states.end(), "Unknown block");
          stateIter = states.find(stateIter->second.info.header.previous);
          check(stateIter != states.end(), "Previous block unknown");
-         BlockContext verifyBc(*systemContext,
-                               stateIter->second.getAuthState(systemContext, writer).revision);
+         BlockContext verifyBc(*systemContext, stateIter->second.authState->revision);
          VerifyProver prover{verifyBc, signature};
          prover.prove(data, claim);
       }
