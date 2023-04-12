@@ -263,20 +263,25 @@ namespace psibase
 
    struct BlockInfo
    {
-      BlockHeader header;  // TODO: shared_view_ptr?
+      BlockHeader header;
       Checksum256 blockId;
 
       BlockInfo()                 = default;
       BlockInfo(const BlockInfo&) = default;
 
-      // TODO: exclude authCode from sha
-      // TODO: don't repack to compute sha
-      BlockInfo(const Block& b) : header{b.header}, blockId{sha256(header)}
+      BlockInfo(const BlockHeader& h) : header(h), blockId{makeBlockId(header)}
       {
          auto* src  = (const char*)&header.blockNum + sizeof(header.blockNum);
          auto* dest = blockId.data();
          while (src != (const char*)&header.blockNum)
             *dest++ = *--src;
+      }
+
+      BlockInfo(const Block& b) : BlockInfo{b.header} {}
+      static Checksum256 makeBlockId(BlockHeader header)
+      {
+         header.authCode.reset();
+         return sha256(header);
       }
    };
    PSIO_REFLECT(BlockInfo, header, blockId)
