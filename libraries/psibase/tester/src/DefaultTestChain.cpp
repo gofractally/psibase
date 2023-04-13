@@ -122,7 +122,7 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                             },
                                             {
                                                 .service = VerifyEcSys::service,
-                                                .flags   = 0,
+                                                .flags   = VerifyEcSys::serviceFlags,
                                                 .code    = readWholeFile("VerifyEcSys.wasm"),
                                             },
                                             {

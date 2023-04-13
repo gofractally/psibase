@@ -3,6 +3,8 @@
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
+#include <algorithm>
+
 namespace psibase
 {
    using NativeTableNum = uint16_t;
@@ -28,11 +30,12 @@ namespace psibase
       std::optional<BlockInfo>                       head;
       Consensus                                      consensus;
       std::optional<std::tuple<Consensus, BlockNum>> nextConsensus;
+      std::vector<BlockHeaderAuthAccount>            authServices;
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() { return statusKey(); }
    };
-   PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus)
+   PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus, authServices)
 
    struct ConfigRow
    {
@@ -96,6 +99,7 @@ namespace psibase
       static constexpr uint64_t allowWriteSubjective = uint64_t(1) << 3;
       static constexpr uint64_t canNotTimeOut        = uint64_t(1) << 4;
       static constexpr uint64_t canSetTimeLimit      = uint64_t(1) << 5;
+      static constexpr uint64_t isAuthService        = uint64_t(1) << 6;
 
       AccountNumber codeNum;
       uint64_t      flags = 0;  // Constants above
@@ -104,7 +108,7 @@ namespace psibase
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
 
-      static constexpr auto db = psibase::DbId::nativeUnconstrained;
+      static constexpr auto db = psibase::DbId::nativeConstrained;
       auto                  key() const { return codeKey(codeNum); }
    };
    PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
@@ -132,6 +136,18 @@ namespace psibase
       auto                  key() const { return codeByHashKey(codeHash, vmType, vmVersion); }
    };
    PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
+
+   inline auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
+   {
+      std::vector<decltype(codeByHashKey(Checksum256(), 0, 0))> result;
+      for (const auto& s : services)
+      {
+         result.push_back(codeByHashKey(s.codeHash, s.vmType, s.vmVersion));
+      }
+      std::sort(result.begin(), result.end());
+      result.erase(std::unique(result.begin(), result.end()), result.end());
+      return result;
+   }
 
    inline auto databaseStatusKey()
    {

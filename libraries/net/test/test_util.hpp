@@ -116,8 +116,10 @@ struct TempDatabase
 template <typename Node>
 struct TestNode
 {
-   TestNode(boost::asio::io_context& ctx, psibase::AccountNumber producer)
-       : system(db.getSystemContext()), node(ctx, system.get())
+   TestNode(boost::asio::io_context&         ctx,
+            psibase::AccountNumber           producer,
+            std::shared_ptr<psibase::Prover> prover = std::make_shared<psibase::CompoundProver>())
+       : system(db.getSystemContext()), node(ctx, system.get(), std::move(prover))
    {
       auto attr = boost::log::attributes::constant(producer.str());
       node.chain().getBlockLogger().add_attribute("Host", attr);
@@ -221,15 +223,17 @@ struct NodeSet
    {
       logger.add_attribute("Host", boost::log::attributes::constant(std::string{"main"}));
    }
-   void add(psibase::AccountNumber producer)
+   void add(psibase::AccountNumber           producer,
+            std::shared_ptr<psibase::Prover> prover = std::make_shared<psibase::CompoundProver>())
    {
-      nodes.push_back(std::make_unique<TestNode<Node>>(ctx, producer));
+      nodes.push_back(std::make_unique<TestNode<Node>>(ctx, producer, std::move(prover)));
    }
-   void add(const std::vector<psibase::AccountNumber>& producers)
+   void add(const std::vector<psibase::AccountNumber>& producers,
+            std::shared_ptr<psibase::Prover> prover = std::make_shared<psibase::CompoundProver>())
    {
       for (auto producer : producers)
       {
-         add(producer);
+         add(producer, prover);
       }
    }
    void partition(const NetworkPartition& groups, psibase::test::mock_clock::duration latency = {})
@@ -312,7 +316,9 @@ psibase::Transaction setProducers(const psibase::Consensus& producers);
 std::vector<psibase::AccountNumber> makeAccounts(
     const std::vector<std::string_view>& producer_names);
 
-void boot(psibase::BlockContext* ctx, const psibase::Consensus& producers);
+void boot(psibase::BlockContext*    ctx,
+          const psibase::Consensus& producers,
+          bool                      enableEcdsa = false);
 
 template <typename C>
 void boot(psibase::BlockContext* ctx, const std::vector<psibase::AccountNumber>& producers)

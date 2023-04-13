@@ -179,7 +179,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sgc!("symbol-sys", 0, "SymbolSys.wasm"),
         sgc!("token-sys", 0, "TokenSys.wasm"),
         sgc!("transact-sys", 3, "TransactionSys.wasm"), // TODO: flags
-        sgc!("verifyec-sys", 0, "VerifyEcSys.wasm"),
+        sgc!("verifyec-sys", 64, "VerifyEcSys.wasm"),
     ];
 
     let genesis_action_data = SharedGenesisActionData {

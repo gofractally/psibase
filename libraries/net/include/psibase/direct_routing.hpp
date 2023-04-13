@@ -37,6 +37,9 @@ namespace psibase::net
    };
    PSIO_REFLECT(ProducerMessage, producer)
 
+   template <typename T>
+   concept has_block_id = requires(T& t) { t.block_id; };
+
    // This requires all producers to be peers
    template <typename Derived>
    struct direct_routing : message_serializer<Derived>
@@ -204,7 +207,14 @@ namespace psibase::net
          raw.insert(raw.end(), msg.data.data(), msg.data.data() + msg.data.size());
          Claim claim = msg.data->signer();
          PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
-         chain().verify({raw.data(), raw.size()}, claim, msg.signature);
+         if constexpr (has_block_id<T>)
+         {
+            chain().verify(msg.data->block_id(), {raw.data(), raw.size()}, claim, msg.signature);
+         }
+         else
+         {
+            chain().verify({raw.data(), raw.size()}, claim, msg.signature);
+         }
          if constexpr (has_recv<SignedMessage<T>, Derived>)
          {
             static_cast<Derived*>(this)->consensus().recv(peer, msg);

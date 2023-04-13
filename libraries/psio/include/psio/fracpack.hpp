@@ -1364,6 +1364,8 @@ namespace psio
    template <typename T, typename U>
    prevalidated(T&& t, U&& u)
        -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
+   struct input_stream;
+   prevalidated(input_stream)->prevalidated<std::span<const char>>;
 
    template <Packable T>
    bool from_frac(T& value, std::span<const char> data)

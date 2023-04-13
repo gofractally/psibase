@@ -41,6 +41,7 @@ namespace psibase
       SharedDatabase& operator=(SharedDatabase&&)      = default;
 
       ConstRevisionPtr getHead();
+      ConstRevisionPtr emptyRevision();
       WriterPtr        createWriter();
       void             setHead(Writer& writer, ConstRevisionPtr revision);
       ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
@@ -143,6 +144,12 @@ namespace psibase
           -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
          kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
+      }
+
+      template <typename K>
+      void kvRemove(DbId db, const K& key)
+      {
+         kvRemoveRaw(db, psio::convert_to_key(key));
       }
 
       template <typename V, typename K>

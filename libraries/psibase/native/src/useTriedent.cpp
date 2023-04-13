@@ -256,6 +256,11 @@ namespace psibase
       return impl->getHead();
    }
 
+   ConstRevisionPtr SharedDatabase::emptyRevision()
+   {
+      return std::make_shared<Revision>();
+   }
+
    WriterPtr SharedDatabase::createWriter()
    {
       return impl->trie->start_write_session();

@@ -154,6 +154,47 @@ namespace psibase
                                   "), or must use another intrinsic");
       }
 
+      void verifyCodeRow(TransactionContext&               ctx,
+                         psio::input_stream                key,
+                         psio::input_stream                value,
+                         std::optional<psio::input_stream> oldValue)
+      {
+         check(psio::fracpack_validate_strict<CodeRow>(value), "CodeRow has invalid format");
+         auto code      = psio::view<const CodeRow>(psio::prevalidated{value});
+         bool oldIsAuth = false;
+         if (oldValue)
+         {
+            auto oldCode = psio::view<const CodeRow>(psio::prevalidated{*oldValue});
+            if (oldCode.flags() & CodeRow::isAuthService)
+            {
+               oldIsAuth = true;
+            }
+            //ctx.incCode(oldCode.codeHash(), oldCode.vmType(), oldCode.vmVersion(), -1);
+         }
+         bool isAuth = code.flags() & CodeRow::isAuthService;
+         if (oldIsAuth || isAuth)
+         {
+            ctx.blockContext.modifiedAuthAccounts[code.codeNum()] = isAuth;
+         }
+         //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), 1);
+         auto expected_key = psio::convert_to_key(codeKey(code.codeNum()));
+         check(key.remaining() == expected_key.size() &&
+                   !std::memcmp(key.pos, expected_key.data(), key.remaining()),
+               "CodeRow has incorrect key");
+      }
+
+      void verifyRemoveCodeRow(TransactionContext& ctx,
+                               psio::input_stream  key,
+                               psio::input_stream  value)
+      {
+         auto code = psio::view<const CodeRow>(psio::prevalidated{value});
+         if (code.flags() & CodeRow::isAuthService)
+         {
+            ctx.blockContext.modifiedAuthAccounts[code.codeNum()] = false;
+         }
+         //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), -1);
+      }
+
       void verifyCodeByHashRow(psio::input_stream key, psio::input_stream value)
       {
          check(psio::fracpack_validate_strict<CodeByHashRow>({value.pos, value.end}),
@@ -199,13 +240,18 @@ namespace psibase
                "WasmConfigRow has incorrect key");
       }
 
-      void verifyWriteConstrained(psio::input_stream key, psio::input_stream value)
+      void verifyWriteConstrained(TransactionContext&               context,
+                                  psio::input_stream                key,
+                                  psio::input_stream                value,
+                                  std::optional<psio::input_stream> existing)
       {
          NativeTableNum table;
          check(key.remaining() >= sizeof(table), "Unrecognized key in nativeConstrained");
          memcpy(&table, key.pos, sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
-         if (table == codeByHashTable)
+         if (table == codeTable)
+            verifyCodeRow(context, key, value, existing);
+         else if (table == codeByHashTable)
             verifyCodeByHashRow(key, value);
          else if (table == configTable)
             verifyConfigRow(key, value);
@@ -213,6 +259,18 @@ namespace psibase
             verifyWasmConfigRow(table, key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeConstrained");
+      }
+
+      void verifyRemoveConstrained(TransactionContext& context,
+                                   psio::input_stream  key,
+                                   psio::input_stream  value)
+      {
+         NativeTableNum table;
+         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeConstrained");
+         memcpy(&table, key.pos, sizeof(table));
+         std::reverse((char*)&table, (char*)(&table + 1));
+         if (table == codeTable)
+            verifyRemoveCodeRow(context, key, value);
       }
 
       uint32_t clearResult(NativeFunctions& self)
@@ -375,8 +433,6 @@ namespace psibase
           {
              check(key.size() <= transactionContext.config.maxKeySize, "key is too big");
              check(value.size() <= transactionContext.config.maxValueSize, "value is too big");
-             if (db == uint32_t(DbId::nativeConstrained))
-                verifyWriteConstrained({key.data(), key.size()}, {value.data(), value.size()});
              clearResult(*this);
              auto w = getDbWrite(*this, db, {key.data(), key.size()});
              if (w.chargeable)
@@ -387,11 +443,18 @@ namespace psibase
                 delta.valueBytes += value.size();
                 if (w.refundable)
                 {
-                   if (auto existing = database.kvGetRaw(w.db, {key.data(), key.size()}))
+                   auto existing = database.kvGetRaw(w.db, {key.data(), key.size()});
+                   if (existing)
                    {
                       delta.records -= 1;
                       delta.keyBytes -= key.size();
                       delta.valueBytes -= existing->remaining();
+                   }
+                   // nativeConstrained is both refundable and chargeable
+                   if (db == uint32_t(DbId::nativeConstrained))
+                   {
+                      verifyWriteConstrained(transactionContext, {key.data(), key.size()},
+                                             {value.data(), value.size()}, existing);
                    }
                 }
              }
@@ -450,6 +513,11 @@ namespace psibase
                           delta.records -= 1;
                           delta.keyBytes -= key.size();
                           delta.valueBytes -= existing->remaining();
+                          if (db == uint32_t(DbId::nativeConstrained))
+                          {
+                             verifyRemoveConstrained(transactionContext, {key.data(), key.size()},
+                                                     *existing);
+                          }
                        }
                     }
                     database.kvRemoveRaw(w.db, {key.data(), key.size()});

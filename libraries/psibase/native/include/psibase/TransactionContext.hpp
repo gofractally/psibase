@@ -60,6 +60,15 @@ namespace psibase
       // This may be called multiple times with different limits; the most-recent limit applies.
       void setWatchdog(std::chrono::steady_clock::duration watchdogLimit);
 
+      void incCodeRef(const Checksum256& codeHash,
+                      std::uint8_t       vmType,
+                      std::uint8_t       vmVersion,
+                      std::int64_t       delta);
+      void incCodeRef(const auto& code, std::int64_t delta)
+      {
+         incCodeRef(code.codeHash, code.vmType, code.vmVersion, delta);
+      }
+
      private:
       std::unique_ptr<TransactionContextImpl> impl;
    };  // TransactionContext

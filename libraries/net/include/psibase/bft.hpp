@@ -934,10 +934,9 @@ namespace psibase::net
                      return;
                   }
                }
-               // TODO: Signature validation should depend on header state only
-               // once we track the verify service code in the block headers.
-               auto verifyState = chain().get_state(chain().get_block_id(chain().commit_index()));
-               verifyIrreversibleSignature(verifyState->revision, data, committed);
+               auto verifyState = chain().get_state(state->info.header.previous);
+               assert(verifyState && "accept_block_header requires the previous block to be known");
+               verifyIrreversibleSignature(verifyState->authState->revision, data, committed);
                if (committed->producers->algorithm == ConsensusAlgorithm::bft)
                {
                   chain().setBlockData(committed->blockId(), *aux);
