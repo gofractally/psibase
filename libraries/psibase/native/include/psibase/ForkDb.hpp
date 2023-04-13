@@ -187,8 +187,9 @@ namespace psibase
          if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
          {
             Database dst{systemContext->sharedDatabase, revision};
-            services  = status->authServices;
-            auto keys = getCodeKeys(services);
+            auto     session = dst.startWrite(writer);
+            services         = status->authServices;
+            auto keys        = getCodeKeys(services);
             for (const auto& key : keys)
             {
                if (auto row = db.kvGet<CodeByHashRow>(CodeByHashRow::db, key))

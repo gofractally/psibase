@@ -34,3 +34,33 @@ TEST_CASE("block signature")
       CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
    CHECK(final_state->blockNum() >= 3);
 }
+
+TEST_CASE("load signature state")
+{
+   TEST_START(logger);
+
+   TempDatabase  db;
+   auto          system = db.getSystemContext();
+   AccountNumber prod{"prod"};
+   auto prover = std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"});
+   {
+      boost::asio::io_context ctx;
+      node_type               node{ctx, system.get(), prover};
+      node.set_producer_id(prod);
+      node.load_producers();
+      boot(node.chain().getBlockContext(), Consensus{CftConsensus{{Producer{prod, prover->get()}}}},
+           true);
+      runFor(ctx, 5s);
+   }
+   {
+      boost::asio::io_context ctx;
+      node_type               node{ctx, system.get(), prover};
+      node.set_producer_id(prod);
+      node.load_producers();
+      auto blocknum = node.chain().get_head_state()->blockNum();
+      runFor(ctx, 5s);
+      auto final_state = node.chain().get_head_state();
+      // We've successfully produced at least one more block
+      CHECK(final_state->blockNum() > blocknum);
+   }
+}
