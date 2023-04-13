@@ -3,91 +3,6 @@
 #include <algorithm>
 #include <chrono>
 
-// TODO remove in c++20
-namespace
-{
-   using days =
-       std::chrono::duration<int, std::ratio_multiply<std::ratio<24>, std::chrono::hours::period>>;
-
-   using weeks = std::chrono::duration<int, std::ratio_multiply<std::ratio<7>, days::period>>;
-
-   using years =
-       std::chrono::duration<int, std::ratio_multiply<std::ratio<146097, 400>, days::period>>;
-
-   using months = std::chrono::duration<int, std::ratio_divide<years::period, std::ratio<12>>>;
-
-   struct day
-   {
-      inline explicit day(uint32_t d) : d(d) {}
-      uint32_t d;
-   };
-   struct month
-   {
-      inline explicit month(uint32_t m) : m(m) {}
-      uint32_t m;
-   };
-   struct month_day
-   {
-      inline month_day(struct month m, day d) : m(m), d(d) {}
-      inline auto  month() const { return m; }
-      inline auto  day() const { return d; }
-      struct month m;
-      struct day   d;
-   };
-   struct year
-   {
-      inline explicit year(uint32_t y) : y(y) {}
-      uint32_t y;
-   };
-
-   template <class Duration>
-   using sys_time = std::chrono::time_point<std::chrono::system_clock, Duration>;
-
-   using sys_days    = sys_time<days>;
-   using sys_seconds = sys_time<std::chrono::seconds>;
-
-   typedef year  year_t;
-   typedef month month_t;
-   typedef day   day_t;
-   struct year_month_day
-   {
-      inline auto from_days(days ds)
-      {
-         const auto z   = ds.count() + 719468;
-         const auto era = (z >= 0 ? z : z - 146096) / 146097;
-         const auto doe = static_cast<uint32_t>(z - era * 146097);
-         const auto yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-         const auto y   = static_cast<days::rep>(yoe) + era * 400;
-         const auto doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-         const auto mp  = (5 * doy + 2) / 153;
-         const auto d   = doy - (153 * mp + 2) / 5 + 1;
-         const auto m   = mp < 10 ? mp + 3 : mp - 9;
-         return year_month_day{year_t{static_cast<uint32_t>(y + (m <= 2))}, month_t(m), day_t(d)};
-      }
-      inline auto to_days() const
-      {
-         const auto _y  = static_cast<int>(y.y) - (m.m <= month_t{2}.m);
-         const auto _m  = static_cast<uint32_t>(m.m);
-         const auto _d  = static_cast<uint32_t>(d.d);
-         const auto era = (_y >= 0 ? _y : _y - 399) / 400;
-         const auto yoe = static_cast<uint32_t>(_y - era * 400);
-         const auto doy = (153 * (_m > 2 ? _m - 3 : _m + 9) + 2) / 5 + _d - 1;
-         const auto doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-         return days{era * 146097 + static_cast<int>(doe) - 719468};
-      }
-      inline year_month_day(const year_t& y, const month_t& m, const day_t& d) : y(y), m(m), d(d) {}
-      inline year_month_day(const year_month_day&) = default;
-      inline year_month_day(year_month_day&&)      = default;
-      inline year_month_day(sys_days ds) : year_month_day(from_days(ds.time_since_epoch())) {}
-      inline auto year() const { return y.y; }
-      inline auto month() const { return m.m; }
-      inline auto day() const { return d.d; }
-      year_t      y;
-      month_t     m;
-      day_t       d;
-   };
-}  // namespace
-
 namespace psibase
 {
    std::string microseconds_to_str(uint64_t microseconds)
@@ -108,8 +23,8 @@ namespace psibase
       };
 
       std::chrono::microseconds us{microseconds};
-      sys_days                  sd(std::chrono::floor<days>(us));
-      auto                      ymd = year_month_day{sd};
+      std::chrono::sys_days     sd(std::chrono::floor<std::chrono::days>(us));
+      auto                      ymd = std::chrono::year_month_day{sd};
       uint32_t                  ms =
           (std::chrono::floor<std::chrono::milliseconds>(us) - sd.time_since_epoch()).count();
       us -= sd.time_since_epoch();
@@ -171,7 +86,7 @@ namespace psibase
          return false;
       if (!parse_uint(sec, 2))
          return false;
-      result = sys_days(year_month_day{year_t{y}, month_t{m}, day_t{d}}.to_days())
+      result = std::chrono::sys_days(std::chrono::year{static_cast<int>(y)} / m / d)
                        .time_since_epoch()
                        .count() *
                    86400 +
