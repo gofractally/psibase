@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2204_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2204-builder:863f6e091ac215d170e1a6419cf9dee55d9ac427"
+  UBUNTU_2204_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2204-builder:69f0e6ba3d4cfc889625c111c8d546f6d8b50d83"
 
 jobs:
   ubuntu-2204-build:
@@ -65,6 +65,7 @@ jobs:
           ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc)"
           echo =====
           ls -la ${GITHUB_WORKSPACE}
+          ls -la ${GITHUB_WORKSPACE}/build/doc/psidk
           echo =====
           ${DOCKER} ccache -s
           echo =====
