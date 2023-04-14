@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2204_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2204-builder:863f6e091ac215d170e1a6419cf9dee55d9ac427"
+  UBUNTU_2204_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2204-builder:333817a3ad5d99bb1e8fc5a6c1b6b845223e3451"
 
 jobs:
   ubuntu-2204-build:
@@ -58,13 +58,14 @@ jobs:
           ${DOCKER} sccache -s
           echo =====
           mkdir build
-          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
+          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DBUILD_DOC=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
           echo =====
           ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc)"
           echo =====
           ls -la ${GITHUB_WORKSPACE}
+          ls -la ${GITHUB_WORKSPACE}/build/doc/psidk
           echo =====
           ${DOCKER} ccache -s
           echo =====
@@ -72,7 +73,7 @@ jobs:
           echo =====
           ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-2204"
           echo =====
-          ${DOCKER} bash -c "cd doc/psidk && mdbook build && mv book psidk-book && tar czf ../../psidk-book.tar.gz psidk-book"
+          ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
       - name: Upload psidk-ubuntu-2204
         uses: actions/upload-artifact@v1
         with:
