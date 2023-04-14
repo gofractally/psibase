@@ -117,10 +117,38 @@ namespace psio
       }
    };
 
+   template <typename T>
+   concept SimplePackableWrapper =
+       Reflected<T> && PackableWrapper<T> &&
+       (std::tuple_size_v<typename reflect<T>::struct_tuple_type> == 1 &&
+        std::is_same_v<
+            std::remove_cvref_t<decltype(clio_unwrap_packable(std::declval<T&>()))>,
+            std::remove_cvref_t<std::tuple_element_t<0, typename reflect<T>::struct_tuple_type>>>);
+
+   template <typename Ch>
+   struct frac_wrap_view : view_base<Ch>
+   {
+      explicit constexpr frac_wrap_view(char_ptr<Ch> ptr) : view_base<Ch>{ptr} {}
+      template <uint32_t idx, uint64_t Name, auto MemberPtr>
+      auto get()
+      {
+         using member_type = decltype(psio::result_of_member(MemberPtr));
+         using result_type =
+             view<std::conditional_t<std::is_const_v<Ch>, const member_type, member_type>>;
+         return result_type(prevalidated{this->data});
+      }
+   };
+
    struct make_reflect_proxy
    {
       template <typename T>
       using fn = typename reflect<T>::template proxy<frac_proxy_view<char_t<T>>>;
+   };
+
+   struct make_wrapper_proxy
+   {
+      template <typename T>
+      using fn = typename reflect<T>::template proxy<frac_wrap_view<char_t<T>>>;
    };
 
    struct not_reflected
@@ -130,11 +158,11 @@ namespace psio
    };
 
    template <typename T>
-   using view_interface_impl =
-       typename std::conditional_t<Reflected<std::remove_cv_t<T>> &&
-                                       !PackableWrapper<std::remove_cv_t<T>>,
-                                   make_reflect_proxy,
-                                   not_reflected>::template fn<T>;
+   using view_interface_impl = typename std::conditional_t<
+       Reflected<std::remove_cv_t<T>> && !PackableWrapper<std::remove_cv_t<T>>,
+       make_reflect_proxy,
+       std::conditional_t<SimplePackableWrapper<T>, make_wrapper_proxy, not_reflected>>::
+       template fn<T>;
 
    template <typename T>
    struct view_interface : view_interface_impl<T>
@@ -532,6 +560,69 @@ namespace psio
       {
          return {data(), size()};
       }
+   };
+
+   template <typename T>
+      requires std::same_as<std::remove_cv_t<T>, std::string>
+   struct view_interface<T> : view_base<T>
+   {
+      static constexpr size_t npos = T::npos;
+      using traits_type            = typename T::traits_type;
+      using value_type             = char;
+      using reference              = char_t<T>&;
+      using const_reference        = const char&;
+      using pointer                = char_t<T>*;
+      using const_pointer          = const char*;
+      using size_type              = std::size_t;
+      using difference_type        = std::ptrdiff_t;
+      using iterator               = pointer;
+      using const_iterator         = const char*;
+      using reverse_iterator       = std::reverse_iterator<iterator>;
+      using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+      pointer   data() const { return view_base<T>::data + 4; }
+      size_type size() const
+      {
+         std::uint32_t result;
+         std::uint32_t pos = 0;
+         (void)unpack_numeric<false>(&result, view_base<T>::data, pos, 4);
+         return result;
+      }
+      size_type              length() const { return size(); }
+      bool                   empty() const { return size() == 0; }
+      iterator               begin() const { return data(); }
+      iterator               end() const { return data() + size(); }
+      const_iterator         cbegin() const { return begin(); }
+      const_iterator         cend() const { return end(); }
+      reverse_iterator       rbegin() const { return reverse_iterator(end()); }
+      reverse_iterator       rend() const { return reverse_iterator(begin()); }
+      const_reverse_iterator crbegin() const { return const_reverse_iterator(end()); }
+      const_reverse_iterator crend() const { return const_reverse_iterator(begin()); }
+
+      reference operator[](size_type idx) const { return *(begin() + idx); }
+      reference at(size_type idx) const
+      {
+         if (idx < size())
+         {
+            return *(begin() + idx);
+         }
+         else
+         {
+#ifdef __cpp_exceptions
+            throw std::out_of_range("view<string> out of range");
+#else
+            abort_error("view<string> out of range");
+#endif
+         }
+      }
+      reference front() const { return *begin(); }
+      reference back() const { return *(end() - 1); }
+
+      std::string_view substr(std::size_t pos = 0, std::size_t count = npos)
+      {
+         return std::string_view(*this).substr(pos, count);
+      }
+      operator std::string_view() const { return {data(), size()}; }
    };
 
    template <typename T, typename Ch>

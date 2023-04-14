@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/String.hpp>
+#include <psibase/Memo.hpp>
 #include <psibase/psibase.hpp>
 
 #include <services/system/CommonTables.hpp>
@@ -21,11 +21,9 @@ namespace UserService
       void init();
       NID  mint();
       void burn(NID nftId);
-      void credit(NID                               nftId,
-                  psibase::AccountNumber            receiver,
-                  psio::view<const psibase::String> memo);
-      void uncredit(NID nftId, psio::view<const psibase::String> memo);
-      void debit(NID nftId, psio::view<const psibase::String> memo);
+      void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
+      void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
+      void debit(NID nftId, psio::view<const psibase::Memo> memo);
       void setUserConf(psibase::EnumElement flag, bool enable);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
@@ -40,17 +38,17 @@ namespace UserService
      public:
       struct Events
       {
-         using Account    = psibase::AccountNumber;
-         using StringView = psio::view<const psibase::String>;
+         using Account  = psibase::AccountNumber;
+         using MemoView = psio::view<const psibase::Memo>;
          // clang-format off
          struct History
          {
             void minted(uint64_t prevEvent, NID nftId, Account issuer) {}
             void burned(uint64_t prevEvent, NID nftId) {}
             void userConfSet(uint64_t prevEvent, Account account, psibase::EnumElement flag, bool enable) {}
-            void credited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, StringView memo) {}
-            void uncredited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, StringView memo) {}
-            void transferred(uint64_t prevEvent, NID nftId, Account creditor, Account debitor, StringView memo) {}
+            void credited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, MemoView memo) {}
+            void uncredited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, MemoView memo) {}
+            void transferred(uint64_t prevEvent, NID nftId, Account creditor, Account debitor, MemoView memo) {}
          };
          // clang-format on
 

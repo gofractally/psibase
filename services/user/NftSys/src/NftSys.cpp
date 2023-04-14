@@ -86,7 +86,7 @@ void NftSys::burn(NID nftId)
    Tables().open<NftHolderTable>().put(holder);
 }
 
-void NftSys::credit(NID nftId, psibase::AccountNumber receiver, view<const String> memo)
+void NftSys::credit(NID nftId, psibase::AccountNumber receiver, view<const Memo> memo)
 {
    auto                   record          = getNft(nftId);
    psibase::AccountNumber sender          = getSender();
@@ -132,7 +132,7 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, view<const Strin
    Tables().open<NftHolderTable>().put(receiverHolder);
 }
 
-void NftSys::uncredit(NID nftId, view<const String> memo)
+void NftSys::uncredit(NID nftId, view<const Memo> memo)
 {
    auto                   record       = getNft(nftId);
    psibase::AccountNumber sender       = getSender();
@@ -156,7 +156,7 @@ void NftSys::uncredit(NID nftId, view<const String> memo)
    Tables().open<CreditTable>().erase(nftId);
 }
 
-void NftSys::debit(NID nftId, view<const String> memo)
+void NftSys::debit(NID nftId, view<const Memo> memo)
 {
    auto record       = getNft(nftId);
    auto debitor      = getSender();

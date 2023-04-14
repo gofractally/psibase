@@ -46,6 +46,16 @@ namespace psio
    concept Packable = Reflected<T> || is_packable<T>::value;
 
    template <typename T>
+   concept PackableValidatedObject = requires(T& x) { clio_validate_packable(x); };
+
+   template <typename T>
+      requires Packable<std::remove_cv_t<T>>
+   class view;
+
+   template <typename T>
+   concept PackableValidatedView = requires(view<const T>& p) { clio_validate_packable(p); };
+
+   template <typename T>
    concept PackableNumeric =            //
        std::is_same_v<T, std::byte> ||  //
        std::is_same_v<T, char> ||       //
@@ -106,6 +116,9 @@ namespace psio
 
    template <Packable... Ts>
    struct is_packable<std::variant<Ts...>>;
+
+   template <bool Unpack, bool Pointer, typename T>
+   bool user_validate(T* value, const char* src, std::uint32_t orig_pos);
 
    // Default implementations for is_packable<T>
    template <typename T, typename Derived>
@@ -381,8 +394,14 @@ namespace psio
                                        uint32_t&   pos,
                                        uint32_t    end_pos)
       {
-         return is_p::template unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown, known_end,
-                                                      src, pos, end_pos);
+         auto orig_pos = pos;
+         bool result   = is_p::template unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown,
+                                                             known_end, src, pos, end_pos);
+         if constexpr (Verify && (PackableValidatedObject<T> || PackableValidatedView<T>))
+         {
+            return result && user_validate<Unpack, false>(value, src, orig_pos);
+         }
+         return result;
       }
 
       template <bool Unpack, bool Verify>
@@ -395,10 +414,15 @@ namespace psio
                                                          uint32_t&   heap_pos,
                                                          uint32_t    end_heap_pos)
       {
-         // TODO: Does this need to exist?
-         return is_p::template embedded_variable_unpack<Unpack, Verify>(
+         auto orig_pos = fixed_pos;
+         bool result   = is_p::template embedded_variable_unpack<Unpack, Verify>(
              ptr<Unpack>(value), has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
              end_heap_pos);
+         if constexpr (Verify && (PackableValidatedObject<T> || PackableValidatedView<T>))
+         {
+            return result && user_validate<Unpack, true>(value, src, orig_pos);
+         }
+         return result;
       }
 
       template <bool Unpack, bool Verify>
@@ -411,9 +435,16 @@ namespace psio
                                                 uint32_t&   heap_pos,
                                                 uint32_t    end_heap_pos)
       {
-         return is_p::template embedded_unpack<Unpack, Verify>(
+         auto orig_pos = fixed_pos;
+         bool result   = is_p::template embedded_unpack<Unpack, Verify>(
              ptr<Unpack>(value), has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
              end_heap_pos);
+         if constexpr (Verify && (PackableValidatedObject<T> || PackableValidatedView<T>))
+         {
+            return result && user_validate < Unpack,
+                   !is_optional && is_variable_size > (value, src, orig_pos);
+         }
+         return result;
       }
    };  // is_packable<PackableWrapper>
 
@@ -1366,6 +1397,26 @@ namespace psio
        -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
    struct input_stream;
    prevalidated(input_stream)->prevalidated<std::span<const char>>;
+
+   template <bool Unpack, bool Pointer, typename T>
+   bool user_validate(T* value, const char* src, std::uint32_t orig_pos)
+   {
+      if constexpr (Unpack && PackableValidatedObject<T>)
+      {
+         return clio_validate_packable(*value);
+      }
+      else if constexpr (!Pointer)
+      {
+         return clio_validate_packable(view<const T>{prevalidated{src + orig_pos}});
+      }
+      else
+      {
+         std::uint32_t offset;
+         std::uint32_t tmp = orig_pos;
+         (void)unpack_numeric<false>(&offset, src, tmp, tmp + 4);
+         return clio_validate_packable(view<const T>{prevalidated{src + orig_pos + offset}});
+      }
+   }
 
    template <Packable T>
    bool from_frac(T& value, std::span<const char> data)

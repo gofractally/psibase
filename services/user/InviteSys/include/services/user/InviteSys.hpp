@@ -1,7 +1,6 @@
 #pragma once
 
 #include <psibase/Rpc.hpp>
-#include <psibase/String.hpp>
 #include <psibase/psibase.hpp>
 
 #include <services/system/AccountSys.hpp>

@@ -22,7 +22,7 @@ namespace
    constexpr bool eventEmissionTestingSupported = false;
    constexpr bool customTokensSupported         = false;
 
-   const psibase::String memo{"memo"};
+   const psibase::Memo memo{"memo"};
 
    constexpr auto manualDebit  = "manualDebit"_m;
    constexpr auto unrecallable = "unrecallable"_m;
