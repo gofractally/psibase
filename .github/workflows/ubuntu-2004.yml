@@ -60,7 +60,7 @@ jobs:
           ${DOCKER} sccache -s
           echo =====
           mkdir build
-          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
+          ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DBUILD_DOC=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
           echo =====
           ${DOCKER} bash -c "cd build && make -j $(nproc)"
           echo =====
@@ -74,7 +74,7 @@ jobs:
           echo =====
           ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-2004"
           echo =====
-          ${DOCKER} bash -c "cd doc/psidk && mdbook build && mv book psidk-book && tar czf ../../psidk-book.tar.gz psidk-book"
+          ${DOCKER} bash -c "cd build/doc/psidk && mv book psidk-book && tar czf ../../../psidk-book.tar.gz psidk-book"
       - name: Upload psidk-ubuntu-2004
         uses: actions/upload-artifact@v1
         with:
