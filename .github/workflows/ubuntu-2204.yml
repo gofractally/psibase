@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2204_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2204-builder:69f0e6ba3d4cfc889625c111c8d546f6d8b50d83"
+  UBUNTU_2204_IMAGE: "ghcr.io/gofractally/internal-ubuntu-2204-builder:333817a3ad5d99bb1e8fc5a6c1b6b845223e3451"
 
 jobs:
   ubuntu-2204-build:

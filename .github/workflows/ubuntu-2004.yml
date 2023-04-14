@@ -67,6 +67,7 @@ jobs:
           ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc)"
           echo =====
           ls -la ${GITHUB_WORKSPACE}
+          ls -la ${GITHUB_WORKSPACE}/build/doc/psidk
           echo =====
           ${DOCKER} ccache -s
           echo =====
