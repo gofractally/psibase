@@ -451,13 +451,13 @@ pub fn create_boot_transactions(
                 sender: account!("symbol-sys"),
                 service: account!("token-sys"),
                 method: method!("mint"),
-                rawData: (1u32, (1_000_000_00000000_u64,), ("memo",)).packed().into(),
+                rawData: (1u32, (1_000_000_00000000_u64,), "memo").packed().into(),
             },
             Action {
                 sender: account!("symbol-sys"),
                 service: account!("token-sys"),
                 method: method!("credit"),
-                rawData: (1u32, account!("alice"), (1_000_00000000_u64,), ("memo",))
+                rawData: (1u32, account!("alice"), (1_000_00000000_u64,), "memo")
                     .packed()
                     .into(),
             },
@@ -465,7 +465,7 @@ pub fn create_boot_transactions(
                 sender: account!("symbol-sys"),
                 service: account!("token-sys"),
                 method: method!("credit"),
-                rawData: (1u32, account!("bob"), (1_000_00000000_u64,), ("memo",))
+                rawData: (1u32, account!("bob"), (1_000_00000000_u64,), "memo")
                     .packed()
                     .into(),
             },
