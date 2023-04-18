@@ -15,7 +15,7 @@ using namespace UserService::Errors;
 
 namespace
 {
-   const String   memo{"memo"};
+   const Memo     memo{"memo"};
    const TID      sysToken{TokenSys::sysToken};
    constexpr auto untradeable = "untradeable"_m;
 

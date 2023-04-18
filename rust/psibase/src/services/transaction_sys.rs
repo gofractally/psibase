@@ -153,7 +153,6 @@ pub mod auth_interface {
     fn canAuthUserSys(user: crate::AccountNumber) {
         unimplemented!()
     }
-
 }
 
 /// All transactions enter the chain through this service

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <psibase/String.hpp>
 #include <psibase/psibase.hpp>
 
 #include <services/system/CommonTables.hpp>

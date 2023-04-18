@@ -19,7 +19,7 @@ using namespace UserService;
 
 namespace
 {
-   const psibase::String memo{"memo"};
+   const psibase::Memo memo{"memo"};
 }  // namespace
 
 SCENARIO("Testing default psibase chain")
