@@ -133,12 +133,12 @@ namespace debug_eos_vm
    };  // debug_instr_map
 
 // Macro because member functions can't be partially specialized
-#define DEBUG_PARSE_CODE_SECTION(Host, Options)                                                   \
+#define DEBUG_PARSE_CODE_SECTION(Host, Options, AsyncBacktrace)                                   \
    template <>                                                                                    \
    template <>                                                                                    \
    void eosio::vm::binary_parser<                                                                 \
-       eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<Host, true>>, Options,     \
-       debug_eos_vm::debug_instr_map>::                                                           \
+       eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<Host, AsyncBacktrace>>,    \
+       Options, debug_eos_vm::debug_instr_map>::                                                  \
        parse_section<eosio::vm::section_id::code_section>(                                        \
            eosio::vm::wasm_code_ptr & code,                                                       \
            eosio::vm::guarded_vector<eosio::vm::function_body> & elems)                           \
@@ -150,8 +150,8 @@ namespace debug_eos_vm
           { parse_function_body(code, fb, idx); });                                               \
       EOS_VM_ASSERT(elems.size() == _mod->functions.size(), eosio::vm::wasm_parse_exception,      \
                     "code section must have the same size as the function section");              \
-      eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<Host, true>> code_writer(   \
-          _allocator, code.bounds() - code.offset(), *_mod);                                      \
+      eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<Host, AsyncBacktrace>>      \
+          code_writer(_allocator, code.bounds() - code.offset(), *_mod);                          \
       imap.on_code_start(code_writer.get_base_addr(), code_start);                                \
       for (size_t i = 0; i < _function_bodies.size(); i++)                                        \
       {                                                                                           \
@@ -186,6 +186,7 @@ namespace debug_eos_vm
       return dwarf::register_with_debugger(
           dwarf_info, dbg.fn_locs, dbg.instr_locs, alloc.get_code_start(), alloc._code_size,
           (char*)alloc.get_code_start() +
-              module.code[func_index - module.get_imported_functions_size()].jit_code_offset);
+              module.code[func_index - module.get_imported_functions_size()].jit_code_offset,
+          module.get_imported_functions_size());
    }
 }  // namespace debug_eos_vm

@@ -40,7 +40,7 @@ void eosio::vm::machine_code_writer<
    eosio::vm::throw_<wasm_interpreter_exception>("unreachable");
 }
 
-DEBUG_PARSE_CODE_SECTION(rhf_t, vm_options)
+DEBUG_PARSE_CODE_SECTION(rhf_t, vm_options, true)
 using backend_t = eosio::vm::backend<  //
     rhf_t,
     eosio::vm::jit_profile,

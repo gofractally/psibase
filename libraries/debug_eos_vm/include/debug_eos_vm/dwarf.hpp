@@ -118,5 +118,6 @@ namespace dwarf
        const std::vector<jit_instr_loc>& instr_locs,
        const void*                       code_start,
        size_t                            code_size,
-       const void*                       entry);
+       const void*                       entry,
+       std::uint32_t                     num_imported);
 }  // namespace dwarf

@@ -224,6 +224,118 @@ namespace dwarf
    }
 
 // clang-format off
+#define OP_RANGE32(a, b, name, value,  x)       \
+   x(a, b, name ## 0, value + 0)                \
+   x(a, b, name ## 1, value + 1)                \
+   x(a, b, name ## 2, value + 2)                \
+   x(a, b, name ## 3, value + 3)                \
+   x(a, b, name ## 4, value + 4)                \
+   x(a, b, name ## 5, value + 5)                \
+   x(a, b, name ## 6, value + 6)                \
+   x(a, b, name ## 7, value + 7)                \
+   x(a, b, name ## 8, value + 8)                \
+   x(a, b, name ## 9, value + 9)                \
+   x(a, b, name ## 10, value + 10)              \
+   x(a, b, name ## 11, value + 11)              \
+   x(a, b, name ## 12, value + 12)              \
+   x(a, b, name ## 13, value + 13)              \
+   x(a, b, name ## 14, value + 14)              \
+   x(a, b, name ## 15, value + 15)              \
+   x(a, b, name ## 16, value + 16)              \
+   x(a, b, name ## 17, value + 17)              \
+   x(a, b, name ## 18, value + 18)              \
+   x(a, b, name ## 19, value + 19)              \
+   x(a, b, name ## 20, value + 20)              \
+   x(a, b, name ## 21, value + 21)              \
+   x(a, b, name ## 22, value + 22)              \
+   x(a, b, name ## 23, value + 23)              \
+   x(a, b, name ## 24, value + 24)              \
+   x(a, b, name ## 25, value + 25)              \
+   x(a, b, name ## 26, value + 26)              \
+   x(a, b, name ## 27, value + 27)              \
+   x(a, b, name ## 28, value + 28)              \
+   x(a, b, name ## 29, value + 29)              \
+   x(a, b, name ## 30, value + 30)              \
+   x(a, b, name ## 31, value + 31)
+
+#define DW_OPS(a, b, x)                         \
+   x(a, b, addr, 0x03)                          \
+   x(a, b, deref, 0x06)                         \
+   x(a, b, const1u, 0x08)                       \
+   x(a, b, const1s, 0x09)                       \
+   x(a, b, const2u, 0x0a)                       \
+   x(a, b, const2s, 0x0b)                       \
+   x(a, b, const4u, 0x0c)                       \
+   x(a, b, const4s, 0x0d)                       \
+   x(a, b, const8u, 0x0e)                       \
+   x(a, b, const8s, 0x0f)                       \
+   x(a, b, constu, 0x10)                        \
+   x(a, b, consts, 0x11)                        \
+   x(a, b, dup, 0x12)                           \
+   x(a, b, drop, 0x13)                          \
+   x(a, b, over, 0x14)                          \
+   x(a, b, pick, 0x15)                          \
+   x(a, b, swap, 0x16)                          \
+   x(a, b, rot, 0x17)                           \
+   x(a, b, xderef, 0x18)                        \
+   x(a, b, abs, 0x19)                           \
+   x(a, b, and, 0x1a)                           \
+   x(a, b, div, 0x1b)                           \
+   x(a, b, minus, 0x1c)                         \
+   x(a, b, mod, 0x1d)                           \
+   x(a, b, mul, 0x1e)                           \
+   x(a, b, neg, 0x1f)                           \
+   x(a, b, not, 0x20)                           \
+   x(a, b, or, 0x21)                            \
+   x(a, b, plus, 0x22)                          \
+   x(a, b, plus_uconst, 0x23)                   \
+   x(a, b, shl, 0x24)                           \
+   x(a, b, shr, 0x25)                           \
+   x(a, b, shra, 0x26)                          \
+   x(a, b, xor, 0x27)                           \
+   x(a, b, skip, 0x2f)                          \
+   x(a, b, bra, 0x28)                           \
+   x(a, b, eq, 0x29)                            \
+   x(a, b, ge, 0x2a)                            \
+   x(a, b, gt, 0x2b)                            \
+   x(a, b, le, 0x2c)                            \
+   x(a, b, lt, 0x2d)                            \
+   x(a, b, ne, 0x2e)                            \
+   OP_RANGE32(a, b, lit, 0x30, x)               \
+   OP_RANGE32(a, b, reg, 0x50, x)               \
+   OP_RANGE32(a, b, breg, 0x70, x)              \
+   x(a, b, regx, 0x90)                          \
+   x(a, b, fbreg, 0x91)                         \
+   x(a, b, bregx, 0x92)                         \
+   x(a, b, piece, 0x93)                         \
+   x(a, b, deref_size, 0x94)                    \
+   x(a, b, xderef_size, 0x95)                   \
+   x(a, b, nop, 0x96)                           \
+   x(a, b, push_object_address, 0x97)           \
+   x(a, b, call2, 0x98)                         \
+   x(a, b, call4, 0x99)                         \
+   x(a, b, call_ref, 0x9a)                      \
+   x(a, b, form_tls_address, 0x9b)              \
+   x(a, b, call_frame_cfa, 0x9c)                \
+   x(a, b, bit_piece, 0x9d)                     \
+   x(a, b, implicit_value, 0x9e)                \
+   x(a, b, stack_value, 0x9f)                   \
+   x(a, b, lo_user, 0xe0)                       \
+   x(a, b, hi_user, 0xff)
+   // clang-format on
+
+   DW_OPS(dw_op_, uint8_t, ENUM_DECL)
+   std::string dw_op_to_str(uint8_t value)
+   {
+      switch (value)
+      {
+         DW_OPS("DW_OP_", _, ENUM_DECODE)
+         default:
+            return "DW_OP_" + std::to_string(value);
+      }
+   }
+
+// clang-format off
 #define DW_TAGS(a, b, x)                     \
    x(a, b, array_type, 0x01)                 \
    x(a, b, class_type, 0x02)                 \
@@ -297,6 +409,49 @@ namespace dwarf
          DW_TAGS("DW_TAG_", _, ENUM_DECODE)
          default:
             return "DW_TAG_" + std::to_string(value);
+      }
+   }
+
+   // clang-format off
+#define DW_CFAS(a, b, x)                        \
+   x(a, b, advance_loc, 0x40)                   \
+   x(a, b, offset, 0x80)                        \
+   x(a, b, restore, 0xc0)                       \
+   x(a, b, nop, 0)                              \
+   x(a, b, set_loc, 0x01)                       \
+   x(a, b, advance_loc1, 0x02)                  \
+   x(a, b, advance_loc2, 0x03)                  \
+   x(a, b, advance_loc4, 0x04)                  \
+   x(a, b, offset_extended, 0x05)               \
+   x(a, b, restore_extended, 0x06)              \
+   x(a, b, undefined, 0x07)                     \
+   x(a, b, same_value, 0x08)                    \
+   x(a, b, register, 0x09)                      \
+   x(a, b, remember_state, 0x0a)                \
+   x(a, b, restore_state, 0x0b)                 \
+   x(a, b, def_cfa, 0x0c)                       \
+   x(a, b, def_cfa_register, 0x0d)              \
+   x(a, b, def_cfa_offset, 0x0e)                \
+   x(a, b, def_cfa_expression, 0x0f)            \
+   x(a, b, expression, 0x10)                    \
+   x(a, b, offset_extended_sf, 0x11)            \
+   x(a, b, def_cfa_sf, 0x12)                    \
+   x(a, b, def_cfa_offset_sf, 0x13)             \
+   x(a, b, val_offset, 0x14)                    \
+   x(a, b, val_offset_sf, 0x15)                 \
+   x(a, b, val_expression, 0x16)                \
+   x(a, b, lo_user, 0x1c)                       \
+   x(a, b, hi_user, 0x3f)
+   // clang-format on
+
+   DW_CFAS(dw_cfa_, uint8_t, ENUM_DECL)
+   std::string dw_cfa_to_str(uint16_t value)
+   {
+      switch (value)
+      {
+         DW_CFAS("DW_CFA_", _, ENUM_DECODE)
+         default:
+            return "DW_CFA_" + std::to_string(value);
       }
    }
 
@@ -1196,7 +1351,7 @@ namespace dwarf
 
    struct attr_form_value
    {
-      using value_type = std::variant<uint8_t, uint64_t, std::string>;
+      using value_type = std::variant<uint8_t, uint64_t, std::string, std::vector<char>>;
 
       uint32_t   attr = 0;
       uint32_t   form = 0;
@@ -1209,6 +1364,13 @@ namespace dwarf
          return a.key() < b.key();
       }
    };
+
+   std::vector<char> make_rbp_loc()
+   {
+      std::vector<char> result;
+      result.push_back(dw_op_reg6);
+      return result;
+   }
 
    struct die_pattern
    {
@@ -1257,13 +1419,11 @@ namespace dwarf
          if (show_generated_dies)
             fprintf(stderr, "%*s%s %s\n", indent + 2, "", dw_at_to_str(attr.attr).c_str(),
                     dw_form_to_str(attr.form).c_str());
-         std::visit(
-             overloaded{
-                 [&](uint8_t v) { psio::to_bin(v, s); },
-                 [&](uint64_t v) { psio::to_bin(v, s); },
-                 [&](const std::string& str) { write_string(str, s); },
-             },
-             attr.value);
+         std::visit(overloaded{[&](uint8_t v) { psio::to_bin(v, s); },
+                               [&](uint64_t v) { psio::to_bin(v, s); },
+                               [&](const std::string& str) { write_string(str, s); },
+                               [&](const std::vector<char>& v) { psio::to_bin(v, s); }},
+                    attr.value);
       }
    }  // write_die
 
@@ -1282,7 +1442,8 @@ namespace dwarf
                           const std::vector<jit_fn_loc>&    fn_locs,
                           const std::vector<jit_instr_loc>& instr_locs,
                           const void*                       code_start,
-                          size_t                            code_size)
+                          size_t                            code_size,
+                          uint32_t                          num_imported)
    {
       std::map<die_pattern, uint32_t> codes;
       die_pattern                     die;
@@ -1314,6 +1475,26 @@ namespace dwarf
 
       std::vector<size_t>  sub_positions(info.subprograms.size());
       std::vector<sub_ref> sub_refs;
+
+      // Write a subprogram and symbol for the extra generated functions
+      // TODO: split out individual functions
+      uint32_t prologue_end = fn_locs.empty() ? code_size : fn_locs.front().code_prologue;
+      die.tag               = dw_tag_subprogram;
+      die.has_children      = false;
+      die.attrs             = {{dw_at_low_pc, dw_form_addr, uint64_t(code_start)},
+                               {dw_at_high_pc, dw_form_addr, uint64_t((char*)code_start + prologue_end)},
+                               {dw_at_frame_base, dw_form_exprloc, make_rbp_loc()}};
+      write_die(4, abbrev_data, info_data, codes, die);
+      Elf64_Sym sym = {
+          .st_name  = 0,
+          .st_info  = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC),
+          .st_other = STV_DEFAULT,
+          .st_shndx = code_section,
+          .st_value = uint64_t(code_start),
+          .st_size  = prologue_end,
+      };
+      sym.st_name = add_str(strings, "_wasm_entry");
+      symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
 
       for (size_t i = 0; i < info.subprograms.size(); ++i)
       {
@@ -1365,6 +1546,9 @@ namespace dwarf
             sym.st_name = add_str(strings, sub.linkage_name->c_str());
          else if (sub.name)
             sym.st_name = add_str(strings, sub.name->c_str());
+         else
+            sym.st_name =
+                add_str(strings, ("<" + std::to_string(num_imported + *fn) + ">").c_str());
          symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
       }  // for(sub)
 
@@ -1379,6 +1563,91 @@ namespace dwarf
       uint64_t inner_size = info_data.size() - inner_pos;
       memcpy(info_data.data() + length_pos, &inner_size, sizeof(inner_size));
    }  // write_subprograms
+
+   struct cie
+   {
+      std::uint32_t     cie_id                  = 0xffffffffu;
+      std::uint8_t      version                 = 1;
+      std::string       augmentation            = "";
+      std::uint32_t     code_alignment_factor   = 1;
+      std::int32_t      data_alignment_factor   = -8;
+      std::uint32_t     return_address_register = 16;
+      std::vector<char> initial_instructions;
+   };
+
+   void to_bin_with_size32(auto&& f, auto& stream)
+   {
+      psio::size_stream ss;
+      f(ss);
+      auto padding = -ss.size & 3u;
+      psio::to_bin(static_cast<std::uint32_t>(ss.size + padding), stream);
+      f(stream);
+      for (int i = 0; i < padding; ++i)
+      {
+         stream.write('\0');
+      }
+   }
+
+   void to_bin(const cie& val, auto& stream)
+   {
+      to_bin_with_size32(
+          [&](auto& stream)
+          {
+             psio::to_bin(val.cie_id, stream);
+             psio::to_bin(val.version, stream);
+             write_string(val.augmentation, stream);
+             psio::varuint32_to_bin(val.code_alignment_factor, stream);
+             psio::sleb64_to_bin(val.data_alignment_factor, stream);
+             psio::varuint32_to_bin(val.return_address_register, stream);
+             stream.write(val.initial_instructions.data(), val.initial_instructions.size());
+          },
+          stream);
+   }
+
+   struct fde
+   {
+      std::uint32_t     cie_ptr          = 0;
+      std::uint64_t     initial_location = 0;
+      std::uint64_t     address_range;
+      std::vector<char> instructions;
+   };
+
+   void to_bin(const fde& val, auto& stream)
+   {
+      to_bin_with_size32(
+          [&](auto& stream)
+          {
+             psio::to_bin(val.cie_ptr, stream);
+             psio::to_bin(val.initial_location, stream);
+             psio::to_bin(val.address_range, stream);
+             stream.write(val.instructions.data(), val.instructions.size());
+          },
+          stream);
+   }
+
+   // This returns a cfi program that assumes chained rbp
+   // It will give incorrect results if the pc is in a function
+   // prologue or epilogue.
+   std::vector<char> get_basic_frame()
+   {
+      std::vector<char>   result;
+      psio::vector_stream s(result);
+      psio::to_bin(dw_cfa_def_cfa, s);
+      psio::varuint32_to_bin(6, s);
+      psio::varuint32_to_bin(16, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 16), s);
+      psio::varuint32_to_bin(1, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 6), s);
+      psio::varuint32_to_bin(2, s);
+      return result;
+   }
+
+   void write_cfi(std::vector<char>& v, const void* code, std::size_t code_size)
+   {
+      psio::vector_stream stream{v};
+      to_bin(cie{.initial_instructions = get_basic_frame()}, stream);
+      to_bin(fde{.initial_location = std::uint64_t(code), .address_range = code_size}, stream);
+   }
 
    struct wasm_header
    {
@@ -1683,13 +1952,50 @@ namespace dwarf
       }
    };
 
+   void default_subprograms(info& info, const std::vector<jit_fn_loc>& fn_locs)
+   {
+      auto&                   subprograms = info.subprograms;
+      std::vector<subprogram> added;
+      auto                    pos = subprograms.begin();
+      auto                    end = subprograms.end();
+      for (std::size_t i = 0; i < fn_locs.size(); ++i)
+      {
+         auto& fn         = fn_locs[i];
+         auto  is_missing = [&]
+         {
+            while (true)
+            {
+               if (pos == end || pos->begin_address + info.wasm_code_offset >= fn.wasm_end)
+               {
+                  return true;
+               }
+               else if (pos->end_address + info.wasm_code_offset > fn.wasm_begin)
+               {
+                  return false;
+               }
+               ++pos;
+            }
+         };
+         if (is_missing())
+         {
+            added.push_back({.begin_address = fn.wasm_begin - info.wasm_code_offset,
+                             .end_address   = fn.wasm_end - info.wasm_code_offset});
+         }
+      }
+      std::vector<subprogram> result;
+      std::merge(subprograms.begin(), subprograms.end(), added.begin(), added.end(),
+                 std::back_inserter(result));
+      subprograms = std::move(result);
+   }
+
    std::shared_ptr<debugger_registration> register_with_debugger(  //
        info&                             info,
        const std::vector<jit_fn_loc>&    fn_locs,
        const std::vector<jit_instr_loc>& instr_locs,
        const void*                       code_start,
        size_t                            code_size,
-       const void*                       entry)
+       const void*                       entry,
+       std::uint32_t                     num_imported)
    {
       psio::check(fn_locs.size() == info.wasm_fns.size(), "number of functions doesn't match");
 
@@ -1729,11 +2035,13 @@ namespace dwarf
             show_fn(++fn);
       }
 
+      default_subprograms(info, fn_locs);
+
       auto              result = std::make_shared<debugger_registration>();
       std::vector<char> strings;
       strings.push_back(0);
 
-      constexpr uint16_t num_sections   = 7;
+      constexpr uint16_t num_sections   = 8;
       constexpr uint16_t strtab_section = 1;
       constexpr uint16_t code_section   = 2;
       Elf64_Ehdr         elf_header{
@@ -1794,6 +2102,7 @@ namespace dwarf
       auto [abbrev_sec_header, abbrev_sec_header_pos] =
           sec_header(".debug_abbrev", SHT_PROGBITS, 0);
       auto [info_sec_header, info_sec_header_pos]     = sec_header(".debug_info", SHT_PROGBITS, 0);
+      auto [frame_sec_header, frame_sec_header_pos]   = sec_header(".debug_frame", SHT_PROGBITS, 0);
       auto [symbol_sec_header, symbol_sec_header_pos] = sec_header(".symtab", SHT_SYMTAB, 0);
 
       code_sec_header.sh_addr = Elf64_Addr(code_start);
@@ -1810,15 +2119,18 @@ namespace dwarf
       std::vector<char> abbrev_data;
       std::vector<char> info_data;
       std::vector<char> symbol_data;
+      std::vector<char> frame_data;
       symbol_sec_header.sh_link    = strtab_section;
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
       write_subprograms(code_section, strings, abbrev_data, info_data, symbol_data, info, fn_locs,
-                        instr_locs, code_start, code_size);
+                        instr_locs, code_start, code_size, num_imported);
+      write_cfi(frame_data, code_start, code_size);
 
       write_sec(line_sec_header, line_sec_header_pos,
                 generate_debug_line(info, fn_locs, instr_locs, code_start));
       write_sec(abbrev_sec_header, abbrev_sec_header_pos, abbrev_data);
       write_sec(info_sec_header, info_sec_header_pos, info_data);
+      write_sec(frame_sec_header, frame_sec_header_pos, frame_data);
       write_sec(symbol_sec_header, symbol_sec_header_pos, symbol_data);
       write_sec(str_sec_header, str_sec_header_pos, strings);
       result->write(elf_header_pos, elf_header);
