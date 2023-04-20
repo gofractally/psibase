@@ -39,6 +39,7 @@ namespace debug_eos_vm
          fn_locs.emplace_back();
          fn_locs.back().code_prologue = code_offset(code_addr);
          fn_locs.back().wasm_begin    = wasm_offset(wasm_addr);
+         on_instr_start(code_addr, wasm_addr);
       }
 
       void on_function_body(const void* code_addr)
@@ -66,6 +67,7 @@ namespace debug_eos_vm
       {
          code_size = (const char*)code_addr - (const char*)code_begin;
          wasm_size = (const char*)wasm_addr - (const char*)wasm_begin;
+         on_instr_start(code_addr, wasm_addr);
       }
 
       void set(builder&& b)
