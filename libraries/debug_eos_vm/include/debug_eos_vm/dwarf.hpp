@@ -31,10 +31,12 @@ namespace dwarf
    struct location
    {
       // Addresses relative to code section content (after section id and section length)
-      uint32_t begin_address = 0;
-      uint32_t end_address   = 0;
-      uint32_t file_index    = 0;
-      uint32_t line          = 0;
+      uint32_t begin_address  = 0;
+      uint32_t end_address    = 0;
+      uint32_t file_index     = 0;
+      uint32_t line           = 0;
+      bool     prologue_end   = false;
+      bool     epilogue_begin = false;
 
       friend bool operator<(const location& a, const location& b)
       {

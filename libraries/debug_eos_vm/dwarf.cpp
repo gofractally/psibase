@@ -610,7 +610,9 @@ namespace dwarf
          if (current && (state.end_sequence || state.file != current->file_index ||
                          state.line != current->line))
          {
-            current->end_address = state.address;
+            current->end_address    = state.address;
+            current->prologue_end   = state.prologue_end;
+            current->epilogue_begin = state.epilogue_begin;
             psio::check(current->file_index < header.file_names.size(),
                         "invalid file index in .debug_line");
             auto& filename = header.file_names[current->file_index];
@@ -844,6 +846,16 @@ namespace dwarf
             psio::to_bin(uint8_t(dw_lns_advance_line), s);
             psio::sleb64_to_bin(int32_t(loc.line - line), s);
             line = loc.line;
+         }
+
+         if (loc.prologue_end)
+         {
+            psio::to_bin(uint8_t(dw_lns_set_prologue_end), s);
+         }
+
+         if (loc.epilogue_begin)
+         {
+            psio::to_bin(uint8_t(dw_lns_set_epilogue_begin), s);
          }
 
          psio::to_bin(uint8_t(dw_lns_copy), s);
