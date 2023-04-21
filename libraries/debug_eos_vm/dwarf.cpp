@@ -902,9 +902,7 @@ namespace dwarf
       return result;
    }
 
-   void parse_debug_abbrev(info&                            result,
-                           std::map<std::string, uint32_t>& files,
-                           psio::input_stream               s)
+   void parse_debug_abbrev(debug_abbrev& result, psio::input_stream s)
    {
       auto begin = s.pos;
       while (s.remaining())
@@ -935,9 +933,10 @@ namespace dwarf
                fprintf(stderr, "%08x [%d]: tag: %s children: %d attrs: %d\n", decl.table_offset,
                        decl.code, dw_tag_to_str(decl.tag).c_str(), decl.has_children,
                        (int)decl.attrs.size());
-            result.abbrev_decls.push_back(std::move(decl));
+            result.contents.push_back(std::move(decl));
          }
       }
+      std::ranges::sort(result.contents, std::less<>());
    }
 
    struct attr_address
@@ -1808,7 +1807,7 @@ namespace dwarf
                      }
                      else if (name == ".debug_abbrev")
                      {
-                        dwarf::parse_debug_abbrev(result, files, section.data);
+                        dwarf::parse_debug_abbrev(result.abbrev_decls, section.data);
                      }
                      else if (name == ".debug_str")
                      {
@@ -1826,7 +1825,6 @@ namespace dwarf
                   });
 
       std::sort(result.locations.begin(), result.locations.end());
-      std::sort(result.abbrev_decls.begin(), result.abbrev_decls.end());
       if (show_wasm_loc_summary)
          for (auto& loc : result.locations)
             fprintf(stderr, "loc  [%08x,%08x) %s:%d\n", loc.begin_address, loc.end_address,
@@ -1855,14 +1853,19 @@ namespace dwarf
       return nullptr;
    }
 
-   const abbrev_decl* info::get_abbrev_decl(uint32_t table_offset, uint32_t code) const
+   const abbrev_decl* debug_abbrev::find(uint32_t table_offset, uint32_t code) const
    {
       auto key = std::pair{table_offset, code};
-      auto it  = std::lower_bound(abbrev_decls.begin(), abbrev_decls.end(), key,
-                                  [](const auto& a, const auto& b) { return a.key() < b; });
-      if (it != abbrev_decls.end() && it->key() == key)
+      auto it =
+          std::ranges::partition_point(contents, [&](const auto& a) { return a.key() < key; });
+      if (it != contents.end() && it->key() == key)
          return &*it;
       return nullptr;
+   }
+
+   const abbrev_decl* info::get_abbrev_decl(uint32_t table_offset, uint32_t code) const
+   {
+      return abbrev_decls.find(table_offset, code);
    }
 
    const subprogram* info::get_subprogram(uint32_t address) const

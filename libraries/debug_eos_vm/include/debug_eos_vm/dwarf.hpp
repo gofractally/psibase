@@ -83,6 +83,12 @@ namespace dwarf
       }
    };
 
+   struct debug_abbrev
+   {
+      std::vector<abbrev_decl> contents;  // sorted
+      const abbrev_decl*       find(uint32_t table_offset, uint32_t code) const;
+   };
+
    // Position of function within wasm file
    struct wasm_fn
    {
@@ -99,10 +105,10 @@ namespace dwarf
 
       std::vector<char>        strings;
       std::vector<std::string> files;
-      std::vector<location>    locations;     // sorted
-      std::vector<abbrev_decl> abbrev_decls;  // sorted
-      std::vector<subprogram>  subprograms;   // sorted
-      std::vector<wasm_fn>     wasm_fns;      // in wasm order
+      std::vector<location>    locations;  // sorted
+      debug_abbrev             abbrev_decls;
+      std::vector<subprogram>  subprograms;  // sorted
+      std::vector<wasm_fn>     wasm_fns;     // in wasm order
 
       const char*        get_str(uint32_t offset) const;
       const location*    get_location(uint32_t address) const;
