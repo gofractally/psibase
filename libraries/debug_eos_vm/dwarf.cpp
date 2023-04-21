@@ -1043,7 +1043,7 @@ namespace dwarf
       return {};
    }
 
-   attr_value parse_attr_value(info& result, uint32_t form, psio::input_stream& s)
+   attr_value parse_attr_value(const debug_str& strings, uint32_t form, psio::input_stream& s)
    {
       auto vardata = [&](size_t size)
       {
@@ -1102,71 +1102,67 @@ namespace dwarf
          case dw_form_string:
             return get_string(s);
          case dw_form_strp:
-            return std::string_view{result.get_str(psio::from_bin<uint32_t>(s))};
+            return std::string_view{strings.get(psio::from_bin<uint32_t>(s))};
          case dw_form_indirect:
-            return parse_attr_value(result, psio::varuint32_from_bin(s), s);
+            return parse_attr_value(strings, psio::varuint32_from_bin(s), s);
          default:
             throw std::runtime_error("unknown form in dwarf entry");
       }
    }  // parse_attr_value
 
-   const abbrev_decl* get_die_abbrev(info&                     result,
-                                     int                       indent,
-                                     uint32_t                  debug_abbrev_offset,
-                                     const psio::input_stream& whole_s,
-                                     psio::input_stream&       s)
+   struct unit_parser
    {
-      const char* p    = s.pos;
-      auto        code = psio::varuint32_from_bin(s);
-      if (!code)
+      const abbrev_decl* get_die_abbrev(psio::input_stream& s)
       {
-         if (show_parsed_dies)
-            fprintf(stderr, "0x%08x: %*sNULL\n", uint32_t(p - whole_s.pos), indent - 12, "");
-         return nullptr;
-      }
-      const auto* abbrev = result.get_abbrev_decl(debug_abbrev_offset, code);
-      psio::check(abbrev, "Bad abbrev in .debug_info");
-      if (show_parsed_dies)
-         fprintf(stderr, "0x%08x: %*s%s\n", uint32_t(p - whole_s.pos), indent - 12, "",
-                 dw_tag_to_str(abbrev->tag).c_str());
-      return abbrev;
-   }
-
-   template <typename F>
-   void parse_die_attrs(info&                     result,
-                        int                       indent,
-                        uint32_t                  debug_abbrev_offset,
-                        const abbrev_decl&        abbrev,
-                        const psio::input_stream& whole_s,
-                        const psio::input_stream& unit_s,
-                        psio::input_stream&       s,
-                        F&&                       f)
-   {
-      for (const auto& attr : abbrev.attrs)
-      {
-         auto value = parse_attr_value(result, attr.form, s);
-         if (show_parsed_dies)
-            fprintf(stderr, "%*s%s %s: %s\n", indent + 2, "", dw_at_to_str(attr.name).c_str(),
-                    dw_form_to_str(attr.form).c_str(), to_string(value).c_str());
-         if (attr.name == dw_at_specification)
+         const char* p    = s.pos;
+         auto        code = psio::varuint32_from_bin(s);
+         if (!code)
          {
-            if (auto ref = get_ref(value))
-            {
-               if (show_parsed_dies)
-                  fprintf(stderr, "%*sref: %08x, unit: %08x\n", indent + 4, "", uint32_t(*ref),
-                          uint32_t(unit_s.pos - whole_s.pos));
-               psio::check(*ref < unit_s.remaining(), "DW_AT_specification out of range");
-               psio::input_stream ref_s{unit_s.pos + *ref, unit_s.end};
-               auto               ref_abbrev =
-                   get_die_abbrev(result, indent + 4, debug_abbrev_offset, whole_s, ref_s);
-               parse_die_attrs(result, indent + 4, debug_abbrev_offset, *ref_abbrev, whole_s,
-                               unit_s, ref_s, f);
-            }
+            return nullptr;
          }
-         else
-            f(attr, value);
+         const auto* result = abbrev.find(debug_abbrev_offset, code);
+         psio::check(result, "Bad abbrev in .debug_info");
+         return result;
       }
-   }
+
+      template <typename F>
+      void parse_die_attrs(const abbrev_decl& abbrev, psio::input_stream& s, F&& f)
+      {
+         for (const auto& attr : abbrev.attrs)
+         {
+            auto value = parse_attr_value(strings, attr.form, s);
+            if (attr.name == dw_at_specification)
+            {
+               if (auto ref = get_ref(value))
+               {
+                  psio::check(*ref < unit_s.remaining(), "DW_AT_specification out of range");
+                  psio::input_stream ref_s{unit_s.pos + *ref, unit_s.end};
+                  auto               ref_abbrev = get_die_abbrev(ref_s);
+                  parse_die_attrs(*ref_abbrev, ref_s, f);
+               }
+            }
+            else
+               f(attr, value);
+         }
+      }
+
+      void skip_die_children(const abbrev_decl& abbrev, psio::input_stream& s)
+      {
+         if (!abbrev.has_children)
+            return;
+         while (auto* child = get_die_abbrev(s))
+         {
+            parse_die_attrs(*child, s, [&](auto&&...) {});
+            skip_die_children(*child, s);
+         }
+      }
+
+      const debug_abbrev&       abbrev;
+      const debug_str&          strings;
+      uint32_t                  debug_abbrev_offset;
+      const psio::input_stream& whole_s;
+      const psio::input_stream& unit_s;
+   };
 
    std::string demangle(const std::string& name)
    {
@@ -1224,45 +1220,17 @@ namespace dwarf
       }
    };  // common_attrs
 
-   void skip_die_children(info&                     result,
-                          int                       indent,
-                          uint32_t                  debug_abbrev_offset,
-                          const abbrev_decl&        abbrev,
-                          const psio::input_stream& whole_s,
-                          const psio::input_stream& unit_s,
-                          psio::input_stream&       s)
+   void parse_subprograms(info&               result,
+                          unit_parser&        parser,
+                          const abbrev_decl&  abbrev,
+                          psio::input_stream& s)
    {
       if (!abbrev.has_children)
          return;
-      while (true)
+      while (auto child = parser.get_die_abbrev(s))
       {
-         auto* child = get_die_abbrev(result, indent, debug_abbrev_offset, whole_s, s);
-         if (!child)
-            break;
-         parse_die_attrs(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s, s,
-                         [&](auto&&...) {});
-         skip_die_children(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s, s);
-      }
-   }
-
-   void parse_die_children(info&                     result,
-                           uint32_t                  indent,
-                           uint32_t                  debug_abbrev_offset,
-                           const abbrev_decl&        abbrev,
-                           const psio::input_stream& whole_s,
-                           const psio::input_stream& unit_s,
-                           psio::input_stream&       s)
-   {
-      if (!abbrev.has_children)
-         return;
-      while (true)
-      {
-         auto* child = get_die_abbrev(result, indent, debug_abbrev_offset, whole_s, s);
-         if (!child)
-            break;
          common_attrs common;
-         parse_die_attrs(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s, s,
-                         common);
+         parser.parse_die_attrs(*child, s, common);
          if (child->tag == dw_tag_subprogram)
          {
             auto demangled_name = common.get_demangled_name();
@@ -1276,23 +1244,14 @@ namespace dwarf
                    .name           = common.name,
                    .demangled_name = demangled_name,
                };
-               if (show_parsed_dies)
-               {
-                  fprintf(stderr, "%*sbegin_address  = %08x\n", indent + 6, "", p.begin_address);
-                  fprintf(stderr, "%*send_address    = %08x\n", indent + 6, "", p.end_address);
-                  fprintf(stderr, "%*sdemangled_name = %s\n", indent + 6, "",
-                          p.demangled_name.c_str());
-               }
                result.subprograms.push_back(std::move(p));
-               parse_die_children(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s,
-                                  s);
+               parse_subprograms(result, parser, *child, s);
             }
             else
-               skip_die_children(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s,
-                                 s);
+               parser.skip_die_children(*child, s);
          }
          else
-            parse_die_children(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s, s);
+            parse_subprograms(result, parser, *child, s);
       }
    }  // parse_die_children
 
@@ -1308,12 +1267,12 @@ namespace dwarf
       auto address_size        = psio::from_bin<uint8_t>(s);
       psio::check(address_size == 4, "mismatched address_size in .debug_info");
 
-      auto* root = get_die_abbrev(result, indent, debug_abbrev_offset, whole_s, s);
+      unit_parser parser{result.abbrev_decls, result.strings, debug_abbrev_offset, whole_s, unit_s};
+      auto        root = parser.get_die_abbrev(s);
       psio::check(root && root->tag == dw_tag_compile_unit,
                   "missing DW_TAG_compile_unit in .debug_info");
-      parse_die_attrs(result, indent + 4, debug_abbrev_offset, *root, whole_s, unit_s, s,
-                      [&](auto&&...) {});
-      parse_die_children(result, indent + 4, debug_abbrev_offset, *root, whole_s, unit_s, s);
+      parser.parse_die_attrs(*root, s, [&](auto&&...) {});
+      parse_subprograms(result, parser, *root, s);
    }  // parse_debug_info_unit
 
    size_t fill_parents(info& result, size_t parent, size_t pos)
@@ -1811,8 +1770,8 @@ namespace dwarf
                      }
                      else if (name == ".debug_str")
                      {
-                        result.strings = std::vector<char>{section.data.pos, section.data.end};
-                        psio::check(result.strings.empty() || result.strings.back() == 0,
+                        result.strings.data = std::vector<char>{section.data.pos, section.data.end};
+                        psio::check(result.strings.data.empty() || result.strings.data.back() == 0,
                                     ".debug_str is malformed");
                      }
                   });
@@ -1838,10 +1797,15 @@ namespace dwarf
       return result;
    }  // get_info_from_wasm
 
+   const char* debug_str::get(uint32_t offset) const
+   {
+      psio::check(offset < data.size(), "string out of range in .debug_str");
+      return &data[offset];
+   }
+
    const char* info::get_str(uint32_t offset) const
    {
-      psio::check(offset < strings.size(), "string out of range in .debug_str");
-      return &strings[offset];
+      return strings.get(offset);
    }
 
    const location* info::get_location(uint32_t address) const

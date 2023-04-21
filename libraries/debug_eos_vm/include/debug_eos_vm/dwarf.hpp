@@ -89,6 +89,12 @@ namespace dwarf
       const abbrev_decl*       find(uint32_t table_offset, uint32_t code) const;
    };
 
+   struct debug_str
+   {
+      std::vector<char> data;
+      const char*       get(uint32_t offset) const;
+   };
+
    // Position of function within wasm file
    struct wasm_fn
    {
@@ -103,7 +109,7 @@ namespace dwarf
       // Offset of code section content (after id and section length) within wasm file
       uint32_t wasm_code_offset = 0;
 
-      std::vector<char>        strings;
+      debug_str                strings;
       std::vector<std::string> files;
       std::vector<location>    locations;  // sorted
       debug_abbrev             abbrev_decls;
