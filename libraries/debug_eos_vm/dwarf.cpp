@@ -1505,9 +1505,6 @@ namespace dwarf
       memset(&null_sym, 0, sizeof(null_sym));
       symbol_data.insert(symbol_data.end(), (char*)(&null_sym), (char*)(&null_sym + 1));
 
-      std::vector<size_t>  sub_positions(info.subprograms.size());
-      std::vector<sub_ref> sub_refs;
-
       // Write a subprogram and symbol for the extra generated functions
       // TODO: split out individual functions
       uint32_t prologue_end = fn_locs.empty() ? code_size : fn_locs.front().code_prologue;
@@ -1530,9 +1527,8 @@ namespace dwarf
 
       for (size_t i = 0; i < info.subprograms.size(); ++i)
       {
-         auto& sub        = info.subprograms[i];
-         sub_positions[i] = info_data.size();
-         auto fn          = get_wasm_fn(info, info.wasm_code_offset + sub.begin_address);
+         auto& sub = info.subprograms[i];
+         auto  fn  = get_wasm_fn(info, info.wasm_code_offset + sub.begin_address);
          if (!fn || info.wasm_code_offset + sub.end_address > info.wasm_fns[*fn].end_pos)
          {
             if (show_generated_dies)
@@ -1583,12 +1579,6 @@ namespace dwarf
                 add_str(strings, ("<" + std::to_string(num_imported + *fn) + ">").c_str());
          symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
       }  // for(sub)
-
-      for (auto& r : sub_refs)
-      {
-         uint64_t subprogram_offset = sub_positions[r.subprogram] - begin_pos;
-         memcpy(info_data.data() + r.stream_pos, &subprogram_offset, sizeof(subprogram_offset));
-      }
 
       psio::varuint32_to_bin(0, info_s);  // end children
       psio::varuint32_to_bin(0, info_s);  // end module
