@@ -486,6 +486,13 @@ namespace dwarf
       stream.write(s.c_str(), s.size() + 1);
    }
 
+   template <typename Stream>
+   void write_string(std::string_view s, Stream& stream)
+   {
+      stream.write(s.data(), s.size());
+      stream.write('\0');
+   }
+
    struct line_header
    {
       uint8_t                  minimum_instruction_length         = 1;
@@ -939,6 +946,11 @@ namespace dwarf
       std::ranges::sort(result.contents, std::less<>());
    }
 
+   struct native_attr_address
+   {
+      uint64_t value = 0;
+   };
+
    struct attr_address
    {
       uint32_t value = 0;
@@ -969,6 +981,11 @@ namespace dwarf
       uint32_t value = 0;
    };
 
+   struct native_attr_sec_offset
+   {
+      uint64_t value = 0;
+   };
+
    struct attr_ref
    {
       uint64_t value = 0;
@@ -995,6 +1012,45 @@ namespace dwarf
        attr_ref_addr,
        attr_ref_sig8,
        std::string_view>;
+
+   struct wasm_attr
+   {
+      uint32_t   attr = 0;
+      attr_value value;
+
+      std::uint8_t form() const;
+
+      auto key() const { return std::pair{attr, value.index()}; }
+
+      friend bool operator<(const wasm_attr& a, const wasm_attr& b) { return a.key() < b.key(); }
+   };
+
+   using native_attr_value = std::variant<  //
+       native_attr_address,
+       attr_block,
+       attr_data,
+       attr_exprloc,
+       attr_flag,
+       native_attr_sec_offset,
+       attr_ref,
+       attr_ref_addr,
+       attr_ref_sig8,
+       std::string_view>;
+
+   struct native_attr
+   {
+      uint32_t          attr = 0;
+      native_attr_value value;
+
+      std::uint8_t form() const;
+
+      auto key() const { return std::pair{attr, value.index()}; }
+
+      friend bool operator<(const native_attr& a, const native_attr& b)
+      {
+         return a.key() < b.key();
+      }
+   };
 
    std::string hex(uint32_t v)
    {
@@ -1319,22 +1375,6 @@ namespace dwarf
       return result;
    }
 
-   struct attr_form_value
-   {
-      using value_type = std::variant<uint8_t, uint64_t, std::string, std::vector<char>>;
-
-      uint32_t   attr = 0;
-      uint32_t   form = 0;
-      value_type value;
-
-      auto key() const { return std::pair{attr, form}; }
-
-      friend bool operator<(const attr_form_value& a, const attr_form_value& b)
-      {
-         return a.key() < b.key();
-      }
-   };
-
    std::vector<char> make_rbp_loc()
    {
       std::vector<char> result;
@@ -1342,11 +1382,42 @@ namespace dwarf
       return result;
    }
 
+   std::uint8_t native_attr::form() const
+   {
+      overloaded o{[](const native_attr_address&) { return dw_form_addr; },
+                   [](const attr_block&) { return dw_form_block; },
+                   // TODO: preserve form for data
+                   [](const attr_data&) { return dw_form_data8; },
+                   [](const attr_exprloc&) { return dw_form_exprloc; },
+                   [](const attr_flag&) { return dw_form_flag; },
+                   [](const native_attr_sec_offset&) { return dw_form_sec_offset; },
+                   [](const attr_ref&) { return dw_form_ref4; },
+                   [](const attr_ref_addr&) { return dw_form_ref_addr; },
+                   [](const attr_ref_sig8&) { return dw_form_ref_sig8; },
+                   [](const std::string_view&) { return dw_form_string; }};
+      return std::visit(o, value);
+   }
+
+   void write_attr_value(const native_attr_value& value, auto& stream)
+   {
+      overloaded o{[&](const native_attr_address& a) { psio::to_bin(a.value, stream); },
+                   [&](const attr_block& a) { psio::to_bin(a.data, stream); },
+                   [&](const attr_data& a) { psio::to_bin(a.value, stream); },
+                   [&](const attr_exprloc& a) { psio::to_bin(a.data, stream); },
+                   [&](const attr_flag& a) { psio::to_bin(a.value, stream); },
+                   [&](const native_attr_sec_offset& a) { psio::to_bin(a.value, stream); },
+                   [&](const attr_ref&) { psio::check(false, "not implemented"); },
+                   [&](const attr_ref_addr&) { psio::check(false, "not implemented"); },
+                   [&](const attr_ref_sig8&) { psio::check(false, "not implemented"); },
+                   [&](const std::string_view& str) { return write_string(str, stream); }};
+      std::visit(o, value);
+   }
+
    struct die_pattern
    {
-      uint32_t                     tag          = 0;
-      bool                         has_children = false;
-      std::vector<attr_form_value> attrs;
+      uint32_t                 tag          = 0;
+      bool                     has_children = false;
+      std::vector<native_attr> attrs;
 
       auto key() const { return std::tie(tag, has_children, attrs); }
 
@@ -1373,7 +1444,7 @@ namespace dwarf
          for (const auto& attr : die.attrs)
          {
             psio::varuint32_to_bin(attr.attr, s);
-            psio::varuint32_to_bin(attr.form, s);
+            psio::varuint32_to_bin(attr.form(), s);
          }
          psio::varuint32_to_bin(0, s);
          psio::varuint32_to_bin(0, s);
@@ -1386,14 +1457,7 @@ namespace dwarf
 
       for (const auto& attr : die.attrs)
       {
-         if (show_generated_dies)
-            fprintf(stderr, "%*s%s %s\n", indent + 2, "", dw_at_to_str(attr.attr).c_str(),
-                    dw_form_to_str(attr.form).c_str());
-         std::visit(overloaded{[&](uint8_t v) { psio::to_bin(v, s); },
-                               [&](uint64_t v) { psio::to_bin(v, s); },
-                               [&](const std::string& str) { write_string(str, s); },
-                               [&](const std::vector<char>& v) { psio::to_bin(v, s); }},
-                    attr.value);
+         write_attr_value(attr.value, s);
       }
    }  // write_die
 
@@ -1431,12 +1495,10 @@ namespace dwarf
 
       die.tag          = dw_tag_compile_unit;
       die.has_children = true;
-      die.attrs        = {
-          {dw_at_language, dw_form_data8, uint64_t(dw_lang_c_plus_plus)},
-          {dw_at_low_pc, dw_form_addr, uint64_t(code_start)},
-          {dw_at_high_pc, dw_form_addr, uint64_t((char*)code_start + code_size)},
-          {dw_at_stmt_list, dw_form_sec_offset, uint64_t(0)},
-      };
+      die.attrs        = {{dw_at_language, attr_data{uint64_t(dw_lang_c_plus_plus)}},
+                          {dw_at_low_pc, native_attr_address{uint64_t(code_start)}},
+                          {dw_at_high_pc, native_attr_address{uint64_t((char*)code_start + code_size)}},
+                          {dw_at_stmt_list, native_attr_sec_offset{uint64_t(0)}}};
       write_die(0, abbrev_data, info_data, codes, die);
 
       Elf64_Sym null_sym;
@@ -1451,9 +1513,9 @@ namespace dwarf
       uint32_t prologue_end = fn_locs.empty() ? code_size : fn_locs.front().code_prologue;
       die.tag               = dw_tag_subprogram;
       die.has_children      = false;
-      die.attrs             = {{dw_at_low_pc, dw_form_addr, uint64_t(code_start)},
-                               {dw_at_high_pc, dw_form_addr, uint64_t((char*)code_start + prologue_end)},
-                               {dw_at_frame_base, dw_form_exprloc, make_rbp_loc()}};
+      die.attrs             = {
+          {dw_at_low_pc, native_attr_address{uint64_t(code_start)}},
+          {dw_at_high_pc, native_attr_address{uint64_t((char*)code_start + prologue_end)}}};
       write_die(4, abbrev_data, info_data, codes, die);
       Elf64_Sym sym = {
           .st_name  = 0,
@@ -1493,15 +1555,15 @@ namespace dwarf
          die.tag          = dw_tag_subprogram;
          die.has_children = false;
          die.attrs        = {
-             {dw_at_low_pc, dw_form_addr, fn_begin},
-             {dw_at_high_pc, dw_form_addr, fn_end},
+             {dw_at_low_pc, native_attr_address{fn_begin}},
+             {dw_at_high_pc, native_attr_address{fn_end}},
          };
          if (sub.linkage_name)
-            die.attrs.push_back({dw_at_linkage_name, dw_form_string, *sub.linkage_name});
+            die.attrs.push_back({dw_at_linkage_name, *sub.linkage_name});
          if (sub.name)
-            die.attrs.push_back({dw_at_name, dw_form_string, *sub.name});
+            die.attrs.push_back({dw_at_name, *sub.name});
          else if (sub.linkage_name)
-            die.attrs.push_back({dw_at_name, dw_form_string, sub.demangled_name});
+            die.attrs.push_back({dw_at_name, sub.demangled_name});
          write_die(4, abbrev_data, info_data, codes, die);
 
          Elf64_Sym sym = {
