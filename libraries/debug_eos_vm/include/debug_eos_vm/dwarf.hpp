@@ -136,5 +136,6 @@ namespace dwarf
        const void*                       code_start,
        size_t                            code_size,
        const void*                       entry,
-       std::uint32_t                     num_imported);
+       std::uint32_t                     num_imported,
+       psio::input_stream                wasm_source);
 }  // namespace dwarf

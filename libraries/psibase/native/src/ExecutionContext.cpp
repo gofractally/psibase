@@ -202,10 +202,11 @@ namespace psibase
                    backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
                 if (!backend.debug)
                 {
-                   auto info = dwarf::get_info_from_wasm(
-                       {reinterpret_cast<const char*>(c->code.data()), c->code.size()});
+                   psio::input_stream s{reinterpret_cast<const char*>(c->code.data()),
+                                        c->code.size()};
+                   auto               info = dwarf::get_info_from_wasm(s);
                    backend.debug =
-                       debug_eos_vm::enable_debug(c->code, *backend.backend, info, "called");
+                       debug_eos_vm::enable_debug(c->code, *backend.backend, info, "called", s);
                 }
              });
       }

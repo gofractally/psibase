@@ -1427,44 +1427,209 @@ namespace dwarf
       }
    };
 
-   void write_die(int                              indent,
-                  std::vector<char>&               abbrev_data,
-                  std::vector<char>&               info_data,
-                  std::map<die_pattern, uint32_t>& codes,
-                  const die_pattern&               die)
+   struct debug_info_visitor
    {
-      auto it = codes.find(die);
-      if (it == codes.end())
+      std::vector<char>& abbrev_data;
+      std::vector<char>& info_data;
+
+      const debug_str&    strings;
+      const debug_abbrev& abbrev_decls;
+
+      const std::vector<jit_instr_loc>& instr_locs;
+      std::uint32_t                     wasm_code_offset;
+      const void*                       code_start;
+
+      std::map<die_pattern, uint32_t> codes;
+
+      void write_die(const die_pattern& die)
       {
-         it = codes.insert(std::pair{die, codes.size() + 1}).first;
-         psio::vector_stream s{abbrev_data};
-         psio::varuint32_to_bin(it->second, s);
-         psio::varuint32_to_bin(die.tag, s);
-         psio::to_bin(die.has_children, s);
+         auto it = codes.find(die);
+         if (it == codes.end())
+         {
+            it = codes.insert(std::pair{die, codes.size() + 1}).first;
+            psio::vector_stream s{abbrev_data};
+            psio::varuint32_to_bin(it->second, s);
+            psio::varuint32_to_bin(die.tag, s);
+            psio::to_bin(die.has_children, s);
+            for (const auto& attr : die.attrs)
+            {
+               psio::varuint32_to_bin(attr.attr, s);
+               psio::varuint32_to_bin(attr.form(), s);
+            }
+            psio::varuint32_to_bin(0, s);
+            psio::varuint32_to_bin(0, s);
+         }
+
+         psio::vector_stream s{info_data};
+         psio::varuint32_to_bin(it->second, s);  // code
+
          for (const auto& attr : die.attrs)
          {
-            psio::varuint32_to_bin(attr.attr, s);
-            psio::varuint32_to_bin(attr.form(), s);
+            write_attr_value(attr.value, s);
          }
-         psio::varuint32_to_bin(0, s);
-         psio::varuint32_to_bin(0, s);
-      }
-
-      psio::vector_stream s{info_data};
-      psio::varuint32_to_bin(it->second, s);  // code
-      if (show_generated_dies)
-         fprintf(stderr, "%*s%s\n", indent, "", dw_tag_to_str(die.tag).c_str());
-
-      for (const auto& attr : die.attrs)
+      }  // write_die
+      native_attr_address translate_address(std::uint32_t wasm_addr)
       {
-         write_attr_value(attr.value, s);
+         if (wasm_addr == 0xffffffff)
+            return {0xffffffffffffffff};
+         auto pos =
+             std::lower_bound(instr_locs.begin(), instr_locs.end(), wasm_code_offset + wasm_addr,
+                              [](const auto& a, auto b) { return a.wasm_addr < b; });
+         if (pos != instr_locs.end())
+         {
+            return {reinterpret_cast<uint64_t>(code_start) + pos->code_offset};
+         }
+         return {~0ull};
       }
-   }  // write_die
+      struct subprogram_info
+      {
+         std::optional<uint32_t> low_pc;
+      };
+      void translate_attr(const abbrev_attr& attr,
+                          attr_value&        value,
+                          subprogram_info&   info,
+                          die_pattern&       out)
+      {
+         overloaded o{[&](const attr_address& a) {
+                         out.attrs.push_back({attr.name, translate_address(a.value)});
+                      },
+                      [&](const attr_block& a) {
+                         out.attrs.push_back({attr.name, a});
+                      },
+                      [&](const attr_data& a) {
+                         out.attrs.push_back({attr.name, a});
+                      },
+                      [&](const attr_exprloc& a) {},
+                      [&](const attr_flag& a) {
+                         out.attrs.push_back({attr.name, a});
+                      },
+                      [&](const attr_sec_offset& a) {},
+                      [&](const attr_ref&) {},
+                      [&](const attr_ref_addr&) {},
+                      [&](const attr_ref_sig8&) {},
+                      [&](const std::string_view& str) {
+                         out.attrs.push_back({attr.name, str});
+                      }};
+         switch (attr.name)
+         {
+            case dw_at_low_pc:
+               info.low_pc = get_address(value);
+               std::visit(o, value);
+               break;
+            case dw_at_high_pc:
+            {
+               auto high_pc = get_address(value);
+               if (info.low_pc && !high_pc)
+               {
+                  auto size = get_data(value);
+                  if (size)
+                     high_pc = *info.low_pc + *size;
+               }
+               if (high_pc)
+                  out.attrs.push_back({attr.name, translate_address(*high_pc)});
+               break;
+            }
+            case dw_at_linkage_name:
+            case dw_at_name:
+            case dw_at_language:
+               std::visit(o, value);
+               break;
+            case dw_at_stmt_list:
+               // TODO: relocate this after making the debug_line translation more precise.
+               out.attrs.push_back({attr.name, native_attr_sec_offset{0}});
+               break;
+            default:
+               break;
+         }
+      }
+      void write_die_children(unit_parser&        parser,
+                              const abbrev_decl&  abbrev,
+                              psio::input_stream& s,
+                              bool                inline_ = false)
+      {
+         if (!abbrev.has_children)
+            return;
+         while (auto child = parser.get_die_abbrev(s))
+         {
+            write_die(parser, *child, s);
+         }
+         if (!inline_)
+         {
+            psio::vector_stream info_s{info_data};
+            psio::varuint32_to_bin(0, info_s);  // end children
+         }
+      }
+      void write_die(unit_parser& parser, const abbrev_decl& abbrev, psio::input_stream& s)
+      {
+         die_pattern die;
+         die.tag          = abbrev.tag;
+         die.has_children = abbrev.has_children;
+         subprogram_info info;
+         parser.parse_die_attrs(abbrev, s,
+                                [&](const abbrev_attr& attr, attr_value& value)
+                                { translate_attr(attr, value, info, die); });
+         if (abbrev.tag == dw_tag_subprogram)
+         {
+            if (info.low_pc && *info.low_pc != 0xffff'ffff)
+            {
+               write_die(die);
+               write_die_children(parser, abbrev, s);
+            }
+            else
+               parser.skip_die_children(abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_compile_unit)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else
+         {
+            write_die_children(parser, abbrev, s, true);
+         }
+      }
+      void write_debug_info_unit(psio::input_stream whole_s,
+                                 psio::input_stream unit_s,
+                                 psio::input_stream s)
+      {
+         auto version = psio::from_bin<uint16_t>(s);
+         psio::check(version == compile_unit_version, ".debug_info isn't from DWARF version 4");
+         auto debug_abbrev_offset = psio::from_bin<uint32_t>(s);
+         auto address_size        = psio::from_bin<uint8_t>(s);
+         psio::check(address_size == 4, "mismatched address_size in .debug_info");
 
-   struct sub_ref
-   {
-      uint64_t stream_pos;
-      uint64_t subprogram;
+         unit_parser parser{abbrev_decls, strings, debug_abbrev_offset, whole_s, unit_s};
+         auto        root = parser.get_die_abbrev(s);
+         psio::check(root && root->tag == dw_tag_compile_unit,
+                     "missing DW_TAG_compile_unit in .debug_info");
+         psio::vector_stream info_s{info_data};
+         psio::to_bin(version, info_s);
+         psio::to_bin(std::uint64_t{0}, info_s);
+         psio::to_bin(std::uint8_t{8}, info_s);
+         write_die(parser, *root, s);
+      }
+      void write_debug_info(psio::input_stream& s)
+      {
+         auto whole_s = s;
+         while (s.remaining())
+         {
+            auto     unit_s      = s;
+            uint32_t unit_length = psio::from_bin<uint32_t>(s);
+            psio::check(unit_length < 0xffff'fff0,
+                        "unit_length values in reserved range in .debug_info not supported");
+            psio::check(unit_length <= s.remaining(), "bad unit_length in .debug_info");
+            psio::vector_stream info_s{info_data};
+            psio::to_bin(uint32_t(0xffff'ffff), info_s);
+            auto     length_pos = info_s.written();
+            uint64_t out_length = 0;
+            psio::to_bin(out_length, info_s);
+            auto inner_pos = info_s.written();
+            write_debug_info_unit(whole_s, unit_s, {s.pos, s.pos + unit_length});
+            s.skip(unit_length);
+            out_length = info_s.written() - inner_pos;
+            info_s.rewrite_raw(length_pos, out_length);
+         }
+      }
    };
 
    void write_subprograms(std::vector<char>&                abbrev_data,
@@ -1474,82 +1639,13 @@ namespace dwarf
                           const std::vector<jit_instr_loc>& instr_locs,
                           const void*                       code_start,
                           size_t                            code_size,
-                          uint32_t                          num_imported)
+                          uint32_t                          num_imported,
+                          psio::input_stream                info_section)
    {
-      std::map<die_pattern, uint32_t> codes;
-      die_pattern                     die;
-
-      psio::vector_stream info_s{info_data};
-      auto                begin_pos = info_data.size();
-      psio::to_bin(uint32_t(0xffff'ffff), info_s);
-      auto length_pos = info_data.size();
-      psio::to_bin(uint64_t(0), info_s);
-      auto inner_pos = info_data.size();
-
-      psio::to_bin(uint16_t(compile_unit_version), info_s);
-      psio::to_bin(uint64_t(0), info_s);  // debug_abbrev_offset
-      psio::to_bin(uint8_t(8), info_s);   // address_size
-
-      die.tag          = dw_tag_compile_unit;
-      die.has_children = true;
-      die.attrs        = {{dw_at_language, attr_data{uint64_t(dw_lang_c_plus_plus)}},
-                          {dw_at_low_pc, native_attr_address{uint64_t(code_start)}},
-                          {dw_at_high_pc, native_attr_address{uint64_t((char*)code_start + code_size)}},
-                          {dw_at_stmt_list, native_attr_sec_offset{uint64_t(0)}}};
-      write_die(0, abbrev_data, info_data, codes, die);
-
-      // Write a subprogram and symbol for the extra generated functions
-      // TODO: split out individual functions
-      uint32_t prologue_end = fn_locs.empty() ? code_size : fn_locs.front().code_prologue;
-      die.tag               = dw_tag_subprogram;
-      die.has_children      = false;
-      die.attrs             = {
-          {dw_at_low_pc, native_attr_address{uint64_t(code_start)}},
-          {dw_at_high_pc, native_attr_address{uint64_t((char*)code_start + prologue_end)}}};
-      write_die(4, abbrev_data, info_data, codes, die);
-
-      for (size_t i = 0; i < info.subprograms.size(); ++i)
-      {
-         auto& sub = info.subprograms[i];
-         auto  fn  = get_wasm_fn(info, info.wasm_code_offset + sub.begin_address);
-         if (!fn || info.wasm_code_offset + sub.end_address > info.wasm_fns[*fn].end_pos)
-         {
-            if (show_generated_dies)
-               fprintf(stderr, "address lookup fail: %s %08x-%08x\n", sub.demangled_name.c_str(),
-                       info.wasm_code_offset + sub.begin_address,
-                       info.wasm_code_offset + sub.end_address);
-            continue;
-         }
-         if (sub.parent)
-            continue;
-         auto fn_begin = uint64_t((const char*)code_start + fn_locs[*fn].code_prologue);
-         auto fn_end   = uint64_t((const char*)code_start + fn_locs[*fn].code_end);
-         if (show_generated_dies)
-            fprintf(stderr, "    DIE 0x%lx (%ld) subprogram %08x-%08x %016lx-%016lx %s\n",
-                    uint64_t(info_data.size()), uint64_t(i),
-                    info.wasm_code_offset + sub.begin_address,
-                    info.wasm_code_offset + sub.end_address, fn_begin + print_addr_adj,
-                    fn_end + print_addr_adj, sub.demangled_name.c_str());
-
-         die.tag          = dw_tag_subprogram;
-         die.has_children = false;
-         die.attrs        = {
-             {dw_at_low_pc, native_attr_address{fn_begin}},
-             {dw_at_high_pc, native_attr_address{fn_end}},
-         };
-         if (sub.linkage_name)
-            die.attrs.push_back({dw_at_linkage_name, *sub.linkage_name});
-         if (sub.name)
-            die.attrs.push_back({dw_at_name, *sub.name});
-         else if (sub.linkage_name)
-            die.attrs.push_back({dw_at_name, sub.demangled_name});
-         write_die(4, abbrev_data, info_data, codes, die);
-      }  // for(sub)
-
-      psio::varuint32_to_bin(0, info_s);  // end children
-      psio::varuint32_to_bin(0, info_s);  // end module
-      uint64_t inner_size = info_data.size() - inner_pos;
-      memcpy(info_data.data() + length_pos, &inner_size, sizeof(inner_size));
+      debug_info_visitor gen{abbrev_data,       info_data,  info.strings,
+                             info.abbrev_decls, instr_locs, info.wasm_code_offset,
+                             code_start};
+      gen.write_debug_info(info_section);
    }  // write_subprograms
 
    struct cie
@@ -1731,12 +1827,21 @@ namespace dwarf
       return {begin, stream.pos};
    }
 
-   info get_info_from_wasm(psio::input_stream stream)
+   struct wasm_section_info
    {
-      info                            result;
-      auto                            file_begin = stream.pos;
-      std::map<std::string, uint32_t> files;
+      std::uint32_t      wasm_code_offset;
+      psio::input_stream code;
+      psio::input_stream debug_line;
+      psio::input_stream debug_abbrev;
+      psio::input_stream debug_str;
+      psio::input_stream debug_info;
+   };
 
+   wasm_section_info get_dwarf_sections(psio::input_stream stream)
+   {
+      wasm_section_info result = {};
+
+      auto        file_begin = stream.pos;
       wasm_header header;
       psio::from_bin(header, stream);
       psio::check(header.magic == eosio::vm::constants::magic,
@@ -1744,113 +1849,81 @@ namespace dwarf
       psio::check(header.version == eosio::vm::constants::version,
                   "wasm file version does not match");
 
-      auto scan = [&](auto stream, auto f)
+      while (stream.remaining())
       {
-         while (stream.remaining())
+         auto section_begin = stream.pos;
+         auto section       = psio::from_bin<wasm_section>(stream);
+         if (section.id == eosio::vm::section_id::code_section)
          {
-            auto section_begin = stream.pos;
-            auto section       = psio::from_bin<wasm_section>(stream);
-            f(section_begin, section);
+            result.code             = section.data;
+            result.wasm_code_offset = section.data.pos - file_begin;
          }
-      };
-
-      auto scan_custom = [&](auto stream, auto f)
-      {
-         scan(stream,
-              [&](auto section_begin, auto& section)
-              {
-                 if (section.id == eosio::vm::section_id::custom_section)
-                    f(section, psio::from_bin<std::string>(section.data));
-              });
-      };
-
-      scan(stream,
-           [&](auto section_begin, auto& section)
-           {
-              if (section.id == eosio::vm::section_id::code_section)
-              {
-                 result.wasm_code_offset = section.data.pos - file_begin;
-                 auto s                  = section.data;
-                 auto count              = psio::varuint32_from_bin(s);
-                 result.wasm_fns.resize(count);
-                 for (uint32_t i = 0; i < count; ++i)
-                 {
-                    auto& fn      = result.wasm_fns[i];
-                    fn.size_pos   = s.pos - file_begin;
-                    auto size     = psio::varuint32_from_bin(s);
-                    fn.locals_pos = s.pos - file_begin;
-                    s.skip(size);
-                    fn.end_pos = s.pos - file_begin;
-                 }
-              }
-           });
-
-      if (show_wasm_fn_info)
-      {
-         scan(stream,
-              [&](auto section_begin, auto& section)
-              {
-                 if (section.id != eosio::vm::section_id::code_section)
-                    return;
-                 psio::input_stream s{section_begin, stream.end};
-                 fprintf(stderr, "%08x %08x: code section id\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 auto id = psio::from_bin<uint8_t>(s);
-                 fprintf(stderr, "         =%d\n", id);
-                 fprintf(stderr, "%08x %08x: section size\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 auto size = psio::varuint32_from_bin(s);
-                 fprintf(stderr, "         =%08x\n", size);
-                 s.end = s.pos + size;
-                 fprintf(stderr, "%08x %08x: count\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 fprintf(stderr, "**** reset section_begin to here\n");
-                 section_begin = s.pos;
-                 fprintf(stderr, "%08x %08x: count\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 auto count = psio::varuint32_from_bin(s);
-                 fprintf(stderr, "         count=%08x\n\n", count);
-                 fprintf(stderr, "%08x %08x\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 for (uint32_t i = 0; i < count; ++i)
-                 {
-                    fprintf(stderr, "[%04d] %08x %08x: function size\n", i,
-                            uint32_t(s.pos - file_begin), uint32_t(s.pos - section_begin));
-                    auto size = psio::varuint32_from_bin(s);
-                    fprintf(stderr, "[%04d] %08x %08x: function body\n", i,
-                            uint32_t(s.pos - file_begin), uint32_t(s.pos - section_begin));
-                    s.skip(size);
-                    fprintf(stderr, "[%04d] %08x %08x: function end\n\n", i,
-                            uint32_t(s.pos - file_begin), uint32_t(s.pos - section_begin));
-                 }
-              });
+         else if (section.id == eosio::vm::section_id::custom_section)
+         {
+            auto name = psio::from_bin<std::string>(section.data);
+            if (name == ".debug_line")
+            {
+               result.debug_line = section.data;
+            }
+            else if (name == ".debug_abbrev")
+            {
+               result.debug_abbrev = section.data;
+            }
+            else if (name == ".debug_str")
+            {
+               result.debug_str = section.data;
+            }
+            else if (name == ".debug_info")
+            {
+               result.debug_info = section.data;
+            }
+         }
       }
 
-      scan_custom(stream,
-                  [&](auto& section, const auto& name)
-                  {
-                     if (name == ".debug_line")
-                     {
-                        dwarf::parse_debug_line(result, files, section.data);
-                     }
-                     else if (name == ".debug_abbrev")
-                     {
-                        dwarf::parse_debug_abbrev(result.abbrev_decls, section.data);
-                     }
-                     else if (name == ".debug_str")
-                     {
-                        result.strings.data = std::vector<char>{section.data.pos, section.data.end};
-                        psio::check(result.strings.data.empty() || result.strings.data.back() == 0,
-                                    ".debug_str is malformed");
-                     }
-                  });
+      return result;
+   }
 
-      scan_custom(stream,
-                  [&](auto& section, const auto& name)
-                  {
-                     if (name == ".debug_info")
-                        dwarf::parse_debug_info(result, section.data);
-                  });
+   info get_info_from_wasm(psio::input_stream stream)
+   {
+      info                            result;
+      auto                            file_begin = stream.pos;
+      std::map<std::string, uint32_t> files;
+      auto                            sections = get_dwarf_sections(stream);
+
+      if (sections.code.remaining())
+      {
+         result.wasm_code_offset = sections.code.pos - file_begin;
+         auto s                  = sections.code;
+         auto count              = psio::varuint32_from_bin(s);
+         result.wasm_fns.resize(count);
+         for (uint32_t i = 0; i < count; ++i)
+         {
+            auto& fn      = result.wasm_fns[i];
+            fn.size_pos   = s.pos - file_begin;
+            auto size     = psio::varuint32_from_bin(s);
+            fn.locals_pos = s.pos - file_begin;
+            s.skip(size);
+            fn.end_pos = s.pos - file_begin;
+         }
+      }
+
+      if (sections.debug_line.remaining())
+      {
+         dwarf::parse_debug_line(result, files, sections.debug_line);
+      }
+      if (sections.debug_abbrev.remaining())
+      {
+         dwarf::parse_debug_abbrev(result.abbrev_decls, sections.debug_abbrev);
+      }
+      if (sections.debug_str.remaining())
+      {
+         result.strings.data = std::vector<char>{sections.debug_str.pos, sections.debug_str.end};
+         psio::check(result.strings.data.empty() || result.strings.data.back() == 0,
+                     ".debug_str is malformed");
+      }
+
+      if (sections.debug_info.remaining())
+         dwarf::parse_debug_info(result, sections.debug_info);
 
       std::sort(result.locations.begin(), result.locations.end());
       if (show_wasm_loc_summary)
@@ -2008,7 +2081,8 @@ namespace dwarf
        const void*                       code_start,
        size_t                            code_size,
        const void*                       entry,
-       std::uint32_t                     num_imported)
+       std::uint32_t                     num_imported,
+       psio::input_stream                wasm_source)
    {
       psio::check(fn_locs.size() == info.wasm_fns.size(), "number of functions doesn't match");
 
@@ -2047,6 +2121,8 @@ namespace dwarf
          while (fn < fn_locs.size())
             show_fn(++fn);
       }
+
+      auto input_sections = get_dwarf_sections(wasm_source);
 
       auto              result = std::make_shared<debugger_registration>();
       std::vector<char> strings;
@@ -2134,7 +2210,7 @@ namespace dwarf
       symbol_sec_header.sh_link    = strtab_section;
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
       write_subprograms(abbrev_data, info_data, info, fn_locs, instr_locs, code_start, code_size,
-                        num_imported);
+                        num_imported, input_sections.debug_info);
       write_symtab(code_section, strings, symbol_data, fn_locs, mod, code_start, code_size,
                    num_imported);
       write_cfi(frame_data, code_start, code_size);

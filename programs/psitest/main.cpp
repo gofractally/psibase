@@ -902,8 +902,10 @@ static void run(const char*                               wasm,
    eosio::vm::wasm_allocator wa;
    auto                      code = eosio::vm::read_wasm(wasm);
    backend_t                 backend(code, nullptr);
-   auto dwarf_info = dwarf::get_info_from_wasm({(const char*)code.data(), code.size()});
-   auto reg        = debug_eos_vm::enable_debug(code, backend, dwarf_info, "_start");
+   psio::input_stream        s{(const char*)code.data(), code.size()};
+   //
+   auto dwarf_info = dwarf::get_info_from_wasm(s);
+   auto reg        = debug_eos_vm::enable_debug(code, backend, dwarf_info, "_start", s);
 
    ::state state{wasm, dwarf_info, wa, backend, args, additional_args};
    fill_substitutions(state, substitutions);

@@ -177,7 +177,8 @@ namespace debug_eos_vm
    std::shared_ptr<dwarf::debugger_registration> enable_debug(std::vector<uint8_t>& code,
                                                               Backend&              backend,
                                                               dwarf::info&          dwarf_info,
-                                                              const char*           entry)
+                                                              const char*           entry,
+                                                              psio::input_stream    wasm_source)
    {
       auto& module     = backend.get_module();
       auto  func_index = module.get_exported_function(entry);
@@ -189,6 +190,6 @@ namespace debug_eos_vm
           dwarf_info, dbg.fn_locs, dbg.instr_locs, module, alloc.get_code_start(), alloc._code_size,
           (char*)alloc.get_code_start() +
               module.code[func_index - module.get_imported_functions_size()].jit_code_offset,
-          module.get_imported_functions_size());
+          module.get_imported_functions_size(), wasm_source);
    }
 }  // namespace debug_eos_vm
