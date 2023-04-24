@@ -14,6 +14,8 @@
 #include <elf.h>
 #include <stdio.h>
 
+#include "locals.hpp"
+
 static constexpr bool     show_parsed_lines      = false;
 static constexpr bool     show_parsed_abbrev     = false;
 static constexpr bool     show_parsed_dies       = false;
@@ -320,6 +322,7 @@ namespace dwarf
    x(a, b, bit_piece, 0x9d)                     \
    x(a, b, implicit_value, 0x9e)                \
    x(a, b, stack_value, 0x9f)                   \
+   x(a, b, wasm_location, 0xed)                 \
    x(a, b, lo_user, 0xe0)                       \
    x(a, b, hi_user, 0xff)
    // clang-format on
@@ -971,6 +974,11 @@ namespace dwarf
       psio::input_stream data;
    };
 
+   struct native_attr_exprloc
+   {
+      std::vector<char> data;
+   };
+
    struct attr_flag
    {
       bool value = false;
@@ -1029,7 +1037,7 @@ namespace dwarf
        native_attr_address,
        attr_block,
        attr_data,
-       attr_exprloc,
+       native_attr_exprloc,
        attr_flag,
        native_attr_sec_offset,
        attr_ref,
@@ -1382,31 +1390,76 @@ namespace dwarf
       return result;
    }
 
+   // A relocation is identified by the offset within the source unit
+   //
+   struct relocation_list
+   {
+      using key_type   = std::uint64_t;
+      using value_type = std::uint64_t;
+      using relocation = std::size_t;
+      void append(auto& out, const attr_ref& key)
+      {
+         // first normalize key
+         if (auto pos = known.find(key.value); pos != known.end())
+         {
+            psio::to_bin(pos->second - unit_base, out);
+         }
+         else
+         {
+            unknown[key.value].push_back(out.written());
+            psio::to_bin(std::uint64_t{0}, out);
+         }
+      }
+      void set(auto& out, const key_type& key)
+      {
+         auto location = out.written();
+         if (auto pos = unknown.find(key); pos != unknown.end())
+         {
+            for (const auto& rel : pos->second)
+            {
+               out.rewrite_raw(rel, location - unit_base);
+            }
+            unknown.erase(pos);
+         }
+         known.insert({key, location});
+      }
+      void start_unit(auto& out)
+      {
+         known.clear();
+         // unknown should be empty unless there are unresolved references
+         unknown.clear();
+         unit_base = out.written();
+      }
+      std::map<key_type, std::vector<relocation>> unknown;
+      std::map<key_type, value_type>              known;
+      std::size_t                                 unit_base;
+   };
+
    std::uint8_t native_attr::form() const
    {
       overloaded o{[](const native_attr_address&) { return dw_form_addr; },
                    [](const attr_block&) { return dw_form_block; },
                    // TODO: preserve form for data
                    [](const attr_data&) { return dw_form_data8; },
-                   [](const attr_exprloc&) { return dw_form_exprloc; },
+                   [](const native_attr_exprloc&) { return dw_form_exprloc; },
                    [](const attr_flag&) { return dw_form_flag; },
                    [](const native_attr_sec_offset&) { return dw_form_sec_offset; },
-                   [](const attr_ref&) { return dw_form_ref4; },
+                   [](const attr_ref&) { return dw_form_ref8; },
                    [](const attr_ref_addr&) { return dw_form_ref_addr; },
                    [](const attr_ref_sig8&) { return dw_form_ref_sig8; },
                    [](const std::string_view&) { return dw_form_string; }};
       return std::visit(o, value);
    }
 
-   void write_attr_value(const native_attr_value& value, auto& stream)
+   void write_attr_value(const native_attr_value& value, auto& stream, relocation_list& reloc)
    {
       overloaded o{[&](const native_attr_address& a) { psio::to_bin(a.value, stream); },
                    [&](const attr_block& a) { psio::to_bin(a.data, stream); },
                    [&](const attr_data& a) { psio::to_bin(a.value, stream); },
-                   [&](const attr_exprloc& a) { psio::to_bin(a.data, stream); },
+                   [&](const native_attr_exprloc& a) { psio::to_bin(a.data, stream); },
                    [&](const attr_flag& a) { psio::to_bin(a.value, stream); },
                    [&](const native_attr_sec_offset& a) { psio::to_bin(a.value, stream); },
-                   [&](const attr_ref&) { psio::check(false, "not implemented"); },
+                   [&](const attr_ref& a) { reloc.append(stream, a); },
                    [&](const attr_ref_addr&) { psio::check(false, "not implemented"); },
                    [&](const attr_ref_sig8&) { psio::check(false, "not implemented"); },
                    [&](const std::string_view& str) { return write_string(str, stream); }};
@@ -1427,6 +1480,111 @@ namespace dwarf
       }
    };
 
+   void translate_expr(const debug_eos_vm::wasm_frame* frame, psio::input_stream s, auto& out)
+   {
+      bool is_addr     = true;
+      auto adjust_addr = [](auto& out)
+      {
+         psio::to_bin(std::uint8_t{dw_op_breg4}, out);
+         psio::varuint32_to_bin(0, out);
+         psio::to_bin(std::uint8_t{dw_op_plus}, out);
+      };
+      enum
+      {
+         wasm_address,
+         native_address,
+         output_value
+      } state = wasm_address;
+      while (s.remaining())
+      {
+         switch (psio::from_bin<std::uint8_t>(s))
+         {
+            case dw_op_addr:
+            {
+               auto val = psio::from_bin<std::uint32_t>(s);
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(val, out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_deref:
+            {
+               psio::check(state == wasm_address, "unexpected deref");
+               adjust_addr(out);
+               psio::to_bin(std::uint8_t{dw_op_deref_size}, out);
+               psio::to_bin(std::uint8_t{4}, out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_fbreg:
+            {
+               // The frame base is a native address. Convert it back to a wasm address here.
+               psio::to_bin(std::uint8_t{dw_op_fbreg}, out);
+               psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
+               psio::to_bin(std::uint8_t{dw_op_breg4}, out);
+               psio::varuint32_to_bin(0, out);
+               psio::to_bin(std::uint8_t{dw_op_minus}, out);
+               break;
+            }
+            case dw_op_implicit_value:
+            {
+               psio::to_bin(std::uint8_t{dw_op_implicit_value}, out);
+               auto size = psio::varuint32_from_bin(s);
+               psio::varuint32_to_bin(size, out);
+               const char* base;
+               s.read_reuse_storage(base, size);
+               out.write(base, size);
+               state = output_value;
+               break;
+            }
+            case dw_op_stack_value:
+            {
+               if (state == native_address)
+               {
+                  psio::to_bin(std::uint8_t{dw_op_deref_size}, out);
+                  psio::to_bin(std::uint8_t{4}, out);
+                  state = wasm_address;
+               }
+               else
+               {
+                  psio::to_bin(std::uint8_t{dw_op_stack_value}, out);
+                  state = output_value;
+               }
+               break;
+            }
+            case dw_op_wasm_location:
+            {
+               switch (psio::from_bin<std::uint8_t>(s))
+               {
+                  case 0:
+                  {
+                     if (!frame)
+                        throw std::runtime_error("Cannot access local without frame info");
+                     auto    idx = psio::varuint32_from_bin(s);
+                     int32_t off = frame->get_frame_offset(idx);
+                     psio::to_bin(std::uint8_t{dw_op_breg6}, out);
+                     psio::sleb64_to_bin(off, out);
+                     state = native_address;
+                     break;
+                  }
+                  case 1:
+                  case 2:
+                  case 3:
+                  default:
+                     throw std::runtime_error("invalid wasm location");
+               }
+               break;
+            }
+            default:
+               throw std::runtime_error("not implemented");
+         }
+      }
+      if (state == wasm_address)
+      {
+         adjust_addr(out);
+      }
+   }
+
    struct debug_info_visitor
    {
       std::vector<char>& abbrev_data;
@@ -1435,11 +1593,15 @@ namespace dwarf
       const debug_str&    strings;
       const debug_abbrev& abbrev_decls;
 
+      const info&              dwarf_info;
+      const eosio::vm::module& mod;
+
       const std::vector<jit_instr_loc>& instr_locs;
       std::uint32_t                     wasm_code_offset;
       const void*                       code_start;
 
       std::map<die_pattern, uint32_t> codes;
+      relocation_list                 relocations;
 
       void write_die(const die_pattern& die)
       {
@@ -1465,7 +1627,7 @@ namespace dwarf
 
          for (const auto& attr : die.attrs)
          {
-            write_attr_value(attr.value, s);
+            write_attr_value(attr.value, s, relocations);
          }
       }  // write_die
       native_attr_address translate_address(std::uint32_t wasm_addr)
@@ -1483,7 +1645,8 @@ namespace dwarf
       }
       struct subprogram_info
       {
-         std::optional<uint32_t> low_pc;
+         std::optional<uint32_t>                 low_pc;
+         std::optional<debug_eos_vm::wasm_frame> frame;
       };
       void translate_attr(const abbrev_attr& attr,
                           attr_value&        value,
@@ -1499,12 +1662,29 @@ namespace dwarf
                       [&](const attr_data& a) {
                          out.attrs.push_back({attr.name, a});
                       },
-                      [&](const attr_exprloc& a) {},
+                      [&](const attr_exprloc& a)
+                      {
+                         auto*               frame = info.frame ? &*info.frame : nullptr;
+                         native_attr_exprloc translated;
+                         psio::vector_stream stream{translated.data};
+                         auto                input = a.data;
+                         try
+                         {
+                            translate_expr(frame, input, stream);
+                         }
+                         catch (std::runtime_error)
+                         {
+                            return;
+                         }
+                         out.attrs.push_back({attr.name, std::move(translated)});
+                      },
                       [&](const attr_flag& a) {
                          out.attrs.push_back({attr.name, a});
                       },
                       [&](const attr_sec_offset& a) {},
-                      [&](const attr_ref&) {},
+                      [&](const attr_ref& a) {
+                         out.attrs.push_back({attr.name, a});
+                      },
                       [&](const attr_ref_addr&) {},
                       [&](const attr_ref_sig8&) {},
                       [&](const std::string_view& str) {
@@ -1514,6 +1694,13 @@ namespace dwarf
          {
             case dw_at_low_pc:
                info.low_pc = get_address(value);
+               if (info.low_pc)
+               {
+                  if (auto fn = get_wasm_fn(dwarf_info, *info.low_pc + wasm_code_offset))
+                  {
+                     info.frame.emplace(mod, *fn);
+                  }
+               }
                std::visit(o, value);
                break;
             case dw_at_high_pc:
@@ -1532,6 +1719,12 @@ namespace dwarf
             case dw_at_linkage_name:
             case dw_at_name:
             case dw_at_language:
+            case dw_at_byte_size:
+            case dw_at_bit_size:
+            case dw_at_encoding:
+            case dw_at_frame_base:
+            case dw_at_location:
+            case dw_at_type:
                std::visit(o, value);
                break;
             case dw_at_stmt_list:
@@ -1549,8 +1742,13 @@ namespace dwarf
       {
          if (!abbrev.has_children)
             return;
-         while (auto child = parser.get_die_abbrev(s))
+         psio::vector_stream info_s{info_data};
+         while (true)
          {
+            relocations.set(info_s, s.pos - parser.unit_s.pos);
+            auto child = parser.get_die_abbrev(s);
+            if (!child)
+               break;
             write_die(parser, *child, s);
          }
          if (!inline_)
@@ -1579,6 +1777,21 @@ namespace dwarf
                parser.skip_die_children(abbrev, s);
          }
          else if (abbrev.tag == dw_tag_compile_unit)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_base_type)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_formal_parameter)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_variable)
          {
             write_die(die);
             write_die_children(parser, abbrev, s);
@@ -1613,12 +1826,13 @@ namespace dwarf
          auto whole_s = s;
          while (s.remaining())
          {
-            auto     unit_s      = s;
+            auto                unit_s = s;
+            psio::vector_stream info_s{info_data};
+            relocations.start_unit(info_s);
             uint32_t unit_length = psio::from_bin<uint32_t>(s);
             psio::check(unit_length < 0xffff'fff0,
                         "unit_length values in reserved range in .debug_info not supported");
             psio::check(unit_length <= s.remaining(), "bad unit_length in .debug_info");
-            psio::vector_stream info_s{info_data};
             psio::to_bin(uint32_t(0xffff'ffff), info_s);
             auto     length_pos = info_s.written();
             uint64_t out_length = 0;
@@ -1635,6 +1849,7 @@ namespace dwarf
    void write_subprograms(std::vector<char>&                abbrev_data,
                           std::vector<char>&                info_data,
                           const info&                       info,
+                          const eosio::vm::module&          mod,
                           const std::vector<jit_fn_loc>&    fn_locs,
                           const std::vector<jit_instr_loc>& instr_locs,
                           const void*                       code_start,
@@ -1642,8 +1857,8 @@ namespace dwarf
                           uint32_t                          num_imported,
                           psio::input_stream                info_section)
    {
-      debug_info_visitor gen{abbrev_data,       info_data,  info.strings,
-                             info.abbrev_decls, instr_locs, info.wasm_code_offset,
+      debug_info_visitor gen{abbrev_data, info_data, info.strings, info.abbrev_decls,
+                             info,        mod,       instr_locs,   info.wasm_code_offset,
                              code_start};
       gen.write_debug_info(info_section);
    }  // write_subprograms
@@ -2209,8 +2424,8 @@ namespace dwarf
       std::vector<char> frame_data;
       symbol_sec_header.sh_link    = strtab_section;
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
-      write_subprograms(abbrev_data, info_data, info, fn_locs, instr_locs, code_start, code_size,
-                        num_imported, input_sections.debug_info);
+      write_subprograms(abbrev_data, info_data, info, mod, fn_locs, instr_locs, code_start,
+                        code_size, num_imported, input_sections.debug_info);
       write_symtab(code_section, strings, symbol_data, fn_locs, mod, code_start, code_size,
                    num_imported);
       write_cfi(frame_data, code_start, code_size);
