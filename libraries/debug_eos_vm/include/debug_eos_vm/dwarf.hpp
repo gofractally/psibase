@@ -4,6 +4,8 @@
 #include <optional>
 #include <psio/stream.hpp>
 
+#include <eosio/vm/types.hpp>
+
 namespace dwarf
 {
    // Location of jitted function
@@ -130,6 +132,7 @@ namespace dwarf
        info&                             info,
        const std::vector<jit_fn_loc>&    fn_locs,
        const std::vector<jit_instr_loc>& instr_locs,
+       const eosio::vm::module&          mod,
        const void*                       code_start,
        size_t                            code_size,
        const void*                       entry,

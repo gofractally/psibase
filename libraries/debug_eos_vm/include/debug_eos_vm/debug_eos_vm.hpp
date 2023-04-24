@@ -186,7 +186,7 @@ namespace debug_eos_vm
       auto& alloc = module.allocator;
       auto& dbg   = backend.get_debug();
       return dwarf::register_with_debugger(
-          dwarf_info, dbg.fn_locs, dbg.instr_locs, alloc.get_code_start(), alloc._code_size,
+          dwarf_info, dbg.fn_locs, dbg.instr_locs, module, alloc.get_code_start(), alloc._code_size,
           (char*)alloc.get_code_start() +
               module.code[func_index - module.get_imported_functions_size()].jit_code_offset,
           module.get_imported_functions_size());

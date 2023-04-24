@@ -1641,6 +1641,7 @@ namespace dwarf
                      std::vector<char>&             strings,
                      std::vector<char>&             symbol_data,
                      const std::vector<jit_fn_loc>& fn_locs,
+                     const eosio::vm::module&       mod,
                      const void*                    code_start,
                      size_t                         code_size,
                      uint32_t                       num_imported)
@@ -1663,6 +1664,22 @@ namespace dwarf
          symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
       };
       add_sym(0, fn_locs.empty() ? code_size : fn_locs.front().code_prologue, "_wasm_entry");
+
+      for (std::size_t i = 0; i < mod.exports.size(); ++i)
+      {
+         const auto& exp = mod.exports[i];
+         if (exp.kind == eosio::vm::Function)
+         {
+            auto idx = exp.index;
+            if (idx > num_imported)
+            {
+               const auto& fn = fn_locs[idx - num_imported];
+               std::string name(reinterpret_cast<const char*>(exp.field_str.raw()),
+                                exp.field_str.size());
+               add_sym(fn.code_prologue, fn.code_end, name.c_str());
+            }
+         }
+      }
 
       for (std::size_t i = 0; i < fn_locs.size(); ++i)
       {
@@ -1987,6 +2004,7 @@ namespace dwarf
        info&                             info,
        const std::vector<jit_fn_loc>&    fn_locs,
        const std::vector<jit_instr_loc>& instr_locs,
+       const eosio::vm::module&          mod,
        const void*                       code_start,
        size_t                            code_size,
        const void*                       entry,
@@ -2117,7 +2135,7 @@ namespace dwarf
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
       write_subprograms(abbrev_data, info_data, info, fn_locs, instr_locs, code_start, code_size,
                         num_imported);
-      write_symtab(code_section, strings, symbol_data, fn_locs, code_start, code_size,
+      write_symtab(code_section, strings, symbol_data, fn_locs, mod, code_start, code_size,
                    num_imported);
       write_cfi(frame_data, code_start, code_size);
 
