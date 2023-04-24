@@ -1467,11 +1467,8 @@ namespace dwarf
       uint64_t subprogram;
    };
 
-   void write_subprograms(uint16_t                          code_section,
-                          std::vector<char>&                strings,
-                          std::vector<char>&                abbrev_data,
+   void write_subprograms(std::vector<char>&                abbrev_data,
                           std::vector<char>&                info_data,
-                          std::vector<char>&                symbol_data,
                           const info&                       info,
                           const std::vector<jit_fn_loc>&    fn_locs,
                           const std::vector<jit_instr_loc>& instr_locs,
@@ -1501,10 +1498,6 @@ namespace dwarf
                           {dw_at_stmt_list, native_attr_sec_offset{uint64_t(0)}}};
       write_die(0, abbrev_data, info_data, codes, die);
 
-      Elf64_Sym null_sym;
-      memset(&null_sym, 0, sizeof(null_sym));
-      symbol_data.insert(symbol_data.end(), (char*)(&null_sym), (char*)(&null_sym + 1));
-
       // Write a subprogram and symbol for the extra generated functions
       // TODO: split out individual functions
       uint32_t prologue_end = fn_locs.empty() ? code_size : fn_locs.front().code_prologue;
@@ -1514,16 +1507,6 @@ namespace dwarf
           {dw_at_low_pc, native_attr_address{uint64_t(code_start)}},
           {dw_at_high_pc, native_attr_address{uint64_t((char*)code_start + prologue_end)}}};
       write_die(4, abbrev_data, info_data, codes, die);
-      Elf64_Sym sym = {
-          .st_name  = 0,
-          .st_info  = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC),
-          .st_other = STV_DEFAULT,
-          .st_shndx = code_section,
-          .st_value = uint64_t(code_start),
-          .st_size  = prologue_end,
-      };
-      sym.st_name = add_str(strings, "_wasm_entry");
-      symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
 
       for (size_t i = 0; i < info.subprograms.size(); ++i)
       {
@@ -1561,23 +1544,6 @@ namespace dwarf
          else if (sub.linkage_name)
             die.attrs.push_back({dw_at_name, sub.demangled_name});
          write_die(4, abbrev_data, info_data, codes, die);
-
-         Elf64_Sym sym = {
-             .st_name  = 0,
-             .st_info  = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC),
-             .st_other = STV_DEFAULT,
-             .st_shndx = code_section,
-             .st_value = fn_begin,
-             .st_size  = fn_end - fn_begin,
-         };
-         if (sub.linkage_name)
-            sym.st_name = add_str(strings, sub.linkage_name->c_str());
-         else if (sub.name)
-            sym.st_name = add_str(strings, sub.name->c_str());
-         else
-            sym.st_name =
-                add_str(strings, ("<" + std::to_string(num_imported + *fn) + ">").c_str());
-         symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
       }  // for(sub)
 
       psio::varuint32_to_bin(0, info_s);  // end children
@@ -1669,6 +1635,40 @@ namespace dwarf
       psio::vector_stream stream{v};
       to_bin(cie{.initial_instructions = get_basic_frame()}, stream);
       to_bin(fde{.initial_location = std::uint64_t(code), .address_range = code_size}, stream);
+   }
+
+   void write_symtab(uint16_t                       code_section,
+                     std::vector<char>&             strings,
+                     std::vector<char>&             symbol_data,
+                     const std::vector<jit_fn_loc>& fn_locs,
+                     const void*                    code_start,
+                     size_t                         code_size,
+                     uint32_t                       num_imported)
+   {
+      Elf64_Sym null_sym;
+      memset(&null_sym, 0, sizeof(null_sym));
+      symbol_data.insert(symbol_data.end(), (char*)(&null_sym), (char*)(&null_sym + 1));
+
+      auto add_sym = [&](uint64_t start, uint64_t end, const char* name)
+      {
+         Elf64_Sym sym = {
+             .st_name  = 0,
+             .st_info  = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC),
+             .st_other = STV_DEFAULT,
+             .st_shndx = code_section,
+             .st_value = uint64_t(code_start) + start,
+             .st_size  = end - start,
+         };
+         sym.st_name = add_str(strings, name);
+         symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
+      };
+      add_sym(0, fn_locs.empty() ? code_size : fn_locs.front().code_prologue, "_wasm_entry");
+
+      for (std::size_t i = 0; i < fn_locs.size(); ++i)
+      {
+         add_sym(fn_locs[i].code_prologue, fn_locs[i].code_end,
+                 ("<" + std::to_string(num_imported + i) + ">").c_str());
+      }
    }
 
    struct wasm_header
@@ -1983,42 +1983,6 @@ namespace dwarf
       }
    };
 
-   void default_subprograms(info& info, const std::vector<jit_fn_loc>& fn_locs)
-   {
-      auto&                   subprograms = info.subprograms;
-      std::vector<subprogram> added;
-      auto                    pos = subprograms.begin();
-      auto                    end = subprograms.end();
-      for (std::size_t i = 0; i < fn_locs.size(); ++i)
-      {
-         auto& fn         = fn_locs[i];
-         auto  is_missing = [&]
-         {
-            while (true)
-            {
-               if (pos == end || pos->begin_address + info.wasm_code_offset >= fn.wasm_end)
-               {
-                  return true;
-               }
-               else if (pos->end_address + info.wasm_code_offset > fn.wasm_begin)
-               {
-                  return false;
-               }
-               ++pos;
-            }
-         };
-         if (is_missing())
-         {
-            added.push_back({.begin_address = fn.wasm_begin - info.wasm_code_offset,
-                             .end_address   = fn.wasm_end - info.wasm_code_offset});
-         }
-      }
-      std::vector<subprogram> result;
-      std::merge(subprograms.begin(), subprograms.end(), added.begin(), added.end(),
-                 std::back_inserter(result));
-      subprograms = std::move(result);
-   }
-
    std::shared_ptr<debugger_registration> register_with_debugger(  //
        info&                             info,
        const std::vector<jit_fn_loc>&    fn_locs,
@@ -2065,8 +2029,6 @@ namespace dwarf
          while (fn < fn_locs.size())
             show_fn(++fn);
       }
-
-      default_subprograms(info, fn_locs);
 
       auto              result = std::make_shared<debugger_registration>();
       std::vector<char> strings;
@@ -2153,8 +2115,10 @@ namespace dwarf
       std::vector<char> frame_data;
       symbol_sec_header.sh_link    = strtab_section;
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
-      write_subprograms(code_section, strings, abbrev_data, info_data, symbol_data, info, fn_locs,
-                        instr_locs, code_start, code_size, num_imported);
+      write_subprograms(abbrev_data, info_data, info, fn_locs, instr_locs, code_start, code_size,
+                        num_imported);
+      write_symtab(code_section, strings, symbol_data, fn_locs, code_start, code_size,
+                   num_imported);
       write_cfi(frame_data, code_start, code_size);
 
       write_sec(line_sec_header, line_sec_header_pos,
