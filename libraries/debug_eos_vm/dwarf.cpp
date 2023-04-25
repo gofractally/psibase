@@ -1840,12 +1840,21 @@ namespace dwarf
             write_die(die);
             write_die_children(parser, abbrev, s);
          }
-         else if (abbrev.tag == dw_tag_pointer_type)
+         else if (abbrev.tag == dw_tag_pointer_type || abbrev.tag == dw_tag_reference_type ||
+                  abbrev.tag == dw_tag_rvalue_reference_type)
          {
-            die_pattern base_struct{
-                .tag          = dw_tag_structure_type,
-                .has_children = true,
-                .attrs = {{dw_at_name, "__wasm_pointer_t"}, {dw_at_byte_size, attr_data{4}}}};
+            const char* name = "__wasm_pointer_t";
+            if (abbrev.tag == dw_tag_reference_type)
+            {
+               name = "__wasm_reference_t";
+            }
+            else if (abbrev.tag == dw_tag_rvalue_reference_type)
+            {
+               name = "__wasm_rvalue_reference_t";
+            }
+            die_pattern base_struct{.tag          = dw_tag_structure_type,
+                                    .has_children = true,
+                                    .attrs = {{dw_at_name, name}, {dw_at_byte_size, attr_data{4}}}};
             write_die(base_struct);
             die_pattern addr{.tag          = dw_tag_member,
                              .has_children = false,
@@ -1874,6 +1883,12 @@ namespace dwarf
             write_die(native_value);
             psio::vector_stream info_s{info_data};
             psio::varuint32_to_bin(0, info_s);  // end children
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_const_type || abbrev.tag == dw_tag_volatile_type ||
+                  abbrev.tag == dw_tag_restrict_type)
+         {
             write_die(die);
             write_die_children(parser, abbrev, s);
          }
