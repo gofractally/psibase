@@ -2037,11 +2037,66 @@ namespace dwarf
       return result;
    }
 
-   void write_cfi(std::vector<char>& v, const void* code, std::size_t code_size)
+   std::vector<char> get_function_entry_frame()
+   {
+      std::vector<char>   result;
+      psio::vector_stream s(result);
+      psio::to_bin(dw_cfa_def_cfa, s);
+      psio::varuint32_to_bin(7, s);
+      psio::varuint32_to_bin(8, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 16), s);
+      psio::varuint32_to_bin(1, s);
+      return result;
+   }
+
+   std::vector<char> get_function_frame(std::size_t fn_size)
+   {
+      std::vector<char>   result;
+      psio::vector_stream s(result);
+      // push %rbp
+      psio::to_bin(std::uint8_t{dw_cfa_advance_loc + 1}, s);
+      psio::to_bin(std::uint8_t{dw_cfa_def_cfa_offset}, s);
+      psio::varuint32_to_bin(16, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 6), s);
+      psio::varuint32_to_bin(2, s);
+      // mov %rsp, %rbp
+      psio::to_bin(std::uint8_t{dw_cfa_advance_loc + 3}, s);
+      psio::to_bin(std::uint8_t{dw_cfa_def_cfa_register}, s);
+      psio::varuint32_to_bin(6, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 6), s);
+      psio::varuint32_to_bin(2, s);
+      // ...
+      // pop %rbp
+      psio::to_bin(dw_cfa_advance_loc4, s);
+      psio::to_bin(static_cast<std::uint32_t>(fn_size - 5), s);
+      psio::to_bin(dw_cfa_def_cfa, s);
+      psio::varuint32_to_bin(7, s);
+      psio::varuint32_to_bin(8, s);
+      // ret
+      return result;
+   }
+
+   void write_cfi(std::vector<char>&             v,
+                  const std::vector<jit_fn_loc>& functions,
+                  const void*                    code,
+                  std::size_t                    code_size)
    {
       psio::vector_stream stream{v};
-      to_bin(cie{.initial_instructions = get_basic_frame()}, stream);
-      to_bin(fde{.initial_location = std::uint64_t(code), .address_range = code_size}, stream);
+      to_bin(cie{.initial_instructions = get_function_entry_frame()}, stream);
+      auto initial_size = functions.empty() ? code_size : functions.front().code_prologue;
+      // TODO: get accurate frame information for module prologue
+      to_bin(fde{.initial_location = std::uint64_t(code),
+                 .address_range    = initial_size,
+                 .instructions     = get_basic_frame()},
+             stream);
+      for (const auto& fn : functions)
+      {
+         auto fn_size = fn.code_end - fn.code_prologue;
+         to_bin(fde{.initial_location = std::uint64_t(code) + fn.code_prologue,
+                    .address_range    = fn_size,
+                    .instructions     = get_function_frame(fn_size)},
+                stream);
+      }
    }
 
    void write_symtab(uint16_t                       code_section,
@@ -2524,7 +2579,7 @@ namespace dwarf
                         code_size, num_imported, input_sections.debug_info);
       write_symtab(code_section, strings, symbol_data, fn_locs, mod, code_start, code_size,
                    num_imported);
-      write_cfi(frame_data, code_start, code_size);
+      write_cfi(frame_data, fn_locs, code_start, code_size);
 
       write_sec(line_sec_header, line_sec_header_pos,
                 generate_debug_line(info, fn_locs, instr_locs, code_start));
