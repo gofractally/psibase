@@ -1725,6 +1725,7 @@ namespace dwarf
             case dw_at_frame_base:
             case dw_at_location:
             case dw_at_type:
+            case dw_at_data_member_location:
                std::visit(o, value);
                break;
             case dw_at_stmt_list:
@@ -1786,12 +1787,23 @@ namespace dwarf
             write_die(die);
             write_die_children(parser, abbrev, s);
          }
+         else if (abbrev.tag == dw_tag_structure_type || abbrev.tag == dw_tag_union_type ||
+                  abbrev.tag == dw_tag_class_type)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
          else if (abbrev.tag == dw_tag_formal_parameter)
          {
             write_die(die);
             write_die_children(parser, abbrev, s);
          }
          else if (abbrev.tag == dw_tag_variable)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_member)
          {
             write_die(die);
             write_die_children(parser, abbrev, s);
