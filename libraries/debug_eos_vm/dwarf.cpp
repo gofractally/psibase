@@ -415,6 +415,39 @@ namespace dwarf
       }
    }
 
+// clang-format off
+#define DW_ATES(a, b, x)                        \
+   x(a, b, address, 0x01)                       \
+   x(a, b, boolean, 0x02)                       \
+   x(a, b, complex_float, 0x03)                 \
+   x(a, b, float, 0x04)                         \
+   x(a, b, signed, 0x05)                        \
+   x(a, b, signed_char, 0x06)                   \
+   x(a, b, unsigned, 0x07)                      \
+   x(a, b, unsigned_char, 0x08)                 \
+   x(a, b, imaginary_float, 0x09)               \
+   x(a, b, packed_decimal, 0x0a)                \
+   x(a, b, numeric_string, 0x0b)                \
+   x(a, b, edited, 0x0c)                        \
+   x(a, b, signed_fixed, 0x0d)                  \
+   x(a, b, unsigned_fixed, 0x0e)                \
+   x(a, b, decimal_float, 0x0f)                 \
+   x(a, b, UTF, 0x10)                           \
+   x(a, b, lo_user, 0x80)                       \
+   x(a, b, hi_user, 0xff)
+   // clang-format on
+
+   DW_ATES(dw_ate_, uint8_t, ENUM_DECL)
+   std::string dw_ate_to_str(uint8_t value)
+   {
+      switch (value)
+      {
+         DW_ATES("DW_ATE_", _, ENUM_DECODE)
+         default:
+            return "DW_ATE_" + std::to_string(value);
+      }
+   }
+
    // clang-format off
 #define DW_CFAS(a, b, x)                        \
    x(a, b, advance_loc, 0x40)                   \
@@ -1423,7 +1456,9 @@ namespace dwarf
          }
          known.insert({key, location});
       }
-      void start_unit(auto& out)
+      void     set(auto& out, const attr_ref& key) { set(out, key.value); }
+      attr_ref new_ref() { return attr_ref{--next_id}; }
+      void     start_unit(auto& out)
       {
          known.clear();
          // unknown should be empty unless there are unresolved references
@@ -1433,6 +1468,7 @@ namespace dwarf
       std::map<key_type, std::vector<relocation>> unknown;
       std::map<key_type, value_type>              known;
       std::size_t                                 unit_base;
+      key_type                                    next_id = 0;
    };
 
    std::uint8_t native_attr::form() const
@@ -1602,6 +1638,7 @@ namespace dwarf
 
       std::map<die_pattern, uint32_t> codes;
       relocation_list                 relocations;
+      attr_ref                        generic_wasm_pointer;
 
       void write_die(const die_pattern& die)
       {
@@ -1780,6 +1817,16 @@ namespace dwarf
          else if (abbrev.tag == dw_tag_compile_unit)
          {
             write_die(die);
+            generic_wasm_pointer = relocations.new_ref();
+
+            psio::vector_stream info_s{info_data};
+            relocations.set(info_s, generic_wasm_pointer);
+            die_pattern wasm_pointer{.tag          = dw_tag_base_type,
+                                     .has_children = false,
+                                     .attrs        = {{dw_at_name, "__wasm_generic_pointer_t"},
+                                                      {dw_at_encoding, attr_data{dw_ate_address}},
+                                                      {dw_at_byte_size, attr_data{4}}}};
+            write_die(wasm_pointer);
             write_die_children(parser, abbrev, s);
          }
          else if (abbrev.tag == dw_tag_base_type)
@@ -1790,6 +1837,43 @@ namespace dwarf
          else if (abbrev.tag == dw_tag_structure_type || abbrev.tag == dw_tag_union_type ||
                   abbrev.tag == dw_tag_class_type)
          {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_pointer_type)
+         {
+            die_pattern base_struct{
+                .tag          = dw_tag_structure_type,
+                .has_children = true,
+                .attrs = {{dw_at_name, "__wasm_pointer_t"}, {dw_at_byte_size, attr_data{4}}}};
+            write_die(base_struct);
+            die_pattern addr{.tag          = dw_tag_member,
+                             .has_children = false,
+                             .attrs        = {{dw_at_name, "__address"},
+                                              {dw_at_data_member_location, attr_data{0}},
+                                              {dw_at_type, generic_wasm_pointer}}};
+            write_die(addr);
+            native_attr_exprloc data_location;
+            psio::vector_stream expr(data_location.data);
+            psio::to_bin(uint8_t{dw_op_deref_size}, expr);
+            psio::to_bin(uint8_t{4}, expr);
+            psio::to_bin(std::uint8_t{dw_op_breg4}, expr);
+            psio::varuint32_to_bin(0, expr);
+            psio::to_bin(std::uint8_t{dw_op_plus}, expr);
+            die_pattern native_value{
+                .tag          = dw_tag_member,
+                .has_children = false,
+                .attrs = {{dw_at_name, "__value"}, {dw_at_data_member_location, data_location}}};
+            for (const auto& attr : die.attrs)
+            {
+               if (attr.attr == dw_at_type)
+               {
+                  native_value.attrs.push_back(attr);
+               }
+            }
+            write_die(native_value);
+            psio::vector_stream info_s{info_data};
+            psio::varuint32_to_bin(0, info_s);  // end children
             write_die(die);
             write_die_children(parser, abbrev, s);
          }
