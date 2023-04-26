@@ -1763,6 +1763,10 @@ namespace dwarf
             case dw_at_location:
             case dw_at_type:
             case dw_at_data_member_location:
+            case dw_at_external:
+            case dw_at_const_value:
+            case dw_at_declaration:
+            case dw_at_enum_class:
                std::visit(o, value);
                break;
             case dw_at_stmt_list:
@@ -1892,6 +1896,11 @@ namespace dwarf
             write_die(die);
             write_die_children(parser, abbrev, s);
          }
+         else if (abbrev.tag == dw_tag_typedef)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
          else if (abbrev.tag == dw_tag_formal_parameter)
          {
             write_die(die);
@@ -1902,7 +1911,17 @@ namespace dwarf
             write_die(die);
             write_die_children(parser, abbrev, s);
          }
-         else if (abbrev.tag == dw_tag_member)
+         else if (abbrev.tag == dw_tag_member || abbrev.tag == dw_tag_inheritance)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_enumeration_type)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_enumerator)
          {
             write_die(die);
             write_die_children(parser, abbrev, s);
