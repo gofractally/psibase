@@ -9,6 +9,7 @@
   - [psinode](psibase/psinode.md)
   - [Serving https](psibase/https.md)
   - [Logging](psibase/logging.md)
+  - [Dockerized nodes](psibase/dockerized-node.md)
 - [Documentation](documentation.md)
 - [Services](services.md)
   - [C++ Services](services/cpp-service.md)
