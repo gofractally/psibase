@@ -1,6 +1,11 @@
-const DASHBOARDS_PREFIX =
-    window.location.hostname === "localhost"
-        ? "http://localhost:8091/grafana"
+function isLocalhost() {
+    const hostname = window.location.hostname;
+    return hostname.includes('localhost') || hostname.includes('127.0.0.1');
+}
+
+const GRAFANA_PORT = 3000;
+const DASHBOARDS_PREFIX = isLocalhost()
+        ? `http://${window.location.hostname}:${GRAFANA_PORT}/grafana`
         : "/grafana";
 
 export const DashboardPage = () => {
