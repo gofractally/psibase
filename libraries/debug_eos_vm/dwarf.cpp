@@ -1223,6 +1223,16 @@ namespace dwarf
       }
 
       template <typename F>
+      void parse_die_attrs_local(const abbrev_decl& abbrev, psio::input_stream& s, F&& f)
+      {
+         for (const auto& attr : abbrev.attrs)
+         {
+            auto value = parse_attr_value(strings, attr.form, s);
+            f(attr, value);
+         }
+      }
+
+      template <typename F>
       void parse_die_attrs(const abbrev_decl& abbrev, psio::input_stream& s, F&& f)
       {
          for (const auto& attr : abbrev.attrs)
@@ -1249,7 +1259,7 @@ namespace dwarf
             return;
          while (auto* child = get_die_abbrev(s))
          {
-            parse_die_attrs(*child, s, [&](auto&&...) {});
+            parse_die_attrs_local(*child, s, [&](auto&&...) {});
             skip_die_children(*child, s);
          }
       }
@@ -1368,7 +1378,7 @@ namespace dwarf
       auto        root = parser.get_die_abbrev(s);
       psio::check(root && root->tag == dw_tag_compile_unit,
                   "missing DW_TAG_compile_unit in .debug_info");
-      parser.parse_die_attrs(*root, s, [&](auto&&...) {});
+      parser.parse_die_attrs_local(*root, s, [&](auto&&...) {});
       parse_subprograms(result, parser, *root, s);
    }  // parse_debug_info_unit
 
@@ -1753,6 +1763,7 @@ namespace dwarf
                   out.attrs.push_back({attr.name, translate_address(*high_pc)});
                break;
             }
+            case dw_at_specification:
             case dw_at_linkage_name:
             case dw_at_name:
             case dw_at_language:
@@ -1767,6 +1778,10 @@ namespace dwarf
             case dw_at_const_value:
             case dw_at_declaration:
             case dw_at_enum_class:
+            case dw_at_count:
+            case dw_at_ordering:
+            case dw_at_lower_bound:
+            case dw_at_upper_bound:
                std::visit(o, value);
                break;
             case dw_at_stmt_list:
@@ -1805,18 +1820,13 @@ namespace dwarf
          die.tag          = abbrev.tag;
          die.has_children = abbrev.has_children;
          subprogram_info info;
-         parser.parse_die_attrs(abbrev, s,
-                                [&](const abbrev_attr& attr, attr_value& value)
-                                { translate_attr(attr, value, info, die); });
+         parser.parse_die_attrs_local(abbrev, s,
+                                      [&](const abbrev_attr& attr, attr_value& value)
+                                      { translate_attr(attr, value, info, die); });
          if (abbrev.tag == dw_tag_subprogram)
          {
-            if (info.low_pc && *info.low_pc != 0xffff'ffff)
-            {
-               write_die(die);
-               write_die_children(parser, abbrev, s);
-            }
-            else
-               parser.skip_die_children(abbrev, s);
+            write_die(die);
+            write_die_children(parser, abbrev, s);
          }
          else if (abbrev.tag == dw_tag_compile_unit)
          {
@@ -1926,6 +1936,21 @@ namespace dwarf
             write_die(die);
             write_die_children(parser, abbrev, s);
          }
+         else if (abbrev.tag == dw_tag_subroutine_type)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_array_type)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_subrange_type)
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s);
+         }
          else
          {
             write_die_children(parser, abbrev, s, true);
@@ -1973,6 +1998,7 @@ namespace dwarf
             out_length = info_s.written() - inner_pos;
             info_s.rewrite_raw(length_pos, out_length);
          }
+         abbrev_data.push_back('\0');
       }
    };
 
