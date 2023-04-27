@@ -1869,32 +1869,50 @@ namespace dwarf
             die_pattern base_struct{.tag          = dw_tag_structure_type,
                                     .has_children = true,
                                     .attrs = {{dw_at_name, name}, {dw_at_byte_size, attr_data{4}}}};
-            write_die(base_struct);
-            die_pattern addr{.tag          = dw_tag_member,
-                             .has_children = false,
-                             .attrs        = {{dw_at_name, "__address"},
-                                              {dw_at_data_member_location, attr_data{0}},
-                                              {dw_at_type, generic_wasm_pointer}}};
-            write_die(addr);
-            native_attr_exprloc data_location;
-            psio::vector_stream expr(data_location.data);
-            psio::to_bin(uint8_t{dw_op_deref_size}, expr);
-            psio::to_bin(uint8_t{4}, expr);
-            psio::to_bin(std::uint8_t{dw_op_breg4}, expr);
-            psio::varuint32_to_bin(0, expr);
-            psio::to_bin(std::uint8_t{dw_op_plus}, expr);
-            die_pattern native_value{
-                .tag          = dw_tag_member,
-                .has_children = false,
-                .attrs = {{dw_at_name, "__value"}, {dw_at_data_member_location, data_location}}};
-            for (const auto& attr : die.attrs)
+            if (abbrev.tag != dw_tag_pointer_type)
             {
-               if (attr.attr == dw_at_type)
-               {
-                  native_value.attrs.push_back(attr);
-               }
+               native_attr_exprloc data_location;
+               psio::vector_stream expr(data_location.data);
+               psio::to_bin(uint8_t{dw_op_push_object_address}, expr);
+               psio::to_bin(uint8_t{dw_op_deref_size}, expr);
+               psio::to_bin(uint8_t{4}, expr);
+               psio::to_bin(std::uint8_t{dw_op_breg4}, expr);
+               psio::varuint32_to_bin(0, expr);
+               psio::to_bin(std::uint8_t{dw_op_plus}, expr);
+               base_struct.attrs.push_back({dw_at_data_location, data_location});
             }
-            write_die(native_value);
+            write_die(base_struct);
+            auto copy_type = [](const die_pattern& src, die_pattern& dest)
+            {
+               for (const auto& attr : src.attrs)
+               {
+                  if (attr.attr == dw_at_type)
+                  {
+                     dest.attrs.push_back(attr);
+                  }
+               }
+            };
+            if (abbrev.tag == dw_tag_pointer_type)
+            {
+               die_pattern addr{.tag          = dw_tag_member,
+                                .has_children = false,
+                                .attrs        = {{dw_at_name, "__address"},
+                                                 {dw_at_data_member_location, attr_data{0}},
+                                                 {dw_at_type, generic_wasm_pointer}}};
+               write_die(addr);
+            }
+            else
+            {
+               die_pattern value{.tag          = dw_tag_member,
+                                 .has_children = false,
+                                 .attrs        = {{dw_at_data_member_location, attr_data{0}}}};
+               copy_type(die, value);
+               write_die(value);
+            }
+            die_pattern type_param{
+                .tag = dw_tag_template_type_parameter, .has_children = false, .attrs = {}};
+            copy_type(die, type_param);
+            write_die(type_param);
             psio::vector_stream info_s{info_data};
             psio::varuint32_to_bin(0, info_s);  // end children
             write_die(die);
