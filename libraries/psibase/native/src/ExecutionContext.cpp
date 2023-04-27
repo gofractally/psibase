@@ -206,7 +206,7 @@ namespace psibase
                                         c->code.size()};
                    auto               info = dwarf::get_info_from_wasm(s);
                    backend.debug =
-                       debug_eos_vm::enable_debug(c->code, *backend.backend, info, "called", s);
+                       debug_eos_vm::enable_debug(c->code, *backend.backend, info, s);
                 }
              });
       }

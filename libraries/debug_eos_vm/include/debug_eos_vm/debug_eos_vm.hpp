@@ -177,19 +177,12 @@ namespace debug_eos_vm
    std::shared_ptr<dwarf::debugger_registration> enable_debug(std::vector<uint8_t>& code,
                                                               Backend&              backend,
                                                               dwarf::info&          dwarf_info,
-                                                              const char*           entry,
                                                               psio::input_stream    wasm_source)
    {
-      auto& module     = backend.get_module();
-      auto  func_index = module.get_exported_function(entry);
-      if (func_index == std::numeric_limits<uint32_t>::max())
-         throw std::runtime_error("can not find " + std::string(entry));
-      auto& alloc = module.allocator;
-      auto& dbg   = backend.get_debug();
-      return dwarf::register_with_debugger(
-          dwarf_info, dbg.fn_locs, dbg.instr_locs, module, alloc.get_code_start(), alloc._code_size,
-          (char*)alloc.get_code_start() +
-              module.code[func_index - module.get_imported_functions_size()].jit_code_offset,
-          module.get_imported_functions_size(), wasm_source);
+      auto& module = backend.get_module();
+      auto& alloc  = module.allocator;
+      auto& dbg    = backend.get_debug();
+      return dwarf::register_with_debugger(dwarf_info, dbg.fn_locs, dbg.instr_locs, module,
+                                           wasm_source);
    }
 }  // namespace debug_eos_vm

@@ -2177,14 +2177,15 @@ namespace dwarf
                      std::vector<char>&             strings,
                      std::vector<char>&             symbol_data,
                      const std::vector<jit_fn_loc>& fn_locs,
-                     const eosio::vm::module&       mod,
-                     const void*                    code_start,
-                     size_t                         code_size,
-                     uint32_t                       num_imported)
+                     const eosio::vm::module&       mod)
    {
       Elf64_Sym null_sym;
       memset(&null_sym, 0, sizeof(null_sym));
       symbol_data.insert(symbol_data.end(), (char*)(&null_sym), (char*)(&null_sym + 1));
+
+      auto code_start   = mod.allocator.get_code_start();
+      auto code_size    = mod.allocator._code_size;
+      auto num_imported = mod.get_imported_functions_size();
 
       auto add_sym = [&](uint64_t start, uint64_t end, const char* name)
       {
@@ -2518,13 +2519,12 @@ namespace dwarf
        const std::vector<jit_fn_loc>&    fn_locs,
        const std::vector<jit_instr_loc>& instr_locs,
        const eosio::vm::module&          mod,
-       const void*                       code_start,
-       size_t                            code_size,
-       const void*                       entry,
-       std::uint32_t                     num_imported,
        psio::input_stream                wasm_source)
    {
       psio::check(fn_locs.size() == info.wasm_fns.size(), "number of functions doesn't match");
+
+      auto code_start = mod.allocator.get_code_start();
+      auto code_size  = mod.allocator._code_size;
 
       auto show_fn = [&](size_t fn)
       {
@@ -2577,7 +2577,7 @@ namespace dwarf
                   .e_type      = ET_EXEC,
                   .e_machine   = EM_X86_64,
                   .e_version   = EV_CURRENT,
-                  .e_entry     = Elf64_Addr(entry),
+                  .e_entry     = Elf64_Addr(code_start),
                   .e_phoff     = 0,
                   .e_shoff     = 0,
                   .e_flags     = 0,
@@ -2651,8 +2651,7 @@ namespace dwarf
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
       write_subprograms(abbrev_data, info_data, info, mod, fn_locs, instr_locs,
                         input_sections.debug_info);
-      write_symtab(code_section, strings, symbol_data, fn_locs, mod, code_start, code_size,
-                   num_imported);
+      write_symtab(code_section, strings, symbol_data, fn_locs, mod);
       write_cfi(frame_data, fn_locs, code_start, code_size);
 
       write_sec(line_sec_header, line_sec_header_pos,
