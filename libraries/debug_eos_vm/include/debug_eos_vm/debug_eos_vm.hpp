@@ -122,43 +122,6 @@ namespace debug_eos_vm
       }
    };  // debug_instr_map
 
-// Macro because member functions can't be partially specialized
-#define DEBUG_PARSE_CODE_SECTION(Host, Options, AsyncBacktrace)                                   \
-   template <>                                                                                    \
-   template <>                                                                                    \
-   void eosio::vm::binary_parser<                                                                 \
-       eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<Host, AsyncBacktrace>>,    \
-       Options, debug_eos_vm::debug_instr_map>::                                                  \
-       parse_section<eosio::vm::section_id::code_section>(                                        \
-           eosio::vm::wasm_code_ptr & code,                                                       \
-           eosio::vm::guarded_vector<eosio::vm::function_body> & elems)                           \
-   {                                                                                              \
-      const void* code_start = code.raw() - code.offset();                                        \
-      parse_section_impl(                                                                         \
-          code, elems, eosio::vm::detail::get_max_function_section_elements(_options),            \
-          [&](eosio::vm::wasm_code_ptr& code, eosio::vm::function_body& fb, std::size_t idx)      \
-          { parse_function_body(code, fb, idx); });                                               \
-      EOS_VM_ASSERT(elems.size() == _mod->functions.size(), eosio::vm::wasm_parse_exception,      \
-                    "code section must have the same size as the function section");              \
-      eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<Host, AsyncBacktrace>>      \
-          code_writer(_allocator, code.bounds() - code.offset(), *_mod);                          \
-      imap.on_code_start(code_writer.get_base_addr(), code_start);                                \
-      for (size_t i = 0; i < _function_bodies.size(); i++)                                        \
-      {                                                                                           \
-         eosio::vm::function_body& fb = _mod->code[i];                                            \
-         eosio::vm::func_type&     ft = _mod->types.at(_mod->functions.at(i));                    \
-         local_types_t             local_types(ft, fb.locals);                                    \
-         imap.on_function_start(code_writer.get_addr(), _function_bodies[i].first.raw());         \
-         code_writer.emit_prologue(ft, fb.locals, i);                                             \
-         parse_function_body_code(_function_bodies[i].first, fb.size, _function_bodies[i].second, \
-                                  code_writer, ft, local_types);                                  \
-         code_writer.emit_epilogue(ft, fb.locals, i);                                             \
-         imap.on_function_end(code_writer.get_addr(), _function_bodies[i].first.bnds);            \
-         code_writer.finalize(fb);                                                                \
-      }                                                                                           \
-      imap.on_code_end(code_writer.get_addr(), code.raw());                                       \
-   }
-
    template <typename Backend>
    std::shared_ptr<dwarf::debugger_registration> enable_debug(std::vector<uint8_t>& code,
                                                               Backend&              backend,

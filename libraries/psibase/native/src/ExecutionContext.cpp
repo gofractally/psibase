@@ -205,8 +205,7 @@ namespace psibase
                    psio::input_stream s{reinterpret_cast<const char*>(c->code.data()),
                                         c->code.size()};
                    auto               info = dwarf::get_info_from_wasm(s);
-                   backend.debug =
-                       debug_eos_vm::enable_debug(c->code, *backend.backend, info, s);
+                   backend.debug = debug_eos_vm::enable_debug(c->code, *backend.backend, info, s);
                 }
              });
       }
@@ -354,5 +353,3 @@ namespace psibase
       impl->backend.backend->get_module().allocator.disable_code();
    }
 }  // namespace psibase
-
-DEBUG_PARSE_CODE_SECTION(psibase::rhf_t, psibase::VMOptions, true)
