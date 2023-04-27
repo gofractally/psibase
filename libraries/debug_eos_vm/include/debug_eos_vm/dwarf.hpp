@@ -95,15 +95,6 @@ namespace dwarf
       const char*       get(uint32_t offset) const;
    };
 
-   // Position of function within wasm file
-   struct wasm_fn
-   {
-      // offsets relative to beginning of file
-      uint32_t size_pos   = 0;
-      uint32_t locals_pos = 0;
-      uint32_t end_pos    = 0;
-   };
-
    struct info
    {
       // Offset of code section content (after id and section length) within wasm file
@@ -114,7 +105,6 @@ namespace dwarf
       std::vector<location>    locations;  // sorted
       debug_abbrev             abbrev_decls;
       std::vector<subprogram>  subprograms;  // sorted
-      std::vector<wasm_fn>     wasm_fns;     // in wasm order
 
       const char*        get_str(uint32_t offset) const;
       const location*    get_location(uint32_t address) const;

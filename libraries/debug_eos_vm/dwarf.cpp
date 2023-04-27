@@ -792,16 +792,13 @@ namespace dwarf
    }
 
    // wasm_addr is relative to beginning of file
-   std::optional<uint32_t> get_wasm_fn(const info& info, uint32_t wasm_addr)
+   std::optional<uint32_t> get_wasm_fn(const std::vector<jit_fn_loc>& fns, uint32_t wasm_addr)
    {
-      auto it = std::upper_bound(info.wasm_fns.begin(), info.wasm_fns.end(), wasm_addr,
-                                 [](auto a, const auto& b) { return a < b.size_pos; });
-      if (it == info.wasm_fns.begin())
+      auto pos = std::ranges::partition_point(
+          fns, [=](const auto& fn) { return fn.wasm_end <= wasm_addr; });
+      if (pos == fns.end())
          return {};
-      --it;
-      if (it->size_pos <= wasm_addr && wasm_addr < it->end_pos)
-         return &*it - &info.wasm_fns[0];
-      return {};
+      return pos - fns.begin();
    }
 
    std::optional<std::pair<uint64_t, uint64_t>> get_addr_range(
@@ -1623,6 +1620,7 @@ namespace dwarf
       const info&              dwarf_info;
       const eosio::vm::module& mod;
 
+      const std::vector<jit_fn_loc>&    fn_locs;
       const std::vector<jit_instr_loc>& instr_locs;
       std::uint32_t                     wasm_code_offset;
       const void*                       code_start;
@@ -1722,9 +1720,9 @@ namespace dwarf
          {
             case dw_at_low_pc:
                info.low_pc = get_address(value);
-               if (info.low_pc)
+               if (info.low_pc && *info.low_pc != 0xffffffff)
                {
-                  if (auto fn = get_wasm_fn(dwarf_info, *info.low_pc + wasm_code_offset))
+                  if (auto fn = get_wasm_fn(fn_locs, *info.low_pc + wasm_code_offset))
                   {
                      info.frame.emplace(mod, *fn);
                   }
@@ -2009,8 +2007,8 @@ namespace dwarf
                           const std::vector<jit_instr_loc>& instr_locs,
                           psio::input_stream                info_section)
    {
-      debug_info_visitor gen{abbrev_data, info_data, info.strings, info.abbrev_decls,
-                             info,        mod,       instr_locs,   info.wasm_code_offset};
+      debug_info_visitor gen{abbrev_data, info_data, info.strings, info.abbrev_decls,    info,
+                             mod,         fn_locs,   instr_locs,   info.wasm_code_offset};
       gen.write_debug_info(info_section);
    }  // write_subprograms
 
@@ -2315,18 +2313,6 @@ namespace dwarf
       if (sections.code.remaining())
       {
          result.wasm_code_offset = sections.code.pos - file_begin;
-         auto s                  = sections.code;
-         auto count              = psio::varuint32_from_bin(s);
-         result.wasm_fns.resize(count);
-         for (uint32_t i = 0; i < count; ++i)
-         {
-            auto& fn      = result.wasm_fns[i];
-            fn.size_pos   = s.pos - file_begin;
-            auto size     = psio::varuint32_from_bin(s);
-            fn.locals_pos = s.pos - file_begin;
-            s.skip(size);
-            fn.end_pos = s.pos - file_begin;
-         }
       }
 
       if (sections.debug_line.remaining())
@@ -2492,8 +2478,6 @@ namespace dwarf
        const eosio::vm::module&          mod,
        psio::input_stream                wasm_source)
    {
-      psio::check(fn_locs.size() == info.wasm_fns.size(), "number of functions doesn't match");
-
       auto code_start = mod.allocator.get_code_start();
       auto code_size  = mod.allocator._code_size;
 
@@ -2501,13 +2485,11 @@ namespace dwarf
       {
          if (show_fn_locs && fn < fn_locs.size())
          {
-            auto& w = info.wasm_fns[fn];
             auto& l = fn_locs[fn];
-            fprintf(stderr,
-                    "fn %5ld: %016lx %016lx %016lx %016lx whole:%08x-%08x instr:%08x-%08x\n", fn,
+            fprintf(stderr, "fn %5ld: %016lx %016lx %016lx %016lx instr:%08x-%08x\n", fn,
                     (long)code_start + l.code_prologue, (long)code_start + l.code_body,  //
                     (long)code_start + l.code_epilogue, (long)code_start + l.code_end,   //
-                    w.size_pos, w.end_pos, l.wasm_begin, l.wasm_end);
+                    l.wasm_begin, l.wasm_end);
          }
       };
       auto show_instr = [&](const auto it)
