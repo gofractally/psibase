@@ -1382,23 +1382,6 @@ namespace dwarf
       parse_subprograms(result, parser, *root, s);
    }  // parse_debug_info_unit
 
-   size_t fill_parents(info& result, size_t parent, size_t pos)
-   {
-      auto& par = result.subprograms[parent];
-      while (true)
-      {
-         if (pos >= result.subprograms.size())
-            return pos;
-         auto& subp = result.subprograms[pos];
-         if (subp.begin_address >= par.end_address)
-            return pos;
-         psio::check(subp.end_address <= par.end_address, "partial overlap in subprograms");
-         par.children.push_back(pos);
-         subp.parent = parent;
-         pos         = fill_parents(result, pos, pos + 1);
-      }
-   }
-
    void parse_debug_info(info& result, psio::input_stream s)
    {
       auto whole_s = s;
@@ -1413,8 +1396,6 @@ namespace dwarf
          s.skip(unit_length);
       }
       std::sort(result.subprograms.begin(), result.subprograms.end());
-      for (size_t pos = 0; pos < result.subprograms.size();)
-         pos = fill_parents(result, pos, pos + 1);
    }
 
    Elf64_Word add_str(std::vector<char>& strings, const char* s)
@@ -2367,16 +2348,6 @@ namespace dwarf
          dwarf::parse_debug_info(result, sections.debug_info);
 
       std::sort(result.locations.begin(), result.locations.end());
-      if (show_wasm_loc_summary)
-         for (auto& loc : result.locations)
-            fprintf(stderr, "loc  [%08x,%08x) %s:%d\n", loc.begin_address, loc.end_address,
-                    result.files[loc.file_index].c_str(), loc.line);
-      if (show_wasm_subp_summary)
-         for (auto& p : result.subprograms)
-            fprintf(stderr, "subp %d [%08x,%08x) size=%08x %6s %s\n",
-                    int(&p - &result.subprograms[0]), p.begin_address, p.end_address,
-                    p.end_address - p.begin_address, p.parent ? "inline" : "",
-                    p.demangled_name.c_str());
       return result;
    }  // get_info_from_wasm
 

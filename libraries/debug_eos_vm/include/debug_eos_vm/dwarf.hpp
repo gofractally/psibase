@@ -55,8 +55,6 @@ namespace dwarf
       std::optional<std::string> linkage_name;
       std::optional<std::string> name;
       std::string                demangled_name;
-      std::optional<uint32_t>    parent;
-      std::vector<uint32_t>      children;
 
       auto key() const { return std::pair{begin_address, ~end_address}; }
 
