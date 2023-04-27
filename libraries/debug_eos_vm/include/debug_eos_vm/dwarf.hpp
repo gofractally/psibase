@@ -13,8 +13,6 @@ namespace dwarf
    {
       // offsets relative to beginning of generated code
       uint32_t code_prologue = 0;
-      uint32_t code_body     = 0;
-      uint32_t code_epilogue = 0;
       uint32_t code_end      = 0;
 
       // offsets relative to beginning of wasm file

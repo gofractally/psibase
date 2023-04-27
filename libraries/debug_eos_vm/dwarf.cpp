@@ -2486,9 +2486,8 @@ namespace dwarf
          if (show_fn_locs && fn < fn_locs.size())
          {
             auto& l = fn_locs[fn];
-            fprintf(stderr, "fn %5ld: %016lx %016lx %016lx %016lx instr:%08x-%08x\n", fn,
-                    (long)code_start + l.code_prologue, (long)code_start + l.code_body,  //
-                    (long)code_start + l.code_epilogue, (long)code_start + l.code_end,   //
+            fprintf(stderr, "fn %5ld: %016lx %016lx instr:%08x-%08x\n", fn,
+                    (long)code_start + l.code_prologue, (long)code_start + l.code_end,  //
                     l.wasm_begin, l.wasm_end);
          }
       };

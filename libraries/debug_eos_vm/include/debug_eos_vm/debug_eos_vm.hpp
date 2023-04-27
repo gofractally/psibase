@@ -42,16 +42,6 @@ namespace debug_eos_vm
          on_instr_start(code_addr, wasm_addr);
       }
 
-      void on_function_body(const void* code_addr)
-      {
-         fn_locs.back().code_body = code_offset(code_addr);
-      }
-
-      void on_function_epilogue(const void* code_addr)
-      {
-         fn_locs.back().code_epilogue = code_offset(code_addr);
-      }
-
       void on_function_end(const void* code_addr, const void* wasm_addr)
       {
          fn_locs.back().code_end = code_offset(code_addr);
@@ -79,10 +69,8 @@ namespace debug_eos_vm
             uint32_t wasm = 0;
             for (auto& fn : fn_locs)
             {
-               EOS_VM_ASSERT(code <= fn.code_prologue &&              //
-                                 fn.code_prologue <= fn.code_body &&  //
-                                 fn.code_body <= fn.code_epilogue &&  //
-                                 fn.code_epilogue <= fn.code_end,
+               EOS_VM_ASSERT(code <= fn.code_prologue &&  //
+                                 fn.code_prologue <= fn.code_end,
                              eosio::vm::profile_exception, "function parts are out of order");
                EOS_VM_ASSERT(wasm <= fn.wasm_begin && fn.wasm_begin <= fn.wasm_end,
                              eosio::vm::profile_exception, "function wasm is out of order");
@@ -162,10 +150,8 @@ namespace debug_eos_vm
          local_types_t             local_types(ft, fb.locals);                                    \
          imap.on_function_start(code_writer.get_addr(), _function_bodies[i].first.raw());         \
          code_writer.emit_prologue(ft, fb.locals, i);                                             \
-         imap.on_function_body(code_writer.get_addr());                                           \
          parse_function_body_code(_function_bodies[i].first, fb.size, _function_bodies[i].second, \
                                   code_writer, ft, local_types);                                  \
-         imap.on_function_epilogue(code_writer.get_addr());                                       \
          code_writer.emit_epilogue(ft, fb.locals, i);                                             \
          imap.on_function_end(code_writer.get_addr(), _function_bodies[i].first.bnds);            \
          code_writer.finalize(fb);                                                                \
