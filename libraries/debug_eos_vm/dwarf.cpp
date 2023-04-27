@@ -1686,7 +1686,7 @@ namespace dwarf
                               [](const auto& a, auto b) { return a.wasm_addr < b; });
          if (pos != instr_locs.end())
          {
-            return {reinterpret_cast<uint64_t>(code_start) + pos->code_offset};
+            return {reinterpret_cast<uint64_t>(mod.allocator.get_code_start()) + pos->code_offset};
          }
          return {~0ull};
       }
@@ -2026,14 +2026,10 @@ namespace dwarf
                           const eosio::vm::module&          mod,
                           const std::vector<jit_fn_loc>&    fn_locs,
                           const std::vector<jit_instr_loc>& instr_locs,
-                          const void*                       code_start,
-                          size_t                            code_size,
-                          uint32_t                          num_imported,
                           psio::input_stream                info_section)
    {
       debug_info_visitor gen{abbrev_data, info_data, info.strings, info.abbrev_decls,
-                             info,        mod,       instr_locs,   info.wasm_code_offset,
-                             code_start};
+                             info,        mod,       instr_locs,   info.wasm_code_offset};
       gen.write_debug_info(info_section);
    }  // write_subprograms
 
@@ -2653,8 +2649,8 @@ namespace dwarf
       std::vector<char> frame_data;
       symbol_sec_header.sh_link    = strtab_section;
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
-      write_subprograms(abbrev_data, info_data, info, mod, fn_locs, instr_locs, code_start,
-                        code_size, num_imported, input_sections.debug_info);
+      write_subprograms(abbrev_data, info_data, info, mod, fn_locs, instr_locs,
+                        input_sections.debug_info);
       write_symtab(code_section, strings, symbol_data, fn_locs, mod, code_start, code_size,
                    num_imported);
       write_cfi(frame_data, fn_locs, code_start, code_size);
