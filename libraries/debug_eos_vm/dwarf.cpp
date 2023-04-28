@@ -1504,11 +1504,19 @@ namespace dwarf
       }
    };
 
+   // implicit_object indicates whether an address is pushed onto the stack
+   // before the expr is evaluted. Such a pointer is native, so it needs to
+   // be translated to a wasm pointer before evaluting the rest of the expression.
+   //
+   // is_location indicates whether the result of the expression is a location
+   // or an integer.  If a location is expected, the expression will leave a
+   // wasm address on the stack, which needs to be translated to a native pointer.
    void translate_expr(const debug_eos_vm::wasm_frame* frame,
                        const eosio::vm::module&        mod,
                        psio::input_stream              s,
                        auto&                           out,
-                       bool                            implicit_object = false)
+                       bool                            implicit_object,
+                       bool                            is_location)
    {
       auto adjust_addr = [](auto& out)
       {
@@ -1522,8 +1530,12 @@ namespace dwarf
          psio::varuint32_to_bin(0, out);
          psio::to_bin(std::uint8_t{dw_op_minus}, out);
       };
+      // The WASM address size is 4 bytes, but the native address is 8 bytes.
+      // In order to make the translation accurate, some operations need
+      // to have their inputs sign-extended and/or their results truncated.
+      //
       // Sign extension and truncation causes significant bloat.
-      // Given that I'm not seeing much other than fbreg, and wasm_location,
+      // Given that I'm not seeing much other than fbreg and wasm_location,
       // I don't think it's worth trying to optimize.
       auto truncate = [](auto& out)
       {
@@ -1869,7 +1881,7 @@ namespace dwarf
                throw std::runtime_error("not implemented");
          }
       }
-      if (state == wasm_address)
+      if (is_location && state == wasm_address)
       {
          adjust_addr(out);
       }
@@ -1937,14 +1949,59 @@ namespace dwarf
       }
       struct subprogram_info
       {
-         std::optional<uint32_t>                 low_pc;
          std::optional<debug_eos_vm::wasm_frame> frame;
       };
+      // These attributes are parsed early because they
+      // can affect translation of other attributes.
+      struct common_attrs
+      {
+         std::optional<uint32_t> low_pc;
+         void                    operator()(const abbrev_attr& attr, const attr_value& value)
+         {
+            if (attr.name == dw_at_low_pc)
+            {
+               low_pc = get_address(value);
+            }
+         }
+      };
+      common_attrs get_common_attrs(unit_parser&       parser,
+                                    const abbrev_decl& abbrev,
+                                    psio::input_stream s)
+      {
+         common_attrs result;
+         parser.parse_die_attrs_local(abbrev, s, result);
+         return result;
+      }
+      static bool is_location_attr(const abbrev_attr& attr)
+      {
+         switch (attr.name)
+         {
+            case dw_at_frame_base:
+            case dw_at_location:
+            case dw_at_data_location:
+            case dw_at_data_member_location:
+               return true;
+            case dw_at_allocated:
+            case dw_at_associated:
+            case dw_at_bit_offset:
+            case dw_at_bit_size:
+            case dw_at_byte_size:
+            case dw_at_count:
+            case dw_at_lower_bound:
+            case dw_at_byte_stride:
+            case dw_at_bit_stride:
+            case dw_at_upper_bound:
+               return false;
+            default:
+               throw std::runtime_error("Don't know how to handle exprloc value for " +
+                                        dw_at_to_str(attr.name));
+         }
+      }
       void translate_attr(const abbrev_attr&     attr,
                           attr_value&            value,
-                          subprogram_info&       info,
+                          const common_attrs&    info,
                           die_pattern&           out,
-                          const subprogram_info* current_fn = nullptr)
+                          const subprogram_info* current_fn)
       {
          overloaded o{[&](const attr_address& a) {
                          out.attrs.push_back({attr.name, translate_address(a.value)});
@@ -1957,26 +2014,23 @@ namespace dwarf
                       },
                       [&](const attr_exprloc& a)
                       {
-                         const auto* frame = info.frame ? &*info.frame : nullptr;
-                         if (!frame && current_fn)
+                         const debug_eos_vm::wasm_frame* frame = nullptr;
+                         if (current_fn && current_fn->frame)
                          {
-                            if (!current_fn->frame)
-                               return;
                             frame = &*current_fn->frame;
-                         }
-                         else if (!frame && info.low_pc)
-                         {
-                            return;
                          }
                          native_attr_exprloc translated;
                          psio::vector_stream stream{translated.data};
                          auto                input = a.data;
+                         // We don't quite handle all expression opcodes.
+                         // If we fail to translate an expression, just drop it.
                          try
                          {
                             translate_expr(frame, mod, input, stream,
-                                           attr.name == dw_at_data_member_location);
+                                           attr.name == dw_at_data_member_location,
+                                           is_location_attr(attr));
                          }
-                         catch (std::runtime_error)
+                         catch (const std::runtime_error&)
                          {
                             return;
                          }
@@ -1996,17 +2050,6 @@ namespace dwarf
                       }};
          switch (attr.name)
          {
-            case dw_at_low_pc:
-               info.low_pc = get_address(value);
-               if (info.low_pc && *info.low_pc != 0xffffffff)
-               {
-                  if (auto fn = get_wasm_fn(fn_locs, *info.low_pc + wasm_code_offset))
-                  {
-                     info.frame.emplace(mod, *fn);
-                  }
-               }
-               std::visit(o, value);
-               break;
             case dw_at_high_pc:
             {
                auto high_pc = get_address(value);
@@ -2020,6 +2063,7 @@ namespace dwarf
                   out.attrs.push_back({attr.name, translate_address(*high_pc)});
                break;
             }
+            case dw_at_low_pc:
             case dw_at_specification:
             case dw_at_linkage_name:
             case dw_at_name:
@@ -2078,46 +2122,48 @@ namespace dwarf
                      const subprogram_info* current_fn = nullptr)
       {
          die_pattern die;
-         die.tag          = abbrev.tag;
-         die.has_children = abbrev.has_children;
+         die.tag               = abbrev.tag;
+         die.has_children      = abbrev.has_children;
+         common_attrs    attrs = get_common_attrs(parser, abbrev, s);
          subprogram_info info;
+         // When we see a subprogram entry, look up the corresponding
+         // wasm function and pass it to all children of the subprogram.
+         if (abbrev.tag == dw_tag_subprogram || abbrev.tag == dw_tag_entry_point)
+         {
+            current_fn = &info;
+            if (attrs.low_pc && *attrs.low_pc != 0xffffffff)
+            {
+               if (auto fn = get_wasm_fn(fn_locs, *attrs.low_pc + wasm_code_offset))
+               {
+                  info.frame.emplace(mod, *fn);
+               }
+            }
+         }
          parser.parse_die_attrs_local(abbrev, s,
                                       [&](const abbrev_attr& attr, attr_value& value)
-                                      { translate_attr(attr, value, info, die, current_fn); });
-         if (abbrev.tag == dw_tag_subprogram)
+                                      { translate_attr(attr, value, attrs, die, current_fn); });
+         if (abbrev.tag == dw_tag_compile_unit || abbrev.tag == dw_tag_partial_unit ||
+             abbrev.tag == dw_tag_type_unit)
          {
             write_die(die);
-            write_die_children(parser, abbrev, s, &info);
-         }
-         else if (abbrev.tag == dw_tag_compile_unit)
-         {
-            write_die(die);
-            generic_wasm_pointer = relocations.new_ref();
-
-            psio::vector_stream info_s{info_data};
-            relocations.set(info_s, generic_wasm_pointer);
-            die_pattern wasm_pointer{.tag          = dw_tag_base_type,
-                                     .has_children = false,
-                                     .attrs        = {{dw_at_name, "__wasm_generic_pointer_t"},
-                                                      {dw_at_encoding, attr_data{dw_ate_address}},
-                                                      {dw_at_byte_size, attr_data{4}}}};
-            write_die(wasm_pointer);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_base_type)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_structure_type || abbrev.tag == dw_tag_union_type ||
-                  abbrev.tag == dw_tag_class_type)
-         {
-            write_die(die);
+            if (die.has_children)
+            {
+               generic_wasm_pointer = relocations.new_ref();
+               psio::vector_stream info_s{info_data};
+               relocations.set(info_s, generic_wasm_pointer);
+               die_pattern wasm_pointer{.tag          = dw_tag_base_type,
+                                        .has_children = false,
+                                        .attrs        = {{dw_at_name, "__wasm_generic_pointer_t"},
+                                                         {dw_at_encoding, attr_data{dw_ate_address}},
+                                                         {dw_at_byte_size, attr_data{4}}}};
+               write_die(wasm_pointer);
+            }
             write_die_children(parser, abbrev, s);
          }
          else if (abbrev.tag == dw_tag_pointer_type || abbrev.tag == dw_tag_reference_type ||
                   abbrev.tag == dw_tag_rvalue_reference_type)
          {
+            // TODO: This doesn't handle function pointers correctly
             const char* name = "__wasm_pointer_t";
             if (abbrev.tag == dw_tag_reference_type)
             {
@@ -2177,62 +2223,12 @@ namespace dwarf
             psio::vector_stream info_s{info_data};
             psio::varuint32_to_bin(0, info_s);  // end children
             write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_const_type || abbrev.tag == dw_tag_volatile_type ||
-                  abbrev.tag == dw_tag_restrict_type)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_typedef)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_formal_parameter)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_variable)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_member || abbrev.tag == dw_tag_inheritance)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_enumeration_type)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_enumerator)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_subroutine_type)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_array_type)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
-         }
-         else if (abbrev.tag == dw_tag_subrange_type)
-         {
-            write_die(die);
-            write_die_children(parser, abbrev, s);
+            write_die_children(parser, abbrev, s, current_fn);
          }
          else
          {
-            write_die_children(parser, abbrev, s, nullptr, true);
+            write_die(die);
+            write_die_children(parser, abbrev, s, current_fn);
          }
       }
       void write_debug_info_unit(psio::input_stream whole_s,
