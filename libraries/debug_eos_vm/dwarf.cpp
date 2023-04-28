@@ -1665,7 +1665,7 @@ namespace dwarf
             case dw_op_fbreg:
             {
                psio::to_bin(std::uint8_t{dw_op_fbreg}, out);
-               psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
+               psio::sleb64_to_bin(psio::sleb64_from_bin(s), out);
                addr_to_wasm(out);
                break;
             }
