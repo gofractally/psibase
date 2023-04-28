@@ -89,6 +89,16 @@ namespace debug_eos_vm
             return _locals.get_frame_offset(local_idx - _params.offsets.size());
          }
       }
+      int32_t get_stack_offset(uint32_t stack_idx) const
+      {
+         // TODO: This doesn't work correctly if there are v128 items on the stack
+         int32_t result = -8 * (stack_idx + 1);
+         if (!_locals.groups.empty())
+         {
+            result += _locals.groups.back().end_offset;
+         }
+         return result;
+      }
       function_parameters _params;
       function_locals     _locals;
    };

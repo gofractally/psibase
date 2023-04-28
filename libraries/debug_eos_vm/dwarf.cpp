@@ -1504,15 +1504,53 @@ namespace dwarf
       }
    };
 
-   void translate_expr(const debug_eos_vm::wasm_frame* frame, psio::input_stream s, auto& out)
+   void translate_expr(const debug_eos_vm::wasm_frame* frame,
+                       const eosio::vm::module&        mod,
+                       psio::input_stream              s,
+                       auto&                           out,
+                       bool                            implicit_object = false)
    {
-      bool is_addr     = true;
       auto adjust_addr = [](auto& out)
       {
          psio::to_bin(std::uint8_t{dw_op_breg4}, out);
          psio::varuint32_to_bin(0, out);
          psio::to_bin(std::uint8_t{dw_op_plus}, out);
       };
+      auto addr_to_wasm = [](auto& out)
+      {
+         psio::to_bin(std::uint8_t{dw_op_breg4}, out);
+         psio::varuint32_to_bin(0, out);
+         psio::to_bin(std::uint8_t{dw_op_minus}, out);
+      };
+      // Sign extension and truncation causes significant bloat.
+      // Given that I'm not seeing much other than fbreg, and wasm_location,
+      // I don't think it's worth trying to optimize.
+      auto truncate = [](auto& out)
+      {
+         psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+         psio::to_bin(std::uint32_t{0xffffffffu}, out);
+         psio::to_bin(std::uint8_t{dw_op_and}, out);
+      };
+      auto sign_extend = [](auto& out)
+      {
+         psio::to_bin(std::uint8_t{dw_op_const1u}, out);
+         psio::to_bin(std::uint8_t{32}, out);
+         psio::to_bin(std::uint8_t{dw_op_shl}, out);
+         psio::to_bin(std::uint8_t{dw_op_const1u}, out);
+         psio::to_bin(std::uint8_t{32}, out);
+         psio::to_bin(std::uint8_t{dw_op_shra}, out);
+      };
+      auto sign_extend2 = [&](auto& out)
+      {
+         sign_extend(out);
+         psio::to_bin(std::uint8_t{dw_op_swap}, out);
+         sign_extend(out);
+         psio::to_bin(std::uint8_t{dw_op_swap}, out);
+      };
+      if (implicit_object)
+      {
+         addr_to_wasm(out);
+      }
       enum
       {
          wasm_address,
@@ -1521,14 +1559,90 @@ namespace dwarf
       } state = wasm_address;
       while (s.remaining())
       {
-         switch (psio::from_bin<std::uint8_t>(s))
+         auto op = psio::from_bin<std::uint8_t>(s);
+         switch (op)
          {
+#define OP_CASE(a, b, name, value) case name:
+            OP_RANGE32(a, b, dw_op_lit, ~, OP_CASE)
+            {
+               psio::to_bin(op, out);
+               state = wasm_address;
+               break;
+            }
+#undef OP_CASE
             case dw_op_addr:
             {
                auto val = psio::from_bin<std::uint32_t>(s);
                psio::to_bin(std::uint8_t{dw_op_const4u}, out);
                psio::to_bin(val, out);
                state = wasm_address;
+               break;
+            }
+            case dw_op_const1u:
+            {
+               psio::to_bin(op, out);
+               psio::to_bin(psio::from_bin<std::uint8_t>(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const2u:
+            {
+               psio::to_bin(op, out);
+               psio::to_bin(psio::from_bin<std::uint16_t>(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const4u:
+            {
+               psio::to_bin(op, out);
+               psio::to_bin(psio::from_bin<std::uint32_t>(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const8u:
+            {
+               // Truncate to the wasm stack element size
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::from_bin<std::uint64_t>(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_fbreg:
+            {
+               psio::to_bin(std::uint8_t{dw_op_fbreg}, out);
+               psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
+               addr_to_wasm(out);
+               break;
+            }
+            case dw_op_dup:
+            {
+               psio::to_bin(std::uint8_t{dw_op_dup}, out);
+               break;
+            }
+            case dw_op_drop:
+            {
+               psio::to_bin(std::uint8_t{dw_op_drop}, out);
+               break;
+            }
+            case dw_op_pick:
+            {
+               psio::to_bin(std::uint8_t{dw_op_pick}, out);
+               psio::to_bin(psio::from_bin<std::uint8_t>(s), out);
+               break;
+            }
+            case dw_op_over:
+            {
+               psio::to_bin(std::uint8_t{dw_op_over}, out);
+               break;
+            }
+            case dw_op_swap:
+            {
+               psio::to_bin(std::uint8_t{dw_op_swap}, out);
+               break;
+            }
+            case dw_op_rot:
+            {
+               psio::to_bin(std::uint8_t{dw_op_rot}, out);
                break;
             }
             case dw_op_deref:
@@ -1540,14 +1654,130 @@ namespace dwarf
                state = wasm_address;
                break;
             }
-            case dw_op_fbreg:
+            case dw_op_deref_size:
             {
-               // The frame base is a native address. Convert it back to a wasm address here.
-               psio::to_bin(std::uint8_t{dw_op_fbreg}, out);
+               adjust_addr(out);
+               psio::to_bin(std::uint8_t{dw_op_deref_size}, out);
+               psio::to_bin(psio::from_bin<std::uint8_t>(s), out);
+               break;
+            }
+            case dw_op_push_object_address:
+            {
+               psio::to_bin(std::uint8_t{dw_op_push_object_address}, out);
                psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
-               psio::to_bin(std::uint8_t{dw_op_breg4}, out);
-               psio::varuint32_to_bin(0, out);
-               psio::to_bin(std::uint8_t{dw_op_minus}, out);
+               addr_to_wasm(out);
+               break;
+            }
+            case dw_op_abs:
+            {
+               sign_extend(out);
+               psio::to_bin(std::uint8_t{dw_op_abs}, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_and:
+            {
+               psio::to_bin(std::uint8_t{dw_op_and}, out);
+               break;
+            }
+            case dw_op_div:
+            {
+               sign_extend2(out);
+               psio::to_bin(std::uint8_t{dw_op_div}, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_minus:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_mod:
+            {
+               sign_extend2(out);
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_mul:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_neg:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_not:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_or:
+            {
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_plus:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_plus_uconst:
+            {
+               psio::to_bin(op, out);
+               psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
+               truncate(out);
+               break;
+            }
+            case dw_op_shl:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_shr:
+            {
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_shra:
+            {
+               psio::to_bin(std::uint8_t{dw_op_swap}, out);
+               sign_extend(out);
+               psio::to_bin(std::uint8_t{dw_op_swap}, out);
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_xor:
+            {
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_le:
+            case dw_op_ge:
+            case dw_op_lt:
+            case dw_op_gt:
+            {
+               sign_extend2(out);
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_eq:
+            case dw_op_ne:
+            {
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_nop:
+            {
                break;
             }
             case dw_op_implicit_value:
@@ -1565,6 +1795,9 @@ namespace dwarf
             {
                if (state == native_address)
                {
+                  // clang generates DW_OP_wasm_location, DW_OP_stack_value
+                  // for the frame base. I'm not quite sure what stack_value
+                  // applied to a register location is supposed to mean.
                   psio::to_bin(std::uint8_t{dw_op_deref_size}, out);
                   psio::to_bin(std::uint8_t{4}, out);
                   state = wasm_address;
@@ -1592,14 +1825,47 @@ namespace dwarf
                      break;
                   }
                   case 1:
+                  {
+                     auto idx  = psio::varuint32_from_bin(s);
+                     auto addr = &mod.globals[idx].current.value;
+                     psio::to_bin(std::uint8_t{dw_op_addr}, out);
+                     psio::to_bin(reinterpret_cast<std::uint64_t>(addr), out);
+                     state = native_address;
+                     break;
+                  }
                   case 2:
+                  {
+                     if (!frame)
+                        throw std::runtime_error("Cannot access local without frame info");
+                     auto    idx = psio::varuint32_from_bin(s);
+                     int32_t off = frame->get_stack_offset(idx);
+                     psio::to_bin(std::uint8_t{dw_op_breg6}, out);
+                     psio::sleb64_to_bin(off, out);
+                     state = native_address;
+                     break;
+                  }
                   case 3:
+                  {
+                     auto idx  = psio::from_bin<std::uint32_t>(s);
+                     auto addr = &mod.globals[idx].current.value;
+                     psio::to_bin(std::uint8_t{dw_op_addr}, out);
+                     psio::to_bin(reinterpret_cast<std::uint64_t>(addr), out);
+                     state = native_address;
+                     break;
+                  }
                   default:
-                     throw std::runtime_error("invalid wasm location");
+                     throw std::runtime_error("invalid DW_OP_wasm_location");
                }
                break;
             }
             default:
+               // breg, reg: should use wasm_location instead
+               // xderef, xderef_size: Would need a definition of address space
+               // form_tls_address: doesn't make sense without threads
+               // call_frame_cfa: clang doesn't generate debug_frame or eh_frame, and
+               //   we're not trying to translate those sections.
+               // skip, bra: Relocations are annoying to implement. Overflow is possible as well.
+               // call: The relocations would need to be stored in the attribute somehow.
                throw std::runtime_error("not implemented");
          }
       }
@@ -1674,10 +1940,11 @@ namespace dwarf
          std::optional<uint32_t>                 low_pc;
          std::optional<debug_eos_vm::wasm_frame> frame;
       };
-      void translate_attr(const abbrev_attr& attr,
-                          attr_value&        value,
-                          subprogram_info&   info,
-                          die_pattern&       out)
+      void translate_attr(const abbrev_attr&     attr,
+                          attr_value&            value,
+                          subprogram_info&       info,
+                          die_pattern&           out,
+                          const subprogram_info* current_fn = nullptr)
       {
          overloaded o{[&](const attr_address& a) {
                          out.attrs.push_back({attr.name, translate_address(a.value)});
@@ -1690,13 +1957,24 @@ namespace dwarf
                       },
                       [&](const attr_exprloc& a)
                       {
-                         auto*               frame = info.frame ? &*info.frame : nullptr;
+                         const auto* frame = info.frame ? &*info.frame : nullptr;
+                         if (!frame && current_fn)
+                         {
+                            if (!current_fn->frame)
+                               return;
+                            frame = &*current_fn->frame;
+                         }
+                         else if (!frame && info.low_pc)
+                         {
+                            return;
+                         }
                          native_attr_exprloc translated;
                          psio::vector_stream stream{translated.data};
                          auto                input = a.data;
                          try
                          {
-                            translate_expr(frame, input, stream);
+                            translate_expr(frame, mod, input, stream,
+                                           attr.name == dw_at_data_member_location);
                          }
                          catch (std::runtime_error)
                          {
@@ -1771,10 +2049,11 @@ namespace dwarf
                break;
          }
       }
-      void write_die_children(unit_parser&        parser,
-                              const abbrev_decl&  abbrev,
-                              psio::input_stream& s,
-                              bool                inline_ = false)
+      void write_die_children(unit_parser&           parser,
+                              const abbrev_decl&     abbrev,
+                              psio::input_stream&    s,
+                              const subprogram_info* current_fn = nullptr,
+                              bool                   inline_    = false)
       {
          if (!abbrev.has_children)
             return;
@@ -1785,7 +2064,7 @@ namespace dwarf
             auto child = parser.get_die_abbrev(s);
             if (!child)
                break;
-            write_die(parser, *child, s);
+            write_die(parser, *child, s, current_fn);
          }
          if (!inline_)
          {
@@ -1793,7 +2072,10 @@ namespace dwarf
             psio::varuint32_to_bin(0, info_s);  // end children
          }
       }
-      void write_die(unit_parser& parser, const abbrev_decl& abbrev, psio::input_stream& s)
+      void write_die(unit_parser&           parser,
+                     const abbrev_decl&     abbrev,
+                     psio::input_stream&    s,
+                     const subprogram_info* current_fn = nullptr)
       {
          die_pattern die;
          die.tag          = abbrev.tag;
@@ -1801,11 +2083,11 @@ namespace dwarf
          subprogram_info info;
          parser.parse_die_attrs_local(abbrev, s,
                                       [&](const abbrev_attr& attr, attr_value& value)
-                                      { translate_attr(attr, value, info, die); });
+                                      { translate_attr(attr, value, info, die, current_fn); });
          if (abbrev.tag == dw_tag_subprogram)
          {
             write_die(die);
-            write_die_children(parser, abbrev, s);
+            write_die_children(parser, abbrev, s, &info);
          }
          else if (abbrev.tag == dw_tag_compile_unit)
          {
@@ -1950,7 +2232,7 @@ namespace dwarf
          }
          else
          {
-            write_die_children(parser, abbrev, s, true);
+            write_die_children(parser, abbrev, s, nullptr, true);
          }
       }
       void write_debug_info_unit(psio::input_stream whole_s,
