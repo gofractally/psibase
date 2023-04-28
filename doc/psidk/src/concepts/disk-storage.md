@@ -1,6 +1,6 @@
 # Disk Storage - Introduction
 
-Psibase services and their corresponding application state are stored in an in-memory database to maximize retrieval performance. But in order to scale data storage capabilities, it is necessary for Psibase nodes to make use of slower but lower-cost disk storage.
+Psibase services and their corresponding application state are perfectly replicated across all nodes on the network in a performant database that can even store to disk but uses an in-memory cache to maximize retrieval performance. But a mechanism is needed to better scale data storage and retrieval capabilities in a way that doesn't jeapordize performance of application-critical state and business-logic. Psibase nodes therefore also provide the infrastructure that enables the use of slower but lower-cost disk storage for specific data without attempting to use the in-memory cache. This also enables the data storage and retrieval process to be asynchronous with block production and propagation.
 
 ## IPFS
 
@@ -99,11 +99,9 @@ When someone without a Psibase account uses their browser to access Psibase, the
 
 Anyone who exceeds a certain bandwidth rate may have their bandwidth throttled by the network. Authenticated users avoid bandwidth throttling by paying a fixed cost per byte of downloaded data in order to maintain their priority connection. This fixed cost is a single rate shared by all IPs, and can be changed at any time with the consensus of the active IP. Sharing a single download bandwidth rate (rather than allowing IPs to set their own individual rates) is intended to prevent IPs from setting excessively high bandwidth rates in order to save costs and effectively outsource download services to the other IPs.
 
-To download a file, a user makes a normal web request to a node for a resource at a particular path. If the request includes a bearer token, the user is implicitly authenticated, and therefore given bandwidth priority. The node looks up the CID stored at the path of the specified service, and then services that file from its own local IPFS storage. If the file is served, then the file size is added to the user's daily consumed bandwidth allowance (<span style="color:red"> TODO: This would mean that there is a state change on every single read, is there a way to avoid this?</span>). If the consumed bandwidth exceeds the daily allowance, the user is billed per byte of downloaded data.
+To download a file, a user makes a normal web request to a node for a resource at a particular path. If the request includes a bearer token, the user is implicitly authenticated, and therefore given bandwidth priority. The node looks up the CID stored at the path of the specified service, and then services that file from its own local IPFS storage. If the file is served, then the file size is added to the user's daily consumed bandwidth allowance. To avoid state changes for every read, a node may store the amount of consumed bandwidth on a per-IP basis and update the chain in batch settlements. If the consumed bandwidth exceeds the daily allowance, the user is billed per byte of downloaded data. This also implies that a use trying to maximize their free download bandwidth could download up to the daily allowed limit from all infrastructure providers before paying for any additional bandwidth. This functionally results in load-balancing across multiple infrastructure providers and helping to ensure that each IP is correctly serving IPFS data.
 
 If the CID of the file does exist in an irreversible block, but the node does not have the CID, it may simply return a 404 error code to the HTTP request.
-
-<span style="color:red"> TODO - Is the daily allowed download bandwidth limit per-IP? In which case, a user could consume their daily bandwidth allowance from each IP before having to pay anything. This might be helpful to ensure that many IPs are robust and able to serve files.</span>
 
 ### Billing details - Security
 
@@ -132,7 +130,9 @@ If a user prefers, they can run their own IPFS client and attempt to peer files 
 
 Infrastructure providers may peer to any other IPFS client who claims to hold a file for which a CID exists in an irreversible block. By default, an IP will only peer download a file from a party who is either a current active infrastructure provider or a third-party who has posted a bond sufficient to cover the cost of the bandwidth needed to transfer the file.
 
-After any download, if the file verification fails (the content hash doesn't match the CID), then an IP can blacklist the client and report the download failure. If 2/3rds of active IPs report a download failure for the same client, the client's bond is automatically burned. If the client belongs to an IP candidate, that candidate is automatically unregistered. If the client belongs to an active IP, they are removed from the active set and unregistered. <span style="color:red"> Shouldn't a client's bond size need to be (2/3rds active set size * bandwidth cost)? Since it could consume 2/3rds set size bandwidth as each IP attempts to peer before being confirmed fraudulent.</span> 
+In order for a bond to be sufficient to cover the download of any particular file, it must be greater than or equal to the number of IPs in the active set multiplied by the cost of the bandwidth to transfer the file. This is because the file may be transferred to the entire IP set before it is discovered that the file was fraudulent, and therefore a fraudulent file can waste `file_size * nr_active_ip_set` total bandwidth.
+
+After any download, if the file verification fails (the content hash doesn't match the CID), then an IP can blacklist the client and report the download failure. If 2/3rds of active IPs report a download failure for the same client, the client's bond is automatically burned. If the client belongs to an IP candidate, that candidate is automatically unregistered. If the client belongs to an active IP, they are removed from the active set and unregistered.
 
 This capability allows anyone to run their own node to save on upload bandwidth costs. Since, if they are honest, the BPs will be able to peer the file from the user without a problem, their bond is never slashed, and they don't have to pay for the regular upload bandwidth fee incurred by executing a traditional upload. This helps decrease the load on the active IP set and further decentralize service provision by introducing third-parties who host files and service peering requests from the active validator set. 
 
@@ -154,9 +154,9 @@ Every IP must publish their current rate that they charge for upload bandwidth. 
 
 The message that indicates that a user should be billed/refunded for an attempt to perform an upload or download will only be accepted if it comes from another active infrastructure provider. Therefore, if an infrastructure provider exits the active set partway through a user-upload, they will be unable to charge the user. As long as the IP has a bond sufficient to cover the file upload bandwidth, other producers will still peer the file from it and the file could still be fully uploaded. In this case, the user was able to upload the file for free. This is not a problem, since there's no way for the user to game this possibility to consistently achieve free uploads. If the bond of the former active infrastructure provider is insufficient to cover the bandwidth, the file upload will have failed to propagate on the network, but the user also will not have incurred any cost, so they must simply try the upload again with an active IP.
 
-### Legality
+### Blacklists
 
-An active IP with a valid file (the file hash matches its declared CID) must keep a file pinned, regardless of origin. <span style="color:red"> Are there legal issues here? An IP may require the right to blacklist certain content.</span>
+An active IP with a valid file (the file hash matches its declared CID) should keep a file pinned, regardless of origin. If an IP is compelled by the legal requirements of their jurisdiction to blacklist some content, then they may do so by adding a CID to a blacklist. The blacklist is an IP-specific on-chain list of CIDs for which the IP will not request any peering from others and will not provide even if requested for download. Of course, if valid content is blacklisted then the community has the right and the ability to remove the IP from the active set.
 
 # Conclusion
 
