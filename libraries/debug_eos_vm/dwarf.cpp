@@ -1619,6 +1619,49 @@ namespace dwarf
                state = wasm_address;
                break;
             }
+            case dw_op_const1s:
+            {
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::from_bin<std::int8_t>(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const2s:
+            {
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::from_bin<std::int16_t>(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const4s:
+            {
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(psio::from_bin<std::uint32_t>(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const8s:
+            {
+               // Truncate to the wasm stack element size
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::from_bin<std::int64_t>(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_constu:
+            {
+               psio::to_bin(std::uint8_t{dw_op_constu}, out);
+               psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_consts:
+            {
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::sleb64_from_bin(s)), out);
+               state = wasm_address;
+               break;
+            }
             case dw_op_fbreg:
             {
                psio::to_bin(std::uint8_t{dw_op_fbreg}, out);
