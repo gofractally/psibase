@@ -1,6 +1,13 @@
 function isLocalhost() {
     const hostname = window.location.hostname;
-    return hostname.includes('localhost') || hostname.includes('127.0.0.1');
+    const localhostPatterns = [
+        /^(.*\.)?localhost:.*$/,
+        /^(.*\.)?127\.0\.0\.1(\..*)?$/,
+        /^\[::1\]:.*$/,
+        /^(.*\.)?--1(\..*)?$/ // ipv6 sslip.io
+    ];
+
+    return localhostPatterns.some(pattern => pattern.test(hostname));
 }
 
 const GRAFANA_PORT = 3000;
