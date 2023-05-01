@@ -25,12 +25,12 @@ initializeApplet(async () => {
           }
           let tokenId = token.id;
 
-          await action(contractName, "credit", 
-            { 
-              tokenId, 
-              receiver, 
-              amount: {value: amount }, 
-              memo: {contents: memo},
+          await action(contractName, "credit",
+            {
+              tokenId,
+              receiver,
+              amount: {value: amount },
+              memo,
           });
         },
     }
@@ -123,7 +123,7 @@ function EmptyPanel() {
   `;
 }
 
-function GetMessage(props) 
+function GetMessage(props)
 {
   if (props.show === true)
   {
@@ -173,14 +173,14 @@ function SendPanel() {
 }
 
 const panes = [
-  { 
-    menuItem: 'Send', 
+  {
+    menuItem: 'Send',
     render: () => {
-      return html`<${Tab.Pane}><${SendPanel} /></${Tab.Pane}>`; 
+      return html`<${Tab.Pane}><${SendPanel} /></${Tab.Pane}>`;
     },
   },
-  { 
-    menuItem: 'Swap', 
+  {
+    menuItem: 'Swap',
     render: () => {
       return html`<${Tab.Pane}><${EmptyPanel} /></${Tab.Pane}>`;
     },
