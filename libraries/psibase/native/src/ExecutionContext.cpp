@@ -19,9 +19,8 @@ using eosio::vm::span;
 namespace psibase
 {
    struct ExecutionContextImpl;
-   using rhf_t = eosio::vm::registered_host_functions<ExecutionContextImpl>;
-   using backend_t =
-       eosio::vm::backend<rhf_t, eosio::vm::jit_profile, VMOptions, debug_eos_vm::debug_instr_map>;
+   using rhf_t     = eosio::vm::registered_host_functions<ExecutionContextImpl>;
+   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit_profile, VMOptions>;
 
    // Rethrow with detailed info
    template <typename F>
@@ -199,13 +198,23 @@ namespace psibase
                 backend = transactionContext.blockContext.systemContext.wasmCache.impl->get(
                     code.codeHash, vmOptions);
                 if (!backend.backend)
-                   backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
-                if (!backend.debug)
                 {
                    psio::input_stream s{reinterpret_cast<const char*>(c->code.data()),
                                         c->code.size()};
-                   auto               info = dwarf::get_info_from_wasm(s);
-                   backend.debug = debug_eos_vm::enable_debug(c->code, *backend.backend, info, s);
+                   if (dwarf::has_debug_info(s))
+                   {
+                      debug_eos_vm::debug_instr_map debug;
+                      backend.backend =
+                          std::make_unique<backend_t>(c->code, nullptr, vmOptions, debug);
+                      auto info     = dwarf::get_info_from_wasm(s);
+                      backend.debug = dwarf::register_with_debugger(
+                          info, debug.locs, backend.backend->get_module(), s);
+                   }
+                   else
+                   {
+                      backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
+                      backend.debug = dwarf::register_with_debugger(backend.backend->get_module());
+                   }
                 }
              });
       }

@@ -2486,11 +2486,10 @@ namespace dwarf
       }
    }
 
-   void write_symtab(uint16_t                       code_section,
-                     std::vector<char>&             strings,
-                     std::vector<char>&             symbol_data,
-                     const std::vector<jit_fn_loc>& fn_locs,
-                     const eosio::vm::module&       mod)
+   void write_symtab(uint16_t                 code_section,
+                     std::vector<char>&       strings,
+                     std::vector<char>&       symbol_data,
+                     const eosio::vm::module& mod)
    {
       Elf64_Sym null_sym;
       memset(&null_sym, 0, sizeof(null_sym));
@@ -2513,7 +2512,14 @@ namespace dwarf
          sym.st_name = add_str(strings, name);
          symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
       };
-      add_sym(0, fn_locs.empty() ? code_size : fn_locs.front().code_prologue, "_wasm_entry");
+      add_sym(0, mod.code.size() == 0 ? code_size : mod.code[0].jit_code_offset, "_wasm_entry");
+
+      auto get_function_bounds = [&](uint32_t idx)
+      {
+         auto lower = mod.code[idx].jit_code_offset;
+         auto upper = (idx + 1 < mod.code.size()) ? mod.code[idx + 1].jit_code_offset : code_size;
+         return std::pair{lower, upper};
+      };
 
       for (std::size_t i = 0; i < mod.exports.size(); ++i)
       {
@@ -2523,18 +2529,18 @@ namespace dwarf
             auto idx = exp.index;
             if (idx > num_imported)
             {
-               const auto& fn = fn_locs[idx - num_imported];
+               auto [start, end] = get_function_bounds(idx - num_imported);
                std::string name(reinterpret_cast<const char*>(exp.field_str.raw()),
                                 exp.field_str.size());
-               add_sym(fn.code_prologue, fn.code_end, name.c_str());
+               add_sym(start, end, name.c_str());
             }
          }
       }
 
-      for (std::size_t i = 0; i < fn_locs.size(); ++i)
+      for (std::size_t i = 0; i < mod.code.size(); ++i)
       {
-         add_sym(fn_locs[i].code_prologue, fn_locs[i].code_end,
-                 ("<" + std::to_string(num_imported + i) + ">").c_str());
+         auto [start, end] = get_function_bounds(i);
+         add_sym(start, end, ("<" + std::to_string(num_imported + i) + ">").c_str());
       }
    }
 
@@ -2670,6 +2676,12 @@ namespace dwarf
       std::sort(result.locations.begin(), result.locations.end());
       return result;
    }  // get_info_from_wasm
+
+   bool has_debug_info(psio::input_stream stream)
+   {
+      auto sections = get_dwarf_sections(stream);
+      return sections.debug_line.remaining() || sections.debug_info.remaining();
+   }
 
    const char* debug_str::get(uint32_t offset) const
    {
@@ -2808,6 +2820,60 @@ namespace dwarf
       }
    };
 
+   Elf64_Ehdr make_ehdr(const void* entry, uint16_t num_sections, uint16_t strtab_section)
+   {
+      return {
+          .e_ident     = {ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT,
+                          ELFOSABI_LINUX, 0},
+          .e_type      = ET_EXEC,
+          .e_machine   = EM_X86_64,
+          .e_version   = EV_CURRENT,
+          .e_entry     = Elf64_Addr(entry),
+          .e_phoff     = 0,
+          .e_shoff     = 0,
+          .e_flags     = 0,
+          .e_ehsize    = sizeof(Elf64_Ehdr),
+          .e_phentsize = sizeof(Elf64_Phdr),
+          .e_phnum     = 1,
+          .e_shentsize = sizeof(Elf64_Shdr),
+          .e_shnum     = num_sections,
+          .e_shstrndx  = strtab_section,
+      };
+   }
+
+   Elf64_Phdr make_phdr(const void* code_start, std::uint64_t code_size)
+   {
+      return {
+          .p_type   = PT_LOAD,
+          .p_flags  = PF_X | PF_R,
+          .p_offset = 0,
+          .p_vaddr  = (Elf64_Addr)code_start,
+          .p_paddr  = 0,
+          .p_filesz = 0,
+          .p_memsz  = code_size,
+          .p_align  = 0,
+      };
+   }
+
+   Elf64_Shdr make_shdr(std::vector<char>& strings,
+                        const char*        name,
+                        Elf64_Word         type,
+                        Elf64_Xword        flags)
+   {
+      return {
+          .sh_name      = add_str(strings, name),
+          .sh_type      = type,
+          .sh_flags     = flags,
+          .sh_addr      = 0,
+          .sh_offset    = 0,
+          .sh_size      = 0,
+          .sh_link      = 0,
+          .sh_info      = 0,
+          .sh_addralign = 0,
+          .sh_entsize   = 0,
+      };
+   }
+
    std::shared_ptr<debugger_registration> register_with_debugger(  //
        info&                    info,
        const jit_info&          reloc,
@@ -2859,54 +2925,18 @@ namespace dwarf
       constexpr uint16_t num_sections   = 8;
       constexpr uint16_t strtab_section = 1;
       constexpr uint16_t code_section   = 2;
-      Elf64_Ehdr         elf_header{
-                  .e_ident = {ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT,
-                              ELFOSABI_LINUX, 0},
-                  .e_type      = ET_EXEC,
-                  .e_machine   = EM_X86_64,
-                  .e_version   = EV_CURRENT,
-                  .e_entry     = Elf64_Addr(code_start),
-                  .e_phoff     = 0,
-                  .e_shoff     = 0,
-                  .e_flags     = 0,
-                  .e_ehsize    = sizeof(elf_header),
-                  .e_phentsize = sizeof(Elf64_Phdr),
-                  .e_phnum     = 1,
-                  .e_shentsize = sizeof(Elf64_Shdr),
-                  .e_shnum     = num_sections,
-                  .e_shstrndx  = strtab_section,
-      };
-      auto elf_header_pos = result->write(elf_header);
+      Elf64_Ehdr         elf_header     = make_ehdr(code_start, num_sections, strtab_section);
+      auto               elf_header_pos = result->write(elf_header);
 
-      elf_header.e_phoff = result->symfile.size();
-      Elf64_Phdr program_header{
-          .p_type   = PT_LOAD,
-          .p_flags  = PF_X | PF_R,
-          .p_offset = 0,
-          .p_vaddr  = (Elf64_Addr)code_start,
-          .p_paddr  = 0,
-          .p_filesz = 0,
-          .p_memsz  = code_size,
-          .p_align  = 0,
-      };
-      auto program_header_pos = result->write(program_header);
+      elf_header.e_phoff            = result->symfile.size();
+      Elf64_Phdr program_header     = make_phdr(code_start, code_size);
+      auto       program_header_pos = result->write(program_header);
 
       elf_header.e_shoff = result->symfile.size();
       auto sec_header    = [&](const char* name, Elf64_Word type, Elf64_Xword flags)
       {
-         Elf64_Shdr header{
-             .sh_name      = add_str(strings, name),
-             .sh_type      = type,
-             .sh_flags     = flags,
-             .sh_addr      = 0,
-             .sh_offset    = 0,
-             .sh_size      = 0,
-             .sh_link      = 0,
-             .sh_info      = 0,
-             .sh_addralign = 0,
-             .sh_entsize   = 0,
-         };
-         auto pos = result->write(header);
+         Elf64_Shdr header = make_shdr(strings, name, type, flags);
+         auto       pos    = result->write(header);
          return std::pair{header, pos};
       };
       auto [reserved_sec_header, reserved_sec_header_pos] = sec_header(0, 0, 0);
@@ -2938,13 +2968,71 @@ namespace dwarf
       symbol_sec_header.sh_link    = strtab_section;
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
       write_subprograms(abbrev_data, info_data, info, mod, reloc, input_sections.debug_info);
-      write_symtab(code_section, strings, symbol_data, reloc.fn_locs, mod);
+      write_symtab(code_section, strings, symbol_data, mod);
       write_cfi(frame_data, reloc.fn_locs, code_start, code_size);
 
       write_sec(line_sec_header, line_sec_header_pos, generate_debug_line(info, reloc, code_start));
       write_sec(abbrev_sec_header, abbrev_sec_header_pos, abbrev_data);
       write_sec(info_sec_header, info_sec_header_pos, info_data);
       write_sec(frame_sec_header, frame_sec_header_pos, frame_data);
+      write_sec(symbol_sec_header, symbol_sec_header_pos, symbol_data);
+      write_sec(str_sec_header, str_sec_header_pos, strings);
+      result->write(elf_header_pos, elf_header);
+
+      result->reg();
+      return result;
+   }
+
+   std::shared_ptr<debugger_registration> register_with_debugger(const eosio::vm::module& mod)
+   {
+      auto code_start = mod.allocator.get_code_start();
+      auto code_size  = mod.allocator._code_size;
+
+      auto              result = std::make_shared<debugger_registration>();
+      std::vector<char> strings;
+      strings.push_back(0);
+
+      // null, strtab, symtab, text
+      constexpr uint16_t num_sections   = 4;
+      constexpr uint16_t strtab_section = 1;
+      constexpr uint16_t code_section   = 2;
+
+      Elf64_Ehdr elf_header     = make_ehdr(code_start, num_sections, strtab_section);
+      auto       elf_header_pos = result->write(elf_header);
+
+      elf_header.e_phoff            = result->symfile.size();
+      Elf64_Phdr program_header     = make_phdr(code_start, code_size);
+      auto       program_header_pos = result->write(program_header);
+
+      elf_header.e_shoff = result->symfile.size();
+      auto sec_header    = [&](const char* name, Elf64_Word type, Elf64_Xword flags)
+      {
+         Elf64_Shdr header = make_shdr(strings, name, type, flags);
+         auto       pos    = result->write(header);
+         return std::pair{header, pos};
+      };
+      auto [reserved_sec_header, reserved_sec_header_pos] = sec_header(0, 0, 0);
+      auto [str_sec_header, str_sec_header_pos]           = sec_header(".shstrtab", SHT_STRTAB, 0);
+      auto [code_sec_header, code_sec_header_pos] =
+          sec_header(".text", SHT_NOBITS, SHF_ALLOC | SHF_EXECINSTR);
+      auto [symbol_sec_header, symbol_sec_header_pos] = sec_header(".symtab", SHT_SYMTAB, 0);
+
+      code_sec_header.sh_addr = Elf64_Addr(code_start);
+      code_sec_header.sh_size = code_size;
+      result->write(code_sec_header_pos, code_sec_header);
+
+      auto write_sec = [&](auto& header, auto pos, const auto& data)
+      {
+         header.sh_offset = result->append(data);
+         header.sh_size   = data.size();
+         result->write(pos, header);
+      };
+
+      std::vector<char> symbol_data;
+      symbol_sec_header.sh_link    = strtab_section;
+      symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
+      write_symtab(code_section, strings, symbol_data, mod);
+
       write_sec(symbol_sec_header, symbol_sec_header_pos, symbol_data);
       write_sec(str_sec_header, str_sec_header_pos, strings);
       result->write(elf_header_pos, elf_header);
