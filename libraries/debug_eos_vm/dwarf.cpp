@@ -10,6 +10,8 @@
 #include <psio/from_bin.hpp>
 #include <psio/to_bin.hpp>
 
+#include <mutex>
+
 #include <cxxabi.h>
 #include <elf.h>
 #include <stdio.h>
@@ -2729,6 +2731,7 @@ extern "C"
 
 namespace dwarf
 {
+   static std::mutex jit_debug_descriptor_mutex;
    struct debugger_registration
    {
       jit_code_entry    desc;
@@ -2736,6 +2739,7 @@ namespace dwarf
 
       ~debugger_registration()
       {
+         std::lock_guard l{jit_debug_descriptor_mutex};
          if (desc.next_entry)
             desc.next_entry->prev_entry = desc.prev_entry;
          if (desc.prev_entry)
@@ -2751,6 +2755,7 @@ namespace dwarf
       {
          desc.symfile_addr = symfile.data();
          desc.symfile_size = symfile.size();
+         std::lock_guard l{jit_debug_descriptor_mutex};
          if (__jit_debug_descriptor.first_entry)
          {
             __jit_debug_descriptor.first_entry->prev_entry = &desc;
