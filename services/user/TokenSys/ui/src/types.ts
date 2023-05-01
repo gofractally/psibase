@@ -42,7 +42,7 @@ export type TransferResult = {
     amount: { value: string };
     event_id: string;
     event_type: string;
-    memo: { contents: string };
+    memo: string ;
     prevEvent: string;
     receiver: string;
     sender: string;

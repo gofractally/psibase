@@ -99,7 +99,7 @@ export class TokenContract extends Service {
             tokenId,
             receiver,
             amount: { value: String(amount) },
-            memo: { contents: memo },
+            memo,
         };
     }
 
@@ -130,7 +130,7 @@ export class TokenContract extends Service {
             tokenId,
             receiver,
             maxAmount: { value: String(maxAmount) },
-            memo: { contents: memo },
+            memo,
         };
     }
 
@@ -161,7 +161,7 @@ export class TokenContract extends Service {
             tokenId,
             sender,
             amount: { value: String(amount) },
-            memo: { contents: memo },
+            memo,
         };
     }
 
