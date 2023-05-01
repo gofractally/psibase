@@ -1,6 +1,19 @@
-const DASHBOARDS_PREFIX =
-    window.location.hostname === "localhost"
-        ? "http://localhost:8091/grafana"
+function isLocalhost() {
+    const hostname = window.location.hostname;
+    const localhostPatterns = [
+        /^(.*\.)?localhost.*$/,
+        /^(.*\.)?127\.0\.0\.1(\..*)?$/,
+        /^(.*\.)?127\.0\.0\.1:(.*)?$/,
+        /^\[::1\].*$/,
+        /^(.*\.)?--1(\..*)?/ // ipv6 sslip.io
+    ];
+
+    return localhostPatterns.some(pattern => pattern.test(hostname));
+}
+
+const GRAFANA_PORT = 3000;
+const DASHBOARDS_PREFIX = isLocalhost()
+        ? `http://${window.location.hostname}:${GRAFANA_PORT}/grafana`
         : "/grafana";
 
 export const DashboardPage = () => {
