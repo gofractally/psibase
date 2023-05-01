@@ -801,21 +801,21 @@ namespace dwarf
       return pos - fns.begin();
    }
 
-   std::optional<std::pair<uint64_t, uint64_t>> get_addr_range(
-       const info&                       info,
-       const std::vector<jit_fn_loc>&    fn_locs,
-       const std::vector<jit_instr_loc>& instr_locs,
-       const void*                       code_start,
-       uint32_t                          begin,
-       uint32_t                          end)
+   std::optional<std::pair<uint64_t, uint64_t>> get_addr_range(const info&     info,
+                                                               const jit_info& reloc,
+                                                               const void*     code_start,
+                                                               uint32_t        begin,
+                                                               uint32_t        end)
    {
+      auto find_instr = [&](auto value)
+      {
+         return std::ranges::partition_point(
+             reloc.instr_locs, [value](const auto& loc) { return loc.wasm_addr < value; });
+      };
       // TODO: cuts off a range which ends at the wasm's end
-      auto it1 =
-          std::lower_bound(instr_locs.begin(), instr_locs.end(), info.wasm_code_offset + begin,
-                           [](const auto& a, auto b) { return a.wasm_addr < b; });
-      auto it2 = std::lower_bound(instr_locs.begin(), instr_locs.end(), info.wasm_code_offset + end,
-                                  [](const auto& a, auto b) { return a.wasm_addr < b; });
-      if (it1 < it2 && it2 != instr_locs.end())
+      auto it1 = find_instr(info.wasm_code_offset + begin);
+      auto it2 = find_instr(info.wasm_code_offset + end);
+      if (it1 < it2 && it2 != reloc.instr_locs.end())
       {
          return std::pair{uint64_t((char*)code_start + it1->code_offset),
                           uint64_t((char*)code_start + it2->code_offset)};
@@ -824,11 +824,7 @@ namespace dwarf
    }
 
    template <typename S>
-   void write_line_program(const info&                       info,
-                           const std::vector<jit_fn_loc>&    fn_locs,
-                           const std::vector<jit_instr_loc>& instr_locs,
-                           const void*                       code_start,
-                           S&                                s)
+   void write_line_program(const info& info, const jit_info& reloc, const void* code_start, S& s)
    {
       uint64_t address = 0;
       uint32_t file    = 1;
@@ -845,8 +841,7 @@ namespace dwarf
 
       for (auto& loc : info.locations)
       {
-         auto range = get_addr_range(info, fn_locs, instr_locs, code_start, loc.begin_address,
-                                     loc.end_address);
+         auto range = get_addr_range(info, reloc, code_start, loc.begin_address, loc.end_address);
          if (!range)
             continue;
 
@@ -917,10 +912,9 @@ namespace dwarf
       });
    }  // write_line_program
 
-   std::vector<char> generate_debug_line(const info&                       info,
-                                         const std::vector<jit_fn_loc>&    fn_locs,
-                                         const std::vector<jit_instr_loc>& instr_locs,
-                                         const void*                       code_start)
+   std::vector<char> generate_debug_line(const info&     info,
+                                         const jit_info& reloc,
+                                         const void*     code_start)
    {
       line_header header;
       header.file_names.push_back("");
@@ -928,7 +922,7 @@ namespace dwarf
       psio::size_stream header_size;
       to_bin(header, header_size);
       psio::size_stream program_size;
-      write_line_program(info, fn_locs, instr_locs, code_start, program_size);
+      write_line_program(info, reloc, code_start, program_size);
 
       std::vector<char>      result(header_size.size + program_size.size + 22);
       psio::fixed_buf_stream s{result.data(), result.size()};
@@ -937,7 +931,7 @@ namespace dwarf
       psio::to_bin(uint16_t(lns_version), s);
       psio::to_bin(uint64_t(header_size.size), s);
       to_bin(header, s);
-      write_line_program(info, fn_locs, instr_locs, code_start, s);
+      write_line_program(info, reloc, code_start, s);
       psio::check(s.pos == s.end, "generate_debug_line: calculated incorrect stream size");
       return result;
    }
@@ -1941,10 +1935,9 @@ namespace dwarf
       const info&              dwarf_info;
       const eosio::vm::module& mod;
 
-      const std::vector<jit_fn_loc>&    fn_locs;
-      const std::vector<jit_instr_loc>& instr_locs;
-      std::uint32_t                     wasm_code_offset;
-      const void*                       code_start;
+      const jit_info& reloc;
+      std::uint32_t   wasm_code_offset;
+      const void*     code_start;
 
       std::map<die_pattern, uint32_t> codes;
       relocation_list                 relocations;
@@ -1981,10 +1974,10 @@ namespace dwarf
       {
          if (wasm_addr == 0xffffffff)
             return {0xffffffffffffffff};
-         auto pos =
-             std::lower_bound(instr_locs.begin(), instr_locs.end(), wasm_code_offset + wasm_addr,
-                              [](const auto& a, auto b) { return a.wasm_addr < b; });
-         if (pos != instr_locs.end())
+         auto pos = std::ranges::partition_point(
+             reloc.instr_locs,
+             [addr = wasm_code_offset + wasm_addr](const auto& a) { return a.wasm_addr < addr; });
+         if (pos != reloc.instr_locs.end())
          {
             return {reinterpret_cast<uint64_t>(mod.allocator.get_code_start()) + pos->code_offset};
          }
@@ -2176,7 +2169,7 @@ namespace dwarf
             current_fn = &info;
             if (attrs.low_pc && *attrs.low_pc != 0xffffffff)
             {
-               if (auto fn = get_wasm_fn(fn_locs, *attrs.low_pc + wasm_code_offset))
+               if (auto fn = get_wasm_fn(reloc.fn_locs, *attrs.low_pc + wasm_code_offset))
                {
                   info.frame.emplace(mod, *fn);
                }
@@ -2320,16 +2313,15 @@ namespace dwarf
       }
    };
 
-   void write_subprograms(std::vector<char>&                abbrev_data,
-                          std::vector<char>&                info_data,
-                          const info&                       info,
-                          const eosio::vm::module&          mod,
-                          const std::vector<jit_fn_loc>&    fn_locs,
-                          const std::vector<jit_instr_loc>& instr_locs,
-                          psio::input_stream                info_section)
+   void write_subprograms(std::vector<char>&       abbrev_data,
+                          std::vector<char>&       info_data,
+                          const info&              info,
+                          const eosio::vm::module& mod,
+                          const jit_info&          reloc,
+                          psio::input_stream       info_section)
    {
-      debug_info_visitor gen{abbrev_data, info_data, info.strings, info.abbrev_decls,    info,
-                             mod,         fn_locs,   instr_locs,   info.wasm_code_offset};
+      debug_info_visitor gen{abbrev_data, info_data, info.strings, info.abbrev_decls,
+                             info,        mod,       reloc,        info.wasm_code_offset};
       gen.write_debug_info(info_section);
    }  // write_subprograms
 
@@ -2793,20 +2785,19 @@ namespace dwarf
    };
 
    std::shared_ptr<debugger_registration> register_with_debugger(  //
-       info&                             info,
-       const std::vector<jit_fn_loc>&    fn_locs,
-       const std::vector<jit_instr_loc>& instr_locs,
-       const eosio::vm::module&          mod,
-       psio::input_stream                wasm_source)
+       info&                    info,
+       const jit_info&          reloc,
+       const eosio::vm::module& mod,
+       psio::input_stream       wasm_source)
    {
       auto code_start = mod.allocator.get_code_start();
       auto code_size  = mod.allocator._code_size;
 
       auto show_fn = [&](size_t fn)
       {
-         if (show_fn_locs && fn < fn_locs.size())
+         if (show_fn_locs && fn < reloc.fn_locs.size())
          {
-            auto& l = fn_locs[fn];
+            auto& l = reloc.fn_locs[fn];
             fprintf(stderr, "fn %5ld: %016lx %016lx instr:%08x-%08x\n", fn,
                     (long)code_start + l.code_prologue, (long)code_start + l.code_end,  //
                     l.wasm_begin, l.wasm_end);
@@ -2814,7 +2805,7 @@ namespace dwarf
       };
       auto show_instr = [&](const auto it)
       {
-         if (show_instr_locs && it != instr_locs.end())
+         if (show_instr_locs && it != reloc.instr_locs.end())
             fprintf(stderr, "          %016lx %08x\n", (long)code_start + it->code_offset,
                     it->wasm_addr);
       };
@@ -2822,16 +2813,16 @@ namespace dwarf
       if (show_fn_locs || show_instr_locs)
       {
          size_t fn    = 0;
-         auto   instr = instr_locs.begin();
+         auto   instr = reloc.instr_locs.begin();
          show_fn(fn);
-         while (instr != instr_locs.end())
+         while (instr != reloc.instr_locs.end())
          {
-            while (fn < fn_locs.size() && instr->code_offset >= fn_locs[fn].code_end)
+            while (fn < reloc.fn_locs.size() && instr->code_offset >= reloc.fn_locs[fn].code_end)
                show_fn(++fn);
             show_instr(instr);
             ++instr;
          }
-         while (fn < fn_locs.size())
+         while (fn < reloc.fn_locs.size())
             show_fn(++fn);
       }
 
@@ -2922,13 +2913,11 @@ namespace dwarf
       std::vector<char> frame_data;
       symbol_sec_header.sh_link    = strtab_section;
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
-      write_subprograms(abbrev_data, info_data, info, mod, fn_locs, instr_locs,
-                        input_sections.debug_info);
-      write_symtab(code_section, strings, symbol_data, fn_locs, mod);
-      write_cfi(frame_data, fn_locs, code_start, code_size);
+      write_subprograms(abbrev_data, info_data, info, mod, reloc, input_sections.debug_info);
+      write_symtab(code_section, strings, symbol_data, reloc.fn_locs, mod);
+      write_cfi(frame_data, reloc.fn_locs, code_start, code_size);
 
-      write_sec(line_sec_header, line_sec_header_pos,
-                generate_debug_line(info, fn_locs, instr_locs, code_start));
+      write_sec(line_sec_header, line_sec_header_pos, generate_debug_line(info, reloc, code_start));
       write_sec(abbrev_sec_header, abbrev_sec_header_pos, abbrev_data);
       write_sec(info_sec_header, info_sec_header_pos, info_data);
       write_sec(frame_sec_header, frame_sec_header_pos, frame_data);

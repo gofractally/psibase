@@ -27,6 +27,12 @@ namespace dwarf
       uint32_t wasm_addr;    // Relative to beginning of wasm file
    };
 
+   struct jit_info
+   {
+      std::vector<jit_fn_loc>    fn_locs;
+      std::vector<jit_instr_loc> instr_locs;
+   };
+
    // Location of line extracted from DWARF
    struct location
    {
@@ -115,9 +121,8 @@ namespace dwarf
 
    struct debugger_registration;
    std::shared_ptr<debugger_registration> register_with_debugger(  //
-       info&                             info,
-       const std::vector<jit_fn_loc>&    fn_locs,
-       const std::vector<jit_instr_loc>& instr_locs,
-       const eosio::vm::module&          mod,
-       psio::input_stream                wasm_source);
+       info&                    info,
+       const jit_info&          reloc,
+       const eosio::vm::module& mod,
+       psio::input_stream       wasm_source);
 }  // namespace dwarf

@@ -13,10 +13,9 @@ namespace debug_eos_vm
       size_t      wasm_size  = 0;
       size_t      code_size  = 0;
 
-      std::vector<dwarf::jit_fn_loc>    fn_locs;
-      std::vector<dwarf::jit_instr_loc> instr_locs;
-      const dwarf::jit_instr_loc*       offset_to_addr     = nullptr;
-      std::size_t                       offset_to_addr_len = 0;
+      dwarf::jit_info             locs;
+      const dwarf::jit_instr_loc* offset_to_addr     = nullptr;
+      std::size_t                 offset_to_addr_len = 0;
 
       uint32_t code_offset(const void* p)
       {
@@ -36,21 +35,21 @@ namespace debug_eos_vm
 
       void on_function_start(const void* code_addr, const void* wasm_addr)
       {
-         fn_locs.emplace_back();
-         fn_locs.back().code_prologue = code_offset(code_addr);
-         fn_locs.back().wasm_begin    = wasm_offset(wasm_addr);
+         locs.fn_locs.emplace_back();
+         locs.fn_locs.back().code_prologue = code_offset(code_addr);
+         locs.fn_locs.back().wasm_begin    = wasm_offset(wasm_addr);
          on_instr_start(code_addr, wasm_addr);
       }
 
       void on_function_end(const void* code_addr, const void* wasm_addr)
       {
-         fn_locs.back().code_end = code_offset(code_addr);
-         fn_locs.back().wasm_end = wasm_offset(wasm_addr);
+         locs.fn_locs.back().code_end = code_offset(code_addr);
+         locs.fn_locs.back().wasm_end = wasm_offset(wasm_addr);
       }
 
       void on_instr_start(const void* code_addr, const void* wasm_addr)
       {
-         instr_locs.push_back({code_offset(code_addr), wasm_offset(wasm_addr)});
+         locs.instr_locs.push_back({code_offset(code_addr), wasm_offset(wasm_addr)});
       }
 
       void on_code_end(const void* code_addr, const void* wasm_addr)
@@ -67,7 +66,7 @@ namespace debug_eos_vm
          {
             uint32_t code = 0;
             uint32_t wasm = 0;
-            for (auto& fn : fn_locs)
+            for (auto& fn : locs.fn_locs)
             {
                EOS_VM_ASSERT(code <= fn.code_prologue &&  //
                                  fn.code_prologue <= fn.code_end,
@@ -82,7 +81,7 @@ namespace debug_eos_vm
          {
             uint32_t code = 0;
             uint32_t wasm = 0;
-            for (auto& instr : instr_locs)
+            for (auto& instr : locs.instr_locs)
             {
                EOS_VM_ASSERT(code <= instr.code_offset, eosio::vm::profile_exception,
                              "jit instructions are out of order");
@@ -93,8 +92,8 @@ namespace debug_eos_vm
             }
          }
 
-         offset_to_addr     = instr_locs.data();
-         offset_to_addr_len = instr_locs.size();
+         offset_to_addr     = locs.instr_locs.data();
+         offset_to_addr_len = locs.instr_locs.size();
       }
 
       void relocate(const void* new_base) { code_begin = new_base; }
@@ -131,7 +130,6 @@ namespace debug_eos_vm
       auto& module = backend.get_module();
       auto& alloc  = module.allocator;
       auto& dbg    = backend.get_debug();
-      return dwarf::register_with_debugger(dwarf_info, dbg.fn_locs, dbg.instr_locs, module,
-                                           wasm_source);
+      return dwarf::register_with_debugger(dwarf_info, dbg.locs, module, wasm_source);
    }
 }  // namespace debug_eos_vm
