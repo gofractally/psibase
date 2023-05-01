@@ -493,6 +493,24 @@ namespace dwarf
       }
    }
 
+// clang-format off
+#define DW_CCS(a, b, x)                         \
+   x(a, b, normal, 0x01)                        \
+   x(a, b, program, 0x02)                       \
+   x(a, b, nocall, 0x03)
+   // clang-format on
+
+   DW_CCS(dw_cc_, uint8_t, ENUM_DECL)
+   std::string dw_cc_to_str(uint16_t value)
+   {
+      switch (value)
+      {
+         DW_CCS("DW_CC_", _, ENUM_DECODE)
+         default:
+            return "DW_CC_" + std::to_string(value);
+      }
+   }
+
    std::string_view get_string(psio::input_stream& s)
    {
       auto begin = s.pos;
@@ -2176,6 +2194,7 @@ namespace dwarf
                   info.frame.emplace(mod, *fn);
                }
             }
+            die.attrs.push_back({dw_at_calling_convention, attr_data{dw_cc_nocall}});
          }
          parser.parse_die_attrs_local(abbrev, s,
                                       [&](const abbrev_attr& attr, attr_value& value)
