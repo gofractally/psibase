@@ -66,7 +66,10 @@ namespace debug_eos_vm
       {
          auto pos = std::partition_point(groups.begin(), groups.end(),
                                          [=](const auto& e) { return paramidx >= e.end; });
-         assert(pos != groups.end());
+         if (pos == groups.end())
+         {
+            throw std::runtime_error("Unknown local index");
+         }
          return (pos->end_offset + (pos->end - paramidx - 1) * pos->elem_size);
       }
       std::vector<entry> groups;
