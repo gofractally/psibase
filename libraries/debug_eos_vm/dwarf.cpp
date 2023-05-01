@@ -2130,6 +2130,7 @@ namespace dwarf
             case dw_at_frame_base:
             case dw_at_location:
             case dw_at_type:
+            case dw_at_containing_type:
             case dw_at_data_member_location:
             case dw_at_external:
             case dw_at_const_value:
