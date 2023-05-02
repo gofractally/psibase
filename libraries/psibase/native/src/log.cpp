@@ -196,6 +196,11 @@ namespace psibase::loggers
             os << ",\"_block_header\":" << psio::convert_to_json(*attr);
          }
 
+         if (auto attr = boost::log::extract<Checksum256>("TransactionId", rec))
+         {
+            os << ",\"_transaction_id\":" << psio::convert_to_json(*attr);
+         }
+
          os << '}';
       };
 
@@ -275,6 +280,11 @@ namespace psibase::loggers
          if (auto attr = boost::log::extract<BlockHeader>("BlockHeader", rec))
          {
             os << ",\"BlockHeader\":" << psio::convert_to_json(*attr);
+         }
+
+         if (auto attr = boost::log::extract<Checksum256>("TransactionId", rec))
+         {
+            os << ",\"TransactionId\":" << psio::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<std::string>("RequestMethod", rec))
@@ -2545,6 +2555,7 @@ namespace psibase::loggers
          add_attribute<std::chrono::system_clock::time_point>("TimeStamp");
          add_attribute<std::string>("RemoteEndpoint");
          add_attribute<Checksum256>("BlockId");
+         add_attribute<Checksum256>("TransactionId");
          add_attribute<std::string>("Process");
          add_attribute<std::string>("Channel");
          add_attribute<std::string>("Host");

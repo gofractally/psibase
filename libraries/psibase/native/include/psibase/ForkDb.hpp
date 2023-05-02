@@ -425,7 +425,7 @@ namespace psibase
       const BlockHeaderState* insert(const psio::shared_view_ptr<SignedBlock>& b)
       {
          BlockInfo info(b->block());
-         PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
+         PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, info.header, info.blockId);
          if (info.header.blockNum <= commitIndex)
          {
             PSIBASE_LOG(blockLogger, debug) << "Block ignored because it is before commitIndex";
@@ -578,7 +578,7 @@ namespace psibase
          assert(root->info.header.term <= currentTerm);
          if (root->invalid)
          {
-            PSIBASE_LOG_CONTEXT_BLOCK(root->info.header, root->blockId());
+            PSIBASE_LOG_CONTEXT_BLOCK(logger, root->info.header, root->blockId());
             PSIBASE_LOG(logger, critical) << "Consensus failure: invalid block " << reason;
             throw consensus_failure{};
          }
@@ -693,7 +693,7 @@ namespace psibase
          {
             if (new_head->blockNum() < commitIndex)
             {
-               PSIBASE_LOG_CONTEXT_BLOCK(new_head->info.header, new_head->blockId());
+               PSIBASE_LOG_CONTEXT_BLOCK(logger, new_head->info.header, new_head->blockId());
                PSIBASE_LOG(logger, critical)
                    << "Consensus failure: multiple conflicting forks confirmed";
                throw consensus_failure{};
@@ -729,7 +729,7 @@ namespace psibase
             }
             if (iter->first <= commitIndex)
             {
-               PSIBASE_LOG_CONTEXT_BLOCK(new_head->info.header, new_head->blockId());
+               PSIBASE_LOG_CONTEXT_BLOCK(logger, new_head->info.header, new_head->blockId());
                PSIBASE_LOG(logger, critical)
                    << "Consensus failure: multiple conflicting forks confirmed";
                throw consensus_failure{};
@@ -776,7 +776,7 @@ namespace psibase
          {
             BlockContext ctx(*systemContext, prev->revision, writer, false);
             auto         blockPtr = get(state->blockId());
-            PSIBASE_LOG_CONTEXT_BLOCK(state->info.header, state->blockId());
+            PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, state->info.header, state->blockId());
             try
             {
                auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
@@ -1040,7 +1040,7 @@ namespace psibase
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
             auto proof = getBlockProof(revision, blockContext->current.header.blockNum);
             blocks.try_emplace(id, SignedBlock{blockContext->current, proof, makeData(head)});
-            PSIBASE_LOG_CONTEXT_BLOCK(blockContext->current.header, id);
+            PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, blockContext->current.header, id);
             PSIBASE_LOG(blockLogger, info) << "Produced block";
             blockContext.reset();
             return head;
@@ -1134,12 +1134,12 @@ namespace psibase
                {
                   head = &state_iter->second;
                   assert(!!head->revision);
-                  PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
+                  PSIBASE_LOG_CONTEXT_BLOCK(logger, info.header, info.blockId);
                   PSIBASE_LOG(logger, debug) << "Read head block";
                }
             } while (blockNum--);
             const auto& info = states.begin()->second.info;
-            PSIBASE_LOG_CONTEXT_BLOCK(info.header, info.blockId);
+            PSIBASE_LOG_CONTEXT_BLOCK(logger, info.header, info.blockId);
             PSIBASE_LOG(logger, debug) << "Read last committed block";
          }
          // Initialize AuthState. This is a separate step because it needs

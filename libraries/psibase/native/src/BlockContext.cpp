@@ -13,6 +13,8 @@ namespace psibase
          session{db.startWrite(this->writer)},
          isProducing{isProducing}
    {
+      trxLogger.add_attribute("Channel",
+                              boost::log::attributes::constant(std::string("transaction")));
    }
 
    BlockContext::BlockContext(psibase::SystemContext&         systemContext,
@@ -23,6 +25,8 @@ namespace psibase
          isProducing{true},  // a read_only block is never replayed
          isReadOnly{true}
    {
+      trxLogger.add_attribute("Channel",
+                              boost::log::attributes::constant(std::string("transaction")));
    }
 
    static bool singleProducer(const StatusRow& status, AccountNumber producer)
@@ -364,6 +368,8 @@ namespace psibase
        bool                                     enableUndo,
        bool                                     commit)
    {
+      BOOST_LOG_SCOPED_THREAD_TAG("TransactionId",
+                                  sha256(trx.transaction.data(), trx.transaction.size()));
       try
       {
          checkActive();
@@ -396,10 +402,12 @@ namespace psibase
             session.commit();
             active = true;
          }
+         PSIBASE_LOG(trxLogger, info) << "Transaction succeeded";
          return std::move(t.subjectiveData);
       }
       catch (const std::exception& e)
       {
+         PSIBASE_LOG(trxLogger, info) << "Transaction failed";
          trace.error = e.what();
          throw;
       }

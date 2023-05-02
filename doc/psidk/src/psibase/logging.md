@@ -165,29 +165,30 @@ Examples:
 
 ## Attributes
 
-| Attribute        | Availability                      | Filter Predicates               | Notes                                                                            |
-|------------------|-----------------------------------|---------------------------------|----------------------------------------------------------------------------------|
-| `BlockHeader`    | blocks                            | None                            |                                                                                  |
-| `BlockId`        | blocks                            | `=`, `!=`                       |                                                                                  |
-| `Channel`        | All records                       | `=`, `!=`                       | Possible values are `http`, `p2p`, `chain`, `block`, and `consensus`             |
-| `Escape`         | Formatters                        | N/A                             | Escapes a list of characters in a subformat.                                     |
-| `FrameDec`       | Formatters                        | N/A                             | Prefixes a nested format with a decimal octet count                              |
-| `Host`           | All records                       | `=`, `!=`                       | The system's FQDN (not the HTTP server's virtual hostname)                       |
-| `Json`           | Formatters                        | N/A                             | Formats the entire log record as JSON                                            |
-| `Message`        | Formatters                        | N/A                             | The log message                                                                  |
-| `PeerId`         | p2p connections                   | `=`, `!=`, `<`, `>`, `<=`, `>=` |                                                                                  |
-| `Process`        | All records                       | `=`, `!=`                       | The program name (usually `psinode`)                                             |
-| `ProcessId`      | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | The server's pid                                                                 |
-| `RemoteEndpoint` | HTTP requests and p2p connections | `=`, `!=`                       |                                                                                  |
-| `RequestHost`    | HTTP requests                     | `=`, `!=`                       | The value of the `Host` header                                                   |
-| `RequestMethod`  | HTTP requests                     | `=`, `!=`                       | The HTTP method of the request: `GET`, `POST`, etc.                              |
-| `RequestTarget`  | HTTP requests                     | `=`, `!=`                       |                                                                                  |
-| `ResponseBytes`  | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The size of the response payload                                                 |
-| `ResponseStatus` | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The numeric status code of the response                                          |
-| `ResponseTime`   | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The elapsed time in microseconds spent handling the request                      |
-| `Severity`       | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | The value is one of `debug`, `info`, `notice`, `warning`, `error`, or `critical` |
-| `Syslog`         | Formatters                        | N/A                             | Formats a [syslog](#syslog) header.                                              |
-| `TimeStamp`      | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                                         |
+| Attribute        | Availability                      | Filter Predicates               | Notes                                                                               |
+|------------------|-----------------------------------|---------------------------------|-------------------------------------------------------------------------------------|
+| `BlockHeader`    | blocks                            | None                            |                                                                                     |
+| `BlockId`        | blocks                            | `=`, `!=`                       |                                                                                     |
+| `Channel`        | All records                       | `=`, `!=`                       | Possible values are `http`, `p2p`, `chain`, `block`, `transaction`, and `consensus` |
+| `Escape`         | Formatters                        | N/A                             | Escapes a list of characters in a subformat.                                        |
+| `FrameDec`       | Formatters                        | N/A                             | Prefixes a nested format with a decimal octet count                                 |
+| `Host`           | All records                       | `=`, `!=`                       | The system's FQDN (not the HTTP server's virtual hostname)                          |
+| `Json`           | Formatters                        | N/A                             | Formats the entire log record as JSON                                               |
+| `Message`        | Formatters                        | N/A                             | The log message                                                                     |
+| `PeerId`         | p2p connections                   | `=`, `!=`, `<`, `>`, `<=`, `>=` |                                                                                     |
+| `Process`        | All records                       | `=`, `!=`                       | The program name (usually `psinode`)                                                |
+| `ProcessId`      | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | The server's pid                                                                    |
+| `RemoteEndpoint` | HTTP requests and p2p connections | `=`, `!=`                       |                                                                                     |
+| `RequestHost`    | HTTP requests                     | `=`, `!=`                       | The value of the `Host` header                                                      |
+| `RequestMethod`  | HTTP requests                     | `=`, `!=`                       | The HTTP method of the request: `GET`, `POST`, etc.                                 |
+| `RequestTarget`  | HTTP requests                     | `=`, `!=`                       |                                                                                     |
+| `ResponseBytes`  | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The size of the response payload                                                    |
+| `ResponseStatus` | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The numeric status code of the response                                             |
+| `ResponseTime`   | HTTP requests                     | `=`, `!=`, `<`, `>`, `<=`, `>=` | The elapsed time in microseconds spent handling the request                         |
+| `Severity`       | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | The value is one of `debug`, `info`, `notice`, `warning`, `error`, or `critical`    |
+| `Syslog`         | Formatters                        | N/A                             | Formats a [syslog](#syslog) header.                                                 |
+| `TimeStamp`      | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                                            |
+| `TransactionId`  | transactions                      | `=`, `!=`                       |                                                                                     |
 
 ### Severity
 
