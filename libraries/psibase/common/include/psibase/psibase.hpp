@@ -4,7 +4,6 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/eventIndex.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psibase/print.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>

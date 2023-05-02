@@ -1,5 +1,4 @@
 #include <psibase/dispatch.hpp>
-#include <psibase/print.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>

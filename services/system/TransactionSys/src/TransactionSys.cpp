@@ -5,8 +5,9 @@
 
 #include <boost/container/flat_map.hpp>
 #include <psibase/crypto.hpp>
-#include <psibase/print.hpp>
 #include <psibase/serviceEntry.hpp>
+
+#include <cstdio>
 
 using namespace psibase;
 
@@ -182,7 +183,7 @@ namespace SystemService
    extern "C" [[clang::export_name("processTransaction")]] void processTransaction()
    {
       if constexpr (enable_print)
-         print("processTransaction\n");
+         std::printf("processTransaction\n");
 
       // TODO: check max_net_usage_words, max_cpu_usage_ms
       // TODO: resource billing
@@ -200,7 +201,7 @@ namespace SystemService
       check(trx.actions.size() > 0, "transaction has no actions");
 
       const auto& stat = getStatus();
-      // print("time: ", psio::convert_to_json(stat.current.time),
+      // printf("time: ", psio::convert_to_json(stat.current.time),
       //       " expiration: ", psio::convert_to_json(trx.tapos.expiration), "\n");
 
       check(!(trx.tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
@@ -235,13 +236,13 @@ namespace SystemService
             check(((trx.tapos.refBlockIndex - 2) & 0x7f) <= stat.head->header.blockNum - 2,
                   "transaction references non-existing block");
 
-         // print("expected suffix: ", summary->blockSuffixes[trx.tapos.refBlockIndex], "\n");
+         // printf("expected suffix: ", summary->blockSuffixes[trx.tapos.refBlockIndex], "\n");
          check(trx.tapos.refBlockSuffix == summary->blockSuffixes[trx.tapos.refBlockIndex],
                "transaction references non-existing block");
       }
       else
       {
-         // print("refBlockIndex: ", trx.tapos.refBlockIndex,
+         // printf("refBlockIndex: ", trx.tapos.refBlockIndex,
          //       " refBlockSuffix: ", trx.tapos.refBlockSuffix, "; should be 0\n");
          check(!trx.tapos.refBlockIndex && !trx.tapos.refBlockSuffix,
                "transaction references non-existing block");
@@ -261,8 +262,8 @@ namespace SystemService
                abortMessage("unknown sender \"" + act.sender.str() + "\"");
 
             if constexpr (enable_print)
-               print("call checkAuthSys on ", account->authService.str(), " for sender account ",
-                     act.sender.str(), "\n");
+               std::printf("call checkAuthSys on %s for sender account %s\n",
+                           account->authService.str().c_str(), act.sender.str().c_str());
             Actor<AuthInterface> auth(TransactionSys::service, account->authService);
             uint32_t             flags = AuthInterface::topActionReq;
             if (&act == &trx.actions[0])
@@ -275,7 +276,7 @@ namespace SystemService
          if (args.checkFirstAuthAndExit)
             break;
          if constexpr (enable_print)
-            print("call action\n");
+            std::printf("call action\n");
          call(act);  // TODO: avoid copy (serializing)
       }
    }
