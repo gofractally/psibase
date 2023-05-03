@@ -227,7 +227,7 @@ void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
 
-AccountNumber DefaultTestChain::add_account(
+AccountNumber DefaultTestChain::addAccount(
     AccountNumber acc,
     AccountNumber authService /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
@@ -242,17 +242,17 @@ AccountNumber DefaultTestChain::add_account(
    return acc;
 }
 
-AccountNumber DefaultTestChain::add_account(
+AccountNumber DefaultTestChain::addAccount(
     const char*   acc,
     AccountNumber authService /* = AccountNumber("auth-any-sys")*/,
     bool          show /* = false */)
 {
-   return add_account(AccountNumber(acc), authService, show);
+   return addAccount(AccountNumber(acc), authService, show);
 }
 
-AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
-                                               const PublicKey& public_key,
-                                               bool             show /* = false */)
+AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
+                                           const PublicKey& public_key,
+                                           bool             show /* = false */)
 {
    transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
    transactor<AuthEcSys>  ecsys(AuthEcSys::service, AuthEcSys::service);
@@ -265,13 +265,13 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
    return name;
-}  // add_ec_account()
+}  // addAccount()
 
-AccountNumber DefaultTestChain::add_ec_account(const char*      name,
-                                               const PublicKey& public_key,
-                                               bool             show /* = false */)
+AccountNumber DefaultTestChain::addAccount(const char*      name,
+                                           const PublicKey& public_key,
+                                           bool             show /* = false */)
 {
-   return add_ec_account(AccountNumber(name), public_key, show);
+   return addAccount(AccountNumber(name), public_key, show);
 }
 
 void DefaultTestChain::setAuthEc(AccountNumber    name,
@@ -289,7 +289,7 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            const char*   filename,
                                            bool          show /* = false */)
 {
-   add_account(acc, AuthAnySys::service, show);
+   addAccount(acc, AuthAnySys::service, show);
 
    transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
 

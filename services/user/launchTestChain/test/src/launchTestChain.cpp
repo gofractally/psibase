@@ -39,8 +39,8 @@ SCENARIO("Testing default psibase chain")
    tokenSysRpc.storeSys("/arrow-up-solid.svg", "image/svg+xml",
                         readWholeFile(rpcUiDir + "arrow-up-solid.svg"));
 
-   auto alice     = t.from(t.add_account("alice"_a));
-   auto bob       = t.from(t.add_account("bob"_a));
+   auto alice     = t.from(t.addAccount("alice"_a));
+   auto bob       = t.from(t.addAccount("bob"_a));
    auto sysIssuer = t.from(SymbolSys::service).to<TokenSys>();
    auto sysToken  = TokenSys::sysToken;
 

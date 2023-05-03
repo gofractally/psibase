@@ -37,9 +37,9 @@ SCENARIO("Buying a symbol")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
       auto a     = alice.to<SymbolSys>();
-      auto bob   = t.from(t.add_account("bob"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<SymbolSys>();
 
       auto sysIssuer = t.from(SymbolSys::service).to<TokenSys>();
@@ -162,7 +162,7 @@ SCENARIO("Measuring price increases")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
       auto a     = alice.to<SymbolSys>();
 
       auto aliceBalance = 1'000'000e8;
@@ -277,8 +277,8 @@ SCENARIO("Using symbol ownership NFT")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
-      auto bob   = t.from(t.add_account("bob"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
       auto a     = alice.to<SymbolSys>();
 
       // Mint token used for purchasing symbols
@@ -329,8 +329,8 @@ SCENARIO("Buying and selling symbols")
       DefaultTestChain t;
 
       // Add a couple accounts
-      auto alice = t.from(t.add_account("alice"_a));
-      auto bob   = t.from(t.add_account("bob"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
 
       // Fund Alice and Bob with the system token
       auto userBalance = 1'000'000e8;
