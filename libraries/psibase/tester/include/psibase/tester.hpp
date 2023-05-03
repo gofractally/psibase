@@ -9,16 +9,6 @@
 
 namespace psibase
 {
-   namespace internal_use_do_not_use
-   {
-      void hex(const uint8_t* begin, const uint8_t* end, std::ostream& os);
-
-      template <typename R, typename C, typename... Args>
-      R get_return_type(R (C::*f)(Args...));
-      template <typename R, typename C, typename... Args>
-      R get_return_type(R (C::*f)(Args...) const);
-   }  // namespace internal_use_do_not_use
-
    inline std::string show(bool include, TransactionTrace t)
    {
       if (include || t.error)

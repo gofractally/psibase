@@ -10,8 +10,6 @@
 
 namespace
 {
-   using cb_alloc_type = void* (*)(void* cb_alloc_data, size_t size);
-
    extern "C"
    {
       // clang-format off
@@ -122,26 +120,6 @@ psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& diges
    check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
          "serialize signature failed");
    return Signature{Signature::variant_type{std::in_place_index<0>, sigdata}};
-}
-
-void psibase::internal_use_do_not_use::hex(const uint8_t* begin,
-                                           const uint8_t* end,
-                                           std::ostream&  os)
-{
-   std::ostreambuf_iterator<char> dest(os.rdbuf());
-   auto                           nibble = [&dest](uint8_t i)
-   {
-      if (i <= 9)
-         *dest++ = '0' + i;
-      else
-         *dest++ = 'A' + i - 10;
-   };
-   while (begin != end)
-   {
-      nibble(((uint8_t)*begin) >> 4);
-      nibble(((uint8_t)*begin) & 0xf);
-      ++begin;
-   }
 }
 
 const psibase::PublicKey psibase::TestChain::defaultPubKey =
