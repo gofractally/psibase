@@ -54,8 +54,6 @@ namespace psibase
 
    std::vector<char> readWholeFile(std::string_view filename);
 
-   int32_t execute(std::string_view command);
-
    /**
     * Validates the status of a transaction.  If expectedExcept is "", then the
     * transaction should succeed.  Otherwise it represents a string which should be

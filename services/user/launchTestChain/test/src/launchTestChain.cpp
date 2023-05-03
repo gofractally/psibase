@@ -66,9 +66,9 @@ SCENARIO("Testing default psibase chain")
    t.finishBlock();
 
    // Run the chain
-   psibase::execute("rm -rf tester_psinode_db");
-   psibase::execute("mkdir tester_psinode_db");
-   psibase::execute("cp -a " + t.getPath() + "/. tester_psinode_db/");
-   psibase::execute(
+   std::system("rm -rf tester_psinode_db");
+   std::system("mkdir tester_psinode_db");
+   std::system(("cp -a " + t.getPath() + "/. tester_psinode_db/").c_str());
+   std::system(
        "psinode -o psibase.127.0.0.1.sslip.io tester_psinode_db -l 8080 --producer firstproducer");
 }

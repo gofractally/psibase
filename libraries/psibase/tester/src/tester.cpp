@@ -17,7 +17,6 @@ namespace
       // clang-format off
       [[clang::import_name("testerCreateChain")]]        uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
       [[clang::import_name("testerDestroyChain")]]       void     testerDestroyChain(uint32_t chain);
-      [[clang::import_name("testerExecute")]]            int32_t  testerExecute(const char* command, uint32_t command_size);
       [[clang::import_name("testerFinishBlock")]]        void     testerFinishBlock(uint32_t chain_index);
       [[clang::import_name("testerGetChainPath")]]       uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
       [[clang::import_name("testerPushTransaction")]]    uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
@@ -91,11 +90,6 @@ std::vector<char> psibase::readWholeFile(std::string_view filename)
       pos += count;
    }
    return result;
-}
-
-int32_t psibase::execute(std::string_view command)
-{
-   return ::testerExecute(command.data(), command.size());
 }
 
 void psibase::expect(TransactionTrace t, const std::string& expected, bool always_show)
