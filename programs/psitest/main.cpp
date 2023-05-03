@@ -11,6 +11,8 @@
 #include <chrono>
 #include <optional>
 
+#include <sys/stat.h>
+
 using namespace std::literals;
 
 using eosio::vm::span;
@@ -56,6 +58,7 @@ inline constexpr uint32_t billed_cpu_time_use = 2000;
 inline constexpr int32_t polyfill_root_dir_fd = 3;
 
 inline constexpr uint16_t wasi_errno_badf  = 8;
+inline constexpr uint16_t wasi_errno_fault = 21;
 inline constexpr uint16_t wasi_errno_inval = 28;
 inline constexpr uint16_t wasi_errno_io    = 29;
 inline constexpr uint16_t wasi_errno_noent = 44;
@@ -526,6 +529,48 @@ struct callbacks
       return wasi_errno_badf;
    }
 
+   uint32_t testerFilestatGet(int32_t fd, span<char> statbuf)
+   {
+      struct wasi_stat
+      {
+         uint64_t dev, ino, filetype, nlink, size, atim, mtim, ctim;
+      } result = {};
+      static_assert(sizeof(wasi_stat) == 64);
+      if (statbuf.size() < sizeof(result))
+         return wasi_errno_fault;
+      if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO)
+      {
+         result.filetype = wasi_filetype_character_device;
+      }
+      else if (fd == polyfill_root_dir_fd)
+      {
+         result.filetype = wasi_filetype_directory;
+      }
+      else if (auto file = get_file(fd))
+      {
+         int         fd = ::fileno(file->f);
+         struct stat stat;
+         if (::fstat(fd, &stat) < 0)
+            return wasi_errno_badf;
+
+         auto to_nsec    = [](const timespec& t) { return t.tv_sec * 1000000000ull + t.tv_nsec; };
+         result.dev      = stat.st_dev;
+         result.ino      = stat.st_ino;
+         result.filetype = wasi_filetype_regular_file;
+         result.nlink    = stat.st_nlink;
+         result.size     = stat.st_size;
+         result.atim     = to_nsec(stat.st_atim);
+         result.mtim     = to_nsec(stat.st_mtim);
+         result.ctim     = to_nsec(stat.st_ctim);
+      }
+      else
+      {
+         return wasi_errno_badf;
+      }
+      std::memcpy(statbuf.data(), &result, sizeof(result));
+      return 0;
+   }
+
    uint32_t testerOpenFile(span<const char>  path,
                            uint32_t          oflags,
                            uint64_t          fs_rights_base,
@@ -625,29 +670,6 @@ struct callbacks
          return wasi_errno_badf;
       *result = fread(content.data(), 1, content.size(), file->f);
       return 0;
-   }
-
-   bool testerReadWholeFile(span<const char> filename, uint32_t cb_alloc_data, uint32_t cb_alloc)
-   {
-      file f = fopen(span_str(filename).c_str(), "r");
-      if (!f.f)
-      {
-         std::cout << "File " << span_str(filename) << " failed to open\n";
-         return false;
-      }
-
-      if (fseek(f.f, 0, SEEK_END))
-         return false;
-      auto size = ftell(f.f);
-      if (size < 0 || (long)(uint32_t)size != size)
-         return false;
-      if (fseek(f.f, 0, SEEK_SET))
-         return false;
-      std::vector<char> buf(size);
-      if (fread(buf.data(), size, 1, f.f) != 1)
-         return false;
-      set_data(cb_alloc_data, cb_alloc, buf);
-      return true;
    }
 
    int32_t testerExecute(span<const char> command) { return system(span_str(command).c_str()); }
@@ -838,11 +860,11 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerGetArgs>("env", "testerGetArgs");
    rhf_t::add<&callbacks::testerClockTimeGet>("env", "testerClockTimeGet");
    rhf_t::add<&callbacks::testerFdstatGet>("env", "testerFdstatGet");
+   rhf_t::add<&callbacks::testerFilestatGet>("env", "testerFdFilestatGet");
    rhf_t::add<&callbacks::testerOpenFile>("env", "testerOpenFile");
    rhf_t::add<&callbacks::testerCloseFile>("env", "testerCloseFile");
    rhf_t::add<&callbacks::testerWriteFile>("env", "testerWriteFile");
    rhf_t::add<&callbacks::testerReadFile>("env", "testerReadFile");
-   rhf_t::add<&callbacks::testerReadWholeFile>("env", "testerReadWholeFile");
    rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
    rhf_t::add<&callbacks::testerCreateChain>("env", "testerCreateChain");
    rhf_t::add<&callbacks::testerDestroyChain>("env", "testerDestroyChain");

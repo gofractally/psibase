@@ -4,6 +4,10 @@
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 namespace
 {
    using cb_alloc_type = void* (*)(void* cb_alloc_data, size_t size);
@@ -19,22 +23,10 @@ namespace
       [[clang::import_name("testerFinishBlock")]]        void     testerFinishBlock(uint32_t chain_index);
       [[clang::import_name("testerGetChainPath")]]       uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
       [[clang::import_name("testerPushTransaction")]]    void     testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size, void* cb_alloc_data, cb_alloc_type cb_alloc);
-      [[clang::import_name("testerReadWholeFile")]]      bool     testerReadWholeFile(const char* filename, uint32_t filename_size, void* cb_alloc_data, cb_alloc_type cb_alloc);
       [[clang::import_name("testerSelectChainForDb")]]   void     testerSelectChainForDb(uint32_t chain_index);
       [[clang::import_name("testerShutdownChain")]]      void     testerShutdownChain(uint32_t chain);
       [[clang::import_name("testerStartBlock")]]         void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
       // clang-format on
-   }
-
-   template <typename Alloc_fn>
-   inline bool readWholeFile(const char* filename_begin, uint32_t filename_size, Alloc_fn alloc_fn)
-   {
-      // TODO: fix memory issue when file not found
-      return testerReadWholeFile(filename_begin, filename_size, &alloc_fn,
-                                 [](void* cb_alloc_data, size_t size) -> void*
-                                 {  //
-                                    return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
-                                 });
    }
 
    template <typename Alloc_fn>
@@ -103,14 +95,26 @@ bool psibase::TraceResult::failed(std::string_view expected)
 
 std::vector<char> psibase::readWholeFile(std::string_view filename)
 {
-   std::vector<char> result;
-   if (!::readWholeFile(filename.data(), filename.size(),
-                        [&](size_t size)
-                        {
-                           result.resize(size);
-                           return result.data();
-                        }))
-      check(false, "read " + std::string(filename) + " failed");
+   auto fail = [&] { check(false, "read " + std::string(filename) + " failed"); };
+   int  fd   = ::open(std::string(filename).c_str(), O_RDONLY);
+   if (fd < 0)
+      fail();
+   struct stat stat;
+   if (::fstat(fd, &stat) < 0)
+      fail();
+   if (stat.st_size > std::numeric_limits<std::size_t>::max())
+      fail();
+   std::vector<char> result(static_cast<std::size_t>(stat.st_size));
+   char*             pos       = result.data();
+   std::size_t       remaining = result.size();
+   while (remaining)
+   {
+      auto count = ::read(fd, pos, remaining);
+      if (count < 0)
+         fail();
+      remaining -= count;
+      pos += count;
+   }
    return result;
 }
 
