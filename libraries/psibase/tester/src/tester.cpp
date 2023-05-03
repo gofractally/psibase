@@ -26,16 +26,6 @@ namespace
       [[clang::import_name("testerStartBlock")]]         void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
       // clang-format on
    }
-
-   template <typename Alloc_fn>
-   inline bool exec_deferred(uint32_t chain, Alloc_fn alloc_fn)
-   {
-      return tester_exec_deferred(chain, &alloc_fn,
-                                  [](void* cb_alloc_data, size_t size) -> void*
-                                  {  //
-                                     return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
-                                  });
-   }
 }  // namespace
 
 psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
