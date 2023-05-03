@@ -177,23 +177,16 @@ const psibase::PublicKey psibase::TestChain::defaultPubKey =
 const psibase::PrivateKey psibase::TestChain::defaultPrivKey =
     psibase::privateKeyFromString("PVT_K1_27Hseiioosmff4ue31Jv37pC1NWfhbjuKuSBxEkqCTzbJtxQD2");
 
-// We only allow one chain to exist at a time in the tester.
-// If we ever find that we need multiple chains, this will
-// need to be kept in sync with whatever updates the native layer.
-static psibase::TestChain* currentChain = nullptr;
-
 psibase::TestChain::TestChain(uint64_t hot_bytes,
                               uint64_t warm_bytes,
                               uint64_t cool_bytes,
                               uint64_t cold_bytes)
     : id{::testerCreateChain(hot_bytes, warm_bytes, cool_bytes, cold_bytes)}
 {
-   currentChain = this;
 }
 
 psibase::TestChain::~TestChain()
 {
-   currentChain = nullptr;
    ::testerDestroyChain(id);
 }
 
