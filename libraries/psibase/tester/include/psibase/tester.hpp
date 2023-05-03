@@ -258,9 +258,6 @@ namespace psibase
       {
          using base = typename psio::reflect<Service>::template proxy<PushTransactionProxy>;
          using base::base;
-
-         auto* operator->() const { return this; }
-         auto& operator*() const { return *this; }
       };
 
       struct UserContext
