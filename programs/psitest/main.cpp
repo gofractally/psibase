@@ -112,6 +112,8 @@ struct state
    std::vector<file>                        files;
    std::vector<std::unique_ptr<test_chain>> chains;
    std::optional<uint32_t>                  selected_chain_index;
+   std::vector<char>                        result_key;
+   std::vector<char>                        result_value;
 };
 
 template <typename T>
@@ -373,42 +375,6 @@ struct callbacks
    }
 
    std::string span_str(span<const char> str) { return {str.data(), str.size()}; }
-
-   char* alloc(uint32_t cb_alloc_data, uint32_t cb_alloc, uint32_t size)
-   {
-      // todo: verify cb_alloc isn't in imports
-      if (state.backend.get_module().tables.size() < 0 ||
-          state.backend.get_module().tables[0].table.size() < cb_alloc)
-      {
-         backtrace();
-         throw std::runtime_error("cb_alloc is out of range");
-      }
-      // Note from Steven: eos-vm not saving top_frame and bottom_frame is an eos-vm bug. The
-      // backtrace was originally designed for profiling contracts, where reentering wasm is not
-      // possible. In addition, saving and restoring these variables is very tricky to do correctly
-      // in the face of asynchronous interrupts, so I didn't bother.
-      auto top_frame                            = state.backend.get_context()._top_frame;
-      auto bottom_frame                         = state.backend.get_context()._bottom_frame;
-      auto result                               = state.backend.get_context().execute(  //
-          this, eosio::vm::jit_visitor(42), state.backend.get_module().tables[0].table[cb_alloc],
-          cb_alloc_data, size);
-      state.backend.get_context()._top_frame    = top_frame;
-      state.backend.get_context()._bottom_frame = bottom_frame;
-      if (!result || !result->is_a<eosio::vm::i32_const_t>())
-      {
-         backtrace();
-         throw std::runtime_error("cb_alloc returned incorrect type");
-      }
-      char* begin = state.wa.get_base_ptr<char>() + result->to_ui32();
-      check_bounds(begin, size);
-      return begin;
-   }
-
-   template <typename T>
-   void set_data(uint32_t cb_alloc_data, uint32_t cb_alloc, const T& data)
-   {
-      memcpy(alloc(cb_alloc_data, cb_alloc, data.size()), data.data(), data.size());
-   }
 
    void testerAbort()
    {
@@ -734,10 +700,7 @@ struct callbacks
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
 
-   void testerPushTransaction(uint32_t         chain_index,
-                              span<const char> args_packed,
-                              uint32_t         cb_alloc_data,
-                              uint32_t         cb_alloc)
+   uint32_t testerPushTransaction(uint32_t chain_index, span<const char> args_packed)
    {
       auto&              chain     = assert_chain(chain_index);
       psio::input_stream s         = {args_packed.data(), args_packed.size()};
@@ -785,7 +748,10 @@ struct callbacks
       }
 
       // std::cout << eosio::format_json(trace) << "\n";
-      set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(trace));
+      state.result_value = psio::convert_to_frac(trace);
+      state.result_key.clear();
+      psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
+      return state.result_value.size();
    }
 
    void testerSelectChainForDb(uint32_t chain_index)
@@ -801,44 +767,74 @@ struct callbacks
       return assert_chain(*state.selected_chain_index).native();
    }
 
+   void setResult(psibase::NativeFunctions& n)
+   {
+      state.result_key   = std::move(n.result_key);
+      state.result_value = std::move(n.result_value);
+   }
+
    uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset)
    {
-      return native().getResult(dest, offset);
+      if (offset < state.result_value.size() && dest.size())
+         memcpy(dest.data(), state.result_value.data() + offset,
+                std::min(state.result_value.size() - offset, dest.size()));
+      return state.result_value.size();
    }
 
    uint32_t getKey(eosio::vm::span<char> dest)
-   {  //
-      return native().getKey(dest);
+   {
+      if (!state.result_key.empty())
+         memcpy(dest.data(), state.result_key.data(),
+                std::min(state.result_key.size(), dest.size()));
+      return state.result_key.size();
    }
 
    uint32_t kvGet(uint32_t db, eosio::vm::span<const char> key)
-   {  //
-      return native().kvGet(db, key);
+   {
+      auto& n      = native();
+      auto  result = n.kvGet(db, key);
+      setResult(n);
+      return result;
    }
 
    uint32_t getSequential(uint32_t db, uint64_t indexNumber)
    {
-      return native().getSequential(db, indexNumber);
+      auto& n      = native();
+      auto  result = n.getSequential(db, indexNumber);
+      setResult(n);
+      return result;
    }
 
    uint32_t kvGreaterEqual(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
    {
-      return native().kvGreaterEqual(db, key, matchKeySize);
+      auto& n      = native();
+      auto  result = n.kvGreaterEqual(db, key, matchKeySize);
+      setResult(n);
+      return result;
    }
 
    uint32_t kvLessThan(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
    {
-      return native().kvLessThan(db, key, matchKeySize);
+      auto& n      = native();
+      auto  result = native().kvLessThan(db, key, matchKeySize);
+      setResult(n);
+      return result;
    }
 
    uint32_t kvMax(uint32_t db, eosio::vm::span<const char> key)
-   {  //
-      return native().kvMax(db, key);
+   {
+      auto& n      = native();
+      auto  result = n.kvMax(db, key);
+      setResult(n);
+      return result;
    }
 
    uint32_t kvGetTransactionUsage()
-   {  //
-      return native().kvGetTransactionUsage();
+   {
+      auto& n      = native();
+      auto  result = n.kvGetTransactionUsage();
+      setResult(n);
+      return result;
    }
 };  // callbacks
 

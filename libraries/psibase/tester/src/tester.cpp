@@ -20,24 +20,11 @@ namespace
       [[clang::import_name("testerExecute")]]            int32_t  testerExecute(const char* command, uint32_t command_size);
       [[clang::import_name("testerFinishBlock")]]        void     testerFinishBlock(uint32_t chain_index);
       [[clang::import_name("testerGetChainPath")]]       uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
-      [[clang::import_name("testerPushTransaction")]]    void     testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size, void* cb_alloc_data, cb_alloc_type cb_alloc);
+      [[clang::import_name("testerPushTransaction")]]    uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
       [[clang::import_name("testerSelectChainForDb")]]   void     testerSelectChainForDb(uint32_t chain_index);
       [[clang::import_name("testerShutdownChain")]]      void     testerShutdownChain(uint32_t chain);
       [[clang::import_name("testerStartBlock")]]         void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
       // clang-format on
-   }
-
-   template <typename Alloc_fn>
-   inline void pushTransaction(uint32_t    chain,
-                               const char* args_begin,
-                               uint32_t    args_size,
-                               Alloc_fn    alloc_fn)
-   {
-      testerPushTransaction(chain, args_begin, args_size, &alloc_fn,
-                            [](void* cb_alloc_data, size_t size) -> void*
-                            {  //
-                               return (*reinterpret_cast<Alloc_fn*>(cb_alloc_data))(size);
-                            });
    }
 
    template <typename Alloc_fn>
@@ -261,14 +248,8 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    if (!producing)
       startBlock();
    std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
-   std::vector<char> bin;
-   ::pushTransaction(id, packed_trx.data(), packed_trx.size(),
-                     [&](size_t size)
-                     {
-                        bin.resize(size);
-                        return bin.data();
-                     });
-   return psio::from_frac<TransactionTrace>(bin);
+   auto              size       = ::testerPushTransaction(id, packed_trx.data(), packed_trx.size());
+   return psio::from_frac<TransactionTrace>(getResult(size));
 }
 
 [[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(Transaction    trx,
