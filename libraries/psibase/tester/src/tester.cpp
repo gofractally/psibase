@@ -14,8 +14,6 @@ namespace
 
    extern "C"
    {
-      // TODO: fix naming
-
       // clang-format off
       [[clang::import_name("testerCreateChain")]]        uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
       [[clang::import_name("testerDestroyChain")]]       void     testerDestroyChain(uint32_t chain);
@@ -175,7 +173,6 @@ void psibase::internal_use_do_not_use::hex(const uint8_t* begin,
    }
 }
 
-// TODO: change defaults
 const psibase::PublicKey psibase::TestChain::defaultPubKey =
     psibase::publicKeyFromString("PUB_K1_8UUMcamEE6dnK4kyrSPnAEAPTWZduZtE9SuFvURr3UjGDpF9LX");
 const psibase::PrivateKey psibase::TestChain::defaultPrivKey =
