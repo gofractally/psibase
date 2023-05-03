@@ -8,22 +8,19 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace
+extern "C"
 {
-   extern "C"
-   {
-      // clang-format off
-      [[clang::import_name("testerCreateChain")]]        uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
-      [[clang::import_name("testerDestroyChain")]]       void     testerDestroyChain(uint32_t chain);
-      [[clang::import_name("testerFinishBlock")]]        void     testerFinishBlock(uint32_t chain_index);
-      [[clang::import_name("testerGetChainPath")]]       uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
-      [[clang::import_name("testerPushTransaction")]]    uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
-      [[clang::import_name("testerSelectChainForDb")]]   void     testerSelectChainForDb(uint32_t chain_index);
-      [[clang::import_name("testerShutdownChain")]]      void     testerShutdownChain(uint32_t chain);
-      [[clang::import_name("testerStartBlock")]]         void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
-      // clang-format on
-   }
-}  // namespace
+   // clang-format off
+   [[clang::import_name("testerCreateChain")]]      uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
+   [[clang::import_name("testerDestroyChain")]]     void     testerDestroyChain(uint32_t chain);
+   [[clang::import_name("testerFinishBlock")]]      void     testerFinishBlock(uint32_t chain_index);
+   [[clang::import_name("testerGetChainPath")]]     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
+   [[clang::import_name("testerPushTransaction")]]  uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
+   [[clang::import_name("testerSelectChainForDb")]] void     testerSelectChainForDb(uint32_t chain_index);
+   [[clang::import_name("testerShutdownChain")]]    void     testerShutdownChain(uint32_t chain);
+   [[clang::import_name("testerStartBlock")]]       void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
+   // clang-format on
+}
 
 psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
 
