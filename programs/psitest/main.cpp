@@ -736,6 +736,10 @@ struct callbacks
       }
       catch (const std::exception& e)
       {
+         if (!trace.error)
+         {
+            trace.error = e.what();
+         }
       }
 
       auto us = std::chrono::duration_cast<std::chrono::microseconds>(

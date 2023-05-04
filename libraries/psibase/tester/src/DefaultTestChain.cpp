@@ -38,13 +38,15 @@ DefaultTestChain::DefaultTestChain(
     uint64_t                                                  cold_bytes)
     : TestChain{hot_bytes, warm_bytes, cool_bytes, cold_bytes}
 {
+   setAutoBlockStart(false);
    startBlock();
    deploySystemServices();
-   startBlock();  // TODO: Why is this startBlock necessary? Without it,
-                  //   all subsequent transactions will silently fail.
-
    createSysServiceAccounts();
    setBlockProducers();
+   // End of genesis block
+   startBlock();
+   setAutoBlockStart(true);
+
    registerSysRpc();
 
    expect(from(UserService::NftSys::service).to<UserService::NftSys>().init().trace());
@@ -214,7 +216,7 @@ void DefaultTestChain::setBlockProducers(bool show /* = false*/)
 {
    transactor<ProducerSys> psys{ProducerSys::service, ProducerSys::service};
    std::vector<Producer>   producerConfig = {{"firstproducer"_a, {}}};
-   auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
+   auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}), {});
    check(psibase::show(show, trace) == "", "Failed to set producers");
 }
 
@@ -222,7 +224,7 @@ void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
 {
    transactor<AccountSys>     asys{TransactionSys::service, AccountSys::service};
    transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
-   auto                       trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
+   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}), {});
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
