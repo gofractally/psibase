@@ -132,6 +132,8 @@ namespace psibase
       static const PublicKey  defaultPubKey;
       static const PrivateKey defaultPrivKey;
 
+      static KeyList defaultKeys() { return {{defaultPubKey, defaultPrivKey}}; }
+
       TestChain(uint64_t hot_bytes  = 1ull << 27,
                 uint64_t warm_bytes = 1ull << 27,
                 uint64_t cool_bytes = 1ull << 27,
@@ -198,17 +200,12 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(Transaction    trx,
-                                                     const KeyList& keys = {{defaultPubKey,  //
-                                                                             defaultPrivKey}});
+                                                     const KeyList& keys = defaultKeys());
 
       template <typename Action>
-      auto trace(Action&& a, const KeyList& keyList)
+      auto trace(Action&& a, const KeyList& keyList = defaultKeys())
       {
-         if (keyList.size() > 0)
-         {
-            return pushTransaction(makeTransaction({a}), keyList);
-         }
-         return pushTransaction(makeTransaction({a}));
+         return pushTransaction(makeTransaction({a}), keyList);
       }
 
       /**
@@ -270,7 +267,7 @@ namespace psibase
          operator AccountNumber() { return id; }
       };
 
-      auto from(AccountNumber id) { return UserContext{*this, id}; }
+      auto from(AccountNumber id) { return UserContext{*this, id, defaultKeys()}; }
    };  // TestChain
 
 }  // namespace psibase
