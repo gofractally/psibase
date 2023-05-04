@@ -17,18 +17,10 @@ namespace psibase
           uint64_t                                                  cool_bytes         = 1ull << 27,
           uint64_t                                                  cold_bytes = 1ull << 27);
 
-      void deploySystemServices(bool show = false);
-
-      void setBlockProducers(bool show = false);
-
-      void createSysServiceAccounts(bool show = false);
-
       AccountNumber addService(const char* acc, const char* filename, bool show = false);
-
       AccountNumber addService(AccountNumber acc, const char* filename, bool show = false);
 
       AccountNumber addAccount(const char* name, const PublicKey& public_key, bool show = false);
-
       AccountNumber addAccount(AccountNumber name, const PublicKey& public_key, bool show = false);
 
       void setAuthEc(AccountNumber name, const PublicKey& pubkey, bool show = false);
@@ -40,6 +32,11 @@ namespace psibase
       AccountNumber addAccount(AccountNumber acc,
                                AccountNumber authService = AccountNumber("auth-any-sys"),
                                bool          show        = false);
-      void          registerSysRpc();
+
+     private:
+      void registerSysRpc();
+      void deploySystemServices(bool show = false);
+      void setBlockProducers(bool show = false);
+      void createSysServiceAccounts(bool show = false);
    };
 }  // namespace psibase
