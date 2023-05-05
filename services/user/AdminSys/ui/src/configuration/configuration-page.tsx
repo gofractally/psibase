@@ -9,6 +9,7 @@ import {
     initialConfigForm,
     resolveConfigFormDiff,
     writeConfig,
+    newId,
 } from "./utils";
 import { putJson } from "../helpers";
 import { Logger } from "../log/logger";
@@ -29,6 +30,11 @@ export const ConfigurationPage = ({
         defaultValues: initialConfigForm(),
     });
     configForm.formState.dirtyFields;
+
+    const listeners = useFieldArray({
+        control: configForm.control,
+        name: "listen",
+    });
 
     const services = useFieldArray({
         control: configForm.control,
@@ -139,6 +145,10 @@ export const ConfigurationPage = ({
 
     const loggers = configForm.watch("loggers");
 
+    const onAddNewListenerClick = () => {
+        listeners.append({ key: newId(), text: "", protocol: "http" });
+    };
+
     return (
         <>
             <h1>Configuration</h1>
@@ -155,13 +165,53 @@ export const ConfigurationPage = ({
                         {...configForm.register("producer")}
                     />
                     <Form.Input label="Host" {...configForm.register("host")} />
-                    <Form.Input
-                        label="Port (requires restart)"
-                        type="number"
-                        min="0"
-                        max="65535"
-                        {...configForm.register("port")}
-                    />
+                    <table>
+                        <th>
+                            <td>Port (requires restart)</td>
+                        </th>
+                        {listeners.fields.map((l, idx: number) => (
+                            <tr key={l.key}>
+                                <td>
+                                    <input
+                                        className="w-full border bg-white px-3 py-2 text-base text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500"
+                                        {...configForm.register(
+                                            `listen.${idx}.text`
+                                        )}
+                                    />
+                                </td>
+                                <td>
+                                    <select
+                                        {...configForm.register(
+                                            `listen.${idx}.protocol`
+                                        )}
+                                    >
+                                        <option value="http">HTTP</option>
+                                        <option value="https">HTTPS</option>
+                                        <option value="local">
+                                            Local Socket
+                                        </option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <Button
+                                        onClick={() => listeners.remove(idx)}
+                                    >
+                                        Remove
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                        <tr>
+                            <td>
+                                <Button
+                                    className="mt-4"
+                                    onClick={onAddNewListenerClick}
+                                >
+                                    New Listener
+                                </Button>
+                            </td>
+                        </tr>
+                    </table>
 
                     <Divider />
 
