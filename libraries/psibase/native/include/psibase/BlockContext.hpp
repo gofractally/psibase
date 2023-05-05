@@ -3,6 +3,7 @@
 #include <chrono>
 #include <psibase/Prover.hpp>
 #include <psibase/SystemContext.hpp>
+#include <psibase/log.hpp>
 #include <psibase/trace.hpp>
 
 namespace psibase
@@ -23,6 +24,8 @@ namespace psibase
       bool              active            = false;
       //
       std::map<AccountNumber, bool> modifiedAuthAccounts;
+
+      loggers::common_logger trxLogger;
 
       BlockContext(SystemContext&                  systemContext,
                    std::shared_ptr<const Revision> revision,

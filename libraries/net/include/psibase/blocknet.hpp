@@ -560,7 +560,7 @@ namespace psibase::net
              [this](const BlockInfo& head)
              {
                 {
-                   PSIBASE_LOG_CONTEXT_BLOCK(head.header, head.blockId);
+                   PSIBASE_LOG_CONTEXT_BLOCK(logger, head.header, head.blockId);
                    PSIBASE_LOG(logger, debug) << "New head block";
                 }
                 // TODO: only run set_producers when the producers actually changed

@@ -339,9 +339,10 @@ struct NetworkBase
       auto expected = nodes[0]->node.chain().get_head_state()->blockId();
       for (const auto& node : nodes)
       {
-         auto state = node->node.chain().get_head_state();
-         PSIBASE_LOG_CONTEXT_BLOCK(state->info.header, state->blockId());
-         PSIBASE_LOG(node->node.chain().getLogger(), debug) << "final head block";
+         auto  state  = node->node.chain().get_head_state();
+         auto& logger = node->node.chain().getLogger();
+         PSIBASE_LOG_CONTEXT_BLOCK(logger, state->info.header, state->blockId());
+         PSIBASE_LOG(logger, debug) << "final head block";
          assert(node->node.chain().get_head_state()->blockId() == expected);
       }
    }
