@@ -28,9 +28,9 @@ TEST_CASE("ec")
    transactor<SystemService::AuthEcSys> ecsys(SystemService::AuthEcSys::service,
                                               SystemService::AuthEcSys::service);
 
-   auto alice = t.from(t.add_account(AccountNumber("alice")));
-   auto bob   = t.from(t.add_account(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
-   auto sue   = t.add_ec_account("sue", pub_key1);
+   auto alice = t.from(t.addAccount(AccountNumber("alice")));
+   auto bob   = t.from(t.addAccount(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
+   auto sue   = t.addAccount("sue", pub_key1);
 
    expect(t.pushTransaction(t.makeTransaction({{
               .sender  = bob,

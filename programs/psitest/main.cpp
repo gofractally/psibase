@@ -11,6 +11,8 @@
 #include <chrono>
 #include <optional>
 
+#include <sys/stat.h>
+
 using namespace std::literals;
 
 using eosio::vm::span;
@@ -55,6 +57,7 @@ inline constexpr uint32_t billed_cpu_time_use = 2000;
 inline constexpr int32_t polyfill_root_dir_fd = 3;
 
 inline constexpr uint16_t wasi_errno_badf  = 8;
+inline constexpr uint16_t wasi_errno_fault = 21;
 inline constexpr uint16_t wasi_errno_inval = 28;
 inline constexpr uint16_t wasi_errno_io    = 29;
 inline constexpr uint16_t wasi_errno_noent = 44;
@@ -108,6 +111,8 @@ struct state
    std::vector<file>                        files;
    std::vector<std::unique_ptr<test_chain>> chains;
    std::optional<uint32_t>                  selected_chain_index;
+   std::vector<char>                        result_key;
+   std::vector<char>                        result_value;
 };
 
 template <typename T>
@@ -370,42 +375,6 @@ struct callbacks
 
    std::string span_str(span<const char> str) { return {str.data(), str.size()}; }
 
-   char* alloc(uint32_t cb_alloc_data, uint32_t cb_alloc, uint32_t size)
-   {
-      // todo: verify cb_alloc isn't in imports
-      if (state.backend.get_module().tables.size() < 0 ||
-          state.backend.get_module().tables[0].table.size() < cb_alloc)
-      {
-         backtrace();
-         throw std::runtime_error("cb_alloc is out of range");
-      }
-      // Note from Steven: eos-vm not saving top_frame and bottom_frame is an eos-vm bug. The
-      // backtrace was originally designed for profiling contracts, where reentering wasm is not
-      // possible. In addition, saving and restoring these variables is very tricky to do correctly
-      // in the face of asynchronous interrupts, so I didn't bother.
-      auto top_frame                            = state.backend.get_context()._top_frame;
-      auto bottom_frame                         = state.backend.get_context()._bottom_frame;
-      auto result                               = state.backend.get_context().execute(  //
-          this, eosio::vm::jit_visitor(42), state.backend.get_module().tables[0].table[cb_alloc],
-          cb_alloc_data, size);
-      state.backend.get_context()._top_frame    = top_frame;
-      state.backend.get_context()._bottom_frame = bottom_frame;
-      if (!result || !result->is_a<eosio::vm::i32_const_t>())
-      {
-         backtrace();
-         throw std::runtime_error("cb_alloc returned incorrect type");
-      }
-      char* begin = state.wa.get_base_ptr<char>() + result->to_ui32();
-      check_bounds(begin, size);
-      return begin;
-   }
-
-   template <typename T>
-   void set_data(uint32_t cb_alloc_data, uint32_t cb_alloc, const T& data)
-   {
-      memcpy(alloc(cb_alloc_data, cb_alloc, data.size()), data.data(), data.size());
-   }
-
    void testerAbort()
    {
       backtrace();
@@ -525,6 +494,48 @@ struct callbacks
       return wasi_errno_badf;
    }
 
+   uint32_t testerFilestatGet(int32_t fd, span<char> statbuf)
+   {
+      struct wasi_stat
+      {
+         uint64_t dev, ino, filetype, nlink, size, atim, mtim, ctim;
+      } result = {};
+      static_assert(sizeof(wasi_stat) == 64);
+      if (statbuf.size() < sizeof(result))
+         return wasi_errno_fault;
+      if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO)
+      {
+         result.filetype = wasi_filetype_character_device;
+      }
+      else if (fd == polyfill_root_dir_fd)
+      {
+         result.filetype = wasi_filetype_directory;
+      }
+      else if (auto file = get_file(fd))
+      {
+         int         fd = ::fileno(file->f);
+         struct stat stat;
+         if (::fstat(fd, &stat) < 0)
+            return wasi_errno_badf;
+
+         auto to_nsec    = [](const timespec& t) { return t.tv_sec * 1000000000ull + t.tv_nsec; };
+         result.dev      = stat.st_dev;
+         result.ino      = stat.st_ino;
+         result.filetype = wasi_filetype_regular_file;
+         result.nlink    = stat.st_nlink;
+         result.size     = stat.st_size;
+         result.atim     = to_nsec(stat.st_atim);
+         result.mtim     = to_nsec(stat.st_mtim);
+         result.ctim     = to_nsec(stat.st_ctim);
+      }
+      else
+      {
+         return wasi_errno_badf;
+      }
+      std::memcpy(statbuf.data(), &result, sizeof(result));
+      return 0;
+   }
+
    uint32_t testerOpenFile(span<const char>  path,
                            uint32_t          oflags,
                            uint64_t          fs_rights_base,
@@ -626,29 +637,6 @@ struct callbacks
       return 0;
    }
 
-   bool testerReadWholeFile(span<const char> filename, uint32_t cb_alloc_data, uint32_t cb_alloc)
-   {
-      file f = fopen(span_str(filename).c_str(), "r");
-      if (!f.f)
-      {
-         std::cout << "File " << span_str(filename) << " failed to open\n";
-         return false;
-      }
-
-      if (fseek(f.f, 0, SEEK_END))
-         return false;
-      auto size = ftell(f.f);
-      if (size < 0 || (long)(uint32_t)size != size)
-         return false;
-      if (fseek(f.f, 0, SEEK_SET))
-         return false;
-      std::vector<char> buf(size);
-      if (fread(buf.data(), size, 1, f.f) != 1)
-         return false;
-      set_data(cb_alloc_data, cb_alloc, buf);
-      return true;
-   }
-
    int32_t testerExecute(span<const char> command) { return system(span_str(command).c_str()); }
 
    test_chain& assert_chain(uint32_t chain, bool require_context = true)
@@ -711,10 +699,7 @@ struct callbacks
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
 
-   void testerPushTransaction(uint32_t         chain_index,
-                              span<const char> args_packed,
-                              uint32_t         cb_alloc_data,
-                              uint32_t         cb_alloc)
+   uint32_t testerPushTransaction(uint32_t chain_index, span<const char> args_packed)
    {
       auto&              chain     = assert_chain(chain_index);
       psio::input_stream s         = {args_packed.data(), args_packed.size()};
@@ -751,6 +736,10 @@ struct callbacks
       }
       catch (const std::exception& e)
       {
+         if (!trace.error)
+         {
+            trace.error = e.what();
+         }
       }
 
       auto us = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -762,7 +751,10 @@ struct callbacks
       }
 
       // std::cout << eosio::format_json(trace) << "\n";
-      set_data(cb_alloc_data, cb_alloc, psio::convert_to_frac(trace));
+      state.result_value = psio::convert_to_frac(trace);
+      state.result_key.clear();
+      psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
+      return state.result_value.size();
    }
 
    void testerSelectChainForDb(uint32_t chain_index)
@@ -778,44 +770,74 @@ struct callbacks
       return assert_chain(*state.selected_chain_index).native();
    }
 
+   void setResult(psibase::NativeFunctions& n)
+   {
+      state.result_key   = std::move(n.result_key);
+      state.result_value = std::move(n.result_value);
+   }
+
    uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset)
    {
-      return native().getResult(dest, offset);
+      if (offset < state.result_value.size() && dest.size())
+         memcpy(dest.data(), state.result_value.data() + offset,
+                std::min(state.result_value.size() - offset, dest.size()));
+      return state.result_value.size();
    }
 
    uint32_t getKey(eosio::vm::span<char> dest)
-   {  //
-      return native().getKey(dest);
+   {
+      if (!state.result_key.empty())
+         memcpy(dest.data(), state.result_key.data(),
+                std::min(state.result_key.size(), dest.size()));
+      return state.result_key.size();
    }
 
    uint32_t kvGet(uint32_t db, eosio::vm::span<const char> key)
-   {  //
-      return native().kvGet(db, key);
+   {
+      auto& n      = native();
+      auto  result = n.kvGet(db, key);
+      setResult(n);
+      return result;
    }
 
    uint32_t getSequential(uint32_t db, uint64_t indexNumber)
    {
-      return native().getSequential(db, indexNumber);
+      auto& n      = native();
+      auto  result = n.getSequential(db, indexNumber);
+      setResult(n);
+      return result;
    }
 
    uint32_t kvGreaterEqual(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
    {
-      return native().kvGreaterEqual(db, key, matchKeySize);
+      auto& n      = native();
+      auto  result = n.kvGreaterEqual(db, key, matchKeySize);
+      setResult(n);
+      return result;
    }
 
    uint32_t kvLessThan(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
    {
-      return native().kvLessThan(db, key, matchKeySize);
+      auto& n      = native();
+      auto  result = native().kvLessThan(db, key, matchKeySize);
+      setResult(n);
+      return result;
    }
 
    uint32_t kvMax(uint32_t db, eosio::vm::span<const char> key)
-   {  //
-      return native().kvMax(db, key);
+   {
+      auto& n      = native();
+      auto  result = n.kvMax(db, key);
+      setResult(n);
+      return result;
    }
 
    uint32_t kvGetTransactionUsage()
-   {  //
-      return native().kvGetTransactionUsage();
+   {
+      auto& n      = native();
+      auto  result = n.kvGetTransactionUsage();
+      setResult(n);
+      return result;
    }
 };  // callbacks
 
@@ -837,11 +859,11 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerGetArgs>("env", "testerGetArgs");
    rhf_t::add<&callbacks::testerClockTimeGet>("env", "testerClockTimeGet");
    rhf_t::add<&callbacks::testerFdstatGet>("env", "testerFdstatGet");
+   rhf_t::add<&callbacks::testerFilestatGet>("env", "testerFdFilestatGet");
    rhf_t::add<&callbacks::testerOpenFile>("env", "testerOpenFile");
    rhf_t::add<&callbacks::testerCloseFile>("env", "testerCloseFile");
    rhf_t::add<&callbacks::testerWriteFile>("env", "testerWriteFile");
    rhf_t::add<&callbacks::testerReadFile>("env", "testerReadFile");
-   rhf_t::add<&callbacks::testerReadWholeFile>("env", "testerReadWholeFile");
    rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
    rhf_t::add<&callbacks::testerCreateChain>("env", "testerCreateChain");
    rhf_t::add<&callbacks::testerDestroyChain>("env", "testerDestroyChain");

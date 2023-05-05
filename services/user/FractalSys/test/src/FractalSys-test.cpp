@@ -25,7 +25,7 @@ SCENARIO("Creating a fractal")
    {
       DefaultTestChain t;
 
-      auto alice      = t.from(t.add_account("alice"_a));
+      auto alice      = t.from(t.addAccount("alice"_a));
       auto fractalSys = t.from(FractalSys::service);
       auto coreFrac   = t.from(CoreFractalSys::service);
       auto a          = alice.to<FractalSys>();
@@ -48,7 +48,7 @@ SCENARIO("Creating a fractal")
 
          THEN("Bob cannot create a fractal with the same name")
          {
-            auto bob = t.from(t.add_account("bob"_a));
+            auto bob = t.from(t.addAccount("bob"_a));
             auto b   = bob.to<FractalSys>();
             b.createIdentity();
 
@@ -65,8 +65,8 @@ SCENARIO("Inviting people to a fractal")
    {
       DefaultTestChain t;
 
-      auto alice      = t.from(t.add_account("alice"_a));
-      auto bob        = t.from(t.add_ec_account("bob"_a, userPub));
+      auto alice      = t.from(t.addAccount("alice"_a));
+      auto bob        = t.from(t.addAccount("bob"_a, userPub));
       auto fractalSys = t.from(FractalSys::service);
       auto coreFrac   = t.from(CoreFractalSys::service);
       auto fractal    = "astronauts"_a;

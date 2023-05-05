@@ -146,6 +146,7 @@ function(add suffix)
             tester/src/wasi_polyfill/__wasi_path_filestat_get.cpp
             tester/src/wasi_polyfill/__wasi_path_open.cpp
             tester/src/wasi_polyfill/__wasi_proc_exit.cpp
+            tester/src/wasi_polyfill/system.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
         target_link_libraries(psitestlib${suffix} PUBLIC
