@@ -1,7 +1,8 @@
 #include <psibase/dispatch.hpp>
-#include <psibase/print.hpp>
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
+
+#include <cstdio>
 
 using namespace psibase;
 
@@ -16,7 +17,7 @@ namespace SystemService
                                 std::vector<psibase::Claim> claims)
    {
       if (enable_print)
-         print("auth_check\n");
+         std::printf("auth_check\n");
 
       auto type = flags & AuthInterface::requestMask;
       if (type == AuthInterface::runAsRequesterReq)

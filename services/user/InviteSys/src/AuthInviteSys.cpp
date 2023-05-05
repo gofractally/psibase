@@ -4,7 +4,6 @@
 #include <services/user/InviteSys.hpp>
 
 #include <psibase/dispatch.hpp>
-#include <psibase/print.hpp>
 
 using namespace psibase;
 using namespace UserService::Errors;

@@ -2,7 +2,6 @@
 
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
-#include <psibase/print.hpp>
 #include <psibase/testUtils.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/RTokenSys.hpp>

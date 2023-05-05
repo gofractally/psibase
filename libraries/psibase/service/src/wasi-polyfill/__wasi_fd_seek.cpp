@@ -1,4 +1,3 @@
-#include <stdlib.h>
 #include <wasi/api.h>
 #include "polyfill.hpp"
 
@@ -8,7 +7,5 @@ extern "C" __wasi_errno_t POLYFILL_NAME(fd_seek)(__wasi_fd_t        fd,
                                                  __wasi_filesize_t* newoffset)
     __attribute__((__import_module__("wasi_snapshot_preview1"), __import_name__("fd_seek")))
 {
-   [[clang::import_name("prints")]] void prints(const char*);
-   prints("__wasi_fd_seek not implemented");
-   abort();
+   abortMessage("__wasi_fd_seek not implemented");
 }

@@ -1,7 +1,8 @@
 #include <services/system/AuthAnySys.hpp>
 
 #include <psibase/dispatch.hpp>
-#include <psibase/print.hpp>
+
+#include <cstdio>
 
 static constexpr bool enable_print = false;
 
@@ -14,13 +15,13 @@ namespace SystemService
                                  std::vector<psibase::Claim> claims)
    {
       if (enable_print)
-         psibase::print("auth_check\n");
+         std::printf("auth_check\n");
    }
 
    void AuthAnySys::canAuthUserSys(psibase::AccountNumber user)
    {
       if (enable_print)
-         psibase::print("user_check\n");
+         std::printf("user_check\n");
    }
 }  // namespace SystemService
 

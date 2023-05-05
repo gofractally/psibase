@@ -1,5 +1,4 @@
 #include <psibase/nativeFunctions.hpp>
-#include <psibase/print.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_key.hpp>
@@ -57,13 +56,13 @@ std::vector<item> items = {
 void test(AccountNumber thisService)
 {
    if (enable_print)
-      print("kvPut\n");
+      printf("kvPut\n");
    for (const auto& item : items)
       if (item.add)
          kvPutRaw(DbId::service, item.getKey(thisService), psio::convert_to_bin(item.value));
 
    if (enable_print)
-      print("kvRemove\n");
+      printf("kvRemove\n");
    for (const auto& item : items)
       if (!item.keep)
          kvRemoveRaw(DbId::service, item.getKey(thisService));
@@ -73,7 +72,7 @@ void test(AccountNumber thisService)
       if (expected == skip)
       {
          if (enable_print)
-            print("skip ");
+            printf("skip ");
          return;
       }
       auto result = f(DbId::service, key, matchKeySize + 4);
@@ -81,7 +80,7 @@ void test(AccountNumber thisService)
       {
          check(getKey().empty(), "getKey() not empty");
          if (enable_print)
-            print("ok   ");
+            printf("ok   ");
          return;
       }
       check(!!result, "missing result");
@@ -103,11 +102,11 @@ void test(AccountNumber thisService)
       }
       check(found, "matching value missing in items");
       if (enable_print)
-         print("ok   ");
+         printf("ok   ");
    };
 
    if (enable_print)
-      print("kvLessThan\n");
+      printf("kvLessThan\n");
    for (const auto& item : items)
    {
       auto key = item.getKey(thisService);
@@ -120,11 +119,11 @@ void test(AccountNumber thisService)
       run(5, item.lt5, key, kvLessThanRaw);
       run(6, item.lt6, key, kvLessThanRaw);
       if (enable_print)
-         print("\n");
+         printf("\n");
    }  // kvLessThan
 
    if (enable_print)
-      print("kvGreaterEqual\n");
+      printf("kvGreaterEqual\n");
    for (const auto& item : items)
    {
       auto key = item.getKey(thisService);
@@ -137,11 +136,11 @@ void test(AccountNumber thisService)
       run(5, item.ge5, key, kvGreaterEqualRaw);
       run(6, item.ge6, key, kvGreaterEqualRaw);
       if (enable_print)
-         print("\n");
+         printf("\n");
    }  // kvGreaterEqual
 
    if (enable_print)
-      print("kvMax\n");
+      printf("kvMax\n");
    for (const auto& item : items)
    {
       auto key = item.getKey(thisService);
@@ -153,7 +152,7 @@ void test(AccountNumber thisService)
       run(0, item.max, key,
           [](DbId db, psio::input_stream key, size_t) { return kvMaxRaw(db, key); });
       if (enable_print)
-         print("\n");
+         printf("\n");
    }  // kvMax
 
 }  // test()

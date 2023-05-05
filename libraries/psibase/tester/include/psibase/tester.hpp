@@ -3,7 +3,6 @@
 #include <iostream>
 #include <psibase/Actor.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psibase/print.hpp>
 #include <psibase/trace.hpp>
 #include <psio/to_hex.hpp>
 
@@ -88,7 +87,7 @@ namespace psibase
       {
          if (_t.error.has_value())
          {
-            psibase::print(prettyTrace(trimRawData(_t)).c_str());
+            std::cout << prettyTrace(trimRawData(_t)).c_str();
          }
 
          if (_return.has_value())

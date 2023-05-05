@@ -80,7 +80,6 @@ function(add suffix)
         add_library(psibase-service-base${suffix})
         target_sources(psibase-service-base${suffix} PRIVATE
             service/src/intrinsic.cpp
-            service/src/print.cpp
             service/src/Service.cpp
         )
         target_link_libraries(psibase-service-base${suffix} PUBLIC psibase${suffix})
