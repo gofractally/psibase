@@ -7,12 +7,13 @@ import { ConfigurationPage } from "./configuration/configuration-page";
 import { usePollJson } from "./hooks";
 import { LogsPage } from "./log/logs-page";
 import { DashboardPage } from "./pages/dashboard-page";
+import { PowerPage } from "./pages/power-page";
 import { PeersPage } from "./peers/peers-page";
 import { Peer } from "./peers/interfaces";
 
 import "./App.css";
 
-const MENU_ITEMS = ["Dashboard", "Peers", "Logs", "Configuration"];
+const MENU_ITEMS = ["Dashboard", "Peers", "Logs", "Configuration", "Power"];
 
 function App() {
     const [activeItem, setActiveItem] = useState("");
@@ -55,6 +56,8 @@ function App() {
                     config={config}
                     refetchConfig={refetchConfig}
                 />
+            ) : activeItem === "Power" ? (
+                <PowerPage />
             ) : null}
         </>
     );
