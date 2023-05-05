@@ -12,3 +12,17 @@
 #else
 #define POLYFILL_NAME(x) __wasi_##x
 #endif
+
+#include <string_view>
+
+inline namespace psibase_polyfill
+{
+
+   [[noreturn]] inline void abortMessage(std::string_view message)
+   {
+      [[clang::import_name("abortMessage")]] [[noreturn]] void abortMessage(const char* message,
+                                                                            uint32_t    len);
+      abortMessage(message.data(), message.size());
+   }
+
+}  // namespace psibase_polyfill
