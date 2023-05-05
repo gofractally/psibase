@@ -10,9 +10,13 @@
 #include <psio/from_bin.hpp>
 #include <psio/to_bin.hpp>
 
+#include <mutex>
+
 #include <cxxabi.h>
 #include <elf.h>
 #include <stdio.h>
+
+#include "locals.hpp"
 
 static constexpr bool     show_parsed_lines      = false;
 static constexpr bool     show_parsed_abbrev     = false;
@@ -224,6 +228,119 @@ namespace dwarf
    }
 
 // clang-format off
+#define OP_RANGE32(a, b, name, value,  x)       \
+   x(a, b, name ## 0, value + 0)                \
+   x(a, b, name ## 1, value + 1)                \
+   x(a, b, name ## 2, value + 2)                \
+   x(a, b, name ## 3, value + 3)                \
+   x(a, b, name ## 4, value + 4)                \
+   x(a, b, name ## 5, value + 5)                \
+   x(a, b, name ## 6, value + 6)                \
+   x(a, b, name ## 7, value + 7)                \
+   x(a, b, name ## 8, value + 8)                \
+   x(a, b, name ## 9, value + 9)                \
+   x(a, b, name ## 10, value + 10)              \
+   x(a, b, name ## 11, value + 11)              \
+   x(a, b, name ## 12, value + 12)              \
+   x(a, b, name ## 13, value + 13)              \
+   x(a, b, name ## 14, value + 14)              \
+   x(a, b, name ## 15, value + 15)              \
+   x(a, b, name ## 16, value + 16)              \
+   x(a, b, name ## 17, value + 17)              \
+   x(a, b, name ## 18, value + 18)              \
+   x(a, b, name ## 19, value + 19)              \
+   x(a, b, name ## 20, value + 20)              \
+   x(a, b, name ## 21, value + 21)              \
+   x(a, b, name ## 22, value + 22)              \
+   x(a, b, name ## 23, value + 23)              \
+   x(a, b, name ## 24, value + 24)              \
+   x(a, b, name ## 25, value + 25)              \
+   x(a, b, name ## 26, value + 26)              \
+   x(a, b, name ## 27, value + 27)              \
+   x(a, b, name ## 28, value + 28)              \
+   x(a, b, name ## 29, value + 29)              \
+   x(a, b, name ## 30, value + 30)              \
+   x(a, b, name ## 31, value + 31)
+
+#define DW_OPS(a, b, x)                         \
+   x(a, b, addr, 0x03)                          \
+   x(a, b, deref, 0x06)                         \
+   x(a, b, const1u, 0x08)                       \
+   x(a, b, const1s, 0x09)                       \
+   x(a, b, const2u, 0x0a)                       \
+   x(a, b, const2s, 0x0b)                       \
+   x(a, b, const4u, 0x0c)                       \
+   x(a, b, const4s, 0x0d)                       \
+   x(a, b, const8u, 0x0e)                       \
+   x(a, b, const8s, 0x0f)                       \
+   x(a, b, constu, 0x10)                        \
+   x(a, b, consts, 0x11)                        \
+   x(a, b, dup, 0x12)                           \
+   x(a, b, drop, 0x13)                          \
+   x(a, b, over, 0x14)                          \
+   x(a, b, pick, 0x15)                          \
+   x(a, b, swap, 0x16)                          \
+   x(a, b, rot, 0x17)                           \
+   x(a, b, xderef, 0x18)                        \
+   x(a, b, abs, 0x19)                           \
+   x(a, b, and, 0x1a)                           \
+   x(a, b, div, 0x1b)                           \
+   x(a, b, minus, 0x1c)                         \
+   x(a, b, mod, 0x1d)                           \
+   x(a, b, mul, 0x1e)                           \
+   x(a, b, neg, 0x1f)                           \
+   x(a, b, not, 0x20)                           \
+   x(a, b, or, 0x21)                            \
+   x(a, b, plus, 0x22)                          \
+   x(a, b, plus_uconst, 0x23)                   \
+   x(a, b, shl, 0x24)                           \
+   x(a, b, shr, 0x25)                           \
+   x(a, b, shra, 0x26)                          \
+   x(a, b, xor, 0x27)                           \
+   x(a, b, skip, 0x2f)                          \
+   x(a, b, bra, 0x28)                           \
+   x(a, b, eq, 0x29)                            \
+   x(a, b, ge, 0x2a)                            \
+   x(a, b, gt, 0x2b)                            \
+   x(a, b, le, 0x2c)                            \
+   x(a, b, lt, 0x2d)                            \
+   x(a, b, ne, 0x2e)                            \
+   OP_RANGE32(a, b, lit, 0x30, x)               \
+   OP_RANGE32(a, b, reg, 0x50, x)               \
+   OP_RANGE32(a, b, breg, 0x70, x)              \
+   x(a, b, regx, 0x90)                          \
+   x(a, b, fbreg, 0x91)                         \
+   x(a, b, bregx, 0x92)                         \
+   x(a, b, piece, 0x93)                         \
+   x(a, b, deref_size, 0x94)                    \
+   x(a, b, xderef_size, 0x95)                   \
+   x(a, b, nop, 0x96)                           \
+   x(a, b, push_object_address, 0x97)           \
+   x(a, b, call2, 0x98)                         \
+   x(a, b, call4, 0x99)                         \
+   x(a, b, call_ref, 0x9a)                      \
+   x(a, b, form_tls_address, 0x9b)              \
+   x(a, b, call_frame_cfa, 0x9c)                \
+   x(a, b, bit_piece, 0x9d)                     \
+   x(a, b, implicit_value, 0x9e)                \
+   x(a, b, stack_value, 0x9f)                   \
+   x(a, b, wasm_location, 0xed)                 \
+   x(a, b, lo_user, 0xe0)                       \
+   x(a, b, hi_user, 0xff)
+   // clang-format on
+
+   DW_OPS(dw_op_, uint8_t, ENUM_DECL)
+   std::string dw_op_to_str(uint8_t value)
+   {
+      switch (value)
+      {
+         DW_OPS("DW_OP_", _, ENUM_DECODE)
+         default:
+            return "DW_OP_" + std::to_string(value);
+      }
+   }
+
+// clang-format off
 #define DW_TAGS(a, b, x)                     \
    x(a, b, array_type, 0x01)                 \
    x(a, b, class_type, 0x02)                 \
@@ -300,6 +417,100 @@ namespace dwarf
       }
    }
 
+// clang-format off
+#define DW_ATES(a, b, x)                        \
+   x(a, b, address, 0x01)                       \
+   x(a, b, boolean, 0x02)                       \
+   x(a, b, complex_float, 0x03)                 \
+   x(a, b, float, 0x04)                         \
+   x(a, b, signed, 0x05)                        \
+   x(a, b, signed_char, 0x06)                   \
+   x(a, b, unsigned, 0x07)                      \
+   x(a, b, unsigned_char, 0x08)                 \
+   x(a, b, imaginary_float, 0x09)               \
+   x(a, b, packed_decimal, 0x0a)                \
+   x(a, b, numeric_string, 0x0b)                \
+   x(a, b, edited, 0x0c)                        \
+   x(a, b, signed_fixed, 0x0d)                  \
+   x(a, b, unsigned_fixed, 0x0e)                \
+   x(a, b, decimal_float, 0x0f)                 \
+   x(a, b, UTF, 0x10)                           \
+   x(a, b, lo_user, 0x80)                       \
+   x(a, b, hi_user, 0xff)
+   // clang-format on
+
+   DW_ATES(dw_ate_, uint8_t, ENUM_DECL)
+   std::string dw_ate_to_str(uint8_t value)
+   {
+      switch (value)
+      {
+         DW_ATES("DW_ATE_", _, ENUM_DECODE)
+         default:
+            return "DW_ATE_" + std::to_string(value);
+      }
+   }
+
+   // clang-format off
+#define DW_CFAS(a, b, x)                        \
+   x(a, b, advance_loc, 0x40)                   \
+   x(a, b, offset, 0x80)                        \
+   x(a, b, restore, 0xc0)                       \
+   x(a, b, nop, 0)                              \
+   x(a, b, set_loc, 0x01)                       \
+   x(a, b, advance_loc1, 0x02)                  \
+   x(a, b, advance_loc2, 0x03)                  \
+   x(a, b, advance_loc4, 0x04)                  \
+   x(a, b, offset_extended, 0x05)               \
+   x(a, b, restore_extended, 0x06)              \
+   x(a, b, undefined, 0x07)                     \
+   x(a, b, same_value, 0x08)                    \
+   x(a, b, register, 0x09)                      \
+   x(a, b, remember_state, 0x0a)                \
+   x(a, b, restore_state, 0x0b)                 \
+   x(a, b, def_cfa, 0x0c)                       \
+   x(a, b, def_cfa_register, 0x0d)              \
+   x(a, b, def_cfa_offset, 0x0e)                \
+   x(a, b, def_cfa_expression, 0x0f)            \
+   x(a, b, expression, 0x10)                    \
+   x(a, b, offset_extended_sf, 0x11)            \
+   x(a, b, def_cfa_sf, 0x12)                    \
+   x(a, b, def_cfa_offset_sf, 0x13)             \
+   x(a, b, val_offset, 0x14)                    \
+   x(a, b, val_offset_sf, 0x15)                 \
+   x(a, b, val_expression, 0x16)                \
+   x(a, b, lo_user, 0x1c)                       \
+   x(a, b, hi_user, 0x3f)
+   // clang-format on
+
+   DW_CFAS(dw_cfa_, uint8_t, ENUM_DECL)
+   std::string dw_cfa_to_str(uint16_t value)
+   {
+      switch (value)
+      {
+         DW_CFAS("DW_CFA_", _, ENUM_DECODE)
+         default:
+            return "DW_CFA_" + std::to_string(value);
+      }
+   }
+
+// clang-format off
+#define DW_CCS(a, b, x)                         \
+   x(a, b, normal, 0x01)                        \
+   x(a, b, program, 0x02)                       \
+   x(a, b, nocall, 0x03)
+   // clang-format on
+
+   DW_CCS(dw_cc_, uint8_t, ENUM_DECL)
+   std::string dw_cc_to_str(uint16_t value)
+   {
+      switch (value)
+      {
+         DW_CCS("DW_CC_", _, ENUM_DECODE)
+         default:
+            return "DW_CC_" + std::to_string(value);
+      }
+   }
+
    std::string_view get_string(psio::input_stream& s)
    {
       auto begin = s.pos;
@@ -329,6 +540,13 @@ namespace dwarf
    void write_string(const std::string& s, Stream& stream)
    {
       stream.write(s.c_str(), s.size() + 1);
+   }
+
+   template <typename Stream>
+   void write_string(std::string_view s, Stream& stream)
+   {
+      stream.write(s.data(), s.size());
+      stream.write('\0');
    }
 
    struct line_header
@@ -455,7 +673,9 @@ namespace dwarf
          if (current && (state.end_sequence || state.file != current->file_index ||
                          state.line != current->line))
          {
-            current->end_address = state.address;
+            current->end_address    = state.address;
+            current->prologue_end   = state.prologue_end;
+            current->epilogue_begin = state.epilogue_begin;
             psio::check(current->file_index < header.file_names.size(),
                         "invalid file index in .debug_line");
             auto& filename = header.file_names[current->file_index];
@@ -592,33 +812,30 @@ namespace dwarf
    }
 
    // wasm_addr is relative to beginning of file
-   std::optional<uint32_t> get_wasm_fn(const info& info, uint32_t wasm_addr)
+   std::optional<uint32_t> get_wasm_fn(const std::vector<jit_fn_loc>& fns, uint32_t wasm_addr)
    {
-      auto it = std::upper_bound(info.wasm_fns.begin(), info.wasm_fns.end(), wasm_addr,
-                                 [](auto a, const auto& b) { return a < b.size_pos; });
-      if (it == info.wasm_fns.begin())
+      auto pos = std::ranges::partition_point(
+          fns, [=](const auto& fn) { return fn.wasm_end <= wasm_addr; });
+      if (pos == fns.end())
          return {};
-      --it;
-      if (it->size_pos <= wasm_addr && wasm_addr < it->end_pos)
-         return &*it - &info.wasm_fns[0];
-      return {};
+      return pos - fns.begin();
    }
 
-   std::optional<std::pair<uint64_t, uint64_t>> get_addr_range(
-       const info&                       info,
-       const std::vector<jit_fn_loc>&    fn_locs,
-       const std::vector<jit_instr_loc>& instr_locs,
-       const void*                       code_start,
-       uint32_t                          begin,
-       uint32_t                          end)
+   std::optional<std::pair<uint64_t, uint64_t>> get_addr_range(const info&     info,
+                                                               const jit_info& reloc,
+                                                               const void*     code_start,
+                                                               uint32_t        begin,
+                                                               uint32_t        end)
    {
+      auto find_instr = [&](auto value)
+      {
+         return std::ranges::partition_point(
+             reloc.instr_locs, [value](const auto& loc) { return loc.wasm_addr < value; });
+      };
       // TODO: cuts off a range which ends at the wasm's end
-      auto it1 =
-          std::lower_bound(instr_locs.begin(), instr_locs.end(), info.wasm_code_offset + begin,
-                           [](const auto& a, auto b) { return a.wasm_addr < b; });
-      auto it2 = std::lower_bound(instr_locs.begin(), instr_locs.end(), info.wasm_code_offset + end,
-                                  [](const auto& a, auto b) { return a.wasm_addr < b; });
-      if (it1 < it2 && it2 != instr_locs.end())
+      auto it1 = find_instr(info.wasm_code_offset + begin);
+      auto it2 = find_instr(info.wasm_code_offset + end);
+      if (it1 < it2 && it2 != reloc.instr_locs.end())
       {
          return std::pair{uint64_t((char*)code_start + it1->code_offset),
                           uint64_t((char*)code_start + it2->code_offset)};
@@ -627,11 +844,7 @@ namespace dwarf
    }
 
    template <typename S>
-   void write_line_program(const info&                       info,
-                           const std::vector<jit_fn_loc>&    fn_locs,
-                           const std::vector<jit_instr_loc>& instr_locs,
-                           const void*                       code_start,
-                           S&                                s)
+   void write_line_program(const info& info, const jit_info& reloc, const void* code_start, S& s)
    {
       uint64_t address = 0;
       uint32_t file    = 1;
@@ -648,8 +861,7 @@ namespace dwarf
 
       for (auto& loc : info.locations)
       {
-         auto range = get_addr_range(info, fn_locs, instr_locs, code_start, loc.begin_address,
-                                     loc.end_address);
+         auto range = get_addr_range(info, reloc, code_start, loc.begin_address, loc.end_address);
          if (!range)
             continue;
 
@@ -691,6 +903,16 @@ namespace dwarf
             line = loc.line;
          }
 
+         if (loc.prologue_end)
+         {
+            psio::to_bin(uint8_t(dw_lns_set_prologue_end), s);
+         }
+
+         if (loc.epilogue_begin)
+         {
+            psio::to_bin(uint8_t(dw_lns_set_epilogue_begin), s);
+         }
+
          psio::to_bin(uint8_t(dw_lns_copy), s);
 
          if (address != range->second)
@@ -710,10 +932,9 @@ namespace dwarf
       });
    }  // write_line_program
 
-   std::vector<char> generate_debug_line(const info&                       info,
-                                         const std::vector<jit_fn_loc>&    fn_locs,
-                                         const std::vector<jit_instr_loc>& instr_locs,
-                                         const void*                       code_start)
+   std::vector<char> generate_debug_line(const info&     info,
+                                         const jit_info& reloc,
+                                         const void*     code_start)
    {
       line_header header;
       header.file_names.push_back("");
@@ -721,7 +942,7 @@ namespace dwarf
       psio::size_stream header_size;
       to_bin(header, header_size);
       psio::size_stream program_size;
-      write_line_program(info, fn_locs, instr_locs, code_start, program_size);
+      write_line_program(info, reloc, code_start, program_size);
 
       std::vector<char>      result(header_size.size + program_size.size + 22);
       psio::fixed_buf_stream s{result.data(), result.size()};
@@ -730,14 +951,12 @@ namespace dwarf
       psio::to_bin(uint16_t(lns_version), s);
       psio::to_bin(uint64_t(header_size.size), s);
       to_bin(header, s);
-      write_line_program(info, fn_locs, instr_locs, code_start, s);
+      write_line_program(info, reloc, code_start, s);
       psio::check(s.pos == s.end, "generate_debug_line: calculated incorrect stream size");
       return result;
    }
 
-   void parse_debug_abbrev(info&                            result,
-                           std::map<std::string, uint32_t>& files,
-                           psio::input_stream               s)
+   void parse_debug_abbrev(debug_abbrev& result, psio::input_stream s)
    {
       auto begin = s.pos;
       while (s.remaining())
@@ -768,10 +987,16 @@ namespace dwarf
                fprintf(stderr, "%08x [%d]: tag: %s children: %d attrs: %d\n", decl.table_offset,
                        decl.code, dw_tag_to_str(decl.tag).c_str(), decl.has_children,
                        (int)decl.attrs.size());
-            result.abbrev_decls.push_back(std::move(decl));
+            result.contents.push_back(std::move(decl));
          }
       }
+      std::ranges::sort(result.contents, std::less<>());
    }
+
+   struct native_attr_address
+   {
+      uint64_t value = 0;
+   };
 
    struct attr_address
    {
@@ -793,6 +1018,11 @@ namespace dwarf
       psio::input_stream data;
    };
 
+   struct native_attr_exprloc
+   {
+      std::vector<char> data;
+   };
+
    struct attr_flag
    {
       bool value = false;
@@ -801,6 +1031,11 @@ namespace dwarf
    struct attr_sec_offset
    {
       uint32_t value = 0;
+   };
+
+   struct native_attr_sec_offset
+   {
+      uint64_t value = 0;
    };
 
    struct attr_ref
@@ -829,6 +1064,45 @@ namespace dwarf
        attr_ref_addr,
        attr_ref_sig8,
        std::string_view>;
+
+   struct wasm_attr
+   {
+      uint32_t   attr = 0;
+      attr_value value;
+
+      std::uint8_t form() const;
+
+      auto key() const { return std::pair{attr, value.index()}; }
+
+      friend bool operator<(const wasm_attr& a, const wasm_attr& b) { return a.key() < b.key(); }
+   };
+
+   using native_attr_value = std::variant<  //
+       native_attr_address,
+       attr_block,
+       attr_data,
+       native_attr_exprloc,
+       attr_flag,
+       native_attr_sec_offset,
+       attr_ref,
+       attr_ref_addr,
+       attr_ref_sig8,
+       std::string_view>;
+
+   struct native_attr
+   {
+      uint32_t          attr = 0;
+      native_attr_value value;
+
+      std::uint8_t form() const;
+
+      auto key() const { return std::pair{attr, value.index()}; }
+
+      friend bool operator<(const native_attr& a, const native_attr& b)
+      {
+         return a.key() < b.key();
+      }
+   };
 
    std::string hex(uint32_t v)
    {
@@ -877,7 +1151,7 @@ namespace dwarf
       return {};
    }
 
-   attr_value parse_attr_value(info& result, uint32_t form, psio::input_stream& s)
+   attr_value parse_attr_value(const debug_str& strings, uint32_t form, psio::input_stream& s)
    {
       auto vardata = [&](size_t size)
       {
@@ -936,71 +1210,77 @@ namespace dwarf
          case dw_form_string:
             return get_string(s);
          case dw_form_strp:
-            return std::string_view{result.get_str(psio::from_bin<uint32_t>(s))};
+            return std::string_view{strings.get(psio::from_bin<uint32_t>(s))};
          case dw_form_indirect:
-            return parse_attr_value(result, psio::varuint32_from_bin(s), s);
+            return parse_attr_value(strings, psio::varuint32_from_bin(s), s);
          default:
             throw std::runtime_error("unknown form in dwarf entry");
       }
    }  // parse_attr_value
 
-   const abbrev_decl* get_die_abbrev(info&                     result,
-                                     int                       indent,
-                                     uint32_t                  debug_abbrev_offset,
-                                     const psio::input_stream& whole_s,
-                                     psio::input_stream&       s)
+   struct unit_parser
    {
-      const char* p    = s.pos;
-      auto        code = psio::varuint32_from_bin(s);
-      if (!code)
+      const abbrev_decl* get_die_abbrev(psio::input_stream& s)
       {
-         if (show_parsed_dies)
-            fprintf(stderr, "0x%08x: %*sNULL\n", uint32_t(p - whole_s.pos), indent - 12, "");
-         return nullptr;
-      }
-      const auto* abbrev = result.get_abbrev_decl(debug_abbrev_offset, code);
-      psio::check(abbrev, "Bad abbrev in .debug_info");
-      if (show_parsed_dies)
-         fprintf(stderr, "0x%08x: %*s%s\n", uint32_t(p - whole_s.pos), indent - 12, "",
-                 dw_tag_to_str(abbrev->tag).c_str());
-      return abbrev;
-   }
-
-   template <typename F>
-   void parse_die_attrs(info&                     result,
-                        int                       indent,
-                        uint32_t                  debug_abbrev_offset,
-                        const abbrev_decl&        abbrev,
-                        const psio::input_stream& whole_s,
-                        const psio::input_stream& unit_s,
-                        psio::input_stream&       s,
-                        F&&                       f)
-   {
-      for (const auto& attr : abbrev.attrs)
-      {
-         auto value = parse_attr_value(result, attr.form, s);
-         if (show_parsed_dies)
-            fprintf(stderr, "%*s%s %s: %s\n", indent + 2, "", dw_at_to_str(attr.name).c_str(),
-                    dw_form_to_str(attr.form).c_str(), to_string(value).c_str());
-         if (attr.name == dw_at_specification)
+         const char* p    = s.pos;
+         auto        code = psio::varuint32_from_bin(s);
+         if (!code)
          {
-            if (auto ref = get_ref(value))
-            {
-               if (show_parsed_dies)
-                  fprintf(stderr, "%*sref: %08x, unit: %08x\n", indent + 4, "", uint32_t(*ref),
-                          uint32_t(unit_s.pos - whole_s.pos));
-               psio::check(*ref < unit_s.remaining(), "DW_AT_specification out of range");
-               psio::input_stream ref_s{unit_s.pos + *ref, unit_s.end};
-               auto               ref_abbrev =
-                   get_die_abbrev(result, indent + 4, debug_abbrev_offset, whole_s, ref_s);
-               parse_die_attrs(result, indent + 4, debug_abbrev_offset, *ref_abbrev, whole_s,
-                               unit_s, ref_s, f);
-            }
+            return nullptr;
          }
-         else
-            f(attr, value);
+         const auto* result = abbrev.find(debug_abbrev_offset, code);
+         psio::check(result, "Bad abbrev in .debug_info");
+         return result;
       }
-   }
+
+      template <typename F>
+      void parse_die_attrs_local(const abbrev_decl& abbrev, psio::input_stream& s, F&& f)
+      {
+         for (const auto& attr : abbrev.attrs)
+         {
+            auto value = parse_attr_value(strings, attr.form, s);
+            f(attr, value);
+         }
+      }
+
+      template <typename F>
+      void parse_die_attrs(const abbrev_decl& abbrev, psio::input_stream& s, F&& f)
+      {
+         for (const auto& attr : abbrev.attrs)
+         {
+            auto value = parse_attr_value(strings, attr.form, s);
+            if (attr.name == dw_at_specification)
+            {
+               if (auto ref = get_ref(value))
+               {
+                  psio::check(*ref < unit_s.remaining(), "DW_AT_specification out of range");
+                  psio::input_stream ref_s{unit_s.pos + *ref, unit_s.end};
+                  auto               ref_abbrev = get_die_abbrev(ref_s);
+                  parse_die_attrs(*ref_abbrev, ref_s, f);
+               }
+            }
+            else
+               f(attr, value);
+         }
+      }
+
+      void skip_die_children(const abbrev_decl& abbrev, psio::input_stream& s)
+      {
+         if (!abbrev.has_children)
+            return;
+         while (auto* child = get_die_abbrev(s))
+         {
+            parse_die_attrs_local(*child, s, [&](auto&&...) {});
+            skip_die_children(*child, s);
+         }
+      }
+
+      const debug_abbrev&       abbrev;
+      const debug_str&          strings;
+      uint32_t                  debug_abbrev_offset;
+      const psio::input_stream& whole_s;
+      const psio::input_stream& unit_s;
+   };
 
    std::string demangle(const std::string& name)
    {
@@ -1058,45 +1338,17 @@ namespace dwarf
       }
    };  // common_attrs
 
-   void skip_die_children(info&                     result,
-                          int                       indent,
-                          uint32_t                  debug_abbrev_offset,
-                          const abbrev_decl&        abbrev,
-                          const psio::input_stream& whole_s,
-                          const psio::input_stream& unit_s,
-                          psio::input_stream&       s)
+   void parse_subprograms(info&               result,
+                          unit_parser&        parser,
+                          const abbrev_decl&  abbrev,
+                          psio::input_stream& s)
    {
       if (!abbrev.has_children)
          return;
-      while (true)
+      while (auto child = parser.get_die_abbrev(s))
       {
-         auto* child = get_die_abbrev(result, indent, debug_abbrev_offset, whole_s, s);
-         if (!child)
-            break;
-         parse_die_attrs(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s, s,
-                         [&](auto&&...) {});
-         skip_die_children(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s, s);
-      }
-   }
-
-   void parse_die_children(info&                     result,
-                           uint32_t                  indent,
-                           uint32_t                  debug_abbrev_offset,
-                           const abbrev_decl&        abbrev,
-                           const psio::input_stream& whole_s,
-                           const psio::input_stream& unit_s,
-                           psio::input_stream&       s)
-   {
-      if (!abbrev.has_children)
-         return;
-      while (true)
-      {
-         auto* child = get_die_abbrev(result, indent, debug_abbrev_offset, whole_s, s);
-         if (!child)
-            break;
          common_attrs common;
-         parse_die_attrs(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s, s,
-                         common);
+         parser.parse_die_attrs(*child, s, common);
          if (child->tag == dw_tag_subprogram)
          {
             auto demangled_name = common.get_demangled_name();
@@ -1110,23 +1362,14 @@ namespace dwarf
                    .name           = common.name,
                    .demangled_name = demangled_name,
                };
-               if (show_parsed_dies)
-               {
-                  fprintf(stderr, "%*sbegin_address  = %08x\n", indent + 6, "", p.begin_address);
-                  fprintf(stderr, "%*send_address    = %08x\n", indent + 6, "", p.end_address);
-                  fprintf(stderr, "%*sdemangled_name = %s\n", indent + 6, "",
-                          p.demangled_name.c_str());
-               }
                result.subprograms.push_back(std::move(p));
-               parse_die_children(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s,
-                                  s);
+               parse_subprograms(result, parser, *child, s);
             }
             else
-               skip_die_children(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s,
-                                 s);
+               parser.skip_die_children(*child, s);
          }
          else
-            parse_die_children(result, indent + 4, debug_abbrev_offset, *child, whole_s, unit_s, s);
+            parse_subprograms(result, parser, *child, s);
       }
    }  // parse_die_children
 
@@ -1142,30 +1385,13 @@ namespace dwarf
       auto address_size        = psio::from_bin<uint8_t>(s);
       psio::check(address_size == 4, "mismatched address_size in .debug_info");
 
-      auto* root = get_die_abbrev(result, indent, debug_abbrev_offset, whole_s, s);
+      unit_parser parser{result.abbrev_decls, result.strings, debug_abbrev_offset, whole_s, unit_s};
+      auto        root = parser.get_die_abbrev(s);
       psio::check(root && root->tag == dw_tag_compile_unit,
                   "missing DW_TAG_compile_unit in .debug_info");
-      parse_die_attrs(result, indent + 4, debug_abbrev_offset, *root, whole_s, unit_s, s,
-                      [&](auto&&...) {});
-      parse_die_children(result, indent + 4, debug_abbrev_offset, *root, whole_s, unit_s, s);
+      parser.parse_die_attrs_local(*root, s, [&](auto&&...) {});
+      parse_subprograms(result, parser, *root, s);
    }  // parse_debug_info_unit
-
-   size_t fill_parents(info& result, size_t parent, size_t pos)
-   {
-      auto& par = result.subprograms[parent];
-      while (true)
-      {
-         if (pos >= result.subprograms.size())
-            return pos;
-         auto& subp = result.subprograms[pos];
-         if (subp.begin_address >= par.end_address)
-            return pos;
-         psio::check(subp.end_address <= par.end_address, "partial overlap in subprograms");
-         par.children.push_back(pos);
-         subp.parent = parent;
-         pos         = fill_parents(result, pos, pos + 1);
-      }
-   }
 
    void parse_debug_info(info& result, psio::input_stream s)
    {
@@ -1181,8 +1407,6 @@ namespace dwarf
          s.skip(unit_length);
       }
       std::sort(result.subprograms.begin(), result.subprograms.end());
-      for (size_t pos = 0; pos < result.subprograms.size();)
-         pos = fill_parents(result, pos, pos + 1);
    }
 
    Elf64_Word add_str(std::vector<char>& strings, const char* s)
@@ -1194,27 +1418,97 @@ namespace dwarf
       return result;
    }
 
-   struct attr_form_value
+   std::vector<char> make_rbp_loc()
    {
-      using value_type = std::variant<uint8_t, uint64_t, std::string>;
+      std::vector<char> result;
+      result.push_back(dw_op_reg6);
+      return result;
+   }
 
-      uint32_t   attr = 0;
-      uint32_t   form = 0;
-      value_type value;
-
-      auto key() const { return std::pair{attr, form}; }
-
-      friend bool operator<(const attr_form_value& a, const attr_form_value& b)
+   // A relocation is identified by the offset within the source unit
+   //
+   struct relocation_list
+   {
+      using key_type   = std::uint64_t;
+      using value_type = std::uint64_t;
+      using relocation = std::size_t;
+      void append(auto& out, const attr_ref& key)
       {
-         return a.key() < b.key();
+         // first normalize key
+         if (auto pos = known.find(key.value); pos != known.end())
+         {
+            psio::to_bin(pos->second - unit_base, out);
+         }
+         else
+         {
+            unknown[key.value].push_back(out.written());
+            psio::to_bin(std::uint64_t{0}, out);
+         }
       }
+      void set(auto& out, const key_type& key)
+      {
+         auto location = out.written();
+         if (auto pos = unknown.find(key); pos != unknown.end())
+         {
+            for (const auto& rel : pos->second)
+            {
+               out.rewrite_raw(rel, location - unit_base);
+            }
+            unknown.erase(pos);
+         }
+         known.insert({key, location});
+      }
+      void     set(auto& out, const attr_ref& key) { set(out, key.value); }
+      attr_ref new_ref() { return attr_ref{--next_id}; }
+      void     start_unit(auto& out)
+      {
+         known.clear();
+         // unknown should be empty unless there are unresolved references
+         unknown.clear();
+         unit_base = out.written();
+      }
+      std::map<key_type, std::vector<relocation>> unknown;
+      std::map<key_type, value_type>              known;
+      std::size_t                                 unit_base;
+      key_type                                    next_id = 0;
    };
+
+   std::uint8_t native_attr::form() const
+   {
+      overloaded o{[](const native_attr_address&) { return dw_form_addr; },
+                   [](const attr_block&) { return dw_form_block; },
+                   // TODO: preserve form for data
+                   [](const attr_data&) { return dw_form_data8; },
+                   [](const native_attr_exprloc&) { return dw_form_exprloc; },
+                   [](const attr_flag&) { return dw_form_flag; },
+                   [](const native_attr_sec_offset&) { return dw_form_sec_offset; },
+                   [](const attr_ref&) { return dw_form_ref8; },
+                   [](const attr_ref_addr&) { return dw_form_ref_addr; },
+                   [](const attr_ref_sig8&) { return dw_form_ref_sig8; },
+                   [](const std::string_view&) { return dw_form_string; }};
+      return std::visit(o, value);
+   }
+
+   void write_attr_value(const native_attr_value& value, auto& stream, relocation_list& reloc)
+   {
+      overloaded o{[&](const native_attr_address& a) { psio::to_bin(a.value, stream); },
+                   [&](const attr_block& a) { psio::to_bin(a.data, stream); },
+                   [&](const attr_data& a) { psio::to_bin(a.value, stream); },
+                   [&](const native_attr_exprloc& a) { psio::to_bin(a.data, stream); },
+                   [&](const attr_flag& a) { psio::to_bin(a.value, stream); },
+                   [&](const native_attr_sec_offset& a) { psio::to_bin(a.value, stream); },
+                   [&](const attr_ref& a) { reloc.append(stream, a); },
+                   [&](const attr_ref_addr&) { psio::check(false, "not implemented"); },
+                   [&](const attr_ref_sig8&) { psio::check(false, "not implemented"); },
+                   [&](const std::string_view& str) { return write_string(str, stream); }};
+      std::visit(o, value);
+   }
 
    struct die_pattern
    {
-      uint32_t                     tag          = 0;
-      bool                         has_children = false;
-      std::vector<attr_form_value> attrs;
+      uint32_t                 tag          = 0;
+      bool                     has_children = false;
+      std::vector<native_attr> attrs;
 
       auto key() const { return std::tie(tag, has_children, attrs); }
 
@@ -1224,161 +1518,1032 @@ namespace dwarf
       }
    };
 
-   void write_die(int                              indent,
-                  std::vector<char>&               abbrev_data,
-                  std::vector<char>&               info_data,
-                  std::map<die_pattern, uint32_t>& codes,
-                  const die_pattern&               die)
+   // implicit_object indicates whether an address is pushed onto the stack
+   // before the expr is evaluted. Such a pointer is native, so it needs to
+   // be translated to a wasm pointer before evaluting the rest of the expression.
+   //
+   // is_location indicates whether the result of the expression is a location
+   // or an integer.  If a location is expected, the expression will leave a
+   // wasm address on the stack, which needs to be translated to a native pointer.
+   void translate_expr(const debug_eos_vm::wasm_frame* frame,
+                       const eosio::vm::module&        mod,
+                       psio::input_stream              s,
+                       auto&                           out,
+                       bool                            implicit_object,
+                       bool                            is_location)
    {
-      auto it = codes.find(die);
-      if (it == codes.end())
+      auto adjust_addr = [](auto& out)
       {
-         it = codes.insert(std::pair{die, codes.size() + 1}).first;
-         psio::vector_stream s{abbrev_data};
-         psio::varuint32_to_bin(it->second, s);
-         psio::varuint32_to_bin(die.tag, s);
-         psio::to_bin(die.has_children, s);
+         psio::to_bin(std::uint8_t{dw_op_breg4}, out);
+         psio::varuint32_to_bin(0, out);
+         psio::to_bin(std::uint8_t{dw_op_plus}, out);
+      };
+      auto addr_to_wasm = [](auto& out)
+      {
+         psio::to_bin(std::uint8_t{dw_op_breg4}, out);
+         psio::varuint32_to_bin(0, out);
+         psio::to_bin(std::uint8_t{dw_op_minus}, out);
+      };
+      // The WASM address size is 4 bytes, but the native address is 8 bytes.
+      // In order to make the translation accurate, some operations need
+      // to have their inputs sign-extended and/or their results truncated.
+      //
+      // Sign extension and truncation causes significant bloat.
+      // Given that I'm not seeing much other than fbreg and wasm_location,
+      // I don't think it's worth trying to optimize.
+      auto truncate = [](auto& out)
+      {
+         psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+         psio::to_bin(std::uint32_t{0xffffffffu}, out);
+         psio::to_bin(std::uint8_t{dw_op_and}, out);
+      };
+      auto sign_extend = [](auto& out)
+      {
+         psio::to_bin(std::uint8_t{dw_op_const1u}, out);
+         psio::to_bin(std::uint8_t{32}, out);
+         psio::to_bin(std::uint8_t{dw_op_shl}, out);
+         psio::to_bin(std::uint8_t{dw_op_const1u}, out);
+         psio::to_bin(std::uint8_t{32}, out);
+         psio::to_bin(std::uint8_t{dw_op_shra}, out);
+      };
+      auto sign_extend2 = [&](auto& out)
+      {
+         sign_extend(out);
+         psio::to_bin(std::uint8_t{dw_op_swap}, out);
+         sign_extend(out);
+         psio::to_bin(std::uint8_t{dw_op_swap}, out);
+      };
+      if (implicit_object)
+      {
+         addr_to_wasm(out);
+      }
+      enum
+      {
+         wasm_address,
+         native_address,
+         output_value
+      } state = wasm_address;
+      while (s.remaining())
+      {
+         auto op = psio::from_bin<std::uint8_t>(s);
+         switch (op)
+         {
+#define OP_CASE(a, b, name, value) case name:
+            OP_RANGE32(a, b, dw_op_lit, ~, OP_CASE)
+            {
+               psio::to_bin(op, out);
+               state = wasm_address;
+               break;
+            }
+#undef OP_CASE
+            case dw_op_addr:
+            {
+               auto val = psio::from_bin<std::uint32_t>(s);
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(val, out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const1u:
+            {
+               psio::to_bin(op, out);
+               psio::to_bin(psio::from_bin<std::uint8_t>(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const2u:
+            {
+               psio::to_bin(op, out);
+               psio::to_bin(psio::from_bin<std::uint16_t>(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const4u:
+            {
+               psio::to_bin(op, out);
+               psio::to_bin(psio::from_bin<std::uint32_t>(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const8u:
+            {
+               // Truncate to the wasm stack element size
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::from_bin<std::uint64_t>(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const1s:
+            {
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::from_bin<std::int8_t>(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const2s:
+            {
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::from_bin<std::int16_t>(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const4s:
+            {
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(psio::from_bin<std::uint32_t>(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_const8s:
+            {
+               // Truncate to the wasm stack element size
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::from_bin<std::int64_t>(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_constu:
+            {
+               psio::to_bin(std::uint8_t{dw_op_constu}, out);
+               psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_consts:
+            {
+               psio::to_bin(std::uint8_t{dw_op_const4u}, out);
+               psio::to_bin(static_cast<std::uint32_t>(psio::sleb64_from_bin(s)), out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_fbreg:
+            {
+               psio::to_bin(std::uint8_t{dw_op_fbreg}, out);
+               psio::sleb64_to_bin(psio::sleb64_from_bin(s), out);
+               addr_to_wasm(out);
+               break;
+            }
+            case dw_op_dup:
+            {
+               psio::to_bin(std::uint8_t{dw_op_dup}, out);
+               break;
+            }
+            case dw_op_drop:
+            {
+               psio::to_bin(std::uint8_t{dw_op_drop}, out);
+               break;
+            }
+            case dw_op_pick:
+            {
+               psio::to_bin(std::uint8_t{dw_op_pick}, out);
+               psio::to_bin(psio::from_bin<std::uint8_t>(s), out);
+               break;
+            }
+            case dw_op_over:
+            {
+               psio::to_bin(std::uint8_t{dw_op_over}, out);
+               break;
+            }
+            case dw_op_swap:
+            {
+               psio::to_bin(std::uint8_t{dw_op_swap}, out);
+               break;
+            }
+            case dw_op_rot:
+            {
+               psio::to_bin(std::uint8_t{dw_op_rot}, out);
+               break;
+            }
+            case dw_op_deref:
+            {
+               psio::check(state == wasm_address, "unexpected deref");
+               adjust_addr(out);
+               psio::to_bin(std::uint8_t{dw_op_deref_size}, out);
+               psio::to_bin(std::uint8_t{4}, out);
+               state = wasm_address;
+               break;
+            }
+            case dw_op_deref_size:
+            {
+               adjust_addr(out);
+               psio::to_bin(std::uint8_t{dw_op_deref_size}, out);
+               psio::to_bin(psio::from_bin<std::uint8_t>(s), out);
+               break;
+            }
+            case dw_op_push_object_address:
+            {
+               psio::to_bin(std::uint8_t{dw_op_push_object_address}, out);
+               psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
+               addr_to_wasm(out);
+               break;
+            }
+            case dw_op_abs:
+            {
+               sign_extend(out);
+               psio::to_bin(std::uint8_t{dw_op_abs}, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_and:
+            {
+               psio::to_bin(std::uint8_t{dw_op_and}, out);
+               break;
+            }
+            case dw_op_div:
+            {
+               sign_extend2(out);
+               psio::to_bin(std::uint8_t{dw_op_div}, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_minus:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_mod:
+            {
+               sign_extend2(out);
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_mul:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_neg:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_not:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_or:
+            {
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_plus:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_plus_uconst:
+            {
+               psio::to_bin(op, out);
+               psio::varuint32_to_bin(psio::varuint32_from_bin(s), out);
+               truncate(out);
+               break;
+            }
+            case dw_op_shl:
+            {
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_shr:
+            {
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_shra:
+            {
+               psio::to_bin(std::uint8_t{dw_op_swap}, out);
+               sign_extend(out);
+               psio::to_bin(std::uint8_t{dw_op_swap}, out);
+               psio::to_bin(op, out);
+               truncate(out);
+               break;
+            }
+            case dw_op_xor:
+            {
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_le:
+            case dw_op_ge:
+            case dw_op_lt:
+            case dw_op_gt:
+            {
+               sign_extend2(out);
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_eq:
+            case dw_op_ne:
+            {
+               psio::to_bin(op, out);
+               break;
+            }
+            case dw_op_nop:
+            {
+               break;
+            }
+            case dw_op_implicit_value:
+            {
+               psio::to_bin(std::uint8_t{dw_op_implicit_value}, out);
+               auto size = psio::varuint32_from_bin(s);
+               psio::varuint32_to_bin(size, out);
+               const char* base;
+               s.read_reuse_storage(base, size);
+               out.write(base, size);
+               state = output_value;
+               break;
+            }
+            case dw_op_stack_value:
+            {
+               if (state == native_address)
+               {
+                  // clang generates DW_OP_wasm_location, DW_OP_stack_value
+                  // for the frame base. I'm not quite sure what stack_value
+                  // applied to a register location is supposed to mean.
+                  psio::to_bin(std::uint8_t{dw_op_deref_size}, out);
+                  psio::to_bin(std::uint8_t{4}, out);
+                  state = wasm_address;
+               }
+               else
+               {
+                  psio::to_bin(std::uint8_t{dw_op_stack_value}, out);
+                  state = output_value;
+               }
+               break;
+            }
+            case dw_op_wasm_location:
+            {
+               switch (psio::from_bin<std::uint8_t>(s))
+               {
+                  case 0:
+                  {
+                     if (!frame)
+                        throw std::runtime_error("Cannot access local without frame info");
+                     auto    idx = psio::varuint32_from_bin(s);
+                     int32_t off = frame->get_frame_offset(idx);
+                     psio::to_bin(std::uint8_t{dw_op_breg6}, out);
+                     psio::sleb64_to_bin(off, out);
+                     state = native_address;
+                     break;
+                  }
+                  case 1:
+                  {
+                     auto idx  = psio::varuint32_from_bin(s);
+                     auto addr = &mod.globals[idx].current.value;
+                     psio::to_bin(std::uint8_t{dw_op_addr}, out);
+                     psio::to_bin(reinterpret_cast<std::uint64_t>(addr), out);
+                     state = native_address;
+                     break;
+                  }
+                  case 2:
+                  {
+                     if (!frame)
+                        throw std::runtime_error("Cannot access local without frame info");
+                     auto    idx = psio::varuint32_from_bin(s);
+                     int32_t off = frame->get_stack_offset(idx);
+                     psio::to_bin(std::uint8_t{dw_op_breg6}, out);
+                     psio::sleb64_to_bin(off, out);
+                     state = native_address;
+                     break;
+                  }
+                  case 3:
+                  {
+                     auto idx  = psio::from_bin<std::uint32_t>(s);
+                     auto addr = &mod.globals[idx].current.value;
+                     psio::to_bin(std::uint8_t{dw_op_addr}, out);
+                     psio::to_bin(reinterpret_cast<std::uint64_t>(addr), out);
+                     state = native_address;
+                     break;
+                  }
+                  default:
+                     throw std::runtime_error("invalid DW_OP_wasm_location");
+               }
+               break;
+            }
+            default:
+               // breg, reg: should use wasm_location instead
+               // xderef, xderef_size: Would need a definition of address space
+               // form_tls_address: doesn't make sense without threads
+               // call_frame_cfa: clang doesn't generate debug_frame or eh_frame, and
+               //   we're not trying to translate those sections.
+               // skip, bra: Relocations are annoying to implement. Overflow is possible as well.
+               // call: The relocations would need to be stored in the attribute somehow.
+               throw std::runtime_error("not implemented");
+         }
+      }
+      if (is_location && state == wasm_address)
+      {
+         adjust_addr(out);
+      }
+   }
+
+   struct debug_info_visitor
+   {
+      std::vector<char>& abbrev_data;
+      std::vector<char>& info_data;
+
+      const debug_str&    strings;
+      const debug_abbrev& abbrev_decls;
+
+      const info&              dwarf_info;
+      const eosio::vm::module& mod;
+
+      const jit_info& reloc;
+      std::uint32_t   wasm_code_offset;
+      const void*     code_start;
+
+      std::map<die_pattern, uint32_t> codes;
+      relocation_list                 relocations;
+      attr_ref                        generic_wasm_pointer;
+
+      void write_die(const die_pattern& die)
+      {
+         auto it = codes.find(die);
+         if (it == codes.end())
+         {
+            it = codes.insert(std::pair{die, codes.size() + 1}).first;
+            psio::vector_stream s{abbrev_data};
+            psio::varuint32_to_bin(it->second, s);
+            psio::varuint32_to_bin(die.tag, s);
+            psio::to_bin(die.has_children, s);
+            for (const auto& attr : die.attrs)
+            {
+               psio::varuint32_to_bin(attr.attr, s);
+               psio::varuint32_to_bin(attr.form(), s);
+            }
+            psio::varuint32_to_bin(0, s);
+            psio::varuint32_to_bin(0, s);
+         }
+
+         psio::vector_stream s{info_data};
+         psio::varuint32_to_bin(it->second, s);  // code
+
          for (const auto& attr : die.attrs)
          {
-            psio::varuint32_to_bin(attr.attr, s);
-            psio::varuint32_to_bin(attr.form, s);
+            write_attr_value(attr.value, s, relocations);
          }
-         psio::varuint32_to_bin(0, s);
-         psio::varuint32_to_bin(0, s);
-      }
-
-      psio::vector_stream s{info_data};
-      psio::varuint32_to_bin(it->second, s);  // code
-      if (show_generated_dies)
-         fprintf(stderr, "%*s%s\n", indent, "", dw_tag_to_str(die.tag).c_str());
-
-      for (const auto& attr : die.attrs)
+      }  // write_die
+      native_attr_address translate_address(std::uint32_t wasm_addr)
       {
-         if (show_generated_dies)
-            fprintf(stderr, "%*s%s %s\n", indent + 2, "", dw_at_to_str(attr.attr).c_str(),
-                    dw_form_to_str(attr.form).c_str());
-         std::visit(
-             overloaded{
-                 [&](uint8_t v) { psio::to_bin(v, s); },
-                 [&](uint64_t v) { psio::to_bin(v, s); },
-                 [&](const std::string& str) { write_string(str, s); },
-             },
-             attr.value);
+         if (wasm_addr == 0xffffffff)
+            return {0xffffffffffffffff};
+         auto pos = std::ranges::partition_point(
+             reloc.instr_locs,
+             [addr = wasm_code_offset + wasm_addr](const auto& a) { return a.wasm_addr < addr; });
+         if (pos != reloc.instr_locs.end())
+         {
+            return {reinterpret_cast<uint64_t>(mod.allocator.get_code_start()) + pos->code_offset};
+         }
+         return {~0ull};
       }
-   }  // write_die
+      struct subprogram_info
+      {
+         std::optional<debug_eos_vm::wasm_frame> frame;
+      };
+      // These attributes are parsed early because they
+      // can affect translation of other attributes.
+      struct common_attrs
+      {
+         std::optional<uint32_t> low_pc;
+         void                    operator()(const abbrev_attr& attr, const attr_value& value)
+         {
+            if (attr.name == dw_at_low_pc)
+            {
+               low_pc = get_address(value);
+            }
+         }
+      };
+      common_attrs get_common_attrs(unit_parser&       parser,
+                                    const abbrev_decl& abbrev,
+                                    psio::input_stream s)
+      {
+         common_attrs result;
+         parser.parse_die_attrs_local(abbrev, s, result);
+         return result;
+      }
+      static bool is_location_attr(const abbrev_attr& attr)
+      {
+         switch (attr.name)
+         {
+            case dw_at_frame_base:
+            case dw_at_location:
+            case dw_at_data_location:
+            case dw_at_data_member_location:
+               return true;
+            case dw_at_allocated:
+            case dw_at_associated:
+            case dw_at_bit_offset:
+            case dw_at_bit_size:
+            case dw_at_byte_size:
+            case dw_at_count:
+            case dw_at_lower_bound:
+            case dw_at_byte_stride:
+            case dw_at_bit_stride:
+            case dw_at_upper_bound:
+               return false;
+            default:
+               throw std::runtime_error("Don't know how to handle exprloc value for " +
+                                        dw_at_to_str(attr.name));
+         }
+      }
+      void translate_attr(const abbrev_attr&     attr,
+                          attr_value&            value,
+                          const common_attrs&    info,
+                          die_pattern&           out,
+                          const subprogram_info* current_fn)
+      {
+         overloaded o{[&](const attr_address& a) {
+                         out.attrs.push_back({attr.name, translate_address(a.value)});
+                      },
+                      [&](const attr_block& a) {
+                         out.attrs.push_back({attr.name, a});
+                      },
+                      [&](const attr_data& a) {
+                         out.attrs.push_back({attr.name, a});
+                      },
+                      [&](const attr_exprloc& a)
+                      {
+                         const debug_eos_vm::wasm_frame* frame = nullptr;
+                         if (current_fn && current_fn->frame)
+                         {
+                            frame = &*current_fn->frame;
+                         }
+                         native_attr_exprloc translated;
+                         psio::vector_stream stream{translated.data};
+                         auto                input = a.data;
+                         // We don't quite handle all expression opcodes.
+                         // If we fail to translate an expression, just drop it.
+                         try
+                         {
+                            translate_expr(frame, mod, input, stream,
+                                           attr.name == dw_at_data_member_location,
+                                           is_location_attr(attr));
+                         }
+                         catch (const std::runtime_error&)
+                         {
+                            return;
+                         }
+                         out.attrs.push_back({attr.name, std::move(translated)});
+                      },
+                      [&](const attr_flag& a) {
+                         out.attrs.push_back({attr.name, a});
+                      },
+                      [&](const attr_sec_offset& a) {},
+                      [&](const attr_ref& a) {
+                         out.attrs.push_back({attr.name, a});
+                      },
+                      [&](const attr_ref_addr&) {},
+                      [&](const attr_ref_sig8&) {},
+                      [&](const std::string_view& str) {
+                         out.attrs.push_back({attr.name, str});
+                      }};
+         switch (attr.name)
+         {
+            case dw_at_high_pc:
+            {
+               auto high_pc = get_address(value);
+               if (info.low_pc && !high_pc)
+               {
+                  auto size = get_data(value);
+                  if (size)
+                     high_pc = *info.low_pc + *size;
+               }
+               if (high_pc)
+                  out.attrs.push_back({attr.name, translate_address(*high_pc)});
+               break;
+            }
+            case dw_at_low_pc:
+            case dw_at_specification:
+            case dw_at_linkage_name:
+            case dw_at_name:
+            case dw_at_language:
+            case dw_at_byte_size:
+            case dw_at_bit_size:
+            case dw_at_encoding:
+            case dw_at_frame_base:
+            case dw_at_location:
+            case dw_at_type:
+            case dw_at_containing_type:
+            case dw_at_data_member_location:
+            case dw_at_external:
+            case dw_at_const_value:
+            case dw_at_declaration:
+            case dw_at_enum_class:
+            case dw_at_count:
+            case dw_at_ordering:
+            case dw_at_lower_bound:
+            case dw_at_upper_bound:
+               std::visit(o, value);
+               break;
+            case dw_at_stmt_list:
+               // TODO: relocate this after making the debug_line translation more precise.
+               out.attrs.push_back({attr.name, native_attr_sec_offset{0}});
+               break;
+            default:
+               break;
+         }
+      }
+      void write_die_children(unit_parser&           parser,
+                              const abbrev_decl&     abbrev,
+                              psio::input_stream&    s,
+                              const subprogram_info* current_fn = nullptr,
+                              bool                   inline_    = false)
+      {
+         if (!abbrev.has_children)
+            return;
+         psio::vector_stream info_s{info_data};
+         while (true)
+         {
+            relocations.set(info_s, s.pos - parser.unit_s.pos);
+            auto child = parser.get_die_abbrev(s);
+            if (!child)
+               break;
+            write_die(parser, *child, s, current_fn);
+         }
+         if (!inline_)
+         {
+            psio::vector_stream info_s{info_data};
+            psio::varuint32_to_bin(0, info_s);  // end children
+         }
+      }
+      void write_die(unit_parser&           parser,
+                     const abbrev_decl&     abbrev,
+                     psio::input_stream&    s,
+                     const subprogram_info* current_fn = nullptr)
+      {
+         die_pattern die;
+         die.tag               = abbrev.tag;
+         die.has_children      = abbrev.has_children;
+         common_attrs    attrs = get_common_attrs(parser, abbrev, s);
+         subprogram_info info;
+         // When we see a subprogram entry, look up the corresponding
+         // wasm function and pass it to all children of the subprogram.
+         if (abbrev.tag == dw_tag_subprogram || abbrev.tag == dw_tag_entry_point)
+         {
+            current_fn = &info;
+            if (attrs.low_pc && *attrs.low_pc != 0xffffffff)
+            {
+               if (auto fn = get_wasm_fn(reloc.fn_locs, *attrs.low_pc + wasm_code_offset))
+               {
+                  info.frame.emplace(mod, *fn);
+               }
+            }
+            die.attrs.push_back({dw_at_calling_convention, attr_data{dw_cc_nocall}});
+         }
+         parser.parse_die_attrs_local(abbrev, s,
+                                      [&](const abbrev_attr& attr, attr_value& value)
+                                      { translate_attr(attr, value, attrs, die, current_fn); });
+         if (abbrev.tag == dw_tag_compile_unit || abbrev.tag == dw_tag_partial_unit ||
+             abbrev.tag == dw_tag_type_unit)
+         {
+            write_die(die);
+            if (die.has_children)
+            {
+               generic_wasm_pointer = relocations.new_ref();
+               psio::vector_stream info_s{info_data};
+               relocations.set(info_s, generic_wasm_pointer);
+               die_pattern wasm_pointer{.tag          = dw_tag_base_type,
+                                        .has_children = false,
+                                        .attrs        = {{dw_at_name, "__wasm_generic_pointer_t"},
+                                                         {dw_at_encoding, attr_data{dw_ate_address}},
+                                                         {dw_at_byte_size, attr_data{4}}}};
+               write_die(wasm_pointer);
+            }
+            write_die_children(parser, abbrev, s);
+         }
+         else if (abbrev.tag == dw_tag_pointer_type || abbrev.tag == dw_tag_reference_type ||
+                  abbrev.tag == dw_tag_rvalue_reference_type)
+         {
+            // TODO: This doesn't handle function pointers correctly
+            const char* name = "__wasm_pointer_t";
+            if (abbrev.tag == dw_tag_reference_type)
+            {
+               name = "__wasm_reference_t";
+            }
+            else if (abbrev.tag == dw_tag_rvalue_reference_type)
+            {
+               name = "__wasm_rvalue_reference_t";
+            }
+            die_pattern base_struct{.tag          = dw_tag_structure_type,
+                                    .has_children = true,
+                                    .attrs = {{dw_at_name, name}, {dw_at_byte_size, attr_data{4}}}};
+            if (abbrev.tag != dw_tag_pointer_type)
+            {
+               native_attr_exprloc data_location;
+               psio::vector_stream expr(data_location.data);
+               psio::to_bin(uint8_t{dw_op_push_object_address}, expr);
+               psio::to_bin(uint8_t{dw_op_deref_size}, expr);
+               psio::to_bin(uint8_t{4}, expr);
+               psio::to_bin(std::uint8_t{dw_op_breg4}, expr);
+               psio::varuint32_to_bin(0, expr);
+               psio::to_bin(std::uint8_t{dw_op_plus}, expr);
+               base_struct.attrs.push_back({dw_at_data_location, data_location});
+            }
+            write_die(base_struct);
+            auto copy_type = [](const die_pattern& src, die_pattern& dest)
+            {
+               for (const auto& attr : src.attrs)
+               {
+                  if (attr.attr == dw_at_type)
+                  {
+                     dest.attrs.push_back(attr);
+                  }
+               }
+            };
+            if (abbrev.tag == dw_tag_pointer_type)
+            {
+               die_pattern addr{.tag          = dw_tag_member,
+                                .has_children = false,
+                                .attrs        = {{dw_at_name, "__address"},
+                                                 {dw_at_data_member_location, attr_data{0}},
+                                                 {dw_at_type, generic_wasm_pointer}}};
+               write_die(addr);
+            }
+            else
+            {
+               die_pattern value{.tag          = dw_tag_member,
+                                 .has_children = false,
+                                 .attrs        = {{dw_at_data_member_location, attr_data{0}}}};
+               copy_type(die, value);
+               write_die(value);
+            }
+            die_pattern type_param{
+                .tag = dw_tag_template_type_parameter, .has_children = false, .attrs = {}};
+            copy_type(die, type_param);
+            write_die(type_param);
+            psio::vector_stream info_s{info_data};
+            psio::varuint32_to_bin(0, info_s);  // end children
+            write_die(die);
+            write_die_children(parser, abbrev, s, current_fn);
+         }
+         else
+         {
+            write_die(die);
+            write_die_children(parser, abbrev, s, current_fn);
+         }
+      }
+      void write_debug_info_unit(psio::input_stream whole_s,
+                                 psio::input_stream unit_s,
+                                 psio::input_stream s)
+      {
+         auto version = psio::from_bin<uint16_t>(s);
+         psio::check(version == compile_unit_version, ".debug_info isn't from DWARF version 4");
+         auto debug_abbrev_offset = psio::from_bin<uint32_t>(s);
+         auto address_size        = psio::from_bin<uint8_t>(s);
+         psio::check(address_size == 4, "mismatched address_size in .debug_info");
 
-   struct sub_ref
-   {
-      uint64_t stream_pos;
-      uint64_t subprogram;
+         unit_parser parser{abbrev_decls, strings, debug_abbrev_offset, whole_s, unit_s};
+         auto        root = parser.get_die_abbrev(s);
+         psio::check(root && root->tag == dw_tag_compile_unit,
+                     "missing DW_TAG_compile_unit in .debug_info");
+         psio::vector_stream info_s{info_data};
+         psio::to_bin(version, info_s);
+         psio::to_bin(std::uint64_t{0}, info_s);
+         psio::to_bin(std::uint8_t{8}, info_s);
+         write_die(parser, *root, s);
+      }
+      void write_debug_info(psio::input_stream& s)
+      {
+         auto whole_s = s;
+         while (s.remaining())
+         {
+            auto                unit_s = s;
+            psio::vector_stream info_s{info_data};
+            relocations.start_unit(info_s);
+            uint32_t unit_length = psio::from_bin<uint32_t>(s);
+            psio::check(unit_length < 0xffff'fff0,
+                        "unit_length values in reserved range in .debug_info not supported");
+            psio::check(unit_length <= s.remaining(), "bad unit_length in .debug_info");
+            psio::to_bin(uint32_t(0xffff'ffff), info_s);
+            auto     length_pos = info_s.written();
+            uint64_t out_length = 0;
+            psio::to_bin(out_length, info_s);
+            auto inner_pos = info_s.written();
+            write_debug_info_unit(whole_s, unit_s, {s.pos, s.pos + unit_length});
+            s.skip(unit_length);
+            out_length = info_s.written() - inner_pos;
+            info_s.rewrite_raw(length_pos, out_length);
+         }
+         abbrev_data.push_back('\0');
+      }
    };
 
-   void write_subprograms(uint16_t                          code_section,
-                          std::vector<char>&                strings,
-                          std::vector<char>&                abbrev_data,
-                          std::vector<char>&                info_data,
-                          std::vector<char>&                symbol_data,
-                          const info&                       info,
-                          const std::vector<jit_fn_loc>&    fn_locs,
-                          const std::vector<jit_instr_loc>& instr_locs,
-                          const void*                       code_start,
-                          size_t                            code_size)
+   void write_subprograms(std::vector<char>&       abbrev_data,
+                          std::vector<char>&       info_data,
+                          const info&              info,
+                          const eosio::vm::module& mod,
+                          const jit_info&          reloc,
+                          psio::input_stream       info_section)
    {
-      std::map<die_pattern, uint32_t> codes;
-      die_pattern                     die;
+      debug_info_visitor gen{abbrev_data, info_data, info.strings, info.abbrev_decls,
+                             info,        mod,       reloc,        info.wasm_code_offset};
+      gen.write_debug_info(info_section);
+   }  // write_subprograms
 
-      psio::vector_stream info_s{info_data};
-      auto                begin_pos = info_data.size();
-      psio::to_bin(uint32_t(0xffff'ffff), info_s);
-      auto length_pos = info_data.size();
-      psio::to_bin(uint64_t(0), info_s);
-      auto inner_pos = info_data.size();
+   struct cie
+   {
+      std::uint32_t     cie_id                  = 0xffffffffu;
+      std::uint8_t      version                 = 1;
+      std::string       augmentation            = "";
+      std::uint32_t     code_alignment_factor   = 1;
+      std::int32_t      data_alignment_factor   = -8;
+      std::uint32_t     return_address_register = 16;
+      std::vector<char> initial_instructions;
+   };
 
-      psio::to_bin(uint16_t(compile_unit_version), info_s);
-      psio::to_bin(uint64_t(0), info_s);  // debug_abbrev_offset
-      psio::to_bin(uint8_t(8), info_s);   // address_size
+   void to_bin_with_size32(auto&& f, auto& stream)
+   {
+      psio::size_stream ss;
+      f(ss);
+      auto padding = -ss.size & 3u;
+      psio::to_bin(static_cast<std::uint32_t>(ss.size + padding), stream);
+      f(stream);
+      for (int i = 0; i < padding; ++i)
+      {
+         stream.write('\0');
+      }
+   }
 
-      die.tag          = dw_tag_compile_unit;
-      die.has_children = true;
-      die.attrs        = {
-          {dw_at_language, dw_form_data8, uint64_t(dw_lang_c_plus_plus)},
-          {dw_at_low_pc, dw_form_addr, uint64_t(code_start)},
-          {dw_at_high_pc, dw_form_addr, uint64_t((char*)code_start + code_size)},
-          {dw_at_stmt_list, dw_form_sec_offset, uint64_t(0)},
-      };
-      write_die(0, abbrev_data, info_data, codes, die);
+   void to_bin(const cie& val, auto& stream)
+   {
+      to_bin_with_size32(
+          [&](auto& stream)
+          {
+             psio::to_bin(val.cie_id, stream);
+             psio::to_bin(val.version, stream);
+             write_string(val.augmentation, stream);
+             psio::varuint32_to_bin(val.code_alignment_factor, stream);
+             psio::sleb64_to_bin(val.data_alignment_factor, stream);
+             psio::varuint32_to_bin(val.return_address_register, stream);
+             stream.write(val.initial_instructions.data(), val.initial_instructions.size());
+          },
+          stream);
+   }
 
+   struct fde
+   {
+      std::uint32_t     cie_ptr          = 0;
+      std::uint64_t     initial_location = 0;
+      std::uint64_t     address_range;
+      std::vector<char> instructions;
+   };
+
+   void to_bin(const fde& val, auto& stream)
+   {
+      to_bin_with_size32(
+          [&](auto& stream)
+          {
+             psio::to_bin(val.cie_ptr, stream);
+             psio::to_bin(val.initial_location, stream);
+             psio::to_bin(val.address_range, stream);
+             stream.write(val.instructions.data(), val.instructions.size());
+          },
+          stream);
+   }
+
+   // This returns a cfi program that assumes chained rbp
+   // It will give incorrect results if the pc is in a function
+   // prologue or epilogue.
+   std::vector<char> get_basic_frame()
+   {
+      std::vector<char>   result;
+      psio::vector_stream s(result);
+      psio::to_bin(dw_cfa_def_cfa, s);
+      psio::varuint32_to_bin(6, s);
+      psio::varuint32_to_bin(16, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 16), s);
+      psio::varuint32_to_bin(1, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 6), s);
+      psio::varuint32_to_bin(2, s);
+      return result;
+   }
+
+   std::vector<char> get_function_entry_frame()
+   {
+      std::vector<char>   result;
+      psio::vector_stream s(result);
+      psio::to_bin(dw_cfa_def_cfa, s);
+      psio::varuint32_to_bin(7, s);
+      psio::varuint32_to_bin(8, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 16), s);
+      psio::varuint32_to_bin(1, s);
+      return result;
+   }
+
+   std::vector<char> get_function_frame(std::size_t fn_size)
+   {
+      std::vector<char>   result;
+      psio::vector_stream s(result);
+      // push %rbp
+      psio::to_bin(std::uint8_t{dw_cfa_advance_loc + 1}, s);
+      psio::to_bin(std::uint8_t{dw_cfa_def_cfa_offset}, s);
+      psio::varuint32_to_bin(16, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 6), s);
+      psio::varuint32_to_bin(2, s);
+      // mov %rsp, %rbp
+      psio::to_bin(std::uint8_t{dw_cfa_advance_loc + 3}, s);
+      psio::to_bin(std::uint8_t{dw_cfa_def_cfa_register}, s);
+      psio::varuint32_to_bin(6, s);
+      psio::to_bin(std::uint8_t(dw_cfa_offset + 6), s);
+      psio::varuint32_to_bin(2, s);
+      // ...
+      // pop %rbp
+      psio::to_bin(dw_cfa_advance_loc4, s);
+      psio::to_bin(static_cast<std::uint32_t>(fn_size - 5), s);
+      psio::to_bin(dw_cfa_def_cfa, s);
+      psio::varuint32_to_bin(7, s);
+      psio::varuint32_to_bin(8, s);
+      // ret
+      return result;
+   }
+
+   void write_cfi(std::vector<char>&             v,
+                  const std::vector<jit_fn_loc>& functions,
+                  const void*                    code,
+                  std::size_t                    code_size)
+   {
+      psio::vector_stream stream{v};
+      to_bin(cie{.initial_instructions = get_function_entry_frame()}, stream);
+      auto initial_size = functions.empty() ? code_size : functions.front().code_prologue;
+      // TODO: get accurate frame information for module prologue
+      to_bin(fde{.initial_location = std::uint64_t(code),
+                 .address_range    = initial_size,
+                 .instructions     = get_basic_frame()},
+             stream);
+      for (const auto& fn : functions)
+      {
+         auto fn_size = fn.code_end - fn.code_prologue;
+         to_bin(fde{.initial_location = std::uint64_t(code) + fn.code_prologue,
+                    .address_range    = fn_size,
+                    .instructions     = get_function_frame(fn_size)},
+                stream);
+      }
+   }
+
+   void write_symtab(uint16_t                 code_section,
+                     std::vector<char>&       strings,
+                     std::vector<char>&       symbol_data,
+                     const eosio::vm::module& mod)
+   {
       Elf64_Sym null_sym;
       memset(&null_sym, 0, sizeof(null_sym));
       symbol_data.insert(symbol_data.end(), (char*)(&null_sym), (char*)(&null_sym + 1));
 
-      std::vector<size_t>  sub_positions(info.subprograms.size());
-      std::vector<sub_ref> sub_refs;
+      auto code_start   = mod.allocator.get_code_start();
+      auto code_size    = mod.allocator._code_size;
+      auto num_imported = mod.get_imported_functions_size();
 
-      for (size_t i = 0; i < info.subprograms.size(); ++i)
+      auto add_sym = [&](uint64_t start, uint64_t end, const char* name)
       {
-         auto& sub        = info.subprograms[i];
-         sub_positions[i] = info_data.size();
-         auto fn          = get_wasm_fn(info, info.wasm_code_offset + sub.begin_address);
-         if (!fn || info.wasm_code_offset + sub.end_address > info.wasm_fns[*fn].end_pos)
-         {
-            if (show_generated_dies)
-               fprintf(stderr, "address lookup fail: %s %08x-%08x\n", sub.demangled_name.c_str(),
-                       info.wasm_code_offset + sub.begin_address,
-                       info.wasm_code_offset + sub.end_address);
-            continue;
-         }
-         if (sub.parent)
-            continue;
-         auto fn_begin = uint64_t((const char*)code_start + fn_locs[*fn].code_prologue);
-         auto fn_end   = uint64_t((const char*)code_start + fn_locs[*fn].code_end);
-         if (show_generated_dies)
-            fprintf(stderr, "    DIE 0x%lx (%ld) subprogram %08x-%08x %016lx-%016lx %s\n",
-                    uint64_t(info_data.size()), uint64_t(i),
-                    info.wasm_code_offset + sub.begin_address,
-                    info.wasm_code_offset + sub.end_address, fn_begin + print_addr_adj,
-                    fn_end + print_addr_adj, sub.demangled_name.c_str());
-
-         die.tag          = dw_tag_subprogram;
-         die.has_children = false;
-         die.attrs        = {
-             {dw_at_low_pc, dw_form_addr, fn_begin},
-             {dw_at_high_pc, dw_form_addr, fn_end},
-         };
-         if (sub.linkage_name)
-            die.attrs.push_back({dw_at_linkage_name, dw_form_string, *sub.linkage_name});
-         if (sub.name)
-            die.attrs.push_back({dw_at_name, dw_form_string, *sub.name});
-         else if (sub.linkage_name)
-            die.attrs.push_back({dw_at_name, dw_form_string, sub.demangled_name});
-         write_die(4, abbrev_data, info_data, codes, die);
-
          Elf64_Sym sym = {
              .st_name  = 0,
              .st_info  = ELF64_ST_INFO(STB_GLOBAL, STT_FUNC),
              .st_other = STV_DEFAULT,
              .st_shndx = code_section,
-             .st_value = fn_begin,
-             .st_size  = fn_end - fn_begin,
+             .st_value = uint64_t(code_start) + start,
+             .st_size  = end - start,
          };
-         if (sub.linkage_name)
-            sym.st_name = add_str(strings, sub.linkage_name->c_str());
-         else if (sub.name)
-            sym.st_name = add_str(strings, sub.name->c_str());
+         sym.st_name = add_str(strings, name);
          symbol_data.insert(symbol_data.end(), (char*)(&sym), (char*)(&sym + 1));
-      }  // for(sub)
+      };
+      add_sym(0, mod.code.size() == 0 ? code_size : mod.code[0].jit_code_offset, "_wasm_entry");
 
-      for (auto& r : sub_refs)
+      auto get_function_bounds = [&](uint32_t idx)
       {
-         uint64_t subprogram_offset = sub_positions[r.subprogram] - begin_pos;
-         memcpy(info_data.data() + r.stream_pos, &subprogram_offset, sizeof(subprogram_offset));
+         auto lower = mod.code[idx].jit_code_offset;
+         auto upper = (idx + 1 < mod.code.size()) ? mod.code[idx + 1].jit_code_offset : code_size;
+         return std::pair{lower, upper};
+      };
+
+      for (std::size_t i = 0; i < mod.exports.size(); ++i)
+      {
+         const auto& exp = mod.exports[i];
+         if (exp.kind == eosio::vm::Function)
+         {
+            auto idx = exp.index;
+            if (idx > num_imported)
+            {
+               auto [start, end] = get_function_bounds(idx - num_imported);
+               std::string name(reinterpret_cast<const char*>(exp.field_str.raw()),
+                                exp.field_str.size());
+               add_sym(start, end, name.c_str());
+            }
+         }
       }
 
-      psio::varuint32_to_bin(0, info_s);  // end children
-      psio::varuint32_to_bin(0, info_s);  // end module
-      uint64_t inner_size = info_data.size() - inner_pos;
-      memcpy(info_data.data() + length_pos, &inner_size, sizeof(inner_size));
-   }  // write_subprograms
+      for (std::size_t i = 0; i < mod.code.size(); ++i)
+      {
+         auto [start, end] = get_function_bounds(i);
+         add_sym(start, end, ("<" + std::to_string(num_imported + i) + ">").c_str());
+      }
+   }
 
    struct wasm_header
    {
@@ -1423,12 +2588,21 @@ namespace dwarf
       return {begin, stream.pos};
    }
 
-   info get_info_from_wasm(psio::input_stream stream)
+   struct wasm_section_info
    {
-      info                            result;
-      auto                            file_begin = stream.pos;
-      std::map<std::string, uint32_t> files;
+      std::uint32_t      wasm_code_offset;
+      psio::input_stream code;
+      psio::input_stream debug_line;
+      psio::input_stream debug_abbrev;
+      psio::input_stream debug_str;
+      psio::input_stream debug_info;
+   };
 
+   wasm_section_info get_dwarf_sections(psio::input_stream stream)
+   {
+      wasm_section_info result = {};
+
+      auto        file_begin = stream.pos;
       wasm_header header;
       psio::from_bin(header, stream);
       psio::check(header.magic == eosio::vm::constants::magic,
@@ -1436,133 +2610,89 @@ namespace dwarf
       psio::check(header.version == eosio::vm::constants::version,
                   "wasm file version does not match");
 
-      auto scan = [&](auto stream, auto f)
+      while (stream.remaining())
       {
-         while (stream.remaining())
+         auto section_begin = stream.pos;
+         auto section       = psio::from_bin<wasm_section>(stream);
+         if (section.id == eosio::vm::section_id::code_section)
          {
-            auto section_begin = stream.pos;
-            auto section       = psio::from_bin<wasm_section>(stream);
-            f(section_begin, section);
+            result.code             = section.data;
+            result.wasm_code_offset = section.data.pos - file_begin;
          }
-      };
-
-      auto scan_custom = [&](auto stream, auto f)
-      {
-         scan(stream,
-              [&](auto section_begin, auto& section)
-              {
-                 if (section.id == eosio::vm::section_id::custom_section)
-                    f(section, psio::from_bin<std::string>(section.data));
-              });
-      };
-
-      scan(stream,
-           [&](auto section_begin, auto& section)
-           {
-              if (section.id == eosio::vm::section_id::code_section)
-              {
-                 result.wasm_code_offset = section.data.pos - file_begin;
-                 auto s                  = section.data;
-                 auto count              = psio::varuint32_from_bin(s);
-                 result.wasm_fns.resize(count);
-                 for (uint32_t i = 0; i < count; ++i)
-                 {
-                    auto& fn      = result.wasm_fns[i];
-                    fn.size_pos   = s.pos - file_begin;
-                    auto size     = psio::varuint32_from_bin(s);
-                    fn.locals_pos = s.pos - file_begin;
-                    s.skip(size);
-                    fn.end_pos = s.pos - file_begin;
-                 }
-              }
-           });
-
-      if (show_wasm_fn_info)
-      {
-         scan(stream,
-              [&](auto section_begin, auto& section)
-              {
-                 if (section.id != eosio::vm::section_id::code_section)
-                    return;
-                 psio::input_stream s{section_begin, stream.end};
-                 fprintf(stderr, "%08x %08x: code section id\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 auto id = psio::from_bin<uint8_t>(s);
-                 fprintf(stderr, "         =%d\n", id);
-                 fprintf(stderr, "%08x %08x: section size\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 auto size = psio::varuint32_from_bin(s);
-                 fprintf(stderr, "         =%08x\n", size);
-                 s.end = s.pos + size;
-                 fprintf(stderr, "%08x %08x: count\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 fprintf(stderr, "**** reset section_begin to here\n");
-                 section_begin = s.pos;
-                 fprintf(stderr, "%08x %08x: count\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 auto count = psio::varuint32_from_bin(s);
-                 fprintf(stderr, "         count=%08x\n\n", count);
-                 fprintf(stderr, "%08x %08x\n", uint32_t(s.pos - file_begin),
-                         uint32_t(s.pos - section_begin));
-                 for (uint32_t i = 0; i < count; ++i)
-                 {
-                    fprintf(stderr, "[%04d] %08x %08x: function size\n", i,
-                            uint32_t(s.pos - file_begin), uint32_t(s.pos - section_begin));
-                    auto size = psio::varuint32_from_bin(s);
-                    fprintf(stderr, "[%04d] %08x %08x: function body\n", i,
-                            uint32_t(s.pos - file_begin), uint32_t(s.pos - section_begin));
-                    s.skip(size);
-                    fprintf(stderr, "[%04d] %08x %08x: function end\n\n", i,
-                            uint32_t(s.pos - file_begin), uint32_t(s.pos - section_begin));
-                 }
-              });
+         else if (section.id == eosio::vm::section_id::custom_section)
+         {
+            auto name = psio::from_bin<std::string>(section.data);
+            if (name == ".debug_line")
+            {
+               result.debug_line = section.data;
+            }
+            else if (name == ".debug_abbrev")
+            {
+               result.debug_abbrev = section.data;
+            }
+            else if (name == ".debug_str")
+            {
+               result.debug_str = section.data;
+            }
+            else if (name == ".debug_info")
+            {
+               result.debug_info = section.data;
+            }
+         }
       }
 
-      scan_custom(stream,
-                  [&](auto& section, const auto& name)
-                  {
-                     if (name == ".debug_line")
-                     {
-                        dwarf::parse_debug_line(result, files, section.data);
-                     }
-                     else if (name == ".debug_abbrev")
-                     {
-                        dwarf::parse_debug_abbrev(result, files, section.data);
-                     }
-                     else if (name == ".debug_str")
-                     {
-                        result.strings = std::vector<char>{section.data.pos, section.data.end};
-                        psio::check(result.strings.empty() || result.strings.back() == 0,
-                                    ".debug_str is malformed");
-                     }
-                  });
+      return result;
+   }
 
-      scan_custom(stream,
-                  [&](auto& section, const auto& name)
-                  {
-                     if (name == ".debug_info")
-                        dwarf::parse_debug_info(result, section.data);
-                  });
+   info get_info_from_wasm(psio::input_stream stream)
+   {
+      info                            result;
+      auto                            file_begin = stream.pos;
+      std::map<std::string, uint32_t> files;
+      auto                            sections = get_dwarf_sections(stream);
+
+      if (sections.code.remaining())
+      {
+         result.wasm_code_offset = sections.code.pos - file_begin;
+      }
+
+      if (sections.debug_line.remaining())
+      {
+         dwarf::parse_debug_line(result, files, sections.debug_line);
+      }
+      if (sections.debug_abbrev.remaining())
+      {
+         dwarf::parse_debug_abbrev(result.abbrev_decls, sections.debug_abbrev);
+      }
+      if (sections.debug_str.remaining())
+      {
+         result.strings.data = std::vector<char>{sections.debug_str.pos, sections.debug_str.end};
+         psio::check(result.strings.data.empty() || result.strings.data.back() == 0,
+                     ".debug_str is malformed");
+      }
+
+      if (sections.debug_info.remaining())
+         dwarf::parse_debug_info(result, sections.debug_info);
 
       std::sort(result.locations.begin(), result.locations.end());
-      std::sort(result.abbrev_decls.begin(), result.abbrev_decls.end());
-      if (show_wasm_loc_summary)
-         for (auto& loc : result.locations)
-            fprintf(stderr, "loc  [%08x,%08x) %s:%d\n", loc.begin_address, loc.end_address,
-                    result.files[loc.file_index].c_str(), loc.line);
-      if (show_wasm_subp_summary)
-         for (auto& p : result.subprograms)
-            fprintf(stderr, "subp %d [%08x,%08x) size=%08x %6s %s\n",
-                    int(&p - &result.subprograms[0]), p.begin_address, p.end_address,
-                    p.end_address - p.begin_address, p.parent ? "inline" : "",
-                    p.demangled_name.c_str());
       return result;
    }  // get_info_from_wasm
 
+   bool has_debug_info(psio::input_stream stream)
+   {
+      auto sections = get_dwarf_sections(stream);
+      return sections.debug_line.remaining() || sections.debug_info.remaining();
+   }
+
+   const char* debug_str::get(uint32_t offset) const
+   {
+      psio::check(offset < data.size(), "string out of range in .debug_str");
+      return &data[offset];
+   }
+
    const char* info::get_str(uint32_t offset) const
    {
-      psio::check(offset < strings.size(), "string out of range in .debug_str");
-      return &strings[offset];
+      return strings.get(offset);
    }
 
    const location* info::get_location(uint32_t address) const
@@ -1574,14 +2704,19 @@ namespace dwarf
       return nullptr;
    }
 
-   const abbrev_decl* info::get_abbrev_decl(uint32_t table_offset, uint32_t code) const
+   const abbrev_decl* debug_abbrev::find(uint32_t table_offset, uint32_t code) const
    {
       auto key = std::pair{table_offset, code};
-      auto it  = std::lower_bound(abbrev_decls.begin(), abbrev_decls.end(), key,
-                                  [](const auto& a, const auto& b) { return a.key() < b; });
-      if (it != abbrev_decls.end() && it->key() == key)
+      auto it =
+          std::ranges::partition_point(contents, [&](const auto& a) { return a.key() < key; });
+      if (it != contents.end() && it->key() == key)
          return &*it;
       return nullptr;
+   }
+
+   const abbrev_decl* info::get_abbrev_decl(uint32_t table_offset, uint32_t code) const
+   {
+      return abbrev_decls.find(table_offset, code);
    }
 
    const subprogram* info::get_subprogram(uint32_t address) const
@@ -1628,6 +2763,7 @@ extern "C"
 
 namespace dwarf
 {
+   static std::mutex jit_debug_descriptor_mutex;
    struct debugger_registration
    {
       jit_code_entry    desc;
@@ -1635,6 +2771,7 @@ namespace dwarf
 
       ~debugger_registration()
       {
+         std::lock_guard l{jit_debug_descriptor_mutex};
          if (desc.next_entry)
             desc.next_entry->prev_entry = desc.prev_entry;
          if (desc.prev_entry)
@@ -1650,6 +2787,7 @@ namespace dwarf
       {
          desc.symfile_addr = symfile.data();
          desc.symfile_size = symfile.size();
+         std::lock_guard l{jit_debug_descriptor_mutex};
          if (__jit_debug_descriptor.first_entry)
          {
             __jit_debug_descriptor.first_entry->prev_entry = &desc;
@@ -1683,80 +2821,30 @@ namespace dwarf
       }
    };
 
-   std::shared_ptr<debugger_registration> register_with_debugger(  //
-       info&                             info,
-       const std::vector<jit_fn_loc>&    fn_locs,
-       const std::vector<jit_instr_loc>& instr_locs,
-       const void*                       code_start,
-       size_t                            code_size,
-       const void*                       entry)
+   Elf64_Ehdr make_ehdr(const void* entry, uint16_t num_sections, uint16_t strtab_section)
    {
-      psio::check(fn_locs.size() == info.wasm_fns.size(), "number of functions doesn't match");
-
-      auto show_fn = [&](size_t fn)
-      {
-         if (show_fn_locs && fn < fn_locs.size())
-         {
-            auto& w = info.wasm_fns[fn];
-            auto& l = fn_locs[fn];
-            fprintf(stderr,
-                    "fn %5ld: %016lx %016lx %016lx %016lx whole:%08x-%08x instr:%08x-%08x\n", fn,
-                    (long)code_start + l.code_prologue, (long)code_start + l.code_body,  //
-                    (long)code_start + l.code_epilogue, (long)code_start + l.code_end,   //
-                    w.size_pos, w.end_pos, l.wasm_begin, l.wasm_end);
-         }
+      return {
+          .e_ident     = {ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT,
+                          ELFOSABI_LINUX, 0},
+          .e_type      = ET_EXEC,
+          .e_machine   = EM_X86_64,
+          .e_version   = EV_CURRENT,
+          .e_entry     = Elf64_Addr(entry),
+          .e_phoff     = 0,
+          .e_shoff     = 0,
+          .e_flags     = 0,
+          .e_ehsize    = sizeof(Elf64_Ehdr),
+          .e_phentsize = sizeof(Elf64_Phdr),
+          .e_phnum     = 1,
+          .e_shentsize = sizeof(Elf64_Shdr),
+          .e_shnum     = num_sections,
+          .e_shstrndx  = strtab_section,
       };
-      auto show_instr = [&](const auto it)
-      {
-         if (show_instr_locs && it != instr_locs.end())
-            fprintf(stderr, "          %016lx %08x\n", (long)code_start + it->code_offset,
-                    it->wasm_addr);
-      };
+   }
 
-      if (show_fn_locs || show_instr_locs)
-      {
-         size_t fn    = 0;
-         auto   instr = instr_locs.begin();
-         show_fn(fn);
-         while (instr != instr_locs.end())
-         {
-            while (fn < fn_locs.size() && instr->code_offset >= fn_locs[fn].code_end)
-               show_fn(++fn);
-            show_instr(instr);
-            ++instr;
-         }
-         while (fn < fn_locs.size())
-            show_fn(++fn);
-      }
-
-      auto              result = std::make_shared<debugger_registration>();
-      std::vector<char> strings;
-      strings.push_back(0);
-
-      constexpr uint16_t num_sections   = 7;
-      constexpr uint16_t strtab_section = 1;
-      constexpr uint16_t code_section   = 2;
-      Elf64_Ehdr         elf_header{
-                  .e_ident = {ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT,
-                              ELFOSABI_LINUX, 0},
-                  .e_type      = ET_EXEC,
-                  .e_machine   = EM_X86_64,
-                  .e_version   = EV_CURRENT,
-                  .e_entry     = Elf64_Addr(entry),
-                  .e_phoff     = 0,
-                  .e_shoff     = 0,
-                  .e_flags     = 0,
-                  .e_ehsize    = sizeof(elf_header),
-                  .e_phentsize = sizeof(Elf64_Phdr),
-                  .e_phnum     = 1,
-                  .e_shentsize = sizeof(Elf64_Shdr),
-                  .e_shnum     = num_sections,
-                  .e_shstrndx  = strtab_section,
-      };
-      auto elf_header_pos = result->write(elf_header);
-
-      elf_header.e_phoff = result->symfile.size();
-      Elf64_Phdr program_header{
+   Elf64_Phdr make_phdr(const void* code_start, std::uint64_t code_size)
+   {
+      return {
           .p_type   = PT_LOAD,
           .p_flags  = PF_X | PF_R,
           .p_offset = 0,
@@ -1766,24 +2854,90 @@ namespace dwarf
           .p_memsz  = code_size,
           .p_align  = 0,
       };
-      auto program_header_pos = result->write(program_header);
+   }
+
+   Elf64_Shdr make_shdr(std::vector<char>& strings,
+                        const char*        name,
+                        Elf64_Word         type,
+                        Elf64_Xword        flags)
+   {
+      return {
+          .sh_name      = add_str(strings, name),
+          .sh_type      = type,
+          .sh_flags     = flags,
+          .sh_addr      = 0,
+          .sh_offset    = 0,
+          .sh_size      = 0,
+          .sh_link      = 0,
+          .sh_info      = 0,
+          .sh_addralign = 0,
+          .sh_entsize   = 0,
+      };
+   }
+
+   std::shared_ptr<debugger_registration> register_with_debugger(  //
+       info&                    info,
+       const jit_info&          reloc,
+       const eosio::vm::module& mod,
+       psio::input_stream       wasm_source)
+   {
+      auto code_start = mod.allocator.get_code_start();
+      auto code_size  = mod.allocator._code_size;
+
+      auto show_fn = [&](size_t fn)
+      {
+         if (show_fn_locs && fn < reloc.fn_locs.size())
+         {
+            auto& l = reloc.fn_locs[fn];
+            fprintf(stderr, "fn %5ld: %016lx %016lx instr:%08x-%08x\n", fn,
+                    (long)code_start + l.code_prologue, (long)code_start + l.code_end,  //
+                    l.wasm_begin, l.wasm_end);
+         }
+      };
+      auto show_instr = [&](const auto it)
+      {
+         if (show_instr_locs && it != reloc.instr_locs.end())
+            fprintf(stderr, "          %016lx %08x\n", (long)code_start + it->code_offset,
+                    it->wasm_addr);
+      };
+
+      if (show_fn_locs || show_instr_locs)
+      {
+         size_t fn    = 0;
+         auto   instr = reloc.instr_locs.begin();
+         show_fn(fn);
+         while (instr != reloc.instr_locs.end())
+         {
+            while (fn < reloc.fn_locs.size() && instr->code_offset >= reloc.fn_locs[fn].code_end)
+               show_fn(++fn);
+            show_instr(instr);
+            ++instr;
+         }
+         while (fn < reloc.fn_locs.size())
+            show_fn(++fn);
+      }
+
+      auto input_sections = get_dwarf_sections(wasm_source);
+
+      auto              result = std::make_shared<debugger_registration>();
+      std::vector<char> strings;
+      strings.push_back(0);
+
+      constexpr uint16_t num_sections   = 8;
+      constexpr uint16_t strtab_section = 1;
+      constexpr uint16_t code_section   = 2;
+      Elf64_Ehdr         elf_header     = make_ehdr(code_start, num_sections, strtab_section);
+      auto               elf_header_pos = result->write(elf_header);
+
+      elf_header.e_phoff            = result->symfile.size();
+      Elf64_Phdr program_header     = make_phdr(code_start, code_size);
+      auto       program_header_pos = result->write(program_header);
 
       elf_header.e_shoff = result->symfile.size();
       auto sec_header    = [&](const char* name, Elf64_Word type, Elf64_Xword flags)
       {
-         Elf64_Shdr header{
-             .sh_name      = add_str(strings, name),
-             .sh_type      = type,
-             .sh_flags     = flags,
-             .sh_addr      = 0,
-             .sh_offset    = 0,
-             .sh_size      = 0,
-             .sh_link      = 0,
-             .sh_info      = 0,
-             .sh_addralign = 0,
-             .sh_entsize   = 0,
-         };
-         auto pos = result->write(header);
+         Elf64_Shdr header = make_shdr(strings, name, type, flags);
+         auto       pos    = result->write(header);
          return std::pair{header, pos};
       };
       auto [reserved_sec_header, reserved_sec_header_pos] = sec_header(0, 0, 0);
@@ -1794,6 +2948,7 @@ namespace dwarf
       auto [abbrev_sec_header, abbrev_sec_header_pos] =
           sec_header(".debug_abbrev", SHT_PROGBITS, 0);
       auto [info_sec_header, info_sec_header_pos]     = sec_header(".debug_info", SHT_PROGBITS, 0);
+      auto [frame_sec_header, frame_sec_header_pos]   = sec_header(".debug_frame", SHT_PROGBITS, 0);
       auto [symbol_sec_header, symbol_sec_header_pos] = sec_header(".symtab", SHT_SYMTAB, 0);
 
       code_sec_header.sh_addr = Elf64_Addr(code_start);
@@ -1810,15 +2965,75 @@ namespace dwarf
       std::vector<char> abbrev_data;
       std::vector<char> info_data;
       std::vector<char> symbol_data;
+      std::vector<char> frame_data;
       symbol_sec_header.sh_link    = strtab_section;
       symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
-      write_subprograms(code_section, strings, abbrev_data, info_data, symbol_data, info, fn_locs,
-                        instr_locs, code_start, code_size);
+      write_subprograms(abbrev_data, info_data, info, mod, reloc, input_sections.debug_info);
+      write_symtab(code_section, strings, symbol_data, mod);
+      write_cfi(frame_data, reloc.fn_locs, code_start, code_size);
 
-      write_sec(line_sec_header, line_sec_header_pos,
-                generate_debug_line(info, fn_locs, instr_locs, code_start));
+      write_sec(line_sec_header, line_sec_header_pos, generate_debug_line(info, reloc, code_start));
       write_sec(abbrev_sec_header, abbrev_sec_header_pos, abbrev_data);
       write_sec(info_sec_header, info_sec_header_pos, info_data);
+      write_sec(frame_sec_header, frame_sec_header_pos, frame_data);
+      write_sec(symbol_sec_header, symbol_sec_header_pos, symbol_data);
+      write_sec(str_sec_header, str_sec_header_pos, strings);
+      result->write(elf_header_pos, elf_header);
+
+      result->reg();
+      return result;
+   }
+
+   std::shared_ptr<debugger_registration> register_with_debugger(const eosio::vm::module& mod)
+   {
+      auto code_start = mod.allocator.get_code_start();
+      auto code_size  = mod.allocator._code_size;
+
+      auto              result = std::make_shared<debugger_registration>();
+      std::vector<char> strings;
+      strings.push_back(0);
+
+      // null, strtab, symtab, text
+      constexpr uint16_t num_sections   = 4;
+      constexpr uint16_t strtab_section = 1;
+      constexpr uint16_t code_section   = 2;
+
+      Elf64_Ehdr elf_header     = make_ehdr(code_start, num_sections, strtab_section);
+      auto       elf_header_pos = result->write(elf_header);
+
+      elf_header.e_phoff            = result->symfile.size();
+      Elf64_Phdr program_header     = make_phdr(code_start, code_size);
+      auto       program_header_pos = result->write(program_header);
+
+      elf_header.e_shoff = result->symfile.size();
+      auto sec_header    = [&](const char* name, Elf64_Word type, Elf64_Xword flags)
+      {
+         Elf64_Shdr header = make_shdr(strings, name, type, flags);
+         auto       pos    = result->write(header);
+         return std::pair{header, pos};
+      };
+      auto [reserved_sec_header, reserved_sec_header_pos] = sec_header(0, 0, 0);
+      auto [str_sec_header, str_sec_header_pos]           = sec_header(".shstrtab", SHT_STRTAB, 0);
+      auto [code_sec_header, code_sec_header_pos] =
+          sec_header(".text", SHT_NOBITS, SHF_ALLOC | SHF_EXECINSTR);
+      auto [symbol_sec_header, symbol_sec_header_pos] = sec_header(".symtab", SHT_SYMTAB, 0);
+
+      code_sec_header.sh_addr = Elf64_Addr(code_start);
+      code_sec_header.sh_size = code_size;
+      result->write(code_sec_header_pos, code_sec_header);
+
+      auto write_sec = [&](auto& header, auto pos, const auto& data)
+      {
+         header.sh_offset = result->append(data);
+         header.sh_size   = data.size();
+         result->write(pos, header);
+      };
+
+      std::vector<char> symbol_data;
+      symbol_sec_header.sh_link    = strtab_section;
+      symbol_sec_header.sh_entsize = sizeof(Elf64_Sym);
+      write_symtab(code_section, strings, symbol_data, mod);
+
       write_sec(symbol_sec_header, symbol_sec_header_pos, symbol_data);
       write_sec(str_sec_header, str_sec_header_pos, strings);
       result->write(elf_header_pos, elf_header);

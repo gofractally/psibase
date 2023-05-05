@@ -145,6 +145,7 @@ function(add suffix)
             tester/src/wasi_polyfill/__wasi_path_filestat_get.cpp
             tester/src/wasi_polyfill/__wasi_path_open.cpp
             tester/src/wasi_polyfill/__wasi_proc_exit.cpp
+            tester/src/wasi_polyfill/system.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
         target_link_libraries(psitestlib${suffix} PUBLIC
@@ -192,7 +193,7 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.67 REQUIRED COMPONENTS filesystem log)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 Boost::filesystem Boost::log)
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 Boost::filesystem Boost::log debug_eos_vm)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)

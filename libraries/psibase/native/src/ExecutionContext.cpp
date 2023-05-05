@@ -5,6 +5,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index_container.hpp>
+#include <debug_eos_vm/debug_eos_vm.hpp>
 #include <eosio/vm/backend.hpp>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
@@ -19,7 +20,7 @@ namespace psibase
 {
    struct ExecutionContextImpl;
    using rhf_t     = eosio::vm::registered_host_functions<ExecutionContextImpl>;
-   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit, VMOptions>;
+   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit_profile, VMOptions>;
 
    // Rethrow with detailed info
    template <typename F>
@@ -69,9 +70,10 @@ namespace psibase
 
    struct BackendEntry
    {
-      Checksum256                hash;
-      VMOptions                  vmOptions;
-      std::unique_ptr<backend_t> backend;
+      Checksum256                                   hash;
+      VMOptions                                     vmOptions;
+      std::unique_ptr<backend_t>                    backend;
+      std::shared_ptr<dwarf::debugger_registration> debug;
 
       auto byHash() const { return std::tie(hash, vmOptions); }
    };
@@ -101,17 +103,17 @@ namespace psibase
             ind.pop_front();
       }
 
-      std::unique_ptr<backend_t> get(const Checksum256& hash, const VMOptions& vmOptions)
+      BackendEntry get(const Checksum256& hash, const VMOptions& vmOptions)
       {
-         std::unique_ptr<backend_t>  result;
+         BackendEntry                result;
          std::lock_guard<std::mutex> lock{mutex};
          auto&                       ind = backends.get<ByHash>();
          auto                        it  = ind.find(std::tie(hash, vmOptions));
          if (it == ind.end())
             return result;
-         ind.modify(it, [&](auto& x) { result = std::move(x.backend); });
+         ind.modify(it, [&](auto& x) { result = std::move(x); });
          ind.erase(it);
-         result->get_module().allocator.enable_code(true);
+         result.backend->get_module().allocator.enable_code(true);
          return result;
       }
    };
@@ -164,11 +166,12 @@ namespace psibase
    // TODO: debugger
    struct ExecutionContextImpl : NativeFunctions
    {
-      VMOptions                  vmOptions;
-      eosio::vm::wasm_allocator& wa;
-      std::unique_ptr<backend_t> backend;
-      std::atomic<bool>          timedOut    = false;
-      bool                       initialized = false;
+      VMOptions                                     vmOptions;
+      eosio::vm::wasm_allocator&                    wa;
+      BackendEntry                                  backend;
+      std::shared_ptr<dwarf::debugger_registration> dbg;
+      std::atomic<bool>                             timedOut    = false;
+      bool                                          initialized = false;
 
       ExecutionContextImpl(TransactionContext& transactionContext,
                            const VMOptions&    vmOptions,
@@ -194,15 +197,31 @@ namespace psibase
              {
                 backend = transactionContext.blockContext.systemContext.wasmCache.impl->get(
                     code.codeHash, vmOptions);
-                if (!backend)
-                   backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
+                if (!backend.backend)
+                {
+                   psio::input_stream s{reinterpret_cast<const char*>(c->code.data()),
+                                        c->code.size()};
+                   if (dwarf::has_debug_info(s))
+                   {
+                      debug_eos_vm::debug_instr_map debug;
+                      backend.backend =
+                          std::make_unique<backend_t>(c->code, nullptr, vmOptions, debug);
+                      auto info     = dwarf::get_info_from_wasm(s);
+                      backend.debug = dwarf::register_with_debugger(
+                          info, debug.locs, backend.backend->get_module(), s);
+                   }
+                   else
+                   {
+                      backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
+                      backend.debug = dwarf::register_with_debugger(backend.backend->get_module());
+                   }
+                }
              });
       }
 
       ~ExecutionContextImpl()
       {
-         transactionContext.blockContext.systemContext.wasmCache.impl->add(
-             {code.codeHash, vmOptions, std::move(backend)});
+         transactionContext.blockContext.systemContext.wasmCache.impl->add(std::move(backend));
       }
 
       void init()
@@ -211,9 +230,9 @@ namespace psibase
              [&]
              {
                 // auto startTime = std::chrono::steady_clock::now();
-                backend->set_wasm_allocator(&wa);
-                backend->initialize(this);
-                (*backend)(*this, "env", "start", currentActContext->action.service.value);
+                backend.backend->set_wasm_allocator(&wa);
+                backend.backend->initialize(this);
+                (*backend.backend)(*this, "env", "start", currentActContext->action.service.value);
                 initialized = true;
                 // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
                 //     std::chrono::steady_clock::now() - startTime);
@@ -285,7 +304,7 @@ namespace psibase
    void ExecutionContext::execProcessTransaction(ActionContext& actionContext)
    {
       impl->exec(actionContext, [&] {  //
-         (*impl->backend)(*impl, "env", "processTransaction");
+         (*impl->backend.backend)(*impl, "env", "processTransaction");
       });
    }
 
@@ -308,8 +327,8 @@ namespace psibase
       }
 
       impl->exec(actionContext, [&] {  //
-         (*impl->backend)(*impl, "env", "called", actionContext.action.service.value,
-                          actionContext.action.sender.value);
+         (*impl->backend.backend)(*impl, "env", "called", actionContext.action.service.value,
+                                  actionContext.action.sender.value);
       });
 
       if ((impl->code.flags & CodeRow::isSubjective) && !(callerFlags & CodeRow::isSubjective))
@@ -321,7 +340,7 @@ namespace psibase
    {
       impl->exec(actionContext, [&] {  //
          // auto startTime = std::chrono::steady_clock::now();
-         (*impl->backend)(*impl, "env", "verify");
+         (*impl->backend.backend)(*impl, "env", "verify");
          // auto us = std::chrono::duration_cast<std::chrono::microseconds>(
          //     std::chrono::steady_clock::now() - startTime);
          // std::cout << "verify: " << us.count() << " us\n";
@@ -331,7 +350,7 @@ namespace psibase
    void ExecutionContext::execServe(ActionContext& actionContext)
    {
       impl->exec(actionContext, [&] {  //
-         (*impl->backend)(*impl, "env", "serve");
+         (*impl->backend.backend)(*impl, "env", "serve");
       });
    }
 
@@ -340,6 +359,6 @@ namespace psibase
       if (impl->code.flags & CodeRow::canNotTimeOut)
          return;
       impl->timedOut = true;
-      impl->backend->get_module().allocator.disable_code();
+      impl->backend.backend->get_module().allocator.disable_code();
    }
 }  // namespace psibase

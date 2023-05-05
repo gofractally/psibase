@@ -38,7 +38,7 @@ SCENARIO("Auth")
    {
       DefaultTestChain t;
 
-      auto alice      = t.from(t.add_account("alice"_a));
+      auto alice      = t.from(t.addAccount("alice"_a));
       auto a          = alice.to<AccountSys>();
       auto accountSys = t.from(AccountSys::service).to<AccountSys>();
 
@@ -70,8 +70,8 @@ SCENARIO("Creating an invite")
    {
       DefaultTestChain t;
 
-      auto alice   = t.from(t.add_account("alice"_a));
-      auto bob     = t.from(t.add_account("bob"_a));
+      auto alice   = t.from(t.addAccount("alice"_a));
+      auto bob     = t.from(t.addAccount("bob"_a));
       auto invited = t.from(InviteSys::payerAccount).with({{invPub, invPriv}});
 
       auto a = alice.to<InviteSys>();
@@ -115,8 +115,8 @@ SCENARIO("Rejecting an invite")
    {
       DefaultTestChain t;
 
-      auto alice   = t.from(t.add_account("alice"_a));
-      auto bob     = t.from(t.add_account("bob"_a));
+      auto alice   = t.from(t.addAccount("alice"_a));
+      auto bob     = t.from(t.addAccount("bob"_a));
       auto invited = t.from(InviteSys::payerAccount);
 
       t.setAuthEc(alice, userPub);
@@ -175,8 +175,8 @@ SCENARIO("Deleting an invite")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
-      auto bob   = t.from(t.add_account("bob"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
       auto a     = alice.to<InviteSys>();
       auto b     = bob.to<InviteSys>();
 
@@ -218,8 +218,8 @@ SCENARIO("Expired invites")
       DefaultTestChain t;
       t.setAutoBlockStart(false);
 
-      auto alice = t.from(t.add_account("alice"_a));
-      auto bob   = t.from(t.add_account("bob"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
       t.setAuthEc(bob, userPub);
 
       auto a = alice.to<InviteSys>();
@@ -298,8 +298,8 @@ SCENARIO("Setting a whitelist", "[whiteblack]")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
-      auto bob   = t.from(t.add_account("bob"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
       auto a     = alice.to<InviteSys>();
       auto b     = bob.to<InviteSys>();
 
@@ -390,8 +390,8 @@ SCENARIO("Setting a blacklist", "[whiteblack]")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
-      auto bob   = t.from(t.add_account("bob"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
       auto a     = alice.to<InviteSys>();
       auto b     = bob.to<InviteSys>();
 
@@ -486,9 +486,9 @@ SCENARIO("Accepting an invite")
    {
       DefaultTestChain t;
 
-      auto alice   = t.from(t.add_account("alice"_a));
-      auto bob     = t.from(t.add_account("bob"_a));
-      auto charlie = t.from(t.add_account("charlie"_a));
+      auto alice   = t.from(t.addAccount("alice"_a));
+      auto bob     = t.from(t.addAccount("bob"_a));
+      auto charlie = t.from(t.addAccount("charlie"_a));
       auto invited = t.from(InviteSys::payerAccount);
       t.setAuthEc(bob, userPub);
       t.setAuthEc(charlie, userPub);

@@ -38,13 +38,15 @@ DefaultTestChain::DefaultTestChain(
     uint64_t                                                  cold_bytes)
     : TestChain{hot_bytes, warm_bytes, cool_bytes, cold_bytes}
 {
+   setAutoBlockStart(false);
    startBlock();
    deploySystemServices();
-   startBlock();  // TODO: Why is this startBlock necessary? Without it,
-                  //   all subsequent transactions will silently fail.
-
    createSysServiceAccounts();
    setBlockProducers();
+   // End of genesis block
+   startBlock();
+   setAutoBlockStart(true);
+
    registerSysRpc();
 
    expect(from(UserService::NftSys::service).to<UserService::NftSys>().init().trace());
@@ -214,7 +216,7 @@ void DefaultTestChain::setBlockProducers(bool show /* = false*/)
 {
    transactor<ProducerSys> psys{ProducerSys::service, ProducerSys::service};
    std::vector<Producer>   producerConfig = {{"firstproducer"_a, {}}};
-   auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}));
+   auto trace = pushTransaction(makeTransaction({psys.setProducers(producerConfig)}), {});
    check(psibase::show(show, trace) == "", "Failed to set producers");
 }
 
@@ -222,12 +224,12 @@ void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
 {
    transactor<AccountSys>     asys{TransactionSys::service, AccountSys::service};
    transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
-   auto                       trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}));
+   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}), {});
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
 
-AccountNumber DefaultTestChain::add_account(
+AccountNumber DefaultTestChain::addAccount(
     AccountNumber acc,
     AccountNumber authService /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
@@ -242,17 +244,17 @@ AccountNumber DefaultTestChain::add_account(
    return acc;
 }
 
-AccountNumber DefaultTestChain::add_account(
+AccountNumber DefaultTestChain::addAccount(
     const char*   acc,
     AccountNumber authService /* = AccountNumber("auth-any-sys")*/,
     bool          show /* = false */)
 {
-   return add_account(AccountNumber(acc), authService, show);
+   return addAccount(AccountNumber(acc), authService, show);
 }
 
-AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
-                                               const PublicKey& public_key,
-                                               bool             show /* = false */)
+AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
+                                           const PublicKey& public_key,
+                                           bool             show /* = false */)
 {
    transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
    transactor<AuthEcSys>  ecsys(AuthEcSys::service, AuthEcSys::service);
@@ -265,13 +267,13 @@ AccountNumber DefaultTestChain::add_ec_account(AccountNumber    name,
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
    return name;
-}  // add_ec_account()
+}  // addAccount()
 
-AccountNumber DefaultTestChain::add_ec_account(const char*      name,
-                                               const PublicKey& public_key,
-                                               bool             show /* = false */)
+AccountNumber DefaultTestChain::addAccount(const char*      name,
+                                           const PublicKey& public_key,
+                                           bool             show /* = false */)
 {
-   return add_ec_account(AccountNumber(name), public_key, show);
+   return addAccount(AccountNumber(name), public_key, show);
 }
 
 void DefaultTestChain::setAuthEc(AccountNumber    name,
@@ -289,7 +291,7 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            const char*   filename,
                                            bool          show /* = false */)
 {
-   add_account(acc, AuthAnySys::service, show);
+   addAccount(acc, AuthAnySys::service, show);
 
    transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
 

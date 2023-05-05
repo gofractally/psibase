@@ -28,8 +28,8 @@ SCENARIO("Minting & burning nfts")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.add_account("alice"_a));
-      auto bob   = t.from(t.add_account("bob"_a));
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
 
       auto a = alice.to<NftSys>();
       auto b = bob.to<NftSys>();
@@ -103,9 +103,9 @@ SCENARIO("Transferring NFTs")
    {
       DefaultTestChain t;
 
-      auto alice   = t.from(t.add_account("alice"_a));
-      auto bob     = t.from(t.add_account("bob"));
-      auto charlie = t.from(t.add_account("charlie"));
+      auto alice   = t.from(t.addAccount("alice"_a));
+      auto bob     = t.from(t.addAccount("bob"));
+      auto charlie = t.from(t.addAccount("charlie"));
 
       auto a = alice.to<NftSys>();
       auto b = bob.to<NftSys>();

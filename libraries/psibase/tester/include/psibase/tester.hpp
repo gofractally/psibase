@@ -8,16 +8,6 @@
 
 namespace psibase
 {
-   namespace internal_use_do_not_use
-   {
-      void hex(const uint8_t* begin, const uint8_t* end, std::ostream& os);
-
-      template <typename R, typename C, typename... Args>
-      R get_return_type(R (C::*f)(Args...));
-      template <typename R, typename C, typename... Args>
-      R get_return_type(R (C::*f)(Args...) const);
-   }  // namespace internal_use_do_not_use
-
    inline std::string show(bool include, TransactionTrace t)
    {
       if (include || t.error)
@@ -52,8 +42,6 @@ namespace psibase
    }
 
    std::vector<char> readWholeFile(std::string_view filename);
-
-   int32_t execute(std::string_view command);
 
    /**
     * Validates the status of a transaction.  If expectedExcept is "", then the
@@ -143,6 +131,8 @@ namespace psibase
       static const PublicKey  defaultPubKey;
       static const PrivateKey defaultPrivKey;
 
+      static KeyList defaultKeys() { return {{defaultPubKey, defaultPrivKey}}; }
+
       TestChain(uint64_t hot_bytes  = 1ull << 27,
                 uint64_t warm_bytes = 1ull << 27,
                 uint64_t cool_bytes = 1ull << 27,
@@ -209,17 +199,12 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(Transaction    trx,
-                                                     const KeyList& keys = {{defaultPubKey,  //
-                                                                             defaultPrivKey}});
+                                                     const KeyList& keys = defaultKeys());
 
       template <typename Action>
-      auto trace(Action&& a, const KeyList& keyList)
+      auto trace(Action&& a, const KeyList& keyList = defaultKeys())
       {
-         if (keyList.size() > 0)
-         {
-            return pushTransaction(makeTransaction({a}), keyList);
-         }
-         return pushTransaction(makeTransaction({a}));
+         return pushTransaction(makeTransaction({a}), keyList);
       }
 
       /**
@@ -259,9 +244,6 @@ namespace psibase
       {
          using base = typename psio::reflect<Service>::template proxy<PushTransactionProxy>;
          using base::base;
-
-         auto* operator->() const { return this; }
-         auto& operator*() const { return *this; }
       };
 
       struct UserContext
@@ -284,7 +266,7 @@ namespace psibase
          operator AccountNumber() { return id; }
       };
 
-      auto from(AccountNumber id) { return UserContext{*this, id}; }
+      auto from(AccountNumber id) { return UserContext{*this, id, defaultKeys()}; }
    };  // TestChain
 
 }  // namespace psibase

@@ -1,13 +1,13 @@
 import { UseFormReturn } from "react-hook-form";
 import { LogConfig } from "../log/interfaces";
 import { readLoggers } from "../log/utils";
-import { PsinodeConfig, ServiceConfig } from "./interfaces";
+import { PsinodeConfig, ServiceConfig, ListenConfig } from "./interfaces";
 
 export const initialConfigForm = () => ({
     p2p: false,
     producer: "",
     host: "",
-    port: 0,
+    listen: [],
     services: [{ host: "", root: "", key: "x" }],
     admin: "",
     loggers: {},
@@ -20,15 +20,15 @@ export const emptyService = (s: ServiceConfig) => {
 export const mergeSimple = <T>(prev: T, updated: T, user: T): T =>
     prev == updated ? user : updated;
 
-export const mergeServices = (
-    base: ServiceConfig[],
-    updated: ServiceConfig[],
-    user: ServiceConfig[]
-): ServiceConfig[] => {
-    let leading: ServiceConfig[] = [];
+export const mergeList = <T extends { key: string }>(
+    base: T[],
+    updated: T[],
+    user: T[]
+): T[] => {
+    let leading: T[] = [];
     let result = updated.map((item) => [item]);
     let insertPoint = -1;
-    const remove = (s: ServiceConfig): boolean => {
+    const remove = (s: T): boolean => {
         const found = result.find(
             (item) => item.length && item[0].key == s.key
         );
@@ -38,7 +38,7 @@ export const mergeServices = (
         }
         return false;
     };
-    const replace = (s: ServiceConfig): void => {
+    const replace = (s: T): void => {
         const pos = result.findIndex(
             (item) => item.length && item[0].key == s.key
         );
@@ -57,7 +57,7 @@ export const mergeServices = (
             baseMap[s.key] = baseIndex++;
         }
     }
-    const insert = (s: ServiceConfig): void => {
+    const insert = (s: T): void => {
         // prefer to put new values from the server before new values from the user
         while (
             insertPoint + 1 < result.length &&
@@ -201,6 +201,57 @@ export function writeLoggers(loggers: { [index: string]: LogConfig }): {
     return result;
 }
 
+function readListen(listen: ListenConfig): ListenConfig {
+    const result = { ...listen };
+    delete result.address;
+    delete result.port;
+    delete result.path;
+    if (listen.protocol == "http" || listen.protocol == "https") {
+        if (listen.address == "0.0.0.0") {
+            return { text: String(listen.port), ...result };
+        } else if (listen.address?.includes(":")) {
+            return {
+                text: "[" + listen.address + "]:" + listen.port,
+                ...result,
+            };
+        } else {
+            return { text: listen.address + ":" + listen.port, ...result };
+        }
+    } else if (listen.protocol == "local") {
+        return { text: listen.path, ...result };
+    }
+    return listen;
+}
+
+function writeListen(listen: ListenConfig): any {
+    if (listen.protocol == "http" || listen.protocol == "https") {
+        const ipv4 = listen.text?.match(/^(\d+\.\d+.\d+.\d+)(?::(\d+))$/);
+        if (ipv4) {
+            return {
+                protocol: listen.protocol,
+                address: ipv4[1],
+                port: Number(ipv4[2]),
+            };
+        }
+        const ipv6 = listen.text?.match(/^\[(.*)\](?::(\d+))$/);
+        if (ipv6) {
+            return {
+                protocol: listen.protocol,
+                address: ipv6[1],
+                port: Number(ipv6[2]),
+            };
+        }
+        return {
+            protocol: listen.protocol,
+            address: "0.0.0.0",
+            port: Number(listen.text),
+        };
+    } else if (listen.protocol == "local") {
+        return { protocol: listen.protocol, path: listen.text };
+    }
+    return listen;
+}
+
 // On conflict, updated overrides user
 export const mergeConfig = (
     prev: PsinodeConfig,
@@ -212,8 +263,8 @@ export const mergeConfig = (
         p2p: mergeSimple(prev.p2p, updated.p2p, user.p2p),
         producer: mergeSimple(prev.producer, updated.producer, user.producer),
         host: mergeSimple(prev.host, updated.host, user.host),
-        port: mergeSimple(prev.port, updated.port, user.port),
-        services: mergeServices(
+        listen: mergeList(prev.listen, updated.listen, user.listen),
+        services: mergeList(
             prev.services.filter((item) => !emptyService(item)),
             updated.services,
             user.services
@@ -226,6 +277,7 @@ export const mergeConfig = (
 export const writeConfig = (input: PsinodeConfig) => {
     return {
         ...input,
+        listen: input.listen.map(writeListen),
         services: input.services
             .filter((s) => !emptyService(s))
             .map((s) => ({
@@ -250,6 +302,19 @@ export const newId = (): string => {
     return (nextId++).toString();
 };
 
+export const resolveListDiff = <T>(
+    base: T[],
+    updated: T[],
+    user: T[],
+    eq: (a: T, b: T) => boolean
+): T[] => {
+    return updated.map((s: any) => {
+        const compare = (item: T) => eq(item, s);
+        const old: any = base.find(compare) || user.find(compare);
+        return { key: old ? old.key : newId(), ...s };
+    });
+};
+
 export const resolveConfigFormDiff = (
     config: PsinodeConfig,
     configForm: UseFormReturn<PsinodeConfig, any>
@@ -257,16 +322,18 @@ export const resolveConfigFormDiff = (
     const result = { ...config };
     const oldDefaults = configForm.formState.defaultValues as PsinodeConfig;
     const userValues = configForm.getValues();
-    result.services = result.services.map((s: any) => {
-        const old =
-            oldDefaults.services.find(
-                (item) => item.host == s.host && item.root == s.root
-            ) ||
-            userValues.services.find(
-                (item) => item.host == s.host && item.root == s.root
-            );
-        return { key: old ? old.key : newId(), ...s };
-    });
+    result.services = resolveListDiff(
+        oldDefaults.services,
+        result.services,
+        userValues.services,
+        (lhs, rhs) => lhs.host == rhs.host && lhs.root == rhs.root
+    );
+    result.listen = resolveListDiff(
+        oldDefaults.listen,
+        result.listen.map(readListen),
+        userValues.listen,
+        (lhs, rhs) => lhs.protocol == rhs.protocol && lhs.text == rhs.text
+    );
     result.loggers = readLoggers(result.loggers);
     result.admin = result.admin ? result.admin : "";
     let newState = mergeConfig(oldDefaults, result, userValues);
