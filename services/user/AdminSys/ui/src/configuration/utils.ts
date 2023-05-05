@@ -334,7 +334,6 @@ export const resolveConfigFormDiff = (
         userValues.listen,
         (lhs, rhs) => lhs.protocol == rhs.protocol && lhs.text == rhs.text
     );
-    console.log(result.listen);
     result.loggers = readLoggers(result.loggers);
     result.admin = result.admin ? result.admin : "";
     let newState = mergeConfig(oldDefaults, result, userValues);
