@@ -3,6 +3,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/log.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 
@@ -146,6 +147,22 @@ struct test_chain
    std::unique_ptr<psibase::TransactionContext> nativeFunctionsTransactionContext;
    std::unique_ptr<psibase::ActionContext>      nativeFunctionsActionContext;
    std::unique_ptr<psibase::NativeFunctions>    nativeFunctions;
+   std::string                                  name = "testchain";
+   psibase::loggers::common_logger              logger;
+
+   std::chrono::system_clock::time_point getTimestamp()
+   {
+      if (blockContext)
+      {
+         return std::chrono::system_clock::time_point{
+             std::chrono::seconds{blockContext->current.header.time.seconds}};
+      }
+      else
+      {
+         return std::chrono::system_clock::now();
+      }
+   }
+   const std::string& getName() { return name; }
 
    test_chain(::state& state,
               uint64_t hot_bytes,
@@ -233,12 +250,16 @@ struct test_chain
    {
       if (blockContext)
       {
+         BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", getTimestamp());
+         BOOST_LOG_SCOPED_THREAD_TAG("Host", getName());
          nativeFunctions.reset();
          nativeFunctionsActionContext.reset();
          nativeFunctionsTransactionContext.reset();
          auto [revision, blockId] = blockContext->writeRevision(NullProver{}, psibase::Claim{});
          db.setHead(*writer, revision);
          db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
+         PSIBASE_LOG_CONTEXT_BLOCK(logger, blockContext->current.header, blockId);
+         PSIBASE_LOG(logger, info) << "Produced block";
          blockContext.reset();
          revisionAtBlockStart.reset();
       }
@@ -706,6 +727,8 @@ struct callbacks
       auto               signedTrx = psio::from_frac<psibase::SignedTransaction>(args_packed);
 
       chain.start_if_needed();
+      BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
+      BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
       psibase::TransactionTrace trace;
       auto                      start_time = std::chrono::steady_clock::now();
       try
@@ -942,6 +965,22 @@ static void run(const char*                               wasm,
    backend(cb, "env", "_start");
 }
 
+struct ConsoleLog
+{
+   std::string type   = "console";
+   std::string filter = "Severity > critical";
+   std::string format =
+       "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {TransactionId}}{?: {BlockId}: "
+       "{BlockHeader}}";
+};
+PSIO_REFLECT(ConsoleLog, type, filter, format);
+
+struct Loggers
+{
+   ConsoleLog stderr;
+};
+PSIO_REFLECT(Loggers, stderr);
+
 const char usage[] = "USAGE: psitest [OPTIONS] file.wasm [args for wasm]...\n";
 const char help[]  = R"(
 OPTIONS:
@@ -952,6 +991,11 @@ OPTIONS:
       -v, --verbose
 
             Show detailed logging
+
+      --log-filter filter
+
+            Set a filter for logging. This can be used to set a more specific
+            log filter than -v.
 
       -s service.wasm debug.wasm
       --subst service.wasm debug.wasm
@@ -970,6 +1014,8 @@ int main(int argc, char* argv[])
 {
    bool                               show_usage = false;
    bool                               error      = false;
+   int                                verbose    = 0;
+   Loggers                            logConfig;
    std::map<std::string, std::string> substitutions;
    cl_flags_t                         additional_args;
 
@@ -980,7 +1026,21 @@ int main(int argc, char* argv[])
          show_usage = true;
       else if (!strcmp(argv[next_arg], "-v") || !strcmp(argv[next_arg], "--verbose"))
       {
-         // TODO
+         ++verbose;
+      }
+      else if (!strcmp(argv[next_arg], "--log-filter"))
+      {
+         ++next_arg;
+         if (next_arg >= argc)
+         {
+            std::cerr << "Missing argument for " << argv[next_arg - 1] << std::endl;
+            error = true;
+         }
+         else
+         {
+            verbose                 = 0;
+            logConfig.stderr.filter = argv[next_arg];
+         }
       }
       else if (!strcmp(argv[next_arg], "--timing"))
       {
@@ -1016,8 +1076,18 @@ int main(int argc, char* argv[])
          std::cerr << help;
       return error;
    }
+   if (verbose == 1)
+   {
+      logConfig.stderr.filter = "Severity >= info";
+   }
+   else if (verbose >= 2)
+   {
+      logConfig.stderr.filter = "Severity >= debug";
+   }
    try
    {
+      psibase::loggers::configure(
+          psio::convert_from_json<psibase::loggers::Config>(psio::convert_to_json(logConfig)));
       std::vector<std::string> args{argv + next_arg, argv + argc};
       psibase::ExecutionContext::registerHostFunctions();
       register_callbacks();
