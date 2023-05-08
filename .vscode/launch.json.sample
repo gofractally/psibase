@@ -1,0 +1,93 @@
+{
+    // Make sure you build with -DCMAKE_BUILD_TYPE=Debug if you plan to debug.
+    // Always build psitest itself in Release or else it will be extra slow.
+
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) Debug unit test",
+            "type": "cppdbg",
+            "MIMode": "gdb",
+            "request": "launch",
+
+            "program": "${workspaceFolder}/build/psidk/bin/psitest",
+            "cwd": "${workspaceFolder}/build",
+            "args": [
+                "${input:serviceName}-test-debug.wasm",
+                "-s",
+                "-r",
+                "compact"
+            ],
+            "stopAtEntry": false,
+            "miDebuggerPath": "/usr/bin/gdb",
+            "environment": [],
+            "externalConsole": false,
+
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Debug unit test (w/Native debugging)",
+            "type": "cppdbg",
+            "MIMode": "gdb",
+            "request": "launch",
+
+            "program": "${workspaceFolder}/build/psidk/bin/psitest",
+            "cwd": "${workspaceFolder}/build",
+            "args": [
+                "${input:serviceName}-test-debug.wasm",
+                "-s",
+                "-r",
+                "compact"
+            ],
+            "stopAtEntry": false,
+            "miDebuggerPath": "/usr/bin/gdb",
+            "environment": [],
+            "externalConsole": false,
+
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Debug native",
+                    "text": "set hide-native off",
+                },
+            ]
+        }
+    ],
+    "inputs": [
+        {
+          "id": "serviceName",
+          "type":"promptString",
+          "description": "Name of the service to test",
+          "default": "TokenSys"
+        },
+      ]
+}
+
+// May want to add some path substitutions to gdb for better debugging:
+/*
+{
+    "description": "Map sources",
+    "text": "set substitute-path psidk-wasi-sdk: ${workspaceFolder}/build/wasi-sdk-prefix/src/wasi-sdk",
+    "ignoreFailures": false
+},
+{
+    "description": "Map sources",
+    "text": "set substitute-path psidk: ${workspaceFolder}/build/psidk",
+    "ignoreFailures": false
+}
+*/
+/*
+Q:  Why don't we use "sourceFileMap" above?
+A:  It appears to work at first, but then things fall apart when
+        you set breakpoints in some of the mapped files.
+        "set substitute-path" works better.
+*/
