@@ -26,19 +26,6 @@ SCENARIO("Testing default psibase chain")
 {
    DefaultTestChain t({}, 1ull << 32, 1ull << 32, 1ull << 32, 1ull << 32);
 
-   auto tokenSysRpc = t.from(RTokenSys::service).to<RTokenSys>();
-
-   // New UI
-   std::string rpcUiDir = "../services/user/TokenSys/ui/dist/";
-   tokenSysRpc.storeSys("/index.html", "text/html", readWholeFile(rpcUiDir + "index.html"));
-   tokenSysRpc.storeSys("/index.js", "text/javascript", readWholeFile(rpcUiDir + "index.js"));
-   tokenSysRpc.storeSys("/style.css", "text/css", readWholeFile(rpcUiDir + "style.css"));
-   tokenSysRpc.storeSys("/loader.svg", "image/svg+xml", readWholeFile(rpcUiDir + "loader.svg"));
-   tokenSysRpc.storeSys("/app-wallet-icon.svg", "image/svg+xml",
-                        readWholeFile(rpcUiDir + "app-wallet-icon.svg"));
-   tokenSysRpc.storeSys("/arrow-up-solid.svg", "image/svg+xml",
-                        readWholeFile(rpcUiDir + "arrow-up-solid.svg"));
-
    auto alice     = t.from(t.addAccount("alice"_a));
    auto bob       = t.from(t.addAccount("bob"_a));
    auto sysIssuer = t.from(SymbolSys::service).to<TokenSys>();
