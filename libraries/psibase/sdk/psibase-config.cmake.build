@@ -67,6 +67,7 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/services/user/PsiSpaceSys/include
         @ROOT_SOURCE_DIR@/services/user/SymbolSys/include
         @ROOT_SOURCE_DIR@/services/user/TokenSys/include
+        @ROOT_SOURCE_DIR@/services/user/InviteSys/include
     )
     target_link_libraries(psibase${suffix} INTERFACE
         -L@ROOT_BINARY_DIR@/wasm/libraries/psibase

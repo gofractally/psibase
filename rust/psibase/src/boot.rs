@@ -413,6 +413,14 @@ pub fn create_boot_transactions(
             psispace_sys::SERVICE,
         );
 
+        let mut invite_sys_files = vec![];
+        fill_dir(
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/InviteSys/ui/dist"),
+            &mut invite_sys_files,
+            account!("invite-sys"),
+            account!("invite-sys"),
+        );
+
         actions.append(&mut reg_actions);
         actions.append(&mut common_sys_files);
         actions.append(&mut common_sys_3rd_party_files);
@@ -421,6 +429,7 @@ pub fn create_boot_transactions(
         actions.append(&mut explore_sys_files);
         actions.append(&mut token_sys_files);
         actions.append(&mut psispace_sys_files);
+        actions.append(&mut invite_sys_files);
     }
 
     let mut doc_actions = vec![
