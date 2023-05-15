@@ -29,6 +29,7 @@
 
 using namespace psibase;
 using namespace SystemService;
+using namespace UserService;
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalServices,
@@ -316,10 +317,10 @@ void DefaultTestChain::registerSysRpc()
 
    // Register servers
    std::vector<Action> a{
-       transactor<ProxySys>{CommonSys::service, r}.registerServer(CommonSys::service),
        transactor<ProxySys>{AccountSys::service, r}.registerServer(RAccountSys::service),
-       transactor<ProxySys>{ExploreSys::service, r}.registerServer(ExploreSys::service),
        transactor<ProxySys>{AuthEcSys::service, r}.registerServer(RAuthEcSys::service),
+       transactor<ProxySys>{CommonSys::service, r}.registerServer(CommonSys::service),
+       transactor<ProxySys>{ExploreSys::service, r}.registerServer(ExploreSys::service),
        transactor<ProxySys>{ProxySys::service, r}.registerServer(RProxySys::service),
        transactor<ProxySys>{PsiSpaceSys::service, r}.registerServer(PsiSpaceSys::service),
    };
@@ -332,6 +333,7 @@ void DefaultTestChain::registerSysRpc()
    transactor<ExploreSys>  rpcExplore(ExploreSys::service, ExploreSys::service);
    transactor<RAuthEcSys>  rpcAuthEc(RAuthEcSys::service, RAuthEcSys::service);
    transactor<PsiSpaceSys> rpcPsiSpace(PsiSpaceSys::service, PsiSpaceSys::service);
+   transactor<RTokenSys>    rpcToken(RTokenSys::service, RTokenSys::service);
 
    // Store UI files
    std::string cdir      = "../services";
@@ -339,6 +341,7 @@ void DefaultTestChain::registerSysRpc()
    std::string accDir    = cdir + "/system/AccountSys";
    std::string expDir    = cdir + "/user/ExploreSys";
    std::string psiSpDir  = cdir + "/user/PsiSpaceSys";
+   std::string tokDir    = cdir + "/user/TokenSys";
    std::string authEcDir = cdir + "/system/AuthEcSys";
    std::string thirdPty  = comDir + "/common/thirdParty/src";
 
@@ -462,6 +465,14 @@ void DefaultTestChain::registerSysRpc()
                             readWholeFile(psiSpDir + "/ui/dist/default-profile/loader.svg")),
        rpcPsiSpace.storeSys("/default-profile/style.css", css,
                             readWholeFile(psiSpDir + "/ui/dist/default-profile/style.css")),
+
+       // TokenSys
+       rpcToken.storeSys("/index.html", html, readWholeFile(tokDir + "/ui/dist/index.html")),
+       rpcToken.storeSys("/index.js", js, readWholeFile(tokDir + "/ui/dist/index.js")),
+       rpcToken.storeSys("/style.css", css, readWholeFile(tokDir + "/ui/dist/style.css")),
+       rpcToken.storeSys("/loader.svg", svg, readWholeFile(tokDir + "/ui/dist/loader.svg")),
+       rpcToken.storeSys("/app-wallet-icon.svg", svg, readWholeFile(tokDir + "/ui/dist/app-wallet-icon.svg")),
+       rpcToken.storeSys("/arrow-up-solid.svg", svg, readWholeFile(tokDir + "/ui/dist/arrow-up-solid.svg")),
    };
 
    trace = pushTransaction(makeTransaction(std::move(b)));
