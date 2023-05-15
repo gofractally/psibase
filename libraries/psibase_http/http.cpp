@@ -1145,11 +1145,11 @@ namespace psibase::http
                      std::decay_t<F>                                            next;
                   };
 
-                  auto ptr = std::make_shared<op>(
-                      op{std::move(request),
-                         websocket::stream<decltype(self.derived_session().stream)>{
-                             std::move(self.derived_session().stream)},
-                         std::move(next)});
+                  auto ptr =
+                      std::make_shared<op>(op{std::move(request),
+                                              websocket::stream<decltype(self.move_stream())>{
+                                                  std::move(self.move_stream())},
+                                              std::move(next)});
 
                   auto p = ptr.get();
                   // Capture only the stream, not self, because after returning, there is
@@ -1221,6 +1221,14 @@ namespace psibase::http
       }
 
       SessionType& derived_session() { return static_cast<SessionType&>(*this); }
+
+      auto move_stream()
+      {
+         auto result = std::move(derived_session().stream);
+         _closed     = true;
+         _timer->cancel();
+         return result;
+      }
 
      private:
       void start_socket_timer(std::shared_ptr<SessionType>&& self)
