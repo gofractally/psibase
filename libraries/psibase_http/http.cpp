@@ -1280,7 +1280,8 @@ namespace psibase::http
 
             std::vector<char>   data;
             psio::vector_stream out{data};
-            psio::to_json(token, out);
+            psio::to_json(
+                token_response{.accessToken = token, .exp = params.exp, .mode = params.mode}, out);
             return send(ok(std::move(data), "application/json"));
          }
          else

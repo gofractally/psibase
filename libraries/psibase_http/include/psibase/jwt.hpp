@@ -37,4 +37,12 @@ namespace psibase::http
    };
    token_data  decode_jwt(const token_key& k, std::string_view token);
    std::string encode_jwt(const token_key& k, const token_data&);
+
+   struct token_response
+   {
+      std::string   accessToken;
+      std::uint64_t exp;
+      std::string   mode;
+   };
+   PSIO_REFLECT(token_response, accessToken, exp, mode)
 }  // namespace psibase::http
