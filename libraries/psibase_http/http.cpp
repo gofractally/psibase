@@ -312,6 +312,118 @@ namespace psibase::http
       return is_admin(cfg, deport(req.at(bhttp::field::host)));
    }
 
+   // Returns the access mode and an indication of whether the request contains
+   // an explicit authorization. The result access mode will not be greater than
+   // the argument.
+   std::pair<authz::mode_type, bool> get_access_impl(const auto&      req,
+                                                     const auto&      session,
+                                                     const auto&      auth,
+                                                     authz::mode_type mode)
+   {
+      if constexpr (requires { session.check_access(auth); })
+      {
+         if (session.check_access(auth))
+         {
+            return {mode, false};
+         }
+         else
+         {
+            return {authz::none, false};
+         }
+      }
+      else
+      {
+         return {authz::none, false};
+      }
+   }
+   std::pair<authz::mode_type, bool> get_access_impl(const auto&      req,
+                                                     const auto&      session,
+                                                     const authz_any& auth,
+                                                     authz::mode_type mode)
+   {
+      return {mode, false};
+   }
+   std::pair<authz::mode_type, bool> get_access_impl(const auto&         req,
+                                                     const auto&         session,
+                                                     const authz_bearer& auth,
+                                                     authz::mode_type    mode)
+   {
+      auto             authorization_b = req[bhttp::field::authorization];
+      std::string_view authorization{authorization_b.data(), authorization_b.size()};
+      std::string_view prefix = "Bearer ";
+      if (authorization.starts_with(prefix))
+      {
+         try
+         {
+            token_data token = decode_jwt(auth.key, authorization.substr(prefix.size()));
+            if (std::chrono::system_clock::now() >
+                std::chrono::system_clock::time_point{std::chrono::seconds(token.exp)})
+            {
+               return {authz::none, false};
+            }
+            return {static_cast<authz::mode_type>(mode & authz::mode_from_string(token.mode)),
+                    true};
+         }
+         catch (...)
+         {
+         }
+      }
+      return {authz::none, false};
+   }
+
+   std::pair<authz::mode_type, bool> get_access(server_impl& server, auto& req, auto& send)
+   {
+      const auto&                       session = send.self.derived_session();
+      std::pair<authz::mode_type, bool> result{authz::none, false};
+      for (const authz& auth : server.http_config->admin_authz)
+      {
+         auto [mode, has_auth] = std::visit(
+             [&](const auto& a) { return get_access_impl(req, session, a, auth.mode); }, auth.data);
+         result.first = static_cast<authz::mode_type>(result.first | mode);
+         result.second |= has_auth;
+      }
+      return result;
+   }
+
+   // true: The client is authorized
+   // false: The client has a valid authorization, but it is insufficent to access this resource
+   // nullopt: The client does not have a valid authorization
+   std::optional<bool> check_access(server_impl&     server,
+                                    auto&            req,
+                                    auto&            send,
+                                    authz::mode_type required_mode)
+   {
+      auto [mode, has_auth] = get_access(server, req, send);
+      if ((mode & required_mode) == required_mode)
+      {
+         return true;
+      }
+      else if (has_auth)
+      {
+         return false;
+      }
+      else
+      {
+         return {};
+      }
+   }
+
+   std::string mkscope(authz::mode_type mode)
+   {
+      std::string result;
+      if (mode & authz::read)
+      {
+         result += "monitor";
+      }
+      else if (mode & authz::write)
+      {
+         if (!result.empty())
+            result.push_back(' ');
+         result += "admin";
+      }
+      return result;
+   }
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -408,6 +520,21 @@ namespace psibase::http
          return res;
       };
 
+      // Returns an error response with a WWW-Authenticate header
+      const auto auth_error = [&server, set_cors, req_version, set_keep_alive](
+                                  bhttp::status status, std::string&& www_auth)
+      {
+         bhttp::response<bhttp::string_body> res{status, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         res.set(bhttp::field::content_type, "text/html");
+         res.set(bhttp::field::www_authenticate, std::move(www_auth));
+         set_cors(res);
+         set_keep_alive(res);
+         res.body() = "Not authorized";
+         res.prepare_payload();
+         return res;
+      };
+
       const auto ok = [&server, set_cors, req_version, set_keep_alive](
                           std::vector<char> reply, const char* content_type,
                           const std::vector<HttpHeader>* headers = nullptr)
@@ -443,6 +570,27 @@ namespace psibase::http
          set_keep_alive(res);
          res.prepare_payload();
          return res;
+      };
+
+      // Returns true on success
+      // Sends an appropriate error response and returns false on failure
+      const auto check_admin_auth = [&server, &req, &send, &auth_error](authz::mode_type mode)
+      {
+         if (auto result = check_access(server, req, send, mode))
+         {
+            if (*result)
+               return true;
+            else
+            {
+               send(auth_error(bhttp::status::forbidden, "Bearer scope=\"" + mkscope(mode) + "\""));
+               return false;
+            }
+         }
+         else
+         {
+            send(auth_error(bhttp::status::unauthorized, "Bearer scope=\"" + mkscope(mode) + "\""));
+            return false;
+         }
       };
 
       // Used for requests that are not subject to CORS such as websockets
@@ -734,6 +882,10 @@ namespace psibase::http
             }
             if (req.method() == bhttp::verb::get)
             {
+               if (!check_admin_auth(authz::mode_type::read))
+               {
+                  return;
+               }
                auto status = server.http_config->status.load();
                //
                std::vector<char>   body;
@@ -756,6 +908,10 @@ namespace psibase::http
             {
                return send(method_not_allowed(req.target(), req.method_string(), "POST"));
             }
+            if (!check_admin_auth(authz::mode_type::write))
+            {
+               return;
+            }
             if (req[bhttp::field::content_type] != "application/json")
             {
                return send(error(bhttp::status::unsupported_media_type,
@@ -774,6 +930,10 @@ namespace psibase::http
             {
                return send(method_not_allowed(req.target(), req.method_string(), "GET"));
             }
+            if (!check_admin_auth(authz::mode_type::read))
+            {
+               return;
+            }
             run_native_handler(
                 server.http_config->get_perf,
                 [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
@@ -788,6 +948,10 @@ namespace psibase::http
             if (req.method() != bhttp::verb::get)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+            if (!check_admin_auth(authz::mode_type::read))
+            {
+               return;
             }
             run_native_handler(
                 server.http_config->get_metrics,
@@ -807,6 +971,10 @@ namespace psibase::http
             if (req.method() != bhttp::verb::get)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+            if (!check_admin_auth(authz::mode_type::read))
+            {
+               return;
             }
 
             // returns json list of {id:int,endpoint:string}
@@ -838,6 +1006,10 @@ namespace psibase::http
             if (req.method() != bhttp::verb::post)
             {
                return send(method_not_allowed(req.target(), req.method_string(), "POST"));
+            }
+            if (!check_admin_auth(authz::mode_type::write))
+            {
+               return;
             }
 
             if (req[bhttp::field::content_type] != "application/json")
@@ -883,6 +1055,10 @@ namespace psibase::http
             {
                return send(method_not_allowed(req.target(), req.method_string(), "POST"));
             }
+            if (!check_admin_auth(authz::mode_type::write))
+            {
+               return;
+            }
 
             if (req[bhttp::field::content_type] != "application/json")
             {
@@ -923,6 +1099,10 @@ namespace psibase::http
                return send(not_found(req.target()));
             if (forbid_cross_origin())
                return;
+            if (!check_admin_auth(authz::mode_type::read))
+            {
+               return;
+            }
             send.pause_read = true;
             send(websocket_upgrade{}, std::move(req),
                  [&server](auto&& stream)
@@ -942,6 +1122,10 @@ namespace psibase::http
             }
             if (req.method() == bhttp::verb::get)
             {
+               if (!check_admin_auth(authz::mode_type::read))
+               {
+                  return;
+               }
                run_native_handler(server.http_config->get_config,
                                   [ok, session = send.self.derived_session().shared_from_this()](
                                       auto&& make_result)
@@ -949,6 +1133,10 @@ namespace psibase::http
             }
             else if (req.method() == bhttp::verb::put)
             {
+               if (!check_admin_auth(authz::mode_type::write))
+               {
+                  return;
+               }
                if (req[bhttp::field::content_type] != "application/json")
                {
                   return send(error(bhttp::status::unsupported_media_type,
@@ -979,6 +1167,10 @@ namespace psibase::http
          {
             if (req.method() == bhttp::verb::get)
             {
+               if (!check_admin_auth(authz::mode_type::read))
+               {
+                  return;
+               }
                run_native_handler(server.http_config->get_keys,
                                   [ok, session = send.self.derived_session().shared_from_this()](
                                       auto&& make_result)
@@ -986,6 +1178,10 @@ namespace psibase::http
             }
             else if (req.method() == bhttp::verb::post)
             {
+               if (!check_admin_auth(authz::mode_type::write))
+               {
+                  return;
+               }
                if (req[bhttp::field::content_type] != "application/json")
                {
                   return send(error(bhttp::status::unsupported_media_type,
@@ -1012,6 +1208,80 @@ namespace psibase::http
                send(method_not_allowed(req.target(), req.method_string(), "GET, POST"));
             }
             return;
+         }
+         else if (req.target() == "/native/admin/login")
+         {
+            if (!is_admin(*server.http_config, req))
+            {
+               return send(not_found(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
+            }
+
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               send(error(bhttp::status::unsupported_media_type,
+                          "Content-Type must be application/json\n"));
+               return;
+            }
+
+            const token_key* key = nullptr;
+            for (const auto& auth : server.http_config->admin_authz)
+            {
+               if (const auto* bearer = std::get_if<authz_bearer>(&auth.data))
+               {
+                  key = &bearer->key;
+               }
+            }
+            if (!key)
+            {
+               return send(error(bhttp::status::internal_server_error,
+                                 "Login requires bearer tokens to be enabled"));
+            }
+            auto [mode, has_auth] = get_access(server, req, send);
+
+            auto input = std::move(req.body());
+            input.push_back('\0');
+            input.push_back('\0');
+            input.push_back('\0');
+            psio::json_token_stream stream{input.data()};
+            auto                    params = psio::from_json<token_data>(stream);
+            if (!params.exp)
+            {
+               params.exp = std::chrono::time_point_cast<std::chrono::seconds>(
+                                std::chrono::system_clock::now() + std::chrono::hours(1))
+                                .time_since_epoch()
+                                .count();
+            }
+            if (params.mode.empty())
+            {
+               if (mode == authz::read)
+               {
+                  params.mode = "r";
+               }
+               else
+               {
+                  params.mode = "rw";
+               }
+            }
+            auto required_mode = authz::mode_from_string(params.mode);
+            if ((required_mode & mode) != required_mode)
+            {
+               if (has_auth)
+                  return send(auth_error(bhttp::status::forbidden,
+                                         "Bearer scope=\"" + mkscope(required_mode) + "\""));
+               else
+                  return send(auth_error(bhttp::status::unauthorized,
+                                         "Bearer scope=\"" + mkscope(required_mode) + "\""));
+            }
+            auto token = encode_jwt(*key, params);
+
+            std::vector<char>   data;
+            psio::vector_stream out{data};
+            psio::to_json(token, out);
+            return send(ok(std::move(data), "application/json"));
          }
          else
          {
@@ -1364,6 +1634,16 @@ namespace psibase::http
                               boost::log::attributes::constant<std::string>(ss.str()));
       }
 
+      bool check_access(const authz_loopback&) const
+      {
+         return stream.socket().remote_endpoint().address().is_loopback();
+      }
+
+      bool check_access(const authz_ip& addr) const
+      {
+         return stream.socket().remote_endpoint().address() == addr.address;
+      }
+
       beast::tcp_stream stream;
    };
 
@@ -1380,6 +1660,16 @@ namespace psibase::http
          ss << stream.next_layer().socket().remote_endpoint();
          logger.add_attribute("RemoteEndpoint",
                               boost::log::attributes::constant<std::string>(ss.str()));
+      }
+
+      bool check_access(const authz_loopback& addr) const
+      {
+         return stream.next_layer().socket().remote_endpoint().address().is_loopback();
+      }
+
+      bool check_access(const authz_ip& addr) const
+      {
+         return stream.next_layer().socket().remote_endpoint().address() == addr.address;
       }
 
       void do_shutdown()
@@ -1413,6 +1703,8 @@ namespace psibase::http
          logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
                                                     stream.socket().remote_endpoint().path()));
       }
+
+      bool check_access(const authz_loopback& addr) const { return true; }
 
       beast::basic_stream<unixs,
 #if BOOST_VERSION >= 107400

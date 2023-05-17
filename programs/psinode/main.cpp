@@ -33,6 +33,7 @@
 using namespace psibase;
 using namespace psibase::net;
 
+using http::authz;
 using http::listen_spec;
 
 struct native_service
@@ -367,6 +368,13 @@ namespace psibase
       {
          boost::program_options::validators::check_first_occurrence(v);
          v = parse_listen(boost::program_options::validators::get_single_string(values));
+      }
+
+      void validate(boost::any& v, const std::vector<std::string>& values, authz*, int)
+      {
+         boost::program_options::validators::check_first_occurrence(v);
+         const auto& s = boost::program_options::validators::get_single_string(values);
+         v             = authz_from_string(s);
       }
    }  // namespace http
 }  // namespace psibase
@@ -1285,6 +1293,19 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
       file.set("", "admin", std::visit([](const auto& v) { return v.str(); }, config.admin),
                "Which services can access the admin API");
    }
+#if 0
+   if (!config.admin_authz.empty())
+   {
+      std::vector<std::string> admin_authz;
+      for (const auto& authz : config.admin_authz)
+      {
+         admin_authz.push_back(authz.str());
+      }
+      file.set("", "admin-authz", [](std::string_view text){ return text; }, "Authorization for admin access");
+   }
+#else
+   file.keep("", "admin-authz");
+#endif
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
@@ -1320,6 +1341,7 @@ void run(const std::string&              db_path,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
+         std::vector<authz>&             admin_authz,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
@@ -1469,7 +1491,8 @@ void run(const std::string&              db_path,
       {
          load_service(entry, http_config->services, host);
       }
-      http_config->admin = admin;
+      http_config->admin       = admin;
+      http_config->admin_authz = admin_authz;
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =
@@ -1973,6 +1996,7 @@ int main(int argc, char* argv[])
    bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
    http::admin_service         admin;
+   std::vector<http::authz>    admin_authz;
    std::vector<std::string>    root_ca;
    std::string                 tls_cert;
    std::string                 tls_key;
@@ -2001,6 +2025,8 @@ int main(int argc, char* argv[])
        "Serve static content from directory using the specified virtual host name");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
+   opt("admin-authz", po::value(&admin_authz)->default_value({}, "")->value_name("SPEC"),
+       "Controls client access to the admin API");
    opt("database-cache-size",
        po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
        "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: this "
@@ -2091,8 +2117,8 @@ int main(int argc, char* argv[])
          restart.shouldRestart     = true;
          restart.soft              = true;
          run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, peers, autoconnect,
-             enable_incoming_p2p, host, listen, services, admin, root_ca, tls_cert, tls_key,
-             leeway_us, restart);
+             enable_incoming_p2p, host, listen, services, admin, admin_authz, root_ca, tls_cert,
+             tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

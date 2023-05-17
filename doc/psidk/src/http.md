@@ -393,11 +393,12 @@ TODO
 
 ## Node administrator services
 
-The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). [admin-sys](system-service/admin-sys.md) provides a user interface for this API.
+The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). [admin-sys](system-service/admin-sys.md) provides a user interface for this API. Authorization to access this API is controlled by the server's `admin-authz` configuration option.
 
 | Method | URL                        | Description                                                                   |
 |--------|----------------------------|-------------------------------------------------------------------------------|
 | `GET`  | `/native/admin/status`     | Returns status conditions currently affecting the server                      |
+| `POST` | `/native/admin/login`      | Returns a bearer token that can be used to access the admin API               |
 | `POST` | `/native/admin/shutdown`   | Stops or restarts the server                                                  |
 | `GET`  | `/native/admin/peers`      | Returns a JSON array of all the peers that the node is currently connected to |
 | `POST` | `/native/admin/connect`    | Connects to another node                                                      |
@@ -426,6 +427,19 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `restart` | Boolean | If set to `true`, the server will be restarted                                                                                                                                                                                  |
 | `force`   | Boolean | If set to `true`, the server will close all connections immediately without notifying the remote endpoint. Since this includes the connection used to send the shutdown, a request with `force` set may not receive a response. |
 | `soft`    | Boolean | Applies to restarts only. If set to `true`, `psinode` will keep the current process image.                                                                                                                                      |
+
+`POST` to `/native/admin/login` returns a bearer token that can be used to access the admin API. Requires bearer tokens to be enabled by the server configuration.
+
+| Field  | Type        | Description                                                                                                                                |
+|--------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| `exp`  | NumericDate | The time at which the token expires in seconds since the UNIX epoch. If not specified, the token will expire 1 hour from the current time. |
+| `mode` | String      | Should be either `"r"` or `"rw"`. If not specified, the token will have the same access rights as the client.                              |
+
+| Field         | Type        | Description |
+|---------------|-------------|-------------|
+| `accessToken` | String      |             |
+| `exp`         | NumericDate |             |
+| `mode`        | String      |             |
 
 ### Peer management
 
