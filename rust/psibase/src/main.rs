@@ -177,11 +177,11 @@ enum Command {
     /// Create a bearer token that can be used to access a node
     CreateToken {
         /// The lifetime of the new token
-        #[clap(long, default_value = "3600", value_name = "SECONDS")]
+        #[clap(short = 'e', long, default_value = "3600", value_name = "SECONDS")]
         expires_after: i64,
 
         /// The access mode: "r" or "rw"
-        #[clap(long, default_value = "rw")]
+        #[clap(short = 'm', long, default_value = "rw")]
         mode: String,
     },
 }
@@ -629,11 +629,11 @@ struct TokenData<'a> {
 }
 
 fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error> {
+    let key_text = rpassword::prompt_password("Enter Key: ")?;
     let claims = TokenData {
         exp: (Utc::now() + expires_after).timestamp(),
         mode: mode,
     };
-    let key_text = rpassword::prompt_password("Enter Key: ")?;
     let key: Hmac<Sha256> = Hmac::new_from_slice(key_text.as_bytes())?;
     let token = claims.sign_with_key(&key)?;
     println!("{}", token);
