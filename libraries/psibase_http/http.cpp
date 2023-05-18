@@ -639,11 +639,11 @@ namespace psibase::http
 
       try
       {
+         std::shared_lock l{server.http_config->mutex};
          if (!req.target().starts_with("/native"))
          {
             auto host = deport(req.at(bhttp::field::host));
 
-            std::shared_lock l{server.http_config->mutex};
             if (auto iter = server.http_config->services.find(host);
                 iter != server.http_config->services.end())
             {
