@@ -10,13 +10,26 @@ namespace psibase::http
 {
    struct authz_any
    {
+      authz_any() = default;
       authz_any(std::string_view s) { psibase::check(s.empty(), "Unexpected argument for any"); }
       std::string str() const { return "any"; }
    };
+   void to_json_impl(const authz_any&, auto& stream)
+   {
+      to_json("kind", stream);
+      stream.write(':');
+      to_json("any", stream);
+   }
    struct authz_loopback
    {
       std::string str() const { return "loopback"; }
    };
+   void to_json_impl(const authz_loopback&, auto& stream)
+   {
+      to_json("kind", stream);
+      stream.write(':');
+      to_json("loopback", stream);
+   }
    inline authz_loopback authz_loopback_from_string(std::string_view s)
    {
       psibase::check(s.empty(), "Unexpected argument for loopback");
@@ -32,6 +45,16 @@ namespace psibase::http
    {
       return authz_ip{boost::asio::ip::make_address(s)};
    }
+   void to_json_impl(const authz_ip& obj, auto& stream)
+   {
+      to_json("kind", stream);
+      stream.write(':');
+      to_json("ip", stream);
+      stream.write(',');
+      to_json("address", stream);
+      stream.write(':');
+      to_json(obj.address.to_string(), stream);
+   }
    struct authz_bearer
    {
       token_key   key;
@@ -40,6 +63,16 @@ namespace psibase::http
    inline authz_bearer authz_bearer_from_string(std::string_view s)
    {
       return authz_bearer{token_key{s}};
+   }
+   void to_json_impl(const authz_bearer& obj, auto& stream)
+   {
+      to_json("kind", stream);
+      stream.write(':');
+      to_json("bearer", stream);
+      stream.write(',');
+      to_json("key", stream);
+      stream.write(':');
+      to_json(obj.key.str(), stream);
    }
    struct authz
    {
@@ -54,25 +87,42 @@ namespace psibase::http
       std::variant<authz_any, authz_loopback, authz_ip, authz_bearer> data;
       std::string                                                     str() const
       {
-         std::string result = mode == read ? "r" : "rw";
+         std::string result = mode_to_string(mode);
          result += ":";
          result += std::visit([](const auto& d) { return d.str(); }, data);
          return result;
       }
+      static std::string mode_to_string(mode_type m)
+      {
+         std::string result;
+         if (m & read)
+         {
+            result += 'r';
+         }
+         if (m & write)
+         {
+            result += 'w';
+         }
+         return result;
+      }
       static mode_type mode_from_string(std::string_view s)
       {
-         if (s == "r")
+         mode_type result = none;
+         for (auto ch : s)
          {
-            return authz::read;
+            switch (ch)
+            {
+               case 'r':
+                  result = static_cast<mode_type>(result | read);
+                  break;
+               case 'w':
+                  result = static_cast<mode_type>(result | write);
+                  break;
+               default:
+                  throw std::runtime_error("Invalid mode");
+            }
          }
-         else if (s == "rw")
-         {
-            return authz::read_write;
-         }
-         else
-         {
-            throw std::runtime_error("Invalid mode");
-         }
+         return result;
       }
    };
    inline authz authz_from_string(std::string_view s)
@@ -99,6 +149,52 @@ namespace psibase::http
       else if (kind == "bearer")
       {
          return {mode, authz_bearer_from_string(params)};
+      }
+      else
+      {
+         throw std::runtime_error("Unknown authorization type");
+      }
+   }
+   void to_json(const authz& obj, auto& stream)
+   {
+      stream.write('{');
+      to_json("mode", stream);
+      stream.write(':');
+      to_json(authz::mode_to_string(obj.mode), stream);
+      stream.write(',');
+      std::visit([&](auto& d) { to_json_impl(d, stream); }, obj.data);
+      stream.write('}');
+   }
+   struct any_authz
+   {
+      std::string                mode;
+      std::string                kind;
+      std::optional<std::string> address;
+      std::optional<std::string> key;
+   };
+   PSIO_REFLECT(any_authz, mode, kind, address, key);
+   inline void from_json(authz& obj, auto& stream)
+   {
+      any_authz tmp;
+      from_json(tmp, stream);
+      obj.mode = authz::mode_from_string(tmp.mode);
+      if (tmp.kind == "any")
+      {
+         obj.data = authz_any{};
+      }
+      else if (tmp.kind == "loopback")
+      {
+         obj.data = authz_loopback{};
+      }
+      else if (tmp.kind == "ip")
+      {
+         check(!!tmp.address, "Missing address");
+         obj.data = authz_ip{boost::asio::ip::make_address(*tmp.address)};
+      }
+      else if (tmp.kind == "bearer")
+      {
+         check(!!tmp.key, "Missing key");
+         obj.data = authz_bearer{token_key(*tmp.key)};
       }
       else
       {
