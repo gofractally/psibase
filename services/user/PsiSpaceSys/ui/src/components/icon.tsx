@@ -62,7 +62,7 @@ export const Icon = ({
 }: IconProps) => {
     const icon = ICONS[type];
     let IconComponent: FC<SVGProps<SVGSVGElement>>;
-    if ("outline" in icon || "solid" in icon) {
+    if ("outline" in icon && "solid" in icon) {
         IconComponent = icon[iconStyle];
     } else {
         IconComponent = icon;

@@ -173,6 +173,15 @@ pub mod auth_interface {
 mod service {
     use crate::Hex;
 
+    /// Only called once, immediately after the boot transaction.
+    ///
+    /// The subsequent transactions listed must be pushed in order, and no
+    /// other transactions will be accepted until finishBoot is run.
+    #[action]
+    fn startBoot(bootTransactions: Vec<crate::Checksum256>) {
+        unimplemented!();
+    }
+
     /// Only called once during chain initialization
     ///
     /// This enables the auth checking system. Before this point, `transaction_sys`
@@ -181,7 +190,7 @@ mod service {
     /// [checkAuthSys](crate::services::transaction_sys::AuthActions::checkAuthSys)
     /// to authenticate top-level actions and uses of [runAs](Self::runAs).
     #[action]
-    fn init() {
+    fn finishBoot() {
         unimplemented!()
     }
 

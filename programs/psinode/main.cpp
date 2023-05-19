@@ -1902,13 +1902,13 @@ void run(const std::string&              db_path,
    // TODO: post the transactions to chainContext rather than batching them at fixed intervals.
    auto process_transactions = [&](const std::error_code& ec)
    {
-      std::vector<transaction_queue::entry> entries;
-      {
-         std::scoped_lock lock{queue->mutex};
-         std::swap(entries, queue->entries);
-      }
       auto fail_all = [&](const std::string& message)
       {
+         std::vector<transaction_queue::entry> entries;
+         {
+            std::scoped_lock lock{queue->mutex};
+            std::swap(entries, queue->entries);
+         }
          {
             std::lock_guard lock{transactionStatsMutex};
             transactionStats.unprocessed -= entries.size();
@@ -1933,6 +1933,29 @@ void run(const std::string&              db_path,
       }
       else if (auto bc = node.chain().getBlockContext())
       {
+         std::vector<transaction_queue::entry> entries;
+         if (bc->needGenesisAction)
+         {
+            // Only process up to the genesis transaction
+            std::scoped_lock lock{queue->mutex};
+            auto             pos = std::ranges::find_if(queue->entries,
+                                                        [](const auto& entry) { return entry.is_boot; });
+            if (pos != queue->entries.end())
+               ++pos;
+            std::ranges::move(queue->entries.begin(), pos, std::back_inserter(entries));
+            queue->entries.erase(queue->entries.begin(), pos);
+         }
+         else if (bc->current.header.previous != Checksum256{})
+         {
+            std::scoped_lock lock{queue->mutex};
+            std::swap(entries, queue->entries);
+         }
+         else
+         {
+            // The genesis transaction has already been executed, but we're still
+            // building the genesis block. Wait for the next block before pushing
+            // any transactions.
+         }
          auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
          {
