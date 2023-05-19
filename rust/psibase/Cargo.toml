@@ -27,5 +27,5 @@ serde_json = "1.0"
 clap = {version = "3.1", features = ["derive", "env"]}
 indicatif = "0.17"
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
-secp256k1 = { version="0.22", features = ["global-context", "bitcoin_hashes"] }
+secp256k1 = { version="0.27", features = ["global-context", "bitcoin_hashes"] }
 tokio = { version = "1", features = ["full"] }

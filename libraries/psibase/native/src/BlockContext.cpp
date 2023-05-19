@@ -333,6 +333,9 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
+         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId",
+                                     sha256(trx.transaction.data(), trx.transaction.size()));
+         PSIBASE_LOG(trxLogger, info) << "Transaction check first auth failed";
          trace.error = e.what();
          throw;
       }

@@ -225,7 +225,7 @@ void DefaultTestChain::createSysServiceAccounts(bool show /* = false */)
 {
    transactor<AccountSys>     asys{TransactionSys::service, AccountSys::service};
    transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
-   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.init()}), {});
+   auto trace = pushTransaction(makeTransaction({asys.init(), tsys.finishBoot()}), {});
 
    check(psibase::show(show, trace) == "", "Failed to create system service accounts");
 }
@@ -333,7 +333,7 @@ void DefaultTestChain::registerSysRpc()
    transactor<ExploreSys>  rpcExplore(ExploreSys::service, ExploreSys::service);
    transactor<RAuthEcSys>  rpcAuthEc(RAuthEcSys::service, RAuthEcSys::service);
    transactor<PsiSpaceSys> rpcPsiSpace(PsiSpaceSys::service, PsiSpaceSys::service);
-   transactor<RTokenSys>    rpcToken(RTokenSys::service, RTokenSys::service);
+   transactor<RTokenSys>   rpcToken(RTokenSys::service, RTokenSys::service);
 
    // Store UI files
    std::string cdir      = "../services";
@@ -471,8 +471,10 @@ void DefaultTestChain::registerSysRpc()
        rpcToken.storeSys("/index.js", js, readWholeFile(tokDir + "/ui/dist/index.js")),
        rpcToken.storeSys("/style.css", css, readWholeFile(tokDir + "/ui/dist/style.css")),
        rpcToken.storeSys("/loader.svg", svg, readWholeFile(tokDir + "/ui/dist/loader.svg")),
-       rpcToken.storeSys("/app-wallet-icon.svg", svg, readWholeFile(tokDir + "/ui/dist/app-wallet-icon.svg")),
-       rpcToken.storeSys("/arrow-up-solid.svg", svg, readWholeFile(tokDir + "/ui/dist/arrow-up-solid.svg")),
+       rpcToken.storeSys("/app-wallet-icon.svg", svg,
+                         readWholeFile(tokDir + "/ui/dist/app-wallet-icon.svg")),
+       rpcToken.storeSys("/arrow-up-solid.svg", svg,
+                         readWholeFile(tokDir + "/ui/dist/arrow-up-solid.svg")),
    };
 
    trace = pushTransaction(makeTransaction(std::move(b)));
