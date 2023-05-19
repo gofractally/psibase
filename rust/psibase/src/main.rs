@@ -493,12 +493,21 @@ async fn boot(
     producer: ExactAccountNumber,
     doc: bool,
 ) -> Result<(), anyhow::Error> {
-    let now_plus_10secs = Utc::now() + Duration::seconds(10);
+    let now_plus_30secs = Utc::now() + Duration::seconds(30);
     let expiration = TimePointSec {
-        seconds: now_plus_10secs.timestamp() as u32,
+        seconds: now_plus_30secs.timestamp() as u32,
     };
-    let transactions = create_boot_transactions(key, producer.into(), true, doc, true, expiration);
-    push_boot(args, client, transactions.packed()).await?;
+    let (boot_transactions, transactions) =
+        create_boot_transactions(key, producer.into(), true, doc, true, expiration);
+
+    let progress = ProgressBar::new((transactions.len() + 1) as u64)
+        .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
+    push_boot(args, &client, boot_transactions.packed()).await?;
+    progress.inc(1);
+    for transaction in transactions {
+        push_transaction(&args.api, client.clone(), transaction.packed()).await?;
+        progress.inc(1)
+    }
     if !args.suppress_ok {
         println!("Ok");
     }
@@ -507,7 +516,7 @@ async fn boot(
 
 async fn push_boot_impl(
     args: &Args,
-    client: reqwest::Client,
+    client: &reqwest::Client,
     packed: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
     let mut response = client
@@ -535,7 +544,7 @@ async fn push_boot_impl(
 
 async fn push_boot(
     args: &Args,
-    client: reqwest::Client,
+    client: &reqwest::Client,
     packed: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
     push_boot_impl(args, client, packed)
