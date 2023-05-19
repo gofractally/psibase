@@ -151,4 +151,4 @@ def register(objfile):
 if hasattr(gdb, "Parameter"):
     gdb.events.breakpoint_created.connect(disable_native_breakpoints)
     gdb.events.breakpoint_modified.connect(disable_native_breakpoints)
-gdb.set_parameter("breakpoint pending", True)
+gdb.execute("set breakpoint pending on")
