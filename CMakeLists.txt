@@ -165,7 +165,7 @@ if(BUILD_JS)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
         DEPENDS ${common_lib_sources}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib && yarn && yarn build
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib && yarn --mutex network && yarn build
     )
     add_custom_target(CommonSysLib_js
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
@@ -178,7 +178,7 @@ if(BUILD_JS)
         add_custom_command(
             OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
             DEPENDS ${sources} ${common} ${common-fonts} CommonSysLib_js
-            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
+            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
         )
         add_custom_target(
             ${DEP}
