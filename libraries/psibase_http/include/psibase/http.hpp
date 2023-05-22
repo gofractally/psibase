@@ -1,5 +1,7 @@
 #pragma once
 
+#include <psibase/authz.hpp>
+
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/asio/ssl/context.hpp>
 #include <boost/beast/core/tcp_stream.hpp>
@@ -297,6 +299,7 @@ namespace psibase::http
       get_config_t             get_keys               = {};
       generic_json_t           new_key                = {};
       admin_service            admin                  = {};
+      std::vector<authz>       admin_authz;
       services_t               services;
       std::atomic<bool>        enable_p2p;
       std::atomic<bool>        enable_transactions;

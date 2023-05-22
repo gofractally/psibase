@@ -5,7 +5,7 @@ if(ENABLE_SSL)
     find_package(OpenSSL REQUIRED SSL)
 endif()
 
-add_library(psibase_http http.cpp)
+add_library(psibase_http http.cpp jwt.cpp)
 target_include_directories(psibase_http PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(psibase_http PUBLIC psibase)
 
