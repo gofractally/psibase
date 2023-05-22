@@ -28,7 +28,10 @@ namespace psibase::http
       constexpr std::array<std::int8_t, 256> make_base64url_invtab()
       {
          std::array<std::int8_t, 256> result = {};
-         std::ranges::fill(result, -1);
+         for (auto& ch : result)
+         {
+            ch = -1;
+         }
          std::int8_t i = 0;
          for (auto ch : base64url_tab)
          {
