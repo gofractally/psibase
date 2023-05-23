@@ -190,7 +190,8 @@ namespace
             }
             else
             {
-               result += std::getenv(name.c_str());
+               if (const char* value = std::getenv(name.c_str()))
+                  result += value;
             }
          }
          else
