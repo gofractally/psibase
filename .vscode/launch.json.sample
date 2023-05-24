@@ -30,11 +30,11 @@
                 },
                 {
                     "description": "Add directory from which to load auto-loaded gdb scripts",
-                    "text": "add-auto-load-scripts-directory ${workspaceFolder}/build/psidk/lib/debug/",
+                    "text": "add-auto-load-scripts-directory ${workspaceFolder}/build/psidk/share/gdb/auto-load/",
                 },
                 {
                     "description": "Add a directory from which it is safe to auto-load a file",
-                    "text": "add-auto-load-safe-path ${workspaceFolder}/build/psidk/lib/debug/",
+                    "text": "add-auto-load-safe-path ${workspaceFolder}/build/psidk/share/gdb/auto-load/",
                 }
             ]
         },
