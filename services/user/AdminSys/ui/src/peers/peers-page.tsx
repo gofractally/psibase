@@ -3,7 +3,6 @@ import { useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { Button, Form } from "../components";
 import { PsinodeConfig } from "../configuration/interfaces";
-import { writeConfig } from "../configuration/utils";
 import { putJson } from "../helpers";
 import {
     AddConnectionInputs,
@@ -66,10 +65,7 @@ export const PeersPage = ({
     const setConfigPeers = async (input: PsinodeConfig) => {
         try {
             setConfigPeersError(undefined);
-            const result = await putJson(
-                "/native/admin/config",
-                writeConfig(input)
-            );
+            const result = await putJson("/native/admin/config", input);
             if (result.ok) {
                 // TODO: revisit
                 // configForm.resetField("peers", { defaultValue: input.peers });
