@@ -151,6 +151,7 @@ set(JS_DIRS
     services/user/TokenSys/ui:TokenSys_js
     services/user/ExploreSys/ui:ExploreSys_js
     services/user/AdminSys/ui:AdminSys_js
+    services/user/InviteSys/ui:InviteSys_js
 )
 
 option(BUILD_JS "Build JS" ON)
@@ -164,7 +165,7 @@ if(BUILD_JS)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
         DEPENDS ${common_lib_sources}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib && yarn && yarn build
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib && yarn --mutex network && yarn build
     )
     add_custom_target(CommonSysLib_js
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
@@ -177,7 +178,7 @@ if(BUILD_JS)
         add_custom_command(
             OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
             DEPENDS ${sources} ${common} ${common-fonts} CommonSysLib_js
-            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
+            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
         )
         add_custom_target(
             ${DEP}
@@ -225,6 +226,7 @@ if(BUILD_RUST)
         COMMAND         mkdir -p ${BOOT_IMAGE}/CommonSys/common ${BOOT_IMAGE}/CommonSys/common/fonts ${BOOT_IMAGE}/CommonSys/ui/vanilla
         COMMAND         mkdir -p ${BOOT_IMAGE}/AccountSys/ui ${BOOT_IMAGE}/ExploreSys/ui
         COMMAND         mkdir -p ${BOOT_IMAGE}/AuthEcSys ${BOOT_IMAGE}/TokenSys/ui ${BOOT_IMAGE}/PsiSpaceSys/ui
+        COMMAND         mkdir -p ${BOOT_IMAGE}/InviteSys/ui
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm                   ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm                    ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm                   ${BOOT_IMAGE}
@@ -259,6 +261,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist      ${BOOT_IMAGE}/ExploreSys/ui/dist
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist        ${BOOT_IMAGE}/TokenSys/ui/dist
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui/dist     ${BOOT_IMAGE}/PsiSpaceSys/ui/dist
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist       ${BOOT_IMAGE}/InviteSys/ui/dist
 
         COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc 2>/dev/null || mkdir -p ${BOOT_IMAGE}/doc"
 

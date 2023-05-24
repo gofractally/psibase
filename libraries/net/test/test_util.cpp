@@ -115,17 +115,22 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
 
    pushTransaction(
        ctx,
-       Transaction{.tapos   = {.expiration = {ctx->current.header.time.seconds + 1}},
-                   .actions = {Action{.sender  = AccountSys::service,
-                                      .service = AccountSys::service,
-                                      .method  = MethodNumber{"init"},
-                                      .rawData = psio::to_frac(std::tuple())},
-                               Action{.sender  = TransactionSys::service,
-                                      .service = TransactionSys::service,
-                                      .method  = MethodNumber{"init"},
-                                      .rawData = psio::to_frac(std::tuple())},
-                               transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
-                                   .setConsensus(producers)}});
+       Transaction{
+           .tapos   = {.expiration = {ctx->current.header.time.seconds + 1}},
+           .actions = {Action{.sender  = TransactionSys::service,
+                              .service = TransactionSys::service,
+                              .method  = MethodNumber{"startBoot"},
+                              .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
+                       Action{.sender  = AccountSys::service,
+                              .service = AccountSys::service,
+                              .method  = MethodNumber{"init"},
+                              .rawData = psio::to_frac(std::tuple())},
+                       transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
+                           .setConsensus(producers),
+                       Action{.sender  = TransactionSys::service,
+                              .service = TransactionSys::service,
+                              .method  = MethodNumber{"finishBoot"},
+                              .rawData = psio::to_frac(std::tuple())}}});
 }
 
 static Tapos getTapos(const BlockInfo& info)

@@ -39,7 +39,7 @@ function(add_user_test_impl suffix name)
       ../../../system/TransactionSys/include
       ../../../system/VerifyEcSys/include
      ${CMAKE_CURRENT_LIST_DIR})
-    target_link_libraries(${TARGET} services_system${suffix} psitestlib)
+    target_link_libraries(${TARGET} services_system${suffix} psitestlib${suffix})
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 

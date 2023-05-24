@@ -18,12 +18,33 @@ static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
 
 namespace SystemService
 {
-   void TransactionSys::init()
+   void TransactionSys::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
       auto tables      = TransactionSys::Tables(TransactionSys::service);
       auto statusTable = tables.open<TransactionSysStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
+      statusTable.put({.enforceAuth = false, .bootTransactions = bootTransactions});
+   }
+
+   void TransactionSys::finishBoot()
+   {
+      auto tables      = TransactionSys::Tables(TransactionSys::service);
+      auto statusTable = tables.open<TransactionSysStatusTable>();
+      auto statusIdx   = statusTable.getIndex<0>();
+      auto status      = statusIdx.get(std::tuple{});
+      if (!status)
+      {
+         check(
+             !getStatus().head,
+             "fatal error: The boot process must use startBoot when split across multiple blocks");
+      }
+      else
+      {
+         check(!status->enforceAuth, "already started");
+         check(!!status->bootTransactions, "Invariant failure");
+         check(status->bootTransactions->empty(), "Not all boot transactions have been run");
+      }
       statusTable.put({.enforceAuth = true});
 
       // TODO: Move these to a config service
@@ -196,7 +217,7 @@ namespace SystemService
       auto t = args.transaction.data_without_size_prefix();
       check(psio::fracpack_validate_strict<Transaction>(t), "transaction has invalid format");
       trx     = psio::from_frac<Transaction>(psio::prevalidated{t});
-      auto id = sha256(top_act.rawData.data(), top_act.rawData.size());
+      auto id = sha256(args.transaction.data(), args.transaction.size());
 
       check(trx.actions.size() > 0, "transaction has no actions");
 
@@ -221,13 +242,37 @@ namespace SystemService
       if (!args.checkFirstAuthAndExit)
          includedTable.put({trx.tapos.expiration, id});
 
+      auto transactionSysStatus = statusIdx.get(std::tuple{});
+
       std::optional<BlockSummary> summary;
       if (args.checkFirstAuthAndExit)
          summary = getBlockSummary();  // startBlock() might not have run
       else
          summary = summaryIdx.get(std::tuple<>{});
 
-      if (summary)
+      if (transactionSysStatus && transactionSysStatus->bootTransactions)
+      {
+         auto& bootTransactions = *transactionSysStatus->bootTransactions;
+         check(!bootTransactions.empty(),
+               "fatal error: All boot transactions have been pushed, but finishBoot was not run.");
+         check(!trx.tapos.refBlockIndex && !trx.tapos.refBlockSuffix,
+               "transaction references non-existing block");
+         if (!args.checkFirstAuthAndExit)
+         {
+            check(id == bootTransactions.front(),
+                  "Wrong transaction during boot " + psio::convert_to_json(id) +
+                      " != " + psio::convert_to_json(bootTransactions.front()));
+            bootTransactions.erase(bootTransactions.begin());
+            statusTable.put(*transactionSysStatus);
+         }
+         else
+         {
+            check(std::find(bootTransactions.begin(), bootTransactions.end(), id) !=
+                      bootTransactions.end(),
+                  "Wrong transaction during boot " + psio::convert_to_json(id));
+         }
+      }
+      else if (summary)
       {
          if (trx.tapos.refBlockIndex & 0x80)
             check(((trx.tapos.refBlockIndex - 2) & 0x7f) <= (stat.head->header.blockNum >> 13) - 2,
@@ -248,10 +293,9 @@ namespace SystemService
                "transaction references non-existing block");
       }
 
-      auto transactionSysStatus = statusIdx.get(std::tuple{});
-      auto accountSysTables     = AccountSys::Tables(AccountSys::service);
-      auto accountTable         = accountSysTables.open<AccountTable>();
-      auto accountIndex         = accountTable.getIndex<0>();
+      auto accountSysTables = AccountSys::Tables(AccountSys::service);
+      auto accountTable     = accountSysTables.open<AccountTable>();
+      auto accountIndex     = accountTable.getIndex<0>();
 
       for (auto& act : trx.actions)
       {

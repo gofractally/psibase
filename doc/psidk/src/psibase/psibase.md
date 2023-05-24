@@ -12,6 +12,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
 `psibase` [`-a` *url*] `upload` *service* *dest* *content-type* *source*  
 `psibase` [`-a` *url*] `upload-tree` *service* *dest* *source*  
+`psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
 
 ## DESCRIPTION
 
@@ -160,3 +161,17 @@ Upload a directory tree to a service. The service must provide a `storeSys` acti
 - `-S`, `--sender` *sender*
 
   Account to use as the sender of the transaction. Defaults to the *service* account.
+
+### create-token
+
+`psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
+
+Create an access token. `psibase` will prompt for the key to use to sign the token. For the token to be useful, the server must enable bearer tokens with the same key.
+
+- `-e`, `--expires-after` *seconds*
+
+  Lifetime of the token in seconds. The default is 1 hour.
+  
+- `-m`, `--mode` *mode*
+
+  The permissions granted by the token. Should be `r` or `rw`. The default is `rw`.

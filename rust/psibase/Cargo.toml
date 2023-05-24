@@ -25,7 +25,11 @@ serde_json = "1.0"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = {version = "3.1", features = ["derive", "env"]}
+hmac = "0.12"
 indicatif = "0.17"
+jwt = "0.16"
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
-secp256k1 = { version="0.22", features = ["global-context", "bitcoin_hashes"] }
+rpassword = "7.2"
+secp256k1 = { version="0.27", features = ["global-context", "bitcoin_hashes"] }
+sha2 = "0.10"
 tokio = { version = "1", features = ["full"] }

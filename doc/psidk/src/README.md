@@ -11,7 +11,7 @@ For a simpler overview of Psibase and its capabilities, see the [landing page](h
 >     - [Default user-facing applications](#default-user-facing-applications)
 >     - [Trusted front-ends](#trusted-front-ends)
 > - [Innovation stack](#innovation-stack)
->   - [Blockchain](#blockchain) 
+>   - [Blockchain](#blockchain)
 >   - [Triedent](#triedent)
 >   - [Fracpack](#fracpack)
 >   - [WebAssembly](#webassembly)
@@ -50,13 +50,13 @@ Application front-ends may be built using traditional front-end tooling, but are
 
 Psibase includes many technologies and innovations. Here are a few of them.
 
-### Blockchain 
+### Blockchain
 
-Psibase uses a proprietary blockchain rewritten from the ground-up from many of the same veterans who originally developed the Bitshares, Hive, and Antelope blockchain architectures. This blockchain is an important component of the overall Psibase architecture that positively affects data integrity, user security, and application composability. Many of the other components of the Psibase software are built to abstract the concept of a blockchain to give both users and developers an experience that is familiar and comparable to those in a more traditional architecture. Information on scalability and other economic design tradeoffs inherent to this blockchain design is outside the scope of this particular document, but can be found elsewhere in our documentation and publications.
+Psibase uses a new blockchain architecture rewritten from the ground-up by many of the same veterans who originally developed the Bitshares, Hive, and Antelope blockchain architectures. This blockchain is an important component of the overall Psibase architecture that positively affects data integrity, user security, and application composability. Many of the other components of the Psibase software are built to abstract the concept of a blockchain to give both users and developers an experience that is familiar and comparable to those in a more traditional architecture. Information on scalability and other economic design tradeoffs inherent to this blockchain design is outside the scope of this particular document, but can be found elsewhere in our documentation and publications.
 
 ### Triedent
 
-Blockchains coordinate shared state between different computers, or nodes. But on a single node, there is still an underlying database technology used to store, cache, and retrieve data. Most blockchains today use the same pre-existing state-of-the-art database technologies used for all other applications, such as LMDB or RocksDB. The ƒractally team has determined that it is possible to significantly improve the throughput of that underlying database by redesigning one with the specific constraints and specifics of the blockchain use-case in mind. The outcome of that research and development is now known as the Triedent database. 
+Blockchains coordinate shared state between different computers, or nodes. But on a single node, there is still an underlying database technology used to store, cache, and retrieve data. Most blockchains today use the same pre-existing state-of-the-art database technologies used for all other applications, such as LMDB or RocksDB. The ƒractally team has determined that it is possible to significantly improve the throughput of that underlying database by redesigning one with the specific constraints and specifics of the blockchain use-case in mind. The outcome of that research and development is now known as the Triedent database.
 
 Even still in its Beta version, the Triedent database performance was [benchmarked](https://hive.blog/fractally/@dan/fractally-s-groundbreaking-new-database-outperforms-lmbdx-eos-hive-chainbase-rocksdb) against several other database technologies and was found to be superior for use in a blockchain context in many ways. Triedent enables read queries to run in parallel without significantly slowing down write performance. This significantly reduces the costs of providing API access the blockchain state because the same memory can be used by dozens of CPU cores at the same time.
 
@@ -82,7 +82,7 @@ Our infrastructure also allows services running in one wasm execution context to
 
 Smart signatures are one of the novel contributions the Psibase architecture makes to the wider blockchain space. These allow developers to add new or custom signature types and curves. Smart signatures can be used for Inter-blockchain-communication proofs, merkle proofs, and other cryptographic algorithms that may be necessary for future innovation.
 
-Since smart signatures are implemented entirely in WebAssembly modules synchronized by the blockchain, this ensures they can be upgraded or patched in real time without the difficult coordination challenges experienced by other platforms (contentious or non-contentious hard forks). 
+Since smart signatures are implemented entirely in WebAssembly modules synchronized by the blockchain, this ensures they can be upgraded or patched in real time without the difficult coordination challenges experienced by other platforms (contentious or non-contentious hard forks).
 
 Smart signatures verification is also done in parallel to increase speed and the proofs are pruned to limit the data growth rate and decrease costs for infrastructure providers.
 
@@ -96,32 +96,16 @@ Psibase infrastructure providers are also web servers that respond to various us
 
 ## Deployment types
 
-Those who deploy Psibase to infrastructure may choose one of multiple strategies to pay for the infrastructure.
+Psibase is built to be able to be deployed in several different ways:
 
-### Simple deployments
-
-Simple deployments allow one node or multiple failover nodes to coordinate on a single server. In a simple deployment, the owner of the server must pay for the server costs through traditional means. Users of applications in a simple deployment may be unaware of the Psibase backend, and will feel as though they are using traditional web applications with a special Psibase OAuth account system.
-
-### Distributed deployments
-
-Distributed deployments have two variations, centralized and decentralized deployments.
-
-### Centralized deployments
-
-Distributed centralized deployments allow multiple independent parties to collaborate on providing infrastructure. These entities can each run a copy of the infrastructure, and Psibase will coordinate their synchronization. Distributed centralized deployments provide cryptographic proof to each of the infrastructure providers that the data in the database is correct and untampered with. If the infrastructure providers each have public and independent reputations, then deployments of this nature could be sufficient to allow users to trust the integrity of the data, as modifying the shared data requires the collaboration of a majority of the infrastructure providers.
-
-### Decentralized deployments
-
-Distributed decentralized deployments allow a permissionless set of independent parties to collaborate on providing infrastructure. To accomodate deployments of this nature, it is necessary that Psibase provides the capability to run ongoing infrastructure provider elections to define the active set of infrastructure providers who must synchronize and verify the data.
-
-Decentralized deployments give users the maximum confidence in the validity of the data, as the users may use various election strategies to have input over the set of infrastructure providers.
-
-Rather than use a permissionless and unbounded set of active infrastructure providers, as is done in many other distributed web application deployment infrastructure systems such as the Ethereum blockchain, Psibase uses a permissionless and unbounded set of infrastructure provider candidates and runs a continuous election in order to achieve a limited final set of active infrastructure providers. This is done to maximize throughput while preserving the system integrity.
-
-Some core capabilities may be missing from Psibase to accomodate this deployment type at this time. Simple and centralized deployments are our current priority.
+| Political decentralization | Architectural decentralization | Description                                           |
+|----------------------------|--------------------------------|-------------------------------------------------------|
+| no                         | no                             | Single entity, single node deployment                 |
+| no                         | yes                            | Single entity deployment with multiple failover nodes |
+| yes                        | yes                            | Multiple entity deployment                            |
 
 ## Conclusion
 
-Psibase is more than a blockchain platform. Psibase is the brand that encapsulates a whole host of open-source technical innovations including a new blockchain architecture, libraries for database management and data-serialization, and a full-stack web3 application and microservices framework. It is the output of the research and development arm of ƒractally concerned with producing best-in-class base-layer infrastructure that can be trusted to reliably power the next generation of humanity's online collaboration and governance tools.
+Psibase is more than a blockchain platform. The Psibase brand encapsulates a whole host of open-source technical innovations including a new blockchain architecture, libraries for database management and data-serialization, and a full-stack web3 application and microservices framework. Intended to be a best-in-class base-layer infrastructure that can be trusted to reliably power the next generation of humanity's online collaboration and governance tools.
 
-All of this technology is open source and available for use for free under the MIT license, and we are always looking for ways to make the process of use and deployment faster and simpler. If our technology is of interest to you or your organization, please try it out, and don't hesitate to reach out in our public [telegram channel](https://t.me/psibase_developers).
+All of this technology is open source and we are always looking for ways to make the process of use and deployment faster and simpler. If our technology is of interest to you or your organization, please try it out, and don't hesitate to reach out in our public [telegram channel](https://t.me/psibase_developers).

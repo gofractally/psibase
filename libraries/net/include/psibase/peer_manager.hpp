@@ -87,7 +87,7 @@ namespace psibase::net
       }
       void maybe_connect_some()
       {
-         if (count >= target || info.empty())
+         if (count >= target || peers.empty())
          {
             _timer.cancel();
             return;
@@ -100,6 +100,8 @@ namespace psibase::net
          {
             const auto& url = peers[idx];
             auto        pos = info.find(url);
+            // Every URL in peers must also be in info
+            assert(pos != info.end());
             if (!pos->second.connected && now >= pos->second.retry_time)
             {
                do_connect(url, pos->second, now);

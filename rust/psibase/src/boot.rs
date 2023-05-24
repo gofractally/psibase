@@ -10,6 +10,7 @@ use crate::{
 use fracpack::Pack;
 use include_dir::{include_dir, Dir};
 use psibase_macros::account_raw;
+use secp256k1::hashes::Hash;
 
 macro_rules! account {
     ($name:expr) => {
@@ -230,21 +231,21 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service
 
 /// Create boot transactions
 ///
-/// This returns a set of transactions which boot a blockchain.
+/// This returns two sets of transactions which boot a blockchain.
+/// The first set MUST be pushed as a group using push_boot and
+/// will be included in the first block. The remaining transactions
+/// MUST be pushed in order, but are not required to be in the first
+/// block. If any of these transactions fail, the chain will be unusable.
+///
 /// The first transaction, the genesis transaction, installs
 /// a set of service WASMs. The remainder initialize the services
-/// and install apps and documentation. All of these transactions
-/// should go into the first block.
+/// and install apps and documentation.
 ///
 /// If `initial_key` is set, then this initializes all accounts to use
 /// that key and sets the key the initial producer signs blocks with.
 /// If it is not set, then this initializes all accounts to use
 /// `auth-any-sys` (no keys required) and sets it up so producers
 /// don't need to sign blocks.
-///
-/// The first block should contain this entire set of transactions.
-/// You may optionally add additional transactions after the ones this
-/// function returns.
 ///
 /// The interface to this function doesn't support customization.
 /// If you want a custom boot, then use `boot.rs` as a guide to
@@ -258,11 +259,10 @@ pub fn create_boot_transactions(
     install_doc: bool,
     install_token_users: bool,
     expiration: TimePointSec,
-) -> Vec<SignedTransaction> {
-    let mut transactions = vec![genesis_transaction(expiration)];
+) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
+    let mut boot_transactions = vec![genesis_transaction(expiration)];
     let mut init_actions = vec![
         account_sys::Wrapper::pack().init(),
-        transaction_sys::Wrapper::pack().init(),
         nft_sys::Wrapper::pack().init(),
         Action {
             sender: account!("token-sys"),
@@ -413,6 +413,14 @@ pub fn create_boot_transactions(
             psispace_sys::SERVICE,
         );
 
+        let mut invite_sys_files = vec![];
+        fill_dir(
+            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/InviteSys/ui/dist"),
+            &mut invite_sys_files,
+            account!("invite-sys"),
+            account!("invite-sys"),
+        );
+
         actions.append(&mut reg_actions);
         actions.append(&mut common_sys_files);
         actions.append(&mut common_sys_3rd_party_files);
@@ -421,6 +429,7 @@ pub fn create_boot_transactions(
         actions.append(&mut explore_sys_files);
         actions.append(&mut token_sys_files);
         actions.append(&mut psispace_sys_files);
+        actions.append(&mut invite_sys_files);
     }
 
     let mut doc_actions = vec![
@@ -491,6 +500,9 @@ pub fn create_boot_transactions(
         }
     }
 
+    actions.push(transaction_sys::Wrapper::pack().finishBoot());
+
+    let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
         let mut size = 0;
@@ -505,5 +517,21 @@ pub fn create_boot_transactions(
             proofs: vec![],
         });
     }
-    transactions
+
+    let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
+    for trx in &transactions {
+        transaction_ids.push(crate::Checksum256::from(
+            secp256k1::hashes::sha256::Hash::hash(&trx.transaction).to_byte_array(),
+        ))
+    }
+    boot_transactions.push(SignedTransaction {
+        transaction: without_tapos(
+            vec![transaction_sys::Wrapper::pack().startBoot(transaction_ids)],
+            expiration,
+        )
+        .packed()
+        .into(),
+        proofs: vec![],
+    });
+    (boot_transactions, transactions)
 }

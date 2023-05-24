@@ -33,6 +33,7 @@
 using namespace psibase;
 using namespace psibase::net;
 
+using http::authz;
 using http::listen_spec;
 
 struct native_service
@@ -367,6 +368,13 @@ namespace psibase
       {
          boost::program_options::validators::check_first_occurrence(v);
          v = parse_listen(boost::program_options::validators::get_single_string(values));
+      }
+
+      void validate(boost::any& v, const std::vector<std::string>& values, authz*, int)
+      {
+         boost::program_options::validators::check_first_occurrence(v);
+         const auto& s = boost::program_options::validators::get_single_string(values);
+         v             = authz_from_string(s);
       }
    }  // namespace http
 }  // namespace psibase
@@ -1200,6 +1208,7 @@ struct PsinodeConfig
    TLSConfig                   tls;
    std::vector<native_service> services;
    http::admin_service         admin;
+   std::vector<authz>          admin_authz;
    psibase::loggers::Config    loggers;
 };
 PSIO_REFLECT(PsinodeConfig,
@@ -1214,6 +1223,7 @@ PSIO_REFLECT(PsinodeConfig,
 #endif
              services,
              admin,
+             admin_authz,
              loggers);
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
@@ -1285,6 +1295,17 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
       file.set("", "admin", std::visit([](const auto& v) { return v.str(); }, config.admin),
                "Which services can access the admin API");
    }
+   if (!config.admin_authz.empty())
+   {
+      std::vector<std::string> admin_authz;
+      for (const auto& authz : config.admin_authz)
+      {
+         admin_authz.push_back(authz.str());
+      }
+      file.set(
+          "", "admin-authz", admin_authz, [](std::string_view text) { return std::string(text); },
+          "Authorization for admin access");
+   }
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
@@ -1320,6 +1341,7 @@ void run(const std::string&              db_path,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
+         std::vector<authz>&             admin_authz,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
@@ -1469,7 +1491,8 @@ void run(const std::string&              db_path,
       {
          load_service(entry, http_config->services, host);
       }
-      http_config->admin = admin;
+      http_config->admin       = admin;
+      http_config->admin_authz = admin_authz;
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =
@@ -1646,9 +1669,10 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->set_config = [&chainContext, &node, &db_path, &runResult, &http_config, &host,
-                                 &admin, &services, &tls_cert, &tls_key, &root_ca, &connect_one](
-                                    std::vector<char> json, http::connect_callback callback)
+      http_config->set_config =
+          [&chainContext, &node, &db_path, &runResult, &http_config, &host, &admin, &admin_authz,
+           &services, &tls_cert, &tls_key, &root_ca,
+           &connect_one](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
@@ -1656,8 +1680,8 @@ void run(const std::string&              db_path,
          boost::asio::post(
              chainContext,
              [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
-              &runResult, &http_config, &host, &services, &admin, &tls_cert, &tls_key, &root_ca,
-              &connect_one, callback = std::move(callback)]() mutable
+              &runResult, &http_config, &host, &services, &admin, &admin_authz, &tls_cert, &tls_key,
+              &root_ca, &connect_one, callback = std::move(callback)]() mutable
              {
                 std::optional<http::services_t> new_services;
                 for (auto& entry : config.services)
@@ -1680,9 +1704,10 @@ void run(const std::string&              db_path,
                    node.autoconnect(std::vector(config.peers), config.autoconnect.value,
                                     connect_one);
                 }
-                host     = config.host;
-                services = config.services;
-                admin    = config.admin;
+                host        = config.host;
+                services    = config.services;
+                admin       = config.admin;
+                admin_authz = config.admin_authz;
 #ifdef PSIBASE_ENABLE_SSL
                 tls_cert = config.tls.certificate;
                 tls_key  = config.tls.key;
@@ -1694,6 +1719,7 @@ void run(const std::string&              db_path,
                    http_config->host                = host;
                    http_config->listen              = config.listen;
                    http_config->admin               = admin;
+                   http_config->admin_authz         = admin_authz;
                    http_config->enable_transactions = !host.empty();
                    if (new_services)
                    {
@@ -1720,36 +1746,39 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->get_config = [&chainContext, &node, &http_config, &host, &admin, &tls_cert,
-                                 &tls_key, &root_ca, &services](http::get_config_callback callback)
+      http_config->get_config = [&chainContext, &node, &http_config, &host, &admin, &admin_authz,
+                                 &tls_cert, &tls_key, &root_ca,
+                                 &services](http::get_config_callback callback)
       {
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, &http_config, &host, &services, &admin, &tls_cert,
-                            &tls_key, &root_ca, callback = std::move(callback)]() mutable
-                           {
-                              PsinodeConfig result;
-                              result.p2p = http_config->enable_p2p;
-                              std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
-                              result.producer = node.producer_name();
-                              result.host     = host;
-                              result.listen   = http_config->listen;
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, &http_config, &host, &services, &admin, &admin_authz, &tls_cert,
+              &tls_key, &root_ca, callback = std::move(callback)]() mutable
+             {
+                PsinodeConfig result;
+                result.p2p                                       = http_config->enable_p2p;
+                std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
+                result.producer                                  = node.producer_name();
+                result.host                                      = host;
+                result.listen                                    = http_config->listen;
 #ifdef PSIBASE_ENABLE_SSL
-                              result.tls.certificate = tls_cert;
-                              result.tls.key         = tls_key;
-                              result.tls.trustfiles  = root_ca;
+                result.tls.certificate = tls_cert;
+                result.tls.key         = tls_key;
+                result.tls.trustfiles  = root_ca;
 #endif
-                              result.services = services;
-                              result.admin    = admin;
-                              result.loggers  = loggers::Config::get();
-                              callback(
-                                  [result = std::move(result)]() mutable
-                                  {
-                                     std::vector<char>   json;
-                                     psio::vector_stream stream(json);
-                                     to_json(result, stream);
-                                     return json;
-                                  });
-                           });
+                result.services    = services;
+                result.admin       = admin;
+                result.admin_authz = admin_authz;
+                result.loggers     = loggers::Config::get();
+                callback(
+                    [result = std::move(result)]() mutable
+                    {
+                       std::vector<char>   json;
+                       psio::vector_stream stream(json);
+                       to_json(result, stream);
+                       return json;
+                    });
+             });
       };
 
       http_config->get_keys = [&chainContext, &prover](auto callback)
@@ -1873,13 +1902,13 @@ void run(const std::string&              db_path,
    // TODO: post the transactions to chainContext rather than batching them at fixed intervals.
    auto process_transactions = [&](const std::error_code& ec)
    {
-      std::vector<transaction_queue::entry> entries;
-      {
-         std::scoped_lock lock{queue->mutex};
-         std::swap(entries, queue->entries);
-      }
       auto fail_all = [&](const std::string& message)
       {
+         std::vector<transaction_queue::entry> entries;
+         {
+            std::scoped_lock lock{queue->mutex};
+            std::swap(entries, queue->entries);
+         }
          {
             std::lock_guard lock{transactionStatsMutex};
             transactionStats.unprocessed -= entries.size();
@@ -1904,6 +1933,29 @@ void run(const std::string&              db_path,
       }
       else if (auto bc = node.chain().getBlockContext())
       {
+         std::vector<transaction_queue::entry> entries;
+         if (bc->needGenesisAction)
+         {
+            // Only process up to the genesis transaction
+            std::scoped_lock lock{queue->mutex};
+            auto             pos = std::ranges::find_if(queue->entries,
+                                                        [](const auto& entry) { return entry.is_boot; });
+            if (pos != queue->entries.end())
+               ++pos;
+            std::ranges::move(queue->entries.begin(), pos, std::back_inserter(entries));
+            queue->entries.erase(queue->entries.begin(), pos);
+         }
+         else if (bc->current.header.previous != Checksum256{})
+         {
+            std::scoped_lock lock{queue->mutex};
+            std::swap(entries, queue->entries);
+         }
+         else
+         {
+            // The genesis transaction has already been executed, but we're still
+            // building the genesis block. Wait for the next block before pushing
+            // any transactions.
+         }
          auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
          {
@@ -1973,6 +2025,7 @@ int main(int argc, char* argv[])
    bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
    http::admin_service         admin;
+   std::vector<http::authz>    admin_authz;
    std::vector<std::string>    root_ca;
    std::string                 tls_cert;
    std::string                 tls_key;
@@ -2001,6 +2054,8 @@ int main(int argc, char* argv[])
        "Serve static content from directory using the specified virtual host name");
    opt("admin", po::value(&admin)->default_value({}, ""),
        "Controls which services can access the admin API");
+   opt("admin-authz", po::value(&admin_authz)->default_value({}, "")->value_name("SPEC"),
+       "Controls client access to the admin API");
    opt("database-cache-size",
        po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
        "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: this "
@@ -2091,8 +2146,8 @@ int main(int argc, char* argv[])
          restart.shouldRestart     = true;
          restart.soft              = true;
          run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, peers, autoconnect,
-             enable_incoming_p2p, host, listen, services, admin, root_ca, tls_cert, tls_key,
-             leeway_us, restart);
+             enable_incoming_p2p, host, listen, services, admin, admin_authz, root_ca, tls_cert,
+             tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

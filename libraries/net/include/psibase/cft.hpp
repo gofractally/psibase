@@ -198,19 +198,22 @@ namespace psibase::net
             _state = producer_state::nonvoting;
          }
       }
-      void validate_producer(producer_id producer, const Claim& claim)
+      // Since this check is not associated with a block, we have to be permissive
+      // and ignore wrong produers, to avoid closing connections due to network delays.
+      bool is_valid_producer(producer_id producer, const Claim& claim)
       {
          auto expected0 = active_producers[0]->getClaim(producer);
          auto expected1 =
              active_producers[1] ? active_producers[1]->getClaim(producer) : decltype(expected0)();
          if (!expected0 && !expected1)
          {
-            throw std::runtime_error(producer.str() + " is not an active producer");
+            return false;
          }
          else if (claim != *expected0 && claim != *expected1)
          {
-            throw std::runtime_error("Wrong key for " + producer.str());
+            return false;
          }
+         return true;
       }
 
       void on_fork_switch(const BlockHeader* new_head)
@@ -441,7 +444,10 @@ namespace psibase::net
          {
             return;
          }
-         validate_producer(request.candidate_id, request.signer);
+         if (!is_valid_producer(request.candidate_id, request.signer))
+         {
+            return;
+         }
          update_term(request.term);
          bool vote_granted = false;
          // Can we vote for this candidate?
@@ -478,7 +484,10 @@ namespace psibase::net
          {
             return;
          }
-         validate_producer(response.voter_id, response.signer);
+         if (!is_valid_producer(response.voter_id, response.signer))
+         {
+            return;
+         }
          update_term(response.term);
          if (response.candidate_id == self && response.term == current_term &&
              response.vote_granted && _state == producer_state::candidate)

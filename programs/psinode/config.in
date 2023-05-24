@@ -12,6 +12,9 @@ service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
 service  = admin-sys.:$PSIBASE_DATADIR/services/admin-sys
 admin    = static:*
 
+admin-authz = r:any
+admin-authz = rw:loopback
+
 [logger.stderr]
 type   = console
 filter = Severity >= info

@@ -13,7 +13,7 @@ function isLocalhost() {
 
 const GRAFANA_PORT = 3000;
 const DASHBOARDS_PREFIX = isLocalhost()
-        ? `http://${window.location.hostname}:${GRAFANA_PORT}/grafana`
+        ? `${window.location.protocol}//${window.location.hostname}:${GRAFANA_PORT}/grafana`
         : "/grafana";
 
 export const DashboardPage = () => {

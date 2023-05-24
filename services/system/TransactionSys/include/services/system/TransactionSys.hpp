@@ -146,9 +146,11 @@ namespace SystemService
    {
       bool enforceAuth = true;
 
+      std::optional<std::vector<psibase::Checksum256>> bootTransactions;
+
       std::tuple<> key() const { return {}; }
    };
-   PSIO_REFLECT(TransactionSysStatus, enforceAuth)
+   PSIO_REFLECT(TransactionSysStatus, enforceAuth, bootTransactions)
    using TransactionSysStatusTable =
        psibase::Table<TransactionSysStatus, &TransactionSysStatus::key>;
 
@@ -194,13 +196,18 @@ namespace SystemService
       using Tables =
           psibase::ServiceTables<TransactionSysStatusTable, BlockSummaryTable, IncludedTrxTable>;
 
+      /// Only called once, immediately after the boot transaction.
+      ///
+      /// The subsequent transactions listed must be pushed in order, and no
+      /// other transactions will be accepted until finishBoot is run.
+      void startBoot(psio::view<const std::vector<psibase::Checksum256>> bootTransactions);
       /// Only called once during chain initialization
       ///
       /// This enables the auth checking system. Before this point, `TransactionSys`
       /// allows all transactions to execute without auth checks. After this point,
       /// `TransactionSys` uses [AuthInterface::checkAuthSys] to authenticate
       /// top-level actions and uses of [runAs].
-      void init();
+      void finishBoot();
 
       /// Called by native code at the beginning of each block
       void startBlock();
@@ -249,7 +256,8 @@ namespace SystemService
       psibase::TimePointSec headBlockTime() const;
    };
    PSIO_REFLECT(TransactionSys,
-                method(init),
+                method(startBoot, bootTransactions),
+                method(finishBoot),
                 method(startBlock),
                 method(runAs, action, allowedActions),
                 method(getTransaction),

@@ -3,7 +3,9 @@ use chrono::{Duration, Utc};
 use clap::{ArgAction, Parser, Subcommand};
 use fracpack::{Pack, Unpack};
 use futures::future::join_all;
+use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
+use jwt::SignWithKey;
 use psibase::services::{account_sys, auth_ec_sys, proxy_sys, psispace_sys, setcode_sys};
 use psibase::{
     account, create_boot_transactions, get_tapos_for_head, push_transaction, sign_transaction,
@@ -13,6 +15,7 @@ use psibase::{
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::Sha256;
 use std::fs::{metadata, read_dir};
 
 /// Interact with a running psinode
@@ -169,6 +172,17 @@ enum Command {
         /// Sender to use; defaults to <SERVICE>
         #[clap(short = 'S', long, value_name = "SENDER")]
         sender: Option<ExactAccountNumber>,
+    },
+
+    /// Create a bearer token that can be used to access a node
+    CreateToken {
+        /// The lifetime of the new token
+        #[clap(short = 'e', long, default_value = "3600", value_name = "SECONDS")]
+        expires_after: i64,
+
+        /// The access mode: "r" or "rw"
+        #[clap(short = 'm', long, default_value = "rw")]
+        mode: String,
     },
 }
 
@@ -493,12 +507,21 @@ async fn boot(
     producer: ExactAccountNumber,
     doc: bool,
 ) -> Result<(), anyhow::Error> {
-    let now_plus_10secs = Utc::now() + Duration::seconds(10);
+    let now_plus_30secs = Utc::now() + Duration::seconds(30);
     let expiration = TimePointSec {
-        seconds: now_plus_10secs.timestamp() as u32,
+        seconds: now_plus_30secs.timestamp() as u32,
     };
-    let transactions = create_boot_transactions(key, producer.into(), true, doc, true, expiration);
-    push_boot(args, client, transactions.packed()).await?;
+    let (boot_transactions, transactions) =
+        create_boot_transactions(key, producer.into(), true, doc, true, expiration);
+
+    let progress = ProgressBar::new((transactions.len() + 1) as u64)
+        .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
+    push_boot(args, &client, boot_transactions.packed()).await?;
+    progress.inc(1);
+    for transaction in transactions {
+        push_transaction(&args.api, client.clone(), transaction.packed()).await?;
+        progress.inc(1)
+    }
     if !args.suppress_ok {
         println!("Ok");
     }
@@ -507,7 +530,7 @@ async fn boot(
 
 async fn push_boot_impl(
     args: &Args,
-    client: reqwest::Client,
+    client: &reqwest::Client,
     packed: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
     let mut response = client
@@ -535,7 +558,7 @@ async fn push_boot_impl(
 
 async fn push_boot(
     args: &Args,
-    client: reqwest::Client,
+    client: &reqwest::Client,
     packed: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
     push_boot_impl(args, client, packed)
@@ -605,6 +628,24 @@ async fn upload_tree(
     if !args.suppress_ok {
         println!("Ok");
     }
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+struct TokenData<'a> {
+    exp: i64,
+    mode: &'a str,
+}
+
+fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error> {
+    let key_text = rpassword::prompt_password("Enter Key: ")?;
+    let claims = TokenData {
+        exp: (Utc::now() + expires_after).timestamp(),
+        mode: mode,
+    };
+    let key: Hmac<Sha256> = Hmac::new_from_slice(key_text.as_bytes())?;
+    let token = claims.sign_with_key(&key)?;
+    println!("{}", token);
     Ok(())
 }
 
@@ -679,6 +720,10 @@ async fn main() -> Result<(), anyhow::Error> {
             source,
             sender,
         } => upload_tree(&args, client, (*service).into(), *sender, dest, source).await?,
+        Command::CreateToken {
+            expires_after,
+            mode,
+        } => create_token(Duration::seconds(*expires_after), mode)?,
     }
 
     Ok(())
