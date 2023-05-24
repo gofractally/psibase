@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -20,7 +21,7 @@ namespace psibase
       ///
       /// Message should be UTF8.
       PSIBASE_NATIVE(abortMessage)
-      [[noreturn]] void abortMessage(const char* message, uint32_t len);
+      [[noreturn]] void abortMessage(const char* message, std::uint32_t len);
    }  // namespace raw
 
    /// Abort with `message`
