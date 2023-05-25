@@ -1,9 +1,23 @@
 {
-    "editor.formatOnSave": true,
-    "editor.defaultFormatter": "xaver.clang-format",
-    "editor.tabSize": 3,
+    "clang-format.executable": "/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format",
     "[markdown]": {
         "files.trimTrailingWhitespace": false
     },
-    "C_Cpp.clang_format_path": "/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
+    "[cpp]": {
+        "editor.defaultFormatter": "xaver.clang-format",
+        "editor.tabSize": 3,
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+    },
+    "[javascript, typescript, typescriptreact]": {
+        "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+        "editor.formatOnPaste": false,
+        "editor.formatOnType": false,
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+    },
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"]
 }

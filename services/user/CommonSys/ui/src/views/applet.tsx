@@ -93,7 +93,6 @@ export const Applet = ({ applet, handleMessage }: Props) => {
             allow="camera;microphone"
             title={appletId.name}
             onLoad={initializeIFrame}
-            frameBorder="0"
         />
     ) : null;
 };
