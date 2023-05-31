@@ -72,12 +72,12 @@ include(GNUInstallDirs)
 install(FILES ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses COMPONENT libpsibase)
 
 add_library(wasm-base INTERFACE)
-target_compile_options(wasm-base INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
-target_link_options(wasm-base INTERFACE -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
+target_compile_options(wasm-base INTERFACE -mno-sign-ext -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
+target_link_options(wasm-base INTERFACE -mno-sign-ext -B${ROOT_SOURCE_DIR}/libraries/psibase/sdk -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 add_library(wasm-base-debug INTERFACE)
-target_compile_options(wasm-base-debug INTERFACE -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
-target_link_options(wasm-base-debug INTERFACE -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
+target_compile_options(wasm-base-debug INTERFACE -mno-sign-ext -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
+target_link_options(wasm-base-debug INTERFACE -mno-sign-ext -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 function(target_mapped_include_directories target type)
     target_include_directories(${target} ${type} ${ARGN})

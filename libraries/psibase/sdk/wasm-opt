@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# clang is not smart about running wasm-opt
+# - wasm-opt does not handle debug info, so RelWithDebInfo doesn't work
+# - clang doesn't pass any feature control options to wasm-opt, so it
+#   generates code that won't run on psibase.
+# /usr/bin/wasm-opt --disable-sign-ext --enable-simd "$@"
