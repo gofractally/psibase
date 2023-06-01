@@ -73,7 +73,7 @@ install(FILES ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/ps
 
 add_library(wasm-base INTERFACE)
 target_compile_options(wasm-base INTERFACE -mno-sign-ext -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
-target_link_options(wasm-base INTERFACE -mno-sign-ext -B${ROOT_SOURCE_DIR}/libraries/psibase/sdk -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
+target_link_options(wasm-base INTERFACE -mno-sign-ext -B${ROOT_SOURCE_DIR}/libraries/psibase/sdk/psibase- -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 add_library(wasm-base-debug INTERFACE)
 target_compile_options(wasm-base-debug INTERFACE -mno-sign-ext -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
