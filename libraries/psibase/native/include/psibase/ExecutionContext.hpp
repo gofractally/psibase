@@ -61,6 +61,8 @@ namespace psibase
 
       static void registerHostFunctions();
 
+      std::uint32_t remainingStack() const;
+
       void execProcessTransaction(ActionContext& actionContext);
       void execCalled(uint64_t callerFlags, ActionContext& actionContext);
       void execVerify(ActionContext& actionContext);

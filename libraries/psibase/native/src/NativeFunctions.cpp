@@ -396,9 +396,11 @@ namespace psibase
    //      * Node config: number of parallel executions happening at the same time
    uint32_t NativeFunctions::call(eosio::vm::span<const char> data)
    {
-      // TODO: replace temporary rule
-      if (++currentActContext->transactionContext.callDepth > 6)
-         check(false, "call depth exceeded (temporary rule)");
+      auto saved          = currentActContext->transactionContext.remainingStack;
+      auto remainingStack = currentExecContext->remainingStack();
+      check(remainingStack >= VMOptions::stack_usage_for_call, "stack overflow");
+      remainingStack -= VMOptions::stack_usage_for_call;
+      currentActContext->transactionContext.remainingStack = remainingStack;
 
       // TODO: don't unpack rawData
       check(psio::fracpack_validate_strict<Action>(data), "call: invalid data format");
@@ -413,7 +415,7 @@ namespace psibase
       currentActContext->transactionContext.execCalledAction(code.flags, act, inner_action_trace);
       setResult(*this, inner_action_trace.rawRetval);
 
-      --currentActContext->transactionContext.callDepth;
+      currentActContext->transactionContext.remainingStack = saved;
       return result_value.size();
    }
 

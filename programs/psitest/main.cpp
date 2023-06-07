@@ -36,8 +36,8 @@ struct vm_options
 };
 
 template <>
-void eosio::vm::machine_code_writer<
-    eosio::vm::jit_execution_context<callbacks, true>>::on_unreachable()
+void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, true>,
+                                    true>::on_unreachable()
 {
    backtrace();
    eosio::vm::throw_<wasm_interpreter_exception>("unreachable");
