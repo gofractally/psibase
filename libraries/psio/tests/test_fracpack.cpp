@@ -62,15 +62,15 @@ template <typename T>
 bool bitwise_equal(const psio::shared_view_ptr<T>& lhs, const psio::shared_view_ptr<T>& rhs);
 
 template <typename T>
-   requires std::is_arithmetic_v<T> bool
-bitwise_equal(const T& lhs, const T& rhs)
+   requires std::is_arithmetic_v<T>
+bool bitwise_equal(const T& lhs, const T& rhs)
 {
    return std::memcmp(&lhs, &rhs, sizeof(T)) == 0;
 }
 
 template <typename T>
-   requires(!std::is_arithmetic_v<T>) bool
-bitwise_equal(const T& lhs, const T& rhs)
+   requires(!std::is_arithmetic_v<T>)
+bool bitwise_equal(const T& lhs, const T& rhs)
 {
    return lhs == rhs;
 }
@@ -242,6 +242,8 @@ struct packable_wrapper
    }
 };
 template <typename T>
+packable_wrapper(T) -> packable_wrapper<T>;
+template <typename T>
 const T& clio_unwrap_packable(const packable_wrapper<T>& wrapper)
 {
    return wrapper.value;
@@ -331,6 +333,8 @@ struct extensible_wrapper
       return bitwise_equal(lhs.value, rhs.value);
    }
 };
+template <typename T>
+extensible_wrapper(T) -> extensible_wrapper<T>;
 
 template <typename T>
 auto wrap_packable(const extensible_wrapper<T>& value)
@@ -357,6 +361,8 @@ struct nonextensible_wrapper
       return bitwise_equal(lhs.value, rhs.value);
    }
 };
+template <typename T>
+nonextensible_wrapper(T) -> nonextensible_wrapper<T>;
 
 template <typename T>
 auto wrap_packable(const nonextensible_wrapper<T>& value)
