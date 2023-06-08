@@ -84,6 +84,7 @@ std::vector<char> psibase::readWholeFile(std::string_view filename)
       remaining -= count;
       pos += count;
    }
+   ::close(fd);
    return result;
 }
 
