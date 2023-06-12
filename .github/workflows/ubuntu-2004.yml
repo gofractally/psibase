@@ -9,7 +9,7 @@ on:
     types: [assigned, opened, synchronize, reopened, labeled]
 
 env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/psibase-builder-ubuntu-2004:2af4a2f8ffd3473c7c393a022ad88c71a031da03"
+  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/psibase-builder-ubuntu-2004:b70111acc20bdc6990e756a855fdbf428112c059"
 
 jobs:
   ubuntu-2004-build:
