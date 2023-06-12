@@ -98,11 +98,16 @@ def native_pretty_printer(val):
         return WasmPointerPrinter(val)
     return None
 
-class HideNative(gdb.Parameter):
-    """Controls whether native frames and functions are visible"""
-    def __init__(self, name):
-        super (HideNative, self).__init__(name, gdb.COMMAND_BREAKPOINTS, gdb.PARAM_BOOLEAN)
-        self.value = True
+if hasattr(gdb, "Parameter"):
+    class HideNative(gdb.Parameter):
+        """Controls whether native frames and functions are visible"""
+        def __init__(self, name):
+            super (HideNative, self).__init__(name, gdb.COMMAND_BREAKPOINTS, gdb.PARAM_BOOLEAN)
+            self.value = True
+else:
+    class HideNative(object):
+        def __init__(self, name):
+            self.value = True
 
 hide_native = HideNative("hide-native")
 
@@ -143,6 +148,7 @@ def register(objfile):
     objfile.pretty_printers.append(native_pretty_printer)
     objfile.frame_filters[wasm_filter.name] = wasm_filter
 
-gdb.events.breakpoint_created.connect(disable_native_breakpoints)
-gdb.events.breakpoint_modified.connect(disable_native_breakpoints)
-gdb.set_parameter("breakpoint pending", True)
+if hasattr(gdb, "Parameter"):
+    gdb.events.breakpoint_created.connect(disable_native_breakpoints)
+    gdb.events.breakpoint_modified.connect(disable_native_breakpoints)
+gdb.execute("set breakpoint pending on")
