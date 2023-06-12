@@ -61,7 +61,7 @@ namespace psibase
    struct VMOptions
    {
       // This is a safe value that is larger than any reasonable stack size
-      static constexpr std::uint32_t max_func_local_bytes = 8192;  //128*1024*1024;
+      static constexpr std::uint32_t max_func_local_bytes = 128 * 1024 * 1024;
       static constexpr bool          enable_simd          = true;
       // TODO: Measure actual stack usage to make sure that
       // this isn't too small. It doesn't need to be exact, but
@@ -71,6 +71,7 @@ namespace psibase
 
       std::uint32_t max_mutable_global_bytes = 1024;
       std::uint32_t max_pages                = 512;  // 32 MiB
+      std::uint32_t max_table_elements       = 8192;
       // This is the total across all modules
       std::uint32_t max_stack_bytes = 1024 * 1024;
 
