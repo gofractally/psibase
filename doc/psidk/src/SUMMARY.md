@@ -33,6 +33,7 @@
       - [Web Services](services/rust-service/reference/web-services.md)
   - [Concepts](services/concepts.md)
     - [Events](services/concepts/events.md)
+  - [WebAssembly](services/webassembly.md)
 - [Data Formats](format.md)
   - [JSON](format/json.md)
   - [Schema](format/schema.md)

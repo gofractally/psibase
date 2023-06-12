@@ -48,9 +48,6 @@ namespace psibase
    };
    PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
 
-   // TODO: determine which eos-vm parameters need to
-   //       be constrained for safety and consensus.
-   //       Also decide on values.
    // The existing eos-vm implementation limits are:
    // - branch offsets, and stack offsets must fit in a signed 32-bit int
    // - The total compiled module size must be < 1 GB (note that this
@@ -63,10 +60,6 @@ namespace psibase
       // This is a safe value that is larger than any reasonable stack size
       static constexpr std::uint32_t max_func_local_bytes = 128 * 1024 * 1024;
       static constexpr bool          enable_simd          = true;
-      // TODO: Measure actual stack usage to make sure that
-      // this isn't too small. It doesn't need to be exact, but
-      // we need to know a bound for <actual stack usage> / stack_usage_for_call
-      // preferably <= 2, as the max ratio in wasm is also 2 (i32 occupies 8 bytes).
       static constexpr std::uint32_t stack_usage_for_call = 4096;
 
       std::uint32_t max_mutable_global_bytes = 1024;
