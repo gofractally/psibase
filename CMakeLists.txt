@@ -43,8 +43,8 @@ if(DEFINED WASI_SDK_PREFIX)
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL FILES_MATCHING PATTERN libc.a EXCLUDE)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     ExternalProject_Add(wasi-sdk
-        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-17/wasi-sdk-17.0-linux.tar.gz
-        URL_HASH SHA256=8778a476af7898a51db9b78395687cc9c8b69702850da77a763711e832614dac
+        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-19/wasi-sdk-19.0-linux.tar.gz
+        URL_HASH SHA256=d900abc826eec1955b9afd250e7cc2496338abbf6c440d86a313c06e42083fa1
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
         INSTALL_COMMAND ""

@@ -105,7 +105,7 @@ namespace psibase
 
       BackendEntry get(const Checksum256& hash, const VMOptions& vmOptions)
       {
-         BackendEntry                result;
+         BackendEntry                result{hash, vmOptions};
          std::lock_guard<std::mutex> lock{mutex};
          auto&                       ind = backends.get<ByHash>();
          auto                        it  = ind.find(std::tie(hash, vmOptions));

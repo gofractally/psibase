@@ -279,8 +279,8 @@ namespace psio
    }
 
    template <typename T, typename V>
-      requires(is_std_variant_v<std::remove_cv_t<V>>) bool
-   holds_alternative(view<V> v)
+      requires(is_std_variant_v<std::remove_cv_t<V>>)
+   bool holds_alternative(view<V> v)
    {
       constexpr std::size_t expected = get_variant_index<T>((std::remove_cv_t<V>*)nullptr);
       static_assert(expected != std::size_t(-1));
@@ -304,8 +304,8 @@ namespace psio
    }
 
    template <typename F, typename T>
-      requires(is_std_variant_v<std::remove_cv_t<T>>) decltype(auto)
-   visit(F&& f, view<T> v)
+      requires(is_std_variant_v<std::remove_cv_t<T>>)
+   decltype(auto) visit(F&& f, view<T> v)
    {
       return variant_visit_impl<0>(std::forward<F>(f), (std::remove_cv_t<T>*)nullptr, v.index(),
                                    v.data + 5);
@@ -667,7 +667,7 @@ namespace psio
       {
       }
       explicit constexpr view(prevalidated<char_ptr<T>> p) : view_interface<T>{p.data} {}
-      T unpack() const
+      std::remove_cv_t<T> unpack() const
       {
          std::remove_cv_t<T> result;
          bool                has_unknown = false;
@@ -677,7 +677,7 @@ namespace psio
              &result, has_unknown, known_end, psio::get_view_data(*this), pos, 0xFFFFFFFFu);
          return result;
       }
-                  operator T() const { return unpack(); }
+      operator std::remove_cv_t<T>() const { return unpack(); }
       const view& operator=(const T& value) const
          requires(!std::is_const_v<T> && !is_packable<std::remove_cv_t<T>>::is_variable_size)
       {
