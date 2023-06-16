@@ -32,12 +32,14 @@ void backtrace();
 
 struct vm_options
 {
-   static constexpr std::uint32_t max_call_depth = 1024;
+   static constexpr bool          enable_simd          = true;
+   static constexpr std::uint32_t max_func_local_bytes = 1024 * 1024;
+   static constexpr std::uint32_t max_stack_bytes      = 1024 * 1024;
 };
 
 template <>
-void eosio::vm::machine_code_writer<
-    eosio::vm::jit_execution_context<callbacks, true>>::on_unreachable()
+void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, true>,
+                                    true>::on_unreachable()
 {
    backtrace();
    eosio::vm::throw_<wasm_interpreter_exception>("unreachable");

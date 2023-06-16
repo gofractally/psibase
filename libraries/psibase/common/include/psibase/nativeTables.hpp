@@ -48,25 +48,29 @@ namespace psibase
    };
    PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
 
-   // TODO: determine which eos-vm parameters need to
-   //       be constrained for safety and consensus.
-   //       Also decide on values.
+   // The existing eos-vm implementation limits are:
+   // - branch offsets, and stack offsets must fit in a signed 32-bit int
+   // - The total compiled module size must be < 1 GB (note that this
+   //   implies that 32-bit branches are okay.) The maximum amplification
+   //   factor is currently 79, if we round up to 128, that means that
+   //   wasms up to 8 MB are safe, which is coincidentally the db maxValueSize.
+   //
    struct VMOptions
    {
+      // This is a safe value that is larger than any reasonable stack size
+      static constexpr std::uint32_t max_func_local_bytes = 128 * 1024 * 1024;
+      static constexpr bool          enable_simd          = true;
+      static constexpr std::uint32_t stack_usage_for_call = 4096;
+
       std::uint32_t max_mutable_global_bytes = 1024;
-      std::uint32_t max_func_local_bytes     = 8192;
-      std::uint32_t max_pages                = 528;  // 33 MiB
-      std::uint32_t max_call_depth           = 251;
-      bool          enable_simd              = true;
+      std::uint32_t max_pages                = 512;  // 32 MiB
+      std::uint32_t max_table_elements       = 8192;
+      // This is the total across all modules
+      std::uint32_t max_stack_bytes = 1024 * 1024;
 
       friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
    };
-   PSIO_REFLECT(VMOptions,
-                max_mutable_global_bytes,
-                max_func_local_bytes,
-                max_pages,
-                max_call_depth,
-                enable_simd)
+   PSIO_REFLECT(VMOptions, max_mutable_global_bytes, max_pages, max_table_elements, max_stack_bytes)
 
    struct WasmConfigRow
    {

@@ -16,6 +16,7 @@ namespace psibase
       bool                allowDbReadSubjective = false;
       CodeRow             code                  = {};
       ActionContext*      currentActContext     = nullptr;  // Changes during recursion
+      ExecutionContext*   currentExecContext    = nullptr;
 
       std::vector<char> result_key;
       std::vector<char> result_value;

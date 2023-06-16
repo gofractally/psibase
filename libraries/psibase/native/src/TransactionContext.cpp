@@ -1,6 +1,7 @@
 #include <psibase/TransactionContext.hpp>
 
 #include <condition_variable>
+#include <eosio/vm/execution_context.hpp>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
 #include <psibase/serviceEntry.hpp>
@@ -15,11 +16,12 @@ namespace psibase
       WasmConfigRow wasmConfig;
 
       // mutex protects everything below
-      std::mutex                                mutex             = {};
-      std::condition_variable                   cond              = {};
-      std::thread                               thread            = {};
-      bool                                      timedOut          = false;
-      bool                                      shuttingDown      = false;
+      std::mutex                                mutex        = {};
+      std::condition_variable                   cond         = {};
+      std::thread                               thread       = {};
+      bool                                      timedOut     = false;
+      bool                                      shuttingDown = false;
+      eosio::vm::stack_manager                  altStack;
       std::map<AccountNumber, ExecutionContext> executionContexts = {};
       std::chrono::steady_clock::duration       watchdogLimit{0};
       std::chrono::steady_clock::duration       serviceLoadTime{0};
@@ -65,6 +67,7 @@ namespace psibase
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
+      remainingStack = impl->wasmConfig.vmOptions.max_stack_bytes;
 
       if (blockContext.needGenesisAction)
       {
@@ -95,6 +98,7 @@ namespace psibase
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
                                                           WasmConfigRow::key(proofWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
+      remainingStack = impl->wasmConfig.vmOptions.max_stack_bytes;
 
       check(!blockContext.needGenesisAction, "checkFirstAuth does not handle genesis");
       execProcessTransaction(*this, true);
@@ -171,6 +175,7 @@ namespace psibase
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
                                                           WasmConfigRow::key(proofWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
+      remainingStack = impl->wasmConfig.vmOptions.max_stack_bytes;
 
       VerifyArgs data{
           .transactionHash = id,
@@ -198,6 +203,7 @@ namespace psibase
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
+      remainingStack = impl->wasmConfig.vmOptions.max_stack_bytes;
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
@@ -223,6 +229,7 @@ namespace psibase
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
+      remainingStack = impl->wasmConfig.vmOptions.max_stack_bytes;
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
@@ -289,4 +296,9 @@ namespace psibase
              });
       }
    }  // TransactionContext::setWatchdog
+
+   eosio::vm::stack_manager& TransactionContext::getAltStack()
+   {
+      return impl->altStack;
+   }
 }  // namespace psibase

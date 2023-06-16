@@ -3,6 +3,11 @@
 #include <boost/container/flat_map.hpp>
 #include <psibase/BlockContext.hpp>
 
+namespace eosio::vm
+{
+   struct stack_manager;
+}
+
 namespace psibase
 {
    using KvResourceMap = boost::container::flat_map<KvResourceKey,
@@ -23,7 +28,7 @@ namespace psibase
       TransactionTrace&                           transactionTrace;
       ConfigRow                                   config;
       KvResourceMap                               kvResourceDeltas;
-      int                                         callDepth = 0;
+      std::uint32_t                               remainingStack = 0;
       const std::chrono::steady_clock::time_point startTime;
       std::chrono::steady_clock::duration         databaseTime;
       bool                                        allowDbRead;
@@ -59,6 +64,9 @@ namespace psibase
       // Set watchdog timer; it will expire at startTime + serviceLoadTime + watchdogLimit.
       // This may be called multiple times with different limits; the most-recent limit applies.
       void setWatchdog(std::chrono::steady_clock::duration watchdogLimit);
+
+      // Returns the alt stack for wasm execution.
+      eosio::vm::stack_manager& getAltStack();
 
       void incCodeRef(const Checksum256& codeHash,
                       std::uint8_t       vmType,

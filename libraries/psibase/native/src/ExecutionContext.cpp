@@ -224,6 +224,8 @@ namespace psibase
          transactionContext.blockContext.systemContext.wasmCache.impl->add(std::move(backend));
       }
 
+      eosio::vm::stack_manager& getAltStack() { return transactionContext.getAltStack(); }
+
       void init()
       {
          rethrowVMExcept(
@@ -231,8 +233,9 @@ namespace psibase
              {
                 // auto startTime = std::chrono::steady_clock::now();
                 backend.backend->set_wasm_allocator(&wa);
-                backend.backend->initialize(this);
-                (*backend.backend)(*this, "env", "start", currentActContext->action.service.value);
+                backend.backend->initialize(getAltStack(), this);
+                (*backend.backend)(getAltStack(), *this, "env", "start",
+                                   currentActContext->action.service.value);
                 initialized = true;
                 // auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
                 //     std::chrono::steady_clock::now() - startTime);
@@ -247,6 +250,8 @@ namespace psibase
          currentActContext = &actionContext;
          try
          {
+            backend.backend->get_context().set_max_call_depth(
+                actionContext.transactionContext.remainingStack);
             if (!initialized)
                init();
             rethrowVMExcept(f);
@@ -268,11 +273,13 @@ namespace psibase
                                       AccountNumber       service)
    {
       impl = std::make_unique<ExecutionContextImpl>(transactionContext, vmOptions, memory, service);
+      impl->currentExecContext = this;
    }
 
    ExecutionContext::ExecutionContext(ExecutionContext&& src)
    {
-      impl = std::move(src.impl);
+      impl                     = std::move(src.impl);
+      impl->currentExecContext = this;
    }
    ExecutionContext::~ExecutionContext() {}
 
@@ -301,10 +308,15 @@ namespace psibase
       // rhf_t::add<&ExecutionContextImpl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
    }
 
+   std::uint32_t ExecutionContext::remainingStack() const
+   {
+      return impl->backend.backend->get_context()._remaining_call_depth;
+   }
+
    void ExecutionContext::execProcessTransaction(ActionContext& actionContext)
    {
       impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(*impl, "env", "processTransaction");
+         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "processTransaction");
       });
    }
 
@@ -327,7 +339,8 @@ namespace psibase
       }
 
       impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(*impl, "env", "called", actionContext.action.service.value,
+         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "called",
+                                  actionContext.action.service.value,
                                   actionContext.action.sender.value);
       });
 
@@ -340,7 +353,7 @@ namespace psibase
    {
       impl->exec(actionContext, [&] {  //
          // auto startTime = std::chrono::steady_clock::now();
-         (*impl->backend.backend)(*impl, "env", "verify");
+         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "verify");
          // auto us = std::chrono::duration_cast<std::chrono::microseconds>(
          //     std::chrono::steady_clock::now() - startTime);
          // std::cout << "verify: " << us.count() << " us\n";
@@ -350,7 +363,7 @@ namespace psibase
    void ExecutionContext::execServe(ActionContext& actionContext)
    {
       impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(*impl, "env", "serve");
+         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "serve");
       });
    }
 
