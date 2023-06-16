@@ -40,7 +40,7 @@ option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 include(GNUInstallDirs)
 
 if(DEFINED WASI_SDK_PREFIX)
-    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL FILES_MATCHING PATTERN libc.a EXCLUDE)
+    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     ExternalProject_Add(wasi-sdk
         URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-19/wasi-sdk-19.0-linux.tar.gz
