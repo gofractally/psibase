@@ -70,7 +70,7 @@ namespace psibase
 
       friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
    };
-   PSIO_REFLECT(VMOptions, max_mutable_global_bytes, max_pages, max_stack_bytes)
+   PSIO_REFLECT(VMOptions, max_mutable_global_bytes, max_pages, max_table_elements, max_stack_bytes)
 
    struct WasmConfigRow
    {
