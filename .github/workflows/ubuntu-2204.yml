@@ -18,17 +18,14 @@ jobs:
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp
-        shell: cmake -P {0}
-        run: |
-          string(TIMESTAMP current_date "%Y-%m-%d-%H-%M-%S" UTC)
-          message("::set-output name=timestamp::${current_date}")
+        run: echo timestamp=`date -u +"%Y-%m-%d-%H-%M-%S"` >>$GITHUB_OUTPUT
       - name: Checkout
         uses: actions/checkout@v3
         with:
           submodules: false
           fetch-depth: 0
       - name: Preserve ccache
-        uses: actions/cache@v1.1.0
+        uses: actions/cache@v3
         with:
           path: .caches
           key: $ubuntu-22.04-caches-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
