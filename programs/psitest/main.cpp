@@ -33,6 +33,7 @@ void backtrace();
 struct vm_options
 {
    static constexpr bool          enable_simd          = true;
+   static constexpr bool          enable_bulk_memory   = true;
    static constexpr std::uint32_t max_func_local_bytes = 1024 * 1024;
    static constexpr std::uint32_t max_stack_bytes      = 1024 * 1024;
 };
