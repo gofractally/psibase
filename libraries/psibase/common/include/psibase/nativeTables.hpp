@@ -60,6 +60,7 @@ namespace psibase
       // This is a safe value that is larger than any reasonable stack size
       static constexpr std::uint32_t max_func_local_bytes = 128 * 1024 * 1024;
       static constexpr bool          enable_simd          = true;
+      static constexpr bool          enable_bulk_memory   = true;
       static constexpr std::uint32_t stack_usage_for_call = 4096;
 
       std::uint32_t max_mutable_global_bytes = 1024;
