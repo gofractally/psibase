@@ -134,7 +134,14 @@ void validate(boost::any& v, const std::vector<std::string>& values, autoconnect
    }
    else
    {
-      v = autoconnect_t{boost::lexical_cast<std::size_t>(s)};
+      try
+      {
+         v = autoconnect_t{boost::lexical_cast<std::size_t>(s)};
+      }
+      catch (boost::bad_lexical_cast&)
+      {
+         throw boost::program_options::invalid_option_value(s);
+      }
    }
 }
 
@@ -152,7 +159,7 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
    auto      err = std::from_chars(s.begin(), s.end(), result.value);
    if (err.ec != std::errc())
    {
-      throw std::runtime_error("Expected number");
+      throw boost::program_options::invalid_option_value(std::string(s));
    }
    s = {err.ptr, s.end()};
    if (!s.empty())
@@ -195,7 +202,7 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
       }
       else
       {
-         throw std::runtime_error("Unknown unit: " + std::string(s));
+         throw boost::program_options::invalid_option_value(std::string(s));
       }
    }
    v = result;
@@ -263,7 +270,15 @@ void validate(boost::any& v, const std::vector<std::string>& values, native_serv
 {
    boost::program_options::validators::check_first_occurrence(v);
    native_service result;
-   parse_config(result, boost::program_options::validators::get_single_string(values));
+   std::string    s = boost::program_options::validators::get_single_string(values);
+   try
+   {
+      parse_config(result, s);
+   }
+   catch (std::exception&)
+   {
+      throw boost::program_options::invalid_option_value(s);
+   }
    v = std::move(result);
 }
 
@@ -326,7 +341,15 @@ namespace psibase
    void validate(boost::any& v, const std::vector<std::string>& values, PrivateKey*, int)
    {
       boost::program_options::validators::check_first_occurrence(v);
-      v = privateKeyFromString(boost::program_options::validators::get_single_string(values));
+      const auto& s = boost::program_options::validators::get_single_string(values);
+      try
+      {
+         v = privateKeyFromString(s);
+      }
+      catch (std::exception&)
+      {
+         throw boost::program_options::invalid_option_value(s);
+      }
    }
 
    void validate(boost::any&                     v,
@@ -361,20 +384,42 @@ namespace psibase
       {
          boost::program_options::validators::check_first_occurrence(v);
          const auto& s = boost::program_options::validators::get_single_string(values);
-         v             = admin_service_from_string(s);
+         try
+         {
+            v = admin_service_from_string(s);
+         }
+         catch (std::exception&)
+         {
+            throw boost::program_options::invalid_option_value(s);
+         }
       }
 
       void validate(boost::any& v, const std::vector<std::string>& values, listen_spec*, int)
       {
          boost::program_options::validators::check_first_occurrence(v);
-         v = parse_listen(boost::program_options::validators::get_single_string(values));
+         const auto& s = boost::program_options::validators::get_single_string(values);
+         try
+         {
+            v = parse_listen(s);
+         }
+         catch (std::exception& e)
+         {
+            throw boost::program_options::invalid_option_value(s);
+         }
       }
 
       void validate(boost::any& v, const std::vector<std::string>& values, authz*, int)
       {
          boost::program_options::validators::check_first_occurrence(v);
          const auto& s = boost::program_options::validators::get_single_string(values);
-         v             = authz_from_string(s);
+         try
+         {
+            v = authz_from_string(s);
+         }
+         catch (std::exception& e)
+         {
+            throw boost::program_options::invalid_option_value(s);
+         }
       }
    }  // namespace http
 }  // namespace psibase
@@ -400,9 +445,7 @@ struct transaction_queue
    }
 
 #define CATCH_IGNORE \
-   catch (...)       \
-   {                 \
-   }
+   catch (...) {}
 
 bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 {
