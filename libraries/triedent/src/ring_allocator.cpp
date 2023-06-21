@@ -9,7 +9,7 @@ namespace triedent
                                   std::uint8_t                 level,
                                   access_mode                  mode,
                                   bool                         pin)
-       : _file(path, mode, pin), _level(level)
+       : _file(path, mode, pin), _level(level), _free_min(0)
    {
       if (_file.size() == 0)
       {
