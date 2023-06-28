@@ -19,8 +19,12 @@ using eosio::vm::span;
 namespace psibase
 {
    struct ExecutionContextImpl;
-   using rhf_t     = eosio::vm::registered_host_functions<ExecutionContextImpl>;
+   using rhf_t = eosio::vm::registered_host_functions<ExecutionContextImpl>;
+#ifdef __x86_64__
    using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit_profile, VMOptions>;
+#else
+   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::interpreter, VMOptions>;
+#endif
 
    // Rethrow with detailed info
    template <typename F>
@@ -70,10 +74,12 @@ namespace psibase
 
    struct BackendEntry
    {
-      Checksum256                                   hash;
-      VMOptions                                     vmOptions;
-      std::unique_ptr<backend_t>                    backend;
+      Checksum256                hash;
+      VMOptions                  vmOptions;
+      std::unique_ptr<backend_t> backend;
+#ifdef __x86_64__
       std::shared_ptr<dwarf::debugger_registration> debug;
+#endif
 
       auto byHash() const { return std::tie(hash, vmOptions); }
    };
@@ -201,6 +207,7 @@ namespace psibase
                 {
                    psio::input_stream s{reinterpret_cast<const char*>(c->code.data()),
                                         c->code.size()};
+#ifdef __x86_64__
                    if (dwarf::has_debug_info(s))
                    {
                       debug_eos_vm::debug_instr_map debug;
@@ -215,6 +222,9 @@ namespace psibase
                       backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
                       backend.debug = dwarf::register_with_debugger(backend.backend->get_module());
                    }
+#else
+                   backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
+#endif
                 }
              });
       }
@@ -310,7 +320,7 @@ namespace psibase
 
    std::uint32_t ExecutionContext::remainingStack() const
    {
-      return impl->backend.backend->get_context()._remaining_call_depth;
+      return impl->backend.backend->get_context().get_remaining_call_depth();
    }
 
    void ExecutionContext::execProcessTransaction(ActionContext& actionContext)

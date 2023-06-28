@@ -71,13 +71,15 @@ endmacro()
 include(GNUInstallDirs)
 install(FILES ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses COMPONENT libpsibase)
 
+set(WASM_FEATURES -msign-ext -mnontrapping-fptoint -msimd128 -mbulk-memory)
+
 add_library(wasm-base INTERFACE)
-target_compile_options(wasm-base INTERFACE -mno-sign-ext -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
-target_link_options(wasm-base INTERFACE -mno-sign-ext -B${ROOT_SOURCE_DIR}/libraries/psibase/sdk/psibase- -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
+target_compile_options(wasm-base INTERFACE ${WASM_FEATURES} -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
+target_link_options(wasm-base INTERFACE ${WASM_FEATURES} -B${ROOT_SOURCE_DIR}/libraries/psibase/sdk/psibase- -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 add_library(wasm-base-debug INTERFACE)
-target_compile_options(wasm-base-debug INTERFACE -mno-sign-ext -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
-target_link_options(wasm-base-debug INTERFACE -mno-sign-ext -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
+target_compile_options(wasm-base-debug INTERFACE ${WASM_FEATURES} -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
+target_link_options(wasm-base-debug INTERFACE ${WASM_FEATURES} -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 function(target_mapped_include_directories target type)
     target_include_directories(${target} ${type} ${ARGN})

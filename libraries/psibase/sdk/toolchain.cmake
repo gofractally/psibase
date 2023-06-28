@@ -44,7 +44,7 @@ set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES WASI_SDK_PREFIX)
 
 if(NOT __psibase_toolchain_included)
     set(__psibase_toolchain_included 1)
-    string(APPEND CMAKE_CXX_FLAGS_INIT "-mno-sign-ext -msimd128")
+    string(APPEND CMAKE_CXX_FLAGS_INIT "-msign-ext -msimd128 -mnontrapping-fptoint -mbulk-memory")
     string(APPEND CMAKE_C_FLAGS_DEBUG_INIT " -ggdb")
     string(APPEND CMAKE_CXX_FLAGS_DEBUG_INIT " -ggdb")
     string(APPEND CMAKE_C_FLAGS_RELWITHDEBINFO_INIT " -ggdb")
