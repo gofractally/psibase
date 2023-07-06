@@ -10,6 +10,16 @@ if(DEFINED IS_NATIVE)
         benchmark.cpp
 #        crypto.cpp
         test_fracpack.cpp
+        test_bool.cpp
+        test_char.cpp
+        test_int8.cpp
+        test_int16.cpp
+        test_int32.cpp
+        test_int64.cpp
+        test_float.cpp
+        test_struct.cpp
+        test_std_array.cpp
+        test_chrono.cpp
         test_view.cpp
     )
     target_link_libraries(psio-tests psio catch2 Threads::Threads )
