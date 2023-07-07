@@ -5,11 +5,14 @@
 
 namespace psibase
 {
+   struct WatchdogManager;
+
    struct SystemContext
    {
-      SharedDatabase               sharedDatabase;
-      WasmCache                    wasmCache;
-      std::vector<ExecutionMemory> executionMemories;
+      SharedDatabase                   sharedDatabase;
+      WasmCache                        wasmCache;
+      std::vector<ExecutionMemory>     executionMemories;
+      std::shared_ptr<WatchdogManager> watchdogManager;
 
       void setNumMemories(size_t n)
       {

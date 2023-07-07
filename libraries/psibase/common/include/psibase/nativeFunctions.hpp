@@ -123,6 +123,13 @@ namespace psibase
       /// Otherwise returns `-1` and clears result. Use [getResult] to get result
       /// and [getKey] to get found key.
       PSIBASE_NATIVE(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
+
+      /// Get the time in nanoseconds since the beginning of the current transaction
+      PSIBASE_NATIVE(getBillableTime) uint64_t getBillableTime();
+
+      /// Sets the transaction timer to expire a given number of nanoseconds
+      /// after the beginning of the current transaction.
+      PSIBASE_NATIVE(setMaxTransactionTime) void setMaxTransactionTime(uint64_t ns);
    }  // namespace raw
 
    /// Get result

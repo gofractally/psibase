@@ -191,8 +191,10 @@ function(add suffix)
             native/src/TransactionContext.cpp
             native/src/useTriedent.cpp
             native/src/VerifyProver.cpp
+            native/src/Watchdog.cpp
         )
 
+        add_subdirectory(native/tests)
         add_subdirectory(common/tests)
     endif()
 endfunction()

@@ -23,19 +23,18 @@ namespace psibase
    //       Might be redundant elsewhere?
    struct TransactionContext
    {
-      BlockContext&                               blockContext;
-      const SignedTransaction&                    signedTransaction;
-      TransactionTrace&                           transactionTrace;
-      ConfigRow                                   config;
-      KvResourceMap                               kvResourceDeltas;
-      std::uint32_t                               remainingStack = 0;
-      const std::chrono::steady_clock::time_point startTime;
-      std::chrono::steady_clock::duration         databaseTime;
-      bool                                        allowDbRead;
-      bool                                        allowDbWrite;
-      bool                                        allowDbReadSubjective;
-      std::vector<std::vector<char>>              subjectiveData;
-      size_t                                      nextSubjectiveRead = 0;
+      BlockContext&                       blockContext;
+      const SignedTransaction&            signedTransaction;
+      TransactionTrace&                   transactionTrace;
+      ConfigRow                           config;
+      KvResourceMap                       kvResourceDeltas;
+      std::uint32_t                       remainingStack = 0;
+      std::chrono::steady_clock::duration databaseTime;
+      bool                                allowDbRead;
+      bool                                allowDbWrite;
+      bool                                allowDbReadSubjective;
+      std::vector<std::vector<char>>      subjectiveData;
+      size_t                              nextSubjectiveRead = 0;
 
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,

@@ -292,8 +292,8 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::getKey>("env", "getKey");
       rhf_t::add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
       rhf_t::add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
-      // rhf_t::add<&ExecutionContextImpl::getBillableTime>("env", "getBillableTime");
-      // rhf_t::add<&ExecutionContextImpl::setMaxTransactionTime>("env", "setMaxTransactionTime");
+      rhf_t::add<&ExecutionContextImpl::getBillableTime>("env", "getBillableTime");
+      rhf_t::add<&ExecutionContextImpl::setMaxTransactionTime>("env", "setMaxTransactionTime");
       rhf_t::add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&ExecutionContextImpl::call>("env", "call");
       rhf_t::add<&ExecutionContextImpl::setRetval>("env", "setRetval");
@@ -333,8 +333,7 @@ namespace psibase
          auto&       ctx = impl->transactionContext;
          const auto& tx  = ctx.signedTransaction;
          check(ctx.nextSubjectiveRead < tx.subjectiveData->size(), "missing subjective data");
-         impl->currentActContext->actionTrace.rawRetval =
-             (*tx.subjectiveData)[ctx.nextSubjectiveRead++];
+         actionContext.actionTrace.rawRetval = (*tx.subjectiveData)[ctx.nextSubjectiveRead++];
          return;
       }
 
@@ -345,8 +344,7 @@ namespace psibase
       });
 
       if ((impl->code.flags & CodeRow::isSubjective) && !(callerFlags & CodeRow::isSubjective))
-         impl->transactionContext.subjectiveData.push_back(
-             impl->currentActContext->actionTrace.rawRetval);
+         impl->transactionContext.subjectiveData.push_back(actionContext.actionTrace.rawRetval);
    }
 
    void ExecutionContext::execVerify(ActionContext& actionContext)

@@ -3,6 +3,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/Watchdog.hpp>
 #include <psibase/log.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
@@ -17,6 +18,7 @@
 using namespace std::literals;
 
 using eosio::vm::span;
+using psibase::WatchdogManager;
 using psio::convert_to_bin;
 
 struct callbacks;
@@ -114,6 +116,7 @@ struct state
    cl_flags_t                               additional_args;
    std::vector<file>                        files;
    std::vector<std::unique_ptr<test_chain>> chains;
+   std::shared_ptr<WatchdogManager>         watchdogManager = std::make_shared<WatchdogManager>();
    std::optional<uint32_t>                  selected_chain_index;
    std::vector<char>                        result_key;
    std::vector<char>                        result_value;
@@ -177,7 +180,8 @@ struct test_chain
       dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
       db     = {dir, hot_bytes, warm_bytes, cool_bytes, cold_bytes};
       writer = db.createWriter();
-      sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{db, {128}});
+      sys    = std::make_unique<psibase::SystemContext>(
+          psibase::SystemContext{db, {128}, {}, state.watchdogManager});
    }
 
    test_chain(const test_chain&)            = delete;
