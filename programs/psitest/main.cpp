@@ -48,7 +48,11 @@ void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, 
 
 using backend_t = eosio::vm::backend<  //
     rhf_t,
+#ifdef __x86_64__
     eosio::vm::jit_profile,
+#else
+    eosio::vm::interpreter,
+#endif
     vm_options,
     debug_eos_vm::debug_instr_map>;
 

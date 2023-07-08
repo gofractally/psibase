@@ -6,5 +6,5 @@
 #   generates code that won't run on psibase.
 if which wasm-opt >/dev/null 2>&1
 then
-    wasm-opt --disable-sign-ext --enable-simd --enable-bulk-memory "$@"
+    wasm-opt --enable-sign-ext --enable-nontrapping-float-to-int --enable-simd --enable-bulk-memory "$@"
 fi
