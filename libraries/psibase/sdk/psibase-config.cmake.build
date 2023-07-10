@@ -53,6 +53,7 @@ function(add_libs suffix)
     add_library(psibase${suffix} INTERFACE)
     target_include_directories(psibase${suffix} INTERFACE
         @ROOT_SOURCE_DIR@/libraries/psibase/common/include
+        @ROOT_SOURCE_DIR@/libraries/psibase/wasm32-wasi
         @ROOT_SOURCE_DIR@/services/system/AccountSys/include
         @ROOT_SOURCE_DIR@/services/system/AuthAnySys/include
         @ROOT_SOURCE_DIR@/services/system/AuthEcSys/include

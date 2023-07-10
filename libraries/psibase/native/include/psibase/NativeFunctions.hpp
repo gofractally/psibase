@@ -2,6 +2,7 @@
 
 #include <psibase/ExecutionContext.hpp>
 
+#include <eosio/vm/argument_proxy.hpp>
 #include <eosio/vm/span.hpp>
 #include <psibase/nativeTables.hpp>
 
@@ -37,7 +38,7 @@ namespace psibase
       uint32_t getKey(eosio::vm::span<char> dest);
       void     writeConsole(eosio::vm::span<const char> str);
       void     abortMessage(eosio::vm::span<const char> str);
-      uint64_t getBillableTime();
+      int32_t  clockTimeGet(uint32_t id, eosio::vm::argument_proxy<uint64_t*> time);
       void     setMaxTransactionTime(uint64_t nanoseconds);
       uint32_t getCurrentAction();
       uint32_t call(eosio::vm::span<const char> data);

@@ -304,6 +304,25 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
    return acc;
 }  // addService()
 
+AccountNumber DefaultTestChain::addService(AccountNumber acc,
+                                           const char*   filename,
+                                           std::uint64_t flags,
+                                           bool          show /* = false */)
+{
+   addAccount(acc, AuthAnySys::service, show);
+
+   transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
+   auto                   setFlags =
+       transactor<SetCodeSys>{SetCodeSys::service, SetCodeSys::service}.setFlags(acc, flags);
+
+   auto trace = pushTransaction(
+       makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename)), setFlags}}));
+
+   check(psibase::show(show, trace) == "", "Failed to create service");
+
+   return acc;
+}  // addService()
+
 AccountNumber DefaultTestChain::addService(const char* acc,
                                            const char* filename,
                                            bool        show /* = false */)

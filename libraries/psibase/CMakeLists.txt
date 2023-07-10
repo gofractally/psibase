@@ -14,7 +14,7 @@ function(add suffix)
 
     if(DEFINED IS_WASM)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
-        target_mapped_include_directories(psibase${suffix} PUBLIC common/include)
+        target_mapped_include_directories(psibase${suffix} PUBLIC common/include wasm32-wasi)
 
         add_library(simple-malloc-objects${suffix} OBJECT service/src/simple_malloc.cpp)
         target_link_libraries(simple-malloc-objects${suffix} PUBLIC wasm-base${suffix})
@@ -42,6 +42,7 @@ function(add suffix)
         target_link_libraries(psibase-service-wasi-polyfill${suffix} PUBLIC wasm-base${suffix})
         target_sources(psibase-service-wasi-polyfill${suffix} PRIVATE
             service/src/ossl.c
+            service/src/time.c
             service/src/wasi-polyfill/__wasi_clock_time_get.cpp
             service/src/wasi-polyfill/__wasi_environ_get.cpp
             service/src/wasi-polyfill/__wasi_environ_sizes_get.cpp
@@ -109,6 +110,7 @@ function(add suffix)
             tester/src/testUtils.cpp
             service/src/intrinsic.cpp
             service/src/ossl.c
+            service/src/time.c
             tester/src/tester_intrinsics.cpp
             tester/src/wasi_polyfill/__wasi_args_get.cpp
             tester/src/wasi_polyfill/__wasi_args_sizes_get.cpp
@@ -207,6 +209,7 @@ endif()
 if(IS_WASM)
     install(DIRECTORY common/include/psibase TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY tester/include/psibase TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp")
+    install(DIRECTORY wasm32-wasi TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.h")
     install(PROGRAMS sdk/psidk-cmake-args TYPE BIN COMPONENT libpsibase)
     install(FILES sdk/psibase-config.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/psidk COMPONENT libpsibase)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements.a ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements-debug.a TYPE LIB COMPONENT libpsibase)

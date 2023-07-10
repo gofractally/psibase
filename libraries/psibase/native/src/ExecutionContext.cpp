@@ -292,7 +292,7 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::getKey>("env", "getKey");
       rhf_t::add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
       rhf_t::add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
-      rhf_t::add<&ExecutionContextImpl::getBillableTime>("env", "getBillableTime");
+      rhf_t::add<&ExecutionContextImpl::clockTimeGet>("env", "clockTimeGet");
       rhf_t::add<&ExecutionContextImpl::setMaxTransactionTime>("env", "setMaxTransactionTime");
       rhf_t::add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&ExecutionContextImpl::call>("env", "call");
