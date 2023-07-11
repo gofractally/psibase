@@ -5,6 +5,7 @@
 
 #include <services/system/AccountSys.hpp>
 #include <services/system/AuthAnySys.hpp>
+#include <services/system/CpuSys.hpp>
 #include <services/system/ProducerSys.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
@@ -79,6 +80,11 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
                                                .service = TransactionSys::service,
                                                .flags   = TransactionSys::serviceFlags,
                                                .code    = readWholeFile("TransactionSys.wasm"),
+                                           },
+                                           {
+                                               .service = CpuSys::service,
+                                               .flags   = CpuSys::serviceFlags,
+                                               .code    = readWholeFile("CpuSys.wasm"),
                                            },
                                            {
                                                .service = AccountSys::service,
@@ -219,6 +225,8 @@ BlockMessage makeBlock(const BlockInfo&                   info,
          }
       }
       trx.subjectiveData.emplace();
+      trx.subjectiveData->emplace_back();
+      trx.subjectiveData->push_back(psio::to_frac(std::chrono::nanoseconds(100000)));
       m.push(TransactionInfo{trx});
    }
    newBlock.block.transactions           = std::move(trxs);

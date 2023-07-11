@@ -5,6 +5,7 @@
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/CommonSys.hpp>
+#include <services/system/CpuSys.hpp>
 #include <services/system/ProducerSys.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/RAccountSys.hpp>
@@ -132,6 +133,11 @@ void DefaultTestChain::deploySystemServices(bool show /* = false */)
                                                 .service = CommonSys::service,
                                                 .flags   = 0,
                                                 .code    = readWholeFile("CommonSys.wasm"),
+                                            },
+                                            {
+                                                .service = CpuSys::service,
+                                                .flags   = CpuSys::serviceFlags,
+                                                .code    = readWholeFile("CpuSys.wasm"),
                                             },
                                             {
                                                 .service = RAccountSys::service,

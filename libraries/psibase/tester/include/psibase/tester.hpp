@@ -34,8 +34,11 @@ namespace psibase
       auto&                           root = t.actionTraces.back();
       std::vector<const ActionTrace*> top_traces;
       for (auto& inner : root.innerTraces)
-         if (std::holds_alternative<ActionTrace>(inner.inner))
-            top_traces.push_back(&std::get<ActionTrace>(inner.inner));
+         if (auto at = std::get_if<ActionTrace>(&inner.inner))
+            if (at->action.service != AccountNumber{"cpu-sys"} &&
+                (at->action.service != AccountNumber{"account-sys"} ||
+                 at->action.method != MethodNumber{"billCpu"}))
+               top_traces.push_back(at);
       check(!(top_traces.size() & 1), "unexpected number of action traces");
       check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];

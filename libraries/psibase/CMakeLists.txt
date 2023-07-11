@@ -152,6 +152,7 @@ function(add suffix)
             ../../services/system/ProducerSys/include
             ../../services/system/AuthEcSys/include
             ../../services/system/AuthAnySys/include
+            ../../services/system/CpuSys/include
             ../../services/system/ProxySys/include
             ../../services/system/SetCodeSys/include
             ../../services/system/TransactionSys/include
