@@ -21,6 +21,7 @@
       - [Web Services](services/cpp-service/reference/web-services.md)
       - [Magic Numbers](services/cpp-service/reference/magic-numbers.md)
       - [Native Functions](services/cpp-service/reference/native-functions.md)
+      - [System Functions](services/cpp-service/reference/system.md)
       - [CMake Support](services/cpp-service/reference/cmake.md)
   - [Rust Services](services/rust-service.md)
     - [Basic Service](services/rust-service/basic.md)

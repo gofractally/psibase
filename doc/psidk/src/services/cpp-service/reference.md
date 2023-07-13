@@ -5,4 +5,5 @@
 - [Web Services](reference/web-services.md)
 - [Magic Numbers](reference/magic-numbers.md)
 - [Native Functions](reference/native-functions.md)
+- [System Functions](reference/system.md)
 - [CMake Support](reference/cmake.md)

@@ -123,6 +123,27 @@ namespace psibase
       /// Otherwise returns `-1` and clears result. Use [getResult] to get result
       /// and [getKey] to get found key.
       PSIBASE_NATIVE(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
+
+      /// Gets the current value of a clock in nanoseconds.
+      ///
+      /// This function is non-deterministic and is only available in subjective services.
+      ///
+      /// The following clocks are supported
+      /// - `__WASI_CLOCKID_REALTIME` returns wall-clock time since the unix epoch.
+      /// - `__WASI_CLOCKID_MONOTONIC` returns monotonic time since an unspecified epoch.
+      ///   All uses of CLOCK_MONOTONIC within the same block use the same epoch.
+      /// - `__WASI_CLOCKID_PROCESS_CPUTIME_ID` measures CPU time spent executing the
+      ///   current transaction.
+      ///
+      /// Returns 0 on success or an error code on failure.
+      ///
+      /// Errors:
+      /// - `EINVAL`: the clock id is not supported
+      int32_t clockTimeGet(uint32_t id, uint64_t* time);
+
+      /// Sets the transaction timer to expire a given number of nanoseconds
+      /// after the beginning of the current transaction.
+      PSIBASE_NATIVE(setMaxTransactionTime) void setMaxTransactionTime(uint64_t ns);
    }  // namespace raw
 
    /// Get result

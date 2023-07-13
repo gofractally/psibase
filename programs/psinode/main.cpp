@@ -542,9 +542,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
                      BlockContext&                          bc,
                      SystemContext&                         proofSystem,
                      transaction_queue::entry&              entry,
-                     std::chrono::microseconds              firstAuthWatchdogLimit,
-                     std::chrono::microseconds              proofWatchdogLimit,
-                     std::chrono::microseconds              initialWatchdogLimit)
+                     std::chrono::microseconds              proofWatchdogLimit)
 {
    try
    {
@@ -606,7 +604,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             // for a modified node to skip it during production. This won't hurt
             // consensus since replay never uses read-only mode for auth checks.
             auto saveTrace = trace;
-            proofBC.checkFirstAuth(trx, trace, firstAuthWatchdogLimit);
+            proofBC.checkFirstAuth(trx, trace, std::nullopt);
             trace = std::move(saveTrace);
 
             // TODO: RPC: don't forward failed transactions to P2P; this gives users
@@ -621,7 +619,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             //       shadow bill, and once shadow billing is in place, failed
             //       transaction billing seems unnecessary.
 
-            bc.pushTransaction(std::move(trx), trace, initialWatchdogLimit);
+            bc.pushTransaction(std::move(trx), trace, std::nullopt);
          }
       }
       RETHROW_BAD_ALLOC
@@ -2007,8 +2005,6 @@ void run(const std::string&              db_path,
                res = push_boot(*bc, entry);
             else
                res = pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
-                                     std::chrono::microseconds(leeway_us),  // TODO
-                                     std::chrono::microseconds(leeway_us),  // TODO
                                      std::chrono::microseconds(leeway_us));
             {
                std::lock_guard lock{transactionStatsMutex};

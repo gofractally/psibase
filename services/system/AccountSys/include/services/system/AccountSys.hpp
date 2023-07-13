@@ -4,6 +4,7 @@
 #include <psibase/name.hpp>
 #include <psibase/nativeFunctions.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psio/chrono.hpp>
 
 namespace SystemService
 {
@@ -19,14 +20,47 @@ namespace SystemService
    PSIO_REFLECT(AccountSysStatus, totalAccounts)
    using AccountSysStatusTable = psibase::Table<AccountSysStatus, &AccountSysStatus::key>;
 
+   struct ResourceLimit
+   {
+      static ResourceLimit fromCpu(std::chrono::nanoseconds cpu)
+      {
+         psibase::check(cpu >= std::chrono::nanoseconds(0), "billed cpu must be non-negative");
+         psibase::check(static_cast<std::uintmax_t>(cpu.count()) <= UINT64_MAX, "integer overflow");
+         return {static_cast<std::uint64_t>(cpu.count())};
+      }
+      std::chrono::nanoseconds cpuLimit()
+      {
+         if (value <= static_cast<std::uintmax_t>(std::chrono::nanoseconds::max().count()))
+         {
+            return std::chrono::nanoseconds(value);
+         }
+         else
+         {
+            return std::chrono::nanoseconds::max();
+         }
+      }
+      friend ResourceLimit operator-(ResourceLimit lhs, ResourceLimit rhs)
+      {
+         psibase::check(lhs.value >= rhs.value, "insufficient resources");
+         return {lhs.value - rhs.value};
+      }
+      void          billCpu(std::chrono::nanoseconds cpu) { *this = *this - fromCpu(cpu); }
+      std::uint64_t value;
+   };
+   PSIO_REFLECT(ResourceLimit, definitionWillNotChange(), value);
+
    /// Structure of an account
    ///
    /// `accountNum` is the name of the account
    /// `authService` is the service used to verify the transaction claims when `accountNum` is the sender
+   /// `resourceBalance` is the available resources for the account
    struct Account
    {
       psibase::AccountNumber accountNum;
       psibase::AccountNumber authService;
+
+      // If this is absent, it means resource usage is unlimited
+      std::optional<ResourceLimit> resourceBalance;
 
       auto key() const { return accountNum; }
    };
@@ -70,6 +104,10 @@ namespace SystemService
       /// Return value indicates whether the account `name` exists
       bool exists(psibase::AccountNumber name);
 
+      /// Reduces the account balance. Aborts the transaction if the
+      /// account does not have sufficient resources.
+      void billCpu(psibase::AccountNumber name, std::chrono::nanoseconds amount);
+
       struct Events
       {
          struct History
@@ -88,7 +126,8 @@ namespace SystemService
                 method(init),
                 method(newAccount, name, authService, requireNew),
                 method(setAuthServ, authService),
-                method(exists, name)
+                method(exists, name),
+                method(billCpu, name, amount)
                 //
    )
 }  // namespace SystemService

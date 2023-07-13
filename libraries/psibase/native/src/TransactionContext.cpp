@@ -4,27 +4,29 @@
 #include <eosio/vm/execution_context.hpp>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
+#include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/from_bin.hpp>
 #include <thread>
 
 namespace psibase
 {
-   // TODO: spawn timeout thread once per block instead of once per trx
    struct TransactionContextImpl
    {
+      explicit TransactionContextImpl(SystemContext& context)
+          : watchdog(*context.watchdogManager, [this] { asyncTimeout(); })
+      {
+      }
+      void asyncTimeout();
+
       WasmConfigRow wasmConfig;
 
-      // mutex protects everything below
-      std::mutex                                mutex        = {};
-      std::condition_variable                   cond         = {};
-      std::thread                               thread       = {};
-      bool                                      timedOut     = false;
-      bool                                      shuttingDown = false;
+      // mutex protects timedOut and insertions in executionContexts
+      std::mutex                                mutex    = {};
+      bool                                      timedOut = false;
       eosio::vm::stack_manager                  altStack;
       std::map<AccountNumber, ExecutionContext> executionContexts = {};
-      std::chrono::steady_clock::duration       watchdogLimit{0};
-      std::chrono::steady_clock::duration       serviceLoadTime{0};
+      Watchdog                                  watchdog;
    };
 
    TransactionContext::TransactionContext(BlockContext&            blockContext,
@@ -36,25 +38,14 @@ namespace psibase
        : blockContext{blockContext},
          signedTransaction{signedTransaction},
          transactionTrace{transactionTrace},
-         startTime{std::chrono::steady_clock::now()},
          allowDbRead{allowDbRead},
          allowDbWrite{allowDbWrite},
          allowDbReadSubjective{allowDbReadSubjective},
-         impl{std::make_unique<TransactionContextImpl>()}
+         impl{std::make_unique<TransactionContextImpl>(blockContext.systemContext)}
    {
    }
 
-   TransactionContext::~TransactionContext()
-   {
-      std::unique_lock<std::mutex> lock{impl->mutex};
-      if (impl->thread.joinable())
-      {
-         impl->shuttingDown = true;
-         impl->cond.notify_one();
-         lock.unlock();
-         impl->thread.join();
-      }
-   }
+   TransactionContext::~TransactionContext() {}
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
    static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit);
@@ -239,62 +230,39 @@ namespace psibase
 
    ExecutionContext& TransactionContext::getExecutionContext(AccountNumber service)
    {
-      auto                        loadStart = std::chrono::steady_clock::now();
-      std::lock_guard<std::mutex> guard{impl->mutex};
-      if (impl->timedOut)
-         throw TimeoutException{};
       auto it = impl->executionContexts.find(service);
       if (it != impl->executionContexts.end())
          return it->second;
+      impl->watchdog.pause();
       check(impl->executionContexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running services");
       auto& memory = blockContext.systemContext.executionMemories[impl->executionContexts.size()];
-      auto& result = impl->executionContexts
-                         .insert({service, ExecutionContext{*this, impl->wasmConfig.vmOptions,
-                                                            memory, service}})
-                         .first->second;
-      impl->serviceLoadTime += std::chrono::steady_clock::now() - loadStart;
+      ExecutionContext            execContext{*this, impl->wasmConfig.vmOptions, memory, service};
+      std::lock_guard<std::mutex> guard{impl->mutex};
+      if (impl->timedOut)
+         throw TimeoutException{};
+      auto& result =
+          impl->executionContexts.insert({service, std::move(execContext)}).first->second;
+      impl->watchdog.resume();
       return result;
+   }
+
+   void TransactionContextImpl::asyncTimeout()
+   {
+      std::lock_guard<std::mutex> guard{mutex};
+      timedOut = true;
+      for (auto& [_, ec] : executionContexts)
+         ec.asyncTimeout();
    }
 
    std::chrono::nanoseconds TransactionContext::getBillableTime()
    {
-      std::lock_guard<std::mutex> guard{impl->mutex};
-      return std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::steady_clock::now() - startTime - impl->serviceLoadTime);
+      return impl->watchdog.elapsed();
    }
 
    void TransactionContext::setWatchdog(std::chrono::steady_clock::duration watchdogLimit)
    {
-      std::lock_guard<std::mutex> guard{impl->mutex};
-      impl->watchdogLimit = watchdogLimit;
-      if (impl->thread.joinable())
-      {
-         impl->cond.notify_one();
-      }
-      else
-      {
-         impl->thread = std::thread(
-             [this]
-             {
-                std::unique_lock<std::mutex> lock{impl->mutex};
-                while (true)
-                {
-                   if (impl->timedOut || impl->shuttingDown)
-                      return;
-                   auto timeSpent =
-                       std::chrono::steady_clock::now() - startTime - impl->serviceLoadTime;
-                   if (timeSpent >= impl->watchdogLimit)
-                   {
-                      impl->timedOut = true;
-                      for (auto& [_, ec] : impl->executionContexts)
-                         ec.asyncTimeout();
-                      return;
-                   }
-                   impl->cond.wait_for(lock, impl->watchdogLimit - timeSpent);
-                }
-             });
-      }
+      impl->watchdog.setLimit(watchdogLimit);
    }  // TransactionContext::setWatchdog
 
    eosio::vm::stack_manager& TransactionContext::getAltStack()
