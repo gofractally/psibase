@@ -20,5 +20,5 @@ namespace SystemService
       std::chrono::nanoseconds getCpuTime();
       void                     setCpuLimit(psibase::AccountNumber account);
    };
-   PSIO_REFLECT(CpuSys, method(getCpuTime), method(setCpuLimit, limit))
+   PSIO_REFLECT(CpuSys, method(getCpuTime), method(setCpuLimit, account))
 }  // namespace SystemService
