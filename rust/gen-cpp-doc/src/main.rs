@@ -695,6 +695,27 @@ fn dump(entity: &Entity, indent: usize) {
     }
 }
 
+fn get_clang_include_dir(wasi_sdk_prefix: &str) -> String {
+    let mut path = wasi_sdk_prefix.to_owned() + "/lib/clang/13.0.0/include";
+    if let Ok(dirs) = std::fs::read_dir(std::path::Path::new(
+        &(wasi_sdk_prefix.to_owned() + "/lib/clang"),
+    )) {
+        for dir in dirs {
+            if let Ok(d) = dir {
+                let mut buf = d.path();
+                buf.push("include");
+                if buf.is_dir() {
+                    if let Some(s) = buf.to_str() {
+                        path = s.to_owned();
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    path
+}
+
 fn parse<'tu>(
     index: &'tu clang::Index<'tu>,
     repo_path: &str,
@@ -702,6 +723,7 @@ fn parse<'tu>(
 ) -> Result<TranslationUnit<'tu>, anyhow::Error> {
     let mut parser = index.parser(repo_path.to_owned() + "/doc/psidk/src/doc-root.cpp");
     let wasi_sdk_prefix = env::var("WASI_SDK_PREFIX")?;
+    let clang_include_dir = get_clang_include_dir(&wasi_sdk_prefix);
     parser.arguments(&[
         "-fcolor-diagnostics",
         "-std=c++2a",
@@ -716,8 +738,7 @@ fn parse<'tu>(
         "-DCOMPILING_WASM",
         &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include/c++/v1"),
         &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include"),
-        &("-I".to_owned() + &wasi_sdk_prefix + "/lib/clang/13.0.0/include"),
-        &("-I".to_owned() + &wasi_sdk_prefix + "/lib/clang/15.0.6/include"),
+        &("-I".to_owned() + &clang_include_dir),
         &("-I".to_owned() + build_path + "/wasm/boost"),
         &("-I".to_owned() + build_path + "/wasm/deps/include"),
         &("-I".to_owned() + repo_path + "/services/system/ProxySys/include"),

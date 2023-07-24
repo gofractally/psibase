@@ -71,13 +71,15 @@ endmacro()
 include(GNUInstallDirs)
 install(FILES ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses COMPONENT libpsibase)
 
+set(WASM_FEATURES -msign-ext -mnontrapping-fptoint -msimd128 -mbulk-memory)
+
 add_library(wasm-base INTERFACE)
-target_compile_options(wasm-base INTERFACE -mno-sign-ext -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
-target_link_options(wasm-base INTERFACE -mno-sign-ext -B${ROOT_SOURCE_DIR}/libraries/psibase/sdk/psibase- -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
+target_compile_options(wasm-base INTERFACE ${WASM_FEATURES} -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)
+target_link_options(wasm-base INTERFACE ${WASM_FEATURES} -B${ROOT_SOURCE_DIR}/libraries/psibase/sdk/psibase- -Wl,--strip-all -O3 -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 add_library(wasm-base-debug INTERFACE)
-target_compile_options(wasm-base-debug INTERFACE -mno-sign-ext -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
-target_link_options(wasm-base-debug INTERFACE -mno-sign-ext -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
+target_compile_options(wasm-base-debug INTERFACE ${WASM_FEATURES} -fno-exceptions -DCOMPILING_WASM -mthread-model single -ggdb)
+target_link_options(wasm-base-debug INTERFACE ${WASM_FEATURES} -ggdb -L${ROOT_BINARY_DIR}/wasm/deps/lib)
 
 function(target_mapped_include_directories target type)
     target_include_directories(${target} ${type} ${ARGN})
@@ -130,7 +132,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
             && export CXX=\"${CMAKE_CXX_COMPILER_LAUNCHER} ${CMAKE_CXX_COMPILER}\"  \
             && export AR=${CMAKE_AR}                                                \
             && export RANLIB=${CMAKE_RANLIB}                                        \
-            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT}\"                         \
+            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasi\"    \
             && ./configure --prefix=${DEP_PREFIX} --static                          \
             && make -j                                                              \
             && make -j install                                                      \
@@ -149,7 +151,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
             && cd ${GMP_EXTRACTED}                                                          \
             && ./configure                                                                  \
                 CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"                     \
-                CFLAGS=\"--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL\"               \
+                CFLAGS=\"--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL --target=wasm32-wasi\"               \
                 LDFLAGS=-lwasi-emulated-signal                                              \
                 --prefix=${DEP_PREFIX}                                                      \
                 --host none                                                                 \
@@ -163,7 +165,7 @@ endif()
 if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
     download(${DEP_URL}/${OPENSSL_ARCHIVE} ${DEP_PREFIX}/${OPENSSL_ARCHIVE} ${OPENSSL_SHA256})
     message("building openssl")
-    set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY")
+    set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasi -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY")
     execute_process(
         WORKING_DIRECTORY ${DEP_PREFIX}
         COMMAND bash -c "\
@@ -196,7 +198,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libsecp256k1.a)
             && export CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"           \
             && export AR=${CMAKE_AR}                                                    \
             && export RANLIB=${CMAKE_RANLIB}                                            \
-            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} -DUSE_FORCE_WIDEMUL_INT64\"   \
+            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasi -DUSE_FORCE_WIDEMUL_INT64\"   \
             && ./configure --prefix=${DEP_PREFIX} --host=wasm32                         \
             && make -j                                                                  \
             && make -j install                                                          \

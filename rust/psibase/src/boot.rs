@@ -1,5 +1,5 @@
 use crate::services::{
-    account_sys, auth_ec_sys, common_sys, nft_sys, producer_sys, proxy_sys, psispace_sys,
+    account_sys, auth_ec_sys, common_sys, cpu_sys, nft_sys, producer_sys, proxy_sys, psispace_sys,
     setcode_sys, transaction_sys,
 };
 use crate::{
@@ -24,7 +24,7 @@ macro_rules! method {
     };
 }
 
-const ACCOUNTS: [AccountNumber; 26] = [
+const ACCOUNTS: [AccountNumber; 27] = [
     account_sys::SERVICE,
     account!("alice"),
     auth_ec_sys::SERVICE,
@@ -32,6 +32,7 @@ const ACCOUNTS: [AccountNumber; 26] = [
     account!("auth-inv-sys"),
     account!("bob"),
     common_sys::SERVICE,
+    cpu_sys::SERVICE,
     account!("doc-sys"),
     account!("explore-sys"),
     account!("fractal-sys"),
@@ -164,6 +165,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sgc!("auth-inv-sys", 0, "AuthInviteSys.wasm"),
         sgc!("common-sys", 0, "CommonSys.wasm"),
         sgc!("core-frac-sys", 0, "CoreFractalSys.wasm"),
+        sgc!("cpu-sys", 0b100100, "CpuSys.wasm"),
         sgc!("explore-sys", 0, "ExploreSys.wasm"),
         sgc!("fractal-sys", 0, "FractalSys.wasm"),
         sgc!("invite-sys", 0, "InviteSys.wasm"),

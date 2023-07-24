@@ -8,7 +8,7 @@ function(add suffix)
     add_custom_command(TARGET VerifyEcSys${suffix} POST_BUILD
         COMMAND wasm-ctor-eval
             -c prestart
-            --enable-bulk-memory
+            --enable-sign-ext --enable-nontrapping-float-to-int --enable-simd --enable-bulk-memory
             VerifyEcSys-prestart${suffix}.wasm
             -o ${ROOT_BINARY_DIR}/VerifyEcSys${suffix}.wasm
     )

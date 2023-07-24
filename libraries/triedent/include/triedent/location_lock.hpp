@@ -102,7 +102,7 @@ namespace triedent
       }
       std::atomic<int_type>        _mutex;
       std::atomic<int_type>        _wait_seq;
-      std::uint32_t                _waiting;
+      std::uint32_t                _waiting = 0;
       static constexpr std::size_t max_locks =
           (64 - sizeof(_waiting) - 2 * sizeof(_mutex)) / sizeof(object_id);
       object_id _locked_ids[max_locks];

@@ -84,6 +84,7 @@ This is the set of raw native functions (wasm imports). They are available for s
 
 - [psibase::raw::abortMessage]
 - [psibase::raw::call]
+- [psibase::raw::clockTimeGet]
 - [psibase::raw::getCurrentAction]
 - [psibase::raw::getKey]
 - [psibase::raw::getResult]
@@ -100,6 +101,7 @@ This is the set of raw native functions (wasm imports). They are available for s
 
 {{#cpp-doc ::psibase::raw::abortMessage}}
 {{#cpp-doc ::psibase::raw::call}}
+{{#cpp-doc ::psibase::raw::clockTimeGet}}
 {{#cpp-doc ::psibase::raw::getCurrentAction}}
 {{#cpp-doc ::psibase::raw::getKey}}
 {{#cpp-doc ::psibase::raw::getResult}}

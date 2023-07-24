@@ -1,6 +1,7 @@
 #include <psibase/dispatch.hpp>
 #include <services/system/AccountSys.hpp>
 #include <services/system/AuthAnySys.hpp>
+#include <services/system/CpuSys.hpp>
 #include <services/system/TransactionSys.hpp>
 
 #include <boost/container/flat_map.hpp>
@@ -293,6 +294,9 @@ namespace SystemService
                "transaction references non-existing block");
       }
 
+      Actor<CpuSys>     cpuSys(TransactionSys::service, CpuSys::service);
+      Actor<AccountSys> accountSys(TransactionSys::service, AccountSys::service);
+
       auto accountSysTables = AccountSys::Tables(AccountSys::service);
       auto accountTable     = accountSysTables.open<AccountTable>();
       auto accountIndex     = accountTable.getIndex<0>();
@@ -311,9 +315,13 @@ namespace SystemService
             Actor<AuthInterface> auth(TransactionSys::service, account->authService);
             uint32_t             flags = AuthInterface::topActionReq;
             if (&act == &trx.actions[0])
+            {
                flags |= AuthInterface::firstAuthFlag;
+               cpuSys.setCpuLimit(act.sender);
+            }
             if (args.checkFirstAuthAndExit)
                flags |= AuthInterface::readOnlyFlag;
+            // This can execute user defined code, so we must set the timer first
             auth.checkAuthSys(flags, psibase::AccountNumber{}, act, std::vector<ServiceMethod>{},
                               trx.claims);
          }
@@ -322,6 +330,13 @@ namespace SystemService
          if constexpr (enable_print)
             std::printf("call action\n");
          call(act);  // TODO: avoid copy (serializing)
+      }
+
+      check(!trx.actions.empty(), "transaction must have at least one action");
+      if (transactionSysStatus && transactionSysStatus->enforceAuth)
+      {
+         std::chrono::nanoseconds cpuUsage = cpuSys.getCpuTime();
+         accountSys.billCpu(trx.actions[0].sender, cpuUsage);
       }
    }
 

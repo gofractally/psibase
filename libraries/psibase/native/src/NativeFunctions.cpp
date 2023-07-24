@@ -6,6 +6,8 @@ namespace psibase
 {
    namespace
    {
+      inline constexpr uint16_t wasi_errno_inval = 28;
+
       template <typename F>
       auto timeDb(NativeFunctions& self, F f)
       {
@@ -339,16 +341,29 @@ namespace psibase
                                "' aborted with message: " + std::string(str.data(), str.size()));
    }
 
-   uint64_t NativeFunctions::getBillableTime()
+   int32_t NativeFunctions::clockTimeGet(uint32_t id, eosio::vm::argument_proxy<uint64_t*> time)
    {
-      // A more-accurate message is "only subjective services may
-      // call getBillableTime", but that may mislead service developers
-      // into thinking they should create a subjective service;
-      // they shouldn't.
-      check(code.flags & CodeRow::isSubjective,
-            "unprivileged services may not call getBillableTime");
+      check(code.flags & CodeRow::isSubjective, "only subjective services may call clockGetTime");
       clearResult(*this);
-      return transactionContext.getBillableTime().count();
+      std::chrono::nanoseconds result;
+      if (id == 0)
+      {  // CLOCK_REALTIME
+         result = std::chrono::system_clock::now().time_since_epoch();
+      }
+      else if (id == 1)
+      {  // CLOCK_MONOTONIC
+         result = std::chrono::steady_clock::now().time_since_epoch();
+      }
+      else if (id == 2 || id == 3)
+      {  // CLOCK_PROCESS_CPUTIME_ID or CLOCK_THREAD_CPUTIME_ID
+         result = transactionContext.getBillableTime();
+      }
+      else
+      {
+         return wasi_errno_inval;
+      }
+      *time = result.count();
+      return 0;
    }
 
    void NativeFunctions::setMaxTransactionTime(uint64_t nanoseconds)
@@ -356,6 +371,11 @@ namespace psibase
       check(code.flags & CodeRow::canSetTimeLimit,
             "setMaxTransactionTime requires canSetTimeLimit privilege");
       clearResult(*this);
+      // Ensure no overflow by capping the value. The exact value is not visible to
+      // wasm and does not affect consensus and there's no way a transaction can
+      // run for 300 years.
+      static constexpr uint64_t maxTransactionTime = INT64_MAX;
+      nanoseconds                                  = std::min(nanoseconds, maxTransactionTime);
       if (transactionContext.blockContext.isProducing)
          transactionContext.setWatchdog(
              std::chrono::duration_cast<std::chrono::steady_clock::duration>(
