@@ -303,13 +303,8 @@ namespace psibase::http
 
    bool is_admin(const http_config& cfg, beast::string_view host)
    {
+      host = deport(host);
       return std::visit([&](const auto& admin) { return is_admin(admin, cfg, host); }, cfg.admin);
-   }
-
-   template <class Body, class Allocator>
-   bool is_admin(const http_config& cfg, bhttp::request<Body, bhttp::basic_fields<Allocator>>& req)
-   {
-      return is_admin(cfg, deport(req.at(bhttp::field::host)));
    }
 
    // Returns the access mode and an indication of whether the request contains
@@ -424,6 +419,45 @@ namespace psibase::http
       return result;
    }
 
+   std::pair<beast::string_view, beast::string_view> parse_uri(beast::string_view uri)
+   {
+      if (uri.starts_with("http://"))
+      {
+         uri = uri.substr(7);
+      }
+      else if (uri.starts_with("https://"))
+      {
+         uri = uri.substr(8);
+      }
+      else
+      {
+         return {};
+      }
+      auto pos         = uri.find('/');
+      auto authority   = uri.substr(0, pos);
+      auto path        = pos == std::string::npos ? "/" : uri.substr(pos);
+      auto enduserinfo = authority.find('@');
+      auto host = enduserinfo == std::string::npos ? authority : authority.substr(enduserinfo + 1);
+      return {host, path};
+   }
+
+   // Returns the host and path for the request. See RFC 9112 § 3.2 and 3.3
+   template <typename Body, typename Allocator>
+   std::pair<beast::string_view, beast::string_view> parse_request_target(
+       const bhttp::request<Body, bhttp::basic_fields<Allocator>>& request)
+   {
+      auto target = request.target();
+      if (target.starts_with('/') || target == "*")
+      {
+         return {request[bhttp::field::host], target};
+      }
+      else
+      {
+         // We are not a proxy, so we don't need to support authority-form
+         return parse_uri(target);
+      }
+   }
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -433,9 +467,10 @@ namespace psibase::http
                        bhttp::request<Body, bhttp::basic_fields<Allocator>>&& req,
                        Send&&                                                 send)
    {
-      unsigned req_version    = req.version();
-      bool     req_keep_alive = req.keep_alive();
-      bool     req_allow_cors = !req.target().starts_with("/native/");
+      auto [req_host, req_target] = parse_request_target(req);
+      unsigned req_version        = req.version();
+      bool     req_keep_alive     = req.keep_alive();
+      bool     req_allow_cors     = !req_target.starts_with("/native/");
 
       const auto set_cors = [&server, req_allow_cors](auto& res)
       {
@@ -594,13 +629,12 @@ namespace psibase::http
       };
 
       // Used for requests that are not subject to CORS such as websockets
-      auto forbid_cross_origin = [&req, &send, &error]()
+      auto forbid_cross_origin = [&req, &req_host, &send, &error]()
       {
          if (auto iter = req.find(bhttp::field::origin); iter != req.end())
          {
-            const auto& host   = req[bhttp::field::host];
             const auto& origin = iter->value();
-            if (origin == "null" || remove_scheme(origin) != host)
+            if (origin == "null" || remove_scheme(origin) != req_host)
             {
                send(error(bhttp::status::bad_request, "Cross origin request refused"));
                return true;
@@ -640,14 +674,18 @@ namespace psibase::http
       try
       {
          std::shared_lock l{server.http_config->mutex};
-         if (!req.target().starts_with("/native"))
+         if (req_target == "")
          {
-            auto host = deport(req.at(bhttp::field::host));
+            return send(bad_request("Invalid request target"));
+         }
+         else if (!req_target.starts_with("/native"))
+         {
+            auto host = deport(req_host);
 
             if (auto iter = server.http_config->services.find(host);
                 iter != server.http_config->services.end())
             {
-               auto file = iter->second.find(req.target());
+               auto file = iter->second.find(req_target);
                if (file != iter->second.end())
                {
                   if (req.method() == bhttp::verb::options)
@@ -694,7 +732,7 @@ namespace psibase::http
                    method_not_allowed(req.target(), req.method_string(), "GET, POST, OPTIONS"));
             data.host        = {host.begin(), host.size()};
             data.rootHost    = server.http_config->host;
-            data.target      = std::string(req.target());
+            data.target      = std::string(req_target);
             data.contentType = (std::string)req[bhttp::field::content_type];
             data.body        = std::move(req.body());
 
@@ -748,7 +786,7 @@ namespace psibase::http
                          "The resource '" + std::string(req.target()) + "' was not found.\n"));
             return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
          }  // !native
-         else if (req.target() == "/native/push_boot" && server.http_config->push_boot_async)
+         else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
          {
             if (!server.http_config->enable_transactions)
                return send(not_found(req.target()));
@@ -800,7 +838,7 @@ namespace psibase::http
             send.pause_read = true;
             return;
          }  // push_boot
-         else if (req.target() == "/native/push_transaction" &&
+         else if (req_target == "/native/push_transaction" &&
                   server.http_config->push_transaction_async)
          {
             if (!server.http_config->enable_transactions)
@@ -863,7 +901,7 @@ namespace psibase::http
             send.pause_read = true;
             return;
          }  // push_transaction
-         else if (req.target() == "/native/p2p" && websocket::is_upgrade(req) &&
+         else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
                   !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
                   server.http_config->enable_p2p)
          {
@@ -874,9 +912,9 @@ namespace psibase::http
             send(websocket_upgrade{}, std::move(req), server.http_config->accept_p2p_websocket);
             return;
          }
-         else if (req.target() == "/native/admin/status")
+         else if (req_target == "/native/admin/status")
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -898,9 +936,9 @@ namespace psibase::http
                send(method_not_allowed(req.target(), req.method_string(), "GET"));
             }
          }
-         else if (req.target() == "/native/admin/shutdown")
+         else if (req_target == "/native/admin/shutdown")
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -920,9 +958,9 @@ namespace psibase::http
             server.http_config->shutdown(std::move(req.body()));
             return send(accepted());
          }
-         else if (req.target() == "/native/admin/perf" && server.http_config->get_perf)
+         else if (req_target == "/native/admin/perf" && server.http_config->get_perf)
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -939,9 +977,9 @@ namespace psibase::http
                 [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
                 { session->queue_(ok(make_result(), "application/json")); });
          }
-         else if (req.target() == "/native/admin/metrics" && server.http_config->get_metrics)
+         else if (req_target == "/native/admin/metrics" && server.http_config->get_metrics)
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -962,9 +1000,9 @@ namespace psibase::http
                           "application/openmetrics-text; version=1.0.0; charset=utf-8"));
                 });
          }
-         else if (req.target() == "/native/admin/peers" && server.http_config->get_peers)
+         else if (req_target == "/native/admin/peers" && server.http_config->get_peers)
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -997,9 +1035,9 @@ namespace psibase::http
                 });
             return;
          }
-         else if (req.target() == "/native/admin/connect" && server.http_config->connect)
+         else if (req_target == "/native/admin/connect" && server.http_config->connect)
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -1045,9 +1083,9 @@ namespace psibase::http
                 });
             return;
          }
-         else if (req.target() == "/native/admin/disconnect" && server.http_config->disconnect)
+         else if (req_target == "/native/admin/disconnect" && server.http_config->disconnect)
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -1093,9 +1131,9 @@ namespace psibase::http
                 });
             return;
          }
-         else if (req.target() == "/native/admin/log" && websocket::is_upgrade(req))
+         else if (req_target == "/native/admin/log" && websocket::is_upgrade(req))
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
                return send(not_found(req.target()));
             if (forbid_cross_origin())
                return;
@@ -1114,9 +1152,9 @@ namespace psibase::http
                     websocket_log_session<stream_type>::run(std::move(session));
                  });
          }
-         else if (req.target() == "/native/admin/config")
+         else if (req_target == "/native/admin/config")
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -1163,7 +1201,7 @@ namespace psibase::http
             }
             return;
          }
-         else if (req.target() == "/native/admin/keys")
+         else if (req_target == "/native/admin/keys")
          {
             if (req.method() == bhttp::verb::get)
             {
@@ -1209,9 +1247,9 @@ namespace psibase::http
             }
             return;
          }
-         else if (req.target() == "/native/admin/login")
+         else if (req_target == "/native/admin/login")
          {
-            if (!is_admin(*server.http_config, req))
+            if (!is_admin(*server.http_config, req_host))
             {
                return send(not_found(req.target()));
             }
@@ -1780,6 +1818,7 @@ namespace psibase::http
       {
          server.register_connection(this->shared_from_this());
          do_accept<Session>();
+         PSIBASE_LOG(logger, info) << "Listening on " << acceptor.local_endpoint();
          return true;
       }
 
