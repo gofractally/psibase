@@ -28,6 +28,15 @@ target_include_directories(psinode PUBLIC
     ../../services/psibase_tests)
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
+find_package(Python COMPONENTS Interpreter)
+if(Python_Interpreter_FOUND)
+    add_test(
+        NAME test_routing
+        COMMAND ${Python_EXECUTABLE} test_routing.py --psinode=$<TARGET_FILE:psinode>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    set_tests_properties(test_routing PROPERTIES PROCESSORS 7)
+endif()
+
 include(GNUInstallDirs)
 install(FILES config.in DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase COMPONENT ServerData)
 install(TARGETS psinode RUNTIME COMPONENT ServerBin)
