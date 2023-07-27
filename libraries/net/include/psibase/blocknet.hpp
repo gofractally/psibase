@@ -188,25 +188,25 @@ namespace psibase::net
             }
          }
          connection.hello_sent = true;
-         network().async_send_block(connection.id, connection.hello,
-                                    [this, &connection](const std::error_code& ec)
-                                    {
-                                       if (connection.closed)
-                                       {
-                                          connection.peer_ready = true;
-                                          disconnect(connection.id);
-                                          return;
-                                       }
-                                       else if (ec)
-                                       {
-                                          connection.peer_ready = true;
-                                       }
-                                       if (!connection.peer_ready)
-                                       {
-                                          // TODO: rate limit hellos, delay second hello until we have received the first peer hello
-                                          async_send_hello(connection);
-                                       }
-                                    });
+         network().async_send(connection.id, connection.hello,
+                              [this, &connection](const std::error_code& ec)
+                              {
+                                 if (connection.closed)
+                                 {
+                                    connection.peer_ready = true;
+                                    disconnect(connection.id);
+                                    return;
+                                 }
+                                 else if (ec)
+                                 {
+                                    connection.peer_ready = true;
+                                 }
+                                 if (!connection.peer_ready)
+                                 {
+                                    // TODO: rate limit hellos, delay second hello until we have received the first peer hello
+                                    async_send_hello(connection);
+                                 }
+                              });
       }
       void recv(peer_id origin, const HelloRequest& request)
       {
@@ -255,9 +255,9 @@ namespace psibase::net
          //std::cout << "ready: received=" << to_string(connection.last_received.id())
          //          << " common=" << to_string(connection.last_sent.id()) << std::endl;
          // FIXME: blocks and hellos need to be sequenced correctly
-         network().async_send_block(connection.id, HelloResponse{},
-                                    [this, &connection](const std::error_code&)
-                                    { async_send_fork(connection); });
+         network().async_send(connection.id, HelloResponse{},
+                              [this, &connection](const std::error_code&)
+                              { async_send_fork(connection); });
       }
       void recv(peer_id origin, const HelloResponse&)
       {
@@ -484,9 +484,9 @@ namespace psibase::net
             peer.last_sent  = {next_block_id, peer.last_sent.num() + 1};
             auto next_block = chain().get(next_block_id);
 
-            network().async_send_block(peer.id, BlockMessage{next_block},
-                                       [this, &peer](const std::error_code& e)
-                                       { async_send_fork(peer); });
+            network().async_send(peer.id, BlockMessage{next_block},
+                                 [this, &peer](const std::error_code& e)
+                                 { async_send_fork(peer); });
             consensus().post_send_block(peer.id, peer.last_sent.id());
          }
          else

@@ -3,12 +3,12 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/bft.hpp>
 #include <psibase/cft.hpp>
-#include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
 #include <psibase/log.hpp>
 #include <psibase/node.hpp>
 #include <psibase/peer_manager.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psibase/shortest_path_routing.hpp>
 #include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
@@ -1473,7 +1473,7 @@ void run(const std::string&              db_path,
    }
 #endif
 
-   using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
+   using node_type = node<peer_manager, shortest_path_routing, consensus, ForkDb>;
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
    node.load_producers();

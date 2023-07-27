@@ -15,7 +15,7 @@ struct basic_fuzz_routing : psibase::net::message_serializer<Derived>
       _network->recv(message);
    }
    template <typename Msg, typename F>
-   void async_send_block(psibase::net::peer_id id, const Msg& msg, F&& f)
+   void async_send(psibase::net::peer_id id, const Msg& msg, F&& f)
    {
       if (peer != id)
       {

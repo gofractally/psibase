@@ -70,7 +70,7 @@ namespace psibase::net
          }
       }
       template <typename Msg, typename F>
-      void async_send_block(peer_id id, const Msg& msg, F&& f)
+      void async_send(peer_id id, const Msg& msg, F&& f)
       {
          auto peer = _peers.find(id);
          if (peer == _peers.end())

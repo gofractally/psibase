@@ -149,11 +149,19 @@ namespace psibase::net
       explicit shortest_path_routing(boost::asio::io_context& ctx) : base_type(ctx) {}
 
       template <typename Msg>
-      void multicastPeers(const Msg& msg)
+      void multicast(const Msg& msg)
       {
          for (const auto& [peer, _] : neighborTable)
          {
             async_send(peer, msg);
+         }
+      }
+      template <typename Msg>
+      void multicast_producers(const Msg& msg)
+      {
+         for (const auto& [producer, peer] : selectedRoutes)
+         {
+            sendto(producer, msg);
          }
       }
       template <typename Msg>
@@ -261,7 +269,7 @@ namespace psibase::net
             {
                pos->second = feasibility;
             }
-            multicastPeers(RouteUpdateMessage{route.first.producer, route.second.seqno, metric});
+            multicast(RouteUpdateMessage{route.first.producer, route.second.seqno, metric});
          }
       }
       void selectRoute(producer_id producer, peer_id updated)
@@ -290,7 +298,7 @@ namespace psibase::net
          else if (selectedRoutes.erase(producer) != 0)
          {
             sendSeqnoRequest(producer);
-            multicastPeers(RouteUpdateMessage{producer, {}, RouteMetric::infinite});
+            multicast(RouteUpdateMessage{producer, {}, RouteMetric::infinite});
          }
       }
       void sendSeqnoRequest(producer_id producer)
@@ -298,7 +306,7 @@ namespace psibase::net
          auto iter = sourceTable.find(producer);
          if (iter != sourceTable.end())
          {
-            multicastPeers(RouteSeqnoRequest{producer, iter->second.seqno + 1});
+            multicast(RouteSeqnoRequest{producer, iter->second.seqno + 1});
          }
       }
       void recv(peer_id peer, const RouteUpdateMessage& msg)
@@ -387,7 +395,7 @@ namespace psibase::net
          if (now - lastSeqnoUpdate > minSeqnoUpdateInterval)
          {
             seqno = seqno + 1;
-            multicastPeers(RouteUpdateMessage{consensus().producer_name(), seqno, 0});
+            multicast(RouteUpdateMessage{consensus().producer_name(), seqno, 0});
             lastSeqnoUpdate = now;
          }
       }

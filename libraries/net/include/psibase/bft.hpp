@@ -899,11 +899,11 @@ namespace psibase::net
          {
             for (const auto& msg : iter->second.prepares)
             {
-               network().async_send_block(peer, msg, [](const std::error_code&) {});
+               network().async_send(peer, msg, [](const std::error_code&) {});
             }
             for (const auto& msg : iter->second.commits)
             {
-               network().async_send_block(peer, msg, [](const std::error_code&) {});
+               network().async_send(peer, msg, [](const std::error_code&) {});
             }
          }
       }
@@ -983,7 +983,7 @@ namespace psibase::net
             {
                if (msg)
                {
-                  network().async_send_block(peer, *msg, [](const std::error_code&) {});
+                  network().async_send(peer, *msg, [](const std::error_code&) {});
                }
             }
          }
@@ -1036,7 +1036,7 @@ namespace psibase::net
             assert(response->data->producer().unpack() == msg.data->producer().unpack());
             assert(response->data->term() > msg.data->term());
             // If we have a newer view than the sender, reply with our view
-            network().async_send_block(peer, *response, [](const std::error_code&) {});
+            network().async_send(peer, *response, [](const std::error_code&) {});
          }
          if (current_term != saved_term)
          {
@@ -1052,7 +1052,7 @@ namespace psibase::net
             {
                if (msg)
                {
-                  network().async_send_block(peer, *msg, [](const std::error_code&) {});
+                  network().async_send(peer, *msg, [](const std::error_code&) {});
                }
             }
          }
