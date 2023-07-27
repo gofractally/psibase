@@ -272,9 +272,17 @@ namespace psibase::net
       }
       bool is_sole_producer() const
       {
-         return ((active_producers[0]->size() == 0 && self != AccountNumber()) ||
-                 (active_producers[0]->size() == 1 && active_producers[0]->isProducer(self))) &&
-                !active_producers[1];
+         if (self == AccountNumber())
+         {
+            return false;
+         }
+         if (active_producers[1])
+         {
+            if (active_producers[1]->size() != 1 || !active_producers[1]->isProducer(self))
+               return false;
+         }
+         return active_producers[0]->size() == 0 ||
+                (active_producers[0]->size() == 1 && active_producers[1]->isProducer(self));
       }
       bool is_producer() const
       {
@@ -406,11 +414,18 @@ namespace psibase::net
                       // to rely on the invariant that there is an active block
                       // iff _state == leader.
                       start_leader();
+                      // If a new consensus was set while building this block,
+                      // our current producers might be out-dated
+                      if (b->info.header.newConsensus)
+                      {
+                         consensus().set_producers({b->producers, b->nextProducers});
+                      }
                       // on_produce_block and on_fork_switch should both run
                       // before set_producers, because they should see the
                       // producers of this of this block.
                       consensus().on_produce_block(b);
                       consensus().on_fork_switch(&b->info.header);
+                      // Set tentative producers for the next block
                       consensus().set_producers(chain().getProducers());
                       // do_gc needs to run after on_fork_switch, because
                       // on_fork_switch is responsible for cleaning up any

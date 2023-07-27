@@ -360,7 +360,7 @@ namespace psibase::net
       void randomize_timer()
       {
          // Don't bother waiting if we're the only producer
-         if (active_producers[0]->size() <= 1 && !active_producers[1])
+         if (this->is_sole_producer())
          {
             if (_state == producer_state::follower)
             {
