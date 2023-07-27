@@ -19,13 +19,42 @@ struct ProducerQuery
 {
    std::vector<Producer> producers() const
    {
+      return std::visit([](const auto& c) { return c.producers; }, consensus());
+   }
+   std::vector<Producer> nextProducers() const
+   {
+      if (auto c = nextConsensus())
+         return std::visit([](const auto& c) { return c.producers; }, *c);
+      return {};
+   }
+   Consensus consensus() const
+   {
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
       if (!status)
          return {};
-      return std::visit([](const auto& c) { return c.producers; }, status->consensus);
+      return std::move(status->consensus);
+   }
+   std::optional<Consensus> nextConsensus() const
+   {
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      if (!status || !status->nextConsensus)
+         return {};
+      return std::move(std::get<0>(*status->nextConsensus));
+   }
+   std::optional<BlockNum> jointStart() const
+   {
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      if (!status || !status->nextConsensus)
+         return {};
+      return std::get<1>(*status->nextConsensus);
    }
 };
-PSIO_REFLECT(ProducerQuery, method(producers))
+PSIO_REFLECT(ProducerQuery,
+             method(producers),
+             method(nextProducers),
+             method(consensus),
+             method(nextConsensus),
+             method(jointStart))
 
 std::optional<HttpReply> RProducerSys::serveSys(HttpRequest request)
 {
