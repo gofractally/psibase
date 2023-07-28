@@ -38,28 +38,40 @@ class _LocalAdapter(requests.adapters.HTTPAdapter):
         self.poolmanager = _LocalPoolManager(num_pools=connections, maxsize=maxsize, block=block, socketpath=self.socketpath)
 
 class Cluster(object):
-    def __init__(self, executable='psinode', dir=None):
+    def __init__(self, dir=None, **node_kw):
         if dir is None:
             self.tempdir = tempfile.TemporaryDirectory()
             self.dir = self.tempdir.name
         else:
             self.dir = dir
         self.next_id = 0
-        self.executable = executable
+        self.node_kw = node_kw
+        self.nodes = {}
     def start(self, name=None, **kw):
         if name is None:
             self.next_id = self.next_id + 1
             hostname = str(self.next_id)
         else:
             hostname = name
-        return Node(self.executable, dir=os.path.join(self.dir, hostname), hostname=hostname, producer=name, **kw)
-    def ring(self, *names):
-        nodes = [self.start(name) for name in names]
+        for (k,v) in self.node_kw.items():
+            kw.setdefault(k, v)
+        result = Node(dir=os.path.join(self.dir, hostname), hostname=hostname, producer=name, **kw)
+        self.nodes[hostname] = result
+        return result
+    def ring(self, *names, **kw):
+        nodes = [self.start(name, **kw) for name in names]
         prev = nodes[-1]
         for node in nodes:
             prev.connect(node)
             prev = node
         return tuple(nodes)
+    def __enter__(self):
+        if hasattr(self, 'tempdir'):
+            self.tempdir.__enter__()
+        return self
+    def __exit__(self, exc_type, exc_value, traceback):
+        if hasattr(self, 'tempdir'):
+            self.tempdir.__exit__(exc_type, exc_value, traceback)
 
 def _get_producer_claim(producer):
     if isinstance(producer, str):
@@ -200,14 +212,43 @@ class API:
         else:
             return edges[0]['node']['header']
 
+_default_config = '''# psinode config
+service  = localhost:$PSIBASE_DATADIR/services/admin-sys
+service  = 127.0.0.1:$PSIBASE_DATADIR/services/admin-sys
+service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
+service  = admin-sys.:$PSIBASE_DATADIR/services/admin-sys
+admin    = static:*
+
+admin-authz = r:any
+admin-authz = rw:loopback
+
+[logger.stderr]
+type   = console
+filter = %s
+format = %s
+'''
+_default_log_filter = 'Severity >= info'
+_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}'
+
+def _write_config(dir, log_filter, log_format):
+    logfile = os.path.join(dir, 'config')
+    if not os.path.exists(logfile):
+        if log_filter is None:
+            log_filter = _default_log_filter
+        if log_format is None:
+            log_format = _default_log_format
+        with open(logfile, 'x') as f:
+            f.write(_default_config % (log_filter, log_format))
+
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[]):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None):
         if dir is None:
             self.tempdir = tempfile.TemporaryDirectory()
             self.dir = self.tempdir.name
         else:
             self.dir = dir
         self.executable = executable
+        self.hostname = hostname
         self.producer = producer
         self.socketpath = os.path.join(self.dir, 'socket')
         self.logpath = os.path.join(self.dir, 'psinode.log')
@@ -215,6 +256,7 @@ class Node(API):
         session.mount('http://', _LocalAdapter(self.socketpath))
         super().__init__('http://%s/' % hostname, session)
         os.makedirs(self.dir, exist_ok=True)
+        _write_config(self.dir, log_filter, log_format)
         args = [self.executable, "-l", self.socketpath]
         if isinstance(listen, str):
             listen = [listen]
@@ -227,7 +269,8 @@ class Node(API):
         if p2p:
             args.append('--p2p')
         args.append(self.dir)
-        self.child = subprocess.Popen(args, stderr=open(self.logpath, 'w'))
+        with open(self.logpath, 'w') as logfile:
+            self.child = subprocess.Popen(args, stderr=logfile)
         self._wait_for_startup()
 
     def __del__(self):
@@ -255,6 +298,22 @@ class Node(API):
         else:
             url = other
         self.post('/native/admin/connect', service='admin-sys', json={'url':url})
+    def disconnect(self, other):
+        '''Disconnects a peer. other can be a peer id, a URL, or a Node object.'''
+        if isinstance(other, int):
+            result = self.post('/native/admin/disconnect', service='admin-sys', json={'id': other})
+            result.raise_for_status()
+            return True
+        elif isinstance(other, str):
+            peers = self.get('/native/admin/peers', service='admin-sys')
+            peers.raise_for_status()
+            for peer in peers.json():
+                if peer['url'] == other:
+                    return self.disconnect(int(peer['id']))
+            return False
+        else:
+            return self.disconnect(other.socketpath) or other.disconnect(self.socketpath)
+
     def boot(self, producer=None, doc=False):
         self._find_psibase()
         if producer is None:
@@ -274,6 +333,9 @@ class Node(API):
         self.wait(isbooted)
     def log(self):
         return open(self.logpath, 'r')
+    def print_log(self):
+        for line in self.log().readlines():
+            print(line, end='')
     def _find_psibase(self):
         if not hasattr(self, 'psibase'):
             dirname = os.path.dirname(self.executable)
