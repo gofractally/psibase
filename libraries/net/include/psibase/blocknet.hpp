@@ -282,7 +282,7 @@ namespace psibase::net
                return false;
          }
          return active_producers[0]->size() == 0 ||
-                (active_producers[0]->size() == 1 && active_producers[1]->isProducer(self));
+                (active_producers[0]->size() == 1 && active_producers[0]->isProducer(self));
       }
       bool is_producer() const
       {
@@ -606,7 +606,7 @@ namespace psibase::net
       void                             on_erase_block(const Checksum256&) {}
       void                             set_producers(auto prods)
       {
-         if (prods.first->size() != 0 || prods.second)
+         if (prods.first->size() != 0)
             throw std::runtime_error("Consensus algorithm not available");
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
