@@ -46,7 +46,23 @@ struct mock_consensus
    explicit mock_consensus(boost::asio::io_context&) {}
    using message_type = std::variant<message1>;
    AccountNumber producer_name() const { return producer; }
-   void          set_producer_id(AccountNumber account) { producer = account; }
+   void          set_producer_id(AccountNumber account)
+   {
+      producer = account;
+      if (active_producers)
+      {
+         static_cast<Derived*>(this)->network().on_producer_change();
+      }
+   }
+   void set_producers(std::set<AccountNumber> prods)
+   {
+      active_producers = std::move(prods);
+      static_cast<Derived*>(this)->network().on_producer_change();
+   }
+   bool is_producer(AccountNumber account) const
+   {
+      return !active_producers || active_producers->count(account) != 0;
+   }
 
    void connect(peer_id id) {}
    void disconnect(peer_id id) {}
@@ -65,6 +81,8 @@ struct mock_consensus
    std::vector<message1> _recv_queue;
    AccountNumber         producer;
    std::string           name = "<anonymous node>";
+   //
+   std::optional<std::set<AccountNumber>> active_producers;
 };
 
 using node_type = node<peer_manager, shortest_path_routing, mock_consensus, int>;
@@ -98,6 +116,7 @@ struct TestNode : node_type
    TestNode(boost::asio::io_context& ctx, const std::string& name) : node_type(ctx), ctx(ctx)
    {
       this->name = name;
+      this->network().logger.add_attribute("Host", boost::log::attributes::constant(name));
    }
    ~TestNode() { disconnect_all(false); }
    boost::asio::io_context& ctx;
@@ -159,6 +178,33 @@ TEST_CASE("cycle")
    ctx.run();
    ctx.restart();
    CHECK(node3.consume() == std::vector{message1{7}});
+}
+
+TEST_CASE("producers only")
+{
+   boost::asio::io_context ctx;
+   TestNode                node1(ctx, "a"), node2(ctx, "b"), node3(ctx, "c");
+   node3.set_producer_id(AccountNumber{"c"});
+   connect(node1, node2);
+   connect(node2, node3);
+   node2.set_producers({});
+   ctx.run();
+   ctx.restart();
+
+   // node2 should not route message to c
+   node1.network().sendto(AccountNumber{"c"}, message1{42});
+   ctx.run();
+   ctx.restart();
+   CHECK(node3.consume() == std::vector<message1>{});
+
+   // making node2 recognize c as a producer allows routing
+   node2.set_producers({AccountNumber{"c"}});
+   ctx.run();
+   ctx.restart();
+   node1.network().sendto(AccountNumber{"c"}, message1{42});
+   ctx.run();
+   ctx.restart();
+   CHECK(node3.consume() == std::vector{message1{42}});
 }
 
 struct ConsoleLog

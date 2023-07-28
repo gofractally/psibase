@@ -98,6 +98,13 @@ namespace psibase::net
    };
    PSIO_REFLECT(RouteSeqnoRequest, producer, seqno, ttl)
 
+   struct RequestRoutesMessage
+   {
+      static constexpr unsigned type = 6;
+      std::string               to_string() const { return "request routes"; }
+   };
+   PSIO_REFLECT(RequestRoutesMessage)
+
    struct RoutingEnvelope
    {
       static constexpr unsigned type = 3;
@@ -146,7 +153,10 @@ namespace psibase::net
          std::chrono::steady_clock::time_point time;
       };
 
-      explicit shortest_path_routing(boost::asio::io_context& ctx) : base_type(ctx) {}
+      explicit shortest_path_routing(boost::asio::io_context& ctx) : base_type(ctx)
+      {
+         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
+      }
 
       template <typename Msg>
       void multicast(const Msg& msg)
@@ -173,19 +183,7 @@ namespace psibase::net
       {
          base_type::connect(peer);
          neighborTable.try_emplace(peer, NeighborData{RouteMetric{1}});
-         for (const auto& [producer, nextPeer] : selectedRoutes)
-         {
-            auto route = routeTable.find(RouteKey{producer, nextPeer});
-            if (route != routeTable.end())
-            {
-               async_send(peer,
-                          RouteUpdateMessage{producer, route->second.seqno, getMetric(*route)});
-            }
-         }
-         if (auto self = consensus().producer_name(); self != AccountNumber{})
-         {
-            async_send(peer, RouteUpdateMessage{self, seqno, RouteMetric{0}});
-         }
+         send_routes(peer);
          consensus().connect(peer);
       }
       void disconnect(peer_id peer)
@@ -212,6 +210,66 @@ namespace psibase::net
                selectRoute(producer, peer);
             }
          }
+      }
+      void send_routes(peer_id peer)
+      {
+         for (const auto& [producer, nextPeer] : selectedRoutes)
+         {
+            auto route = routeTable.find(RouteKey{producer, nextPeer});
+            if (route != routeTable.end())
+            {
+               async_send(peer,
+                          RouteUpdateMessage{producer, route->second.seqno, getMetric(*route)});
+            }
+         }
+         if (auto self = consensus().producer_name(); consensus().is_producer(self))
+         {
+            async_send(peer, RouteUpdateMessage{self, seqno, RouteMetric{0}});
+         }
+      }
+      void on_producer_change()
+      {
+         PSIBASE_LOG(logger, debug) << "Cleaning up routes to inactive producers";
+         // purge out-dated routes
+         auto self = consensus().producer_name();
+         for (auto iter = selectedRoutes.begin(), end = selectedRoutes.end(); iter != end;)
+         {
+            if (consensus().is_producer(iter->first) && iter->first != self)
+            {
+               ++iter;
+            }
+            else
+            {
+               iter = selectedRoutes.erase(iter);
+            }
+         }
+         for (auto iter = routeTable.begin(), end = routeTable.end(); iter != end;)
+         {
+            auto next = routeTable.upper_bound(iter->first.producer);
+            if (!consensus().is_producer(iter->first.producer) || iter->first.producer == self)
+            {
+               routeTable.erase(iter, next);
+            }
+            iter = next;
+         }
+         for (auto iter = sourceTable.begin(), end = sourceTable.end(); iter != end;)
+         {
+            if (consensus().is_producer(iter->first) && iter->first != self)
+            {
+               ++iter;
+            }
+            else
+            {
+               iter = sourceTable.erase(iter);
+            }
+         }
+         // If we became a producer, we need to establish a new route
+         if (consensus().is_producer(self))
+         {
+            multicast(RouteUpdateMessage{self, seqno, RouteMetric{0}});
+         }
+         // Sync our routing table with all peers
+         multicast(RequestRoutesMessage{});
       }
       bool isFeasible(std::pair<const RouteKey, RouteData>& route)
       {
@@ -316,6 +374,12 @@ namespace psibase::net
          {
             return;
          }
+         if (!consensus().is_producer(msg.producer))
+         {
+            PSIBASE_LOG(peers().logger(peer), debug)
+                << "Ignoring route because " << msg.producer.str() << " is not an active producer";
+            return;
+         }
          auto iter = routeTable.find(RouteKey{msg.producer, peer});
          if (iter == routeTable.end())
          {
@@ -329,6 +393,11 @@ namespace psibase::net
          {
             updateRoute(*iter, msg);
          }
+      }
+      void recv(peer_id peer, const RequestRoutesMessage& msg)
+      {
+         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
+         send_routes(peer);
       }
       RouteUpdateMessage makeUpdate(producer_id producer)
       {
@@ -358,7 +427,8 @@ namespace psibase::net
          }
       }
 
-      using message_type = std::variant<RouteUpdateMessage, RouteSeqnoRequest, RoutingEnvelope>;
+      using message_type = std::
+          variant<RouteUpdateMessage, RouteSeqnoRequest, RequestRoutesMessage, RoutingEnvelope>;
 
       void recv(peer_id peer, const RouteSeqnoRequest& msg)
       {
@@ -455,5 +525,7 @@ namespace psibase::net
       std::map<producer_id, peer_id>             selectedRoutes;
 
       std::map<producer_id, CachedSeqnoRequest> recentSeqnoRequests;
+
+      loggers::common_logger logger;
    };
 }  // namespace psibase::net

@@ -9,6 +9,7 @@ struct basic_fuzz_routing : psibase::net::message_serializer<Derived>
    {
       logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
    }
+   void on_producer_change() {}
    void send(const auto& message)
    {
       PSIBASE_LOG(logger, debug) << "Send message: " << message.to_string() << std::endl;

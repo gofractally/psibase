@@ -293,6 +293,13 @@ namespace psibase::net
                 active_producers[0]->isProducer(self) ||
                 (active_producers[1] && active_producers[1]->isProducer(self));
       }
+      bool is_producer(AccountNumber account) const
+      {
+         return (active_producers[0]->size() == 0 && account != AccountNumber() &&
+                 !active_producers[1]) ||
+                active_producers[0]->isProducer(account) ||
+                (active_producers[1] && active_producers[1]->isProducer(account));
+      }
       producer_id producer_name() const { return self; }
 
       void set_producer_id(producer_id prod)
@@ -309,6 +316,7 @@ namespace psibase::net
                // I believe that this is safe because the fact that it's
                // still the same node guarantees that the hand-off is atomic.
                consensus().set_producers({active_producers[0], active_producers[1]});
+               network().on_producer_change();
                // set_producers may abort the current block,
                // if we are no longer an active producer
                switch_fork();
@@ -414,11 +422,13 @@ namespace psibase::net
                       // to rely on the invariant that there is an active block
                       // iff _state == leader.
                       start_leader();
+                      bool updatedProducers = false;
                       // If a new consensus was set while building this block,
                       // our current producers might be out-dated
                       if (b->info.header.newConsensus)
                       {
                          consensus().set_producers({b->producers, b->nextProducers});
+                         updatedProducers = true;
                       }
                       // on_produce_block and on_fork_switch should both run
                       // before set_producers, because they should see the
@@ -426,7 +436,15 @@ namespace psibase::net
                       consensus().on_produce_block(b);
                       consensus().on_fork_switch(&b->info.header);
                       // Set tentative producers for the next block
-                      consensus().set_producers(chain().getProducers());
+                      if (b->endsJointConsensus())
+                      {
+                         consensus().set_producers({b->nextProducers, nullptr});
+                         updatedProducers = true;
+                      }
+                      if (updatedProducers)
+                      {
+                         network().on_producer_change();
+                      }
                       // do_gc needs to run after on_fork_switch, because
                       // on_fork_switch is responsible for cleaning up any
                       // pointers that will become dangling.
@@ -579,7 +597,13 @@ namespace psibase::net
                    PSIBASE_LOG(logger, debug) << "New head block";
                 }
                 // TODO: only run set_producers when the producers actually changed
-                consensus().set_producers(chain().getProducers());
+                auto producers = chain().getProducers();
+                if (producers.first != active_producers[0] ||
+                    producers.second != active_producers[1])
+                {
+                   consensus().set_producers(std::move(producers));
+                   network().on_producer_change();
+                }
                 if (_state == producer_state::leader &&
                     chain().getBlockContext()->current.header.previous != head.blockId)
                 {

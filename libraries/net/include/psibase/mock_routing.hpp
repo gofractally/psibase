@@ -29,6 +29,7 @@ namespace psibase::net
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
       }
+      void on_producer_change() {}
       void post_recv(peer_id origin, const auto& msg)
       {
          ctx.post(

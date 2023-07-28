@@ -221,8 +221,9 @@ namespace psibase
             std::ranges::set_difference(prevKeys, nextKeys, std::back_inserter(removed));
             std::ranges::set_difference(nextKeys, prevKeys, std::back_inserter(added));
             auto code = makeCodeIndex(&header);
-            check(std::ranges::includes(nextKeys, code | std::views::transform([
-                                                  ](auto& arg) -> auto& { return arg.first; })),
+            check(std::ranges::includes(
+                      nextKeys,
+                      code | std::views::transform([](auto& arg) -> auto& { return arg.first; })),
                   "Wrong code");
             Database db{systemContext->sharedDatabase, prev.revision};
             auto     session = db.startWrite(writer);
@@ -311,9 +312,7 @@ namespace psibase
             nextProducersBlockNum(prev.nextProducersBlockNum)
       {
          // Handling of the producer schedule must match BlockContext::writeRevision
-         // Note: technically we could use this block's commitNum instead of the
-         // previous block's commitNum, but that complicates the producer hand-off.
-         if (nextProducers && prev.info.header.commitNum >= nextProducersBlockNum)
+         if (prev.endsJointConsensus())
          {
             producers = std::move(nextProducers);
          }
@@ -350,6 +349,10 @@ namespace psibase
          Database db{systemContext->sharedDatabase, revision};
          auto     session = db.startRead();
          authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info);
+      }
+      bool endsJointConsensus() const
+      {
+         return nextProducers && info.header.commitNum >= nextProducersBlockNum;
       }
       // Returns the claim for an immediate successor of this block
       std::optional<Claim> getNextProducerClaim(AccountNumber producer)
@@ -840,7 +843,7 @@ namespace psibase
       bool is_complete_chain(const id_type& id) { return get_state(id) != nullptr; }
       std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> getProducers()
       {
-         if (head->nextProducers && head->info.header.commitNum >= head->nextProducersBlockNum)
+         if (head->endsJointConsensus())
          {
             return {head->nextProducers, nullptr};
          }
