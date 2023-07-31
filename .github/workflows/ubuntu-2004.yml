@@ -46,8 +46,8 @@ jobs:
           echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
           export SCCACHE_CACHE_SIZE=200M
           export RUSTC_WRAPPER=sccache
-          export LLVM_CONFIG_PATH=/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/llvm-config
-          export LD_LIBRARY_PATH=/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/lib/
+          export LLVM_CONFIG_PATH=/opt/clang+llvm-15.0.6/bin/llvm-config
+          export LD_LIBRARY_PATH=/opt/clang+llvm-15.0.6/lib/
           export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER -e LLVM_CONFIG_PATH -e LD_LIBRARY_PATH --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
           export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER -e LLVM_CONFIG_PATH -e LD_LIBRARY_PATH ${UBUNTU_2004_IMAGE}"
           docker pull ${UBUNTU_2004_IMAGE}
