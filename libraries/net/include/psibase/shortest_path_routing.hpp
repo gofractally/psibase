@@ -521,7 +521,7 @@ namespace psibase::net
          auto [begin, end] = routeTable.equal_range(producer);
          return std::ranges::subrange(begin, end);
       }
-      SequenceNumber                             seqno;
+      SequenceNumber                             seqno = {};
       std::chrono::steady_clock::time_point      lastSeqnoUpdate;
       std::map<peer_id, NeighborData>            neighborTable;
       std::map<RouteKey, RouteData, std::less<>> routeTable;
