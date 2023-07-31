@@ -334,8 +334,9 @@ class Node(API):
     def log(self):
         return open(self.logpath, 'r')
     def print_log(self):
-        for line in self.log().readlines():
-            print(line, end='')
+        with self.log() as f:
+            for line in f.readlines():
+                print(line, end='')
     def _find_psibase(self):
         if not hasattr(self, 'psibase'):
             dirname = os.path.dirname(self.executable)
