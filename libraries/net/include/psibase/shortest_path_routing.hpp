@@ -203,12 +203,15 @@ namespace psibase::net
             }
          }
          neighborTable.erase(peer);
-         for (auto [producer, selected] : selectedRoutes)
+         for (auto iter = selectedRoutes.begin(), end = selectedRoutes.end(); iter != end;)
          {
-            if (selected == peer)
+            auto next = iter;
+            ++next;
+            if (iter->second == peer)
             {
-               selectRoute(producer, peer);
+               selectRoute(iter->first, iter->second);
             }
+            iter = next;
          }
       }
       void send_routes(peer_id peer)
@@ -355,6 +358,7 @@ namespace psibase::net
          }
          else if (selectedRoutes.erase(producer) != 0)
          {
+            PSIBASE_LOG(logger, info) << "No feasible route to " << producer.str();
             sendSeqnoRequest(producer);
             multicast(RouteUpdateMessage{producer, {}, RouteMetric::infinite});
          }
