@@ -1,9 +1,15 @@
 import calendar
 import time
 
+def _get_producer_name(prod):
+    if isinstance(prod, str):
+        return prod
+    else:
+        return prod.producer
+
 def producers_are(expected):
+    expected = [_get_producer_name(p) for p in expected]
     print("waiting for producers: %s" % expected)
-    expected = expected.copy()
     expected.sort()
     def result(node):
         (prods, nextProds) = node.get_producers()

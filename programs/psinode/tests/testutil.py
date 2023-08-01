@@ -1,4 +1,5 @@
 from psinode import Cluster
+import predicates
 import argparse
 import unittest
 import sys
@@ -18,6 +19,19 @@ def psinode_test(f):
                         if hostname in args.print_logs or 'all' in args.print_logs:
                             node.print_log()
     return result
+
+def generate_names(n):
+    letters = 'abcdefghijklmnopqrstuvwxyz'
+    return list(letters[0:n])
+
+def boot_with_producers(nodes):
+    p = nodes[0]
+    print("booting chain")
+    p.boot()
+    print("setting producers")
+    p.set_producers(nodes, 'cft')
+    p.wait(predicates.producers_are(nodes))
+    return p
 
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()

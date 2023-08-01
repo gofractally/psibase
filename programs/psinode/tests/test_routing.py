@@ -11,13 +11,8 @@ class TestRouting(unittest.TestCase):
     def test_routing(self, cluster):
         # Each node is adjacent to two others. With 7 nodes, consensus
         # requires 4 nodes, so this test will time out if messages are not routed
-        (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
-
-        print("booting chain")
-        a.boot()
-        print("setting producers")
-        a.set_producers([a, b, c, d, e, f, g], 'cft')
-        a.wait(producers_are(['a', 'b', 'c', 'd', 'e', 'f', 'g']))
+        prods = cluster.ring(*testutil.generate_names(7))
+        a = testutil.boot_with_producers(prods)
 
         # wait for irreversibility to advance
         a.wait(new_block())
@@ -36,12 +31,7 @@ class TestRouting(unittest.TestCase):
         # Each node is a adjacent to two others. With 7 nodes, consensus
         # requires 4 nodes, so this test will time out if messages are not routed
         (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
-
-        print("booting chain")
-        a.boot()
-        print("setting producers")
-        a.set_producers([a, b, c, d, e, f, g], 'cft')
-        a.wait(producers_are(['a', 'b', 'c', 'd', 'e', 'f', 'g']))
+        testutil.boot_with_producers([a, b, c, d, e, f, g])
 
         # wait for irreversibility to advance
         a.wait(new_block())

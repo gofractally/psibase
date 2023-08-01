@@ -38,7 +38,14 @@ class _LocalAdapter(requests.adapters.HTTPAdapter):
         self.poolmanager = _LocalPoolManager(num_pools=connections, maxsize=maxsize, block=block, socketpath=self.socketpath)
 
 class Cluster(object):
+    '''Manages a cluster of psinode servers.'''
     def __init__(self, dir=None, **node_kw):
+        '''
+        Creates a new Cluster.
+
+        If dir is None, the cluster will use a temporary directory.
+        Addition keyword arguments will be used to construct every node.
+        '''
         if dir is None:
             self.tempdir = tempfile.TemporaryDirectory()
             self.dir = self.tempdir.name
@@ -47,7 +54,12 @@ class Cluster(object):
         self.next_id = 0
         self.node_kw = node_kw
         self.nodes = {}
-    def start(self, name=None, **kw):
+    def make_node(self, name=None, **kw):
+        '''
+        Creates a new Node in this cluster.
+
+        If a name is not provided, the node will be a non-producing node.
+        '''
         if name is None:
             self.next_id = self.next_id + 1
             hostname = str(self.next_id)
@@ -58,18 +70,35 @@ class Cluster(object):
         result = Node(dir=os.path.join(self.dir, hostname), hostname=hostname, producer=name, **kw)
         self.nodes[hostname] = result
         return result
+    def star(self, *names, **kw):
+        '''Create a star graph with the first node in the center'''
+        nodes = [self.make_node(name, **kw) for name in names]
+        center = nodes[0]
+        for node in nodes[1:]:
+            node.connect(center)
+        return tuple(nodes)
     def ring(self, *names, **kw):
-        nodes = [self.start(name, **kw) for name in names]
+        '''Creates nodes connected in a ring'''
+        nodes = [self.make_node(name, **kw) for name in names]
         prev = nodes[-1]
         for node in nodes:
             prev.connect(node)
             prev = node
+        return tuple(nodes)
+    def complete(self, *names, **kw):
+        '''Creates a fully connected group of nodes'''
+        nodes = [self.make_node(name, **kw) for name in names]
+        for a in nodes:
+            for b in nodes:
+                a.connect(b)
         return tuple(nodes)
     def __enter__(self):
         if hasattr(self, 'tempdir'):
             self.tempdir.__enter__()
         return self
     def __exit__(self, exc_type, exc_value, traceback):
+        for child in self.nodes.values():
+            child.close()
         if hasattr(self, 'tempdir'):
             self.tempdir.__exit__(exc_type, exc_value, traceback)
 
@@ -89,9 +118,21 @@ class TransactionError(Exception):
         super().__init__(trace['error'])
         self.trace = trace
 
+class GraphQLError(Exception):
+    def __init__(self, json):
+        super().__init__(json['errors']['message'])
+        self.json = json
+
 class API:
+    '''Provides an interface to the HTTP API of a psinode server based on requests'''
     def __init__(self, url, session=None):
+        '''
+        Initializes a new API object for url. If session is provided, it should
+        be a requests Session object that will be used to handle all requests
+        '''
         self.url = url
+        if session is None:
+            session = requests
         self.session = session
 
     # HTTP requests
@@ -103,33 +144,40 @@ class API:
             host = url.host
         return urllib3.util.Url(url.scheme, url.auth, host, url.port, path).url
     def request(self, method, path, service=None, **kw):
-        if self.session is not None:
-            return self.session.request(method, self._make_url(path, service), **kw)
-        else:
-            return requests.request(method, self._make_url(path, service), **kw)
+        '''Makes an HTTP request and returns a Response. Other named parameters are passed through to requests.request.'''
+        return self.session.request(method, self._make_url(path, service), **kw)
     def head(self, path, service=None, **kw):
+        '''HTTP HEAD request'''
         return self.request('HEAD', path, service, **kw)
     def get(self, path, service=None, **kw):
+        '''HTTP GET request'''
         return self.request('GET', path, service, **kw)
     def post(self, path, service=None, **kw):
+        '''HTTP POST request'''
         return self.request('POST', path, service, **kw)
     def put(self, path, service=None, **kw):
+        '''HTTP PUT request'''
         return self.request('PUT', path, service, **kw)
     def patch(self, path, service=None, **kw):
+        '''HTTP PATCH request'''
         return self.request('PATCH', path, service, **kw)
     def delete(self, path, service=None, **kw):
+        '''HTTP DELETE request'''
         return self.request('DELETE', path, service, **kw)
 
     # Transaction processing
     def pack_action(self, act):
+        '''Pack an action and return a json object suitable for use in pack_transaction'''
         result = self.post('/pack_action/%s' % act.method, service=act.service, json=act.data)
         result.raise_for_status()
         return {'sender':act.sender, 'service':act.service, 'method': act.method, 'rawData': result.content.hex()}
     def pack_transaction(self, trx):
+        '''Pack a transaction and return the result as bytes'''
         result = self.post('/common/pack/Transaction', json={'tapos':trx.tapos, 'actions':[self.pack_action(act) for act in trx.actions], 'claims': trx.claims})
         result.raise_for_status()
         return result.content
     def pack_signed_transaction(self, trx, signatures=[]):
+        '''Pack a signed transactions and return the result as bytes'''
         if isinstance(trx, bytes):
             trx = trx.hex()
         elif isinstance(trx, Transaction):
@@ -138,6 +186,11 @@ class API:
         result.raise_for_status()
         return result.content
     def push_transaction(self, trx):
+        '''
+        Push a transaction to the chain and return the transaction trace
+
+        Raise TransactionError if the transaction fails
+        '''
         packed = self.pack_signed_transaction(trx)
         result = self.post('/native/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed)
         result.raise_for_status()
@@ -146,6 +199,11 @@ class API:
             raise TransactionError(trace)
         return trace
     def push_action(self, sender, service, method, data):
+        '''
+        Push a transaction consisting of a single action to the chain and return the transaction trace
+
+        Raise TransactionError if the transaction fails
+        '''
         tapos = tapos=self.get_tapos()
         tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + 10))
         tapos['flags'] = 0
@@ -153,6 +211,14 @@ class API:
 
     # Transactions for key system services
     def set_producers(self, prods, algorithm=None):
+        '''
+        Pushes a transaction to set the block producers.
+        prods should be a list whose elements are any of
+        - The name of a producer
+        - A Node object
+        - A json dict of the form {"name":<name>, "auth":{"service":<verify service>,"rawData":<hex string>}}
+        algorithm should be either "cft" or "bft". If algorithm is None, the current consensus algorithm will be used.
+        '''
         producers = [_get_producer_claim(p) for p in prods]
         if algorithm is None:
             return self.push_action('producer-sys', 'producer-sys', 'setProducers', {'producers': producers})
@@ -164,22 +230,33 @@ class API:
 
     # Queries
     def graphql(self, service, query):
+        '''
+        Sends a GraphQL query to a service and returns the result as json
+
+        Raise GraphQLError if the query fails
+        '''
         result = self.post('/graphql', service=service, json={'query': query})
         result.raise_for_status()
-        return result.json()
+        json = result.json()
+        if 'errors' in json:
+            raise GraphQLError(json)
+        return json['data']
 
     def get_tapos(self):
+        '''Returns TaPoS for the current head block'''
         result = self.get('/common/tapos/head')
         result.raise_for_status()
         return result.json()
 
     def get_producers(self):
+        '''Returns a tuple of (current producers, next producers). The next producers are empty except when the chain is in the process of changing block producers.'''
         def flatten(producers):
             return [p['name'] for p in producers]
-        result = self.graphql('producer-sys', 'query { producers { name } nextProducers { name } }')['data']
+        result = self.graphql('producer-sys', 'query { producers { name } nextProducers { name } }')
         return (flatten(result['producers']), flatten(result['nextProducers']))
 
     def get_block_header(self, num=-1):
+        '''Returns the header for a given blocknum. A negative num will return blocks from the end of the chain. -1 is the head block.'''
         if num == -1:
             args = 'last:1'
         else:
@@ -206,7 +283,7 @@ class API:
                 }
             }
         ''' % args)
-        edges = result['data']['blocks']['edges']
+        edges = result['blocks']['edges']
         if len(edges) == 0:
             return None
         else:
@@ -242,6 +319,10 @@ def _write_config(dir, log_filter, log_format):
 
 class Node(API):
     def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None):
+        '''
+        Create a new psinode server
+        If dir is not specified, the server will reside in a temporary directory
+        '''
         if dir is None:
             self.tempdir = tempfile.TemporaryDirectory()
             self.dir = self.tempdir.name
@@ -273,26 +354,46 @@ class Node(API):
             self.child = subprocess.Popen(args, stderr=logfile)
         self._wait_for_startup()
 
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
     def __del__(self):
-        if not hasattr(self, 'child'):
-            return
-        self.child.terminate()
-        try:
-            self.child.wait(timeout=10)
-        except TimeoutExpired:
-            self.child.kill()
-            self.child.wait()
+        self.close()
+    def close(self):
+        '''
+        Stops the server and cleans up all associated resources.
+
+        If a temporary directory was created for the node, it will be deleted.
+        '''
+        if hasattr(self, 'child'):
+            self.child.terminate()
+            try:
+                self.child.wait(timeout=10)
+            except TimeoutExpired:
+                self.child.kill()
+                self.child.wait()
+
+        if hasattr(self, 'tempdir'):
+            self.tempdir.cleanup()
     def shutdown(self):
+        '''Stop the server and wait for the server process to exit'''
         self.post('/native/admin/shutdown', service='admin-sys', json={})
         self.session.close()
         self.child.wait()
     def wait(self, cond, timeout=10):
+        '''
+        Wait until cond(self) is true.
+
+        Raise TimeoutError if the timeout expires first
+        '''
         for i in range(timeout):
             if cond(self):
                 return
             time.sleep(1)
         raise TimeoutError()
     def connect(self, other):
+        '''Connect to a peer. other can be a URL or a Node object'''
         if isinstance(other, Node):
             url = other.socketpath
         else:
@@ -315,6 +416,7 @@ class Node(API):
             return self.disconnect(other.socketpath) or other.disconnect(self.socketpath)
 
     def boot(self, producer=None, doc=False):
+        '''boots the chain. If a producer is not specified, uses the name of this node'''
         self._find_psibase()
         if producer is None:
             producer = self.producer
