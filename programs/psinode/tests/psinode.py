@@ -318,7 +318,7 @@ def _write_config(dir, log_filter, log_format):
             f.write(_default_config % (log_filter, log_format))
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -349,6 +349,8 @@ class Node(API):
             args.extend(['--host', hostname])
         if p2p:
             args.append('--p2p')
+        if database_cache_size is not None:
+            args.extend(['--database-cache-size', str(database_cache_size)])
         args.append(self.dir)
         with open(self.logpath, 'w') as logfile:
             self.child = subprocess.Popen(args, stderr=logfile)
