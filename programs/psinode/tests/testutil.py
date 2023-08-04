@@ -3,6 +3,8 @@ import predicates
 import argparse
 import unittest
 import sys
+import time
+import math
 
 def psinode_test(f):
     def result(self):
@@ -32,6 +34,16 @@ def boot_with_producers(nodes, algorithm=None, timeout=10):
     p.set_producers(nodes, algorithm)
     p.wait(predicates.producers_are(nodes), timeout=timeout)
     return p
+
+def sleep(secs, end_at):
+    '''Like time.sleep, but waits additional time until the fractional seconds are equal to end_at'''
+    ticks_per_sec = 1000000000
+    current = (time.time_ns() % ticks_per_sec) / ticks_per_sec
+    extra = end_at - (current + math.modf(secs)[0])
+    if extra < 0:
+        extra += 1
+
+    time.sleep(secs + extra)
 
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()

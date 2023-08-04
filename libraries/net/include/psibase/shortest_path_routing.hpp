@@ -10,6 +10,7 @@
 #include <psibase/net_base.hpp>
 #include <psibase/routing_base.hpp>
 
+#include <boost/asio/steady_timer.hpp>
 #include <chrono>
 #include <cstdint>
 #include <map>
@@ -156,7 +157,7 @@ namespace psibase::net
          std::chrono::steady_clock::time_point time;
       };
 
-      explicit shortest_path_routing(boost::asio::io_context& ctx) : base_type(ctx)
+      explicit shortest_path_routing(boost::asio::io_context& ctx) : base_type(ctx), seqnoTimer(ctx)
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
       }
@@ -480,6 +481,18 @@ namespace psibase::net
             multicast(RouteUpdateMessage{consensus().producer_name(), seqno, 0});
             lastSeqnoUpdate = now;
          }
+         else
+         {
+            seqnoTimer.expires_at(lastSeqnoUpdate + minSeqnoUpdateInterval);
+            seqnoTimer.async_wait(
+                [this](const std::error_code& e)
+                {
+                   if (!e)
+                   {
+                      incrementSeqno();
+                   }
+                });
+         }
       }
       bool cacheSeqnoRequest(const RouteSeqnoRequest& msg)
       {
@@ -537,6 +550,7 @@ namespace psibase::net
       std::map<producer_id, peer_id>             selectedRoutes;
 
       std::map<producer_id, CachedSeqnoRequest> recentSeqnoRequests;
+      boost::asio::steady_timer                 seqnoTimer;
 
       loggers::common_logger logger;
    };

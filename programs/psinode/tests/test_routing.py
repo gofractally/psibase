@@ -55,23 +55,23 @@ class TestRouting(unittest.TestCase):
 
     @testutil.psinode_test
     def test_bft(self, cluster):
-        (a, b, c, d, e, f, g) = cluster.line('a', 'b', 'c', 'd', 'e', 'f', 'g')
-        # This isn't working. The problem is that the routing algorithm
-        # doesn't respect the order dependency between blocks and consensus
-        # messages related to said blocks.
-        testutil.boot_with_producers([a, b, c, d, e, f, g], 'bft', timeout=15)
+        (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
+        testutil.boot_with_producers([a, b, c, d, e, f, g], 'bft')
 
         # wait for irreversibility to advance
         a.wait(new_block())
         a.wait(irreversible(a.get_block_header()['blockNum']))
 
+        a.disconnect(g)
+
         # Switch between two different configurations
         print('checking blocks')
+        testutil.sleep(0.0, 0.5)
         for i in range(10):
             header = a.get_block_header()
             print(header)
             self.assertEqual(header['commitNum'] + 2, header['blockNum'])
-            time.sleep(1)
+            testutil.sleep(0.5, 0.5)
             if i % 2 == 0:
                 a.connect(g)
                 a.disconnect(b)
