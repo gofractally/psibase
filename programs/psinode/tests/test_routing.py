@@ -44,8 +44,7 @@ class TestRouting(unittest.TestCase):
         for i in range(10):
             header = a.get_block_header()
             print(header)
-            if header['commitNum'] + 2 != header['blockNum']:
-                raise RuntimeError('unexpected commitNum: %s' % header)
+            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             time.sleep(1)
             if i % 2 == 0:
                 a.connect(b)
@@ -53,6 +52,32 @@ class TestRouting(unittest.TestCase):
             else:
                 a.connect(g)
                 a.disconnect(b)
+
+    @testutil.psinode_test
+    def test_bft(self, cluster):
+        (a, b, c, d, e, f, g) = cluster.line('a', 'b', 'c', 'd', 'e', 'f', 'g')
+        # This isn't working. The problem is that the routing algorithm
+        # doesn't respect the order dependency between blocks and consensus
+        # messages related to said blocks.
+        testutil.boot_with_producers([a, b, c, d, e, f, g], 'bft', timeout=15)
+
+        # wait for irreversibility to advance
+        a.wait(new_block())
+        a.wait(irreversible(a.get_block_header()['blockNum']))
+
+        # Switch between two different configurations
+        print('checking blocks')
+        for i in range(10):
+            header = a.get_block_header()
+            print(header)
+            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+            time.sleep(1)
+            if i % 2 == 0:
+                a.connect(g)
+                a.disconnect(b)
+            else:
+                a.connect(b)
+                a.disconnect(g)
 
 if __name__ == '__main__':
     testutil.main()

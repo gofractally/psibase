@@ -55,10 +55,25 @@ namespace psibase::net
                  decltype(static_cast<Derived*>(this)->network())>::message_type,
              std::variant<InitMessage>>{};
       }
+      std::string message_to_string(const auto& msg)
+      {
+         if constexpr (requires { msg.to_string(); })
+         {
+            return msg.to_string();
+         }
+         else if constexpr (requires { msg.to_string(this); })
+         {
+            return msg.to_string(this);
+         }
+         else
+         {
+            return "unknown message";
+         }
+      }
       template <typename Msg, typename F>
       void async_send(peer_id id, const Msg& msg, F&& f)
       {
-         PSIBASE_LOG(peers().logger(id), debug) << "Sending message: " << msg.to_string();
+         PSIBASE_LOG(peers().logger(id), debug) << "Sending message: " << message_to_string(msg);
          peers().async_send(id, this->serialize_message(msg), std::forward<F>(f));
       }
       template <typename Msg>
@@ -120,6 +135,29 @@ namespace psibase::net
          }
          recv_impl(peer, msg[0], std::move(msg), (message_type*)0);
       }
+      template <typename T>
+      std::string message_to_string_impl(psio::input_stream& s)
+      {
+         using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
+         return message_to_string(psio::from_frac<message_type>({s.pos, s.end}));
+      }
+      template <template <typename...> class L, typename... T>
+      std::string message_to_string_impl(int key, const std::vector<char>& msg, L<T...>*)
+      {
+         psio::input_stream s(msg.data() + 1, msg.size() - 1);
+         std::string        result;
+         ((key == T::type ? (void)(result = message_to_string_impl<T>(s)) : (void)0), ...);
+         return result;
+      }
+      std::string message_to_string(const std::vector<char>& msg)
+      {
+         using message_type = decltype(get_message_impl());
+         if (msg.empty())
+         {
+            return "";
+         }
+         return message_to_string_impl(msg[0], msg, (message_type*)0);
+      }
       void recv(peer_id peer, const InitMessage& msg)
       {
          PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
@@ -142,13 +180,26 @@ namespace psibase::net
          raw.insert(raw.end(), msg.data.data(), msg.data.data() + msg.data.size());
          Claim claim = msg.data->signer();
          PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
-         if constexpr (has_block_id<T>)
+         try
          {
-            chain().verify(msg.data->block_id(), {raw.data(), raw.size()}, claim, msg.signature);
+            if constexpr (has_block_id<T>)
+            {
+               chain().verify(msg.data->block_id(), {raw.data(), raw.size()}, claim, msg.signature);
+            }
+            else
+            {
+               chain().verify({raw.data(), raw.size()}, claim, msg.signature);
+            }
          }
-         else
+         catch (std::runtime_error& e)
          {
-            chain().verify({raw.data(), raw.size()}, claim, msg.signature);
+            // We might fail to validate the signature due to being ahead or
+            // behind the origin of the message. This is not an error, so just
+            // drop the message. TODO: When verifying a signature with an
+            // associated block, we can strictly enforce the signature as long
+            // as we have the correct block header state.
+            PSIBASE_LOG(peers().logger(peer), debug) << "Message dropped: " << e.what();
+            return;
          }
          if constexpr (has_recv<SignedMessage<T>, Derived>)
          {

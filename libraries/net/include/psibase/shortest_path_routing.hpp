@@ -110,7 +110,10 @@ namespace psibase::net
       static constexpr unsigned type = 3;
       producer_id               destination;
       std::vector<char>         data;
-      std::string               to_string() const { return "wrapped message"; }
+      std::string               to_string(auto* serializer) const
+      {
+         return "to " + destination.str() + ": " + serializer->message_to_string(data);
+      }
    };
    PSIO_REFLECT(RoutingEnvelope, destination, data)
 
@@ -232,7 +235,6 @@ namespace psibase::net
       }
       void on_producer_change()
       {
-         PSIBASE_LOG(logger, debug) << "Cleaning up routes to inactive producers";
          // purge out-dated routes
          auto self = consensus().producer_name();
          for (auto iter = selectedRoutes.begin(), end = selectedRoutes.end(); iter != end;)
@@ -243,6 +245,7 @@ namespace psibase::net
             }
             else
             {
+               PSIBASE_LOG(logger, info) << "Removed route to " << iter->first.str();
                iter = selectedRoutes.erase(iter);
             }
          }
@@ -289,9 +292,12 @@ namespace psibase::net
       }
       void updateRoute(std::pair<const RouteKey, RouteData>& route, const RouteUpdateMessage& msg)
       {
-         route.second.metric = msg.metric;
-         route.second.seqno  = msg.seqno;
-         selectRoute(route.first.producer, route.first.peer);
+         if (route.second.metric != msg.metric || route.second.seqno != msg.seqno)
+         {
+            route.second.metric = msg.metric;
+            route.second.seqno  = msg.seqno;
+            selectRoute(route.first.producer, route.first.peer);
+         }
       }
       bool isSelected(const RouteKey& key)
       {
@@ -321,7 +327,7 @@ namespace psibase::net
          if (updated || route.first.peer == updatedRoute)
          {
             auto metric = getMetric(route);
-            PSIBASE_LOG(peers().logger(route.first.peer), debug)
+            PSIBASE_LOG(peers().logger(route.first.peer), info)
                 << (updated ? "New" : "Updated") << " route for " << route.first.producer.str()
                 << " seqno=" << route.second.seqno.value << " metric=" << metric.value;
             auto feasibility     = Feasibility{route.second.seqno, metric};
@@ -453,7 +459,9 @@ namespace psibase::net
       }
       void recv(peer_id peer, RoutingEnvelope&& msg)
       {
-         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
+         PSIBASE_LOG(peers().logger(peer), debug)
+             << "Received message: to " << msg.destination.str() << ": "
+             << this->message_to_string(msg.data);
          if (msg.destination == consensus().producer_name())
          {
             recv(peer, std::move(msg.data));

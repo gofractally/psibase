@@ -92,6 +92,14 @@ class Cluster(object):
             for b in nodes:
                 a.connect(b)
         return tuple(nodes)
+    def line(self, *names, **kw):
+        '''Creates nodes connected in a line'''
+        nodes = [self.make_node(name, **kw) for name in names]
+        prev = nodes[0]
+        for node in nodes[1:]:
+            prev.connect(node)
+            prev = node
+        return tuple(nodes)
     def __enter__(self):
         if hasattr(self, 'tempdir'):
             self.tempdir.__enter__()
