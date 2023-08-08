@@ -71,6 +71,10 @@ namespace psibase::net
       }
    };
 
+   template <typename Derived, typename Msg>
+   concept has_validate_message =
+       requires(Derived& d, const Msg& msg) { d.consensus().validate_message(msg); };
+
    struct RouteUpdateMessage
    {
       static constexpr unsigned type = 4;
@@ -520,8 +524,8 @@ namespace psibase::net
          }
       }
       template <typename T>
+         requires has_validate_message<Derived, T>
       auto validate_message(const SignedMessage<T>& msg)
-          -> decltype(consensus().validate_message(*msg.data))
       {
          try
          {
@@ -534,7 +538,8 @@ namespace psibase::net
          return consensus().validate_message(*msg.data);
       }
       template <typename T>
-      auto validate_message(const T& msg) -> decltype(consensus().validate_message(msg))
+         requires has_validate_message<Derived, T>
+      auto validate_message(const T& msg)
       {
          return consensus().validate_message(msg);
       }
