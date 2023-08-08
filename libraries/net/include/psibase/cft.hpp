@@ -87,6 +87,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
+      using Base::validate_message;
       using Base::validate_producer;
       using typename Base::producer_state;
 
@@ -503,6 +504,21 @@ namespace psibase::net
             }
             check_votes();
          }
+      }
+      bool validate_message(const ConfirmMessage&)
+      {
+         // TODO:
+         return true;
+      }
+      bool validate_message(const RequestVoteRequest&)
+      {
+         // TODO:
+         return true;
+      }
+      bool validate_message(const RequestVoteResponse&)
+      {
+         // TODO:
+         return true;
       }
    };
 

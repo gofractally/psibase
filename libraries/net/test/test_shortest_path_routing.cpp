@@ -64,6 +64,8 @@ struct mock_consensus
       return !active_producers || active_producers->count(account) != 0;
    }
 
+   bool validate_message(const message1&) { return true; }
+
    void connect(peer_id id) {}
    void disconnect(peer_id id) {}
    void recv(peer_id id, message1 msg) { _recv_queue.push_back(msg); }

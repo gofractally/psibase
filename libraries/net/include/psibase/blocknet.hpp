@@ -563,11 +563,12 @@ namespace psibase::net
          {
             peer.last_sent = xid;
          }
+         consensus().post_send_block(peer.id, xid.id());
       }
 
       void recv(peer_id origin, const BlockMessage& request)
       {
-         if (auto state = chain().insert(request.block))
+         if (auto [state, inserted] = chain().insert(request.block); inserted)
          {
             try
             {
@@ -578,11 +579,14 @@ namespace psibase::net
                chain().erase(state);
                throw;
             }
-            // TODO: update_last_received should run even if the block
-            // is already known.
             auto& connection = get_connection(origin);
             update_last_received(connection, state->xid());
             switch_fork();
+         }
+         else if (state)
+         {
+            auto& connection = get_connection(origin);
+            update_last_received(connection, state->xid());
          }
       }
 
@@ -621,14 +625,34 @@ namespace psibase::net
          chain().gc([this](const auto& b) { consensus().on_erase_block(b); });
       }
 
+      bool peer_has_block(peer_id peer, const Checksum256& id)
+      {
+         // If peer_has_block returns true, then the peer's receipt of the block
+         // happens before its receipt of any message sent after peer_has_block returns.
+         //
+         // If peer_has_block returns false, then one of the following will eventually happen:
+         // - The block is not in the best chain
+         // - post_send_block(peer, id)
+
+         auto& connection = get_connection(peer);
+         if (chain().in_best_chain(id) && getBlockNum(id) <= connection.last_sent.num())
+         {
+            return true;
+         }
+         return chain().is_ancestor(id, connection.last_received);
+      }
+
       // Default implementations
       std::optional<std::vector<char>> makeBlockData(const BlockHeaderState*) { return {}; }
       void                             on_accept_block_header(const BlockHeaderState*) {}
       void                             on_produce_block(const BlockHeaderState*) {}
       void                             on_accept_block(const BlockHeaderState*) {}
-      void                             post_send_block(peer_id, const Checksum256&) {}
-      void                             on_erase_block(const Checksum256&) {}
-      void                             set_producers(auto prods)
+      void                             post_send_block(peer_id peer, const Checksum256& id)
+      {
+         network().on_peer_block(peer, id);
+      }
+      void on_erase_block(const Checksum256&) {}
+      void set_producers(auto prods)
       {
          if (prods.first->size() != 0)
             throw std::runtime_error("Consensus algorithm not available");
@@ -644,5 +668,6 @@ namespace psibase::net
          }
       }
       void cancel() {}
+      void validate_message() {}
    };
 }  // namespace psibase::net

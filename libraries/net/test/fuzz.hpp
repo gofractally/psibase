@@ -10,6 +10,7 @@ struct basic_fuzz_routing : psibase::net::message_serializer<Derived>
       logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
    }
    void on_producer_change() {}
+   void on_peer_block(psibase::net::peer_id /*peer*/, const psibase::Checksum256& /*blockid*/) {}
    void send(const auto& message)
    {
       PSIBASE_LOG(logger, debug) << "Send message: " << message.to_string() << std::endl;
@@ -24,6 +25,11 @@ struct basic_fuzz_routing : psibase::net::message_serializer<Derived>
       }
       send(msg);
       ctx.post([f]() { f(std::error_code()); });
+   }
+   template <typename Msg>
+   void multicast_producers(const psibase::Checksum256&, const Msg& msg)
+   {
+      send(msg);
    }
    template <typename Msg>
    void multicast_producers(const Msg& msg)

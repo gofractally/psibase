@@ -116,6 +116,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
+      using Base::validate_message;
       using Base::validate_producer;
       using typename Base::producer_state;
       enum class confirm_type
@@ -513,7 +514,7 @@ namespace psibase::net
                 auto msg = network().sign_message(
                     ViewChangeMessage{.term = current_term, .producer = self, .signer = k});
                 set_producer_view(msg);
-                network().multicast_producers(msg);
+                network().multicast(msg);
              });
       }
 
@@ -751,7 +752,7 @@ namespace psibase::net
                          auto message = network().sign_message(
                              PrepareMessage{.block_id = id, .producer = self, .signer = key});
                          on_prepare(state, self, message);
-                         network().multicast_producers(message);
+                         network().multicast_producers(id, message);
                       });
       }
       void save_commit_data(const BlockHeaderState* state)
@@ -835,7 +836,7 @@ namespace psibase::net
                          auto message = network().sign_message(
                              CommitMessage{.block_id = id, .producer = self, .signer = key});
                          on_commit(state, self, message);
-                         network().multicast_producers(message);
+                         network().multicast_producers(id, message);
                       });
       }
       std::optional<std::vector<char>> makeBlockData(const BlockHeaderState* state)
@@ -906,6 +907,7 @@ namespace psibase::net
                network().async_send(peer, msg, [](const std::error_code&) {});
             }
          }
+         Base::post_send_block(peer, id);
       }
 
       void on_accept_block_header(const BlockHeaderState* state)
@@ -1042,6 +1044,18 @@ namespace psibase::net
          {
             Base::switch_fork();
          }
+      }
+
+      std::optional<Checksum256> validate_message(const PrepareMessage& msg)
+      {
+         // TODO: actual validation
+         return msg.block_id;
+      }
+
+      std::optional<Checksum256> validate_message(const CommitMessage& msg)
+      {
+         // TODO: actual validation
+         return msg.block_id;
       }
 
       void recv(peer_id peer, const RequestViewMessage&)

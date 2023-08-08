@@ -157,6 +157,23 @@ namespace psibase::net
          std::chrono::steady_clock::time_point time;
       };
 
+      struct DeferredMessage
+      {
+         using MessageKey = std::tuple<peer_id, Checksum256>;
+         peer_id           peer;
+         Checksum256       blockid;
+         std::vector<char> message;
+         friend auto       operator<=>(const DeferredMessage&, const DeferredMessage&) = default;
+         friend auto       operator<=>(const DeferredMessage& lhs, const peer_id& rhs)
+         {
+            return lhs.peer <=> rhs;
+         }
+         friend auto operator<=>(const DeferredMessage& lhs, const MessageKey& rhs)
+         {
+            return MessageKey{lhs.peer, lhs.blockid} <=> rhs;
+         }
+      };
+
       explicit shortest_path_routing(boost::asio::io_context& ctx) : base_type(ctx), seqnoTimer(ctx)
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
@@ -171,6 +188,14 @@ namespace psibase::net
          }
       }
       template <typename Msg>
+      void multicast_producers(const Checksum256& id, const Msg& msg)
+      {
+         for (const auto& [producer, peer] : selectedRoutes)
+         {
+            send_after_block(peer, id, RoutingEnvelope{producer, this->serialize_message(msg)});
+         }
+      }
+      template <typename Msg>
       void multicast_producers(const Msg& msg)
       {
          for (const auto& [producer, peer] : selectedRoutes)
@@ -179,9 +204,45 @@ namespace psibase::net
          }
       }
       template <typename Msg>
+      void sendto(producer_id producer, const Checksum256& id, const Msg& msg)
+      {
+         auto selected = selectedRoutes.find(producer);
+         if (selected != selectedRoutes.end())
+         {
+            send_after_block(selected->second, id,
+                             RoutingEnvelope{producer, this->serialize_message(msg)});
+         }
+         else
+         {
+            PSIBASE_LOG(logger, debug)
+                << "Message discarded for lack of a route to " << msg.destination.str();
+         }
+      }
+      template <typename Msg>
       void sendto(producer_id producer, const Msg& msg)
       {
          trySend(producer, RoutingEnvelope{producer, this->serialize_message(msg)});
+      }
+      template <typename Msg>
+      void send_after_block(peer_id peer, const Checksum256& blockid, const Msg& msg)
+      {
+         if (consensus().peer_has_block(peer, blockid))
+         {
+            async_send(peer, msg);
+         }
+         else
+         {
+            deferredMessages.insert({peer, blockid, this->serialize_message(msg)});
+         }
+      }
+      void on_peer_block(peer_id peer, const Checksum256& blockid)
+      {
+         auto r = deferredMessages.equal_range(std::tuple{peer, blockid});
+         for (const auto& value : std::ranges::subrange(r.first, r.second))
+         {
+            async_send(peer, value.message);
+         }
+         deferredMessages.erase(r.first, r.second);
       }
       void connect(peer_id peer)
       {
@@ -366,8 +427,8 @@ namespace psibase::net
          else if (selectedRoutes.erase(producer) != 0)
          {
             PSIBASE_LOG(logger, info) << "No feasible route to " << producer.str();
-            sendSeqnoRequest(producer);
             multicast(RouteUpdateMessage{producer, {}, RouteMetric::infinite});
+            sendSeqnoRequest(producer);
          }
       }
       void sendSeqnoRequest(producer_id producer)
@@ -396,7 +457,7 @@ namespace psibase::net
          {
             if (msg.metric != RouteMetric::infinite)
             {
-               routeTable.try_emplace(RouteKey{msg.producer, peer}, seqno, msg.metric);
+               routeTable.try_emplace(RouteKey{msg.producer, peer}, msg.seqno, msg.metric);
                selectRoute(msg.producer, peer);
             }
          }
@@ -458,6 +519,25 @@ namespace psibase::net
             forwardSeqnoRequest(msg);
          }
       }
+      template <typename T>
+      auto validate_message(const SignedMessage<T>& msg)
+          -> decltype(consensus().validate_message(*msg.data))
+      {
+         try
+         {
+            this->verify_signature(msg);
+         }
+         catch (std::runtime_error&)
+         {
+            return decltype(consensus().validate_message(*msg.data)){};
+         }
+         return consensus().validate_message(*msg.data);
+      }
+      template <typename T>
+      auto validate_message(const T& msg) -> decltype(consensus().validate_message(msg))
+      {
+         return consensus().validate_message(msg);
+      }
       void recv(peer_id peer, RoutingEnvelope&& msg)
       {
          PSIBASE_LOG(peers().logger(peer), debug)
@@ -469,7 +549,39 @@ namespace psibase::net
          }
          else
          {
-            trySend(msg.destination, msg);
+            this->handle_message(msg.data,
+                                 [&, this](const auto& deserialized)
+                                 {
+                                    if constexpr (requires { validate_message(deserialized); })
+                                    {
+                                       if (auto id = validate_message(deserialized))
+                                       {
+                                          auto selected = selectedRoutes.find(msg.destination);
+                                          if (selected != selectedRoutes.end())
+                                          {
+                                             if constexpr (std::is_same_v<decltype(id), bool>)
+                                             {
+                                                this->async_send(selected->second, msg);
+                                             }
+                                             else
+                                             {
+                                                send_after_block(selected->second, *id, msg);
+                                             }
+                                          }
+                                          else
+                                          {
+                                             PSIBASE_LOG(logger, debug)
+                                                 << "Message discarded for lack of a route to "
+                                                 << msg.destination.str();
+                                          }
+                                       }
+                                    }
+                                    else
+                                    {
+                                       PSIBASE_LOG(this->peers().logger(peer), warning)
+                                           << "Wrong message type";
+                                    }
+                                 });
          }
       }
       void incrementSeqno()
@@ -551,6 +663,8 @@ namespace psibase::net
 
       std::map<producer_id, CachedSeqnoRequest> recentSeqnoRequests;
       boost::asio::steady_timer                 seqnoTimer;
+
+      std::set<DeferredMessage, std::less<>> deferredMessages;
 
       loggers::common_logger logger;
    };

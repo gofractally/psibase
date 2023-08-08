@@ -135,28 +135,32 @@ namespace psibase::net
          }
          recv_impl(peer, msg[0], std::move(msg), (message_type*)0);
       }
-      template <typename T>
-      std::string message_to_string_impl(psio::input_stream& s)
-      {
-         using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-         return message_to_string(psio::from_frac<message_type>({s.pos, s.end}));
-      }
-      template <template <typename...> class L, typename... T>
-      std::string message_to_string_impl(int key, const std::vector<char>& msg, L<T...>*)
-      {
-         psio::input_stream s(msg.data() + 1, msg.size() - 1);
-         std::string        result;
-         ((key == T::type ? (void)(result = message_to_string_impl<T>(s)) : (void)0), ...);
-         return result;
-      }
       std::string message_to_string(const std::vector<char>& msg)
       {
+         std::string result;
+         handle_message(msg, [&](const auto& m) { result = message_to_string(m); });
+         return result;
+      }
+      template <typename T, typename F>
+      void handle_message_impl(psio::input_stream& s, F&& f)
+      {
+         using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
+         f(psio::from_frac<message_type>({s.pos, s.end}));
+      }
+      template <typename F, template <typename...> class L, typename... T>
+      void handle_message_impl(int key, const std::vector<char>& msg, F&& f, L<T...>*)
+      {
+         psio::input_stream s(msg.data() + 1, msg.size() - 1);
+         ((key == T::type ? handle_message_impl<T>(s, f) : (void)0), ...);
+      }
+      template <typename F>
+      void handle_message(const std::vector<char>& msg, F&& f)
+      {
          using message_type = decltype(get_message_impl());
-         if (msg.empty())
+         if (!msg.empty())
          {
-            return "";
+            handle_message_impl(msg[0], msg, f, (message_type*)0);
          }
-         return message_to_string_impl(msg[0], msg, (message_type*)0);
       }
       void recv(peer_id peer, const InitMessage& msg)
       {
@@ -172,24 +176,29 @@ namespace psibase::net
          }
       }
       template <typename T>
-      void recv(peer_id peer, const SignedMessage<T>& msg)
+      void verify_signature(const SignedMessage<T>& msg)
       {
          std::vector<char> raw;
          raw.reserve(msg.data.size() + 1);
          raw.push_back(T::type);
          raw.insert(raw.end(), msg.data.data(), msg.data.data() + msg.data.size());
          Claim claim = msg.data->signer();
+         if constexpr (has_block_id<T>)
+         {
+            chain().verify(msg.data->block_id(), {raw.data(), raw.size()}, claim, msg.signature);
+         }
+         else
+         {
+            chain().verify({raw.data(), raw.size()}, claim, msg.signature);
+         }
+      }
+      template <typename T>
+      void recv(peer_id peer, const SignedMessage<T>& msg)
+      {
          PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
          try
          {
-            if constexpr (has_block_id<T>)
-            {
-               chain().verify(msg.data->block_id(), {raw.data(), raw.size()}, claim, msg.signature);
-            }
-            else
-            {
-               chain().verify({raw.data(), raw.size()}, claim, msg.signature);
-            }
+            verify_signature(msg);
          }
          catch (std::runtime_error& e)
          {

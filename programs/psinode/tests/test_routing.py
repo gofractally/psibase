@@ -54,9 +54,63 @@ class TestRouting(unittest.TestCase):
                 a.disconnect(b)
 
     @testutil.psinode_test
+    def test_min_nodes(self, cluster):
+        # Each node is a adjacent to two others. With 7 nodes, consensus
+        # requires 4 nodes, so this test will time out if messages are not routed
+        (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
+        testutil.boot_with_producers([a, b, c, d, e, f, g, 'h', 'i', 'j', 'k', 'l', 'm'])
+
+        # wait for irreversibility to advance
+        a.wait(new_block())
+        a.wait(irreversible(a.get_block_header()['blockNum']))
+
+        a.disconnect(b)
+
+        # Switch between two different configurations
+        print('checking blocks')
+        testutil.sleep(0.0, 0.5)
+        for i in range(10):
+            header = a.get_block_header()
+            print(header)
+            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+            testutil.sleep(0.5, 0.5)
+            if i % 2 == 0:
+                a.connect(b)
+                a.disconnect(g)
+            else:
+                a.connect(g)
+                a.disconnect(b)
+
+    @testutil.psinode_test
     def test_bft(self, cluster):
         (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
         testutil.boot_with_producers([a, b, c, d, e, f, g], 'bft')
+
+        # wait for irreversibility to advance
+        a.wait(new_block())
+        a.wait(irreversible(a.get_block_header()['blockNum']))
+
+        a.disconnect(g)
+
+        # Switch between two different configurations
+        print('checking blocks')
+        testutil.sleep(0.0, 0.5)
+        for i in range(10):
+            header = a.get_block_header()
+            print(header)
+            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+            testutil.sleep(0.5, 0.5)
+            if i % 2 == 0:
+                a.connect(g)
+                a.disconnect(b)
+            else:
+                a.connect(b)
+                a.disconnect(g)
+
+    @testutil.psinode_test
+    def test_bft_min_nodes(self, cluster):
+        (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
+        testutil.boot_with_producers([a, b, c, d, e, f, g, 'h', 'i', 'j'], 'bft')
 
         # wait for irreversibility to advance
         a.wait(new_block())

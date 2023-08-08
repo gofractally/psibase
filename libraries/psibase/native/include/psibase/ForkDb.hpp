@@ -422,23 +422,23 @@ namespace psibase
    {
      public:
       using id_type = Checksum256;
-      // \return a pointer to the header state for the block or null if the block
-      // was not inserted for any reason.
+      // \return a pointer to the header state for the block and a bool indicating
+      // whether a new block was inserted.
       // \post if the block was successfully inserted, a fork switch is required.
-      const BlockHeaderState* insert(const psio::shared_view_ptr<SignedBlock>& b)
+      std::pair<const BlockHeaderState*, bool> insert(const psio::shared_view_ptr<SignedBlock>& b)
       {
          BlockInfo info(b->block());
          PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, info.header, info.blockId);
          if (info.header.blockNum <= commitIndex)
          {
             PSIBASE_LOG(blockLogger, debug) << "Block ignored because it is before commitIndex";
-            return nullptr;
+            return {nullptr, false};
          }
          auto [iter, inserted] = blocks.try_emplace(info.blockId, b);
          if (!inserted)
          {
             PSIBASE_LOG(blockLogger, debug) << "Block skipped because it is already known";
-            return nullptr;
+            return {get_state(info.blockId), false};
          }
          if (auto* prev = get_state(info.header.previous))
          {
@@ -467,14 +467,14 @@ namespace psibase
             {
                PSIBASE_LOG(blockLogger, debug) << "Block is outside current tree";
             }
-            return &pos->second;
+            return {&pos->second, true};
          }
          else
          {
             blocks.erase(iter);
             PSIBASE_LOG(blockLogger, debug) << "Block dropped because its parent is missing";
          }
-         return nullptr;
+         return {nullptr, false};
       }
       // \pre The block must not be in the current chain and
       // must not have any children. Practially speaking, this
@@ -938,8 +938,10 @@ namespace psibase
       {
          return T{get_prev_id(t.id()), t.num() - 1};
       }
-      auto    commit_index() const { return commitIndex; }
-      id_type get_ancestor(id_type id, auto n)
+      auto            commit_index() const { return commitIndex; }
+      ExtendedBlockId xid(const ExtendedBlockId& id) { return id; }
+      ExtendedBlockId xid(const Checksum256& id) { return {id, getBlockNum(id)}; }
+      id_type         get_ancestor(id_type id, auto n)
       {
          for (; n > 0; --n)
          {
@@ -987,6 +989,30 @@ namespace psibase
                }
             }
          }
+      }
+      bool is_ancestor(const ExtendedBlockId& ancestor, const ExtendedBlockId& descendant)
+      {
+         Checksum256 tmp = descendant.id();
+         for (auto idx = descendant.num(); idx >= ancestor.num(); --idx)
+         {
+            if (tmp == ancestor.id())
+            {
+               return true;
+            }
+            if (auto current_block = get(tmp))
+            {
+               tmp = current_block->block().header().previous();
+            }
+            else
+            {
+               return false;
+            }
+         }
+         return false;
+      }
+      bool is_ancestor(const Checksum256& ancestor, const ExtendedBlockId& descendant)
+      {
+         return is_ancestor(xid(ancestor), descendant);
       }
       bool in_best_chain(const ExtendedBlockId& t)
       {
