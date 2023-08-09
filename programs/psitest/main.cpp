@@ -40,6 +40,7 @@ struct vm_options
    static constexpr std::uint32_t max_stack_bytes      = 1024 * 1024;
 };
 
+#ifdef __x86_64__
 template <>
 void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, true>,
                                     true>::on_unreachable()
@@ -47,6 +48,7 @@ void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, 
    backtrace();
    eosio::vm::throw_<wasm_interpreter_exception>("unreachable");
 }
+#endif
 
 using backend_t = eosio::vm::backend<  //
     rhf_t,
