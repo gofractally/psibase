@@ -15,9 +15,9 @@ namespace psibase::http
       {
          std::array<char, 64> result = {};
          auto                 pos    = result.begin();
-         pos    = std::ranges::copy(std::ranges::views::iota('A', 'Z' + 1), pos).out;
-         pos    = std::ranges::copy(std::ranges::views::iota('a', 'z' + 1), pos).out;
-         pos    = std::ranges::copy(std::ranges::views::iota('0', '9' + 1), pos).out;
+         pos    = std::ranges::copy(std::ranges::views::iota('A', static_cast<char>('Z' + 1)), pos).out;
+         pos    = std::ranges::copy(std::ranges::views::iota('a', static_cast<char>('z' + 1)), pos).out;
+         pos    = std::ranges::copy(std::ranges::views::iota('0', static_cast<char>('9' + 1)), pos).out;
          *pos++ = '-';
          *pos++ = '_';
          if (pos != result.end())
