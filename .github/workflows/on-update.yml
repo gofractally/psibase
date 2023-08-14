@@ -10,5 +10,5 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Run Builds
     uses: ./.github/workflows/ubuntu-builder.yml

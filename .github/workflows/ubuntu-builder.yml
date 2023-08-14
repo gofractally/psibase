@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Ubuntu ${{ matrix.ubuntu-version }} - Build
     runs-on: ubuntu-latest
     strategy:
       matrix:
