@@ -1,9 +1,6 @@
 name: Ubuntu builds
 
 on:
-  pull_request:
-    types: [assigned, opened, synchronize, reopened, labeled]
-  workflow_dispatch:
   workflow_call:
 
 jobs:

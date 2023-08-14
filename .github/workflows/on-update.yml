@@ -1,0 +1,14 @@
+name: On Update - Build
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "release/*"
+  pull_request:
+    types: [assigned, opened, synchronize, reopened, labeled]
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/ubuntu-builder.yml
