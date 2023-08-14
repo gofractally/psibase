@@ -1,4 +1,4 @@
-name: Pull Request
+name: Submodule regression
 on: [pull_request]
 
 env:
