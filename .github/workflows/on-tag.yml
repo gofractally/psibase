@@ -59,10 +59,9 @@ jobs:
         with:
           files: |
             psidk-ubuntu-2004.tar.gz
-            psidk-book-2004.tar.gz
             psidk-ubuntu-2204.tar.gz
             psidk-book-2204.tar.gz
-          draft: true # TODO: Change to false
+          draft: true
           prerelease: ${{needs.prerelease-check.outputs.prerelease}}
           release_name: ${{ github.ref_name }}
           tag_name: ${{ github.ref }}
