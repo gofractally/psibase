@@ -1,0 +1,5 @@
+#pragma once
+
+#define PSINODE_VERSION_MAJOR 0
+#define PSINODE_VERSION_MINOR 1
+#define PSINODE_VERSION_PATCH 6
