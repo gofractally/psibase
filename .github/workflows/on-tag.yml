@@ -60,7 +60,7 @@ jobs:
           files: |
             psidk-ubuntu-2004.tar.gz
             psidk-ubuntu-2204.tar.gz
-            psidk-book-2204.tar.gz
+            psidk-book.tar.gz
           draft: true
           prerelease: ${{needs.prerelease-check.outputs.prerelease}}
           release_name: ${{ github.ref_name }}
