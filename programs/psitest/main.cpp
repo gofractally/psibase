@@ -5,6 +5,7 @@
 #include <psibase/Prover.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/log.hpp>
+#include <psibase/version.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 
@@ -1001,6 +1002,10 @@ OPTIONS:
 
             Show this message
 
+      -V, --version
+
+            Print version information
+
       -v, --verbose
 
             Show detailed logging
@@ -1018,16 +1023,17 @@ OPTIONS:
             other constraints on debug.wasm. psibase still enforces
             constraints on service.wasm. (repeatable)
 
-      --timing 
+      --timing
 
-            Show how long transactions take in us.
+            Show how long transactions take in µs.
 )";
 
 int main(int argc, char* argv[])
 {
-   bool                               show_usage = false;
-   bool                               error      = false;
-   int                                verbose    = 0;
+   bool                               show_usage   = false;
+   bool                               error        = false;
+   bool                               show_version = false;
+   int                                verbose      = 0;
    Loggers                            logConfig;
    std::map<std::string, std::string> substitutions;
    cl_flags_t                         additional_args;
@@ -1037,6 +1043,8 @@ int main(int argc, char* argv[])
    {
       if (!strcmp(argv[next_arg], "-h") || !strcmp(argv[next_arg], "--help"))
          show_usage = true;
+      else if (!strcmp(argv[next_arg], "-V") || !strcmp(argv[next_arg], "--version"))
+         show_version = true;
       else if (!strcmp(argv[next_arg], "-v") || !strcmp(argv[next_arg], "--verbose"))
       {
          ++verbose;
@@ -1082,6 +1090,12 @@ int main(int argc, char* argv[])
    }
    if (next_arg >= argc)
       error = true;
+   if (show_version)
+   {
+      std::cerr << "psitest " << PSIBASE_VERSION_MAJOR << "." << PSIBASE_VERSION_MINOR << "."
+                << PSIBASE_VERSION_PATCH << "\n";
+      return 0;
+   }
    if (show_usage || error)
    {
       std::cerr << usage;
