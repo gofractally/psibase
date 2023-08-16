@@ -1,0 +1,88 @@
+name: On Tag - Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+
+jobs:
+  debug-print:
+    name: <Debug> Branch/tag - ${{github.ref}}
+    steps:
+      - name: step1
+        id: step1
+        run: |
+          echo "no-op"
+
+  build-psibase:
+    name: Run Builds
+    uses: ./.github/workflows/ubuntu-builder.yml
+
+  prerelease-check:
+    name: Prerelease Check
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.set-prerelease-var.outputs.prerelease }}
+    steps:
+      - name: Set prerelease variable
+        id: set-prerelease-var
+        shell: bash
+        run: |
+          if [[ ${{ github.ref_name }} == *-* ]]; then
+              echo prerelease=true >>$GITHUB_OUTPUT
+          else
+              echo prerelease=false >>$GITHUB_OUTPUT
+          fi
+
+  create-psibase-release:
+    name: Create Psibase Release
+    needs:
+      - build-psibase
+      - prerelease-check
+    steps:
+      - name: "Build Changelog"
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+
+      - name: <Debug> Display structure of downloaded files
+        run: ls -R
+
+      - name: Create new Github Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            psidk-ubuntu-2004.tar.gz
+            psidk-ubuntu-2204.tar.gz
+            psidk-book.tar.gz
+          draft: true
+          prerelease: ${{needs.prerelease-check.outputs.prerelease}}
+          release_name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
+          body_path: ${{ steps.build_changelog.outputs.changelog }}
+          # note you'll typically need to create a personal access token
+          # with permissions to create releases in the other repo
+          #token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+          # env:
+          #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  # build-new-CLI-versions:
+  #   name: Build new CLI version
+  #   needs: create-psibase-release
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - env:
+  #         GITHUB_TOKEN: ${{ secrets.WORKFLOW_DISPATCHER_TOKEN }}
+  #       run: |
+  #         version=${{ github.ref_name }}
+  #         gh workflow run cli.yml -f version=$version -R ${{ github.repository_owner }}/image-builders
+
+# TODO: Psinode image is still taking the binaries from rolling-release. Needs to be changed to
+#       Download the artifacts from the release that I just uploaded to.
