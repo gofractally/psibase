@@ -1092,8 +1092,8 @@ int main(int argc, char* argv[])
       error = true;
    if (show_version)
    {
-      std::cerr << "psitest " << PSINODE_VERSION_MAJOR << "." << PSINODE_VERSION_MINOR << "."
-                << PSINODE_VERSION_PATCH << "\n";
+      std::cerr << "psitest " << PSIBASE_VERSION_MAJOR << "." << PSIBASE_VERSION_MINOR << "."
+                << PSIBASE_VERSION_PATCH << "\n";
       return 0;
    }
    if (show_usage || error)

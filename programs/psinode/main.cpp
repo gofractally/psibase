@@ -2181,8 +2181,8 @@ int main(int argc, char* argv[])
 
    if (version)
    {
-      std::cerr << "psinode " << PSINODE_VERSION_MAJOR << "." << PSINODE_VERSION_MINOR << "."
-                << PSINODE_VERSION_PATCH << "\n";
+      std::cerr << "psinode " << PSIBASE_VERSION_MAJOR << "." << PSIBASE_VERSION_MINOR << "."
+                << PSIBASE_VERSION_PATCH << "\n";
       return 1;
    }
 
