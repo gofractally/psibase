@@ -165,7 +165,7 @@ endif()
 if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
     download(${DEP_URL}/${OPENSSL_ARCHIVE} ${DEP_PREFIX}/${OPENSSL_ARCHIVE} ${OPENSSL_SHA256})
     message("building openssl")
-    set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasi -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY")
+    set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasi -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY -Wno-error=implicit-function-declaration")
     execute_process(
         WORKING_DIRECTORY ${DEP_PREFIX}
         COMMAND bash -c "\
