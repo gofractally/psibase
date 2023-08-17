@@ -108,6 +108,18 @@ extern "C"
       return nullptr;
    }
 
+   void* aligned_alloc(size_t alignment, size_t size)
+   {
+      if (size % alignment != 0)
+         return nullptr;
+
+      void* ptr;
+      if (posix_memalign(&ptr, alignment, size) == 0)
+         return ptr;
+
+      return nullptr;
+   }
+
    void free(void* ptr) {}
 
    // Define these to satisfy musl references.
