@@ -9,6 +9,7 @@ on:
 jobs:
   debug-print:
     name: <Debug> Branch/tag - ${{github.ref}}
+    runs-on: ubuntu-latest
     steps:
       - name: step1
         id: step1
