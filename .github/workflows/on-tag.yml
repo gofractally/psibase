@@ -1,4 +1,4 @@
-name: On Tag - Release
+name: On Tag - Release Draft
 
 on:
   push:
@@ -44,7 +44,7 @@ jobs:
         with:
           configurationJson: |
             {
-              "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Changes in this release 👨‍💻</summary>\n\n\n#{{UNCATEGORIZED}}\n</details>",
+              "template": "#{{CHANGELOG}}\n\Changes in this release 👨‍💻:\n#{{UNCATEGORIZED}}\n",
             }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,29 +65,3 @@ jobs:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref }}
           body: ${{ steps.build_changelog.outputs.changelog }}
-
-      - name: Update dev-chat
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_TO }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
-          format: markdown
-          message: |
-            🎉 New Psibase release 🎉
-            Prerelease: ${{needs.prerelease-check.outputs.prerelease}}
-            [${{ github.ref_name }}](${{ steps.create_release.outputs.url }})
-
-
-  # build-new-CLI-versions:
-  #   name: Build new CLI version
-  #   needs: create-psibase-release
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - env:
-  #         GITHUB_TOKEN: ${{ secrets.WORKFLOW_DISPATCHER_TOKEN }}
-  #       run: |
-  #         version=${{ github.ref_name }}
-  #         gh workflow run cli.yml -f version=$version -R ${{ github.repository_owner }}/image-builders
-
-# TODO: Psinode image is still taking the binaries from rolling-release. Needs to be changed to
-#       Download the artifacts from the release that I just uploaded to.
