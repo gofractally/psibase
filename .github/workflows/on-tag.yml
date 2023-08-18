@@ -7,14 +7,6 @@ on:
       - 'v*.*.*-*'
 
 jobs:
-  debug-print:
-    name: <Debug> Branch/tag - ${{github.ref}}
-    runs-on: ubuntu-latest
-    steps:
-      - name: step1
-        id: step1
-        run: |
-          echo "no-op"
 
   build-psibase:
     name: Run Builds
@@ -37,7 +29,7 @@ jobs:
           fi
 
   create-psibase-release:
-    name: Create Psibase Release
+    name: Release - ${{github.ref_name}}
     runs-on: ubuntu-latest
     needs:
       - build-psibase
@@ -52,17 +44,14 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v3
 
-      - name: <Debug> Display structure of downloaded files
-        run: ls -R
-
       - name: Create new Github Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            psidk-ubuntu-2004.tar.gz
-            psidk-ubuntu-2204.tar.gz
-            psidk-book.tar.gz
+            psidk-ubuntu-2004/psidk-ubuntu-2004.tar.gz
+            psidk-ubuntu-2204/psidk-ubuntu-2204.tar.gz
+            psidk-book/psidk-book.tar.gz
           draft: true
           prerelease: ${{needs.prerelease-check.outputs.prerelease}}
           release_name: ${{ github.ref_name }}
