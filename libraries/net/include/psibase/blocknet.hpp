@@ -28,6 +28,17 @@ namespace psibase::net
       return tp - rem;
    }
 
+   template <typename F>
+   struct print_function
+   {
+      F                    f;
+      friend std::ostream& operator<<(std::ostream& os, const print_function& f)
+      {
+         f.f(os);
+         return os;
+      }
+   };
+
    struct HelloRequest
    {
       static constexpr unsigned type = 32;

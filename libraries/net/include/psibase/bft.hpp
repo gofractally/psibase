@@ -125,17 +125,6 @@ namespace psibase::net
    };
    PSIO_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
 
-   template <typename F>
-   struct print_function
-   {
-      F                    f;
-      friend std::ostream& operator<<(std::ostream& os, const print_function& f)
-      {
-         f.f(os);
-         return os;
-      }
-   };
-
    template <typename Base, typename Timer>
    struct basic_bft_consensus : Base
    {
@@ -341,25 +330,6 @@ namespace psibase::net
       std::tuple<const std::shared_ptr<ProducerSet>&, const std::shared_ptr<ProducerSet>&>
       get_producers(const BlockHeaderState* state)
       {
-#if 0
-         std::cout << "producers for block: " << loggers::to_string(state->blockId());
-         std::cout << " {";
-         for(const auto& [name,key] : state->producers->activeProducers)
-         {
-            std::cout << name.str() << ',';
-         }
-         std::cout << '}';
-         if(state->nextProducers)
-         {
-            std::cout << " {";
-            for(const auto& [name,key] : state->nextProducers->activeProducers)
-            {
-               std::cout << name.str() << ',';
-            }
-            std::cout << '}';
-         }
-         std::cout << std::endl;
-#endif
          return {state->producers, state->nextProducers};
       }
 
@@ -487,10 +457,17 @@ namespace psibase::net
          {
             producer_views[1].clear();
          }
-         if (new_producers)
+         if (new_producers || active_producers[1] != prods.second)
          {
-            PSIBASE_LOG(logger, info) << "New producers: " << prods.first->size() << ", "
-                                      << (prods.second ? prods.second->size() : 0);
+            PSIBASE_LOG(logger, info) << "Active producers: " << *prods.first
+                                      << print_function(
+                                             [&](std::ostream& os)
+                                             {
+                                                if (prods.second)
+                                                {
+                                                   os << ", " << *prods.second;
+                                                }
+                                             });
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);

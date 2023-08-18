@@ -128,6 +128,34 @@ namespace psibase
       }
    };
 
+   inline std::ostream& operator<<(std::ostream& os, const ProducerSet& prods)
+   {
+      if (prods.algorithm == ConsensusAlgorithm::cft)
+      {
+         os << "CFT:";
+      }
+      else if (prods.algorithm == ConsensusAlgorithm::bft)
+      {
+         os << "BFT:";
+      }
+      os << '[';
+      bool first = true;
+      for (const auto& [name, auth] : prods.activeProducers)
+      {
+         if (first)
+         {
+            first = false;
+         }
+         else
+         {
+            os << ',';
+         }
+         os << name.str();
+      }
+      os << ']';
+      return os;
+   }
+
    struct BlockAuthState
    {
       ConstRevisionPtr                    revision;

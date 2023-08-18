@@ -50,27 +50,6 @@ namespace psibase
       std::visit([&os](const auto& obj) { os << obj; }, consensus);
       return os;
    }
-
-   std::ostream& operator<<(std::ostream& os, const ProducerSet& producers)
-   {
-      if (producers.algorithm == ConsensusAlgorithm::cft)
-      {
-         os << "CFT:";
-      }
-      else if (producers.algorithm == ConsensusAlgorithm::bft)
-      {
-         os << "BFT:";
-      }
-      else
-      {
-         os << "?FT:";
-      }
-      for (const auto& [name, auth] : producers.activeProducers)
-      {
-         os << " " << name.str();
-      }
-      return os;
-   }
 }  // namespace psibase
 
 std::vector<std::pair<Consensus, Consensus>> transitions = {
