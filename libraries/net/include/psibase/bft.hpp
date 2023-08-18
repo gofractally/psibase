@@ -526,7 +526,8 @@ namespace psibase::net
                          // If we have not committed a block in the current term, increase the block timer
                          //_timeout += _timeout_delta;
                          _timeout = _timeout * 3 / 2;
-                         PSIBASE_LOG(logger, info) << "Increased consensus timeout to " << _timeout;
+                         PSIBASE_LOG(logger, info)
+                             << "Increased consensus timeout to " << _timeout.count() << " ms";
                       }
                       increase_view();
                    }
