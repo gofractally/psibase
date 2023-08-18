@@ -38,6 +38,7 @@ jobs:
 
   create-psibase-release:
     name: Create Psibase Release
+    runs-on: ubuntu-latest
     needs:
       - build-psibase
       - prerelease-check
