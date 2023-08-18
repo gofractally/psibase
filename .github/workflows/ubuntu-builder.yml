@@ -1,20 +1,19 @@
-name: Ubuntu 20.04
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-      - "release/*"
-  pull_request:
-    types: [assigned, opened, synchronize, reopened, labeled]
+name: Ubuntu builds
 
-env:
-  UBUNTU_2004_IMAGE: "ghcr.io/gofractally/psibase-builder-ubuntu-2004:62bc81622cb7cd21f03937b84c16571c2708bcd5"
+on:
+  workflow_call:
 
 jobs:
-  ubuntu-2004-build:
-    name: Ubuntu 20.04 | Build
+  build:
+    name: Ubuntu ${{ matrix.ubuntu-version }} - Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2004:efa3d81568eb2d4cdc3b3d8a343dd26de0fcba6c"
+            ubuntu-version: "2004"
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:efa3d81568eb2d4cdc3b3d8a343dd26de0fcba6c"
+            ubuntu-version: "2204"
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp
@@ -28,9 +27,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: .caches
-          key: $ubuntu-20.04-caches-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
+          key: $ubuntu-${{ matrix.ubuntu-version }}-caches-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
           restore-keys: |
-            $ubuntu-20.04-caches-
+            $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
         run: |
           set -e
@@ -46,11 +45,10 @@ jobs:
           echo log_file = ${GITHUB_WORKSPACE}/ccache.log >>${GITHUB_WORKSPACE}/ccache.conf
           export SCCACHE_CACHE_SIZE=200M
           export RUSTC_WRAPPER=sccache
-          export LLVM_CONFIG_PATH=/opt/clang+llvm-15.0.6/bin/llvm-config
-          export LD_LIBRARY_PATH=/opt/clang+llvm-15.0.6/lib/
-          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER -e LLVM_CONFIG_PATH -e LD_LIBRARY_PATH --user $(id -u):$(id -g) ${UBUNTU_2004_IMAGE}"
-          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER -e LLVM_CONFIG_PATH -e LD_LIBRARY_PATH ${UBUNTU_2004_IMAGE}"
-          docker pull ${UBUNTU_2004_IMAGE}
+          export DOCKER="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER --user $(id -u):$(id -g) ${{ matrix.builder-image }}"
+          export DOCKER_ROOT="docker run --rm -v ${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE} -w ${GITHUB_WORKSPACE} -e CCACHE_DIR -e CCACHE_CONFIGPATH -e SCCACHE_DIR -e SCCACHE_CACHE_SIZE -e RUSTC_WRAPPER ${{ matrix.builder-image }}"
+
+          docker pull ${{ matrix.builder-image }}
           echo =====
           ${DOCKER} ccache -s
           echo =====
@@ -64,19 +62,20 @@ jobs:
           ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc)"
           echo =====
           ls -la ${GITHUB_WORKSPACE}
+          ls -la ${GITHUB_WORKSPACE}/build/doc/psidk
           echo =====
           ${DOCKER} ccache -s
           echo =====
           ${DOCKER} sccache -s
           echo =====
-          ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-2004"
+          ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-${{ matrix.ubuntu-version }}"
           echo =====
           ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
-      - name: Upload psidk-ubuntu-2004
+      - name: Upload psidk-ubuntu-${{ matrix.ubuntu-version }}
         uses: actions/upload-artifact@v1
         with:
-          name: psidk-ubuntu-2004
-          path: build/psidk-ubuntu-2004.tar.gz
+          name: psidk-ubuntu-${{ matrix.ubuntu-version }}
+          path: build/psidk-ubuntu-${{ matrix.ubuntu-version }}.tar.gz
       - name: Upload psidk-book
         uses: actions/upload-artifact@v1
         with:

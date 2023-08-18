@@ -9,6 +9,7 @@
 #include <psibase/peer_manager.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/shortest_path_routing.hpp>
+#include <psibase/version.hpp>
 #include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
@@ -445,7 +446,9 @@ struct transaction_queue
    }
 
 #define CATCH_IGNORE \
-   catch (...) {}
+   catch (...)       \
+   {                 \
+   }
 
 bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 {
@@ -2095,6 +2098,7 @@ int main(int argc, char* argv[])
    std::string                 tls_key;
    byte_size                   db_cache_size;
    byte_size                   db_size;
+   bool                        version;
 
    namespace po = boost::program_options;
 
@@ -2134,6 +2138,7 @@ int main(int argc, char* argv[])
 #endif
    opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in µs.");
+   opt("version,V", po::bool_switch(&version), "Print version information");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
@@ -2185,7 +2190,7 @@ int main(int argc, char* argv[])
    }
    catch (std::exception& e)
    {
-      if (!vm.count("help"))
+      if (!vm.count("help") && !vm.count("version"))
       {
          std::cerr << e.what() << "\n";
          return 1;
@@ -2196,6 +2201,13 @@ int main(int argc, char* argv[])
    {
       std::cerr << usage << "\n\n";
       std::cerr << common_opts << "\n";
+      return 1;
+   }
+
+   if (version)
+   {
+      std::cerr << "psinode " << PSIBASE_VERSION_MAJOR << "." << PSIBASE_VERSION_MINOR << "."
+                << PSIBASE_VERSION_PATCH << "\n";
       return 1;
    }
 
