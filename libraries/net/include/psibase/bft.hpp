@@ -1116,7 +1116,8 @@ namespace psibase::net
          {
             return false;
          }
-         if (state->info.header.term != current_term)
+         if (state->info.header.term != current_term ||
+             active_producers[0]->algorithm != ConsensusAlgorithm::bft || !is_term_ready())
          {
             return false;
          }
@@ -1136,7 +1137,8 @@ namespace psibase::net
          {
             return false;
          }
-         if (state->info.header.term != current_term)
+         if (state->info.header.term != current_term ||
+             active_producers[0]->algorithm != ConsensusAlgorithm::bft || !is_term_ready())
          {
             return false;
          }
