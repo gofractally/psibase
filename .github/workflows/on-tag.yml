@@ -57,15 +57,9 @@ jobs:
             psidk-book/psidk-book.tar.gz
           draft: true
           prerelease: ${{needs.prerelease-check.outputs.prerelease}}
-          release_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           tag_name: ${{ github.ref }}
           body_path: ${{ steps.build_changelog.outputs.changelog }}
-          # note you'll typically need to create a personal access token
-          # with permissions to create releases in the other repo
-          #token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
-          # env:
-          #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 
   # build-new-CLI-versions:
   #   name: Build new CLI version
