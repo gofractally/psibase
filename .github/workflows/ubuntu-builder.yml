@@ -8,6 +8,7 @@ jobs:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2004:b2a46a609b12f645aaeb03245afd0e3d2bf75340"
