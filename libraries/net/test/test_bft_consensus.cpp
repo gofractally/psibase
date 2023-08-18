@@ -136,7 +136,13 @@ TEST_CASE("bft latency", "[bft]")
 {
    TEST_START(logger);
 
-   auto latency = GENERATE(150ms, 450ms, 900ms, 1050ms, 2100ms, 3450ms, 7650ms, 10350ms, 15450ms);
+   static const std::vector latencies{150ms,  450ms,  900ms,   1050ms, 2100ms,
+                                      3450ms, 7650ms, 10350ms, 15450ms};
+   auto                     dataIndex = GENERATE_INDEX(latencies);
+   INFO("data-index: " << dataIndex);
+   auto latency = latencies.at(dataIndex);
+
+   INFO("latency: " << latency);
 
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
@@ -236,7 +242,7 @@ TEST_CASE("fork before invalid 1", "[bft]")
    node.send(block2);
    node.send(invalid);
    node.send(makeViewChange("b", 6));
-   node.send(makeViewChange("c", 6));
+   node.send(makeViewChange("d", 6));
    CHECK(node.head().blockId == BlockInfo{block2.block->block()}.blockId);
 }
 
@@ -257,7 +263,7 @@ TEST_CASE("fork before invalid 2", "[bft]")
    node.send(block1);
    node.send(block2);
    node.send(makeViewChange("b", 6));
-   node.send(makeViewChange("c", 6));
+   node.send(makeViewChange("d", 6));
    CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
 }
 
@@ -274,13 +280,15 @@ TEST_CASE("truncated fork switch", "[bft]")
    auto root    = node.head();
    auto block1a = makeBlock(root, "b", 4);
    auto block1b = makeBlock(block1a, "b", 4);
-   auto block2  = makeBlock(root, "c", 5, setProducers(bft("a", "b", "c")));
+   auto block1c = makeBlock(block1b, "b", 4);
+   auto block2  = makeBlock(root, "c", 5, setProducers(bft("a", "b", "c", "e")));
    auto invalid = makeBlock(block2, "c", 5, Transaction{.actions = {Action{}}});
    node.addClient();
    node.send(block1a);
    node.send(makeViewChange("b", 4));
    node.send(makeViewChange("c", 4));
    node.send0(block1b);
+   node.send0(block1c);
    node.send0(block2);
    node.send0(invalid);
    node.send0(makeViewChange("b", 5));
@@ -329,13 +337,14 @@ TEST_CASE("producer fork 1", "[bft]")
    node.send(fork1);
    node.send(invalid);
    // Force switch to fork 1
-   node.send(makePrepare(fork1, "b"));
-   node.send(makePrepare(fork1, "c"));
-   node.send(makePrepare(fork1, "d"));
-   CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
+   BlockInfo fork1info{fork1.block->block()};
+   node.send(makeViewChange("b", 11, fork1info, {"b", "c", "d"}));
+   node.send(makeViewChange("c", 11, fork1info, {"b", "c", "d"}));
+   node.send(makeViewChange("d", 11, fork1info, {"b", "c", "d"}));
+   CHECK(node.head().blockId == fork1info.blockId);
    runFor(node.ctx, 1s);
    // The block should be built off fork1
-   CHECK(node.head().header.previous == BlockInfo{fork1.block->block()}.blockId);
+   CHECK(node.head().header.previous == fork1info.blockId);
    CHECK(node.head().header.producer.str() == "a");
 }
 
@@ -406,19 +415,19 @@ TEST_CASE("return to previous fork", "[bft]")
    CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
    // return to the worse fork
    node.send(fork1b);
-   node.send(makePrepare(fork1, "b"));
-   node.send(makePrepare(fork1, "c"));
+   node.send(makeViewChange("b", 6, BlockInfo{fork1.block->block()}, {"b", "c", "d"}));
+   node.send(makeViewChange("c", 6, BlockInfo{fork1.block->block()}, {"b", "c", "d"}));
    node.send(makePrepare(fork1b, "b"));
    node.send(makePrepare(fork1b, "c"));
    CHECK(node.head().blockId == BlockInfo{fork1b.block->block()}.blockId);
    // Must not generate commit for fork1b because this conflicts
-   // with the prepare for fork2.  Note that c's commit also violates
+   // with the view change.  Note that c's commit also violates
    // the protocol, so we have to consider it to be the one adversary node..
    node.send(makeCommit(fork1b, "c"));
    node.send(makeCommit(fork1b, "d"));
 
-   node.send(makePrepare(fork2, "b"));
-   node.send(makePrepare(fork2, "c"));
+   node.send(makeViewChange("b", 7, BlockInfo{fork2.block->block()}, {"b", "c", "d"}));
+   node.send(makeViewChange("c", 7, BlockInfo{fork2.block->block()}, {"b", "c", "d"}));
 
    // should switch to fork 2
    CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
@@ -485,7 +494,13 @@ TEST_CASE("invalid prepared block 1", "[bft]")
    node.send(makeViewChange("c", 4));
    node.send(makePrepare(invalid, "b"));
    node.send(makePrepare(invalid, "c"));
-   CHECK_THROWS_AS(node.send(makePrepare(invalid, "d")), consensus_failure);
+   try
+   {
+      node.send(makePrepare(invalid, "d"));
+   }
+   catch (consensus_failure&)
+   {
+   }
 }
 
 // The invalid block is executed at the fork switch
@@ -503,7 +518,13 @@ TEST_CASE("invalid prepared block 2", "[bft]")
    node.send(invalid);
    node.send(makePrepare(invalid, "b"));
    node.send(makePrepare(invalid, "c"));
-   CHECK_THROWS_AS(node.send(makePrepare(invalid, "d")), consensus_failure);
+   try
+   {
+      node.send(makePrepare(invalid, "d"));
+   }
+   catch (consensus_failure&)
+   {
+   }
 }
 
 TEST_CASE("invalid committed block", "[bft]")

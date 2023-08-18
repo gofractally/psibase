@@ -310,13 +310,33 @@ ViewChangeMessage makeViewChange(std::string_view producer, TermNum view)
    return ViewChangeMessage{view, AccountNumber{producer}};
 }
 
+ViewChangeMessage makeViewChange(std::string_view                        producer,
+                                 TermNum                                 view,
+                                 const BlockInfo&                        prepared,
+                                 std::initializer_list<std::string_view> preparers)
+{
+   ViewChangeMessage result{
+       view, AccountNumber{producer}, {}, prepared.blockId, prepared.header.term};
+   for (auto p : preparers)
+   {
+      result.prepares.push_back({AccountNumber{p}, {}});
+   }
+   return result;
+}
+
 void runFor(boost::asio::io_context& ctx, mock_clock::duration total_time)
 {
-   for (auto end = mock_clock::now() + total_time; mock_clock::now() < end; mock_clock::advance())
+   for (auto end = mock_clock::now() + total_time; mock_clock::now() < end;)
    {
       ctx.poll();
+      ctx.restart();
+      if (!mock_clock::advance())
+      {
+         return;
+      }
    }
    ctx.poll();
+   ctx.restart();
 }
 
 void printAccounts(std::ostream& os, const std::vector<AccountNumber>& producers)

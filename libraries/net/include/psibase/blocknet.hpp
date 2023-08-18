@@ -163,6 +163,12 @@ namespace psibase::net
          connection.hello_sent       = false;
          connection.hello.xid        = chain().get_head_state()->xid();
          async_send_hello(connection);
+         if (connection.hello.xid.id() == Checksum256{})
+         {
+            connection.last_received = {Checksum256{}, 1};
+            connection.last_sent     = connection.last_received;
+            connection.ready         = true;
+         }
       }
       void async_send_hello(peer_connection& connection)
       {
@@ -228,6 +234,8 @@ namespace psibase::net
             // sync from genesis
             connection.last_received = {Checksum256{}, 1};
             connection.last_sent     = connection.last_received;
+            // With no common block, we don't expect to get a HelloResponse
+            connection.peer_ready = true;
          }
          else
          {
@@ -551,6 +559,10 @@ namespace psibase::net
                   peer->syncing = true;
                   async_send_fork(*peer);
                }
+            }
+            else
+            {
+               PSIBASE_LOG(logger, debug) << "Peer " << peer->id << " not ready";
             }
             // ------------------------------------------------------------------
          }
