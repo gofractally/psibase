@@ -1,0 +1,31 @@
+name: Propagate new release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+
+  build-new-CLI-versions:
+    name: Build new CLI version
+    needs: create-psibase-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: <Debug> ${{ github.event.release.name }}
+        id: output
+        run: echo no-op
+      - name: Trigger CLI image builds
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_DISPATCHER_TOKEN }}
+        run: |
+          version=${{ github.event.release.name }}
+          gh workflow run cli.yml -f version=$version -R ${{ github.repository_owner }}/image-builders
+      - name: Update dev-chat
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: markdown
+          message: |
+            🎉 New Psibase release 🎉
+            [${{ github.ref_name }}](https://github.com/gofractally/psibase/releases/tag/${{ github.event.release.name }})
