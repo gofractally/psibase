@@ -27,9 +27,9 @@ jobs:
           else
               echo prerelease=false >>$GITHUB_OUTPUT
           fi
-      - name: Output
+      - name: PRERELEASE=${{ steps.set-prerelease-var.outputs.prerelease }}
         id: output
-        run: echo ${{ steps.set-prerelease-var.outputs.prerelease }}
+        run: echo no-op
 
   create-psibase-release:
     name: Release - ${{github.ref_name}}
