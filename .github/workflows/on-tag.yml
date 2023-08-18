@@ -59,9 +59,9 @@ jobs:
           prerelease: ${{needs.prerelease-check.outputs.prerelease}}
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref }}
-          body_path: ${{ steps.build_changelog.outputs.changelog }}
+          body: ${{ steps.build_changelog.outputs.changelog }}
 
-      - name: update dev-chat
+      - name: Update dev-chat
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_TO }}
