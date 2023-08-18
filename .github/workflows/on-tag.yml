@@ -28,6 +28,12 @@ jobs:
               echo prerelease=false >>$GITHUB_OUTPUT
           fi
 
+  prerelease-output:
+    name: Is prerelease?
+    needs: prerelease-check
+    runs-on: ubuntu-latest
+    run: echo ${{ needs.prerelease-check.outputs.prerelease }}
+
   create-psibase-release:
     name: Release - ${{github.ref_name}}
     runs-on: ubuntu-latest
