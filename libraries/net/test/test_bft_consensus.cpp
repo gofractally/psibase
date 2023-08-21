@@ -113,9 +113,9 @@ TEST_CASE("bft partition", "[bft]")
    loop(timer, 15s, [&]() { nodes.partition(NetworkPartition::split(rng)); });
    // This may advance the chain, but should not be expected to
    runFor(ctx, 10min);
-   ctx.poll();
    timer.cancel();
    ctx.poll();
+   ctx.restart();
 
    PSIBASE_LOG(logger, info) << "Final sync";
    // Make all nodes active
