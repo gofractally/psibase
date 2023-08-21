@@ -782,19 +782,22 @@ namespace psibase::net
          {
             pendingBlocks.clear();
             view_info* best_view_change = nullptr;
-            for (auto& view_change : producer_views[0])
+            for (int i = 0; i < 2; ++i)
             {
-               if (view_change.term == current_term)
+               for (auto& view_change : producer_views[i])
                {
-                  BlockHeaderState* check_state = get_subtree_from_view_change(view_change);
-                  if (check_state)
+                  if (view_change.term == current_term)
                   {
-                     if (!best_view_change ||
-                         by_best_prepared(*best_view_change->best_message->data) <
-                             by_best_prepared(*view_change.best_message->data))
+                     BlockHeaderState* check_state = get_subtree_from_view_change(view_change);
+                     if (check_state)
                      {
-                        best_view_change = &view_change;
-                        state            = check_state;
+                        if (!best_view_change ||
+                            by_best_prepared(*best_view_change->best_message->data) <
+                                by_best_prepared(*view_change.best_message->data))
+                        {
+                           best_view_change = &view_change;
+                           state            = check_state;
+                        }
                      }
                   }
                }
