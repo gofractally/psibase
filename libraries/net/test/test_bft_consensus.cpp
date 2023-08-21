@@ -142,7 +142,7 @@ TEST_CASE("bft latency", "[bft]")
    INFO("data-index: " << dataIndex);
    auto latency = latencies.at(dataIndex);
 
-   INFO("latency: " << latency);
+   INFO("latency: " << latency.count() << " ms");
 
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
