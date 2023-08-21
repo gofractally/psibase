@@ -1,4 +1,4 @@
-name: On PR Closed - Copy issue labels
+name: On PR Closed - Copy Issue Labels
 
 on:
   pull_request:

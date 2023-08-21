@@ -1,4 +1,4 @@
-name: Propagate new release
+name: On Release - Propagate
 
 on:
   release:
@@ -11,9 +11,9 @@ jobs:
     needs: create-psibase-release
     runs-on: ubuntu-latest
     steps:
-      - name: <Debug> ${{ github.event.release.name }}
+      - name: Building ${{ github.event.release.name }}
         id: output
-        run: echo no-op
+        run: true
       - name: Trigger CLI image builds
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_DISPATCHER_TOKEN }}
