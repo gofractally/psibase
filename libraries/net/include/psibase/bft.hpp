@@ -318,7 +318,7 @@ namespace psibase::net
       BlockOrder alt_prepare   = {};
 
       Timer                     _new_term_timer;
-      TermNum                   _ready_term;
+      TermNum                   _ready_term    = -1;
       std::chrono::milliseconds _timeout       = std::chrono::seconds(10);
       std::chrono::milliseconds _timeout_delta = std::chrono::seconds(5);
 
