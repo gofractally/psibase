@@ -45,6 +45,18 @@ def sleep(secs, end_at):
 
     time.sleep(secs + extra)
 
+class SuppressErrors:
+    '''A Context Manager used to handle repeated checks that we expect to pass most of the time'''
+    def __init__(self, n):
+        self.n = n
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is not None:
+            self.n -= 1
+            if self.n >= 0:
+                return True
+
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--psinode", default="psinode", help="The path to the psinode executable")

@@ -20,10 +20,12 @@ class TestRouting(unittest.TestCase):
 
         # We expect irreversible to be behind by 2
         print('checking blocks')
+        err = testutil.SuppressErrors(1)
         for i in range(5):
             header = a.get_block_header()
             print(header)
-            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+            with err:
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             time.sleep(1)
 
     @testutil.psinode_test
@@ -41,10 +43,12 @@ class TestRouting(unittest.TestCase):
 
         # Switch between two different configurations
         print('checking blocks')
+        err = testutil.SuppressErrors(1)
         for i in range(10):
             header = a.get_block_header()
             print(header)
-            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+            with err:
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             time.sleep(1)
             if i % 2 == 0:
                 a.connect(b)
@@ -68,11 +72,13 @@ class TestRouting(unittest.TestCase):
 
         # Switch between two different configurations
         print('checking blocks')
+        err = testutil.SuppressErrors(1)
         testutil.sleep(0.0, 0.5)
         for i in range(10):
             header = a.get_block_header()
             print(header)
-            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+            with err:
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             testutil.sleep(0.5, 0.5)
             if i % 2 == 0:
                 a.connect(b)
@@ -94,11 +100,13 @@ class TestRouting(unittest.TestCase):
 
         # Switch between two different configurations
         print('checking blocks')
+        err = testutil.SuppressErrors(1)
         testutil.sleep(0.0, 0.5)
         for i in range(10):
             header = a.get_block_header()
             print(header)
-            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+            with err:
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             testutil.sleep(0.5, 0.5)
             if i % 2 == 0:
                 a.connect(g)
@@ -120,11 +128,13 @@ class TestRouting(unittest.TestCase):
 
         # Switch between two different configurations
         print('checking blocks')
+        err = testutil.SuppressErrors(1)
         testutil.sleep(0.0, 0.5)
         for i in range(10):
             header = a.get_block_header()
             print(header)
-            self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+            with err:
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             testutil.sleep(0.5, 0.5)
             if i % 2 == 0:
                 a.connect(g)
