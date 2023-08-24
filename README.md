@@ -120,8 +120,6 @@ Alternatively, fork the project and do whatever you want with it!
 
 If you have a Mac (including Apple Silicon), you may use an Ubuntu 22.04 VM or Docker Ubuntu 22.04 container. We do not host ARM variants of our [docker images](https://github.com/orgs/gofractally/packages?repo_name=image-builders) on our GitHub container registry. Therefore if you would like to use either the `psibase-builder-ubuntu-2204` or `psibase-contributor` on your ARM-based Mac, you should pull the [image-builders](https://github.com/gofractally/image-builders) repo and build the images yourself.
 
-If your machine is ARM, you must use Rosetta; eos-vm JITs Intel machine code.
-
 ## Support 📱
 
 Some contributors to this repo hang out in [this telegram channel](https://t.me/psibase_developers). That's probably the best place to ask questions and get support.
