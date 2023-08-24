@@ -33,11 +33,11 @@ This repo contains an open source software implementation of the Psibase protoco
 <p align="center">
     &bull;
     <a href="#demo-deployment-%EF%B8%8F">Demo 🖥️</a> &bull;
-    <a href="#technical-docs">Technical docs 📓</a> &bull;
-    <a href="#running-psibase">Running psibase 🚀</a> &bull;
-    <a href="#build-from-source">Build from source 🛠️</a> &bull;
+    <a href="#technical-docs-">Technical docs 📓</a> &bull;
+    <a href="#running-psibase-">Running psibase 🚀</a> &bull;
+    <a href="#build-from-source-%EF%B8%8F">Build from source 🛠️</a> &bull;
     <a href="#contribute-">Contribute 🧬</a> &bull;
-    <a href="#support">Support 📱</a> &bull;
+    <a href="#support-">Support 📱</a> &bull;
 </p>
 
 -------
