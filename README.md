@@ -5,7 +5,22 @@
   psibase
 </h1>
 
-This repo contains an implementation of the Psibase protocol. Included in this repo are implementations of the following:
+## What is psibase
+
+Psibase an infrastructure protocol that can be used for full-stack Web3 application development and deployment. It aims to improve data integrity, user privacy and security, application efficiency and composability, and user and developer experience wherever it is deployed.
+
+Notable features:
+* Custom blockchain backend with simple node configuration graphical UI
+* Custom high-performance underlying database technology: Triedent
+* Flexible GraphQL data query support
+* Innovative validator selection mechanism
+* Decentralized user-interfaces
+* C++ & Rust support for writing web services
+* Nodes serve state over GraphQL 
+
+Check out our [docs](https://doc-sys.psibase.io/) to learn more.
+
+This repo contains an open source software implementation of the Psibase protocol. Included in this repo are implementations of the following:
 
 - `psinode`, the psibase node
 - `psibase`, the command-line utility for pushing transactions and booting a chain
@@ -16,12 +31,12 @@ This repo contains an implementation of the Psibase protocol. Included in this r
 -------
 
 <p align="center">
+    &bull;
     <a href="#demo-deployment-%EF%B8%8F">Demo 🖥️</a> &bull;
     <a href="#technical-docs">Technical docs 📓</a> &bull;
     <a href="#running-psibase">Running psibase 🚀</a> &bull;
     <a href="#build-from-source">Build from source 🛠️</a> &bull;
     <a href="#contribute-">Contribute 🧬</a> &bull;
-    <a href="#macos">MacOS 🍏</a> &bull;
     <a href="#support">Support 📱</a> &bull;
 </p>
 
@@ -101,7 +116,7 @@ If you're interested in developing next-generation web application development &
 
 Alternatively, fork the project and do whatever you want with it!
 
-## MacOS 🍏
+### MacOS 🍏
 
 If you have a Mac (including Apple Silicon), you may use an Ubuntu 22.04 VM or Docker Ubuntu 22.04 container. We do not host ARM variants of our [docker images](https://github.com/orgs/gofractally/packages?repo_name=image-builders) on our GitHub container registry. Therefore if you would like to use either the `psibase-builder-ubuntu-2204` or `psibase-contributor` on your ARM-based Mac, you should pull the [image-builders](https://github.com/gofractally/image-builders) repo and build the images yourself.
 
