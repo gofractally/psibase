@@ -7,26 +7,16 @@
 
 ## What is psibase
 
-Psibase an infrastructure protocol that can be used for full-stack Web3 application development and deployment. It aims to improve data integrity, user privacy and security, application efficiency and composability, and user and developer experience wherever it is deployed.
+Psibase is a powerful protocol that enables communities to come together to easily self-host web applications. This repository is an open source implementation of that protocol.
+Any psinode deployment comes with some default applications. Some of these are mandatory and critical for the infrastructure to function properly, and others are optional example user applications.
 
-Notable features:
-* Custom blockchain backend with simple node configuration graphical UI
-* Custom high-performance underlying database technology: Triedent
-* Flexible GraphQL data query support
-* Innovative validator selection mechanism
-* Decentralized user-interfaces
-* C++ & Rust support for writing web services
-* Nodes serve state over GraphQL 
+Primary packages included in this repository:
 
-Check out our [docs](https://doc-sys.psibase.io/) to learn more.
-
-This repo contains an open source software implementation of the Psibase protocol. Included in this repo are implementations of the following:
-
-- `psinode`, the psibase node
-- `psibase`, the command-line utility for pushing transactions and booting a chain
-- psibase system applications 
-- psibase example user applications
-- `psidk`, the service development kit
+| Package   | Description                                                                   |
+|-----------|-------------------------------------------------------------------------------|
+| `psinode` | The psibase infrastructure node                                               |
+| `psibase` | Command-line utility for interacting with psinode. Used primarily by scripts. |
+| `psidk`   | The SDK used for developing web services                                      |
 
 -------
 
