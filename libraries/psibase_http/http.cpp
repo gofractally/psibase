@@ -1557,8 +1557,17 @@ namespace psibase::http
                 }
                 else
                 {
-                   PSIBASE_LOG(logger, info) << "Idle connection closed";
-                   return do_close();
+                   beast::error_code ec;
+                   derived_session().close_impl(ec);
+                   if (ec)
+                   {
+                      PSIBASE_LOG(logger, warning) << "close: " << ec.message();
+                   }
+                   else
+                   {
+                      PSIBASE_LOG(logger, info) << "Idle connection closed";
+                   }
+                   _closed = true;
                 }
              });
       }
@@ -1591,7 +1600,7 @@ namespace psibase::http
          if (ec)
          {
             fail(logger, ec, "read");
-            return do_close();
+            return close_on_error();
          }
 
          {
@@ -1624,7 +1633,7 @@ namespace psibase::http
          if (ec)
          {
             fail(logger, ec, "write");
-            return do_close();
+            return close_on_error();
          }
 
          if (close)
@@ -1648,17 +1657,43 @@ namespace psibase::http
          // Send a TCP shutdown
          if (!_closed)
          {
-            derived_session().do_shutdown();
+            derived_session().shutdown_impl();
             _timer->cancel();  // cancel connection timer.
             _closed = true;
          }
          // At this point the connection is closed gracefully
       }
-      void do_shutdown()
+      void close_on_error()
+      {
+         if (!_closed)
+         {
+            _timer->cancel();
+            beast::error_code ec;
+            derived_session().close_impl(ec);
+            if (ec)
+            {
+               PSIBASE_LOG(logger, warning) << "close: " << ec.message();
+            }
+            _closed = true;
+         }
+      }
+
+     protected:
+      void shutdown_impl()
       {
          beast::error_code ec;
-         derived_session().stream.socket().shutdown(tcp::socket::shutdown_send, ec);
+         derived_session().stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+         if (ec)
+         {
+            PSIBASE_LOG(logger, warning) << "shutdown: " << ec.message();
+         }
+         derived_session().stream.socket().close(ec);
+         if (ec)
+         {
+            PSIBASE_LOG(logger, warning) << "close: " << ec.message();
+         }
       }
+      void close_impl(beast::error_code& ec) { derived_session().stream.socket().close(ec); }
    };  // http_session
 
    struct tcp_http_session : public http_session<tcp_http_session>,
@@ -1711,10 +1746,12 @@ namespace psibase::http
          return stream.next_layer().socket().remote_endpoint().address() == addr.address;
       }
 
-      void do_shutdown()
+      void shutdown_impl()
       {
          stream.async_shutdown([self = shared_from_this()](const std::error_code& ec) {});
       }
+
+      void close_impl(beast::error_code& ec) { stream.next_layer().socket().close(ec); }
 
       void run()
       {
