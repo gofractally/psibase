@@ -113,7 +113,7 @@ To run psinode, you can either build from source as described above, or you can 
 1. Installing a binary release, the latest of which can be found on our [Releases](https://github.com/gofractally/psibase/releases) page. We provide binary packages for both Ubuntu 20.04 and Ubuntu 22.04.
 2. Installing our psinode [Docker Image](https://github.com/orgs/gofractally/packages/container/package/psinode).
 
-To execute psinode from the docker image, you can use something the following docker command (make sure to specify the `VERSION` you want to run):
+To execute psinode from the docker image, you can use the following docker command (make sure to specify the `VERSION` you want to run):
 ```
 docker run --rm -p 8080:8080 -p 3000:3000 -p 9090:9090 ghcr.io/gofractally/psinode:VERSION
 ```
