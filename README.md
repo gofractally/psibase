@@ -1,11 +1,21 @@
 <div align="center">
-  <img src="https://about.psibase.io/assets/logo-psibase-green.0714b8ee.svg" />
+  <img src="./.github/images/logo-psibase-green.svg" />
+  <h1>psibase</h1>
+  <p>
+    &bull;
+    <a href="#overview">Overview</a> &bull;
+    <a href="#demo-deployment-%EF%B8%8F">Demo 🖥️</a> &bull;
+    <a href="#technical-docs-">Docs 📓</a> &bull;
+    <a href="#build-from-source-%EF%B8%8F">Build 🛠️</a> &bull;
+    <a href="#running-psibase-infrastructure-">Run 🚀</a> &bull;
+    <a href="#contribute-">Contribute 🧬</a> &bull;
+    <a href="#support-">Support 📱</a> &bull;
+  </p>
 </div>
-<h1 align="center">
-  psibase
-</h1>
 
-## What is psibase
+-------
+
+## Overview
 
 Psibase is a powerful protocol that enables communities to come together to easily self-host web applications. This repository is an open source implementation of that protocol.
 Any psinode deployment comes with some default applications, some of which are mandatory and critical for the infrastructure to function properly, and others are optional sample user applications.
@@ -18,20 +28,6 @@ Primary packages included in this repository:
 | `psibase` | Command-line utility for interacting with psinode. Used primarily by scripts. |
 | `psidk`   | The SDK used for developing web services                                      |
 
--------
-
-<p align="center">
-    &bull;
-    <a href="#demo-deployment-%EF%B8%8F">Demo 🖥️</a> &bull;
-    <a href="#technical-docs-">Technical docs 📓</a> &bull;
-    <a href="#running-psibase-">Running psibase 🚀</a> &bull;
-    <a href="#build-from-source-%EF%B8%8F">Build from source 🛠️</a> &bull;
-    <a href="#contribute-">Contribute 🧬</a> &bull;
-    <a href="#support-">Support 📱</a> &bull;
-</p>
-
--------
-
 ## Demo deployment 🖥️
 
 A demonstration deployment is currently hosted at [psibase.io](https://psibase.io) to showcase what psibase infrastructure could look like for end users. The applications available on this demo are sample applications and are not intended to be used for a production deployment.
@@ -39,13 +35,6 @@ A demonstration deployment is currently hosted at [psibase.io](https://psibase.i
 ## Technical docs 📓
 
 Documentation is hosted on the [doc-sys applet](https://doc-sys.psibase.io/) of our demo deployment.
-
-## Running psibase 🚀
-
-If you want to operate a node, build services, or explore psibase's command-line utility, we recommend one of the following methods:
-1. Installing a binary release, the latest of which can be found on our [Releases](https://github.com/gofractally/psibase/releases) page. We provide binary packages for both Ubuntu 20.04 and Ubuntu 22.04.
-2. Installing our psinode [Docker Image](https://github.com/gofractally/psinode-docker-image/pkgs/container/psinode). Our docker image can be used to run psibase on any operating system that supports Docker. Currently we do not automatically build an image for the arm architecture. However, we have successfully manually built and run Psibase on the latest [Apple Silicon](https://support.apple.com/en-us/HT211814) based devices. 
-
 
 ## Build from source 🛠️
 
@@ -81,7 +70,7 @@ Other notes:
 * Set the `WASI_SDK_PREFIX` environment variable before building to the root of your llvm installation (e.g. `/usr/lib/llvm-16`). Alternatively, set this variable during the build using the CMake flag `-DWASI_SDK_PREFIX=....`.
 * Add the wasm32-wasi target to rust.
 
-> 🔍 You may reference either the [Ubuntu 20.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2004-builder.Dockerfile) or the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile) for an example on how an environment could be set up.
+> 🔍 You can reference either the [Ubuntu 20.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2004-builder.Dockerfile) or the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile) for an example on how an environment could be set up.
 
 ### Build
 
@@ -98,22 +87,38 @@ make install
 
 The built product lives in `CMAKE_INSTALL_PREFIX` (`$CMAKE_BINARY_DIR/psidk` in the above example).
 
-The technical documentation for Psibase is part of this repository. To build & view it through the doc-sys applet of a deployed Psibase instance, see the instructions in [the docs](https://doc-sys.psibase.io/documentation.html).
+The technical documentation for psibase is part of this repository. To build & view it through the doc-sys applet of a deployed psibase instance, see the instructions in [the docs](https://doc-sys.psibase.io/documentation.html).
 
 #### Build flags
 
-The following are some of the common/useful build flags you may use to configure CMake that modify the build. Open the build directory and run `cmake -LH` to view a list of all options.
+The following are some of the common/useful build flags you can use to configure CMake that modify the build. Open the build directory and run `cmake -LH` to view a list of all options.
 
 | Flag                           | Example Values    | Description                                                                                          |
 | ------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------- |
-| BUILD_DEBUG_WASM               | `ON`,`OFF`        | Built wasms should include debug information                                                         |
+| BUILD_DEBUG_WASM               | `yes`,`no`        | Build debug wasms (Needed for using the debugger)                                                    |
 | BUILD_DOC                      | `yes`,`no`        | Build the technical documentation                                                                    |
 | BUILD_JS                       | `yes`,`no`        | Build application front-ends                                                                         |
 | BUILD_NATIVE                   | `yes`,`no`        | Build the native programs (`psinode`, `psitest`)                                                     |
+| BUILD_RELEASE_WASM             | `yes`,`no`        | Build optimized release wasms                                                                        |
 | BUILD_RUST                     | `yes`,`no`        | Build `psibase` CLI tool                                                                             |
-| CMAKE_BUILD_TYPE               | `Debug`,`Release` | Determines level of optimization                                                                     |
-| CMAKE_EXPORT_COMPILE_COMMANDS  | `ON`,`OFF`        | Tell CMake to generate compile_commands.json, used by various tools (e.g. clang format intellisense) |
+| CMAKE_BUILD_TYPE               | `Debug`,`Release` | Determines level of optimization for the native programs                                             |
+| CMAKE_EXPORT_COMPILE_COMMANDS  | `yes`,`no`        | Tell CMake to generate compile_commands.json, used by various tools (e.g. clang format intellisense) |
 | CMAKE_INSTALL_PREFIX           | `psidk`           | Binary install location.                                                                             |
+
+## Running psibase infrastructure 🚀
+
+> 🔍 We currently do not provide an ARM binary or docker image. If your device uses an ARM chip, you should build psinode (or its [docker image](https://github.com/gofractally/image-builders)) yourself. 
+
+To run psinode, you can either build from source as described above, or you can install prebuilt binaries through one of the following two methods:
+1. Installing a binary release, the latest of which can be found on our [Releases](https://github.com/gofractally/psibase/releases) page. We provide binary packages for both Ubuntu 20.04 and Ubuntu 22.04.
+2. Installing our psinode [Docker Image](https://github.com/orgs/gofractally/packages/container/package/psinode).
+
+To execute psinode from the docker image, you can use something the following docker command (make sure to specify the `VERSION` you want to run):
+```
+docker run --rm -p 8080:8080 -p 3000:3000 -p 9090:9090 ghcr.io/gofractally/psinode:VERSION
+```
+
+Run psinode with `--help` to learn about the various options, or consult our technical [docs](https://doc-sys.psibase.io/).
 
 ## Contribute 🧬
 
@@ -123,7 +128,7 @@ Alternatively, fork the project and do whatever you want with it!
 
 ### MacOS 🍏
 
-If you have a Mac (including Apple Silicon), you may use an Ubuntu 22.04 VM or Docker container. We do not host ARM variants of our [docker images](https://github.com/orgs/gofractally/packages?repo_name=image-builders) on our GitHub container registry. Therefore if you would like to use either the `psibase-builder-ubuntu-2204` or `psibase-contributor` on your Apple Silicon Mac, you should pull the [image-builders](https://github.com/gofractally/image-builders) repo and build the images yourself.
+If you have a Mac (including Apple Silicon), you can use an Ubuntu 22.04 VM or Docker container. We do not host ARM variants of our [docker images](https://github.com/orgs/gofractally/packages?repo_name=image-builders) on our GitHub container registry. Therefore if you would like to use either the `psibase-builder-ubuntu-2204` or `psibase-contributor` on your Apple Silicon Mac, you should pull the [image-builders](https://github.com/gofractally/image-builders) repo and build the images yourself.
 
 ## Support 📱
 
