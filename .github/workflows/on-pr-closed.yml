@@ -1,18 +1,44 @@
 name: On PR Closed - Copy Issue Labels
 
 on:
-  pull_request:
-    types:
-      - closed
+#  pull_request:
+#    types:
+#      - closed
+  workflow_dispatch:
+    inputs:
+      prnum:
+        description: 'PR Number (e.g. 350)'
+        required: true
 
 jobs:
-
   copy-labels:
     name: Copy linked issue labels
     runs-on: ubuntu-latest
     steps:
-      - name: copy-labels
-        uses: michalvankodev/copy-issue-labels@v1.2.1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          from-title: true
+      - name: copy labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_CLI_TOKEN }}
+          #PR_NUMBER: ${{ github.event.number }}
+          PR_NUMBER: ${{ github.event.inputs.prnum }}
+        run: |
+          org=${{ github.repository_owner }}
+          repo=psibase
+          pr_number=$PR_NUMBER
+          issue_number=$(gh api graphql -F owner="$org" -F repo="$repo" -F pr=$pr_number -f query='
+          query ($owner: String!, $repo: String!, $pr: Int!) {
+            repository(owner: $owner, name: $repo) {
+              pullRequest(number: $pr) {
+                closingIssuesReferences(first: 1) {
+                  nodes {
+                    number
+                  }
+                }
+              }
+            }
+          }'  --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].number')
+
+          labels=$(gh api "repos/$org/$repo/issues/$issue_number/labels" --jq 'map(.name) | join(",")')
+          json_labels="[\"$(echo "$labels" | sed 's/,/","/g')\"]"
+          echo "{\"labels\":$json_labels}" > input.json
+          gh api "repos/$org/$repo/issues/$pr_number/labels" -X POST --input input.json
+          rm input.json

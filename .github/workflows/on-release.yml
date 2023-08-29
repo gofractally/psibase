@@ -28,4 +28,4 @@ jobs:
           format: markdown
           message: |
             🎉 New Psibase release 🎉
-            [${{ github.ref_name }}](https://github.com/gofractally/psibase/releases/tag/${{ github.event.release.name }})
+            [${{ github.ref_name }}](https://github.com/${{ github.repository }}/releases/tag/${{ github.event.release.name }})
