@@ -446,6 +446,11 @@ namespace psibase
       return ExtendedBlockId{std::get<2>(order), std::get<1>(order)};
    }
 
+   TermNum orderToTerm(const auto& order)
+   {
+      return std::get<0>(order);
+   }
+
    class ForkDb
    {
      public:

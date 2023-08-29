@@ -314,8 +314,7 @@ namespace psibase::net
       using BlockOrder = decltype(std::declval<BlockHeaderState>().order());
 
       BlockOrder best_prepared = {};
-      BlockOrder best_prepare  = {};
-      BlockOrder alt_prepare   = {};
+      BlockOrder best_confirm  = {};
 
       Timer                     _new_term_timer;
       TermNum                   _ready_term    = -1;
@@ -1086,6 +1085,22 @@ namespace psibase::net
          }
       }
 
+      bool is_forbidden_fork(const BlockHeaderState* state)
+      {
+         // If we have not confirmed anything, there are no restrictions
+         if (orderToXid(best_confirm).id() == Checksum256{})
+         {
+            return false;
+         }
+         // If the block does not fork, then we can confirm it
+         if (chain().in_best_chain(state->xid()) && chain().in_best_chain(orderToXid(best_confirm)))
+         {
+            return false;
+         }
+         // Forks are allowed on a new term
+         return orderToTerm(best_confirm) >= state->info.header.term;
+      }
+
       // track best committed, best prepared, best prepared on different fork
       bool can_prepare(const BlockHeaderState* state)
       {
@@ -1102,9 +1117,15 @@ namespace psibase::net
          {
             return false;
          }
+         // CFT joint producers should not prepare
          if (state->nextProducers && state->nextProducers->algorithm != ConsensusAlgorithm::bft)
          {
-            return state->producers->isProducer(self);
+            if (!state->producers->isProducer(self))
+               return false;
+         }
+         if (is_forbidden_fork(state))
+         {
+            return false;
          }
          return true;
       }
@@ -1123,16 +1144,7 @@ namespace psibase::net
          {
             return false;
          }
-         // have threshold prepares AND have not prepared a better conflicting block
-         if (chain().in_best_chain(state->xid()) && chain().in_best_chain(orderToXid(best_prepare)))
-         {
-            return state->order() > alt_prepare;
-         }
-         else
-         {
-            return state->order() > best_prepare;
-         }
-         return false;
+         return !is_forbidden_fork(state);
       }
       void on_prepare(const BlockHeaderState* state, AccountNumber producer, const auto& msg)
       {
@@ -1158,13 +1170,9 @@ namespace psibase::net
       {
          const auto& id = state->blockId();
          assert(chain().in_best_chain(state->xid()));
-         if (state->order() > best_prepare)
+         if (state->order() > best_confirm)
          {
-            if (!chain().in_best_chain(orderToXid(best_prepare)))
-            {
-               alt_prepare = best_prepare;
-            }
-            best_prepare = state->order();
+            best_confirm = state->order();
          }
          for_each_key(state,
                       [&](const auto& key)
@@ -1249,6 +1257,10 @@ namespace psibase::net
       void do_commit(const BlockHeaderState* state, AccountNumber producer)
       {
          const auto& id = state->blockId();
+         if (state->order() > best_confirm)
+         {
+            best_confirm = state->order();
+         }
          for_each_key(state,
                       [&](const auto& key)
                       {
