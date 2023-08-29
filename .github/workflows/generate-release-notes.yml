@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       starttag:
-        description: 'e.g. "vX.Y.Z"'
+        description: 'Start tag (e.g. "vX.Y.Z")'
         required: true
       endtag:
-        description: 'e.g. "vX.Y.Z"'
+        description: 'End tag (e.g. "vX.Y.Z")'
         required: true
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
           toTag: ${{ github.event.inputs.endtag }}
           configurationJson: |
             {
-              "template": "${{CHANGELOG}}\n\n<details>\n<summary>Uncategorized</summary>\n\n${{UNCATEGORIZED}}\n</details>",
+              "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Features</summary>\n\n#{{UNCATEGORIZED}}\n</details>",
               "pr_template": "- #{{TITLE}} (PR ##{{NUMBER}})",
               "categories": [
                 {
