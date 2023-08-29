@@ -67,7 +67,7 @@ jobs:
       - name: Write to file
         id: write_changelog_file
         run: |
-          echo "${{ steps.build_changelog.outputs.changelog }}"" > changelog.md
+          echo "${{ steps.build_changelog.outputs.changelog }}" > changelog.md
       - name: Upload changelog
         uses: actions/upload-artifact@v1
         with:
