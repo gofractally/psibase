@@ -31,10 +31,15 @@ set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_
 find_package(Python COMPONENTS Interpreter)
 if(Python_Interpreter_FOUND)
     add_test(
-        NAME test_routing
+        NAME psinode_test_routing
         COMMAND ${Python_EXECUTABLE} test_routing.py --psinode=$<TARGET_FILE:psinode>
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     set_tests_properties(test_routing PROPERTIES PROCESSORS 7)
+    add_test(
+        NAME psinode_test_crash
+        COMMAND ${Python_EXECUTABLE} test_crash.py --psinode=$<TARGET_FILE:psinode>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    set_tests_properties(test_routing PROPERTIES PROCESSORS 4)
 endif()
 
 include(GNUInstallDirs)

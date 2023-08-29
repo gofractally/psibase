@@ -176,23 +176,23 @@ class API:
     # Transaction processing
     def pack_action(self, act):
         '''Pack an action and return a json object suitable for use in pack_transaction'''
-        result = self.post('/pack_action/%s' % act.method, service=act.service, json=act.data)
-        result.raise_for_status()
-        return {'sender':act.sender, 'service':act.service, 'method': act.method, 'rawData': result.content.hex()}
+        with self.post('/pack_action/%s' % act.method, service=act.service, json=act.data) as result:
+            result.raise_for_status()
+            return {'sender':act.sender, 'service':act.service, 'method': act.method, 'rawData': result.content.hex()}
     def pack_transaction(self, trx):
         '''Pack a transaction and return the result as bytes'''
-        result = self.post('/common/pack/Transaction', json={'tapos':trx.tapos, 'actions':[self.pack_action(act) for act in trx.actions], 'claims': trx.claims})
-        result.raise_for_status()
-        return result.content
+        with self.post('/common/pack/Transaction', json={'tapos':trx.tapos, 'actions':[self.pack_action(act) for act in trx.actions], 'claims': trx.claims}) as result:
+            result.raise_for_status()
+            return result.content
     def pack_signed_transaction(self, trx, signatures=[]):
         '''Pack a signed transactions and return the result as bytes'''
         if isinstance(trx, bytes):
             trx = trx.hex()
         elif isinstance(trx, Transaction):
             trx = self.pack_transaction(trx).hex()
-        result = self.post('/common/pack/SignedTransaction', json={'transaction': trx, 'proofs':signatures})
-        result.raise_for_status()
-        return result.content
+        with self.post('/common/pack/SignedTransaction', json={'transaction': trx, 'proofs':signatures}) as result:
+            result.raise_for_status()
+            return result.content
     def push_transaction(self, trx):
         '''
         Push a transaction to the chain and return the transaction trace
@@ -200,12 +200,12 @@ class API:
         Raise TransactionError if the transaction fails
         '''
         packed = self.pack_signed_transaction(trx)
-        result = self.post('/native/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed)
-        result.raise_for_status()
-        trace = result.json()
-        if trace['error'] is not None:
-            raise TransactionError(trace)
-        return trace
+        with self.post('/native/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
+            result.raise_for_status()
+            trace = result.json()
+            if trace['error'] is not None:
+                raise TransactionError(trace)
+            return trace
     def push_action(self, sender, service, method, data):
         '''
         Push a transaction consisting of a single action to the chain and return the transaction trace
@@ -243,18 +243,18 @@ class API:
 
         Raise GraphQLError if the query fails
         '''
-        result = self.post('/graphql', service=service, json={'query': query})
-        result.raise_for_status()
-        json = result.json()
-        if 'errors' in json:
-            raise GraphQLError(json)
-        return json['data']
+        with self.post('/graphql', service=service, json={'query': query}) as result:
+            result.raise_for_status()
+            json = result.json()
+            if 'errors' in json:
+                raise GraphQLError(json)
+            return json['data']
 
     def get_tapos(self):
         '''Returns TaPoS for the current head block'''
-        result = self.get('/common/tapos/head')
-        result.raise_for_status()
-        return result.json()
+        with  self.get('/common/tapos/head') as result:
+            result.raise_for_status()
+            return result.json()
 
     def get_producers(self):
         '''Returns a tuple of (current producers, next producers). The next producers are empty except when the chain is in the process of changing block producers.'''
@@ -346,21 +346,25 @@ class Node(API):
         super().__init__('http://%s/' % hostname, session)
         os.makedirs(self.dir, exist_ok=True)
         _write_config(self.dir, log_filter, log_format)
-        args = [self.executable, "-l", self.socketpath]
         if isinstance(listen, str):
             listen = [listen]
-        for interface in listen:
+        self.listen = listen
+        self.p2p = p2p
+        self.start(database_cache_size=database_cache_size)
+    def start(self, database_cache_size=None):
+        args = [self.executable, "-l", self.socketpath]
+        for interface in self.listen:
             args.extend(['-l', interface])
-        if producer is not None:
-            args.extend(['-p', producer])
-        if hostname is not None:
-            args.extend(['--host', hostname])
-        if p2p:
+        if self.producer is not None:
+            args.extend(['-p', self.producer])
+        if self.hostname is not None:
+            args.extend(['--host', self.hostname])
+        if self.p2p:
             args.append('--p2p')
         if database_cache_size is not None:
             args.extend(['--database-cache-size', str(database_cache_size)])
         args.append(self.dir)
-        with open(self.logpath, 'w') as logfile:
+        with open(self.logpath, 'a') as logfile:
             self.child = subprocess.Popen(args, stderr=logfile)
         self._wait_for_startup()
 
@@ -388,7 +392,8 @@ class Node(API):
             self.tempdir.cleanup()
     def shutdown(self):
         '''Stop the server and wait for the server process to exit'''
-        self.post('/native/admin/shutdown', service='admin-sys', json={})
+        with self.post('/native/admin/shutdown', service='admin-sys', json={}):
+            pass
         self.session.close()
         self.child.wait()
     def wait(self, cond, timeout=10):
@@ -408,7 +413,8 @@ class Node(API):
             url = other.socketpath
         else:
             url = other
-        self.post('/native/admin/connect', service='admin-sys', json={'url':url})
+        with self.post('/native/admin/connect', service='admin-sys', json={'url':url}):
+            pass
     def disconnect(self, other):
         '''Disconnects a peer. other can be a peer id, a URL, or a Node object.'''
         if isinstance(other, int):
@@ -416,11 +422,11 @@ class Node(API):
             result.raise_for_status()
             return True
         elif isinstance(other, str):
-            peers = self.get('/native/admin/peers', service='admin-sys')
-            peers.raise_for_status()
-            for peer in peers.json():
-                if peer['url'] == other:
-                    return self.disconnect(int(peer['id']))
+            with self.get('/native/admin/peers', service='admin-sys') as peers:
+                peers.raise_for_status()
+                for peer in peers.json():
+                    if peer['url'] == other:
+                        return self.disconnect(int(peer['id']))
             return False
         else:
             return self.disconnect(other.socketpath) or other.disconnect(self.socketpath)
@@ -465,7 +471,7 @@ class Node(API):
             time.sleep(0.1)
     def _is_ready(self):
         try:
-            result = self.get('/native/admin/status', service='admin-sys')
-            return result.status_code == requests.codes.ok and 'startup' not in result.json()
-        except requests.exceptions.ConnectionError:
+            with self.get('/native/admin/status', service='admin-sys') as result:
+                return result.status_code == requests.codes.ok and 'startup' not in result.json()
+        except requests.exceptions.ConnectionError as e:
             return False
