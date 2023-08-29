@@ -34,12 +34,12 @@ if(Python_Interpreter_FOUND)
         NAME psinode_test_routing
         COMMAND ${Python_EXECUTABLE} test_routing.py --psinode=$<TARGET_FILE:psinode>
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    set_tests_properties(test_routing PROPERTIES PROCESSORS 7)
+    set_tests_properties(psinode_test_routing PROPERTIES PROCESSORS 7)
     add_test(
         NAME psinode_test_crash
         COMMAND ${Python_EXECUTABLE} test_crash.py --psinode=$<TARGET_FILE:psinode>
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    set_tests_properties(test_routing PROPERTIES PROCESSORS 4)
+    set_tests_properties(psinode_test_crash PROPERTIES PROCESSORS 4)
 endif()
 
 include(GNUInstallDirs)
