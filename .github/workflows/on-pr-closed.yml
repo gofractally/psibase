@@ -1,14 +1,9 @@
 name: On PR Closed - Copy Issue Labels
 
 on:
-#  pull_request:
-#    types:
-#      - closed
-  workflow_dispatch:
-    inputs:
-      prnum:
-        description: 'PR Number (e.g. 350)'
-        required: true
+  pull_request:
+    types:
+      - closed
 
 jobs:
   copy-labels:
@@ -18,8 +13,7 @@ jobs:
       - name: copy labels
         env:
           GITHUB_TOKEN: ${{ secrets.GH_CLI_TOKEN }}
-          #PR_NUMBER: ${{ github.event.number }}
-          PR_NUMBER: ${{ github.event.inputs.prnum }}
+          PR_NUMBER: ${{ github.event.number }}
         run: |
           org=${{ github.repository_owner }}
           repo=psibase
