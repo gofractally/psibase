@@ -27,7 +27,7 @@ env:
       "categories": [
         {
             "title": "## 🐛 Fixes",
-            "labels": ["bug"],
+            "labels": ["bug"]
         },
         {
             "title": "## 💻 App development",
@@ -35,12 +35,12 @@ env:
         },
         {
             "title": "### 📄 Developer experience docs",
-            "labels": ["Dev Experience", "documentation"]
+            "labels": ["Dev Experience", "documentation"],
             "exhaustive": true,
         },
         {
             "title": "### 📄 Front-end infrastructure docs",
-            "labels": ["Front-end Infra", "documentation"]
+            "labels": ["Front-end Infra", "documentation"],
             "exhaustive": true,
         },
         {
@@ -49,7 +49,7 @@ env:
         },
         {
             "title": "### 📄 Docs",
-            "labels": ["System app", "documentation"]
+            "labels": ["System app", "documentation"],
             "exhaustive": true,
         },
         {
@@ -58,7 +58,7 @@ env:
         },
         {
             "title": "### 📄 Docs",
-            "labels": ["Governance", "documentation"]
+            "labels": ["Governance", "documentation"],
             "exhaustive": true,
         },
         {
@@ -67,7 +67,7 @@ env:
         },
         {
             "title": "### 📄 Docs",
-            "labels": ["Node infra", "documentation"]
+            "labels": ["Node infra", "documentation"],
             "exhaustive": true,
         }
       ]
