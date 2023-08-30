@@ -36,12 +36,12 @@ env:
         {
             "title": "### 📄 Developer experience docs",
             "labels": ["Dev Experience", "documentation"],
-            "exhaustive": true,
+            "exhaustive": true
         },
         {
             "title": "### 📄 Front-end infrastructure docs",
             "labels": ["Front-end Infra", "documentation"],
-            "exhaustive": true,
+            "exhaustive": true
         },
         {
             "title": "## 🚀 Default apps",
@@ -50,7 +50,7 @@ env:
         {
             "title": "### 📄 Docs",
             "labels": ["System app", "documentation"],
-            "exhaustive": true,
+            "exhaustive": true
         },
         {
             "title": "## ⚖️ Governance",
@@ -59,7 +59,7 @@ env:
         {
             "title": "### 📄 Docs",
             "labels": ["Governance", "documentation"],
-            "exhaustive": true,
+            "exhaustive": true
         },
         {
             "title": "## 🏗️ Infrastructure Providers",
@@ -68,7 +68,7 @@ env:
         {
             "title": "### 📄 Docs",
             "labels": ["Node infra", "documentation"],
-            "exhaustive": true,
+            "exhaustive": true
         }
       ]
     }
@@ -107,7 +107,58 @@ jobs:
           failOnError: true
           fromTag: ${{ github.event.inputs.starttag }}
           toTag: ${{ github.event.inputs.endtag }}
-          configurationJson: $CONFIG_JSON
+          configurationJson: |
+            {
+              "template": "#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n",
+              "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}}) | #{{TITLE}}",
+              "categories": [
+                {
+                    "title": "## 🐛 Fixes",
+                    "labels": ["bug"]
+                },
+                {
+                    "title": "## 💻 App development",
+                    "labels": ["Dev Experience", "Front-end Infra"]
+                },
+                {
+                    "title": "### 📄 Developer experience docs",
+                    "labels": ["Dev Experience", "documentation"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "### 📄 Front-end infrastructure docs",
+                    "labels": ["Front-end Infra", "documentation"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "## 🚀 Default apps",
+                    "labels": ["System app"]
+                },
+                {
+                    "title": "### 📄 Docs",
+                    "labels": ["System app", "documentation"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "## ⚖️ Governance",
+                    "labels": ["Governance"]
+                },
+                {
+                    "title": "### 📄 Docs",
+                    "labels": ["Governance", "documentation"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "## 🏗️ Infrastructure Providers",
+                    "labels": ["Node infra"]
+                },
+                {
+                    "title": "### 📄 Docs",
+                    "labels": ["Node infra", "documentation"],
+                    "exhaustive": true
+                }
+              ]
+            }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Write to file
