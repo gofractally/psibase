@@ -107,7 +107,7 @@ jobs:
           failOnError: true
           fromTag: ${{ github.event.inputs.starttag }}
           toTag: ${{ github.event.inputs.endtag }}
-          configurationJson: $CONFIG_JSON
+          configurationJson: ${{ env.CONFIG_JSON }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Write to file
@@ -136,7 +136,7 @@ jobs:
         with:
           failOnError: true
           toTag: ${{ github.event.inputs.endtag }}
-          configurationJson: $CONFIG_JSON
+          configurationJson: ${{ env.CONFIG_JSON }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Write to file
