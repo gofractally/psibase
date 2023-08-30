@@ -78,31 +78,10 @@ env:
             }
 
 jobs:
-  prerelease-check:
-    name: Prerelease Check
-    runs-on: ubuntu-latest
-    outputs:
-      prerelease: ${{ steps.set-prerelease-var.outputs.prerelease }}
-    steps:
-      - name: Set prerelease variable
-        id: set-prerelease-var
-        shell: bash
-        run: |
-          if [[ ${{ github.event.inputs.endtag }} == *-* ]]; then
-              echo prerelease=true >>$GITHUB_OUTPUT
-          else
-              echo prerelease=false >>$GITHUB_OUTPUT
-          fi
-      - name: PRERELEASE=${{ steps.set-prerelease-var.outputs.prerelease }}
-        id: output
-        run: true
-
   generate-custom-release-notes:
     if: github.event_name == 'workflow_dispatch'
     name: Gen notes ${{ github.event.inputs.starttag }} - ${{ github.event.inputs.endtag }}
     runs-on: ubuntu-latest
-    needs:
-      - prerelease-check
     steps:
       - name: Build Changelog
         id: build_changelog
@@ -129,8 +108,6 @@ jobs:
     if: github.event_name == 'workflow_call'
     name: Gen ${{ github.event.inputs.endtag }} notes
     runs-on: ubuntu-latest
-    needs:
-      - prerelease-check
     outputs:
       changelog: ${{ steps.build_changelog.outputs.changelog }}
     steps:
