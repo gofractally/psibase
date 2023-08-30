@@ -110,7 +110,7 @@ jobs:
 
 
   auto-generate-release-notes:
-    if: github.event.inputs.externalCall
+    if: ${{ inputs.externalCall }}
     name: Gen ${{ github.event.inputs.endtag }} notes
     runs-on: ubuntu-latest
     outputs:
