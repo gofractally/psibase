@@ -111,7 +111,7 @@ jobs:
 
   auto-generate-release-notes:
     if: ${{ inputs.externalCall }}
-    name: Gen ${{ github.event.inputs.endtag }} notes
+    name: Gen ${{ inputs.endtag }} notes
     runs-on: ubuntu-latest
     outputs:
       changelog: ${{ steps.build_changelog.outputs.changelog }}
