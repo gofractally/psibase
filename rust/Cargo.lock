@@ -342,7 +342,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "binaryen",
@@ -748,7 +748,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.1.7"
+version = "0.2.0"
 dependencies = [
  "custom_error",
  "psibase_macros",
@@ -2000,7 +2000,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "darling",
  "proc-macro-error",
@@ -2012,7 +2012,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.1.5"
+version = "0.2.0"
 dependencies = [
  "seahash",
 ]
