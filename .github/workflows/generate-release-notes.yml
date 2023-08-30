@@ -31,51 +31,72 @@ env:
               "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}})  |  #{{TITLE}}",
               "categories": [
                 {
-                    "title": "## 🐛 Fixes",
-                    "labels": ["bug"]
-                },
-                {
                     "title": "## 💻 App development",
                     "labels": ["Dev Experience", "Front-end Infra"],
-                    "exclude_labels": ["documentation"]
+                    "exclude_labels": ["documentation", "bug"]
                 },
                 {
-                    "title": "### 📄 Developer experience docs",
+                    "title": "### Developer experience bugfixes",
+                    "labels": ["Dev Experience", "bug"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "### Front-end infrastructure bugfixes",
+                    "labels": ["Front-end Infra", "bug"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "### Developer experience docs",
                     "labels": ["Dev Experience", "documentation"],
                     "exhaustive": true
                 },
                 {
-                    "title": "### 📄 Front-end infrastructure docs",
+                    "title": "### Front-end infrastructure docs",
                     "labels": ["Front-end Infra", "documentation"],
                     "exhaustive": true
                 },
                 {
                     "title": "## 🚀 Default apps",
                     "labels": ["System app"],
-                    "exclude_labels": ["documentation"]
+                    "exclude_labels": ["documentation", "bug"]
                 },
                 {
-                    "title": "### 📄 Docs",
+                    "title": "### Bugfixes",
+                    "labels": ["System app", "bug"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "### Docs",
                     "labels": ["System app", "documentation"],
                     "exhaustive": true
                 },
                 {
                     "title": "## ⚖️ Governance",
                     "labels": ["Governance"],
-                    "exclude_labels": ["documentation"]
+                    "exclude_labels": ["documentation", "bug"]
                 },
                 {
-                    "title": "### 📄 Docs",
+                    "title": "### Bugfixes",
+                    "labels": ["Governance", "bug"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "### Docs",
                     "labels": ["Governance", "documentation"],
                     "exhaustive": true
                 },
                 {
                     "title": "## 🏗️ Infrastructure Providers",
                     "labels": ["Node infra"],
-                    "exclude_labels": ["documentation"]
+                    "exclude_labels": ["documentation", "bug"]
                 },
                 {
-                    "title": "### 📄 Docs",
+                    "title": "### Bugfixes",
+                    "labels": ["Node infra", "bug"],
+                    "exhaustive": true
+                },
+                {
+                    "title": "### Docs",
                     "labels": ["Node infra", "documentation"],
                     "exhaustive": true
                 }
