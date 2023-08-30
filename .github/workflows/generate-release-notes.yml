@@ -11,6 +11,11 @@ on:
         required: true
   workflow_call:
     inputs:
+      externalCall:
+        description: "To distinguish workflow_call from workflow_dispatch"
+        type: boolean
+        required: false
+        default: true
       endtag:
         required: true
         type: string
@@ -105,7 +110,7 @@ jobs:
 
 
   auto-generate-release-notes:
-    if: github.event_name == 'workflow_call'
+    if: github.event.inputs.externalCall
     name: Gen ${{ github.event.inputs.endtag }} notes
     runs-on: ubuntu-latest
     outputs:
