@@ -1,6 +1,6 @@
 [package]
 name = "psibase"
-version = "0.1.6"
+version = "0.2.0"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
