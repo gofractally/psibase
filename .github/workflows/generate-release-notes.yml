@@ -23,7 +23,7 @@ env:
   CONFIG_JSON: |
             {
               "template": "#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n",
-              "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}}) | #{{TITLE}}",
+              "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}})  |  #{{TITLE}}",
               "categories": [
                 {
                     "title": "## 🐛 Fixes",
@@ -31,7 +31,8 @@ env:
                 },
                 {
                     "title": "## 💻 App development",
-                    "labels": ["Dev Experience", "Front-end Infra"]
+                    "labels": ["Dev Experience", "Front-end Infra"],
+                    "exclude_labels": ["documentation"]
                 },
                 {
                     "title": "### 📄 Developer experience docs",
@@ -45,7 +46,8 @@ env:
                 },
                 {
                     "title": "## 🚀 Default apps",
-                    "labels": ["System app"]
+                    "labels": ["System app"],
+                    "exclude_labels": ["documentation"]
                 },
                 {
                     "title": "### 📄 Docs",
@@ -54,7 +56,8 @@ env:
                 },
                 {
                     "title": "## ⚖️ Governance",
-                    "labels": ["Governance"]
+                    "labels": ["Governance"],
+                    "exclude_labels": ["documentation"]
                 },
                 {
                     "title": "### 📄 Docs",
@@ -63,7 +66,8 @@ env:
                 },
                 {
                     "title": "## 🏗️ Infrastructure Providers",
-                    "labels": ["Node infra"]
+                    "labels": ["Node infra"],
+                    "exclude_labels": ["documentation"]
                 },
                 {
                     "title": "### 📄 Docs",
