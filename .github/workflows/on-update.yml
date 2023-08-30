@@ -6,7 +6,7 @@ on:
       - main
       - "release/*"
   pull_request:
-    types: [assigned, opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
 
 jobs:
   build:
