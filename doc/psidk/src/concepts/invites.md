@@ -2,7 +2,7 @@
 
 ## Background
 
-A Psibase deployment allows many applications to run on the same infastructure, which allows for many benefits, such as account sharing, data sharing, and inter-application-messaging. Account sharing means that there is a concept of an "account" that exists independent of any particular deployed application and that can be reused between them.
+A Psibase deployment allows many applications to run on the same infrastructure, which allows for many benefits, such as account sharing, data sharing, and inter-application-messaging. Account sharing means that there is a concept of an "account" that exists independent of any particular deployed application and that can be reused between them.
 
 In traditional web applications, the cost to create and store an account are borne by the company who produced the web application. This is usually done because the value of acquiring another user exceeds the associated creation and storage costs. But in many modern web applications (particularly those in the "web-3" or blockchain space), accounts are paid for by the new user either explicitly through an account creation cost or implicitly through minimum account value requirements.
 
@@ -23,7 +23,7 @@ Psibase provides mechanisms to handle all of the above scenarios and their permu
 
 ## Psibase onboarding flow
 
-When a user creates an invite, a keypair is generated. The public key uniquely identifies that specific invite, and the private key is embedded in a sharable link that allows the link recipient to prove that they are the recipient of the invite.
+When a user creates an invite, a keypair is generated. The public key uniquely identifies that specific invite, and the private key is embedded in a shareable link that allows the link recipient to prove that they are the recipient of the invite.
 
 The following sequence diagram provides an outline of the high level user flow for the process of inviting a user to an application:
 
