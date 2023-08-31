@@ -12,7 +12,7 @@
 
 In most blockchains, every function called on an on-chain smart-contract is called a "transaction." In some other blockchains, calling a function on chain requires one "action," and a "transaction" may be comprised of one or many such actions. On these chains, a transaction can be viewed as a kind of "script" with one very basic functionality: execute an ordered list of actions.
 
-In psibase, this concept of a script has been further generalized, and is known as an "Action Script". Transactions in psibase blockchains may contain a list of actions, but some actions may themselves be scripts written to execute an ordered list of other actions. Such scripts are called Action Scripts. What differentiates Action Scripts from regular actions? Action scripts enable intelegent, dynamic transactions that act from the perspective of the user rather than the perspective of an application. Regular actions may only execute inline actions as the running application, whereas an action called from an Action Script appears to originate from the user.
+In psibase, this concept of a script has been further generalized, and is known as an "Action Script". Transactions in psibase blockchains may contain a list of actions, but some actions may themselves be scripts written to execute an ordered list of other actions. Such scripts are called Action Scripts. What differentiates Action Scripts from regular actions? Action scripts enable intelligent, dynamic transactions that act from the perspective of the user rather than the perspective of an application. Regular actions may only execute inline actions as the running application, whereas an action called from an Action Script appears to originate from the user.
 
 ## Use case
 
