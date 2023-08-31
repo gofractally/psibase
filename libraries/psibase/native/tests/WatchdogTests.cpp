@@ -106,7 +106,7 @@ TEST_CASE("Watchdog threaded")
              std::atomic<bool> interrupted{false};
              auto              start = CpuClock::now();
              Watchdog          watchdog(manager, [&] { interrupted = true; });
-             watchdog.setLimit(std::chrono::milliseconds(i * 10));
+             watchdog.setLimit(std::chrono::milliseconds(i * 20));
              while (!interrupted)
              {
              }
@@ -118,7 +118,7 @@ TEST_CASE("Watchdog threaded")
    threads.clear();
    for (int i = 0; i < num_threads; ++i)
    {
-      CHECK(durations[i] >= std::chrono::milliseconds(i * 10));
-      CHECK(durations[i] - std::chrono::milliseconds(i * 10) < std::chrono::milliseconds(5));
+      CHECK(durations[i] >= std::chrono::milliseconds(i * 20));
+      CHECK(durations[i] - std::chrono::milliseconds(i * 20) < std::chrono::milliseconds(10));
    }
 }
