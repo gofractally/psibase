@@ -173,7 +173,7 @@ An serialized object of type `T` may be deserialized as type `U` if any of the f
 - `T` is the same type as `U`
 - `T` and `U` are both non-extensible structs with the same number of members AND each member of `T` can be deserialized as the corresponding member of `U`
 - `T` and `U` are both tuples or extensible structs with the same number of members AND each member of `T` can be deserialized as the corresponding member of `U`
-- `T` and `U` are both tuples or extensible structs AND `T` has fewer members than `U` AND every member of `T` can be deserialized as the corresponding member of `U` AND every trailing member of `U` that does not have a corresponding member of `T` is optional. The trailing members of `U` will be be set to empty.
+- `T` and `U` are both tuples or extensible structs AND `T` has fewer members than `U` AND every member of `T` can be deserialized as the corresponding member of `U` AND every trailing member of `U` that does not have a corresponding member of `T` is optional. The trailing members of `U` will be set to empty.
 - `T` and `U` are both tuples or extensible structs AND `T` has more members than `U` AND every member of `T` that has a corresponding member of `U` can be deserialized as the corresponding member of `U` AND every trailing member of `T` that does not have a corresponding member of `U` is optional. The trailing members of `T` will be dropped.
 - `T` and `U` are unions AND `U` has at least as many alternatives as `T` AND every alternative of `T` can be deserialized as the corresponding alternative of `U`
 - `T` and `U` are both containers of the same kind AND the value type of `T` can be deserialized as the value type of `U`. The possible kinds of containers are optional, array, and vector.

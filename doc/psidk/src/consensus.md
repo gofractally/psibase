@@ -84,7 +84,7 @@ Each producer maintains a view change timer to detect failure in the leader. The
 
 ## Joint Consensus
 
-Changes to the consensus algorithm or to the set of block producers are managed by joint consensus. Joint consensus defines a transition period during which the the old producers and the new producers cooperate to produce blocks. Joint consensus begins on the block containing the new producer schedule and ends after this block becomes irreversible. The precise behavior depends on the combination of the old and new consensus algorithms.
+Changes to the consensus algorithm or to the set of block producers are managed by joint consensus. Joint consensus defines a transition period during which the old producers and the new producers cooperate to produce blocks. Joint consensus begins on the block containing the new producer schedule and ends after this block becomes irreversible. The precise behavior depends on the combination of the old and new consensus algorithms.
 
 ### CFT → CFT
 

@@ -12,7 +12,7 @@ that by including the lowest 16 bits of the block number and 32 bits of the bloc
 block. The transaction will be considered invalid for any blockchain that doesn't include the
 referenced block.  All told, this prevents attackers from forking a chain in secret and 
 migrating most of the transactions from the legitimate chain to a forked chain. This hash is
-"proof" the the transactor has some stake in building on a particular state.
+"proof" that the transactor has some stake in building on a particular state.
 
 TaPoS data will be available via a special KV_MAP which can only be read by the transact service. This
 will allow it to utilize a circular buffer optimization rather than using 65k database rows.
@@ -41,7 +41,7 @@ and 2 and know that B will not be applied before A which would invalidate A.  Tr
 set 'prev_seq' to 1.  
 
 `thread` is used to allow a user to have multiple sequences operating in parallel which do not
-invalidate eachother.  Each user can have up to 8 threads.
+invalidate each other.  Each user can have up to 8 threads.
 
 `next_seq` must be less than the head block time. This restriction prevents users from using up
 all of the available sequence numbers in any of their threads.
@@ -70,7 +70,7 @@ before expiration.
 The principle of Psibase is that "transactions" or "groups of actions" are not something that should
 be user-facing. Unlike Bitcoin, where every transaction is a "transfer", a token "transfer" could be
 initiated either directly or indirectly by other services and users. Therefore, the event log is what
-you need to provide as evidence of transfer, not the input transcation that caused it. For example,
+you need to provide as evidence of transfer, not the input transaction that caused it. For example,
 an exchange would be foolish to assume that all transfers are represented in transactions which
 are logged in the blockchain. Proof of transfer would be provided by giving someone a link to a query
 which returns the transfer event. 

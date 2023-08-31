@@ -45,4 +45,4 @@ The following is an explanation of each step in the diagram to aid understanding
 
 ## Conclusion
 
-This transaction signing flow is needed for applets to accomodate the fully programmable Psibase permission system. For most use-cases, applets don't need to worry about signing and permissions, as signing is done automatically by simply submitting actions within an applet. But if custom permissions are needed to submit a particular action, this architecture allows for maximum flexibility in collecting the claims and proofs necessary to authenticate the transaction.
+This transaction signing flow is needed for applets to accommodate the fully programmable Psibase permission system. For most use-cases, applets don't need to worry about signing and permissions, as signing is done automatically by simply submitting actions within an applet. But if custom permissions are needed to submit a particular action, this architecture allows for maximum flexibility in collecting the claims and proofs necessary to authenticate the transaction.
