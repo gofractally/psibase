@@ -27,7 +27,7 @@ on:
 env:
   CONFIG_JSON: |
             {
-              "template": "# Release Notes\n#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n\n# Associated docker images\n\nDocker images for this release of the `psinode` and `psibase` tools are available in GitHub container registry.\n* [psinode](https://github.com/orgs/${{ github.repository_owner }}/packages/container/package/psinode)\n* [psibase](https://github.com/orgs/${{ github.repository_owner }}/packages/container/package/psibase)\n",
+              "template": "# Release Notes\n#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n\n# Associated docker images\n\nDocker images for this release of the psinode and psibase tools are available in GitHub container registry.\n* [psinode](https://github.com/orgs/${{ github.repository_owner }}/packages/container/package/psinode)\n* [psibase](https://github.com/orgs/${{ github.repository_owner }}/packages/container/package/psibase)\n",
               "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}})  |  #{{TITLE}}",
               "categories": [
                 {
