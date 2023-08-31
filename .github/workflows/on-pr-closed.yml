@@ -31,7 +31,18 @@ jobs:
             }
           }'  --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].number')
 
+          if [ -z "${issue_number}" ]; then
+          echo "No issue linked to this PR"
+          exit 0
+          fi
+
           labels=$(gh api "repos/$org/$repo/issues/$issue_number/labels" --jq 'map(.name) | join(",")')
+
+          if [ -z "${labels}" ]; then
+          echo "No labels on linked issue"
+          exit 0
+          fi
+
           json_labels="[\"$(echo "$labels" | sed 's/,/","/g')\"]"
           echo "{\"labels\":$json_labels}" > input.json
           gh api "repos/$org/$repo/issues/$pr_number/labels" -X POST --input input.json
