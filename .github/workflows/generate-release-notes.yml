@@ -27,7 +27,7 @@ on:
 env:
   CONFIG_JSON: |
             {
-              "template": "#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n",
+              "template": "# Release Notes\n#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n",
               "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}})  |  #{{TITLE}}",
               "categories": [
                 {
