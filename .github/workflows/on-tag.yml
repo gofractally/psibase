@@ -18,7 +18,7 @@ jobs:
     outputs:
       prerelease: ${{ steps.set-prerelease-var.outputs.prerelease }}
     steps:
-      - name: Set prerelease variable
+      - name: Check prerelease condition (tag ${{ github.ref_name }} contains '-')
         id: set-prerelease-var
         shell: bash
         run: |
@@ -38,7 +38,7 @@ jobs:
       endtag: ${{ github.ref_name }}
 
   create-psibase-release:
-    name: Release - ${{github.ref_name}}
+    name: Release draft - ${{github.ref_name}}
     runs-on: ubuntu-latest
     needs:
       - build-psibase
