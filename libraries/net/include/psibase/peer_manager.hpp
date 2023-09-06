@@ -1,9 +1,11 @@
 #pragma once
 
 #include <psibase/log.hpp>
+#include <psibase/net_base.hpp>
 
 #include <boost/asio/dispatch.hpp>
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/log/attributes/constant.hpp>
 #include <functional>
 #include <map>

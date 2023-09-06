@@ -87,6 +87,7 @@ namespace psibase::net
       using Base::self;
       using Base::start_leader;
       using Base::stop_leader;
+      using Base::validate_message;
       using Base::validate_producer;
       using typename Base::producer_state;
 
@@ -171,6 +172,18 @@ namespace psibase::net
                stop_leader("Stopping boot block production");
                _state = producer_state::unknown;
             }
+         }
+         if (active_producers[0] != prods.first || active_producers[1] != prods.second)
+         {
+            PSIBASE_LOG(logger, info) << "Active producers: " << *prods.first
+                                      << print_function(
+                                             [&](std::ostream& os)
+                                             {
+                                                if (prods.second)
+                                                {
+                                                   os << ", " << *prods.second;
+                                                }
+                                             });
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
@@ -360,7 +373,7 @@ namespace psibase::net
       void randomize_timer()
       {
          // Don't bother waiting if we're the only producer
-         if (active_producers[0]->size() <= 1 && !active_producers[1])
+         if (this->is_sole_producer())
          {
             if (_state == producer_state::follower)
             {
@@ -503,6 +516,21 @@ namespace psibase::net
             }
             check_votes();
          }
+      }
+      bool validate_message(const ConfirmMessage&)
+      {
+         // TODO:
+         return true;
+      }
+      bool validate_message(const RequestVoteRequest&)
+      {
+         // TODO:
+         return true;
+      }
+      bool validate_message(const RequestVoteResponse&)
+      {
+         // TODO:
+         return true;
       }
    };
 

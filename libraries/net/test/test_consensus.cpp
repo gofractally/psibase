@@ -50,27 +50,6 @@ namespace psibase
       std::visit([&os](const auto& obj) { os << obj; }, consensus);
       return os;
    }
-
-   std::ostream& operator<<(std::ostream& os, const ProducerSet& producers)
-   {
-      if (producers.algorithm == ConsensusAlgorithm::cft)
-      {
-         os << "CFT:";
-      }
-      else if (producers.algorithm == ConsensusAlgorithm::bft)
-      {
-         os << "BFT:";
-      }
-      else
-      {
-         os << "?FT:";
-      }
-      for (const auto& [name, auth] : producers.activeProducers)
-      {
-         os << " " << name.str();
-      }
-      return os;
-   }
 }  // namespace psibase
 
 std::vector<std::pair<Consensus, Consensus>> transitions = {
@@ -220,6 +199,7 @@ TEST_CASE("joint consensus crash", "[combined]")
    runFor(ctx, 2min);
    timer.cancel();
    ctx.poll();
+   ctx.reset();
 
    nodes.connect_all();
    runFor(ctx, 30s);
@@ -254,6 +234,7 @@ TEST_CASE("fork at commit consensus change", "[combined]")
    {
       nodes[1].sendto(AccountNumber{"a"}, message);
       ctx.poll();
+      ctx.reset();
    };
    auto boot_block = nodes[0].chain().get_head_state()->info;
 

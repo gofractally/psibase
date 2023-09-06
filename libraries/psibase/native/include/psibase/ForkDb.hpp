@@ -128,6 +128,34 @@ namespace psibase
       }
    };
 
+   inline std::ostream& operator<<(std::ostream& os, const ProducerSet& prods)
+   {
+      if (prods.algorithm == ConsensusAlgorithm::cft)
+      {
+         os << "CFT:";
+      }
+      else if (prods.algorithm == ConsensusAlgorithm::bft)
+      {
+         os << "BFT:";
+      }
+      os << '[';
+      bool first = true;
+      for (const auto& [name, auth] : prods.activeProducers)
+      {
+         if (first)
+         {
+            first = false;
+         }
+         else
+         {
+            os << ',';
+         }
+         os << name.str();
+      }
+      os << ']';
+      return os;
+   }
+
    struct BlockAuthState
    {
       ConstRevisionPtr                    revision;
@@ -221,8 +249,9 @@ namespace psibase
             std::ranges::set_difference(prevKeys, nextKeys, std::back_inserter(removed));
             std::ranges::set_difference(nextKeys, prevKeys, std::back_inserter(added));
             auto code = makeCodeIndex(&header);
-            check(std::ranges::includes(nextKeys, code | std::views::transform([
-                                                  ](auto& arg) -> auto& { return arg.first; })),
+            check(std::ranges::includes(
+                      nextKeys,
+                      code | std::views::transform([](auto& arg) -> auto& { return arg.first; })),
                   "Wrong code");
             Database db{systemContext->sharedDatabase, prev.revision};
             auto     session = db.startWrite(writer);
@@ -311,9 +340,7 @@ namespace psibase
             nextProducersBlockNum(prev.nextProducersBlockNum)
       {
          // Handling of the producer schedule must match BlockContext::writeRevision
-         // Note: technically we could use this block's commitNum instead of the
-         // previous block's commitNum, but that complicates the producer hand-off.
-         if (nextProducers && prev.info.header.commitNum >= nextProducersBlockNum)
+         if (prev.endsJointConsensus())
          {
             producers = std::move(nextProducers);
          }
@@ -350,6 +377,10 @@ namespace psibase
          Database db{systemContext->sharedDatabase, revision};
          auto     session = db.startRead();
          authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info);
+      }
+      bool endsJointConsensus() const
+      {
+         return nextProducers && info.header.commitNum >= nextProducersBlockNum;
       }
       // Returns the claim for an immediate successor of this block
       std::optional<Claim> getNextProducerClaim(AccountNumber producer)
@@ -415,27 +446,32 @@ namespace psibase
       return ExtendedBlockId{std::get<2>(order), std::get<1>(order)};
    }
 
+   TermNum orderToTerm(const auto& order)
+   {
+      return std::get<0>(order);
+   }
+
    class ForkDb
    {
      public:
       using id_type = Checksum256;
-      // \return a pointer to the header state for the block or null if the block
-      // was not inserted for any reason.
+      // \return a pointer to the header state for the block and a bool indicating
+      // whether a new block was inserted.
       // \post if the block was successfully inserted, a fork switch is required.
-      const BlockHeaderState* insert(const psio::shared_view_ptr<SignedBlock>& b)
+      std::pair<const BlockHeaderState*, bool> insert(const psio::shared_view_ptr<SignedBlock>& b)
       {
          BlockInfo info(b->block());
          PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, info.header, info.blockId);
          if (info.header.blockNum <= commitIndex)
          {
             PSIBASE_LOG(blockLogger, debug) << "Block ignored because it is before commitIndex";
-            return nullptr;
+            return {nullptr, false};
          }
          auto [iter, inserted] = blocks.try_emplace(info.blockId, b);
          if (!inserted)
          {
             PSIBASE_LOG(blockLogger, debug) << "Block skipped because it is already known";
-            return nullptr;
+            return {get_state(info.blockId), false};
          }
          if (auto* prev = get_state(info.header.previous))
          {
@@ -464,14 +500,14 @@ namespace psibase
             {
                PSIBASE_LOG(blockLogger, debug) << "Block is outside current tree";
             }
-            return &pos->second;
+            return {&pos->second, true};
          }
          else
          {
             blocks.erase(iter);
             PSIBASE_LOG(blockLogger, debug) << "Block dropped because its parent is missing";
          }
-         return nullptr;
+         return {nullptr, false};
       }
       // \pre The block must not be in the current chain and
       // must not have any children. Practially speaking, this
@@ -840,7 +876,7 @@ namespace psibase
       bool is_complete_chain(const id_type& id) { return get_state(id) != nullptr; }
       std::pair<std::shared_ptr<ProducerSet>, std::shared_ptr<ProducerSet>> getProducers()
       {
-         if (head->nextProducers && head->info.header.commitNum >= head->nextProducersBlockNum)
+         if (head->endsJointConsensus())
          {
             return {head->nextProducers, nullptr};
          }
@@ -935,8 +971,10 @@ namespace psibase
       {
          return T{get_prev_id(t.id()), t.num() - 1};
       }
-      auto    commit_index() const { return commitIndex; }
-      id_type get_ancestor(id_type id, auto n)
+      auto            commit_index() const { return commitIndex; }
+      ExtendedBlockId xid(const ExtendedBlockId& id) { return id; }
+      ExtendedBlockId xid(const Checksum256& id) { return {id, getBlockNum(id)}; }
+      id_type         get_ancestor(id_type id, auto n)
       {
          for (; n > 0; --n)
          {
@@ -984,6 +1022,30 @@ namespace psibase
                }
             }
          }
+      }
+      bool is_ancestor(const ExtendedBlockId& ancestor, const ExtendedBlockId& descendant)
+      {
+         Checksum256 tmp = descendant.id();
+         for (auto idx = descendant.num(); idx >= ancestor.num(); --idx)
+         {
+            if (tmp == ancestor.id())
+            {
+               return true;
+            }
+            if (auto current_block = get(tmp))
+            {
+               tmp = current_block->block().header().previous();
+            }
+            else
+            {
+               return false;
+            }
+         }
+         return false;
+      }
+      bool is_ancestor(const Checksum256& ancestor, const ExtendedBlockId& descendant)
+      {
+         return is_ancestor(xid(ancestor), descendant);
       }
       bool in_best_chain(const ExtendedBlockId& t)
       {

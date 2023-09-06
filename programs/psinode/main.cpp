@@ -3,12 +3,12 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/bft.hpp>
 #include <psibase/cft.hpp>
-#include <psibase/direct_routing.hpp>
 #include <psibase/http.hpp>
 #include <psibase/log.hpp>
 #include <psibase/node.hpp>
 #include <psibase/peer_manager.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psibase/shortest_path_routing.hpp>
 #include <psibase/version.hpp>
 #include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
@@ -663,40 +663,59 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
    return false;
 }  // pushTransaction
 
-std::tuple<bool, std::string_view, std::string_view> parse_endpoint(std::string_view peer)
+enum class socket_type
 {
-   // TODO: handle ipv6 addresses [addr]:port
-   bool secure = false;
+   unknown,
+   tcp,
+   tls,
+   local
+};
+
+std::tuple<socket_type, std::string_view, std::string_view> parse_endpoint(std::string_view peer)
+{
+   auto type = socket_type::unknown;
    if (peer.starts_with("ws://"))
    {
+      type = socket_type::tcp;
       peer = peer.substr(5);
    }
    else if (peer.starts_with("http://"))
    {
+      type = socket_type::tcp;
       peer = peer.substr(7);
    }
    else if (peer.starts_with("wss://"))
    {
-      secure = true;
-      peer   = peer.substr(6);
+      type = socket_type::tls;
+      peer = peer.substr(6);
    }
    else if (peer.starts_with("https://"))
    {
-      secure = true;
-      peer   = peer.substr(8);
+      type = socket_type::tls;
+      peer = peer.substr(8);
    }
-   if (peer.ends_with('/'))
+   if (type == socket_type::unknown)
    {
-      peer = peer.substr(0, peer.size() - 1);
+      if (peer.find('/') != std::string::npos)
+      {
+         return {socket_type::local, peer, ""};
+      }
+   }
+   else
+   {
+      if (peer.ends_with('/'))
+      {
+         peer = peer.substr(0, peer.size() - 1);
+      }
    }
    auto pos = peer.find(':');
    if (pos == std::string_view::npos)
    {
-      return {secure, peer, secure ? "443" : "80"};
+      return {type, peer, type == socket_type::tls ? "443" : "80"};
    }
    else
    {
-      return {secure, peer.substr(0, pos), peer.substr(pos + 1)};
+      return {type, peer.substr(0, pos), peer.substr(pos + 1)};
    }
 }
 
@@ -704,8 +723,7 @@ std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 {
    for (auto& url : urls)
    {
-      if (!url.starts_with("http:") && !url.starts_with("ws:") && !url.starts_with("https") &&
-          !url.starts_with("wss:"))
+      if (url.find('/') == std::string::npos)
       {
          url = "http://" + url + "/";
       }
@@ -1458,7 +1476,7 @@ void run(const std::string&              db_path,
    }
 #endif
 
-   using node_type = node<peer_manager, direct_routing, consensus, ForkDb>;
+   using node_type = node<peer_manager, shortest_path_routing, consensus, ForkDb>;
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
    node.load_producers();
@@ -1469,30 +1487,37 @@ void run(const std::string&              db_path,
    auto connect_one = [&resolver, &node, &chainContext, &http_config, &runResult](
                           const std::string& peer, auto&& f)
    {
-      auto [secure, host, service] = parse_endpoint(peer);
-      auto do_connect              = [&](auto&& conn)
+      auto [proto, host, service] = parse_endpoint(peer);
+      auto on_connect = [&node, &http_config, &runResult, f = static_cast<decltype(f)>(f)](
+                            const std::error_code& ec, auto&& conn) mutable
+      {
+         if (!ec)
+         {
+            if (http_config->status.load().shutdown)
+            {
+               conn->close(runResult.shouldRestart ? connection_base::close_code::restart
+                                                   : connection_base::close_code::shutdown);
+               f(make_error_code(boost::asio::error::operation_aborted));
+               return;
+            }
+            node.add_connection(std::move(conn));
+         }
+         f(ec);
+      };
+      auto do_connect = [&](auto&& conn)
       {
          conn->url = peer;
-         async_connect(std::move(conn), resolver, host, service,
-                       [&node, &http_config, &runResult, f = static_cast<decltype(f)>(f)](
-                           const std::error_code& ec, auto&& conn)
-                       {
-                          if (!ec)
-                          {
-                             if (http_config->status.load().shutdown)
-                             {
-                                conn->close(runResult.shouldRestart
-                                                ? connection_base::close_code::restart
-                                                : connection_base::close_code::shutdown);
-                                f(make_error_code(boost::asio::error::operation_aborted));
-                                return;
-                             }
-                             node.add_connection(std::move(conn));
-                          }
-                          f(ec);
-                       });
+         async_connect(std::move(conn), resolver, host, service, std::move(on_connect));
       };
-      if (secure)
+      if (proto == socket_type::local)
+      {
+         auto conn = std::make_shared<
+             websocket_connection<boost::beast::basic_stream<boost::asio::local::stream_protocol>>>(
+             chainContext);
+         conn->url = peer;
+         async_connect(std::move(conn), host, std::move(on_connect));
+      }
+      else if (proto == socket_type::tls)
       {
 #if PSIBASE_ENABLE_SSL
          auto conn = std::make_shared<

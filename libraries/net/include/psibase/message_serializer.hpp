@@ -50,5 +50,6 @@ namespace psibase::net
       {
          return serialize_signed_message(msg);
       }
+      auto serialize_message(const std::vector<char>& msg) { return msg; }
    };
 }  // namespace psibase::net

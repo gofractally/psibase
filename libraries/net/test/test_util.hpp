@@ -406,6 +406,10 @@ psibase::net::BlockConfirm makeBlockConfirm(const BlockArg&                     
 SignedMessage<PrepareMessage> makePrepare(const BlockMessage& block, std::string_view producer);
 SignedMessage<CommitMessage>  makeCommit(const BlockMessage& block, std::string_view producer);
 ViewChangeMessage             makeViewChange(std::string_view producer, psibase::TermNum view);
+ViewChangeMessage             makeViewChange(std::string_view                        producer,
+                                             psibase::TermNum                        view,
+                                             const psibase::BlockInfo&               prepared,
+                                             std::initializer_list<std::string_view> preparers);
 
 void runFor(boost::asio::io_context& ctx, psibase::test::mock_clock::duration total_time);
 

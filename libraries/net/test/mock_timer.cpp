@@ -11,10 +11,11 @@ namespace psibase::test
    namespace
    {
       static constexpr auto timer_queue_compare = [](const auto& lhs, const auto& rhs)
-      { return lhs->deadline > rhs->deadline; };
+      { return std::tie(lhs->deadline, lhs->sequence) > std::tie(rhs->deadline, rhs->sequence); };
       mock_clock::time_point                         mock_current_time;
       std::vector<std::shared_ptr<mock_timer::impl>> timer_queue;
       std::mutex                                     queue_mutex;
+      std::atomic<std::uint64_t>                     timer_sequence;
       void                                           process_queue(mock_clock::time_point new_now)
       {
          while (!timer_queue.empty() && timer_queue.front()->deadline <= new_now)
@@ -68,13 +69,18 @@ namespace psibase::test
       mock_current_time += diff;
       process_queue(mock_current_time);
    }
-   void mock_clock::advance()
+   bool mock_clock::advance()
    {
       std::lock_guard l{queue_mutex};
       if (!timer_queue.empty())
       {
          mock_current_time = timer_queue.front()->deadline;
          process_queue(mock_current_time);
+         return true;
+      }
+      else
+      {
+         return false;
       }
    }
    std::ostream& operator<<(std::ostream& os, mock_clock::time_point tp)
@@ -92,12 +98,14 @@ namespace psibase::test
       std::lock_guard l{queue_mutex};
       cancel_timer(_impl);
       _impl->deadline = expiration;
+      _impl->sequence = timer_sequence.fetch_add(1);
    }
    void mock_timer::expires_after(duration d)
    {
       std::lock_guard l{queue_mutex};
       cancel_timer(_impl);
       _impl->deadline = mock_current_time + d;
+      _impl->sequence = timer_sequence.fetch_add(1);
    }
    void mock_timer::async_wait(std::function<void(const std::error_code&)> callback)
    {
