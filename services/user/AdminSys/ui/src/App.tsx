@@ -6,8 +6,8 @@ import { StatusBanner } from "./components/status-banner";
 import { ConfigurationPage } from "./configuration/configuration-page";
 import { usePollJson } from "./hooks";
 import { LogsPage } from "./log/logs-page";
-import { DashboardPage } from "./pages/dashboard-page";
-import { PowerPage } from "./pages/power-page";
+import { DashboardPage } from "./dashboard/dashboard-page";
+import { PowerPage } from "./power-control/power-page";
 import { PeersPage } from "./peers/peers-page";
 import { Peer } from "./peers/interfaces";
 
@@ -57,7 +57,9 @@ function App() {
                     refetchConfig={refetchConfig}
                 />
             ) : activeItem === "Power" ? (
-                <PowerPage />
+                <PowerPage
+                    producer={config?.producer}
+                />
             ) : null}
         </>
     );

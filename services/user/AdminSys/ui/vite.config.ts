@@ -2,6 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
+import wasm from 'vite-plugin-wasm';
+import topLevelAwait from "vite-plugin-top-level-await";
+
 
 const psibase = (appletContract: string) => {
     return [
@@ -30,25 +33,27 @@ const psibase = (appletContract: string) => {
                         port: 8081,
                         proxy: {
                             "^/ws/.*": {
-                                target: "ws://localhost:8080/",
+                                target: "ws://localhost:8079/",
                                 ws: true,
                                 rewrite: (path) => path.replace(/^\/ws/, ""),
+                                timeout: 10000,
                             },
                             "/": {
-                                target: "http://psibase.127.0.0.1.sslip.io:8080/",
+                                target: "http://psibase.127.0.0.1.sslip.io:8079/",
+                                autoRewrite: true,
                                 bypass: (req, _res, _opt) => {
                                     if (
-                                        req.url === "/" ||
-                                        (req.method !== "POST" &&
-                                            req.method !== "PUT" &&
-                                            req.headers.accept !==
-                                                "application/json" &&
-                                            !req.url.startsWith("/common") &&
-                                            !req.url.startsWith("/api"))
+                                        req.url === "/" || (
+                                            req.method !== "POST"
+                                         && req.method !== "PUT"
+                                         && req.headers.accept !== "application/json"
+                                         && !req.url.startsWith("/common")
+                                         )
                                     ) {
                                         return req.url;
                                     }
                                 },
+                                timeout: 10000,
                             },
                         },
                     },
@@ -91,5 +96,7 @@ export default defineConfig({
             },
         }),
         psibase("__contract__(kebabCase)"),
+        wasm(),
+        topLevelAwait()
     ],
 });

@@ -3,14 +3,17 @@ use crate::services::{
     setcode_sys, transaction_sys,
 };
 use crate::{
-    method_raw, AccountNumber, Action, Claim, MethodNumber, ProducerConfigRow, PublicKey,
+    method_raw, AccountNumber, Action, Claim, ExactAccountNumber, MethodNumber, ProducerConfigRow, PublicKey,
     SharedGenesisActionData, SharedGenesisService, SignedTransaction, Tapos, TimePointSec,
     Transaction,
 };
 use fracpack::Pack;
 use include_dir::{include_dir, Dir};
 use psibase_macros::account_raw;
-use secp256k1::hashes::Hash;
+use sha2::{Digest, Sha256};
+use std::str::FromStr;
+use wasm_bindgen::prelude::*;
+
 
 macro_rules! account {
     ($name:expr) => {
@@ -211,13 +214,6 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service
             include_dir::DirEntry::File(e) => {
                 let path = e.path().to_str().unwrap();
                 if let Some(t) = mime_guess::from_path(path).first() {
-                    // println!(
-                    //     "{} {} {} {}",
-                    //     sender,
-                    //     service,
-                    //     &("/".to_owned() + path),
-                    //     t.essence_str()
-                    // );
                     actions.push(store_sys(
                         service,
                         sender,
@@ -345,20 +341,7 @@ pub fn create_boot_transactions(
             store_third_party!("useLocalStorageState.js", js),
         ];
 
-        let mut account_sys_files = vec![
-            // store!(
-            //     "r-account-sys",
-            //     "/index.html",
-            //     html,
-            //     "AccountSys/ui/vanilla/index.html"
-            // ),
-            // store!(
-            //     "r-account-sys",
-            //     "/ui/index.js",
-            //     js,
-            //     "AccountSys/ui/vanilla/index.js"
-            // ),
-        ];
+        let mut account_sys_files = vec![];
         fill_dir(
             &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/AccountSys/ui/dist"),
             &mut account_sys_files,
@@ -371,14 +354,7 @@ pub fn create_boot_transactions(
             store!("r-ath-ec-sys", "/index.js", js, "AuthEcSys/ui/index.js"),
         ];
 
-        let mut explore_sys_files = vec![
-            // store!(
-            //    "explore-sys",
-            //    "/ui/index.js",
-            //    js,
-            //    "ExploreSys/ui/index.js"
-            // ),
-        ];
+        let mut explore_sys_files = vec![];
         fill_dir(
             &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/ExploreSys/ui/dist"),
             &mut explore_sys_files,
@@ -386,20 +362,7 @@ pub fn create_boot_transactions(
             account!("explore-sys"),
         );
 
-        let mut token_sys_files = vec![
-            // store!(
-            //     "r-tok-sys",
-            //     "/index.html",
-            //     html,
-            //     "CommonSys/ui/vanilla/common.index.html"
-            // ),
-            // store!(
-            //     "r-tok-sys",
-            //     "/ui/index.js",
-            //     js,
-            //     "TokenSys/ui/vanilla/index.js"
-            // ),
-        ];
+        let mut token_sys_files = vec![];
         fill_dir(
             &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/TokenSys/ui/dist"),
             &mut token_sys_files,
@@ -523,7 +486,7 @@ pub fn create_boot_transactions(
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
     for trx in &transactions {
         transaction_ids.push(crate::Checksum256::from(
-            secp256k1::hashes::sha256::Hash::hash(&trx.transaction).to_byte_array(),
+            <[u8; 32]>::from(Sha256::digest(&trx.transaction)),
         ))
     }
     boot_transactions.push(SignedTransaction {
@@ -536,4 +499,31 @@ pub fn create_boot_transactions(
         proofs: vec![],
     });
     (boot_transactions, transactions)
+}
+
+
+/// Creates boot transactions.
+/// This function reuses the same boot transaction construction as the psibase CLI, and
+/// is used to generate a wasm that may be called from the browser to construct the boot
+/// transactions when booting the chain from the GUI.
+#[wasm_bindgen]
+pub fn js_create_boot_transactions(producer: String) -> Result<JsValue, JsValue> {
+
+    let now_plus_30secs = chrono::Utc::now() + chrono::Duration::seconds(30);
+    let expiration = TimePointSec {
+        seconds: now_plus_30secs.timestamp() as u32,
+    };
+    let prod = ExactAccountNumber::from_str(&producer)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let (boot_transactions, transactions) =
+        create_boot_transactions(&None, prod.into(), true, true, true, expiration);
+
+    let boot_transactions = boot_transactions.packed();
+    let transactions : Vec<Vec<u8>> = transactions
+        .into_iter()
+        .map(|tx| tx.packed())
+        .collect();
+
+    Ok(serde_wasm_bindgen::to_value(&(boot_transactions, transactions))?)
 }
