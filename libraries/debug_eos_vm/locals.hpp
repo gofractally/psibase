@@ -39,7 +39,7 @@ namespace debug_eos_vm
    struct function_locals
    {
       function_locals() = default;
-      function_locals(const eosio::vm::guarded_vector<eosio::vm::local_entry>& params)
+      function_locals(const std::vector<eosio::vm::local_entry>& params)
       {
          uint32_t offset       = 0;
          int32_t  frame_offset = 0;

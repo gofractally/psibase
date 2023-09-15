@@ -1895,10 +1895,13 @@ namespace dwarf
                   }
                   case 1:
                   {
-                     auto idx  = psio::varuint32_from_bin(s);
-                     auto addr = &mod.globals[idx].current.value;
-                     psio::to_bin(std::uint8_t{dw_op_addr}, out);
-                     psio::to_bin(reinterpret_cast<std::uint64_t>(addr), out);
+                     auto idx = psio::varuint32_from_bin(s);
+                     psio::to_bin(std::uint8_t{dw_op_breg4}, out);
+                     psio::sleb64_to_bin(-4096 - 8, out);
+                     psio::to_bin(std::uint8_t{dw_op_deref}, out);
+                     psio::to_bin(std::uint8_t{dw_op_consts}, out);
+                     psio::sleb64_to_bin(eosio::vm::module::get_global_offset(idx), out);
+                     psio::to_bin(std::uint8_t{dw_op_plus}, out);
                      state = native_address;
                      break;
                   }
@@ -1915,10 +1918,13 @@ namespace dwarf
                   }
                   case 3:
                   {
-                     auto idx  = psio::from_bin<std::uint32_t>(s);
-                     auto addr = &mod.globals[idx].current.value;
-                     psio::to_bin(std::uint8_t{dw_op_addr}, out);
-                     psio::to_bin(reinterpret_cast<std::uint64_t>(addr), out);
+                     auto idx = psio::from_bin<std::uint32_t>(s);
+                     psio::to_bin(std::uint8_t{dw_op_breg4}, out);
+                     psio::sleb64_to_bin(-4096 - 8, out);
+                     psio::to_bin(std::uint8_t{dw_op_deref}, out);
+                     psio::to_bin(std::uint8_t{dw_op_consts}, out);
+                     psio::sleb64_to_bin(eosio::vm::module::get_global_offset(idx), out);
+                     psio::to_bin(std::uint8_t{dw_op_plus}, out);
                      state = native_address;
                      break;
                   }
@@ -2531,7 +2537,7 @@ namespace dwarf
             if (idx > num_imported)
             {
                auto [start, end] = get_function_bounds(idx - num_imported);
-               std::string name(reinterpret_cast<const char*>(exp.field_str.raw()),
+               std::string name(reinterpret_cast<const char*>(exp.field_str.data()),
                                 exp.field_str.size());
                add_sym(start, end, name.c_str());
             }
