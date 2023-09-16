@@ -24,11 +24,11 @@ export const PowerPage = ({producer} : PowerPageProps) => {
                 // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
                 // in a dev environment.
                 let [boot_transactions, transactions] = wasm.js_create_boot_transactions(producer);
-                await postArrayBuffer("/native/push_boot", Uint8Array.from(boot_transactions).buffer);
+                await postArrayBuffer("/native/push_boot", boot_transactions.buffer);
                 let i = 0;
                 for (const t of transactions) {
                     console.log(`Pushing transaction number: ${i}`);
-                    await postArrayBufferGetJson("/native/push_transaction", Uint8Array.from(t).buffer);
+                    await postArrayBufferGetJson("/native/push_transaction", t.buffer);
                     i++;
                 }
 

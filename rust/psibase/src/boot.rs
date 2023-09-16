@@ -10,6 +10,7 @@ use crate::{
 use fracpack::Pack;
 use include_dir::{include_dir, Dir};
 use psibase_macros::account_raw;
+use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
@@ -520,10 +521,10 @@ pub fn js_create_boot_transactions(producer: String) -> Result<JsValue, JsValue>
         create_boot_transactions(&None, prod.into(), true, true, true, expiration);
 
     let boot_transactions = boot_transactions.packed();
-    let transactions : Vec<Vec<u8>> = transactions
+    let transactions : Vec<ByteBuf> = transactions
         .into_iter()
-        .map(|tx| tx.packed())
+        .map(|tx| ByteBuf::from(tx.packed()))
         .collect();
 
-    Ok(serde_wasm_bindgen::to_value(&(boot_transactions, transactions))?)
+    Ok(serde_wasm_bindgen::to_value(&(ByteBuf::from(boot_transactions), transactions))?)
 }

@@ -26,8 +26,9 @@ psibase_macros = { version = "0.2.0", path = "../psibase_macros" }
 psibase_names = { version = "0.2.0", path = "../psibase_names" }
 ripemd = "0.1"
 serde = { version = "1.0", features = ["derive", "rc"] }
+serde_bytes = "0.11.12"
 serde_json = "1.0"
-serde-wasm-bindgen = "0.5"
+serde-wasm-bindgen = "0.6.0"
 wasm-bindgen = "0.2"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
