@@ -19,6 +19,7 @@ namespace psibase::net
    template <typename Derived>
    struct mock_routing : message_serializer<Derived>
    {
+      using DeferredMessageKey = std::tuple<peer_id, Checksum256>;
       struct peer_info
       {
          mock_routing*              ptr;
@@ -29,6 +30,7 @@ namespace psibase::net
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
       }
+      void on_producer_change() {}
       void post_recv(peer_id origin, const auto& msg)
       {
          ctx.post(
@@ -69,8 +71,8 @@ namespace psibase::net
                              { ptr->post_recv(origin, message); });
          }
       }
-      template <typename Msg, typename F>
-      void async_send_block(peer_id id, const Msg& msg, F&& f)
+      template <typename Msg>
+      void async_send(peer_id id, const Msg& msg)
       {
          auto peer = _peers.find(id);
          if (peer == _peers.end())
@@ -78,6 +80,11 @@ namespace psibase::net
             throw std::runtime_error("unknown peer");
          }
          send(peer->second, msg);
+      }
+      template <typename Msg, typename F>
+      void async_send(peer_id id, const Msg& msg, F&& f)
+      {
+         async_send(id, msg);
          ctx.post([f]() { f(std::error_code()); });
       }
       template <typename Msg>
@@ -86,12 +93,42 @@ namespace psibase::net
          multicast(msg);
       }
       template <typename Msg>
+      void multicast_producers(const Checksum256& blockid, const Msg& msg)
+      {
+         for (const auto& [id, peer] : _peers)
+         {
+            send_after_block(id, blockid, msg);
+         }
+      }
+      template <typename Msg>
       void multicast(const Msg& msg)
       {
          for (const auto& [id, peer] : _peers)
          {
             send(peer, msg);
          }
+      }
+      template <typename Msg>
+      void send_after_block(peer_id peer, const Checksum256& blockid, const Msg& msg)
+      {
+         if (static_cast<Derived*>(this)->consensus().peer_has_block(peer, blockid))
+         {
+            async_send(peer, msg);
+         }
+         else
+         {
+            deferredMessages.try_emplace({peer, blockid},
+                                         [this, peer, msg] { async_send(peer, msg); });
+         }
+      }
+      void on_peer_block(peer_id peer, const Checksum256& blockid)
+      {
+         auto r = deferredMessages.equal_range({peer, blockid});
+         for (const auto& [k, f] : std::ranges::subrange(r.first, r.second))
+         {
+            f();
+         }
+         deferredMessages.erase(r.first, r.second);
       }
       template <typename Msg>
       void sendto(producer_id producer, const Msg& msg)
@@ -149,6 +186,9 @@ namespace psibase::net
       peer_id                      next_peer_id = 0;
       std::map<peer_id, peer_info> _peers;
       loggers::common_logger       logger;
+      // Stores messages that should be sent to a peer after the
+      // peer is known to have a particular block.
+      std::map<DeferredMessageKey, std::function<void()>> deferredMessages;
    };
 
 }  // namespace psibase::net

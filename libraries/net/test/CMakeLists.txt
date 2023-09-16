@@ -13,6 +13,11 @@ target_link_libraries(test_mock_timer PUBLIC catch2 Threads::Threads Boost::head
 
 add_test(NAME test_mock_timer COMMAND test_mock_timer)
 
+add_executable(test_shortest_path_routing test_shortest_path_routing.cpp connection_pair.cpp)
+target_include_directories(test_shortest_path_routing PUBLIC ../include)
+target_link_libraries(test_shortest_path_routing PUBLIC catch2 psibase Threads::Threads Boost::headers)
+add_test(NAME test_shortest_path_routing COMMAND test_shortest_path_routing --log-filter "Severity >= debug")
+
 add_executable(test_consensus test_consensus.cpp test_cft_consensus.cpp test_bft_consensus.cpp test_signatures.cpp mock_timer.cpp test_util.cpp main.cpp)
 target_include_directories(test_consensus PUBLIC ../include)
 target_link_libraries(test_consensus PUBLIC catch2 psibase services_system)

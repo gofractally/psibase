@@ -24,3 +24,4 @@ vite.config.ts.timestamp-*.mjs
 psibase.127.0.0.1.sslip.io*.pem
 psinode_db
 psinode_db_secure
+__pycache__

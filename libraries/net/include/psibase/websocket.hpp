@@ -195,7 +195,7 @@ namespace psibase::net
       auto& ssl = conn->stream.next_layer();
       ssl.async_handshake(boost::asio::ssl::stream_base::client,
                           [conn = std::move(conn), f = std::forward<F>(f)](
-                              const std::error_code& ec) { f(ec, std::move(conn)); });
+                              const std::error_code& ec) mutable { f(ec, std::move(conn)); });
    }
 #endif
 
@@ -231,7 +231,7 @@ namespace psibase::net
                        {
                           maybe_async_ssl_handshake(
                               std::move(conn),
-                              [f = std::move(f)](const std::error_code& ec, auto&& conn)
+                              [f = std::move(f)](const std::error_code& ec, auto&& conn) mutable
                               {
                                  if (ec)
                                  {
@@ -266,6 +266,45 @@ namespace psibase::net
              {
                 PSIBASE_LOG(conn->logger, warning) << ec.message();
                 f(ec, std::move(conn));
+             }
+          });
+   }
+
+   template <typename Stream, typename F>
+   void async_connect(std::shared_ptr<websocket_connection<Stream>>&& conn,
+                      std::string_view                                path,
+                      F&&                                             f)
+   {
+      conn->host = path;
+      conn->logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(conn->host));
+      auto& sock = get_lowest_layer(conn->stream);
+      sock.async_connect(
+          std::string(path),
+          [conn = std::move(conn), f = std::forward<F>(f)](const std::error_code& ec) mutable
+          {
+             if (ec)
+             {
+                PSIBASE_LOG(conn->logger, warning) << ec.message();
+                f(ec, std::move(conn));
+             }
+             else
+             {
+                auto* p = conn.get();
+                p->stream.async_handshake(
+                    "localhost", "/native/p2p",
+                    [conn = std::move(conn), f = std::move(f)](const std::error_code& ec) mutable
+                    {
+                       if (ec)
+                       {
+                          PSIBASE_LOG(conn->logger, warning) << ec.message();
+                          f(ec, std::move(conn));
+                       }
+                       else
+                       {
+                          conn->need_close_msg = true;
+                          f(ec, std::move(conn));
+                       }
+                    });
              }
           });
    }

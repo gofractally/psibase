@@ -28,6 +28,17 @@ namespace psibase::net
       return tp - rem;
    }
 
+   template <typename F>
+   struct print_function
+   {
+      F                    f;
+      friend std::ostream& operator<<(std::ostream& os, const print_function& f)
+      {
+         f.f(os);
+         return os;
+      }
+   };
+
    struct HelloRequest
    {
       static constexpr unsigned type = 32;
@@ -163,6 +174,12 @@ namespace psibase::net
          connection.hello_sent       = false;
          connection.hello.xid        = chain().get_head_state()->xid();
          async_send_hello(connection);
+         if (connection.hello.xid.id() == Checksum256{})
+         {
+            connection.last_received = {Checksum256{}, 1};
+            connection.last_sent     = connection.last_received;
+            connection.ready         = true;
+         }
       }
       void async_send_hello(peer_connection& connection)
       {
@@ -188,25 +205,25 @@ namespace psibase::net
             }
          }
          connection.hello_sent = true;
-         network().async_send_block(connection.id, connection.hello,
-                                    [this, &connection](const std::error_code& ec)
-                                    {
-                                       if (connection.closed)
-                                       {
-                                          connection.peer_ready = true;
-                                          disconnect(connection.id);
-                                          return;
-                                       }
-                                       else if (ec)
-                                       {
-                                          connection.peer_ready = true;
-                                       }
-                                       if (!connection.peer_ready)
-                                       {
-                                          // TODO: rate limit hellos, delay second hello until we have received the first peer hello
-                                          async_send_hello(connection);
-                                       }
-                                    });
+         network().async_send(connection.id, connection.hello,
+                              [this, &connection](const std::error_code& ec)
+                              {
+                                 if (connection.closed)
+                                 {
+                                    connection.peer_ready = true;
+                                    disconnect(connection.id);
+                                    return;
+                                 }
+                                 else if (ec)
+                                 {
+                                    connection.peer_ready = true;
+                                 }
+                                 if (!connection.peer_ready)
+                                 {
+                                    // TODO: rate limit hellos, delay second hello until we have received the first peer hello
+                                    async_send_hello(connection);
+                                 }
+                              });
       }
       void recv(peer_id origin, const HelloRequest& request)
       {
@@ -228,6 +245,8 @@ namespace psibase::net
             // sync from genesis
             connection.last_received = {Checksum256{}, 1};
             connection.last_sent     = connection.last_received;
+            // With no common block, we don't expect to get a HelloResponse
+            connection.peer_ready = true;
          }
          else
          {
@@ -255,9 +274,9 @@ namespace psibase::net
          //std::cout << "ready: received=" << to_string(connection.last_received.id())
          //          << " common=" << to_string(connection.last_sent.id()) << std::endl;
          // FIXME: blocks and hellos need to be sequenced correctly
-         network().async_send_block(connection.id, HelloResponse{},
-                                    [this, &connection](const std::error_code&)
-                                    { async_send_fork(connection); });
+         network().async_send(connection.id, HelloResponse{},
+                              [this, &connection](const std::error_code&)
+                              { async_send_fork(connection); });
       }
       void recv(peer_id origin, const HelloResponse&)
       {
@@ -272,9 +291,17 @@ namespace psibase::net
       }
       bool is_sole_producer() const
       {
-         return ((active_producers[0]->size() == 0 && self != AccountNumber()) ||
-                 (active_producers[0]->size() == 1 && active_producers[0]->isProducer(self))) &&
-                !active_producers[1];
+         if (self == AccountNumber())
+         {
+            return false;
+         }
+         if (active_producers[1])
+         {
+            if (active_producers[1]->size() != 1 || !active_producers[1]->isProducer(self))
+               return false;
+         }
+         return active_producers[0]->size() == 0 ||
+                (active_producers[0]->size() == 1 && active_producers[0]->isProducer(self));
       }
       bool is_producer() const
       {
@@ -284,6 +311,13 @@ namespace psibase::net
                  !active_producers[1]) ||
                 active_producers[0]->isProducer(self) ||
                 (active_producers[1] && active_producers[1]->isProducer(self));
+      }
+      bool is_producer(AccountNumber account) const
+      {
+         return (active_producers[0]->size() == 0 && account != AccountNumber() &&
+                 !active_producers[1]) ||
+                active_producers[0]->isProducer(account) ||
+                (active_producers[1] && active_producers[1]->isProducer(account));
       }
       producer_id producer_name() const { return self; }
 
@@ -301,6 +335,7 @@ namespace psibase::net
                // I believe that this is safe because the fact that it's
                // still the same node guarantees that the hand-off is atomic.
                consensus().set_producers({active_producers[0], active_producers[1]});
+               network().on_producer_change();
                // set_producers may abort the current block,
                // if we are no longer an active producer
                switch_fork();
@@ -406,12 +441,29 @@ namespace psibase::net
                       // to rely on the invariant that there is an active block
                       // iff _state == leader.
                       start_leader();
+                      bool updatedProducers = false;
+                      // If a new consensus was set while building this block,
+                      // our current producers might be out-dated
+                      if (b->info.header.newConsensus)
+                      {
+                         consensus().set_producers({b->producers, b->nextProducers});
+                         updatedProducers = true;
+                      }
                       // on_produce_block and on_fork_switch should both run
                       // before set_producers, because they should see the
                       // producers of this of this block.
                       consensus().on_produce_block(b);
                       consensus().on_fork_switch(&b->info.header);
-                      consensus().set_producers(chain().getProducers());
+                      // Set tentative producers for the next block
+                      if (b->endsJointConsensus())
+                      {
+                         consensus().set_producers({b->nextProducers, nullptr});
+                         updatedProducers = true;
+                      }
+                      if (updatedProducers)
+                      {
+                         network().on_producer_change();
+                      }
                       // do_gc needs to run after on_fork_switch, because
                       // on_fork_switch is responsible for cleaning up any
                       // pointers that will become dangling.
@@ -469,9 +521,9 @@ namespace psibase::net
             peer.last_sent  = {next_block_id, peer.last_sent.num() + 1};
             auto next_block = chain().get(next_block_id);
 
-            network().async_send_block(peer.id, BlockMessage{next_block},
-                                       [this, &peer](const std::error_code& e)
-                                       { async_send_fork(peer); });
+            network().async_send(peer.id, BlockMessage{next_block},
+                                 [this, &peer](const std::error_code& e)
+                                 { async_send_fork(peer); });
             consensus().post_send_block(peer.id, peer.last_sent.id());
          }
          else
@@ -519,6 +571,10 @@ namespace psibase::net
                   async_send_fork(*peer);
                }
             }
+            else
+            {
+               PSIBASE_LOG(logger, debug) << "Peer " << peer->id << " not ready";
+            }
             // ------------------------------------------------------------------
          }
       }
@@ -530,11 +586,12 @@ namespace psibase::net
          {
             peer.last_sent = xid;
          }
+         consensus().post_send_block(peer.id, xid.id());
       }
 
       void recv(peer_id origin, const BlockMessage& request)
       {
-         if (auto state = chain().insert(request.block))
+         if (auto [state, inserted] = chain().insert(request.block); inserted)
          {
             try
             {
@@ -545,11 +602,14 @@ namespace psibase::net
                chain().erase(state);
                throw;
             }
-            // TODO: update_last_received should run even if the block
-            // is already known.
             auto& connection = get_connection(origin);
             update_last_received(connection, state->xid());
             switch_fork();
+         }
+         else if (state)
+         {
+            auto& connection = get_connection(origin);
+            update_last_received(connection, state->xid());
          }
       }
 
@@ -564,7 +624,13 @@ namespace psibase::net
                    PSIBASE_LOG(logger, debug) << "New head block";
                 }
                 // TODO: only run set_producers when the producers actually changed
-                consensus().set_producers(chain().getProducers());
+                auto producers = chain().getProducers();
+                if (producers.first != active_producers[0] ||
+                    producers.second != active_producers[1])
+                {
+                   consensus().set_producers(std::move(producers));
+                   network().on_producer_change();
+                }
                 if (_state == producer_state::leader &&
                     chain().getBlockContext()->current.header.previous != head.blockId)
                 {
@@ -582,16 +648,36 @@ namespace psibase::net
          chain().gc([this](const auto& b) { consensus().on_erase_block(b); });
       }
 
+      bool peer_has_block(peer_id peer, const Checksum256& id)
+      {
+         // If peer_has_block returns true, then the peer's receipt of the block
+         // happens before its receipt of any message sent after peer_has_block returns.
+         //
+         // If peer_has_block returns false, then one of the following will eventually happen:
+         // - The block is not in the best chain
+         // - post_send_block(peer, id)
+
+         auto& connection = get_connection(peer);
+         if (chain().in_best_chain(id) && getBlockNum(id) <= connection.last_sent.num())
+         {
+            return true;
+         }
+         return chain().is_ancestor(id, connection.last_received);
+      }
+
       // Default implementations
       std::optional<std::vector<char>> makeBlockData(const BlockHeaderState*) { return {}; }
       void                             on_accept_block_header(const BlockHeaderState*) {}
       void                             on_produce_block(const BlockHeaderState*) {}
       void                             on_accept_block(const BlockHeaderState*) {}
-      void                             post_send_block(peer_id, const Checksum256&) {}
-      void                             on_erase_block(const Checksum256&) {}
-      void                             set_producers(auto prods)
+      void                             post_send_block(peer_id peer, const Checksum256& id)
       {
-         if (prods.first->size() != 0 || prods.second)
+         network().on_peer_block(peer, id);
+      }
+      void on_erase_block(const Checksum256&) {}
+      void set_producers(auto prods)
+      {
+         if (prods.first->size() != 0)
             throw std::runtime_error("Consensus algorithm not available");
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
@@ -605,5 +691,6 @@ namespace psibase::net
          }
       }
       void cancel() {}
+      void validate_message() {}
    };
 }  // namespace psibase::net

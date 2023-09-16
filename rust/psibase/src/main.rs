@@ -8,9 +8,9 @@ use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
 use psibase::services::{account_sys, auth_ec_sys, proxy_sys, psispace_sys, setcode_sys};
 use psibase::{
-    account, create_boot_transactions, get_tapos_for_head, push_transaction, sign_transaction,
-    AccountNumber, Action, ExactAccountNumber, PrivateKey, PublicKey, SignedTransaction, Tapos,
-    TaposRefBlock, TimePointSec, Transaction,
+    account, apply_proxy, create_boot_transactions, get_tapos_for_head, push_transaction,
+    sign_transaction, AccountNumber, Action, AutoAbort, ExactAccountNumber, PrivateKey, PublicKey,
+    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,10 @@ struct Args {
         default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
     )]
     api: Url,
+
+    /// HTTP proxy
+    #[clap(long, value_name = "URL")]
+    proxy: Option<Url>,
 
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
@@ -649,10 +653,15 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
+async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
+    let (builder, result) = apply_proxy(reqwest::Client::builder(), &args.proxy).await?;
+    Ok((builder.build()?, result))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
-    let client = reqwest::Client::new();
+    let (client, _proxy) = build_client(&args).await?;
     match &args.command {
         Command::Boot { key, producer, doc } => boot(&args, client, key, *producer, *doc).await?,
         Command::Create {

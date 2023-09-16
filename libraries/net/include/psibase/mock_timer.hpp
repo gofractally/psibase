@@ -29,7 +29,7 @@ namespace psibase::test
       static void           reset();
       static void           reset(time_point);
       static void           advance(duration);
-      static void           advance();
+      static bool           advance();
    };
 
    std::ostream& operator<<(std::ostream&, mock_clock::time_point);
@@ -58,6 +58,7 @@ namespace psibase::test
          std::vector<callback_type>                         callbacks;
          std::function<callback_type(const callback_type&)> bind;
          time_point                                         deadline;
+         std::uint64_t                                      sequence;
       };
       std::shared_ptr<impl> _impl;
       void                  cancel();
