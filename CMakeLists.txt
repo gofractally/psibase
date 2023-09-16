@@ -150,46 +150,53 @@ set(JS_DIRS
     services/user/CommonSys/ui:CommonSys_js
     services/user/TokenSys/ui:TokenSys_js
     services/user/ExploreSys/ui:ExploreSys_js
-    services/user/AdminSys/ui:AdminSys_js
     services/user/InviteSys/ui:InviteSys_js
 )
+set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
+set(COMMON_DIR services/user/CommonSys/common-lib/:CommonSysLib_js)
+
+function(add_js_target ENTRY OUTPUT_FILE)
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
+
+    file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
+    set(DEPENDENCIES ${sources} ${ARGN})
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE}
+        DEPENDS ${DEPENDENCIES}
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
+    )
+    add_custom_target(
+        ${DEP}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE}
+    )
+endfunction()
 
 option(BUILD_JS "Build JS" ON)
 if(BUILD_JS)
-    execute_process(COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase --out-name wasm-psibase )
-
     list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
     file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
     file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
+    file(GLOB admin-wasm LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/*)
 
     # Builds the Common Sys Lib
-    file(GLOB common_lib_sources ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/src/*)
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
-        DEPENDS ${common_lib_sources}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib && yarn --mutex network && yarn build
-    )
-    add_custom_target(CommonSysLib_js
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/dist/common-lib.js
-    )
+    add_js_target(${COMMON_DIR} common-lib.js)
 
     foreach(ENTRY ${JS_DIRS})
-        string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
-        string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
-        file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
-        add_custom_command(
-            OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
-            DEPENDS ${sources} ${common} ${common-fonts} CommonSysLib_js
-            COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
-        )
-        add_custom_target(
-            ${DEP}
-            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
-        )
+        add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
     endforeach()
+
+    add_js_target(${ADMIN_DIR} index.html ${admin-wasm})
 endif()
 
 if(BUILD_JS)
+    add_custom_target(
+    wasm-psibase
+    ALL
+    COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase --out-name wasm-psibase
+    )
+    add_dependencies(wasm-psibase rust)
+
     function(psinode_files target pfx)
     add_custom_target(
     ${target}
@@ -198,7 +205,6 @@ if(BUILD_JS)
     COMMAND rm -rf ${pfx}/share/psibase/services/admin-sys
     COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
     COMMAND cp -a -T ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist ${pfx}/share/psibase/services/admin-sys
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase ${pfx}/share/psibase/services/admin-sys
     COMMAND cp -a -T ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/rpc.mjs ${pfx}/share/psibase/services/admin-sys/common/
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/keyConversions.mjs ${pfx}/share/psibase/services/admin-sys/common/
@@ -207,6 +213,7 @@ if(BUILD_JS)
     endfunction()
 
     psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
+    add_dependencies(AdminSys_js wasm-psibase)
 
     include(GNUInstallDirs)
     install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
