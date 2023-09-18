@@ -58,7 +58,7 @@ jobs:
           mkdir build
           ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DBUILD_DOC=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
           echo =====
-          ${DOCKER} bash -c "cd build && make VERBOSE=1 -j $(nproc)"
+          ${DOCKER_ROOT} bash -c "cd build && make VERBOSE=1 -j $(nproc)"
           echo =====
           ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc)"
           echo =====
