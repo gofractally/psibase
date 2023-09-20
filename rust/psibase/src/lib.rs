@@ -9,6 +9,7 @@ mod graph_ql;
 mod hex;
 mod http;
 mod internal_macros;
+#[cfg(not(target_family = "wasm"))]
 mod local_socket;
 mod method_number;
 pub mod native;
@@ -40,6 +41,7 @@ pub use from_bin::*;
 pub use graph_ql::*;
 pub use hex::*;
 pub use http::*;
+#[cfg(not(target_family = "wasm"))]
 pub use local_socket::*;
 pub use method_number::*;
 pub use native::*;
