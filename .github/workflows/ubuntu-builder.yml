@@ -72,6 +72,12 @@ jobs:
           ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-${{ matrix.ubuntu-version }}"
           echo =====
           ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
+      - name: Upload cpack failure log
+        if: success() || failure()
+        uses: actions/upload-artifact@v1
+        with:
+          name: PreinstallOutput.log
+          path: build/_CPack_Packages/Linux/TGZ/PreinstallOutput.log
       - name: Upload psidk-ubuntu-${{ matrix.ubuntu-version }}
         uses: actions/upload-artifact@v1
         with:
