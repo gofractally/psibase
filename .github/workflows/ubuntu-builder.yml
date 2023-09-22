@@ -11,9 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2004:999c4939a67244c0c798480fcb05a1e86c6f8bf4"
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2004:9e5daca8d7a08cf877ac4c40a9d3c12cdb44e534"
             ubuntu-version: "2004"
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:999c4939a67244c0c798480fcb05a1e86c6f8bf4"
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:9e5daca8d7a08cf877ac4c40a9d3c12cdb44e534"
             ubuntu-version: "2204"
     steps:
       - name: Timestamp
@@ -69,9 +69,15 @@ jobs:
           echo =====
           ${DOCKER} sccache -s
           echo =====
-          ${DOCKER_ROOT} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-${{ matrix.ubuntu-version }}"
+          ${DOCKER_ROOT} bash -c "cd build && strace -e trace=file -o strace.txt cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-${{ matrix.ubuntu-version }}"
           echo =====
           ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
+      - name: Upload strace log
+        if: success() || failure()
+        uses: actions/upload-artifact@v1
+        with:
+          name: strace.txt
+          path: build/strace.txt
       - name: Upload psidk-ubuntu-${{ matrix.ubuntu-version }}
         uses: actions/upload-artifact@v1
         with:
