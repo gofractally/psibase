@@ -27,5 +27,9 @@ extern "C" void called(AccountNumber thisService, AccountNumber sender)
    abortMessage("this service has no actions");
 }
 
-// Caution! Don't replace with version in dispatcher!
-extern "C" void start(AccountNumber thisService) {}
+extern "C" void __wasm_call_ctors();
+
+extern "C" void start(AccountNumber thisService)
+{
+   __wasm_call_ctors();
+}
