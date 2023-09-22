@@ -57,19 +57,26 @@ endif()
 
 if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
     ProcessorCount(NUM_PROCS)
+    # This is used by the VerifySys service. The kinds of keys supported need to be configured
+    # here.  We use a minimized build to keep the size of the service down. Static linking is
+    # not enough because the algorithms are looked up dynamically.
+    #
+    # --cpu=generic is used instead of --cpu=wasm, because Botan thinks that wasm means emscripten.
+    # --cc=gcc is used instead of clang, because Botan's clang configration includes -pthread.
+    # The stack protector requires an entropy source so we can't support it.
     ExternalProject_Add(wasm-botan
         URL https://github.com/gofractally/psibase/releases/download/deps/Botan-3.1.1.tar.xz
         URL_HASH SHA256=30c84fe919936a98fef5331f246c62aa2c0e4d2085b2d4511207f6a20afa3a6b
         DEPENDS ${wasm-deps}
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/botan
         INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
-        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa "--cxxflags=--target=wasm32-wasi -O3" --without-stack-protector --prefix=<INSTALL_DIR>
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa "--cxxflags=--target=wasm32-wasi -O3 -msign-ext -mnontrapping-fptoint -msimd128 -mbulk-memory" --without-stack-protector --prefix=<INSTALL_DIR>
         BUILD_COMMAND make -j${NUM_PROCS}
         INSTALL_COMMAND make install
     )
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
-        DEPENDS ${wasm-deps}
+        DEPENDS ${wasm-deps} wasm-botan
         BINARY_DIR wasm
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1

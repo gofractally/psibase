@@ -7,6 +7,7 @@
 using namespace psibase;
 using namespace Botan;
 
+// The supported algorithms depend on how Botan was built. See the root CMakeLists.txt.
 extern "C" [[clang::export_name("verify")]] void verify()
 {
    auto act  = getCurrentAction();
