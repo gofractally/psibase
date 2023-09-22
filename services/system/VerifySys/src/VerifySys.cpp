@@ -19,7 +19,7 @@ extern "C" [[clang::export_name("verify")]] void verify()
        std::span{reinterpret_cast<const std::uint8_t*>(data.proof.data()), data.proof.size()};
 
    std::unique_ptr<Public_Key> pubkey = X509::load_key(ber_pubkey);
-   PK_Verifier                 verifier(*pubkey, "Raw", Signature_Format::DerSequence);
+   PK_Verifier                 verifier(*pubkey, "Raw", Signature_Format::Standard);
    check(verifier.verify_message(data.transactionHash, signature), "signature invalid");
 }
 

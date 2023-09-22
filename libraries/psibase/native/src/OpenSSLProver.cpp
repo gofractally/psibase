@@ -22,6 +22,7 @@ namespace
    {
       void operator()(EVP_MD_CTX* ctx) const { EVP_MD_CTX_free(ctx); }
       void operator()(EVP_PKEY* key) const { EVP_PKEY_free(key); }
+      void operator()(ECDSA_SIG* sig) const { ECDSA_SIG_free(sig); }
    };
    std::vector<char> getPublicKey(EVP_PKEY* key)
    {
@@ -35,6 +36,39 @@ namespace
       {
          unsigned char* p = reinterpret_cast<unsigned char*>(result.data());
          i2d_PublicKey(static_cast<EVP_PKEY*>(key), &p);
+      }
+      return result;
+   }
+   std::size_t getEcLen(EVP_PKEY* key)
+   {
+      if (EVP_PKEY_is_a(key, "EC"))
+      {
+         return (EVP_PKEY_get_bits(key) + 7) / 8;
+      }
+      else
+      {
+         return 0;
+      }
+   }
+   // len is the key size in bytes
+   std::vector<char> der2compact(std::vector<char>&& sig, std::size_t len)
+   {
+      auto p = reinterpret_cast<const unsigned char*>(sig.data());
+      std::unique_ptr<ECDSA_SIG, OpenSSLDeleter> decoded(d2i_ECDSA_SIG(nullptr, &p, sig.size()));
+      if (!decoded)
+      {
+         handleOpenSSLError();
+      }
+      auto              r = ECDSA_SIG_get0_r(decoded.get());
+      auto              s = ECDSA_SIG_get0_s(decoded.get());
+      std::vector<char> result(len * 2);
+      if (BN_bn2binpad(r, reinterpret_cast<unsigned char*>(result.data()), len) == -1)
+      {
+         handleOpenSSLError();
+      }
+      if (BN_bn2binpad(s, reinterpret_cast<unsigned char*>(result.data()) + len, len) == -1)
+      {
+         handleOpenSSLError();
       }
       return result;
    }
@@ -89,6 +123,10 @@ std::vector<char> psibase::OpenSSLProver::prove(std::span<const char> data,
                                         &n, reinterpret_cast<const unsigned char*>(data.data()),
                                         data.size()));
       result.resize(n);
+      if (auto len = getEcLen(static_cast<EVP_PKEY*>(privateKey)))
+      {
+         result = der2compact(std::move(result), len);
+      }
       return result;
    }
    else
