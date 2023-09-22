@@ -1,5 +1,6 @@
 #include <psibase/ConfigFile.hpp>
 #include <psibase/EcdsaProver.hpp>
+#include <psibase/OpenSSLProver.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/bft.hpp>
 #include <psibase/cft.hpp>
@@ -446,9 +447,7 @@ struct transaction_queue
    }
 
 #define CATCH_IGNORE \
-   catch (...)       \
-   {                 \
-   }
+   catch (...) {}
 
 bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 {
@@ -1874,7 +1873,7 @@ void run(const std::string&              db_path,
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    key = psio::from_json<NewKeyRequest>(stream);
-         if (key.service.str() != "verifyec-sys")
+         if (key.service.str() != "verifyec-sys" && key.service.str() != "verify-sys")
          {
             throw std::runtime_error("Not implemented for native signing: " + key.service.str());
          }
@@ -1885,20 +1884,36 @@ void run(const std::string&              db_path,
              {
                 try
                 {
-                   std::shared_ptr<EcdsaSecp256K1Sha256Prover> result;
-                   if (key.rawData)
+                   std::shared_ptr<Prover> result;
+                   if (key.service == AccountNumber{})
                    {
-                      result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
-                          key.service, psio::from_frac<PrivateKey>(*key.rawData));
+                      if (key.rawData)
+                      {
+                         result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
+                             key.service, psio::from_frac<PrivateKey>(*key.rawData));
+                      }
+                      else
+                      {
+                         result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
+                      }
                    }
                    else
                    {
-                      result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
+                      if (key.rawData)
+                      {
+                         result = std::make_shared<OpenSSLProver>(key.service, *key.rawData);
+                      }
+                      else
+                      {
+                         result = std::make_shared<OpenSSLProver>(key.service);
+                      }
                    }
                    std::vector<Claim> existing;
                    prover->get(existing);
-                   auto claim = result->get();
-                   if (std::find(existing.begin(), existing.end(), claim) == existing.end())
+                   std::vector<Claim> claim;
+                   result->get(claim);
+                   if (!claim.empty() &&
+                       std::find(existing.begin(), existing.end(), claim[0]) == existing.end())
                    {
                       prover->add(std::move(result));
 
