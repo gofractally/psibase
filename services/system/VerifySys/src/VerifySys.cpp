@@ -29,15 +29,3 @@ extern "C" void called(AccountNumber thisService, AccountNumber sender)
 
 // Caution! Don't replace with version in dispatcher!
 extern "C" void start(AccountNumber thisService) {}
-
-extern "C"
-{
-   void* __cxa_allocate_exception(std::size_t) throw()
-   {
-      std::abort();
-   }
-   void __cxa_throw(void*, std::type_info*, void (*)(void*))
-   {
-      std::abort();
-   }
-}

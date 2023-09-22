@@ -103,6 +103,12 @@ function(add suffix)
             ${LIBCLANG_RT_BUILTINS}
         )
 
+        add_library(exception-stub${suffix})
+        target_sources(exception-stub${suffix} PRIVATE service/src/exceptions.cpp)
+        target_include_directories(exception-stub${suffix} PRIVATE common/include)
+        target_compile_options(exception-stub${suffix} INTERFACE -fexceptions)
+        target_link_libraries(exception-stub${suffix} PUBLIC wasm-base${suffix})
+
         add_library(psitestlib${suffix})
         target_sources(psitestlib${suffix} PRIVATE
             tester/src/tester.cpp
