@@ -56,6 +56,17 @@ elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
 endif()
 
 if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
+    ProcessorCount(NUM_PROCS)
+    ExternalProject_Add(wasm-botan
+        URL https://github.com/gofractally/psibase/releases/download/deps/Botan-3.1.1.tar.xz
+        URL_HASH SHA256=30c84fe919936a98fef5331f246c62aa2c0e4d2085b2d4511207f6a20afa3a6b
+        DEPENDS ${wasm-deps}
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/botan
+        INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa "--cxxflags=--target=wasm32-wasi -O3" --without-stack-protector --prefix=<INSTALL_DIR>
+        BUILD_COMMAND make -j${NUM_PROCS}
+        INSTALL_COMMAND make install
+    )
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
         DEPENDS ${wasm-deps}
@@ -251,6 +262,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm                     ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm               ${BOOT_IMAGE}
         COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm                  ${BOOT_IMAGE}
+        COMMAND         cp -a ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm                    ${BOOT_IMAGE}
 
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist    ${BOOT_IMAGE}/AccountSys/ui/dist
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui          ${BOOT_IMAGE}/AuthEcSys/ui

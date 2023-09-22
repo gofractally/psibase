@@ -24,7 +24,7 @@ macro_rules! method {
     };
 }
 
-const ACCOUNTS: [AccountNumber; 27] = [
+const ACCOUNTS: [AccountNumber; 28] = [
     account_sys::SERVICE,
     account!("alice"),
     auth_ec_sys::SERVICE,
@@ -52,6 +52,7 @@ const ACCOUNTS: [AccountNumber; 27] = [
     account!("token-sys"),
     transaction_sys::SERVICE,
     account!("verifyec-sys"),
+    account!("verify-sys"),
 ];
 
 macro_rules! sgc {
@@ -183,6 +184,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sgc!("token-sys", 0, "TokenSys.wasm"),
         sgc!("transact-sys", 3, "TransactionSys.wasm"), // TODO: flags
         sgc!("verifyec-sys", 64, "VerifyEcSys.wasm"),
+        sgc!("verify-sys", 64, "VerifySys.wasm"),
     ];
 
     let genesis_action_data = SharedGenesisActionData {
