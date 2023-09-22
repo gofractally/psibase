@@ -363,14 +363,23 @@ namespace psibase
       const auto& s = boost::program_options::validators::get_single_string(values);
       if (s.starts_with('{'))
       {
-         auto key = psio::convert_from_json<ClaimKey>(s);
-         if (key.service.str() != "verifyec-sys")
+         auto                    key = psio::convert_from_json<ClaimKey>(s);
+         std::shared_ptr<Prover> result;
+
+         if (key.service.str() == "verifyec-sys")
+         {
+            result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
+                key.service, psio::from_frac<PrivateKey>(key.rawData));
+         }
+         else if (key.service.str() == "verify-sys")
+         {
+            result = std::make_shared<OpenSSLProver>(key.service, key.rawData);
+         }
+         else
          {
             throw std::runtime_error("Not implemented: keys from service " + key.service.str());
          }
-         auto result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
-             key.service, psio::from_frac<PrivateKey>(key.rawData));
-         v = std::shared_ptr<Prover>(std::move(result));
+         v = result;
       }
       else
       {
