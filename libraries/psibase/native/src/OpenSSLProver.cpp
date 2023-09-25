@@ -90,7 +90,7 @@ namespace
          handleOpenSSLError();
       }
       EVP_PKEY* result = nullptr;
-      if (EVP_PKEY_generate(ctx.get(), &result) <= 0)
+      if (EVP_PKEY_keygen(ctx.get(), &result) <= 0)
       {
          handleOpenSSLError();
       }
