@@ -22,6 +22,7 @@ namespace
    {
       void operator()(EVP_MD_CTX* ctx) const { EVP_MD_CTX_free(ctx); }
       void operator()(EVP_PKEY* key) const { EVP_PKEY_free(key); }
+      void operator()(EVP_PKEY_CTX* ctx) const { EVP_PKEY_CTX_free(ctx); }
       void operator()(ECDSA_SIG* sig) const { ECDSA_SIG_free(sig); }
    };
    std::vector<char> getPublicKey(EVP_PKEY* key)
@@ -41,9 +42,9 @@ namespace
    }
    std::size_t getEcLen(EVP_PKEY* key)
    {
-      if (EVP_PKEY_is_a(key, "EC"))
+      if (EVP_PKEY_base_id(key) == EVP_PKEY_EC)
       {
-         return (EVP_PKEY_get_bits(key) + 7) / 8;
+         return (EVP_PKEY_bits(key) + 7) / 8;
       }
       else
       {
@@ -72,11 +73,34 @@ namespace
       }
       return result;
    }
+
+   std::unique_ptr<EVP_PKEY, OpenSSLDeleter> generateKey()
+   {
+      std::unique_ptr<EVP_PKEY_CTX, OpenSSLDeleter> ctx(EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr));
+      if (!ctx)
+      {
+         handleOpenSSLError();
+      }
+      if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
+      {
+         handleOpenSSLError();
+      }
+      if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx.get(), NID_X9_62_prime256v1) <= 0)
+      {
+         handleOpenSSLError();
+      }
+      EVP_PKEY* result = nullptr;
+      if (EVP_PKEY_generate(ctx.get(), &result) <= 0)
+      {
+         handleOpenSSLError();
+      }
+      return std::unique_ptr<EVP_PKEY, OpenSSLDeleter>(result);
+   }
 }  // namespace
 
 psibase::OpenSSLProver::OpenSSLProver(AccountNumber service) : service(service)
 {
-   std::unique_ptr<EVP_PKEY, OpenSSLDeleter> pkey(EVP_EC_gen("P-256"));
+   auto pkey = generateKey();
    if (!pkey)
    {
       handleOpenSSLError();
