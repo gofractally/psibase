@@ -23,7 +23,7 @@ def _key_normalizer(request_context):
     context = request_context.copy()
     del context['socketpath']
     return urllib3.poolmanager.key_fn_by_scheme['http'](context)
-        
+
 class _LocalPoolManager(urllib3.PoolManager):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -431,7 +431,7 @@ class Node(API):
         else:
             return self.disconnect(other.socketpath) or other.disconnect(self.socketpath)
 
-    def boot(self, producer=None, doc=False):
+    def boot(self, producer=None):
         '''boots the chain. If a producer is not specified, uses the name of this node'''
         self._find_psibase()
         if producer is None:
@@ -439,8 +439,6 @@ class Node(API):
         if producer is None:
             raise RuntimeError("Producer required for boot")
         args = ['-p', producer]
-        if not doc:
-            args.append('--no-doc')
         subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath, 'boot'] + args)
         now = time.time_ns() // 1000000000
         def isbooted(node):

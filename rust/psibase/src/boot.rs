@@ -255,7 +255,6 @@ pub fn create_boot_transactions(
     initial_key: &Option<PublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
-    install_doc: bool,
     install_token_users: bool,
     expiration: TimePointSec,
 ) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
@@ -401,14 +400,12 @@ pub fn create_boot_transactions(
     let mut doc_actions = vec![
         new_account_action(account_sys::SERVICE, account!("doc-sys")), //
     ];
-    if install_doc {
-        fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc"),
-            &mut doc_actions,
-            account!("doc-sys"),
-            psispace_sys::SERVICE,
-        );
-    }
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc"),
+        &mut doc_actions,
+        account!("doc-sys"),
+        psispace_sys::SERVICE,
+    );
     actions.append(&mut doc_actions);
 
     if install_token_users {
@@ -518,7 +515,7 @@ pub fn js_create_boot_transactions(producer: String) -> Result<JsValue, JsValue>
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     let (boot_transactions, transactions) =
-        create_boot_transactions(&None, prod.into(), true, true, true, expiration);
+        create_boot_transactions(&None, prod.into(), true, true, expiration);
 
     let boot_transactions = boot_transactions.packed();
     let transactions : Vec<ByteBuf> = transactions

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use fracpack::{Pack, Unpack};
 use futures::future::join_all;
 use hmac::{Hmac, Mac};
@@ -59,10 +59,6 @@ enum Command {
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
         producer: ExactAccountNumber,
-
-        /// Don't include documentation in the boot image
-        #[clap(long="no-doc",action=ArgAction::SetFalse)]
-        doc: bool,
     },
 
     /// Create or modify an account
@@ -509,14 +505,13 @@ async fn boot(
     client: reqwest::Client,
     key: &Option<PublicKey>,
     producer: ExactAccountNumber,
-    doc: bool,
 ) -> Result<(), anyhow::Error> {
     let now_plus_30secs = Utc::now() + Duration::seconds(30);
     let expiration = TimePointSec {
         seconds: now_plus_30secs.timestamp() as u32,
     };
     let (boot_transactions, transactions) =
-        create_boot_transactions(key, producer.into(), true, doc, true, expiration);
+        create_boot_transactions(key, producer.into(), true, true, expiration);
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
@@ -663,7 +658,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let (client, _proxy) = build_client(&args).await?;
     match &args.command {
-        Command::Boot { key, producer, doc } => boot(&args, client, key, *producer, *doc).await?,
+        Command::Boot { key, producer } => boot(&args, client, key, *producer).await?,
         Command::Create {
             account,
             key,

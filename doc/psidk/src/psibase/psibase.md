@@ -6,7 +6,7 @@ psibase - The psibase blockchain command line client
 
 ## SYNOPSIS
 
-`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [`--no-doc`]  
+`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*]  
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
 `psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
@@ -47,10 +47,6 @@ The boot command deploys a set of system services and web interfaces suitable fo
 - `-p`, `--producer` *name*
 
   Set the name of the block producer. `psinode` should be configured to use the same name.
-
-- `--no-doc`
-
-  Do not upload psibase documentation
 
 ### create
 
