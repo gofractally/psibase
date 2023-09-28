@@ -177,7 +177,6 @@ if(BUILD_JS)
     list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
     file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
     file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
-    file(GLOB admin-wasm LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/*)
 
     # Builds the Common Sys Lib
     add_js_target(${COMMON_DIR} common-lib.js)
@@ -186,7 +185,7 @@ if(BUILD_JS)
         add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
     endforeach()
 
-    add_js_target(${ADMIN_DIR} index.html ${admin-wasm})
+    add_js_target(${ADMIN_DIR} index.html)
 endif()
 
 if(BUILD_JS)
