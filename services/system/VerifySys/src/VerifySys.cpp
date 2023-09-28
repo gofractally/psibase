@@ -1,6 +1,8 @@
-#include <botan/pkcs8.h>
+#include <services/system/VerifySys.hpp>
+
 #include <botan/pubkey.h>
 #include <botan/x509_key.h>
+#include <psibase/dispatch.hpp>
 #include <psibase/nativeFunctions.hpp>
 #include <psibase/serviceEntry.hpp>
 
@@ -23,14 +25,4 @@ extern "C" [[clang::export_name("verify")]] void verify()
    check(verifier.verify_message(data.transactionHash, signature), "signature invalid");
 }
 
-extern "C" void called(AccountNumber thisService, AccountNumber sender)
-{
-   abortMessage("this service has no actions");
-}
-
-extern "C" void __wasm_call_ctors();
-
-extern "C" void start(AccountNumber thisService)
-{
-   __wasm_call_ctors();
-}
+PSIBASE_DISPATCH(SystemService::VerifySys)
