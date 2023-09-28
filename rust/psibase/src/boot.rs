@@ -208,6 +208,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
     }
 }
 
+// Adds an action
 fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service: AccountNumber) {
     for e in dir.entries() {
         match e {
@@ -228,37 +229,16 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service
     }
 }
 
-/// Create boot transactions
+/// Get initial actions
 ///
-/// This returns two sets of transactions which boot a blockchain.
-/// The first set MUST be pushed as a group using push_boot and
-/// will be included in the first block. The remaining transactions
-/// MUST be pushed in order, but are not required to be in the first
-/// block. If any of these transactions fail, the chain will be unusable.
-///
-/// The first transaction, the genesis transaction, installs
-/// a set of service WASMs. The remainder initialize the services
-/// and install apps and documentation.
-///
-/// If `initial_key` is set, then this initializes all accounts to use
-/// that key and sets the key the initial producer signs blocks with.
-/// If it is not set, then this initializes all accounts to use
-/// `auth-any-sys` (no keys required) and sets it up so producers
-/// don't need to sign blocks.
-///
-/// The interface to this function doesn't support customization.
-/// If you want a custom boot, then use `boot.rs` as a guide to
-/// create your own.
-// TODO: switch to builder pattern
-// TODO: sometimes tries to set keys on non-existing accounts
-pub fn create_boot_transactions(
+/// This returns all actions that need to be packed into the transactions pushed after the
+/// boot block.
+pub fn get_initial_actions(
     initial_key: &Option<PublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
-    install_token_users: bool,
-    expiration: TimePointSec,
-) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
-    let mut boot_transactions = vec![genesis_transaction(expiration)];
+    install_token_users: bool)
+    -> Vec<Action> {
     let mut init_actions = vec![
         account_sys::Wrapper::pack().init(),
         nft_sys::Wrapper::pack().init(),
@@ -331,14 +311,7 @@ pub fn create_boot_transactions(
         let mut common_sys_3rd_party_files = vec![
             store_third_party!("htm.module.js", js),
             store_third_party!("iframeResizer.contentWindow.js", js),
-            store_third_party!("iframeResizer.js", js),
-            store_third_party!("react-dom.development.js", js),
-            store_third_party!("react-dom.production.min.js", js),
-            store_third_party!("react-router-dom.min.js", js),
-            store_third_party!("react.development.js", js),
-            store_third_party!("react.production.min.js", js),
-            store_third_party!("semantic-ui-react.min.js", js),
-            store_third_party!("useLocalStorageState.js", js),
+            store_third_party!("iframeResizer.js", js)
         ];
 
         let mut account_sys_files = vec![];
@@ -465,6 +438,42 @@ pub fn create_boot_transactions(
 
     actions.push(transaction_sys::Wrapper::pack().finishBoot());
 
+    actions
+}
+
+
+/// Create boot transactions
+///
+/// This returns two sets of transactions which boot a blockchain.
+/// The first set MUST be pushed as a group using push_boot and
+/// will be included in the first block. The remaining transactions
+/// MUST be pushed in order, but are not required to be in the first
+/// block. If any of these transactions fail, the chain will be unusable.
+///
+/// The first transaction, the genesis transaction, installs
+/// a set of service WASMs. The remainder initialize the services
+/// and install apps and documentation.
+///
+/// If `initial_key` is set, then this initializes all accounts to use
+/// that key and sets the key the initial producer signs blocks with.
+/// If it is not set, then this initializes all accounts to use
+/// `auth-any-sys` (no keys required) and sets it up so producers
+/// don't need to sign blocks.
+///
+/// The interface to this function doesn't support customization.
+/// If you want a custom boot, then use `boot.rs` as a guide to
+/// create your own.
+// TODO: switch to builder pattern
+// TODO: sometimes tries to set keys on non-existing accounts
+pub fn create_boot_transactions(
+    initial_key: &Option<PublicKey>,
+    initial_producer: AccountNumber,
+    install_ui: bool,
+    install_token_users: bool,
+    expiration: TimePointSec,
+) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
+    let mut boot_transactions = vec![genesis_transaction(expiration)];
+    let mut actions = get_initial_actions(initial_key, initial_producer, install_ui, install_token_users);
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -524,4 +533,16 @@ pub fn js_create_boot_transactions(producer: String) -> Result<JsValue, JsValue>
         .collect();
 
     Ok(serde_wasm_bindgen::to_value(&(ByteBuf::from(boot_transactions), transactions))?)
+}
+
+/// Gets an unpacked view of the transactions committed to during boot.
+#[wasm_bindgen]
+pub fn js_get_initial_actions(producer: String) -> Result<JsValue, JsValue> {
+
+    let prod = ExactAccountNumber::from_str(&producer)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let actions = get_initial_actions(&None, prod.into(), true, true);
+
+    Ok(serde_wasm_bindgen::to_value(&actions)?)
 }
