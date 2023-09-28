@@ -28,9 +28,9 @@ declare module "common/rpc.mjs" {
     };
 
     type ChangeHistoryPayload = {
-        href: string;
         pathname: string;
         search: string;
+        hash: string;
     };
 
     declare class AppletId {

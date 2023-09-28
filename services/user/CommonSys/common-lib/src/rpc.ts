@@ -29,6 +29,12 @@ const bufferedMessages: any[] = [];
 const callbacks: any[] = [null];
 const promises: any[] = [null];
 const transactions: any = {};
+const debug : Boolean = false;
+
+function debugPrint(...args: any[]): void {
+    if (debug)
+        console.debug(...args);
+}
 
 export async function getRootDomain() {
     if (rootDomain) {
@@ -489,7 +495,7 @@ function sendToParent(message: any) {
     if ("parentIFrame" in window) {
         sendMessage();
     } else {
-        console.log("Message queued");
+        debugPrint("Message queued");
         bufferedMessages.push(sendMessage);
     }
 }
@@ -668,6 +674,7 @@ export async function initializeApplet(initializer = () => {}) {
     await redirectIfAccessedDirectly();
 
     const rootUrl = await siblingUrl(undefined, undefined, undefined);
+
     (window as any).iFrameResizer = {
         targetOrigin: rootUrl,
         onReady: async () => {
@@ -700,47 +707,31 @@ export async function initializeApplet(initializer = () => {}) {
         },
     };
 
-    console.info("loading contentwindow");
-    // @ts-ignore
-    await import("/common/iframeResizer.contentWindow.js");
-    console.info("contentwindow loaded!!!!!!");
-
-    console.info("setting up applet event listeners popstate");
     let currentHref = document.location.href;
-    const body = document.querySelector("body");
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach(() => {
-            if (currentHref !== document.location.href) {
-                console.info(">>> observed href mutation");
-                sendHistoryChange();
-                currentHref = document.location.href;
-            }
-        });
-    });
-    observer.observe(body!, { childList: true, subtree: true });
-
+    // Clicking links that loads a new subpage of the applet
+    //    will update the browser URL.
+    sendHistoryChange();
     // required to detect back button
     window.onpopstate = (_event) => {
         if (currentHref !== document.location.href) {
-            console.info(">>> observed popstate href mutation");
             sendHistoryChange();
             currentHref = document.location.href;
         }
     };
 
+    // @ts-ignore
+    await import("/common/iframeResizer.contentWindow.js");
+
     await initializer();
+
 }
 
 const sendHistoryChange = () => {
-    const { pathname, href, search } = document.location;
-    console.info("sending change history message", {
-        href,
-        pathname,
-        search,
-    });
+    const { pathname, href, search, hash } = document.location;
+    debugPrint(`Change browser URL to: ${href}`);
     sendToParent({
         type: MessageTypes.ChangeHistory,
-        payload: { href, pathname, search },
+        payload: { pathname, search, hash },
     });
 };
 
