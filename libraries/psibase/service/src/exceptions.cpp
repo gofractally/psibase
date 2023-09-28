@@ -1,11 +1,13 @@
+#include <cstdlib>
 #include <psibase/check.hpp>
+#include <typeinfo>
 
 extern "C" void* __cxa_allocate_exception(std::size_t sz) throw()
 {
-   psibase::abortMessage("Exceptions not supported");
+   return std::malloc(sz);
 }
 
-extern "C" void __cxa_throw(void*, std::type_info*, void (*)(void*))
+extern "C" void __cxa_throw(void* except, std::type_info* tinfo, void (*)(void*))
 {
-   psibase::abortMessage("Exceptions not supported");
+   psibase::abortMessage(tinfo->name());
 }
