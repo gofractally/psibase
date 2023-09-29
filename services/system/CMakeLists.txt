@@ -11,12 +11,14 @@ function(add suffix)
         AccountSys/include
         AuthEcSys/include
         AuthAnySys/include
+        AuthSys/include
         CpuSys/include
         ProducerSys/include
         ProxySys/include
         SetCodeSys/include
         TransactionSys/include
         VerifyEcSys/include
+        VerifySys/include
     )
 endfunction(add)
 
@@ -27,6 +29,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(AccountSys)
     add_subdirectory(AuthEcSys)
     add_subdirectory(AuthAnySys)
+    add_subdirectory(AuthSys)
     add_subdirectory(CpuSys)
     add_subdirectory(ProducerSys)
     add_subdirectory(ProxySys)

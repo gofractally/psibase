@@ -39,7 +39,7 @@ export const fetchAccountsByKey = async (publicKey: string) => {
     if (!publicKey) throw new Error(`No public key found ${publicKey}`);
     const accKeys = await fetchQuery<{ account: string; pubkey: string }[]>(
         "accWithKey",
-        "auth-ec-sys",
+        "auth-sys",
         {
             key: publicKey,
         }

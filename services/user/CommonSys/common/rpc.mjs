@@ -242,8 +242,8 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
         else return k;
     });
     const claims = keys.map((k) => ({
-        service: "verifyec-sys",
-        rawData: uint8ArrayToHex(publicKeyPairToFracpack(k)),
+        service: "verify-sys",
+        rawData: uint8ArrayToHex(publicKeyPairToDER(k)),
     }));
     transaction = new Uint8Array(
         await packTransaction(baseUrl, { ...transaction, claims })
@@ -251,7 +251,7 @@ export async function signTransaction(baseUrl, transaction, privateKeys) {
     const digest = new hashJs.sha256().update(transaction).digest();
     const proofs = keys.map((k) =>
         uint8ArrayToHex(
-            signatureToFracpack({
+            signatureToBin({
                 keyType: k.keyType,
                 signature: k.keyPair.sign(digest),
             })

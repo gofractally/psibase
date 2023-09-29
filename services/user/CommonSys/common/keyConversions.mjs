@@ -195,6 +195,47 @@ export function publicKeyPairToFracpack({ keyType, keyPair }) {
     );
 }
 
+function PEMtoDER(s, tag) {
+    const match = s.match(/-----BEGIN (.*?)-----([^]*?)-----END \1-----/);
+    if (!match) throw new Error("Public key expected");
+    if (tag && tag !== match[1])
+        throw new Error(`Expected ${tag} but got ${match[1]}`);
+    return Uint8Array.from(atob(match[2]), (b) => b.codePointAt(0));
+}
+
+export function publicStringToDER(s) {
+    if (s.startsWith("PUB_")) {
+        return publicKeyPairToDER(publicStringToKeyPair(s));
+    } else {
+        return PEMtoDER(s, "PUBLIC KEY");
+    }
+}
+
+function getSPKIPrefix(keyType) {
+    if (keyType == 0) {
+        return "3036301006072a8648ce3d020106052b8104000a032200";
+    } else if (keyType == 1) {
+        return "3039301306072a8648ce3d020106082a8648ce3d030107032200";
+    }
+}
+
+export function publicKeyPairToDER({ keyType, keyPair }) {
+    const prefix = getSPKIPrefix(keyType);
+    const l = prefix.length / 2;
+    const result = new Uint8Array(l + 33);
+    let i = 0;
+    for (; i < l; ++i) {
+        result[i] = parseInt(prefix.substring(i * 2, i * 2 + 2), 16);
+    }
+    const x = keyPair.getPublic().getX().toArray("be", 32);
+    const y = keyPair.getPublic().getY().toArray("be", 32);
+    result[i++] = y[31] & 1 ? 3 : 2;
+    for (let j = 0; j < x.length; ++i, ++j) {
+        result[i] = x[j];
+    }
+    return result;
+}
+
 // Convert the signature in {keyType, signature} to fracpack format
 export function signatureToFracpack({ keyType, signature }) {
     const r = signature.r.toArray("be", 32);
@@ -212,6 +253,12 @@ export function signatureToFracpack({ keyType, signature }) {
             0, // variant size
         ].concat(r, s)
     );
+}
+
+export function signatureToBin({ keyType, signature }) {
+    const r = signature.r.toArray("be", 32);
+    const s = signature.s.toArray("be", 32);
+    return new Uint8Array(r.concat(s));
 }
 
 export function keyPairStrings(key) {

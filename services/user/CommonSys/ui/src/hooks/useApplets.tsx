@@ -32,9 +32,7 @@ const SERVICE_NAME = "common-sys";
 const ACCOUNT_SYS = new AppletId("account-sys", "");
 const COMMON_SYS = new AppletId(SERVICE_NAME);
 const ACTIVE_APPLET = getAppletInURL();
-const CLAIM_APPLETS: Map<string, AppletId> = new Map([
-    ["auth-ec-sys", new AppletId("auth-ec-sys", "")],
-]);
+const CLAIM_APPLETS: Map<string, AppletId> = new Map([]);
 
 type AppletsMap = {
     [appletPath: string]: NewAppletState;
@@ -259,17 +257,22 @@ export const useApplets = () => {
             const actionSenderClaims = claimParams
                 .filter((action: any) => action.sender)
                 .map((claimParams) => {
-                    // For now we only support `auth-ec-sys`
-                    if (
-                        accountsMap.get(claimParams.sender)?.authService !==
-                        "auth-ec-sys"
-                    ) {
+                    const authService = accountsMap.get(claimParams.sender)?.authService;
+                    // For now we only support `auth-ec-sys` and `auth-sys`
+                    if (authService !== "auth-ec-sys" && authService !== "auth-sys") {
                         return undefined;
+                    }
+
+                    if (!CLAIM_APPLETS.has(authService)) {
+                        CLAIM_APPLETS.set(
+                            authService,
+                            new AppletId(authService, "")
+                        );
                     }
 
                     return sendQuery(
                         COMMON_SYS,
-                        CLAIM_APPLETS.get("auth-ec-sys")!,
+                        CLAIM_APPLETS.get(authService)!,
                         "getClaim",
                         claimParams
                     )

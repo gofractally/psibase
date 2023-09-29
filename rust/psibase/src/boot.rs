@@ -24,10 +24,11 @@ macro_rules! method {
     };
 }
 
-const ACCOUNTS: [AccountNumber; 28] = [
+const ACCOUNTS: [AccountNumber; 30] = [
     account_sys::SERVICE,
     account!("alice"),
     auth_ec_sys::SERVICE,
+    account!("auth-sys"),
     account!("auth-any-sys"),
     account!("auth-inv-sys"),
     account!("bob"),
@@ -44,6 +45,7 @@ const ACCOUNTS: [AccountNumber; 28] = [
     psispace_sys::SERVICE,
     account!("r-account-sys"),
     account!("r-ath-ec-sys"),
+    account!("r-auth-sys"),
     account!("r-prod-sys"),
     account!("r-proxy-sys"),
     account!("r-tok-sys"),
@@ -162,6 +164,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
     let services = vec![
         sgc!("account-sys", 0, "AccountSys.wasm"),
         sgc!("auth-ec-sys", 0, "AuthEcSys.wasm"),
+        sgc!("auth-sys", 0, "AuthSys.wasm"),
         sgc!("auth-any-sys", 0, "AuthAnySys.wasm"),
         sgc!("auth-inv-sys", 0, "AuthInviteSys.wasm"),
         sgc!("common-sys", 0, "CommonSys.wasm"),
@@ -176,6 +179,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sgc!("psispace-sys", 0, "PsiSpaceSys.wasm"),
         sgc!("r-account-sys", 0, "RAccountSys.wasm"),
         sgc!("r-ath-ec-sys", 0, "RAuthEcSys.wasm"),
+        sgc!("r-auth-sys", 0, "RAuthSys.wasm"),
         sgc!("r-prod-sys", 0, "RProducerSys.wasm"),
         sgc!("r-proxy-sys", 0, "RProxySys.wasm"),
         sgc!("r-tok-sys", 0, "RTokenSys.wasm"),
@@ -299,6 +303,7 @@ pub fn create_boot_transactions(
         let mut reg_actions = vec![
             reg_server(account_sys::SERVICE, account!("r-account-sys")),
             reg_server(auth_ec_sys::SERVICE, account!("r-ath-ec-sys")),
+            reg_server(account!("auth-sys"), account!("r-auth-sys")),
             reg_server(common_sys::SERVICE, common_sys::SERVICE),
             reg_server(account!("explore-sys"), account!("explore-sys")),
             reg_server(producer_sys::SERVICE, account!("r-prod-sys")),
@@ -373,6 +378,11 @@ pub fn create_boot_transactions(
             store!("r-ath-ec-sys", "/index.js", js, "AuthEcSys/ui/index.js"),
         ];
 
+        let mut auth_sys_files = vec![
+            store!("r-auth-sys", "/", html, "AuthSys/ui/index.html"),
+            store!("r-auth-sys", "/index.js", js, "AuthSys/ui/index.js"),
+        ];
+
         let mut explore_sys_files = vec![
             // store!(
             //    "explore-sys",
@@ -430,6 +440,7 @@ pub fn create_boot_transactions(
         actions.append(&mut common_sys_3rd_party_files);
         actions.append(&mut account_sys_files);
         actions.append(&mut auth_ec_sys_files);
+        actions.append(&mut auth_sys_files);
         actions.append(&mut explore_sys_files);
         actions.append(&mut token_sys_files);
         actions.append(&mut psispace_sys_files);
