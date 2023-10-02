@@ -185,24 +185,17 @@ if(BUILD_JS)
         add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
     endforeach()
 
-    set(byproducts ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase)
-
-    add_js_target(${ADMIN_DIR} index.html
-        ${byproducts}/wasm-psibase_bg.js
-        ${byproducts}/wasm-psibase_bg.wasm
-        ${byproducts}/wasm-psibase_bg.wasm.d.ts
-        ${byproducts}/wasm-psibase.d.ts
-        ${byproducts}/wasm-psibase.js
+    set(WASM_PSIBASE_BYPRODUCTS
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm.d.ts
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.d.ts
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.js
     )
-
+    add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS})
     add_custom_target(wasm-psibase ALL
-    COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${byproducts} --out-name wasm-psibase
-    BYPRODUCTS
-        ${byproducts}/wasm-psibase_bg.js
-        ${byproducts}/wasm-psibase_bg.wasm
-        ${byproducts}/wasm-psibase_bg.wasm.d.ts
-        ${byproducts}/wasm-psibase.d.ts
-        ${byproducts}/wasm-psibase.js
+    COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase --out-name wasm-psibase
+    BYPRODUCTS ${WASM_PSIBASE_BYPRODUCTS}
     )
     add_dependencies(wasm-psibase rust)
 
