@@ -336,12 +336,6 @@ pub fn create_boot_transactions(
             store_third_party!("htm.module.js", js),
             store_third_party!("iframeResizer.contentWindow.js", js),
             store_third_party!("iframeResizer.js", js),
-            store_third_party!("react-dom.development.js", js),
-            store_third_party!("react-dom.production.min.js", js),
-            store_third_party!("react-router-dom.min.js", js),
-            store_third_party!("react.development.js", js),
-            store_third_party!("react.production.min.js", js),
-            store_third_party!("semantic-ui-react.min.js", js),
             store_third_party!("useLocalStorageState.js", js),
         ];
 
