@@ -29,7 +29,7 @@ echo max_size = 600M >${WORKSPACE_ROOT}/ccache.conf
 echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${WORKSPACE_ROOT}/ccache.conf
 export SCCACHE_CACHE_SIZE=200M
 export RUSTC_WRAPPER=sccache
-export DOCKER="docker run --rm \
+DOCKER="docker run --rm \
   -v ${WORKSPACE_ROOT}:${WORKSPACE_ROOT} \
   -w ${WORKSPACE_ROOT} \
   -e CCACHE_DIR \
@@ -40,16 +40,6 @@ export DOCKER="docker run --rm \
   -e WASM_PACK_CACHE=.wasm-pack-cache \
   --user $(id -u):$(id -g) \
   ${BUILDER_IMAGE}"
-export DOCKER_ROOT="docker run --rm \
-  -v ${WORKSPACE_ROOT}:${WORKSPACE_ROOT} \
-  -w ${WORKSPACE_ROOT} \
-  -e CCACHE_DIR \
-  -e CCACHE_CONFIGPATH \
-  -e SCCACHE_DIR \
-  -e SCCACHE_CACHE_SIZE \
-  -e RUSTC_WRAPPER \
-  -e WASM_PACK_CACHE=.wasm-pack-cache \
-  ${BUILDER_IMAGE}"
 
 docker pull ${BUILDER_IMAGE}
 echo =====
@@ -57,7 +47,7 @@ ${DOCKER} ccache -s
 echo =====
 ${DOCKER} sccache -s
 echo =====
-mkdir build
+mkdir -p build
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_RELEASE_WASM=yes -DBUILD_DEBUG_WASM=yes -DBUILD_DOC=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
 echo =====
 ${DOCKER} bash -c "cd build && make -j $(nproc)"
