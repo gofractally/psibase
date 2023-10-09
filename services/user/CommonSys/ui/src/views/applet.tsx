@@ -43,8 +43,8 @@ export const Applet = ({ applet, handleMessage }: Props) => {
 
             // If we're on the applet page, add the query params to the applet url
             if (window.location.pathname.startsWith(`/applet/${appletId}`)) {
-                const queryParams = window.location.search;
-                url += queryParams;
+                const { search, hash } = window.location;
+                url += search + hash;
             }
 
             setAppletSrc(url);

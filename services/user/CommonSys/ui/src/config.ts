@@ -65,10 +65,9 @@ export const applets: AppletEntry[] = [
         requiresUser: true,
     },
     {
-        title: "About",
-        description: "About psibase.",
-        href: `${window.location.protocol}//about.${window.location.host}`,
-        service: "psibase-landing",
+        title: "Docs",
+        description: "Psibase technical documentation",
+        service: "doc-sys",
         MobileIcon: IconPsibaseMobile,
         DesktopIcon: IconPsibaseDesktop,
         requiresUser: false,

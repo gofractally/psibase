@@ -559,20 +559,18 @@ export const useApplets = () => {
     );
 
     const handleChangeHistory = useCallback(
-        async (applet: AppletId, payload: ChangeHistoryPayload) => {
+        async (
+            applet: AppletId,
+            { pathname, search, hash }: ChangeHistoryPayload
+        ) => {
             // Set history only if the applet is the active one
             if (ACTIVE_APPLET.name === applet.name) {
                 // Trim the leading slash because we can't load applets with "/" in their name
-                const appletPath =
-                    payload.pathname === "/" ? "" : payload.pathname;
-
-                // Build full applet subpath
-                const appletSubpath = `${appletPath}${payload.search}`;
+                const appletPath = pathname === "/" ? "" : pathname;
 
                 // Set the new applet subpath
-                const newPath = `/applet/${applet.name}${appletSubpath}`;
+                const newPath = `/applet/${applet.name}${appletPath}${search}${hash}`;
 
-                console.info("ChangeHistory", newPath);
                 window.history.replaceState(undefined, "", newPath);
             }
         },
@@ -606,7 +604,7 @@ export const useApplets = () => {
                 handle: handleSetActiveUser,
             },
             [MessageTypes.ChangeHistory]: {
-                fields: ["href", "pathname", "search"],
+                fields: ["pathname", "search", "hash"],
                 handle: handleChangeHistory,
             },
         }),

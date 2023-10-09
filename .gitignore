@@ -10,6 +10,7 @@
 *.tsbuildinfo
 *.wasm
 *.wat
+*.pem
 build
 build-*
 CMakeCache.txt
@@ -22,7 +23,7 @@ dist
 vite.config.ts.timestamp-*.mjs
 .pnpm-store
 .env
-psibase.127.0.0.1.sslip.io*.pem
 psinode_db
 psinode_db_secure
 __pycache__
+ccache.conf

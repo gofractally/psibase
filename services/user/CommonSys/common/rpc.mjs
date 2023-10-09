@@ -653,7 +653,6 @@ export async function initializeApplet(initializer = () => {}) {
 
     await import("/common/iframeResizer.contentWindow.js");
 
-    console.info("setting up applet event listeners popstate");
     let currentHref = document.location.href;
     const body = document.querySelector("body");
     const observer = new MutationObserver((mutations) => {
