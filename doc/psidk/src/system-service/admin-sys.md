@@ -40,6 +40,7 @@ Builtin services can only serve the following files types:
 - `.mjs`
 - `.css`
 - `.ttf`
+- `.wasm`
 
 ### Access to admin API
 

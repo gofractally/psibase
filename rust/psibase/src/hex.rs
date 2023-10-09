@@ -4,6 +4,7 @@ use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
+use std::convert::AsRef;
 
 trait ToHex:
     Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect + ToKey
@@ -93,6 +94,15 @@ impl reflect::Reflect for Hex<Vec<u8>> {
     type StaticType = Self;
     fn reflect<V: reflect::Visitor>(visitor: V) -> V::Return {
         visitor.builtin::<Hex<Vec<u8>>>("hex")
+    }
+}
+
+impl AsRef<[u8]> for Hex<Vec<u8>>
+where
+    <Hex<Vec<u8>> as Deref>::Target: AsRef<[u8]>,
+{
+    fn as_ref(&self) -> &[u8] {
+        self.deref().as_ref()
     }
 }
 

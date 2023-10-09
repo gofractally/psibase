@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc && vite build",
+        "build": "yarn upgrade wasm-psibase && tsc && vite build",
         "preview": "vite preview"
     },
     "dependencies": {
@@ -14,7 +14,10 @@
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "react-hook-form": "^7.38.0",
-        "waait": "^1.0.5"
+        "vite-plugin-top-level-await": "^1.3.1",
+        "vite-plugin-wasm": "^3.2.2",
+        "waait": "^1.0.5",
+        "wasm-psibase": "file:./wasm-psibase"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.2",
