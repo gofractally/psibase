@@ -179,7 +179,6 @@ if(BUILD_JS)
     list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
     file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
     file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
-    file(GLOB admin-wasm LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/*)
 
     # Builds the Common Sys Lib
     add_js_target(${COMMON_DIR} common-lib.js)
@@ -188,15 +187,20 @@ if(BUILD_JS)
         add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
     endforeach()
 
-    add_js_target(${ADMIN_DIR} index.html ${admin-wasm})
-endif()
-
-if(BUILD_JS)
-    add_custom_target(
-    wasm-psibase
-    ALL
-    COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase --out-name wasm-psibase
+    set(WASM_PSIBASE_BYPRODUCTS
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm.d.ts
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.d.ts
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.js
     )
+    add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS})
+    add_custom_command(
+        OUTPUT ${WASM_PSIBASE_BYPRODUCTS}
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
+        COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase --out-name wasm-psibase
+    )
+    add_custom_target(wasm-psibase ALL DEPENDS ${WASM_PSIBASE_BYPRODUCTS})
     add_dependencies(wasm-psibase rust)
 
     function(psinode_files target pfx)
@@ -233,6 +237,7 @@ if(BUILD_RUST)
         rust
         DEPENDS wasm ${DOC_DEP} ${JS_DEPS}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
+        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
         CONFIGURE_COMMAND ""
         BUILD_COMMAND   rm -rf ${BOOT_IMAGE}
         COMMAND         mkdir -p ${BOOT_IMAGE}/CommonSys/common ${BOOT_IMAGE}/CommonSys/common/fonts ${BOOT_IMAGE}/CommonSys/ui/vanilla
