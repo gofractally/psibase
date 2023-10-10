@@ -20,13 +20,13 @@ export const fetchQuery = <T>(
     queryName: string,
     service: string,
     params: any = {},
-    subPath: string = ""
+    subPath: string = "",
 ): Promise<T> => query(new AppletId(service, subPath), queryName, params);
 
 export const getLoggedInUser = async (): Promise<string> => {
     return query<any, string>(
         new AppletId("account-sys", ""),
-        "getLoggedInUser"
+        "getLoggedInUser",
     );
 };
 
@@ -41,7 +41,7 @@ export const fetchAccountsByKey = async (publicKey: string) => {
         "auth-sys",
         {
             key: publicKey,
-        }
+        },
     );
     if (publicKey.startsWith("PUB_")) {
         const accEcKeys = await fetchQuery<{ account: string; pubkey: string }[]>(

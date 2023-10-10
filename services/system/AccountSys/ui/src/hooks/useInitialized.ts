@@ -14,6 +14,6 @@ export const useInitialized = (callback: () => void) => {
         if (!appInitialized) {
             return;
         }
-        callback()
+        callback();
     }, [appInitialized]);
-}
+};

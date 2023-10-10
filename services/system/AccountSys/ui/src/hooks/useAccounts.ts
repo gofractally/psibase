@@ -6,11 +6,13 @@ export const useAccounts = (): [AccountWithAuth[], () => void] => {
     const [accounts, setAccounts] = useState<AccountWithAuth[]>([]);
 
     const refreshAccounts = async () => {
-        const res = await fetchAccounts()
+        const res = await fetchAccounts();
         setAccounts(res);
-    }
+    };
 
-    useEffect(() => { refreshAccounts() }, []);
+    useEffect(() => {
+        refreshAccounts();
+    }, []);
 
     return [accounts, refreshAccounts];
 };

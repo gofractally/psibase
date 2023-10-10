@@ -68,7 +68,7 @@ class KeyStore {
     }
 
     findKeyPairForPublicKey(
-        publicKey: string
+        publicKey: string,
     ): KeyPairWithAccounts | undefined {
         const keyStore = this.getKeyStore();
         return (
@@ -101,10 +101,10 @@ class KeyStore {
         const keyStore = this.getKeyStore();
 
         const allAccounts = keyStore.flatMap(
-            (keyPair) => keyPair.knownAccounts || []
+            (keyPair) => keyPair.knownAccounts || [],
         );
         const duplicateAccounts = allAccounts.filter(
-            (item, index, arr) => arr.indexOf(item) !== index
+            (item, index, arr) => arr.indexOf(item) !== index,
         );
         if (duplicateAccounts.length > 0) {
             duplicateAccounts.forEach((account) => {
@@ -112,18 +112,18 @@ class KeyStore {
                     .filter(
                         (keyStore) =>
                             keyStore.knownAccounts &&
-                            keyStore.knownAccounts.includes(account)
+                            keyStore.knownAccounts.includes(account),
                     )
                     .map((keystore) => keystore.publicKey)
                     .join("Key: ");
                 console.warn(
-                    `Keystore has recorded multiple keys for account "${account}", possible chance existing logic will pick the wrong one to use for tx signing. ${keys}`
+                    `Keystore has recorded multiple keys for account "${account}", possible chance existing logic will pick the wrong one to use for tx signing. ${keys}`,
                 );
             });
         }
 
         return allAccounts.filter(
-            (item, index, arr) => arr.indexOf(item) === index
+            (item, index, arr) => arr.indexOf(item) === index,
         );
     }
 
@@ -131,7 +131,7 @@ class KeyStore {
         const keyPairs = this.getKeyStore();
 
         const newAccountsWithPrivateKeys = newAccounts.filter(
-            (account) => "privateKey" in account
+            (account) => "privateKey" in account,
         );
         if (newAccountsWithPrivateKeys.length > 0) {
             const incomingAccounts: KeyPairWithAccounts[] = newAccounts.map(
@@ -143,10 +143,10 @@ class KeyStore {
                     privateKey,
                     knownAccounts: [accountNum],
                     publicKey,
-                })
+                }),
             );
             const accountNumsCovered = incomingAccounts.flatMap(
-                (account) => account.knownAccounts || []
+                (account) => account.knownAccounts || [],
             );
 
             const easier = keyPairs.map((keyPair) => ({
@@ -156,7 +156,7 @@ class KeyStore {
             const keypairsWithoutStaleAccounts = easier.map((keyPair) => ({
                 ...keyPair,
                 knownAccounts: keyPair.knownAccounts.filter(
-                    (account) => !accountNumsCovered.some((a) => a == account)
+                    (account) => !accountNumsCovered.some((a) => a == account),
                 ),
             }));
             const existingAccountsToRemain = keypairsWithoutStaleAccounts;
@@ -167,13 +167,13 @@ class KeyStore {
                     ({ privateKey, publicKey }): KeyPair => ({
                         privateKey,
                         publicKey,
-                    })
+                    }),
                 )
                 .filter(
                     (keyPair, index, arr) =>
                         arr.findIndex(
-                            (kp) => kp.publicKey === keyPair.publicKey
-                        ) === index
+                            (kp) => kp.publicKey === keyPair.publicKey,
+                        ) === index,
                 );
 
             const fresh = pureUniqueKeyPairs.map(
@@ -182,9 +182,9 @@ class KeyStore {
                     knownAccounts: combined.flatMap((kp) =>
                         kp.publicKey === keyPair.publicKey
                             ? kp.knownAccounts || []
-                            : []
+                            : [],
                     ),
-                })
+                }),
             );
 
             this.setKeyStore(fresh);
@@ -211,7 +211,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                             authService: "auth-any-sys",
                             requireNew: true,
                         },
-                        "account-sys" // TODO: should we handle the sender for newAccount better?
+                        "account-sys", // TODO: should we handle the sender for newAccount better?
                     );
 
                     if (pubKey && pubKey !== "") {
@@ -230,7 +230,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                             "auth-sys",
                             "setKey",
                             { key: pubKey },
-                            name
+                            name,
                         );
                         await action(
                             thisApplet,
@@ -264,11 +264,11 @@ export const initAppFn = (setAppInitialized: () => void) =>
                 id: "storeKey",
                 exec: async (keyPair: KeyPair) => {
                     const keyStore = JSON.parse(
-                        window.localStorage.getItem("keyPairs") || "[]"
+                        window.localStorage.getItem("keyPairs") || "[]",
                     );
 
                     const existingKey = keyStore.find(
-                        (kp: KeyPair) => kp.publicKey === keyPair.publicKey
+                        (kp: KeyPair) => kp.publicKey === keyPair.publicKey,
                     );
 
                     // Checks if the key is already in the store
@@ -278,7 +278,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                         keyStore.push(keyPair);
                         window.localStorage.setItem(
                             "keyPairs",
-                            JSON.stringify(keyStore)
+                            JSON.stringify(keyStore),
                         );
                     }
                 },
@@ -287,10 +287,10 @@ export const initAppFn = (setAppInitialized: () => void) =>
         setQueries([
             {
                 id: "getLoggedInUser",
-                exec: (params: any) => {
+                exec: (_params: any) => {
                     // TODO - Get the actual logged in user
                     return JSON.parse(
-                        window.localStorage.getItem(CURRENT_USER) || ""
+                        window.localStorage.getItem(CURRENT_USER) || "",
                     );
                 },
             },
@@ -304,11 +304,11 @@ export const initAppFn = (setAppInitialized: () => void) =>
                 id: "getProof",
                 exec: async (
                     params: GetProofParams,
-                    metadata: MessageMetadata
+                    metadata: MessageMetadata,
                 ): Promise<any> => {
                     if (metadata.sender !== "common-sys") {
                         console.error(
-                            "Security error: only common-sys can get proofs"
+                            "Security error: only common-sys can get proofs",
                         );
                         return { proof: undefined };
                     }

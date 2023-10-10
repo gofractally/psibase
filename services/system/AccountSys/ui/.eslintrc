@@ -1,0 +1,43 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "@typescript-eslint",
+    "prettier"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended",
+    "plugin:import/errors"
+  ],
+  "settings": {
+    "import/parsers": {
+      "@typescript-eslint/parser": [".ts", ".tsx"]
+    },
+    "import/resolver": {
+      "typescript": {
+        "alwaysTryTypes": true, // always try to resolve types under `<root>@types` directory even it doesn't contain any source code, like `@types/unist`
+        "project": "tsconfig.json"
+      }
+    }
+  },
+  "rules":{
+    "quotes": ["error", "double"],
+    "react/react-in-jsx-scope": "off",
+    "no-unused-vars": "off",
+    "react/jsx-props-no-spreading": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    // "import/no-extraneous-dependencies": [
+    //   "error",
+    //   {
+    //     "devDependencies": ["**/*.config.ts", "**/*.config.js"]
+    //   }
+    // ],
+    "import/no-unresolved": "off",                // Temporarily silencing these errors
+    "@typescript-eslint/no-explicit-any": "off",  // Temporarily silencing these errors
+    "no-nested-ternary": "off",
+    "react/no-unstable-nested-components": "off"
+  }
+}

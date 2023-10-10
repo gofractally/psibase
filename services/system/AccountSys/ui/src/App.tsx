@@ -95,7 +95,6 @@ function App() {
                 />
             )}
             <ImportAccountForm addAccounts={addAccounts} />
-            {/* <SetAuth /> */}
             <AccountsList accounts={allAccounts} />
         </div>
     );

@@ -39,7 +39,7 @@ export const importAccount = async (keyPair: {
                 authService: "auth-sys",
                 publicKey: res.pubkey,
                 privateKey: keyPair.privateKey,
-            })
+            }),
         );
         return accounts;
     }
