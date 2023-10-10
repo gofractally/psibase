@@ -819,23 +819,23 @@ export async function operation<Params>(
 }
 
 /**
- * Description: Calls the specified action on the blockchain
+ * Description: Calls the specified action on the specified service
  *
- * @param {String} application - The name of the application that defines the action.
- * @param {String} actionName - The name of the action being called.
- * @param {Object} params - The object containing all parameters expected by the action.
- * @param {String} sender - Optional parameter to explicitly specify a sender. If no sender is provided,
+ * @param service - The name of the service that defines the action.
+ * @param action - The name of the action being called.
+ * @param params - The object containing all parameters expected by the action.
+ * @param sender - Optional parameter to explicitly specify a sender. If no sender is provided,
  *  the currently logged in user is assumed to be the sender.
  */
 export function action<ActionParams>(
-    application: string,
-    actionName: string,
+    service: string,
+    action: string,
     params: ActionParams,
-    sender = null
+    sender: string | null = null
 ) {
     sendToParent({
         type: MessageTypes.Action,
-        payload: { application, actionName, params, sender },
+        payload: { service, action, params, sender },
     });
 }
 
@@ -991,4 +991,25 @@ export function setActiveAccount(account: string) {
         type: MessageTypes.SetActiveAccount,
         payload: { account },
     });
+}
+
+export interface GetClaimParams {
+    service: string;
+    sender: string;
+    method: string;
+    params: any;
+}
+
+export type Claim = {
+    service: string;
+    rawData: string; // hex bytes
+};
+
+export type WrappedClaim = {
+    claim: Claim;
+    pubkey: string; // Public key string
+};
+
+export type MessageMetadata = {
+    sender: string;
 }
