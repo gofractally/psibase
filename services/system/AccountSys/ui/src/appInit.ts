@@ -9,13 +9,12 @@ import {
     uint8ArrayToHex,
     WrappedClaim,
     MessageMetadata,
-} from "common/rpc.mjs";
-import {
     publicStringToDER,
     privateStringToKeyPair,
     signatureToBin,
     signatureToFracpack,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
+
 import { AccountWithKey, KeyPair, KeyPairWithAccounts } from "./App";
 import { fetchAccounts } from "./helpers";
 

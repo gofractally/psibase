@@ -2,9 +2,8 @@ import {
     AppletId,
     getJson,
     query,
-    siblingUrl,
     setActiveAccount,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 import { AccountWithAuth } from "./App";
 export interface MsgProps {
     addMsg: any;

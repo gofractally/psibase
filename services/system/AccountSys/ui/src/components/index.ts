@@ -6,5 +6,4 @@ export { Form } from "./Form";
 export { GenerateKeyPair } from "./GenerateKeyPair";
 export { Heading } from "./Heading";
 export { Icon } from "./Icon";
-export { SetAuth } from "./SetAuth";
 export { Text } from "./Text";

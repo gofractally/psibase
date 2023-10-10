@@ -4,7 +4,7 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import {
     privateStringToKeyPair,
     publicKeyPairToString,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
 import Button from "./Button";
 import Heading from "./Heading";
 import Form from "./Form";

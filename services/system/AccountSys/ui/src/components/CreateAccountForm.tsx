@@ -6,7 +6,7 @@ import {
     KeyType,
     privateStringToKeyPair,
     publicKeyPairToString,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
 
 import { AccountWithKey } from "../App";
 import Button from "./Button";

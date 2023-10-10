@@ -5,7 +5,8 @@
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
         "paths": {
-            "/common": ["../../../user/CommonSys/common"]
+            "/common": ["../../../user/CommonSys/common"],
+            "@psibase/common-lib": ["../../../user/CommonSys/common-lib/src"],
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
@@ -21,7 +22,6 @@
     },
     "include": [
         "src",
-        "../../../user/CommonSys/common/rpc.d.ts",
         "../../../user/CommonSys/common/keyConversions.d.ts",
         "../../../user/CommonSys/common/useLocalStorage.d.ts"
     ],
