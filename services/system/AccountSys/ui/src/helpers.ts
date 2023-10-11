@@ -44,7 +44,18 @@ export const fetchAccountsByKey = async (publicKey: string) => {
             key: publicKey,
         }
     );
-    return accKeys;
+    if (publicKey.startsWith("PUB_")) {
+        const accEcKeys = await fetchQuery<{ account: string; pubkey: string }[]>(
+            "accWithKey",
+            "auth-ec-sys",
+            {
+                key: publicKey,
+            }
+        );
+        return accKeys.concat(accEcKeys);
+    } else {
+        return accKeys;
+    }
 };
 
 export const fetchAccounts = async () => {

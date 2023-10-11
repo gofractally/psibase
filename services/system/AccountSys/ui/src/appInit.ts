@@ -14,6 +14,7 @@ import {
     publicStringToDER,
     privateStringToKeyPair,
     signatureToBin,
+    signatureToFracpack,
 } from "common/keyConversions.mjs";
 import { AccountWithKey, KeyPair, KeyPairWithAccounts } from "./App";
 import { fetchAccounts } from "./helpers";
@@ -51,6 +52,17 @@ function comparePublicKeys(lhs: string, rhs: string): boolean {
     }
 }
 
+function serializeSignature(claim: WrappedClaim, sig: any): Uint8Array {
+    if (claim.claim.service === "verifyec-sys") {
+        return signatureToFracpack(sig);
+    } else if (claim.claim.service === "verify-sys") {
+        return signatureToBin(sig);
+    } else {
+        console.error(`Don't know how to sign for ${claim.claim.service}`);
+        throw new Error("Wrong service");
+    }
+}
+
 class KeyStore {
     getKeyStore(): KeyPairWithAccounts[] {
         return JSON.parse(window.localStorage.getItem("keyPairs") || "[]");
@@ -74,7 +86,7 @@ class KeyStore {
         }
 
         const k = privateStringToKeyPair(keyPair.privateKey);
-        const packedSignature = signatureToBin({
+        const packedSignature = serializeSignature(claim,{
             keyType: k.keyType,
             signature: k.keyPair.sign(trxDigest),
         });
