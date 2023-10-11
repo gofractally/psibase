@@ -102,9 +102,7 @@ const psibase = (options: Options, isDev?: boolean) => {
                         cssCodeSplit: false,
                         rollupOptions: {
                             external: [
-                                "/common/rootdomain.mjs",
                                 "/common/iframeResizer.js",
-                                "/common/useLocalStorage.mjs",
                                 "/common/common-lib.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
@@ -124,10 +122,6 @@ const psibase = (options: Options, isDev?: boolean) => {
         },
         alias({
             entries: [
-                {
-                    find: "common/useLocalStorage.mjs",
-                    replacement: "/common/useLocalStorage.mjs",
-                },
                 {
                     find: "@psibase/common-lib",
                     replacement: "/common/common-lib.js",

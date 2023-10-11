@@ -1,4 +1,4 @@
-import { useLocalStorage } from "common/useLocalStorage.mjs";
+import { useLocalStorage } from "react-use";
 import { useEffect, useState } from "react";
 import {
     AccountWithAuth,
@@ -64,14 +64,14 @@ export const useAccountsWithKeys = (): [
         });
 
         Promise.all(
-            keyPairs
+            keyPairs!
                 .filter((keyPair) => keyPair.publicKey)
                 .map((keyPair) => fetchAccountsByKey(keyPair.publicKey)),
         ).then((responses) => {
             const flatAccounts = responses.flat(1);
             setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authService: 'auth-sys', publicKey: account.pubkey })), ...currentAccounts]))
             const currentKeyPairs = keyPairs;
-            const newKeyPairs = currentKeyPairs.map(
+            const newKeyPairs = currentKeyPairs!.map(
                 (keyPair): KeyPairWithAccounts => {
                     const relevantAccounts = flatAccounts
                         .filter(
@@ -95,7 +95,7 @@ export const useAccountsWithKeys = (): [
                 accounts.filter((account) => account.publicKey !== key),
             );
             setKeyPairs(
-                keyPairs.filter((keyPair) => {
+                keyPairs!.filter((keyPair) => {
                     if (
                         "knownAccounts" in keyPair &&
                         keyPair.knownAccounts!.includes(accountNum)
@@ -136,7 +136,7 @@ export const useAccountsWithKeys = (): [
                 (account) => account.knownAccounts || [],
             );
 
-            const easier = keyPairs.map((keyPair) => ({
+            const easier = keyPairs!.map((keyPair) => ({
                 ...keyPair,
                 knownAccounts: keyPair.knownAccounts || [],
             }));

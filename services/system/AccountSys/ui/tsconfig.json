@@ -21,9 +21,7 @@
         "jsx": "react-jsx"
     },
     "include": [
-        "src",
-        "../../../user/CommonSys/common/keyConversions.d.ts",
-        "../../../user/CommonSys/common/useLocalStorage.d.ts"
+        "src"
     ],
     "references": [
         {

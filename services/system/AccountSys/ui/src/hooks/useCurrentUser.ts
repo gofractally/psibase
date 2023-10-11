@@ -1,6 +1,6 @@
-import { useLocalStorage } from "common/useLocalStorage.mjs";
+import { useLocalStorage } from "react-use";
 
 export const useCurrentUser = (): [string, (newUser: string) => void] => {
     const [currentUser, setCurrentUser] = useLocalStorage("currentUser", "");
-    return [currentUser, setCurrentUser];
+    return [currentUser!, setCurrentUser];
 };
