@@ -67,7 +67,7 @@ export const useApplets = () => {
     // object; When the operation and it nested operations are complete, it will be reset to zero
     const pendingTransactionId = useRef(0);
 
-    const [applets, setApplets] = useState<AppletsMap>({
+    let [applets, setApplets] = useState<AppletsMap>({
         [ACTIVE_APPLET.fullPath]: {
             appletId: ACTIVE_APPLET,
             state: AppletStates.primary,
@@ -92,7 +92,7 @@ export const useApplets = () => {
         async (appletId: AppletId) => {
             const appletPath = appletId.fullPath;
             if (!applets[appletPath]) {
-                setApplets({
+                applets = {
                     ...applets,
                     [appletPath]: {
                         appletId,
@@ -101,7 +101,8 @@ export const useApplets = () => {
                             updateInitializedApplets(appletId);
                         },
                     },
-                });
+                };
+                setApplets(applets);
             }
 
             // Await for applet initialization for 10 seconds
