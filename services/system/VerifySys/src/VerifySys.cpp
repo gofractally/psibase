@@ -1,5 +1,6 @@
 #include <services/system/VerifySys.hpp>
 
+#include <botan/ec_group.h>
 #include <botan/pubkey.h>
 #include <botan/x509_key.h>
 #include <psibase/dispatch.hpp>
@@ -25,4 +26,21 @@ extern "C" [[clang::export_name("verify")]] void verify()
    check(verifier.verify_message(data.transactionHash, signature), "signature invalid");
 }
 
-PSIBASE_DISPATCH(SystemService::VerifySys)
+extern "C" void __wasm_call_ctors();
+
+// Called by wasm-ctor-eval during build
+extern "C" [[clang::export_name("prestart")]] void prestart()
+{
+   __wasm_call_ctors();
+   // Loading an EC_Group for the first time is very expensive
+   EC_Group{"secp256k1"};
+   EC_Group{"secp256r1"};
+}
+
+extern "C" void called(AccountNumber thisService, AccountNumber sender)
+{
+   abortMessage("this service has no actions");
+}
+
+// Caution! Don't replace with version in dispatcher!
+extern "C" void start(AccountNumber thisService) {}

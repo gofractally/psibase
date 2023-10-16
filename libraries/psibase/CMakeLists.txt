@@ -95,6 +95,7 @@ function(add suffix)
         # Service with full malloc/free
         add_library(psibase-service${suffix} INTERFACE)
         target_link_libraries(psibase-service${suffix} INTERFACE
+            -L${ROOT_BINARY_DIR}/wasm/libraries/psibase
             psibase-service-base${suffix}
             -lc++
             c++abi-replacements${suffix}
