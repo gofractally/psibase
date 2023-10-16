@@ -450,9 +450,7 @@ struct transaction_queue
    }
 
 #define CATCH_IGNORE \
-   catch (...)       \
-   {                 \
-   }
+   catch (...) {}
 
 bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 {
@@ -588,7 +586,6 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             for (size_t i = 0; i < trx.proofs.size(); ++i)
             {
                proofBC.verifyProof(trx, trace, i, proofWatchdogLimit);
-               trace = {};
             }
 
             // TODO: in another thread: check first auth and first proof. After
