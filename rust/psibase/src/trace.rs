@@ -11,6 +11,7 @@ pub struct ActionTrace {
     pub action: Action,
     pub raw_retval: Hex<Vec<u8>>,
     pub inner_traces: Vec<InnerTrace>,
+    pub total_time: i64,
     pub error: Option<String>,
 }
 

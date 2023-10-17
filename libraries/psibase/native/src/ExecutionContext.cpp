@@ -253,11 +253,28 @@ namespace psibase
              });
       }
 
+      struct RecordActionTime
+      {
+         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext)
+         {
+            actionContext.actionTrace.totalTime =
+                actionContext.transactionContext.getBillableTime();
+         }
+         ~RecordActionTime()
+         {
+            actionContext.actionTrace.totalTime =
+                actionContext.transactionContext.getBillableTime() -
+                actionContext.actionTrace.totalTime;
+         }
+         ActionContext& actionContext;
+      };
+
       template <typename F>
       void exec(ActionContext& actionContext, F f)
       {
          auto prev         = currentActContext;
          currentActContext = &actionContext;
+         RecordActionTime timer{actionContext};
          try
          {
             backend.backend->get_context().set_max_call_depth(
