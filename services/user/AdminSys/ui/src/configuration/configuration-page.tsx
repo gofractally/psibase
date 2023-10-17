@@ -166,9 +166,12 @@ export const ConfigurationPage = ({
                     />
                     <Form.Input label="Host" {...configForm.register("host")} />
                     <table>
-                        <th>
-                            <td>Port (requires restart)</td>
-                        </th>
+                        <thead>
+                            <tr>
+                                <th>Port (requires restart)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                         {listeners.fields.map((l, idx: number) => (
                             <tr key={l.key}>
                                 <td>
@@ -211,6 +214,7 @@ export const ConfigurationPage = ({
                                 </Button>
                             </td>
                         </tr>
+                        </tbody>
                     </table>
 
                     <Divider />

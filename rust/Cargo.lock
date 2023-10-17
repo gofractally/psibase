@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "account_sys"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "fracpack",
  "psibase",
@@ -374,7 +374,7 @@ checksum = "a3e2c3daef883ecc1b5d58c15adae93470a91d425f3532ba1695849656af3fc1"
 
 [[package]]
 name = "burst-transfer"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "binaryen",
@@ -801,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "elections"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "fracpack",
  "psibase",
@@ -907,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "custom_error",
  "psibase_macros",
@@ -1023,7 +1023,7 @@ dependencies = [
 
 [[package]]
 name = "gen-cpp-doc"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clang",
@@ -1061,8 +1061,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be4136b2a15dd319360be1c07d9933517ccf0be8f16bf62a3bee4f0d618df427"
 dependencies = [
  "cfg-if 1.0.0",
+ "js-sys",
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1632,7 +1634,7 @@ dependencies = [
 
 [[package]]
 name = "md2man"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "clap 3.2.25",
  "pulldown-cmark",
@@ -2182,7 +2184,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2191,6 +2193,7 @@ dependencies = [
  "custom_error",
  "fracpack",
  "futures",
+ "getrandom",
  "hmac",
  "include_dir",
  "indicatif",
@@ -2203,14 +2206,17 @@ dependencies = [
  "rpassword",
  "secp256k1",
  "serde",
+ "serde-wasm-bindgen",
+ "serde_bytes",
  "serde_json",
  "sha2",
  "tokio",
+ "wasm-bindgen",
 ]
 
 [[package]]
 name = "psibase_macros"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "darling",
  "proc-macro-error",
@@ -2222,14 +2228,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "seahash",
 ]
 
 [[package]]
 name = "psispace-sys"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-graphql",
  "fracpack",
@@ -2621,6 +2627,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30c9933e5689bd420dc6c87b7a1835701810cbc10cd86a26e4da45b73e6b1d78"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab33ec92f677585af6d88c65593ae2375adde54efdbf16d597f2cbc7a6d368ff"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.188"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2884,7 +2910,7 @@ dependencies = [
 
 [[package]]
 name = "test_contract"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "psibase",
  "serde",
@@ -2893,7 +2919,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "cxx",
  "cxx-build",

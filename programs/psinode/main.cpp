@@ -321,6 +321,10 @@ void load_service(const native_service& config,
       {
          result.content_type = "font/ttf";
       }
+      else if (extension == ".wasm")
+      {
+         result.content_type = "application/wasm";
+      }
       if (!result.content_type.empty() && entry.is_regular_file())
       {
          result.path = entry.path();
@@ -592,7 +596,6 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             for (size_t i = 0; i < trx.proofs.size(); ++i)
             {
                proofBC.verifyProof(trx, trace, i, proofWatchdogLimit);
-               trace = {};
             }
 
             // TODO: in another thread: check first auth and first proof. After

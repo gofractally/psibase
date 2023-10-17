@@ -3,14 +3,18 @@ use crate::services::{
     setcode_sys, transaction_sys,
 };
 use crate::{
-    method_raw, AccountNumber, Action, Claim, MethodNumber, ProducerConfigRow, PublicKey,
+    method_raw, AccountNumber, Action, Claim, ExactAccountNumber, MethodNumber, ProducerConfigRow, PublicKey,
     SharedGenesisActionData, SharedGenesisService, SignedTransaction, Tapos, TimePointSec,
     Transaction,
 };
 use fracpack::Pack;
 use include_dir::{include_dir, Dir};
 use psibase_macros::account_raw;
-use secp256k1::hashes::Hash;
+use serde_bytes::ByteBuf;
+use sha2::{Digest, Sha256};
+use std::str::FromStr;
+use wasm_bindgen::prelude::*;
+
 
 macro_rules! account {
     ($name:expr) => {
@@ -210,6 +214,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
     }
 }
 
+// Adds an action
 fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service: AccountNumber) {
     for e in dir.entries() {
         match e {
@@ -217,13 +222,6 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service
             include_dir::DirEntry::File(e) => {
                 let path = e.path().to_str().unwrap();
                 if let Some(t) = mime_guess::from_path(path).first() {
-                    // println!(
-                    //     "{} {} {} {}",
-                    //     sender,
-                    //     service,
-                    //     &("/".to_owned() + path),
-                    //     t.essence_str()
-                    // );
                     actions.push(store_sys(
                         service,
                         sender,
@@ -237,38 +235,16 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service
     }
 }
 
-/// Create boot transactions
+/// Get initial actions
 ///
-/// This returns two sets of transactions which boot a blockchain.
-/// The first set MUST be pushed as a group using push_boot and
-/// will be included in the first block. The remaining transactions
-/// MUST be pushed in order, but are not required to be in the first
-/// block. If any of these transactions fail, the chain will be unusable.
-///
-/// The first transaction, the genesis transaction, installs
-/// a set of service WASMs. The remainder initialize the services
-/// and install apps and documentation.
-///
-/// If `initial_key` is set, then this initializes all accounts to use
-/// that key and sets the key the initial producer signs blocks with.
-/// If it is not set, then this initializes all accounts to use
-/// `auth-any-sys` (no keys required) and sets it up so producers
-/// don't need to sign blocks.
-///
-/// The interface to this function doesn't support customization.
-/// If you want a custom boot, then use `boot.rs` as a guide to
-/// create your own.
-// TODO: switch to builder pattern
-// TODO: sometimes tries to set keys on non-existing accounts
-pub fn create_boot_transactions(
+/// This returns all actions that need to be packed into the transactions pushed after the
+/// boot block.
+pub fn get_initial_actions(
     initial_key: &Option<PublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
-    install_doc: bool,
-    install_token_users: bool,
-    expiration: TimePointSec,
-) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
-    let mut boot_transactions = vec![genesis_transaction(expiration)];
+    install_token_users: bool)
+    -> Vec<Action> {
     let mut init_actions = vec![
         account_sys::Wrapper::pack().init(),
         nft_sys::Wrapper::pack().init(),
@@ -342,30 +318,10 @@ pub fn create_boot_transactions(
         let mut common_sys_3rd_party_files = vec![
             store_third_party!("htm.module.js", js),
             store_third_party!("iframeResizer.contentWindow.js", js),
-            store_third_party!("iframeResizer.js", js),
-            store_third_party!("react-dom.development.js", js),
-            store_third_party!("react-dom.production.min.js", js),
-            store_third_party!("react-router-dom.min.js", js),
-            store_third_party!("react.development.js", js),
-            store_third_party!("react.production.min.js", js),
-            store_third_party!("semantic-ui-react.min.js", js),
-            store_third_party!("useLocalStorageState.js", js),
+            store_third_party!("iframeResizer.js", js)
         ];
 
-        let mut account_sys_files = vec![
-            // store!(
-            //     "r-account-sys",
-            //     "/index.html",
-            //     html,
-            //     "AccountSys/ui/vanilla/index.html"
-            // ),
-            // store!(
-            //     "r-account-sys",
-            //     "/ui/index.js",
-            //     js,
-            //     "AccountSys/ui/vanilla/index.js"
-            // ),
-        ];
+        let mut account_sys_files = vec![];
         fill_dir(
             &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/AccountSys/ui/dist"),
             &mut account_sys_files,
@@ -383,14 +339,7 @@ pub fn create_boot_transactions(
             store!("r-auth-sys", "/index.js", js, "AuthSys/ui/index.js"),
         ];
 
-        let mut explore_sys_files = vec![
-            // store!(
-            //    "explore-sys",
-            //    "/ui/index.js",
-            //    js,
-            //    "ExploreSys/ui/index.js"
-            // ),
-        ];
+        let mut explore_sys_files = vec![];
         fill_dir(
             &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/ExploreSys/ui/dist"),
             &mut explore_sys_files,
@@ -398,20 +347,7 @@ pub fn create_boot_transactions(
             account!("explore-sys"),
         );
 
-        let mut token_sys_files = vec![
-            // store!(
-            //     "r-tok-sys",
-            //     "/index.html",
-            //     html,
-            //     "CommonSys/ui/vanilla/common.index.html"
-            // ),
-            // store!(
-            //     "r-tok-sys",
-            //     "/ui/index.js",
-            //     js,
-            //     "TokenSys/ui/vanilla/index.js"
-            // ),
-        ];
+        let mut token_sys_files = vec![];
         fill_dir(
             &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/TokenSys/ui/dist"),
             &mut token_sys_files,
@@ -450,14 +386,12 @@ pub fn create_boot_transactions(
     let mut doc_actions = vec![
         new_account_action(account_sys::SERVICE, account!("doc-sys")), //
     ];
-    if install_doc {
-        fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc"),
-            &mut doc_actions,
-            account!("doc-sys"),
-            psispace_sys::SERVICE,
-        );
-    }
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc"),
+        &mut doc_actions,
+        account!("doc-sys"),
+        psispace_sys::SERVICE,
+    );
     actions.append(&mut doc_actions);
 
     if install_token_users {
@@ -517,6 +451,42 @@ pub fn create_boot_transactions(
 
     actions.push(transaction_sys::Wrapper::pack().finishBoot());
 
+    actions
+}
+
+
+/// Create boot transactions
+///
+/// This returns two sets of transactions which boot a blockchain.
+/// The first set MUST be pushed as a group using push_boot and
+/// will be included in the first block. The remaining transactions
+/// MUST be pushed in order, but are not required to be in the first
+/// block. If any of these transactions fail, the chain will be unusable.
+///
+/// The first transaction, the genesis transaction, installs
+/// a set of service WASMs. The remainder initialize the services
+/// and install apps and documentation.
+///
+/// If `initial_key` is set, then this initializes all accounts to use
+/// that key and sets the key the initial producer signs blocks with.
+/// If it is not set, then this initializes all accounts to use
+/// `auth-any-sys` (no keys required) and sets it up so producers
+/// don't need to sign blocks.
+///
+/// The interface to this function doesn't support customization.
+/// If you want a custom boot, then use `boot.rs` as a guide to
+/// create your own.
+// TODO: switch to builder pattern
+// TODO: sometimes tries to set keys on non-existing accounts
+pub fn create_boot_transactions(
+    initial_key: &Option<PublicKey>,
+    initial_producer: AccountNumber,
+    install_ui: bool,
+    install_token_users: bool,
+    expiration: TimePointSec,
+) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
+    let mut boot_transactions = vec![genesis_transaction(expiration)];
+    let mut actions = get_initial_actions(initial_key, initial_producer, install_ui, install_token_users);
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -536,7 +506,7 @@ pub fn create_boot_transactions(
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
     for trx in &transactions {
         transaction_ids.push(crate::Checksum256::from(
-            secp256k1::hashes::sha256::Hash::hash(&trx.transaction).to_byte_array(),
+            <[u8; 32]>::from(Sha256::digest(&trx.transaction)),
         ))
     }
     boot_transactions.push(SignedTransaction {
@@ -549,4 +519,43 @@ pub fn create_boot_transactions(
         proofs: vec![],
     });
     (boot_transactions, transactions)
+}
+
+
+/// Creates boot transactions.
+/// This function reuses the same boot transaction construction as the psibase CLI, and
+/// is used to generate a wasm that may be called from the browser to construct the boot
+/// transactions when booting the chain from the GUI.
+#[wasm_bindgen]
+pub fn js_create_boot_transactions(producer: String) -> Result<JsValue, JsValue> {
+
+    let now_plus_30secs = chrono::Utc::now() + chrono::Duration::seconds(30);
+    let expiration = TimePointSec {
+        seconds: now_plus_30secs.timestamp() as u32,
+    };
+    let prod = ExactAccountNumber::from_str(&producer)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let (boot_transactions, transactions) =
+        create_boot_transactions(&None, prod.into(), true, true, expiration);
+
+    let boot_transactions = boot_transactions.packed();
+    let transactions : Vec<ByteBuf> = transactions
+        .into_iter()
+        .map(|tx| ByteBuf::from(tx.packed()))
+        .collect();
+
+    Ok(serde_wasm_bindgen::to_value(&(ByteBuf::from(boot_transactions), transactions))?)
+}
+
+/// Gets an unpacked view of the transactions committed to during boot.
+#[wasm_bindgen]
+pub fn js_get_initial_actions(producer: String) -> Result<JsValue, JsValue> {
+
+    let prod = ExactAccountNumber::from_str(&producer)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let actions = get_initial_actions(&None, prod.into(), true, true);
+
+    Ok(serde_wasm_bindgen::to_value(&actions)?)
 }

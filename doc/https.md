@@ -48,7 +48,7 @@ format = [{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {BlockI
 ```
 
 3. From the `psibase` directory, start `psinode` with: `psinode psinode_db_secure`
-4. Boot the chain with: `psibase -a http://psibase.127.0.0.1.sslip.io:8079 boot -p firstproducer --no-doc`
+4. Boot the chain with: `psibase -a http://psibase.127.0.0.1.sslip.io:8079 boot -p firstproducer`
 
 If you're running `psinode` within a container, commands sent to psinode via the `psibase` command locally within the container must be sent to port `8079` without SSL. The node should now be accessible outside the container (assuming the ports are properly exposed) at `https://psibase.127.0.0.1.sslip.io:8080`.
 

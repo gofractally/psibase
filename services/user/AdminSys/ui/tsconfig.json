@@ -19,7 +19,7 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": ["src", "../../CommonSys/common/rpc.d.ts"],
+    "include": ["src", "../../CommonSys/common/rpc.d.ts", "./wasm-psibase/*.d.ts", "wasm-psibase"],
     "references": [
         {
             "path": "./tsconfig.node.json"
