@@ -6,11 +6,12 @@ use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{account_sys, auth_ec_sys, proxy_sys, psispace_sys, setcode_sys};
+use psibase::services::{account_sys, auth_ec_sys, auth_sys, proxy_sys, psispace_sys, setcode_sys};
 use psibase::{
     account, apply_proxy, create_boot_transactions, get_tapos_for_head, push_transaction,
-    sign_transaction, AccountNumber, Action, AutoAbort, ExactAccountNumber, PrivateKey, PublicKey,
-    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
+    sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
+    ExactAccountNumber, PublicKey, SignedTransaction, Tapos, TaposRefBlock, TimePointSec,
+    Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -38,7 +39,7 @@ struct Args {
 
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
-    sign: Vec<PrivateKey>,
+    sign: Vec<AnyPrivateKey>,
 
     /// Suppress "Ok" message
     #[clap(long)]
@@ -54,7 +55,7 @@ enum Command {
     Boot {
         /// Set all accounts to authenticate using this key
         #[clap(short = 'k', long, value_name = "KEY")]
-        key: Option<PublicKey>,
+        key: Option<AnyPublicKey>,
 
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
@@ -69,7 +70,7 @@ enum Command {
         /// Set the account to authenticate using this key. Also works
         /// if the account already exists.
         #[clap(short = 'k', long, value_name = "KEY")]
-        key: Option<PublicKey>,
+        key: Option<AnyPublicKey>,
 
         /// The account won't be secured; anyone can authorize as this
         /// account without signing. This option does nothing if the
@@ -95,7 +96,7 @@ enum Command {
 
         /// Set the account to authenticate using this key
         #[clap(short = 'k', long, value_name = "KEY")]
-        key: Option<PublicKey>,
+        key: Option<AnyPublicKey>,
 
         /// Make the account insecure, even if it has been previously
         /// secured. Anyone will be able to authorize as this account
@@ -116,7 +117,7 @@ enum Command {
         /// Create the account if it doesn't exist. Also set the account to
         /// authenticate using this key, even if the account already existed.
         #[clap(short = 'c', long, value_name = "KEY")]
-        create_account: Option<PublicKey>,
+        create_account: Option<AnyPublicKey>,
 
         /// Create the account if it doesn't exist. The account won't be secured;
         /// anyone can authorize as this account without signing. Caution: this option
@@ -208,8 +209,15 @@ fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
     account_sys::Wrapper::pack_from(sender).newAccount(account, account!("auth-any-sys"), false)
 }
 
-fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
-    auth_ec_sys::Wrapper::pack_from(account).setKey(key.clone())
+fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
+    if key.key.service == account!("verifyec-sys") {
+        auth_ec_sys::Wrapper::pack_from(account)
+            .setKey(PublicKey::unpacked(&key.key.rawData).unwrap())
+    } else if key.key.service == account!("verify-sys") {
+        auth_sys::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec())
+    } else {
+        panic!("unknown account service");
+    }
 }
 
 fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
@@ -268,7 +276,7 @@ async fn create(
     client: reqwest::Client,
     sender: AccountNumber,
     account: AccountNumber,
-    key: &Option<PublicKey>,
+    key: &Option<AnyPublicKey>,
     insecure: bool,
 ) -> Result<(), anyhow::Error> {
     let mut actions: Vec<Action> = Vec::new();
@@ -284,7 +292,7 @@ async fn create(
 
     if let Some(key) = key {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, auth_ec_sys::SERVICE));
+        actions.push(set_auth_service_action(account, key.auth_service()));
     }
 
     let trx = with_tapos(
@@ -307,7 +315,7 @@ async fn modify(
     args: &Args,
     client: reqwest::Client,
     account: AccountNumber,
-    key: &Option<PublicKey>,
+    key: &Option<AnyPublicKey>,
     insecure: bool,
 ) -> Result<(), anyhow::Error> {
     let mut actions: Vec<Action> = Vec::new();
@@ -321,7 +329,7 @@ async fn modify(
 
     if let Some(key) = key {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, auth_ec_sys::SERVICE));
+        actions.push(set_auth_service_action(account, key.auth_service()));
     }
 
     if insecure {
@@ -351,7 +359,7 @@ async fn deploy(
     sender: AccountNumber,
     account: AccountNumber,
     filename: &str,
-    create_account: &Option<PublicKey>,
+    create_account: &Option<AnyPublicKey>,
     create_insecure_account: bool,
     register_proxy: bool,
 ) -> Result<(), anyhow::Error> {
@@ -377,7 +385,7 @@ async fn deploy(
     // if the user doesn't have it.
     if let Some(key) = create_account {
         actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, auth_ec_sys::SERVICE));
+        actions.push(set_auth_service_action(account, key.auth_service()));
     }
 
     actions.push(set_code_action(account, wasm));
@@ -503,7 +511,7 @@ async fn monitor_trx(
 async fn boot(
     args: &Args,
     client: reqwest::Client,
-    key: &Option<PublicKey>,
+    key: &Option<AnyPublicKey>,
     producer: ExactAccountNumber,
 ) -> Result<(), anyhow::Error> {
     let now_plus_30secs = Utc::now() + Duration::seconds(30);

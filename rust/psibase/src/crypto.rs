@@ -3,7 +3,12 @@ use custom_error::custom_error;
 use ripemd::{Digest, Ripemd160};
 use std::{fmt, str::FromStr};
 
+use der::asn1::{AnyRef, BitStringRef};
 #[cfg(not(target_family = "wasm"))]
+use der::{asn1::ObjectIdentifier, Decode, Encode};
+#[cfg(not(target_family = "wasm"))]
+use spki::SubjectPublicKeyInfo;
+
 use crate::{account_raw, AccountNumber};
 
 custom_error! {
@@ -285,35 +290,162 @@ fn key_to_string(bytes: &[u8], suffix: &str) -> String {
 }
 
 #[cfg(not(target_family = "wasm"))]
-pub fn sign_transaction(
-    mut trx: crate::Transaction,
-    keys: &[PrivateKey],
-) -> Result<crate::SignedTransaction, K1Error> {
-    let keys = keys
-        .iter()
-        .map(|k| k.into_k1())
-        .collect::<Result<Vec<_>, _>>()?;
-    trx.claims = keys
-        .iter()
-        .map(|k| crate::Claim {
+#[derive(Debug)]
+struct PKCS8PrivateKeyK1 {
+    key: secp256k1::SecretKey,
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub trait Signer: std::fmt::Debug {
+    fn get_claim(&self) -> crate::Claim;
+    fn sign(&self, data: &[u8]) -> Vec<u8>;
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl Signer for PrivateKey {
+    fn get_claim(&self) -> crate::Claim {
+        crate::Claim {
             service: AccountNumber::new(account_raw!("verifyec-sys")),
             rawData: fracpack::Pack::packed(&PublicKey::from(
-                &secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, k),
+                &secp256k1::PublicKey::from_secret_key(
+                    secp256k1::SECP256K1,
+                    &self.into_k1().unwrap(),
+                ),
             ))
             .into(),
+        }
+    }
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
+        let digest = secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(data);
+        fracpack::Pack::packed(&Signature::from(
+            secp256k1::SECP256K1.sign_ecdsa(&digest, &self.into_k1().unwrap()),
+        ))
+        .into()
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+const OID_ECDSA: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.2.1");
+#[cfg(not(target_family = "wasm"))]
+const OID_SECP256K1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.132.0.10");
+
+#[cfg(not(target_family = "wasm"))]
+impl Signer for PKCS8PrivateKeyK1 {
+    fn get_claim(&self) -> crate::Claim {
+        let algid = spki::AlgorithmIdentifier {
+            oid: OID_ECDSA,
+            parameters: Some(OID_SECP256K1),
+        };
+        let pubkey =
+            secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, &self.key).serialize();
+        let keydata = Encode::to_der(&SubjectPublicKeyInfo {
+            algorithm: algid,
+            subject_public_key: BitStringRef::from_bytes(&pubkey).unwrap(),
         })
-        .collect();
+        .unwrap();
+        crate::Claim {
+            service: AccountNumber::new(account_raw!("verify-sys")),
+            rawData: crate::Hex::from(keydata),
+        }
+    }
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
+        let digest = secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(data);
+        secp256k1::SECP256K1
+            .sign_ecdsa(&digest, &self.key)
+            .serialize_compact()
+            .into()
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn load_private_key(key: &str) -> Result<Box<dyn Signer>, anyhow::Error> {
+    if key.starts_with("PVT") {
+        return Ok(Box::new(PrivateKey::from_str(key)?));
+    }
+
+    let (label, data) = der::Document::from_pem(key)?;
+    if label != "PRIVATE KEY" {
+        return Err(Error::ExpectedPrivateKey.into());
+    }
+    let pkcs8_key = data.decode_msg::<pkcs8::PrivateKeyInfo>()?;
+    match pkcs8_key.algorithm.oids()? {
+        (OID_ECDSA, Some(OID_SECP256K1)) => Ok(Box::new(PKCS8PrivateKeyK1 {
+            key: secp256k1::SecretKey::from_slice(
+                sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?.private_key,
+            )?,
+        })),
+        _ => Err(Error::ExpectedPrivateKey.into()),
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[derive(Debug)]
+pub struct AnyPrivateKey {
+    key: Box<dyn Signer>,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl FromStr for AnyPrivateKey {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            key: load_private_key(s)?,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct AnyPublicKey {
+    pub key: crate::Claim,
+}
+
+impl AnyPublicKey {
+    pub fn auth_service(&self) -> AccountNumber {
+        if self.key.service == AccountNumber::new(account_raw!("verifyec-sys")) {
+            AccountNumber::new(account_raw!("auth-ec-sys"))
+        } else {
+            AccountNumber::new(account_raw!("auth-sys"))
+        }
+    }
+}
+
+impl FromStr for AnyPublicKey {
+    type Err = anyhow::Error;
+    fn from_str(key: &str) -> Result<Self, Self::Err> {
+        if key.starts_with("PUB") {
+            return Ok(Self {
+                key: crate::Claim {
+                    service: AccountNumber::new(account_raw!("verifyec-sys")),
+                    rawData: fracpack::Pack::packed(&PublicKey::from_str(key)?).into(),
+                },
+            });
+        }
+
+        let (label, data) = der::Document::from_pem(key)?;
+        if label != "PUBLIC KEY" {
+            return Err(Error::ExpectedPublicKey.into());
+        }
+
+        data.decode_msg::<spki::SubjectPublicKeyInfo<AnyRef, BitStringRef>>()?;
+        Ok(Self {
+            key: crate::Claim {
+                service: AccountNumber::new(account_raw!("verify-sys")),
+                rawData: data.into_vec().into(),
+            },
+        })
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn sign_transaction(
+    mut trx: crate::Transaction,
+    keys: &[AnyPrivateKey],
+) -> Result<crate::SignedTransaction, K1Error> {
+    trx.claims = keys.iter().map(|k| k.key.get_claim()).collect();
     let transaction = fracpack::Pack::packed(&trx);
-    let digest =
-        secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(&transaction);
     let proofs = keys
         .iter()
-        .map(|k| {
-            fracpack::Pack::packed(&Signature::from(
-                secp256k1::SECP256K1.sign_ecdsa(&digest, k),
-            ))
-            .into()
-        })
+        .map(|k| k.key.sign(&transaction).into())
         .collect();
     Ok(crate::SignedTransaction {
         transaction: transaction.into(),

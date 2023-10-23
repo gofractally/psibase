@@ -1,10 +1,10 @@
 use crate::{reflect, ToKey};
 use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType};
+use std::convert::AsRef;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::convert::AsRef;
 
 trait ToHex:
     Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect + ToKey
