@@ -357,16 +357,36 @@ impl Signer for PKCS8PrivateKeyK1 {
     }
 }
 
+fn read_key_file(
+    key: &str,
+    expected_label: &str,
+    err: Error,
+) -> Result<der::Document, anyhow::Error> {
+    match der::Document::read_pem_file(key) {
+        Ok((label, data)) => {
+            if label != expected_label {
+                Err(err.into())
+            } else {
+                Ok(data)
+            }
+        }
+        Err(pem_err) => {
+            if let Ok(data) = der::Document::read_der_file(key) {
+                Ok(data)
+            } else {
+                Err(pem_err.into())
+            }
+        }
+    }
+}
+
 #[cfg(not(target_family = "wasm"))]
 pub fn load_private_key(key: &str) -> Result<Box<dyn Signer>, anyhow::Error> {
-    if key.starts_with("PVT") {
-        return Ok(Box::new(PrivateKey::from_str(key)?));
+    if let Ok(pkey) = PrivateKey::from_str(key) {
+        return Ok(Box::new(pkey));
     }
 
-    let (label, data) = der::Document::from_pem(key)?;
-    if label != "PRIVATE KEY" {
-        return Err(Error::ExpectedPrivateKey.into());
-    }
+    let data = read_key_file(key, "PRIVATE KEY", Error::ExpectedPrivateKey)?;
     let pkcs8_key = data.decode_msg::<pkcs8::PrivateKeyInfo>()?;
     match pkcs8_key.algorithm.oids()? {
         (OID_ECDSA, Some(OID_SECP256K1)) => Ok(Box::new(PKCS8PrivateKeyK1 {
@@ -412,19 +432,16 @@ impl AnyPublicKey {
 impl FromStr for AnyPublicKey {
     type Err = anyhow::Error;
     fn from_str(key: &str) -> Result<Self, Self::Err> {
-        if key.starts_with("PUB") {
+        if let Ok(pkey) = PublicKey::from_str(key) {
             return Ok(Self {
                 key: crate::Claim {
                     service: AccountNumber::new(account_raw!("verifyec-sys")),
-                    rawData: fracpack::Pack::packed(&PublicKey::from_str(key)?).into(),
+                    rawData: fracpack::Pack::packed(&pkey).into(),
                 },
             });
         }
 
-        let (label, data) = der::Document::from_pem(key)?;
-        if label != "PUBLIC KEY" {
-            return Err(Error::ExpectedPublicKey.into());
-        }
+        let data = read_key_file(key, "PUBLIC KEY", Error::ExpectedPublicKey)?;
 
         data.decode_msg::<spki::SubjectPublicKeyInfo<AnyRef, BitStringRef>>()?;
         Ok(Self {
