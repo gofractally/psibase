@@ -40,11 +40,17 @@ declare module "common/keyConversions.mjs" {
     // Convert the public key in {keyType, keyPair} to a string
     function publicKeyPairToString({ keyType, keyPair }: any): string;
 
+    // Convert the public key in string form to a DER encoded SubjectPublicKeyInfo
+    function publicStringToDER(s: string): Uint8Array;
+
     // Convert the public key in {keyType, keyPair} to fracpack format
     function publicKeyPairToFracpack({ keyType, keyPair }: any): Uint8Array;
 
     // Convert the signature in {keyType, signature} to fracpack format
     function signatureToFracpack({ keyType, signature }: any): Uint8Array;
+
+    // Convert the signature in {keyType, signation} to compact form
+    function signatureToBin({ keyType, signature }: any): Uint8Array;
 
     function keyPairStrings(key: any): any;
 

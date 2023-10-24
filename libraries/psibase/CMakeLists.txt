@@ -95,6 +95,7 @@ function(add suffix)
         # Service with full malloc/free
         add_library(psibase-service${suffix} INTERFACE)
         target_link_libraries(psibase-service${suffix} INTERFACE
+            -L${ROOT_BINARY_DIR}/wasm/libraries/psibase
             psibase-service-base${suffix}
             -lc++
             c++abi-replacements${suffix}
@@ -102,6 +103,12 @@ function(add suffix)
             psibase-service-wasi-polyfill${suffix}
             ${LIBCLANG_RT_BUILTINS}
         )
+
+        add_library(exception-stub${suffix})
+        target_sources(exception-stub${suffix} PRIVATE service/src/exceptions.cpp)
+        target_include_directories(exception-stub${suffix} PRIVATE common/include)
+        target_compile_options(exception-stub${suffix} INTERFACE -fexceptions)
+        target_link_libraries(exception-stub${suffix} PUBLIC wasm-base${suffix})
 
         add_library(psitestlib${suffix})
         target_sources(psitestlib${suffix} PRIVATE
@@ -189,6 +196,7 @@ function(add suffix)
             native/src/ExecutionContext.cpp
             native/src/log.cpp
             native/src/NativeFunctions.cpp
+            native/src/OpenSSLProver.cpp
             native/src/Prover.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp

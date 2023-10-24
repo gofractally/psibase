@@ -1,20 +1,19 @@
 use crate::services::{
-    account_sys, auth_ec_sys, common_sys, cpu_sys, nft_sys, producer_sys, proxy_sys, psispace_sys,
-    setcode_sys, transaction_sys,
+    account_sys, auth_ec_sys, auth_sys, common_sys, cpu_sys, nft_sys, producer_sys, proxy_sys,
+    psispace_sys, setcode_sys, transaction_sys,
 };
 use crate::{
-    method_raw, AccountNumber, Action, Claim, ExactAccountNumber, MethodNumber, ProducerConfigRow, PublicKey,
-    SharedGenesisActionData, SharedGenesisService, SignedTransaction, Tapos, TimePointSec,
-    Transaction,
+    method_raw, AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, MethodNumber,
+    ProducerConfigRow, PublicKey, SharedGenesisActionData, SharedGenesisService, SignedTransaction,
+    Tapos, TimePointSec, Transaction,
 };
-use fracpack::Pack;
+use fracpack::{Pack, Unpack};
 use include_dir::{include_dir, Dir};
 use psibase_macros::account_raw;
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
-
 
 macro_rules! account {
     ($name:expr) => {
@@ -28,10 +27,11 @@ macro_rules! method {
     };
 }
 
-const ACCOUNTS: [AccountNumber; 27] = [
+const ACCOUNTS: [AccountNumber; 30] = [
     account_sys::SERVICE,
     account!("alice"),
     auth_ec_sys::SERVICE,
+    account!("auth-sys"),
     account!("auth-any-sys"),
     account!("auth-inv-sys"),
     account!("bob"),
@@ -48,6 +48,7 @@ const ACCOUNTS: [AccountNumber; 27] = [
     psispace_sys::SERVICE,
     account!("r-account-sys"),
     account!("r-ath-ec-sys"),
+    account!("r-auth-sys"),
     account!("r-prod-sys"),
     account!("r-proxy-sys"),
     account!("r-tok-sys"),
@@ -56,6 +57,7 @@ const ACCOUNTS: [AccountNumber; 27] = [
     account!("token-sys"),
     transaction_sys::SERVICE,
     account!("verifyec-sys"),
+    account!("verify-sys"),
 ];
 
 macro_rules! sgc {
@@ -111,10 +113,10 @@ fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
     }])
 }
 
-fn to_claim(key: &PublicKey) -> Claim {
+fn to_claim(key: &AnyPublicKey) -> Claim {
     Claim {
-        service: account!("verifyec-sys"),
-        rawData: key.packed().into(),
+        service: key.key.service,
+        rawData: key.key.rawData.clone(),
     }
 }
 
@@ -122,8 +124,15 @@ fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
     account_sys::Wrapper::pack_from(sender).newAccount(account, account!("auth-any-sys"), false)
 }
 
-fn set_key_action(account: AccountNumber, key: &PublicKey) -> Action {
-    auth_ec_sys::Wrapper::pack_from(account).setKey(key.clone())
+fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
+    if key.key.service == account!("verifyec-sys") {
+        auth_ec_sys::Wrapper::pack_from(account)
+            .setKey(PublicKey::unpacked(&key.key.rawData).unwrap())
+    } else if key.key.service == account!("verify-sys") {
+        auth_sys::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec())
+    } else {
+        panic!("unknown account service");
+    }
 }
 
 fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
@@ -165,6 +174,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
     let services = vec![
         sgc!("account-sys", 0, "AccountSys.wasm"),
         sgc!("auth-ec-sys", 0, "AuthEcSys.wasm"),
+        sgc!("auth-sys", 0, "AuthSys.wasm"),
         sgc!("auth-any-sys", 0, "AuthAnySys.wasm"),
         sgc!("auth-inv-sys", 0, "AuthInviteSys.wasm"),
         sgc!("common-sys", 0, "CommonSys.wasm"),
@@ -179,6 +189,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sgc!("psispace-sys", 0, "PsiSpaceSys.wasm"),
         sgc!("r-account-sys", 0, "RAccountSys.wasm"),
         sgc!("r-ath-ec-sys", 0, "RAuthEcSys.wasm"),
+        sgc!("r-auth-sys", 0, "RAuthSys.wasm"),
         sgc!("r-prod-sys", 0, "RProducerSys.wasm"),
         sgc!("r-proxy-sys", 0, "RProxySys.wasm"),
         sgc!("r-tok-sys", 0, "RTokenSys.wasm"),
@@ -187,6 +198,7 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sgc!("token-sys", 0, "TokenSys.wasm"),
         sgc!("transact-sys", 3, "TransactionSys.wasm"), // TODO: flags
         sgc!("verifyec-sys", 64, "VerifyEcSys.wasm"),
+        sgc!("verify-sys", 64, "VerifySys.wasm"),
     ];
 
     let genesis_action_data = SharedGenesisActionData {
@@ -234,11 +246,11 @@ fn fill_dir(dir: &Dir, actions: &mut Vec<Action>, sender: AccountNumber, service
 /// This returns all actions that need to be packed into the transactions pushed after the
 /// boot block.
 pub fn get_initial_actions(
-    initial_key: &Option<PublicKey>,
+    initial_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
-    install_token_users: bool)
-    -> Vec<Action> {
+    install_token_users: bool,
+) -> Vec<Action> {
     let mut init_actions = vec![
         account_sys::Wrapper::pack().init(),
         nft_sys::Wrapper::pack().init(),
@@ -273,6 +285,7 @@ pub fn get_initial_actions(
         let mut reg_actions = vec![
             reg_server(account_sys::SERVICE, account!("r-account-sys")),
             reg_server(auth_ec_sys::SERVICE, account!("r-ath-ec-sys")),
+            reg_server(account!("auth-sys"), account!("r-auth-sys")),
             reg_server(common_sys::SERVICE, common_sys::SERVICE),
             reg_server(account!("explore-sys"), account!("explore-sys")),
             reg_server(producer_sys::SERVICE, account!("r-prod-sys")),
@@ -311,7 +324,7 @@ pub fn get_initial_actions(
         let mut common_sys_3rd_party_files = vec![
             store_third_party!("htm.module.js", js),
             store_third_party!("iframeResizer.contentWindow.js", js),
-            store_third_party!("iframeResizer.js", js)
+            store_third_party!("iframeResizer.js", js),
         ];
 
         let mut account_sys_files = vec![];
@@ -325,6 +338,11 @@ pub fn get_initial_actions(
         let mut auth_ec_sys_files = vec![
             store!("r-ath-ec-sys", "/", html, "AuthEcSys/ui/index.html"),
             store!("r-ath-ec-sys", "/index.js", js, "AuthEcSys/ui/index.js"),
+        ];
+
+        let mut auth_sys_files = vec![
+            store!("r-auth-sys", "/", html, "AuthSys/ui/index.html"),
+            store!("r-auth-sys", "/index.js", js, "AuthSys/ui/index.js"),
         ];
 
         let mut explore_sys_files = vec![];
@@ -364,6 +382,7 @@ pub fn get_initial_actions(
         actions.append(&mut common_sys_3rd_party_files);
         actions.append(&mut account_sys_files);
         actions.append(&mut auth_ec_sys_files);
+        actions.append(&mut auth_sys_files);
         actions.append(&mut explore_sys_files);
         actions.append(&mut token_sys_files);
         actions.append(&mut psispace_sys_files);
@@ -441,7 +460,6 @@ pub fn get_initial_actions(
     actions
 }
 
-
 /// Create boot transactions
 ///
 /// This returns two sets of transactions which boot a blockchain.
@@ -466,14 +484,19 @@ pub fn get_initial_actions(
 // TODO: switch to builder pattern
 // TODO: sometimes tries to set keys on non-existing accounts
 pub fn create_boot_transactions(
-    initial_key: &Option<PublicKey>,
+    initial_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
     install_token_users: bool,
     expiration: TimePointSec,
 ) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
     let mut boot_transactions = vec![genesis_transaction(expiration)];
-    let mut actions = get_initial_actions(initial_key, initial_producer, install_ui, install_token_users);
+    let mut actions = get_initial_actions(
+        initial_key,
+        initial_producer,
+        install_ui,
+        install_token_users,
+    );
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -492,9 +515,9 @@ pub fn create_boot_transactions(
 
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
     for trx in &transactions {
-        transaction_ids.push(crate::Checksum256::from(
-            <[u8; 32]>::from(Sha256::digest(&trx.transaction)),
-        ))
+        transaction_ids.push(crate::Checksum256::from(<[u8; 32]>::from(Sha256::digest(
+            &trx.transaction,
+        ))))
     }
     boot_transactions.push(SignedTransaction {
         transaction: without_tapos(
@@ -508,39 +531,39 @@ pub fn create_boot_transactions(
     (boot_transactions, transactions)
 }
 
-
 /// Creates boot transactions.
 /// This function reuses the same boot transaction construction as the psibase CLI, and
 /// is used to generate a wasm that may be called from the browser to construct the boot
 /// transactions when booting the chain from the GUI.
 #[wasm_bindgen]
 pub fn js_create_boot_transactions(producer: String) -> Result<JsValue, JsValue> {
-
     let now_plus_30secs = chrono::Utc::now() + chrono::Duration::seconds(30);
     let expiration = TimePointSec {
         seconds: now_plus_30secs.timestamp() as u32,
     };
-    let prod = ExactAccountNumber::from_str(&producer)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let prod =
+        ExactAccountNumber::from_str(&producer).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     let (boot_transactions, transactions) =
         create_boot_transactions(&None, prod.into(), true, true, expiration);
 
     let boot_transactions = boot_transactions.packed();
-    let transactions : Vec<ByteBuf> = transactions
+    let transactions: Vec<ByteBuf> = transactions
         .into_iter()
         .map(|tx| ByteBuf::from(tx.packed()))
         .collect();
 
-    Ok(serde_wasm_bindgen::to_value(&(ByteBuf::from(boot_transactions), transactions))?)
+    Ok(serde_wasm_bindgen::to_value(&(
+        ByteBuf::from(boot_transactions),
+        transactions,
+    ))?)
 }
 
 /// Gets an unpacked view of the transactions committed to during boot.
 #[wasm_bindgen]
 pub fn js_get_initial_actions(producer: String) -> Result<JsValue, JsValue> {
-
-    let prod = ExactAccountNumber::from_str(&producer)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let prod =
+        ExactAccountNumber::from_str(&producer).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     let actions = get_initial_actions(&None, prod.into(), true, true);
 

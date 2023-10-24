@@ -10,7 +10,7 @@ export const createAccount = async (account: AccountPair) => {
 
     const newAccount: AccountWithAuth = {
         accountNum: account.account,
-        authService: account.publicKey ? "auth-ec-sys" : "auth-any-sys",
+        authService: account.publicKey ? "auth-sys" : "auth-any-sys",
         publicKey: account.publicKey,
     };
 
@@ -36,7 +36,7 @@ export const importAccount = async (keyPair: {
         const accounts = res.map(
             (res): AccountWithKey => ({
                 accountNum: res.account,
-                authService: "auth-ec-sys",
+                authService: "auth-sys",
                 publicKey: res.pubkey,
                 privateKey: keyPair.privateKey,
             })

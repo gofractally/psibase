@@ -11,7 +11,9 @@ import {
     MessageMetadata,
 } from "common/rpc.mjs";
 import {
+    publicStringToDER,
     privateStringToKeyPair,
+    signatureToBin,
     signatureToFracpack,
 } from "common/keyConversions.mjs";
 import { AccountWithKey, KeyPair, KeyPairWithAccounts } from "./App";
@@ -30,6 +32,37 @@ interface GetProofParams {
     trxDigest: number[];
 }
 
+function comparePublicKeys(lhs: string, rhs: string): boolean {
+    try {
+        const lhsDER = publicStringToDER(lhs);
+        const rhsDER = publicStringToDER(rhs);
+        console.log("compare ", lhsDER, " to ", rhsDER);
+        if (lhsDER.length !== rhsDER.length) {
+            return false;
+        }
+        for (let i = 0; i < lhsDER.length; i++) {
+            if (lhsDER[i] !== rhsDER[i]) {
+                return false;
+            }
+        }
+        return true;
+    } catch (e) {
+        console.warn(e);
+        return false;
+    }
+}
+
+function serializeSignature(claim: WrappedClaim, sig: any): Uint8Array {
+    if (claim.claim.service === "verifyec-sys") {
+        return signatureToFracpack(sig);
+    } else if (claim.claim.service === "verify-sys") {
+        return signatureToBin(sig);
+    } else {
+        console.error(`Don't know how to sign for ${claim.claim.service}`);
+        throw new Error("Wrong service");
+    }
+}
+
 class KeyStore {
     getKeyStore(): KeyPairWithAccounts[] {
         return JSON.parse(window.localStorage.getItem("keyPairs") || "[]");
@@ -40,8 +73,9 @@ class KeyStore {
     ): KeyPairWithAccounts | undefined {
         const keyStore = this.getKeyStore();
         return (
-            keyStore.find((keyPair) => keyPair.publicKey == publicKey) ||
-            undefined
+            keyStore.find((keyPair) =>
+                comparePublicKeys(keyPair.publicKey, publicKey)
+            ) || undefined
         );
     }
 
@@ -52,7 +86,7 @@ class KeyStore {
         }
 
         const k = privateStringToKeyPair(keyPair.privateKey);
-        const packedSignature = signatureToFracpack({
+        const packedSignature = serializeSignature(claim,{
             keyType: k.keyType,
             signature: k.keyPair.sign(trxDigest),
         });
@@ -194,7 +228,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                 exec: async ({ name, pubKey }: execArgs) => {
                     if (pubKey !== "") {
                         await action(
-                            "auth-ec-sys",
+                            "auth-sys",
                             "setKey",
                             { key: pubKey },
                             name
@@ -202,7 +236,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                         await action(
                             thisApplet,
                             "setAuthServ",
-                            { authService: "auth-ec-sys" },
+                            { authService: "auth-sys" },
                             name
                         );
                     }
@@ -220,7 +254,7 @@ export const initAppFn = (setAppInitialized: () => void) =>
                     keystore.addAccount([
                         {
                             accountNum,
-                            authService: "auth-ec-sys",
+                            authService: "auth-sys",
                             privateKey: keyPair.privateKey,
                             publicKey: keyPair.publicKey,
                         },

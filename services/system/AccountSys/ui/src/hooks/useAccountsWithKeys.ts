@@ -43,7 +43,7 @@ export const useAccountsWithKeys = (): [AccountWithAuth[], (key: string) => void
             .map(keyPair => fetchAccountsByKey(keyPair.publicKey))
         ).then(responses => {
             const flatAccounts = responses.flat(1);
-            setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authService: 'auth-ec-sys', publicKey: account.pubkey })), ...currentAccounts]))
+            setAccounts(currentAccounts => uniqueAccounts([...flatAccounts.map((account): AccountWithAuth => ({ accountNum: account.account, authService: 'auth-sys', publicKey: account.pubkey })), ...currentAccounts]))
             const currentKeyPairs = keyPairs;
             const newKeyPairs = currentKeyPairs.map((keyPair): KeyPairWithAccounts => {
                 const relevantAccounts = flatAccounts.filter(account => account.pubkey === keyPair.publicKey).map(account => account.account)
