@@ -89,7 +89,7 @@ psinode - The psibase blockchain server
 
 ### Configuration File
 
-Options can also be specified in a configuration file loaded from *database*`/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, it will be initialized with a default configuration file that includes the [administrator service](../system-service/admin-sys.md).
+Options can also be specified in a configuration file loaded from *database*`/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, it will be initialized with a default configuration file that includes the [administrator service](../default-apps/admin-sys.md).
 
 The configuration file also controls [logging](logging.md).
 

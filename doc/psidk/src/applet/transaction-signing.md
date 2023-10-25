@@ -36,7 +36,7 @@ Note over common_sys: 7. Submit transaction
 The following is an explanation of each step in the diagram to aid understanding:
 
 1. In step 1, alice interacts with an application in such a way that it schedules an action to be called on a service on chain
-2. Recall the structure of an "Account" object as specified by the [account-sys](../system-service/account-sys.md) system service. Every account has an auth service responsible for checking that certain claims are present whenever the user sends a transaction. Therefore here in step 2, the applet stored at common-sys (the core component of front-end infrastructure), looks up the auth service for the sender.
+2. Recall the structure of an "Account" object as specified by the [account-sys](../default-apps/account-sys.md) system service. Every account has an auth service responsible for checking that certain claims are present whenever the user sends a transaction. Therefore here in step 2, the applet stored at common-sys (the core component of front-end infrastructure), looks up the auth service for the sender.
 3. In step 3, the applet served by the users' auth service has the opportunity to add a claim to the transaction by implementing the GetClaim query. 
 4. In step 4, every service specified as the recipient of an action within this transaction is also given the opportunity to add a claim to the transaction by serving an applet implementing the GetClaim query. This is done because it may occasionally be necessary for a service to add additional claims based on the action name, sender, or action parameters.
 5. In step 5, now that the common-sys applet has accumulated all claims for this transaction, it hashes the transaction object.

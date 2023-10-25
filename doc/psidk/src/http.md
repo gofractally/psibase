@@ -113,7 +113,7 @@ psinode provides virtual hosting. Domains have 2 categories:
 | 4           | service | `/common*` | [Common services](#common-services). Registered services only.                     |
 | 5 (lowest)  | service | `*`        | [Service-provided services](#service-provided-services). Registered services only. |
 
-The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys service](system-service/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct chains and by individual node operators.
+The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys service](default-apps/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct chains and by individual node operators.
 
 ### CORS and authorization (http)
 
@@ -157,7 +157,7 @@ Future psinode versions may trim the action traces when not in a developer mode.
 - [Key Conversions (js)](#key-conversions-js)
 - [React GraphQL hooks (js)](#react-graphql-hooks-js)
 
-The [common-sys service](system-service/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
+The [common-sys service](default-apps/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
 | Method | URL                              | Description                                                                                                              |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -393,7 +393,7 @@ TODO
 
 ## Node administrator services
 
-The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). [admin-sys](system-service/admin-sys.md) provides a user interface for this API. Authorization to access this API is controlled by the server's `admin-authz` configuration option.
+The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). [admin-sys](default-apps/admin-sys.md) provides a user interface for this API. Authorization to access this API is controlled by the server's `admin-authz` configuration option.
 
 | Method | URL                        | Description                                                                   |
 |--------|----------------------------|-------------------------------------------------------------------------------|

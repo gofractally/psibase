@@ -24,7 +24,7 @@ pub struct HttpHeader {
 /// An HTTP Request
 ///
 /// Most services receive this via their [serveSys](crate::server_interface::ServerActions::serveSys)
-/// action. [proxy-sys](https://doc-sys.psibase.io/system-service/proxy-sys.html) receives it via
+/// action. [proxy-sys](https://doc-sys.psibase.io/default-apps/proxy-sys.html) receives it via
 /// its `serve` exported function.
 
 #[derive(
