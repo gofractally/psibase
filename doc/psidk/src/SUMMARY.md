@@ -53,6 +53,5 @@
   - [psispace-sys](system-service/psispace-sys.md)
   - [admin-sys](system-service/admin-sys.md)
   - [invite-sys](system-service/invite-sys.md)
-- [Standard Actions](standards/actions.md)
 - [Concepts](concepts.md)
   - [User onboarding](concepts/invites.md)
