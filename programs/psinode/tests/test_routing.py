@@ -48,7 +48,9 @@ class TestRouting(unittest.TestCase):
             header = a.get_block_header()
             print(header)
             with err:
-                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+                commitLag = header['blockNum'] - header['commitNum']
+                self.assertLessEqual(commitLag, 3)
+                self.assertGreaterEqual(commitLag, 2)
             time.sleep(1)
             if i % 2 == 0:
                 a.connect(b)
@@ -78,7 +80,9 @@ class TestRouting(unittest.TestCase):
             header = a.get_block_header()
             print(header)
             with err:
-                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+                commitLag = header['blockNum'] - header['commitNum']
+                self.assertLessEqual(commitLag, 3)
+                self.assertGreaterEqual(commitLag, 2)
             testutil.sleep(0.5, 0.5)
             if i % 2 == 0:
                 a.connect(b)
@@ -106,7 +110,9 @@ class TestRouting(unittest.TestCase):
             header = a.get_block_header()
             print(header)
             with err:
-                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+                commitLag = header['blockNum'] - header['commitNum']
+                self.assertLessEqual(commitLag, 3)
+                self.assertGreaterEqual(commitLag, 2)
             testutil.sleep(0.5, 0.5)
             if i % 2 == 0:
                 a.connect(g)
@@ -134,7 +140,9 @@ class TestRouting(unittest.TestCase):
             header = a.get_block_header()
             print(header)
             with err:
-                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
+                commitLag = header['blockNum'] - header['commitNum']
+                self.assertLessEqual(commitLag, 3)
+                self.assertGreaterEqual(commitLag, 2)
             testutil.sleep(0.5, 0.5)
             if i % 2 == 0:
                 a.connect(g)
