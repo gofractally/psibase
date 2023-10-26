@@ -153,15 +153,15 @@ if(BUILD_DOC)
     )
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-        DEPENDS md2man doc/psidk/src/psibase/psinode.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/psibase/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
+        DEPENDS md2man doc/psidk/src/cli/psinode.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/cli/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
     )
     add_custom_target(psinode.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1 TYPE MAN COMPONENT ServerData)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-        DEPENDS md2man doc/psidk/src/psibase/psibase.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/psibase/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
+        DEPENDS md2man doc/psidk/src/cli/psibase.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/cli/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
     )
     add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
