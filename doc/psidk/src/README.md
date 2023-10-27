@@ -2,19 +2,6 @@
 
 ![<Psibase Logo>](https://about.psibase.io/assets/logo-psibase-green.0714b8ee.svg)
 
-> **Table of Contents**
-> - [What is Psibase](#what-is-psibase)
-> - [Default applications](#default-applications)
-> - [Innovation stack](#innovation-stack)
->   - [Blockchain](#blockchain)
->   - [Application interfaces](#application-interfaces)
->   - [Triedent](#triedent)
->   - [Fracpack](#fracpack)
->   - [Custom WebAssembly runtime](#custom-webassembly-runtime)
->   - [Smart signatures](#smart-signatures)
->   - [Smart authorities](#smart-authorities)
-> - [Conclusion](#conclusion)
-
 ## What is Psibase
 
 Increasingly, individuals need online applications that they can self-host in order to protect their data, guarantee the app's future availability, and eliminate censorship concerns. Communities have similar needs. Communities often want to avoid depending too heavily on any one member or third party.
