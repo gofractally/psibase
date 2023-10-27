@@ -17,11 +17,11 @@
 
 ## What is Psibase
 
-Increasingly, individuals are in need of online applications that they can self-host in order to protect their data, guarantee the app's future availability, and eliminate censorship concerns. Communities have similar needs. Communities often want to avoid depending too heavily on any one member or third-party. 
+Increasingly, individuals need online applications that they can self-host in order to protect their data, guarantee the app's future availability, and eliminate censorship concerns. Communities have similar needs. Communities often want to avoid depending too heavily on any one member or third party.
 
-Psibase is a powerful protocol that enables communities to come together to collectively self-host web applications. Psibase further enables the development of a new kind of web app that is unqiuely well-suited to working alongside other community apps.
+Psibase is a powerful protocol that enables communities to come together to collectively self-host web applications. Psibase further enables the development of a new kind of web app that is uniquely well-suited to working alongside other community apps.
 
-Community members opt to become infrastructure providers (IP) for the rest of the community. All network participants get accounts, and can use community-owned apps to invite others into the community. Developers can publish their own apps and services to further extend the capabilities of members.
+Community members opt to become infrastructure providers (IPs) for the rest of the community. All network participants get accounts and can use community-owned apps to invite others into the community. Developers can publish their apps and services to further extend the capabilities of members.
 
 ## Default applications
 
@@ -35,11 +35,11 @@ Psibase includes many technologies and innovations. Here are a few of them.
 
 ### Blockchain
 
-Blockchains provide a means for decentralized rate limiting and shared resource consumption, and a method to synchronize state between a set of distributed nodes in a network. Block production is therefore one of the services provided by the psibase IPs.
+Blockchains provide a means for decentralized rate limiting and shared resource consumption, and a method to synchronize the state between a set of distributed nodes in a network. Block production is therefore one of the services provided by the psibase IPs.
 
 The novel blockchain architecture defined by psibase minimizes the complexity of the code that runs natively on the infrastructure provider in favor of defining functionality in discrete WebAssembly modules that are synchronized across nodes by the blockchain itself. This maximizes the flexibility of the infrastructure providers, enabling communities to reach consensus on and implement changes to the blockchain protocol itself.
 
-Furthermore, the psibase blockchain architecture is designed to interface directly with HTTP/RPC queries, allowing it to store and serve application front-ends. This design choice addresses a common failure mode of decentralized applications: the front-end is rarely decentralized. With the psibase blockchain architecture, everything from the back-end to the front-end, as well as the API provision are all equally decentralized. This helps to maximize the independence of the community leveraging psibase. This also allows the core blockchain protocol to serve graphical user-interfaces for simpler understanding and configuring of the core protocol itself.
+Furthermore, the psibase blockchain architecture is designed to interface directly with HTTP/RPC queries, allowing it to store and serve application front-ends. This design choice addresses a common failure mode of decentralized applications: the front end is rarely decentralized. With the psibase blockchain architecture, everything from the back-end to the front-end, as well as the API provision are all equally decentralized. This helps to maximize the independence of the community leveraging psibase. This also allows the core blockchain protocol to serve graphical user interfaces for simpler understanding and configuring of the core protocol itself.
 
 The reference implementation of this blockchain protocol, including reference implementations of the necessary WebAssembly components and associated front-end applications, can be found in the psibase repository [here](https://github.com/gofractally/psibase).
 
@@ -47,13 +47,13 @@ Further reading on the default applications can be found [here](./default-apps/R
 
 ### Application interfaces
 
-In addition to storing and serving user interfaces, the psibase protocol also introduces the concept of app interfaces, which wrap interactions with applications into convenient helper functions and which run client-side. These interfaces are intended to facilitate most interactions between users and applications, and between different applications on the client-side.
+In addition to storing and serving user interfaces, the psibase protocol also introduces the concept of app interfaces, which wrap interactions with applications into convenient client-side helper functions. These interfaces are intended to facilitate most interactions between users and applications.
 
-More about applications interfaces can be read about [here](./development/app-interfaces/README.md).
+More about application interfaces can be read about [here](./development/app-interfaces/README.md).
 
 ### Triedent
 
-Blockchains coordinate shared state between different nodes. Within a single node, there is still an underlying database technology used to store, cache, and retrieve data from the device storage disk and/or RAM. Psibase also specifies the design and characteristics of this underlying database technology in order to maximize its throughput by working with the unique constraints of a blockchain use-case. For example, read queries to this database must run in parallel without significantly affecting write performance. This characteristic minimizes the costs of running infrastructure providers because blockchain state can be accessed in parallel by many CPU cores.
+Blockchains coordinate shared state between different nodes. Within a single node, there is still an underlying database technology used to store, cache, and retrieve data from the device storage disk and/or RAM. Psibase also specifies the design and characteristics of this underlying database technology in order to maximize its throughput by working with the unique constraints of a blockchain use case. For example, read queries to this database must run in parallel without significantly affecting write performance. This characteristic minimizes the costs of running infrastructure providers because the blockchain state can be accessed in parallel by many CPU cores.
 
 This novel database design is called Triedent, and a reference implementation can be found [here](https://github.com/gofractally/psibase/tree/main/libraries/triedent).
 
@@ -75,16 +75,16 @@ The reference implementation for the custom Psibase WebAssembly runtime can be f
 
 Psibase signature verification happens within wasm modules, and the cryptographic verification service for a particular transaction signature can be specified by the transaction, allowing developers to add new or custom signature types and curves. This system lays the groundwork for future innovations related to proving statements between networks, signature aggregation, and more.
 
-Smart signatures verification is also done in parallel to increase speed and the proofs are pruned to limit the data growth rate and decrease costs for infrastructure providers.
+Smart signature verification is also done in parallel to increase speed and the proofs are pruned to limit the data growth rate and decrease costs for infrastructure providers.
 
 A reference signature verification service implementation can be found [here](https://github.com/gofractally/psibase/blob/main/services/system/VerifySys/src/VerifySys.cpp).
 
 ### Smart authorization
 
-What is the best way for a user to generate a proof that authorizes their account to perform some action? There are many solutions and combinations of solutions that may be ideal for a given scenario. The psibase protocol gives accounts complete programmatic control over how their account should be authorized. This could include simple signature verification, time locks, zero-knowledge passwords proofs, multi-user authentication, or anything else that developers can create. Psibase is unopinionated on exactly how to authorize an account, and is only opinionated on the general transaction structure that enables the dynamic specification of such logic.
+What is the best way for a user to generate proof that authorizes their account to perform some action? Many solutions and combinations of solutions may be ideal for any given scenario. The psibase protocol gives accounts complete programmatic control over how their account should be authorized. This could include simple signature verification, time locks, zero-knowledge password proofs, multi-user authentication, or anything else that developers can create. Psibase is unopinionated on exactly how to authorize an account and is only opinionated on the general transaction structure that enables the dynamic specification of such logic.
 
 A reference implementation of a service that allows users to specify a simple cryptographic signature public key can be found [here](https://github.com/gofractally/psibase/blob/main/services/system/AuthSys/src/AuthSys.cpp).
 
 ## Conclusion
 
-The psibase protocol encapsulates a whole host of open-source technical innovations including a new blockchain architecture, libraries for database management and data-serialization, and a full-stack web application and microservices framework. Intended to be a best-in-class base-layer infrastructure that can be trusted to facilitate better human collaboration and reliably power the next generation of community-hosted web-apps.
+The psibase protocol encapsulates a host of open-source technical innovations including a new blockchain architecture, libraries for database management and data-serialization, and a full-stack web application and microservices framework. Intended to be a best-in-class base-layer infrastructure that can be trusted to facilitate better human collaboration and reliably power the next generation of community-hosted web apps.
