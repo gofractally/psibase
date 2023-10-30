@@ -2,7 +2,7 @@
 
 - [Introduction](README.md)
   
-- [Development](development/README.md)
+- [App development](development/README.md)
   - [Services](development/services/README.md)
     - [Action scripts](development/services/action-scripts.md)
     - [Events](development/services/events.md)
