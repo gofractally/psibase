@@ -23,8 +23,7 @@ additional-css = [
     "theme/css/pagetoc-tock.css"
 ]
 additional-js = [
-    "theme/js/mermaid.min.js", 
-    "theme/js/mermaid-init.js", 
+    "theme/js/mermaid-load.js", 
     "theme/js/applet-init.js", 
     "theme/js/fix-github-edit-link.js", 
     "theme/js/pagetoc.js"
