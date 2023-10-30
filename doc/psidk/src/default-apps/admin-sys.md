@@ -24,7 +24,7 @@ The TCP port on which the server listens. The server must be restarted for a cha
 
 ### Logger
 
-See [Logging](../psibase/logging.md) for a list of the available logger types and their parameters.
+See [Logging](../run-infrastructure/cli/logging.md) for a list of the available logger types and their parameters.
 
 ### Builtin Services
 

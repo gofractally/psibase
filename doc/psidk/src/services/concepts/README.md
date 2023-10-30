@@ -1,3 +1,0 @@
-# Concepts
-
-- [Events](events.md)

@@ -1,4 +1,4 @@
-# Linux Installation
+# SDK installation for C++
 
 This downloads and extracts both `wasi-sdk` and `psidk`. wasi-sdk provides clang and other tools and provides the C and C++ runtime libraries built for WASM. psidk provides libraries and tools for working with psibase. The set of additional packages you need varies with Linux distribution; see the sections below.
 

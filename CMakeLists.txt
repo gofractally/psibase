@@ -142,8 +142,8 @@ if(BUILD_DOC)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/theme/js/pagetoc.js)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/theme/css/pagetoc.css)
     list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/theme/css/pagetoc-tock.css)
-    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/services/cpp-service/*.cpp)
-    file(GLOB_RECURSE doc-cmake doc/src/services/cpp-service/*/CMakeLists.txt)
+    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/development/services/cpp-service/*.cpp)
+    file(GLOB_RECURSE doc-cmake doc/src/development/services/cpp-service/*/CMakeLists.txt)
     file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
     file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
     add_custom_command(
@@ -157,15 +157,15 @@ if(BUILD_DOC)
     )
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-        DEPENDS md2man doc/psidk/src/cli/psinode.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/cli/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
+        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psinode.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
     )
     add_custom_target(psinode.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1 TYPE MAN COMPONENT ServerData)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-        DEPENDS md2man doc/psidk/src/cli/psibase.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/cli/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
+        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psibase.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
     )
     add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
@@ -334,7 +334,7 @@ endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
-    add_subdirectory(doc/psidk/src/services/cpp-service doc-examples)
+    add_subdirectory(doc/psidk/src/development/services/cpp-service doc-examples)
 endif()
 
 include(CPackComponent)

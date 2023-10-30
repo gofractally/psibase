@@ -10,11 +10,22 @@ Psibase is a powerful protocol that enables communities to come together to coll
 
 Community members opt to become infrastructure providers (IPs) for the rest of the community. All network participants get accounts and can use community-owned apps to invite others into the community. Developers can publish their apps and services to further extend the capabilities of members.
 
-## Default applications
+## Psibase applications
+
+Psibase can host the full application stack. Accounts on Psibase double as domain names relative to each infrastructure provider's root domain name. For example, if an infrastructure provider is hosting their node at `my-psibase-node.com`, then an account `alice` could host content that is retrievable at `alice.my-psibase-node.com/`. If another IP on the same network is hosting at `another-node.com`, then Alice's content is also available at `alice.another-node.com`. Each IP on the network is responsible for hosting full applications and their state, and providing API/RPC access for those trying to interact with the apps on the network.
+
+This design provides redundancy so that a community that self-hosts their applications using psibase is resilient to server unavailability and other faults. Furthermore, anyone can run their own infrastructure provider node and will effectively have all apps/services/state running on their local node, further eliminating dependency on external parties.
+
+### App stack
+
+A Psibase app has three parts which can each be stored in and served from a Psibase account:
+1. The service - Server-side component that handles web requests and defines the actions users can take to update their own app data.
+2. The interface - Client-side component that wraps requests and complex interactions with apps and services into a concise and user-friendly API for consumption by user-interfaces.
+3. The user interface - The typical client-side component that is presented to the user in the browser.
 
 Psibase networks provide some default applications that manage account creation, user onboarding, application browsing, and other core capabilities required by all deployments. This saves time and energy for communities; deploy psibase and skip straight to developing the applications that fulfill your mission.
 
-To read more about the default applications, see [here](./default-apps/README.md).
+To read more about the default applications, see [here](default-apps/).
 
 ## Innovation stack
 
@@ -30,13 +41,13 @@ Furthermore, the psibase blockchain architecture is designed to interface direct
 
 The reference implementation of this blockchain protocol, including reference implementations of the necessary WebAssembly components and associated front-end applications, can be found in the psibase repository [here](https://github.com/gofractally/psibase).
 
-Further reading on the default applications can be found [here](./default-apps/README.md).
+Further reading on the default applications can be found [here](default-apps/).
 
 ### Application interfaces
 
 In addition to storing and serving user interfaces, the psibase protocol also introduces the concept of app interfaces, which wrap interactions with applications into convenient client-side helper functions. These interfaces are intended to facilitate most interactions between users and applications.
 
-More about application interfaces can be read about [here](./development/app-interfaces/README.md).
+More about application interfaces can be read about [here](development/interfaces/).
 
 ### Triedent
 
@@ -48,7 +59,7 @@ This novel database design is called Triedent, and a reference implementation ca
 
 Psibase also specifies a novel data-serialization format built for extremely fast data packing and unpacking, and even reading without unpacking. This binary format is used when passing data between psibase services within a node, between nodes, and between nodes and user browsers. This is also the binary format of the objects stored in the database on any particular IP node.
 
-This novel binary format is called Fracpack. Learn more about the design of the format [here](format/fracpack.md), and a reference implementation can be found [here](https://github.com/gofractally/psibase/blob/main/libraries/psio/include/psio/fracpack.hpp).
+This novel binary format is called Fracpack. Learn more about the design of the format [here](development/format/fracpack.md), and a reference implementation can be found [here](https://github.com/gofractally/psibase/blob/main/libraries/psio/include/psio/fracpack.hpp).
 
 ### Custom WebAssembly runtime
 
