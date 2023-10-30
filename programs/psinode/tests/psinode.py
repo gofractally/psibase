@@ -442,7 +442,10 @@ class Node(API):
         subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath, 'boot'] + args)
         now = time.time_ns() // 1000000000
         def isbooted(node):
-            timestamp = node.get_block_header()['time']
+            try:
+                timestamp = node.get_block_header()['time']
+            except requests.exceptions.HTTPError as e:
+                return False
             if calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.000Z")) <= now:
                 return False
             return node.get_producers() == ([producer],[])
