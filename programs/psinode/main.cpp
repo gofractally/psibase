@@ -1,6 +1,7 @@
 #include <psibase/ConfigFile.hpp>
 #include <psibase/EcdsaProver.hpp>
 #include <psibase/OpenSSLProver.hpp>
+#include <psibase/PKCS11Prover.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/bft.hpp>
 #include <psibase/cft.hpp>
@@ -437,6 +438,23 @@ namespace psibase
          }
       }
    }  // namespace http
+
+   namespace pkcs11
+   {
+      void validate(boost::any& v, const std::vector<std::string>& values, URI*, int)
+      {
+         boost::program_options::validators::check_first_occurrence(v);
+         const auto& s = boost::program_options::validators::get_single_string(values);
+         try
+         {
+            v = URI(s);
+         }
+         catch (std::exception& e)
+         {
+            throw boost::program_options::invalid_option_value(s);
+         }
+      }
+   }  // namespace pkcs11
 }  // namespace psibase
 
 struct transaction_queue
@@ -1407,6 +1425,7 @@ void run(const std::string&              db_path,
          const DbConfig&                 db_conf,
          AccountNumber                   producer,
          std::shared_ptr<CompoundProver> prover,
+         pkcs11::URI&                    keyring,
          const std::vector<std::string>& peers,
          autoconnect_t                   autoconnect,
          bool                            enable_incoming_p2p,
@@ -1455,6 +1474,39 @@ void run(const std::string&              db_path,
             std::filesystem::copy_file(template_path, config_path);
          }
       }
+   }
+
+   std::shared_ptr<pkcs11::pkcs11_library> pkcs11Lib;
+   std::shared_ptr<pkcs11::session>        pkcs11Session;
+   if (keyring.modulePath)
+   {
+      pkcs11Lib = std::make_shared<pkcs11::pkcs11_library>(keyring.modulePath->c_str());
+   }
+   if (pkcs11Lib)
+   {
+      std::vector<pkcs11::slot_id_t> slots;
+      for (auto slot : pkcs11Lib->GetSlotList(true))
+      {
+         if (keyring.matches(pkcs11Lib->GetSlotInfo(slot)) &&
+             keyring.matches(pkcs11Lib->GetTokenInfo(slot)))
+         {
+            slots.push_back(slot);
+         }
+      }
+      if (slots.empty())
+      {
+         throw std::runtime_error("Cannot find token for keyring");
+      }
+      else if (slots.size() > 1)
+      {
+         throw std::runtime_error("Multiple matching tokens found for keyring");
+      }
+      pkcs11Session = std::make_shared<pkcs11::session>(pkcs11Lib, slots[0]);
+      pkcs11Session->Login();
+   }
+   if (pkcs11Session)
+   {
+      loadPKCS11Keys(pkcs11Session, AccountNumber{"verify-sys"}, *prover);
    }
 
    // http_config must live until server shutdown which happens when chainContext
@@ -1879,8 +1931,8 @@ void run(const std::string&              db_path,
                            });
       };
 
-      http_config->new_key =
-          [&chainContext, &prover, &db_path, &runResult](std::vector<char> json, auto callback)
+      http_config->new_key = [&chainContext, &prover, &db_path, &runResult, &pkcs11Session](
+                                 std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
@@ -1891,13 +1943,13 @@ void run(const std::string&              db_path,
          }
          boost::asio::post(
              chainContext,
-             [&prover, &db_path, &runResult, callback = std::move(callback),
+             [&prover, &db_path, &runResult, &pkcs11Session, callback = std::move(callback),
               key = std::move(key)]() mutable
              {
                 try
                 {
                    std::shared_ptr<Prover> result;
-                   if (key.service == AccountNumber{})
+                   if (key.service == AccountNumber{"verifyec-sys"})
                    {
                       if (key.rawData)
                       {
@@ -1913,11 +1965,12 @@ void run(const std::string&              db_path,
                    {
                       if (key.rawData)
                       {
-                         result = std::make_shared<OpenSSLProver>(key.service, *key.rawData);
+                         result = std::make_shared<PKCS11Prover>(pkcs11Session, key.service,
+                                                                 *key.rawData);
                       }
                       else
                       {
-                         result = std::make_shared<OpenSSLProver>(key.service);
+                         result = std::make_shared<PKCS11Prover>(pkcs11Session, key.service);
                       }
                    }
                    std::vector<Claim> existing;
@@ -2111,7 +2164,8 @@ int main(int argc, char* argv[])
    std::string                 db_path;
    std::string                 producer = {};
    auto                        keys     = std::make_shared<CompoundProver>();
-   std::string                 host     = {};
+   pkcs11::URI                 keyring;
+   std::string                 host = {};
    std::vector<listen_spec>    listen;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
@@ -2163,6 +2217,7 @@ int main(int argc, char* argv[])
    opt("tls-key", po::value(&tls_key)->default_value("")->value_name("path"),
        "The file containing the private key corresponding to --tls-cert in PEM format");
 #endif
+   opt("keyring", po::value(&keyring), "PKCS #11 token that holds the server's keyring");
    opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in µs.");
    opt("version,V", po::bool_switch(&version), "Print version information");
@@ -2248,9 +2303,9 @@ int main(int argc, char* argv[])
          restart.shutdownRequested = false;
          restart.shouldRestart     = true;
          restart.soft              = true;
-         run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, peers, autoconnect,
-             enable_incoming_p2p, host, listen, services, admin, admin_authz, root_ca, tls_cert,
-             tls_key, leeway_us, restart);
+         run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, keyring, peers,
+             autoconnect, enable_incoming_p2p, host, listen, services, admin, admin_authz, root_ca,
+             tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

@@ -197,6 +197,8 @@ function(add suffix)
             native/src/log.cpp
             native/src/NativeFunctions.cpp
             native/src/OpenSSLProver.cpp
+            native/src/pkcs11.cpp
+            native/src/PKCS11Prover.cpp
             native/src/Prover.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
