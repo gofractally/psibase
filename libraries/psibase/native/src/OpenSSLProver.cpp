@@ -6,6 +6,7 @@
 #include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/x509.h>
 
 using psibase::handleOpenSSLError;
 using psibase::OpenSSLDeleter;
@@ -57,7 +58,7 @@ void psibase::handleOpenSSLError()
 
 std::vector<char> psibase::getPublicKey(EVP_PKEY* key)
 {
-   int sz = i2d_PublicKey(static_cast<EVP_PKEY*>(key), nullptr);
+   int sz = i2d_PUBKEY(static_cast<EVP_PKEY*>(key), nullptr);
    if (sz < 0)
    {
       handleOpenSSLError();
@@ -66,7 +67,7 @@ std::vector<char> psibase::getPublicKey(EVP_PKEY* key)
    if (sz != 0)
    {
       unsigned char* p = reinterpret_cast<unsigned char*>(result.data());
-      i2d_PublicKey(static_cast<EVP_PKEY*>(key), &p);
+      i2d_PUBKEY(static_cast<EVP_PKEY*>(key), &p);
    }
    return result;
 }
