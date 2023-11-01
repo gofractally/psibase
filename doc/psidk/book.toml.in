@@ -31,6 +31,9 @@ additional-js = [
     "theme/js/pagetoc.js"
 ]
 
+[output.html.print]
+enable = false
+
 [output.html.playground]
 runnable = false
 
