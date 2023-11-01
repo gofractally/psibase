@@ -1,6 +1,7 @@
 # C++ Service
 
-- [Basic Service](cpp-service/basic/README.md)
-- [Minimal UI](cpp-service/minimal-ui/README.md)
-- [Calling Others](cpp-service/calling/README.md)
-- [Reference](cpp-service/reference.md)
+- [Environment setup](setup.md)
+- [Basic Service](basic/)
+- [Minimal UI](minimal-ui/)
+- [Calling Others](calling/)
+- [Reference](reference.md)
