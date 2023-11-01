@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./.github/images/logo-psibase-green.svg" />
+  <img src="./doc/psidk/src/_img/logo-psibase-green.svg" />
   <h1>psibase</h1>
   <p>
     &bull;

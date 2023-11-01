@@ -127,15 +127,21 @@ if(BUILD_DOC)
         BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
         INSTALL_COMMAND     ""
     )
+    
+    function(ADD_BOOK_FILES path extension)
+        file(COPY ${CMAKE_CURRENT_SOURCE_DIR}${path} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}${path})
+        file(GLOB DOC_FILES ${CMAKE_CURRENT_BINARY_DIR}${path}*.${extension})
+        set(doc-src ${doc-src} ${DOC_FILES} PARENT_SCOPE)
+    endfunction()
+    
     configure_file(doc/psidk/book.toml.in doc/psidk/book.toml)
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/theme/js/ DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/theme/js/)
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/theme/css/ DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/theme/css/)
+    ADD_BOOK_FILES("/doc/psidk/theme/js/" "js")
+    ADD_BOOK_FILES("/doc/psidk/theme/css/" "css")
+    ADD_BOOK_FILES("/doc/psidk/src/_img/" "svg")
+    
     file(GLOB_RECURSE doc-src ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/*.md)
-    list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)
-    file(GLOB DOC_JS_FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/theme/js/*.js)
-    list(APPEND doc-src ${DOC_JS_FILES})
-    file(GLOB DOC_CSS_FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/theme/css/*.css)
-    list(APPEND doc-src ${DOC_CSS_FILES})
+    list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)   
+    
     file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/development/services/cpp-service/*.cpp)
     file(GLOB_RECURSE doc-cmake doc/src/development/services/cpp-service/*/CMakeLists.txt)
     file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)

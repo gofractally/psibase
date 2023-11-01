@@ -1,6 +1,6 @@
 # Psibase
 
-![<Psibase Logo>](https://about.psibase.io/assets/logo-psibase-green.0714b8ee.svg)
+![<Psibase Logo>](./_img/logo-psibase-green.svg)
 
 ## What is Psibase
 
