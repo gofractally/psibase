@@ -50,9 +50,4 @@ you avoid it?
 
 ## vscode support
 
-The following files configure vscode:
-
-- [.vscode/c_cpp_properties.json](.vscode/c_cpp_properties.json)
-- [.vscode/settings.json](.vscode/settings.json)
-
-Code completion and symbol lookup does not work until the project is built (above).
+Code completion and symbol lookup in VSCode won't work until you add `.vscode/c_cpp_properties.json` and `.vscode/settings.json` to the root of your project. You can check the corresponding `*.sample` files at the root of the [psibase](https://github.com/gofractally/psibase) repository for an example.

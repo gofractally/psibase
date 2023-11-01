@@ -12,7 +12,7 @@ If enabled, the node will accept p2p connections at the websocket endpoint `/nat
 
 ### Block Producer Name
 
-The name that the server uses to produce blocks. It must be a valid [account name](../services/cpp-service/reference/magic-numbers.html#psibaseaccountnumber). The node will only produce blocks when its producer name is one of the currently active producers specified by the chain. To disable block production, the producer name can be left blank.
+The name that the server uses to produce blocks. It must be a valid [account name](../development/services/cpp-service/reference/magic-numbers.md#psibaseaccountnumber). The node will only produce blocks when its producer name is one of the currently active producers specified by the chain. To disable block production, the producer name can be left blank.
 
 ### Host
 
@@ -24,7 +24,7 @@ The TCP port on which the server listens. The server must be restarted for a cha
 
 ### Logger
 
-See [Logging](../run-infrastructure/cli/logging.md) for a list of the available logger types and their parameters.
+See [Logging](../run-infrastructure/configuration/logging.md) for a list of the available logger types and their parameters.
 
 ### Builtin Services
 
@@ -44,7 +44,7 @@ Builtin services can only serve the following files types:
 
 ### Access to admin API
 
-This option controls access to the [HTTP API](../http.md#node-administrator-services) under `/native/admin`, which is used by the administrator service. The admin API must be restricted to services trusted by the node operator, because it can tell `psinode` to read or write any file.
+This option controls access to the [HTTP API](../run-infrastructure/administration.md#node-administrator-services) under `/native/admin`, which is used by the administrator service. The admin API must be restricted to services trusted by the node operator, because it can tell `psinode` to read or write any file.
 
 - Builtin services only: Allows builtin services to access the admin API. This is the default and should rarely need to be changed.
 - All services: Allows any service to access the admin API. This should only be used for trusted private chains.

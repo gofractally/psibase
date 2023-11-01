@@ -9,7 +9,7 @@
 - [Log Filters](#log-filters)
 - [Log Formatters](#log-formatters)
 
-Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../http.md#server-configuration) while the server is running.
+Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../administration.md#server-configuration) while the server is running.
 
 ## Config File
 
@@ -122,7 +122,7 @@ command = /bin/sh
 
 ### Differences from JSON
 
-The config file format is intended to allow manual editing and is therefore more permissive than the JSON format used by the [HTTP API](../http.md#logging), which is designed as a machine-to-machine interface.
+The config file format is intended to allow manual editing and is therefore more permissive than the JSON format used by the [HTTP API](../administration.md#logging), which is designed as a machine-to-machine interface.
 
 - `rotationSize` and `maxSize` can specify units, such as KiB, MiB, GiB, etc. The JSON format requires a Number in bytes only.
 - TODO: currently rotationTime is pretty human-unfriendly

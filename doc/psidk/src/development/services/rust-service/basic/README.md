@@ -2,7 +2,7 @@
 
 ## Installation
 
-Follow the [Rust Installation Guide](../../rust.md).
+Follow the [Rust Installation Guide](../setup.md).
 
 ## Getting Started
 
@@ -46,15 +46,18 @@ mod service {
 
 ## Deploying the Service
 
-This, if you have a [local test chain running](../../psibase#booting-a-chain), will:
-
-- Build the service.
-- Create the `example` account, if it doesn't already exist. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public chains. `-i` is a shortcut for `--create-insecure-account`.
-- Deploy the just-built service on that account.
+If you have a local chain running, run: 
 
 ```sh
 cargo psibase deploy -i example
 ```
+
+This will:
+- Build the service.
+- Create the `example` account, if it doesn't already exist. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public chains. `-i` is a shortcut for `--create-insecure-account`.
+- Deploy the just-built service on that account.
+
+See the [psibase cli docs](../../../../run-infrastructure/cli/psibase.md#deploy) for more information on `psibase deploy`.
 
 ## Where's the pub?
 
@@ -71,7 +74,7 @@ Here's an example of how they differ: `psibase deploy` has an argument which mus
 
 ## Testing the Service
 
-The next section, [Testing Services](testing.html) covers testing our service.
+The next section, [Testing Services](../testing.md) covers testing our service.
 
 ## Homework
 

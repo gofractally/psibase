@@ -62,11 +62,11 @@ psinode - The psibase blockchain server
 
 - `--admin` `static:*` | `*` | *service*
 
-  tells psinode to enable the [admin API](../http.md#node-administrator-services)
+  tells psinode to enable the [admin API](../administration.md#node-administrator-services)
 
 - `--admin-authz` *mode*:*type*:*params*
 
-  Restricts client access to the [admin API](../http.md#node-administrator-services). *mode* can be `r` or `rw`. *type* should be one of the following:
+  Restricts client access to the [admin API](../administration.md#node-administrator-services). *mode* can be `r` or `rw`. *type* should be one of the following:
   - `any`: Allows any client
   - `loopback`: Allows connections from localhost
   - `ip`:*address*: Allows connections from a specific IP address
@@ -89,9 +89,9 @@ psinode - The psibase blockchain server
 
 ### Configuration File
 
-Options can also be specified in a configuration file loaded from *database*`/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, it will be initialized with a default configuration file that includes the [administrator service](../default-apps/admin-sys.md).
+Options can also be specified in a configuration file loaded from *database*`/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, it will be initialized with a default configuration file that includes the [administrator service](../../default-apps/admin-sys.md).
 
-The configuration file also controls [logging](logging.md).
+The configuration file also controls [logging](../configuration/logging.md).
 
 Example:
 ```ini

@@ -291,8 +291,8 @@ All loggers must have the following fields:
 | Field    | Type             | Description                                                                                                            |
 |----------|------------------|------------------------------------------------------------------------------------------------------------------------|
 | `type`   | String           | The type of the logger: [`"console"`](#console-logger), [`"file"`](#file-logger), or [`"local"`](#local-socket-logger) |
-| `filter` | String           | The [filter](psibase/logging.md#log-filters) for the logger                                                            |
-| `format` | String or Object | Determines the [format](psibase/logging.md#log-fomatters) of log messages                                              |
+| `filter` | String           | The [filter](./configuration/logging.md#log-filters) for the logger                                                            |
+| `format` | String or Object | Determines the [format](./configuration/logging.md#log-fomatters) of log messages                                              |
 
 Additional fields are determined by the logger type.
 
@@ -397,7 +397,7 @@ Examples:
 
 | Field  | Type             | Description                                                                                                                                  |
 |--------|------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| filter | String           | The [filter](psibase/logging.md#log-filters) for this websocket. If no filter is provided, the default is to send all possible log messages. |
-| format | String or Object | The [format](psibase/logging.md#log-formatters) for log messages. If no format is provided, the default is JSON.                             |
+| filter | String           | The [filter](./configuration/logging.md#log-filters) for this websocket. If no filter is provided, the default is to send all possible log messages. |
+| format | String or Object | The [format](./configuration/logging.md#log-formatters) for log messages. If no format is provided, the default is JSON.                             |
 
 The server begins sending log messages after it receives the first logger configuration from the client. The client can change the configuration at any time.  The configuration change is asynchronous, so the server will continue to send messages using the old configuration for a short period after client sends the update but before the server processes it.

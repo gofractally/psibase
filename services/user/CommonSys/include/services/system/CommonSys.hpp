@@ -5,9 +5,9 @@
 
 namespace SystemService
 {
-   /// Services that contains the common files and libraries used by applets on psibase
+   /// Services that contains the common files and libraries used by apps on psibase
    ///
-   /// See [HTTP and Javascript](../http.md)
+   /// See [External apps](../development/front-ends/external-apps.md#common-services)
    struct CommonSys : psibase::Service<CommonSys>
    {
       /// "common-sys"

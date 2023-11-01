@@ -58,9 +58,11 @@ psibase deploy -ip arithmetic arithmetic.wasm
 psibase deploy -ip caller caller.wasm
 ```
 
+See the [psibase deploy](../../../../run-infrastructure/cli/psibase.md#deploy) docs for more details.
+
 ## Trying the service
 
-If you're running a test chain locally, then the caller service's user interface is at [http://caller.psibase.127.0.0.1.sslip.io:8080/](http://caller.psibase.127.0.0.1.sslip.io:8080/).
+Follow the instructions at [trying the service](../minimal-ui/#trying-the-service) to view the development UI.
 
 # What's Happening?
 

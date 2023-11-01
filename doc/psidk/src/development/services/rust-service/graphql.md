@@ -50,16 +50,11 @@ mod service {
 cargo psibase deploy -ip
 ```
 
-Here are the service's links if you're hosting a local test chain:
+If you're running psibase locally, you can follow the [minimal UI instructions](./minimal-ui.md#trying-the-ui) to connect to the `example-query` service. You should be able to access:
 
-- [http://example-query.psibase.127.0.0.1.sslip.io:8080/graphiql.html](http://example-query.psibase.127.0.0.1.sslip.io:8080/graphiql.html).
-  This is GraphiQL, which lets you test your service's GraphQL
-  queries and examine its schema.
-- [http://example-query.psibase.127.0.0.1.sslip.io:8080/graphql](http://example-query.psibase.127.0.0.1.sslip.io:8080/graphql).
-  The service hosts the GraphQL protocol here. If you do a GET at
-  this location or click the link you'll receive the schema.
-- [http://example-query.psibase.127.0.0.1.sslip.io:8080/](http://example-query.psibase.127.0.0.1.sslip.io:8080/).
-  This is the developer UI, which lets you push transactions.
+- The `/graphiql.html` endpoint: This is GraphiQL, which lets you test your service's GraphQL queries and examine its schema.
+- The `/graphql` endpoint: The service hosts the GraphQL protocol here. If you do a GET at this location or click the link you'll receive the schema.
+- The `/` endpoint: This is the developer UI, which lets you push transactions.
 
 Try running the following query:
 
@@ -229,12 +224,13 @@ psibase create -i joe
 psibase create -i sue
 ```
 
-If you're running psibase locally, you should be able to
+If you're running psibase locally, you can follow the [minimal UI instructions](./minimal-ui.md#trying-the-ui) to connect to the `example-query` service. 
 
-- Open [http://example-query.psibase.127.0.0.1.sslip.io:8080/](http://example-query.psibase.127.0.0.1.sslip.io:8080/).
-- Use `generateRandom` to create messages. Use `1000` for `numMessages`. Use `["alice","bob","frank","jennifer","joe","sue"]` for `users`.
-- Open [http://example-query.psibase.127.0.0.1.sslip.io:8080/graphiql.html](http://example-query.psibase.127.0.0.1.sslip.io:8080/graphiql.html).
-- Run the following query:
+Use `generateRandom` to create messages. 
+- Use `1000` for `numMessages`. 
+- Use `["alice","bob","frank","jennifer","joe","sue"]` for `users`.
+
+Access the `/graphiql.html` endpoint on this service, and run the following query:
 
 ```
 {

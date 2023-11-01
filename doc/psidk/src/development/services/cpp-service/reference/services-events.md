@@ -1,21 +1,5 @@
 # C++ Services and Events
 
-- [Defining a service](#defining-a-service)
-- [Reserved action names](#reserved-action-names)
-- [Calling other services](#calling-other-services)
-- [Defining events](#defining-events)
-- [Recursion safety](#recursion-safety)
-- [psibase::getSender]
-- [psibase::getReceiver]
-- [psibase::Service]
-  - [psibase::Service::emit]
-  - [psibase::Service::events]
-- [psibase::Actor]
-- [psibase::to]
-- [psibase::from]
-- [psibase::EventEmitter]
-- [psibase::EventReader]
-
 ## Defining a service
 
 To define a service:
@@ -59,13 +43,6 @@ PSIO_REFLECT(MyService,
              method(doSomething, str),
              method(somethingElse, x, y))
 ```
-
-## Reserved action names
-
-Psibase standard action names end with `Sys` or `_Sys` (case insensitive). You should avoid this suffix
-when defining your own actions if they're not implementing one of the
-[existing standards](../../standards/actions.html) documented in this book. If you don't avoid it, your
-service may misbehave when future standards are adopted. e.g. don't create an action named `emphasys`.
 
 ## Calling other services
 

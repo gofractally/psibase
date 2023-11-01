@@ -89,24 +89,16 @@ psibase create -i bob
 psibase create -i sue
 ```
 
-If you're running psibase locally, you should be able to
+If you're running psibase locally, you can follow the [minimal UI instructions](./minimal-ui.md#trying-the-ui) to connect to the `messages` service.
 
-- Connect to [http://messages.psibase.127.0.0.1.sslip.io:8080/](http://messages.psibase.127.0.0.1.sslip.io:8080/)
 - Use `storeMessage` to create messages
 - Use `getMessages`
 
-`getMessages` makes it possible for other services to retrieve messages without
-accessing this service's tables directly. However, there isn't currently a way
-for javascript to get decoded return values (TODO), so the developer UI shows
-hex in the transaction trace. It's also wasteful in most cases to push
-transactions just to run a query. We can add a custom RPC endpoint to address
-these issues.
+`getMessages` makes it possible for other services to retrieve messages without accessing this service's tables directly. However, there isn't currently a way for javascript to get decoded return values (TODO), so the developer UI shows hex in the transaction trace. It's also wasteful in most cases to push transactions just to run a query. We can add a custom RPC endpoint to address these issues.
 
 ## Custom RPC
 
-Replace `serveSys` with the following. This handles RPC requests of the form
-`/messages/begin/end`, where `begin` and `end` are integer keys. This returns
-the selected messages in a JSON array.
+Replace `serveSys` with the following. This handles RPC requests of the form `/messages/begin/end`, where `begin` and `end` are integer keys. This returns the selected messages in a JSON array.
 
 ```rust
 #[action]
@@ -143,8 +135,7 @@ curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/20/30 | jq
 
 ## Singletons
 
-A singleton is a table that has at most 1 row. Let's add one to track the
-most-recent message ID so we can keep messages in order.
+A singleton is a table that has at most 1 row. Let's add one to track the most-recent message ID so we can keep messages in order.
 
 ```rust
 #[allow(non_snake_case)]
@@ -241,20 +232,13 @@ mod service {
 }
 ```
 
-You should be able to try this as before. This time however, `storeMessage`
-returns an ID; users can't post messages out of order or overwrite other
-users' messages, except for a new bug.
+You should be able to try this as before. This time however, `storeMessage` returns an ID; users can't post messages out of order or overwrite other users' messages, except for a new bug.
 
-We modified the behavior of an already-deployed service and introduced a
-bug in the process. The new version gradually overwrites messages created
-by the previous version. Production services need to be very careful with
-upgrades.
+We modified the behavior of an already-deployed service and introduced a bug in the process. The new version gradually overwrites messages created by the previous version. Production services need to be very careful with upgrades.
 
 ## Secondary Indexes
 
-So far we have a way to page through all messages, but don't have a good
-way to page through all messages from a particular user, or to a particular
-user. We can add secondary indexes to solve this.
+So far we have a way to page through all messages, but don't have a good way to page through all messages from a particular user, or to a particular user. We can add secondary indexes to solve this.
 
 ```rust
 #[allow(non_snake_case)]
@@ -396,12 +380,7 @@ curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/to/bob/0/99999999 
 
 ## Why Is It Empty?
 
-The above queries should be empty, even if Alice and Bob exchanged messages before you
-upgraded the service. Many database engines automatically rescan tables when you add
-indexes. Psibase doesn't, since it has a potentially unbound execution time cost which
-would make busy chains unavailable for other users. Instead, psibase adds index entries
-only when putting rows. We could add an action which gradually reputs `n` rows of the
-table. For now, you can test the above by storing more messages.
+The above queries should be empty, even if Alice and Bob exchanged messages before you upgraded the service. Many database engines automatically rescan tables when you add indexes. Psibase doesn't, since it has a potentially unbound execution time cost which would make busy chains unavailable for other users. Instead, psibase adds index entries only when putting rows. We could add an action which gradually reputs `n` rows of the table. For now, you can test the above by storing more messages.
 
 ## Modifying Tables And Indexes
 
@@ -414,15 +393,11 @@ The following corrupt tables:
 - Removing tables. TODO: it may be possible to relax this in the future.
 - Changing the definitions of fields within tables.
 
-There is an exemption to the last rule. You may add new `Option<...>` fields
-to the end of an existing table. You may not add non-option fields to an
-existing table, add fields to the middle of a table, change a field's type,
-or remove a field.
+There is an exemption to the last rule. You may add new `Option<...>` fields to the end of an existing table. You may not add non-option fields to an existing table, add fields to the middle of a table, change a field's type, or remove a field.
 
 ## Reading Tables in Test Cases
 
-Let's make the following adjustment to Message. `Debug, PartialEq, Eq` aid
-testability. We also changed the fields to public.
+Let's make the following adjustment to Message. `Debug, PartialEq, Eq` aid testability. We also changed the fields to public.
 
 ```rust
 #[table(name = "MessageTable", index = 0)]
@@ -502,10 +477,7 @@ cargo psibase test
 
 ## Storing Structs Defined Elsewhere
 
-Sometimes services need to define tables whose struct isn't defined
-within the service module itself. Here's an example where we define
-the struct in the service's crate. It could also be defined in another
-library.
+Sometimes services need to define tables whose struct isn't defined within the service module itself. Here's an example where we define the struct in the service's crate. It could also be defined in another library.
 
 ```rust
 // This definition lives outside of the service module. We can't use
@@ -544,9 +516,4 @@ impl WrapMessage {
 }
 ```
 
-`WrapMessage` falls under a special exemption to Fracpack,
-serde_json, and schema rules since it has exactly 1 unnamed
-field. All 3 formats treat `WrapMessage` as an alias to
-`Message` instead of treating it as a type which contains
-`Message`. e.g. They don't treat it as a tuple. They would
-treat it as a tuple if it contained more than 1 unnamed field.
+`WrapMessage` falls under a special exemption to Fracpack, serde_json, and schema rules since it has exactly 1 unnamed field. All 3 formats treat `WrapMessage` as an alias to `Message` instead of treating it as a type which contains `Message`. e.g. They don't treat it as a tuple. They would treat it as a tuple if it contained more than 1 unnamed field.

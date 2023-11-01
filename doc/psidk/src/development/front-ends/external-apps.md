@@ -85,7 +85,7 @@ psinode provides virtual hosting. Domains have 2 categories:
 | 4           | service | `/common*` | [Common services](#common-services). Registered services only.                     |
 | 5 (lowest)  | service | `*`        | [Service-provided services](#service-provided-services). Registered services only. |
 
-The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys service](default-apps/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct networks and by individual infrastructure providers.
+The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys service](../../default-apps/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct networks and by individual infrastructure providers.
 
 ### CORS and authorization (http)
 
@@ -119,7 +119,7 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 ## Common services
 
-The [common-sys service](default-apps/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
+The [common-sys service](../../default-apps/common-sys.md) provides services which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
 | Method | URL                              | Description                                                                                                              |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -207,9 +207,7 @@ TODO: document additional tapos fields once they're operational
 }
 ```
 
-`Proof` is a hex string containing data which proves the claim. e.g. `verifyec-sys`
-expects a signature in fracpack format. See [Signing (js)](#signing-js) to fill
-claims and proofs.
+`Proof` is a hex string containing data which proves the claim. e.g. `verifyec-sys` expects a signature in fracpack format. See [Signing (js)](#signing-js) to fill claims and proofs.
 
 ### Simple RPC wrappers (js)
 
@@ -266,8 +264,7 @@ claims and proofs.
 | `signAndPushTransaction(baseUrl, transaction, privateKeys)` | async | Sign, pack, and push transaction.                                                                                         |
 
 `signTransaction` signs a transaction; it also packs any actions if needed.
-`baseUrl` must point to within the root domain, one of the service domains,
-or be empty or null; see [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js).
+`baseUrl` must point to within the root domain, one of the service domains, or be empty or null; see [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js).
 `transaction` must have the following form:
 
 ```
@@ -303,11 +300,7 @@ or be empty or null; see [rootdomain and siblingUrl (js)](#rootdomain-and-siblin
 
 ### Key Conversions (js)
 
-`/common/keyConversions.mjs` exports functions which convert
-[Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic
-Signature objects to and from psibase's text and fracpack forms. Each function
-accepts or returns a `{keyType, keyPair}` or `{keyType, signature}`, where
-keyType is one of the following values:
+`/common/keyConversions.mjs` exports functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text and fracpack forms. Each function accepts or returns a `{keyType, keyPair}` or `{keyType, signature}`, where `keyType` is one of the following values:
 
 ```js
 export const KeyType = {

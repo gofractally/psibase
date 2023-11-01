@@ -18,10 +18,12 @@ psinode -p prod -o psibase.127.0.0.1.sslip.io my_psinode_db --listen 8080
 This will:
 
 - Open a database named `my_psinode_db` in the current directory; it will create it if it does not already exist.
-- Host a web UI and an RPC interface at [http://psibase.127.0.0.1.sslip.io:8080/](http://psibase.127.0.0.1.sslip.io:8080/).
+- Host a web UI and an RPC interface at `http://psibase.127.0.0.1.sslip.io:8080/`.
 - Produce blocks once the chain is booted.
 
 ### Boot the chain
+
+Interacting with the node can now be done either through the psibase cli tool, or graphically through the [admin-sys app](../../default-apps/admin-sys.md).
 
 In a separate terminal, while `psinode` is running, run the following:
 
@@ -39,7 +41,7 @@ This will create a new chain which has:
 
 You may now interact with the chain using:
 
-- The web UI at [http://psibase.127.0.0.1.sslip.io:8080/](http://psibase.127.0.0.1.sslip.io:8080/)
+- The web UI at `http://psibase.127.0.0.1.sslip.io:8080/`
 - Additional psibase commands
 
 ## Connecting to an existing chain
@@ -55,7 +57,7 @@ psinode \
 This will:
 
 - Open a database named `my_psinode_db` in the current directory; it will create it if it does not already exist.
-- Host a web UI and an RPC interface at [http://psibase.127.0.0.1.sslip.io:8080/](http://psibase.127.0.0.1.sslip.io:8080/).
+- Host a web UI and an RPC interface at `http://psibase.127.0.0.1.sslip.io:8080/`.
 - Connect to a peer at `some_domain_or_ip:8080`. The peer option may be repeated multiple times to connect to multiple peers.
 
 If the database is currently empty, or if the database is on the same chain as the peers, this will grab blocks from the peers and replay them. Any peers must have their `--p2p` option enabled.

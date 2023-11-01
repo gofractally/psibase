@@ -1,7 +1,7 @@
 # Rust service
 
 - [Environment setup](setup.md)
-- [Basic Service](basic.md)
+- [Basic Service](./basic/)
 - [Testing Services](testing.md)
 - [Calling Others](calling.md)
 - [Minimal UI](minimal-ui.md)
