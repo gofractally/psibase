@@ -1502,7 +1502,14 @@ void run(const std::string&              db_path,
          throw std::runtime_error("Multiple matching tokens found for keyring");
       }
       pkcs11Session = std::make_shared<pkcs11::session>(pkcs11Lib, slots[0]);
-      pkcs11Session->Login();
+      if (keyring.pinValue)
+      {
+         pkcs11Session->Login(*keyring.pinValue);
+      }
+      else
+      {
+         pkcs11Session->Login();
+      }
    }
    if (pkcs11Session)
    {

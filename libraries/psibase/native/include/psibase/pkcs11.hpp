@@ -477,7 +477,7 @@ namespace psibase::pkcs11
    {
       using class_    = basic_attribute<attribute_type::class_, object_class>;
       using label     = basic_attribute<attribute_type::label, std::string>;
-      using id        = basic_attribute<attribute_type::id, std::string>;
+      using id        = basic_attribute<attribute_type::id, std::vector<unsigned char>>;
       using key_type  = basic_attribute<attribute_type::key_type, key_type>;
       using token     = basic_attribute<attribute_type::token, bool>;
       using ec_params = basic_attribute<attribute_type::ec_params, std::vector<unsigned char>>;
@@ -520,7 +520,7 @@ namespace psibase::pkcs11
       error (*C_GetSessionInfo)(session_handle, session_info*);
       unused_func_t C_GetOperationState;
       unused_func_t C_SetOperationState;
-      error (*C_Login)(session_handle, user_type, char8_t* pin, unsigned long pinLen);
+      error (*C_Login)(session_handle, user_type, const char8_t* pin, unsigned long pinLen);
       unused_func_t C_Logout;
       error (*C_CreateObject)(session_handle, attribute*, unsigned long, object_handle*);
       unused_func_t C_CopyObject;
@@ -606,8 +606,10 @@ namespace psibase::pkcs11
       session(std::shared_ptr<pkcs11_library> lib,
               slot_id_t                       slot,
               session_flags                   flags = session_flags::serial_session);
-      session_info GetSessionInfo();
-      void         Login();
+      session_info                GetSessionInfo();
+      std::vector<mechanism_type> GetMechanismList();
+      void                        Login();
+      void                        Login(std::string_view pin);
       template <typename... Attrs>
       object_handle CreateObject(const Attrs&... attrs)
       {
@@ -693,6 +695,7 @@ namespace psibase::pkcs11
       bool                       matches(const slot_info&);
       bool                       matches(const token_info&);
       std::optional<std::string> modulePath;
+      std::optional<std::string> pinValue;
       std::optional<std::string> token;
       std::optional<std::string> serial;
       //...

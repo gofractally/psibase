@@ -584,6 +584,10 @@ namespace psibase::pkcs11
       handle_error(lib->functions->C_GetSessionInfo(handle, &result));
       return result;
    }
+   std::vector<mechanism_type> session::GetMechanismList()
+   {
+      return lib->GetMechanismList(GetSessionInfo().slotID);
+   }
    void session::Login()
    {
       if (lib->GetTokenInfo(GetSessionInfo().slotID).flags &
@@ -595,6 +599,11 @@ namespace psibase::pkcs11
       {
          throw std::runtime_error("pin required");
       }
+   }
+   void session::Login(std::string_view pin)
+   {
+      handle_error(lib->functions->C_Login(
+          handle, user_type::user, reinterpret_cast<const char8_t*>(pin.data()), pin.size()));
    }
    std::vector<char> session::Sign(const mechanism&               m,
                                    object_handle                  obj,
@@ -882,6 +891,11 @@ namespace psibase::pkcs11
       {
          check(!out.modulePath, "Duplicate module-path attribute");
          out.modulePath = parseQStr(uri);
+      }
+      else if (parseLiteral(uri, "pin-value="))
+      {
+         check(!out.pinValue, "Duplicate pin-value attribute");
+         out.pinValue = parseQStr(uri);
       }
       else
       {

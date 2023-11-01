@@ -2,6 +2,7 @@
 
 #include <openssl/sha.h>
 #include <psibase/block.hpp>
+#include <psibase/log.hpp>
 #include <psibase/openssl.hpp>
 
 using namespace psibase;
@@ -85,23 +86,38 @@ namespace
       return std::vector<unsigned char>(result, result + n);
    }
 
-   // encode sequence
-
    pkcs11::object_handle storeEcKey(pkcs11::session& s, std::string_view label, EVP_PKEY* key)
    {
       auto pubkey  = encodeOctetString(getPublicKeyData(key));
       auto privkey = getEcPrivateKeyData(key);
       auto params  = getKeyParams(key);
 
+      attributes::allowed_mechanisms mechanisms;
+      auto                           tokenMechanisms = s.GetMechanismList();
+      std::ranges::sort(tokenMechanisms);
+      if (std::ranges::binary_search(tokenMechanisms, pkcs11::mechanism_type::ecdsa_sha256))
+      {
+         mechanisms.value.push_back(pkcs11::mechanism_type::ecdsa_sha256);
+      }
+      else if (std::ranges::binary_search(tokenMechanisms, pkcs11::mechanism_type::ecdsa))
+      {
+         mechanisms.value.push_back(pkcs11::mechanism_type::ecdsa);
+      }
+
+      // set id to sha-256 key fingerprint
+      auto                       spki = getPublicKey(key);
+      std::vector<unsigned char> fingerprint(32);
+      SHA256(reinterpret_cast<const unsigned char*>(spki.data()), spki.size(), fingerprint.data());
+
       auto priv = s.CreateObject(
           attributes::class_{object_class::private_key}, attributes::key_type{key_type::ecdsa},
-          attributes::token{true}, attributes::label{std::string{label}},
-          attributes::ec_params{params}, attributes::ec_point{pubkey}, attributes::value{privkey});
+          attributes::token{true}, attributes::label{std::string{label}}, mechanisms,
+          attributes::id{fingerprint}, attributes::ec_params{params}, attributes::value{privkey});
       // Do we actually need to record a public key as a separate object?
-      auto pub = s.CreateObject(attributes::class_{object_class::public_key},
-                                attributes::key_type{key_type::ecdsa}, attributes::token{true},
-                                attributes::label{std::string{label}},
-                                attributes::ec_params{params}, attributes::ec_point{pubkey});
+      auto pub = s.CreateObject(
+          attributes::class_{object_class::public_key}, attributes::key_type{key_type::ecdsa},
+          attributes::token{true}, attributes::label{std::string{label}}, mechanisms,
+          attributes::id{fingerprint}, attributes::ec_params{params}, attributes::ec_point{pubkey});
       return priv;
    }
 
@@ -119,8 +135,13 @@ namespace
 
    std::vector<char> getEcPublicKey(pkcs11::session& session, pkcs11::object_handle private_key)
    {
+      // look up the corresponding public key
+      auto id  = session.GetAttributeValue<attributes::id>(private_key);
+      auto pub = session.FindObjects(attributes::class_{object_class::public_key}, id);
+      auto key = pub.empty() ? private_key : pub[0];
+
       auto [params, point] =
-          session.GetAttributeValues<attributes::ec_params, attributes::ec_point>(private_key);
+          session.GetAttributeValues<attributes::ec_params, attributes::ec_point>(key);
       // sequence{{ecdsa, ec_params}, ec_point}
       const unsigned char* p         = reinterpret_cast<const unsigned char*>(params.value.data());
       auto                 keyParams = d2i_KeyParams(EVP_PKEY_EC, nullptr, &p, params.value.size());
@@ -174,7 +195,14 @@ void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
                             attributes::key_type{key_type::ecdsa}, attributes::label{key_label});
    for (pkcs11::object_handle key : keys)
    {
-      out.add(std::make_shared<PKCS11Prover>(session, service, key));
+      try
+      {
+         out.add(std::make_shared<PKCS11Prover>(session, service, key));
+      }
+      catch (std::runtime_error& e)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), warning) << "Load key failed: " << e.what();
+      }
    }
 }
 
