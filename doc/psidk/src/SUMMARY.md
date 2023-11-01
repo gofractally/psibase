@@ -36,6 +36,7 @@
     - [User onboarding](development/front-ends/user-onboarding.md)
     - [Transaction signing](development/front-ends/transaction-signing.md)
   - [Data formats](development/format/README.md)
+    - [Account numbers](development/format/account-numbers.md)
     - [JSON](development/format/json.md)
     - [Schema](development/format/schema.md)
     - [fracpack](development/format/fracpack.md)
