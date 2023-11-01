@@ -1,14 +1,5 @@
 # Logging
 
-- [Config File](#config-file)
-  - [Console Logger](#console-logger)
-  - [File Logger](#file-logger)
-  - [Local Socket Logger](#local-socket-logger)
-  - [Pipe Logger](#pipe-logger)
-  - [Differences from JSON](#differences-from-json)
-- [Log Filters](#log-filters)
-- [Log Formatters](#log-formatters)
-
 Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../administration.md#server-configuration) while the server is running.
 
 ## Config File

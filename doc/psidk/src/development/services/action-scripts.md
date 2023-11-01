@@ -1,13 +1,5 @@
 # Action Scripts
 
-- [What are action scripts](#what-are-action-scripts)
-- [Use case](#use-case)
-  - [Example](#example)
-- [Security](#security)
-  - [Application groups](#application-groups)
-  - [Future extension outside application groups](#future-extension-outside-application-groups)
-- [Atomicity](#atomicity)
-
 ## What are action scripts
 
 In most blockchains, every function called on an on-chain smart-contract is called a "transaction." In some other blockchains, calling a function on chain requires one "action," and a "transaction" may be comprised of one or many such actions. On these chains, a transaction can be viewed as a kind of "script" with one very basic functionality: execute an ordered list of actions.

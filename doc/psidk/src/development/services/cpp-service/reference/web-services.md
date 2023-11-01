@@ -1,30 +1,5 @@
 # C++ Web Services
 
-- [Routing](#routing)
-- [Registration](#registration)
-- [Interfaces](#interfaces)
-  - [psibase::ServerInterface]
-  - [psibase::HttpRequest]
-  - [psibase::HttpReply]
-  - [psibase::StorageInterface]
-- [Helpers](#helpers)
-  - [psibase::serveSimpleUI]
-  - [psibase::serveActionTemplates]
-  - [psibase::servePackAction]
-  - [psibase::WebContentRow]
-  - [psibase::storeContent]
-  - [psibase::serveContent]
-  - [psibase::serveGraphQL]
-  - [psibase::makeConnection]
-    - [psibase::PageInfo]
-    - [psibase::Edge]
-    - [psibase::Connection]
-  - [psibase::EventDecoder]
-  - [psibase::EventQuery]
-  - [psibase::makeEventConnection]
-  - [psibase::historyQuery]
-  - [psibase::QueryableService]
-
 ## Routing
 
 ```svgbob
@@ -80,7 +55,7 @@ Services which wish to serve HTTP requests need to register using the [SystemSer
 
 A service doesn't have to serve HTTP requests itself; it may delegate this to another service during registration.
 
-## Interfaces
+## HTTP Interfaces
 
 Services which serve HTTP implement these interfaces:
 

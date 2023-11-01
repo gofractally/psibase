@@ -1,19 +1,5 @@
 # Rust Web Services
 
-- [Routing](#routing)
-- [Registration](#registration)
-- [Interfaces](#interfaces)
-  - [psibase::server_interface](https://docs.rs/psibase/latest/psibase/server_interface/index.html)
-    - [psibase::HttpRequest](https://docs.rs/psibase/latest/psibase/struct.HttpRequest.html)
-    - [psibase::HttpReply](https://docs.rs/psibase/latest/psibase/struct.HttpReply.html)
-  - [psibase::storage_interface](https://docs.rs/psibase/latest/psibase/storage_interface/index.html)
-- [Helpers](#helpers)
-  - [psibase::serve_simple_ui](https://docs.rs/psibase/latest/psibase/fn.serve_simple_ui.html)
-  - [psibase::serve_simple_index](https://docs.rs/psibase/latest/psibase/fn.serve_simple_index.html)
-  - [psibase::serve_action_templates](https://docs.rs/psibase/latest/psibase/fn.serve_action_templates.html)
-  - [psibase::serve_schema](https://docs.rs/psibase/latest/psibase/fn.serve_schema.html)
-  - [psibase::serve_pack_action](https://docs.rs/psibase/latest/psibase/fn.serve_pack_action.html)
-
 ## Routing
 
 ```svgbob
@@ -69,7 +55,7 @@ Services which wish to serve HTTP requests need to register using the [SystemSer
 
 A service doesn't have to serve HTTP requests itself; it may delegate this to another service during registration.
 
-## Interfaces
+## HTTP Interfaces
 
 Services which serve HTTP implement these interfaces:
 
