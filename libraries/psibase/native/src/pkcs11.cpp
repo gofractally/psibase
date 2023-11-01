@@ -808,17 +808,18 @@ namespace psibase::pkcs11
          char ch = uri.front();
          if (ch == '%')
          {
+            uri = uri.substr(1);
             result.push_back(parseHexChar(uri));
          }
          else if (pchar(ch) || ch == '&')
          {
+            uri = uri.substr(1);
             result.push_back(ch);
          }
          else
          {
             break;
          }
-         uri = uri.substr(1);
       }
       return result;
    }
@@ -831,17 +832,18 @@ namespace psibase::pkcs11
          char ch = uri.front();
          if (ch == '%')
          {
+            uri = uri.substr(1);
             result.push_back(parseHexChar(uri));
          }
          else if (pchar(ch) || ch == '/' || ch == '?' || ch == '|')
          {
+            uri = uri.substr(1);
             result.push_back(ch);
          }
          else
          {
             break;
          }
-         uri = uri.substr(1);
       }
       return result;
    }
