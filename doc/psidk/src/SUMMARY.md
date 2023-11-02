@@ -82,4 +82,6 @@
   - [transact-sys](default-apps/transact-sys.md)
   - [verify-sys]()
 
+- [Core concepts]()
+  - [Psibase OS](core-concepts/psibase-os.md)
 - [Contribute](contribute/README.md)
