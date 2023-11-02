@@ -16,6 +16,7 @@ namespace psibase
       void operator()(ECDSA_SIG* sig) const { ECDSA_SIG_free(sig); }
       void operator()(BIGNUM* bn) const { BN_free(bn); }
       void operator()(ASN1_OCTET_STRING* s) const { ASN1_OCTET_STRING_free(s); }
+      void operator()(ASN1_OBJECT* o) const { ASN1_OBJECT_free(o); }
       void operator()(unsigned char* p) const { OPENSSL_free(p); }
    };
    std::vector<char>                         getPublicKey(EVP_PKEY* key);

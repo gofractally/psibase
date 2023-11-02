@@ -469,6 +469,18 @@ namespace psibase::pkcs11
       return {N, attr->value.data(), size};
    }
 
+   template <typename Tuple, std::size_t... I>
+   std::array<attribute, sizeof...(I)> make_attributes(Tuple& attrs, std::index_sequence<I...>*)
+   {
+      return {make_attribute(&std::get<I>(attrs))...};
+   }
+
+   template <typename Tuple>
+   auto make_attributes(Tuple& attrs)
+   {
+      return make_attributes(attrs, (std::make_index_sequence<std::tuple_size_v<Tuple>>*)nullptr);
+   }
+
    template <typename T>
    concept variable_size_attribute =
        requires(T* attr, unsigned long size) { make_attribute(attr, size); };
@@ -480,6 +492,8 @@ namespace psibase::pkcs11
       using id        = basic_attribute<attribute_type::id, std::vector<unsigned char>>;
       using key_type  = basic_attribute<attribute_type::key_type, key_type>;
       using token     = basic_attribute<attribute_type::token, bool>;
+      using sign      = basic_attribute<attribute_type::sign, bool>;
+      using verify    = basic_attribute<attribute_type::verify, bool>;
       using ec_params = basic_attribute<attribute_type::ec_params, std::vector<unsigned char>>;
       using ec_point  = basic_attribute<attribute_type::ec_point, std::vector<unsigned char>>;
       using value     = basic_attribute<attribute_type::value, std::vector<unsigned char>>;
@@ -569,7 +583,14 @@ namespace psibase::pkcs11
       unused_func_t C_SignEncryptUpdate;
       unused_func_t C_DecryptVerifyUpdate;
       unused_func_t C_GenerateKey;
-      unused_func_t C_GenerateKeyPair;
+      error (*C_GenerateKeyPair)(session_handle,
+                                 const mechanism*,
+                                 const attribute*,
+                                 unsigned long,
+                                 const attribute*,
+                                 unsigned long,
+                                 object_handle*,
+                                 object_handle*);
       unused_func_t C_WrapKey;
       unused_func_t C_UnwrapKey;
       unused_func_t C_DeriveKey;
@@ -617,6 +638,19 @@ namespace psibase::pkcs11
          attribute     template_[] = {make_attribute(&const_cast<Attrs&>(attrs))...};
          handle_error(lib->functions->C_CreateObject(handle, template_, sizeof...(attrs), &result));
          return result;
+      }
+      template <typename PubAttrs, typename PrivAttrs>
+      std::pair<object_handle, object_handle> GenerateKeyPair(const mechanism& m,
+                                                              const PubAttrs&  pubattrs,
+                                                              const PrivAttrs& privattrs)
+      {
+         object_handle pub, priv;
+         auto          pubTemplate  = make_attributes(const_cast<PubAttrs&>(pubattrs));
+         auto          privTemplate = make_attributes(const_cast<PrivAttrs&>(privattrs));
+         handle_error(lib->functions->C_GenerateKeyPair(handle, &m, pubTemplate.data(),
+                                                        pubTemplate.size(), privTemplate.data(),
+                                                        privTemplate.size(), &pub, &priv));
+         return {pub, priv};
       }
       struct finder
       {

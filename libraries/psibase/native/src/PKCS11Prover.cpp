@@ -1,5 +1,6 @@
 #include <psibase/PKCS11Prover.hpp>
 
+#include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <psibase/block.hpp>
 #include <psibase/log.hpp>
@@ -84,6 +85,37 @@ namespace
       const unsigned char* result = ASN1_STRING_get0_data(decoded.get());
       int                  n      = ASN1_STRING_length(decoded.get());
       return std::vector<unsigned char>(result, result + n);
+   }
+
+   std::vector<unsigned char> encodeObjectId(ASN1_OBJECT* obj)
+   {
+      int sz = i2d_ASN1_OBJECT(obj, nullptr);
+      if (sz < 0)
+      {
+         handleOpenSSLError();
+      }
+      std::vector<unsigned char> result(sz);
+      if (sz != 0)
+      {
+         unsigned char* p = result.data();
+         i2d_ASN1_OBJECT(obj, &p);
+      }
+      return result;
+   }
+
+   // pre: all must be sorted
+   std::vector<mechanism_type> getEcdsaMechanism(const std::vector<mechanism_type>& all)
+   {
+      std::vector<mechanism_type> result;
+      if (std::ranges::binary_search(all, pkcs11::mechanism_type::ecdsa_sha256))
+      {
+         result.push_back(pkcs11::mechanism_type::ecdsa_sha256);
+      }
+      else if (std::ranges::binary_search(all, pkcs11::mechanism_type::ecdsa))
+      {
+         result.push_back(pkcs11::mechanism_type::ecdsa);
+      }
+      return result;
    }
 
    pkcs11::object_handle storeEcKey(pkcs11::session& s, std::string_view label, EVP_PKEY* key)
@@ -178,11 +210,44 @@ namespace
       }
    }
 
-   pkcs11::object_handle generateKey(pkcs11::session& session)
+   // The ID is only a convenience. It isn't required for security.
+   std::vector<unsigned char> newId(pkcs11::session& session)
    {
-      // if the session supports key generation...
-      // otherwise
-      return storeKey(session, key_label, psibase::generateKey().get());
+      std::vector<unsigned char> result(8);
+      do
+      {
+         if (RAND_bytes(result.data(), result.size()) != 1)
+         {
+            handleOpenSSLError();
+         }
+      } while (!session.FindObjects(attributes::id{result}).empty());
+      return result;
+   }
+
+   pkcs11::object_handle generateKey(pkcs11::session& session, std::string_view label)
+   {
+      auto tokenMechanisms = session.GetMechanismList();
+      std::ranges::sort(tokenMechanisms);
+      if (std::ranges::binary_search(tokenMechanisms, pkcs11::mechanism_type::ec_key_pair_gen))
+      {
+         auto params = encodeObjectId(
+             std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter>(OBJ_nid2obj(NID_X9_62_prime256v1)).get());
+         auto id          = newId(session);
+         auto mechanism   = getEcdsaMechanism(tokenMechanisms);
+         auto [pub, priv] = session.GenerateKeyPair(
+             pkcs11::mechanism{pkcs11::mechanism_type::ec_key_pair_gen},
+             std::tuple(attributes::token{true}, attributes::id{id},
+                        attributes::allowed_mechanisms{mechanism},
+                        attributes::label{std::string{label}}, attributes::verify{true},
+                        attributes::ec_params{params}),
+             std::tuple(attributes::token{true}, attributes::id{id},
+                        attributes::allowed_mechanisms{mechanism},
+                        attributes::label{std::string{label}}, attributes::sign{true}));
+         return priv;
+      }
+      // If there is no suitable key gen mechansim, fall back on generating and
+      // importing a key
+      return storeKey(session, label, psibase::generateKey().get());
    }
 }  // namespace
 
@@ -240,7 +305,7 @@ psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,
 }
 
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session, AccountNumber service)
-    : PKCS11Prover(session, service, ::generateKey(*session))
+    : PKCS11Prover(session, service, ::generateKey(*session, key_label))
 {
 }
 
