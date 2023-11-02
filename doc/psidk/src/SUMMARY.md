@@ -30,7 +30,7 @@
       - [GraphQL](development/services/rust-service/graphql.md)
       - [Reference](development/services/rust-service/reference/README.md)
         - [Web Services](development/services/rust-service/reference/web-services.md)
-  - [Interfaces](development/interfaces/README.md)
+  - [App interfaces]()
   - [Front-ends]()
     - [External apps](development/front-ends/external-apps.md)
     - [User onboarding](development/front-ends/user-onboarding.md)
