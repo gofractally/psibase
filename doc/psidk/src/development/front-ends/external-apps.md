@@ -2,7 +2,7 @@
 
 It is possible to build third-party apps & scripts that interact with a psibase deployment. To do so however requires the developer to manually do more of the heavy-lifting regarding key management and transaction packing. 
 
-External apps are also unable to engage client-side interfaces and use inter-app communication.
+External apps are also unable to engage [app interfaces](../app-interfaces/) and use inter-app communication.
 
 ## TLDR: Pushing a transaction
 

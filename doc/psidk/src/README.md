@@ -20,7 +20,7 @@ This design provides redundancy so that a community that self-hosts their applic
 
 A Psibase app has three parts which can each be stored in and served from a Psibase account:
 1. The service - Server-side component that handles web requests and defines the actions users can take to update their own app data.
-2. The interface - Client-side component that wraps requests and complex interactions with apps and services into a concise and user-friendly API for consumption by user-interfaces.
+2. The app interface - Client-side component that wraps requests and complex interactions with apps and services into a concise and user-friendly API for consumption by user-interfaces.
 3. The user interface - The typical client-side component that is presented to the user in the browser.
 
 Psibase networks provide some default applications that manage account creation, user onboarding, application browsing, and other core capabilities required by all deployments. This saves time and energy for communities; deploy psibase and skip straight to developing the applications that fulfill your mission.
@@ -47,7 +47,7 @@ Further reading on the default applications can be found [here](default-apps/).
 
 In addition to storing and serving user interfaces, the psibase protocol also introduces the concept of app interfaces, which wrap interactions with applications into convenient client-side helper functions. These interfaces are intended to facilitate most interactions between users and applications.
 
-More about application interfaces can be read about [here](development/interfaces/).
+More about application interfaces can be read about [here](development/app-interfaces/).
 
 ### Triedent
 
