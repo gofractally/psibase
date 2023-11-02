@@ -36,7 +36,6 @@
     - [Bundling](development/front-ends/bundling.md)
     - [External apps](development/front-ends/external-apps.md)
     - [User onboarding](development/front-ends/user-onboarding.md)
-    - [Transaction signing](development/front-ends/transaction-signing.md)
   - [Data formats](development/format/README.md)
     - [Account numbers](development/format/account-numbers.md)
     - [JSON](development/format/json.md)
@@ -84,4 +83,6 @@
 
 - [Core concepts]()
   - [Psibase OS](core-concepts/psibase-os.md)
+  - [Smart authorization](core-concepts/smart-authorization.md)
+
 - [Contribute](contribute/README.md)
