@@ -32,6 +32,7 @@
         - [Web Services](development/services/rust-service/reference/web-services.md)
   - [App interfaces](development/app-interfaces/README.md)
     - [Reference](development/app-interfaces/reference/README.md)
+  - [Front-ends](development/front-ends/README.md)
     - [External apps](development/front-ends/external-apps.md)
     - [User onboarding](development/front-ends/user-onboarding.md)
     - [Transaction signing](development/front-ends/transaction-signing.md)
