@@ -1970,6 +1970,10 @@ void run(const std::string&              db_path,
                    }
                    else
                    {
+                      if (!pkcs11Session)
+                      {
+                         throw std::runtime_error("No keyring");
+                      }
                       if (key.rawData)
                       {
                          result = std::make_shared<PKCS11Prover>(pkcs11Session, key.service,
