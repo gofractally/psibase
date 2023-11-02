@@ -588,6 +588,11 @@ namespace psibase::pkcs11
    {
       return lib->GetMechanismList(GetSessionInfo().slotID);
    }
+
+   token_info session::GetTokenInfo()
+   {
+      return lib->GetTokenInfo(GetSessionInfo().slotID);
+   }
    void session::Login()
    {
       if (lib->GetTokenInfo(GetSessionInfo().slotID).flags &

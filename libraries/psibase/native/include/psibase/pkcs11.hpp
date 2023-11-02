@@ -628,6 +628,7 @@ namespace psibase::pkcs11
               slot_id_t                       slot,
               session_flags                   flags = session_flags::serial_session);
       session_info                GetSessionInfo();
+      token_info                  GetTokenInfo();
       std::vector<mechanism_type> GetMechanismList();
       void                        Login();
       void                        Login(std::string_view pin);

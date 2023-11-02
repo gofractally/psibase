@@ -789,6 +789,12 @@ struct NewKeyRequest
 };
 PSIO_REFLECT(NewKeyRequest, service, rawData);
 
+struct UnlockKeyringRequest
+{
+   std::string pin;
+};
+PSIO_REFLECT(UnlockKeyringRequest, pin);
+
 struct RestartInfo
 {
    // If the server stops for any reason other than an explicit
@@ -1506,7 +1512,8 @@ void run(const std::string&              db_path,
       {
          pkcs11Session->Login(*keyring.pinValue);
       }
-      else
+      else if (pkcs11Session->GetTokenInfo().flags &
+               pkcs11::token_flags::protected_authentication_path)
       {
          pkcs11Session->Login();
       }
@@ -2029,6 +2036,34 @@ void run(const std::string&              db_path,
                    callback(e.what());
                 }
              });
+      };
+
+      http_config->unlock_keyring =
+          [&chainContext, &prover, &pkcs11Session](std::vector<char> json, auto callback)
+      {
+         json.push_back('\0');
+         psio::json_token_stream stream(json.data());
+         auto                    pin = psio::from_json<UnlockKeyringRequest>(stream);
+         boost::asio::post(chainContext,
+                           [&pkcs11Session, &prover, callback = std::move(callback),
+                            pin = std::move(pin)]() mutable
+                           {
+                              try
+                              {
+                                 if (!pkcs11Session)
+                                 {
+                                    throw std::runtime_error("No keyring");
+                                 }
+                                 pkcs11Session->Login(pin.pin);
+                                 loadPKCS11Keys(pkcs11Session, AccountNumber{"verify-sys"},
+                                                *prover);
+                                 callback(std::nullopt);
+                              }
+                              catch (std::exception& e)
+                              {
+                                 callback(e.what());
+                              }
+                           });
       };
 
       boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
