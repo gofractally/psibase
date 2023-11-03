@@ -11,6 +11,8 @@
 namespace SystemService
 {
 
+   /// The public key type used by this auth service.
+   /// It is encoded as an X.509 Subject Public Key Info.
    struct SubjectPublicKeyInfo
    {
       std::vector<unsigned char> data;
@@ -51,15 +53,26 @@ namespace SystemService
       to_key(obj.data, stream);
    }
 
+   /// A record containing the authorization claims needed for an account using this auth service.
    struct AuthRecord
    {
+      /// The account whose transactions will be required to contain the specified public key.
       psibase::AccountNumber account;
+      
+      /// The public key included in the claims for each transaction sent by this account.
       SubjectPublicKeyInfo   pubkey;
 
       auto byPubkey() const { return std::tuple{pubkey, account}; }
    };
    PSIO_REFLECT(AuthRecord, account, pubkey)
 
+   /// The `auth-sys` service is a default auth service that can be used to authenticate actions for accounts.
+   ///
+   /// Any account using this auth service must store in this service a public key that they own.
+   /// This service will ensure that the specified public key is included in the transaction claims for any
+   /// transaction sent by this account. 
+   ///
+   /// This service supports K1 or R1 keys (Secp256K1 or Secp256R1) keys.
    class AuthSys : public psibase::Service<AuthSys>
    {
      public:
@@ -67,13 +80,32 @@ namespace SystemService
       using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::byPubkey>;
       using Tables    = psibase::ServiceTables<AuthTable>;
 
+      /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface].
+      /// It will be automatically called by `transact-sys` when it is processing a transaction from a user who
+      /// has set this service as their auth service. 
+      ///
+      /// For this implementation in `auth-sys`, it verifies that the transaction contains a claim for the public 
+      /// key specified by AuthRecord::pubkey.
       void checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::Action             action,
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
+      /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface].
+      /// It will be automatically called by `account-sys` when a user attempts to configure their account to use this
+      /// auth service. 
+      ///
+      /// Verifies that a particular user is allowed to use a particular auth service. 
+      ///
+      /// For this implementation in `auth-sys`, it allows any user who has already set a public key using 
+      /// `AuthEcSys::setKey`.
       void canAuthUserSys(psibase::AccountNumber user);
+
+      /// Set the sender's public key.
+      /// 
+      /// This is the public key that must be claimed by the transaction whenever a sender using this auth service 
+      /// submits a transaction.
       void setKey(SubjectPublicKeyInfo key);
 
      private:

@@ -744,6 +744,8 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/services/system/ProxySys/include"),
         &("-I".to_owned() + repo_path + "/services/system/TransactionSys/include"),
         &("-I".to_owned() + repo_path + "/services/system/AccountSys/include"),
+        &("-I".to_owned() + repo_path + "/services/system/AuthEcSys/include"),
+        &("-I".to_owned() + repo_path + "/services/system/AuthSys/include"),
         &("-I".to_owned() + repo_path + "/services/user/CommonSys/include"),
         &("-I".to_owned() + repo_path + "/services/user/InviteSys/include"),
         &("-I".to_owned() + repo_path + "/services/user/PsiSpaceSys/include"),

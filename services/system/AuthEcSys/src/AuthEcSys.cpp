@@ -5,6 +5,7 @@
 #include <cstdio>
 
 using namespace psibase;
+using SystemService::AuthEc::AuthRecord;
 
 static constexpr bool enable_print = false;
 
@@ -53,7 +54,7 @@ namespace SystemService
             return;
          }
       }
-      abortMessage("transaction is not signed with key " + publicKeyToString(row->pubkey) +
+      abortMessage("transaction does not include a claim for the key " + publicKeyToString(row->pubkey) +
                    " needed to authenticate sender " + action.sender.str() + " for action " +
                    action.service.str() + "::" + action.method.str());
    }
