@@ -83,6 +83,7 @@
   - [verify-sys]()
 
 - [Core concepts]()
+  - [Invite-only networks](core-concepts/invite-only.md)
   - [Psibase OS](core-concepts/psibase-os.md)
   - [Smart authorization](core-concepts/smart-authorization.md)
 
