@@ -20,6 +20,6 @@ Psibase OS facilitates:
 
 * [Inter-app communication](../development/app-interfaces/README.md#inter-app-communication)
 * Transaction packing
-* Smart authorization (e.g. transaction signing)
+* [Smart authorization](./smart-authorization.md) (e.g. transaction signing)
 * WebRTC connections with other peers
 * Polling for [events](../development/services/events.md) emitted by services
