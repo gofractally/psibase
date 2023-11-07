@@ -1247,7 +1247,31 @@ namespace psibase::http
             }
             return;
          }
-         else if (req_target == "/native/admin/keys/unlock")
+         else if (req_target == "/native/admin/keyring/devices")
+         {
+            if (req.method() != bhttp::verb::get)
+            {
+               send(method_not_allowed(req.target(), req.method_string(), "GET"));
+            }
+            if (!check_admin_auth(authz::mode_type::read))
+            {
+               return;
+            }
+            run_native_handler(
+                server.http_config->get_pkcs11_tokens,
+                [error, ok, session = send.self.derived_session().shared_from_this()](auto&& result)
+                {
+                   if (auto err = std::get_if<std::string>(&result))
+                   {
+                      session->queue_(error(bhttp::status::internal_server_error, *err));
+                   }
+                   else
+                   {
+                      session->queue_(ok(std::get<1>(result)(), "application/json"));
+                   }
+                });
+         }
+         else if (req_target == "/native/admin/keyring/unlock")
          {
             if (req.method() != bhttp::verb::post)
             {

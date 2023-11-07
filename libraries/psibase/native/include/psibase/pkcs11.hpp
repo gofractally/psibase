@@ -142,6 +142,20 @@ namespace psibase::pkcs11
    };
    std::ostream& operator<<(std::ostream& os, token_flags flags);
 
+   // Strings in PKCS #11 structs are padded with trailing spaces
+   // This function removes the padding
+   std::string_view getString(const char*, std::size_t);
+   template <std::size_t N>
+   std::string_view getString(const char8_t (&a)[N])
+   {
+      return getString(reinterpret_cast<const char*>(a), N);
+   }
+   template <std::size_t N>
+   std::string_view getString(const char (&a)[N])
+   {
+      return getString(a, N);
+   }
+
    struct token_info
    {
       char8_t       label[32];
@@ -733,6 +747,10 @@ namespace psibase::pkcs11
       std::optional<std::string> pinValue;
       std::optional<std::string> token;
       std::optional<std::string> serial;
+      std::optional<std::string> manufacturer;
+      std::optional<std::string> model;
       //...
    };
+
+   std::string makeURI(const token_info&);
 }  // namespace psibase::pkcs11

@@ -786,14 +786,24 @@ struct NewKeyRequest
 {
    AccountNumber                    service;
    std::optional<std::vector<char>> rawData;
+   std::string                      device;
 };
-PSIO_REFLECT(NewKeyRequest, service, rawData);
+PSIO_REFLECT(NewKeyRequest, service, rawData, device);
 
 struct UnlockKeyringRequest
 {
    std::string pin;
+   std::string id;
 };
-PSIO_REFLECT(UnlockKeyringRequest, pin);
+PSIO_REFLECT(UnlockKeyringRequest, pin, id);
+
+struct PKCS11TokenInfo
+{
+   std::string name;
+   std::string id;
+   bool        unlocked;
+};
+PSIO_REFLECT(PKCS11TokenInfo, name, id, unlocked);
 
 struct RestartInfo
 {
@@ -1431,7 +1441,7 @@ void run(const std::string&              db_path,
          const DbConfig&                 db_conf,
          AccountNumber                   producer,
          std::shared_ptr<CompoundProver> prover,
-         pkcs11::URI&                    keyring,
+         std::vector<std::string>&       pkcs11_modules,
          const std::vector<std::string>& peers,
          autoconnect_t                   autoconnect,
          bool                            enable_incoming_p2p,
@@ -1482,46 +1492,37 @@ void run(const std::string&              db_path,
       }
    }
 
-   std::shared_ptr<pkcs11::pkcs11_library> pkcs11Lib;
-   std::shared_ptr<pkcs11::session>        pkcs11Session;
-   if (keyring.modulePath)
+   using PKCS11LibInfo = std::pair<std::shared_ptr<pkcs11::pkcs11_library>,
+                                   std::map<pkcs11::slot_id_t, std::shared_ptr<pkcs11::session>>>;
+
+   std::vector<PKCS11LibInfo> pkcs11Libs;
+   for (const std::string& path : pkcs11_modules)
    {
-      pkcs11Lib = std::make_shared<pkcs11::pkcs11_library>(keyring.modulePath->c_str());
+      pkcs11Libs.push_back({std::make_shared<pkcs11::pkcs11_library>(path.c_str()), {}});
    }
-   if (pkcs11Lib)
+
+   auto getPKCS11Slot = [&pkcs11Libs](std::string_view uri)
    {
-      std::vector<pkcs11::slot_id_t> slots;
-      for (auto slot : pkcs11Lib->GetSlotList(true))
+      pkcs11::URI                              token(uri);
+      std::optional<pkcs11::slot_id_t>         found;
+      std::shared_ptr<pkcs11::pkcs11_library>* foundLib      = nullptr;
+      PKCS11LibInfo::second_type*              foundSessions = nullptr;
+      for (auto& [lib, sessions] : pkcs11Libs)
       {
-         if (keyring.matches(pkcs11Lib->GetSlotInfo(slot)) &&
-             keyring.matches(pkcs11Lib->GetTokenInfo(slot)))
+         for (auto slot : lib->GetSlotList(true))
          {
-            slots.push_back(slot);
+            if (token.matches(lib->GetSlotInfo(slot)) && token.matches(lib->GetTokenInfo(slot)))
+            {
+               check(!found, "Multiple tokens match URI");
+               found         = slot;
+               foundLib      = &lib;
+               foundSessions = &sessions;
+            }
          }
       }
-      if (slots.empty())
-      {
-         throw std::runtime_error("Cannot find token for keyring");
-      }
-      else if (slots.size() > 1)
-      {
-         throw std::runtime_error("Multiple matching tokens found for keyring");
-      }
-      pkcs11Session = std::make_shared<pkcs11::session>(pkcs11Lib, slots[0]);
-      if (keyring.pinValue)
-      {
-         pkcs11Session->Login(*keyring.pinValue);
-      }
-      else if (pkcs11Session->GetTokenInfo().flags &
-               pkcs11::token_flags::protected_authentication_path)
-      {
-         pkcs11Session->Login();
-      }
-   }
-   if (pkcs11Session)
-   {
-      loadPKCS11Keys(pkcs11Session, AccountNumber{"verify-sys"}, *prover);
-   }
+      check(!!found, "No token matches URI");
+      return std::tuple{*foundLib, *found, foundSessions};
+   };
 
    // http_config must live until server shutdown which happens when chainContext
    // is destroyed.
@@ -1945,7 +1946,7 @@ void run(const std::string&              db_path,
                            });
       };
 
-      http_config->new_key = [&chainContext, &prover, &db_path, &runResult, &pkcs11Session](
+      http_config->new_key = [&chainContext, &prover, &db_path, &runResult, getPKCS11Slot](
                                  std::vector<char> json, auto callback)
       {
          json.push_back('\0');
@@ -1957,7 +1958,7 @@ void run(const std::string&              db_path,
          }
          boost::asio::post(
              chainContext,
-             [&prover, &db_path, &runResult, &pkcs11Session, callback = std::move(callback),
+             [&prover, &db_path, &runResult, getPKCS11Slot, callback = std::move(callback),
               key = std::move(key)]() mutable
              {
                 try
@@ -1977,18 +1978,17 @@ void run(const std::string&              db_path,
                    }
                    else
                    {
-                      if (!pkcs11Session)
-                      {
-                         throw std::runtime_error("No keyring");
-                      }
+                      auto [lib, slot, sessions] = getPKCS11Slot(key.device);
+                      auto pos                   = sessions->find(slot);
+                      check(pos != sessions->end(), "Device locked");
                       if (key.rawData)
                       {
-                         result = std::make_shared<PKCS11Prover>(pkcs11Session, key.service,
-                                                                 *key.rawData);
+                         result =
+                             std::make_shared<PKCS11Prover>(pos->second, key.service, *key.rawData);
                       }
                       else
                       {
-                         result = std::make_shared<PKCS11Prover>(pkcs11Session, key.service);
+                         result = std::make_shared<PKCS11Prover>(pos->second, key.service);
                       }
                    }
                    std::vector<Claim> existing;
@@ -2039,25 +2039,69 @@ void run(const std::string&              db_path,
       };
 
       http_config->unlock_keyring =
-          [&chainContext, &prover, &pkcs11Session](std::vector<char> json, auto callback)
+          [&chainContext, &prover, getPKCS11Slot](std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    pin = psio::from_json<UnlockKeyringRequest>(stream);
+         boost::asio::post(
+             chainContext,
+             [getPKCS11Slot, &prover, callback = std::move(callback),
+              pin = std::move(pin)]() mutable
+             {
+                try
+                {
+                   auto [lib, slot, sessions] = getPKCS11Slot(pin.id);
+                   auto pos                   = sessions->find(slot);
+                   if (pos == sessions->end())
+                   {
+                      pos = sessions->insert({slot, std::make_shared<pkcs11::session>(lib, slot)})
+                                .first;
+                   }
+                   pos->second->Login(pin.pin);
+                   loadPKCS11Keys(pos->second, AccountNumber{"verify-sys"}, *prover);
+                   callback(std::nullopt);
+                }
+                catch (std::exception& e)
+                {
+                   callback(e.what());
+                }
+             });
+      };
+
+      http_config->get_pkcs11_tokens = [&chainContext, &pkcs11Libs](auto callback)
+      {
          boost::asio::post(chainContext,
-                           [&pkcs11Session, &prover, callback = std::move(callback),
-                            pin = std::move(pin)]() mutable
+                           [&pkcs11Libs, callback = std::move(callback)]() mutable
                            {
                               try
                               {
-                                 if (!pkcs11Session)
+                                 std::vector<PKCS11TokenInfo> result;
+                                 for (const auto& [lib, sessions] : pkcs11Libs)
                                  {
-                                    throw std::runtime_error("No keyring");
+                                    for (const auto& slot : lib->GetSlotList(true))
+                                    {
+                                       auto             tinfo = lib->GetTokenInfo(slot);
+                                       std::string_view label = pkcs11::getString(tinfo.label);
+                                       std::string      id    = pkcs11::makeURI(tinfo);
+                                       auto             session_pos = sessions.find(slot);
+                                       bool             unlocked =
+                                           session_pos != sessions.end() &&
+                                           session_pos->second->GetSessionInfo().state ==
+                                               pkcs11::state_t::rw_user_functions;
+                                       result.push_back({.name     = std::string(label),
+                                                         .id       = std::move(id),
+                                                         .unlocked = unlocked});
+                                    }
                                  }
-                                 pkcs11Session->Login(pin.pin);
-                                 loadPKCS11Keys(pkcs11Session, AccountNumber{"verify-sys"},
-                                                *prover);
-                                 callback(std::nullopt);
+                                 callback(
+                                     [result = std::move(result)]() mutable
+                                     {
+                                        std::vector<char>   json;
+                                        psio::vector_stream stream(json);
+                                        to_json(result, stream);
+                                        return json;
+                                     });
                               }
                               catch (std::exception& e)
                               {
@@ -2210,7 +2254,7 @@ int main(int argc, char* argv[])
    std::string                 db_path;
    std::string                 producer = {};
    auto                        keys     = std::make_shared<CompoundProver>();
-   pkcs11::URI                 keyring;
+   std::vector<std::string>    pkcs11_modules;
    std::string                 host = {};
    std::vector<listen_spec>    listen;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
@@ -2263,7 +2307,10 @@ int main(int argc, char* argv[])
    opt("tls-key", po::value(&tls_key)->default_value("")->value_name("path"),
        "The file containing the private key corresponding to --tls-cert in PEM format");
 #endif
-   opt("keyring", po::value(&keyring), "PKCS #11 token that holds the server's keyring");
+   opt("pkcs11-module",
+       po::value(&pkcs11_modules)->composing()->default_value({}, "")->value_name("path"),
+       "Path to a PKCS #11 module to load");
+   // specify default token/service
    opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in µs.");
    opt("version,V", po::bool_switch(&version), "Print version information");
@@ -2349,7 +2396,7 @@ int main(int argc, char* argv[])
          restart.shutdownRequested = false;
          restart.shouldRestart     = true;
          restart.soft              = true;
-         run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, keyring, peers,
+         run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, pkcs11_modules, peers,
              autoconnect, enable_incoming_p2p, host, listen, services, admin, admin_authz, root_ca,
              tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)

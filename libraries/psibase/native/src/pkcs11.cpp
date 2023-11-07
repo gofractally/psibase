@@ -878,6 +878,16 @@ namespace psibase::pkcs11
          check(!out.serial, "Duplicate serial attribute");
          out.serial = parsePStr(uri);
       }
+      else if (parseLiteral(uri, "manufacturer="))
+      {
+         check(!out.serial, "Duplicate manufacturer attribute");
+         out.manufacturer = parsePStr(uri);
+      }
+      else if (parseLiteral(uri, "model="))
+      {
+         check(!out.serial, "Duplicate model attribute");
+         out.model = parsePStr(uri);
+      }
       else
       {
          auto pos = uri.find('=');
@@ -937,15 +947,13 @@ namespace psibase::pkcs11
       check(uri == "", "Expected end of URI");
    }
 
-   template <typename Ch, std::size_t N>
-      requires(sizeof(Ch) == 1)
-   std::string_view handleTrailingSpace(const Ch (&a)[N])
+   std::string_view getString(const char* s, std::size_t n)
    {
-      std::string_view result{reinterpret_cast<const char*>(&a[0]), N};
+      std::string_view result{s, n};
       auto             pos = result.find_last_not_of(' ');
       if (pos == std::string::npos)
       {
-         return result;
+         return {};
       }
       return result.substr(0, pos + 1);
    }
@@ -957,14 +965,57 @@ namespace psibase::pkcs11
 
    bool URI::matches(const token_info& tinfo)
    {
-      if (token && *token != handleTrailingSpace(tinfo.label))
+      if (token && *token != getString(tinfo.label))
       {
          return false;
       }
-      if (serial && *serial != handleTrailingSpace(tinfo.serialNumber))
+      if (serial && *serial != getString(tinfo.serialNumber))
+      {
+         return false;
+      }
+      if (manufacturer && *manufacturer != getString(tinfo.manufacturerID))
+      {
+         return false;
+      }
+      if (model && *model != getString(tinfo.model))
       {
          return false;
       }
       return true;
+   }
+
+   std::string makePStr(std::string_view s)
+   {
+      constexpr const char* xdigits = "0123456789ABCDEF";
+      std::string           result;
+      for (char ch : s)
+      {
+         if (pchar(ch) || ch == '&')
+         {
+            result.push_back(ch);
+         }
+         else
+         {
+            result.push_back('%');
+            result.push_back(xdigits[(ch >> 4) & 0x0F]);
+            result.push_back(xdigits[ch & 0x0F]);
+         }
+      }
+      return result;
+   }
+
+   std::string makeURI(const token_info& tinfo)
+   {
+      std::string result;
+      result += "pkcs11:";
+      result += "token=";
+      result += makePStr(getString(tinfo.label));
+      result += ";manufacturer=";
+      result += makePStr(getString(tinfo.manufacturerID));
+      result += ";model=";
+      result += makePStr(getString(tinfo.model));
+      result += ";serial=";
+      result += makePStr(getString(tinfo.serialNumber));
+      return result;
    }
 }  // namespace psibase::pkcs11
