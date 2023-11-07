@@ -1,8 +1,13 @@
 # psidk
 
 - [Introduction](README.md)
-  
-- [App development](development/README.md)
+
+- [Specifications]()
+  - [User onboarding](specifications/user-onboarding.md)
+  - [Psibase OS](specifications/psibase-os.md)
+  - [Smart authorization](specifications/smart-authorization.md)
+
+- [Development guides](development/README.md)
   - [Services](development/services/README.md)
     - [Action scripts](development/services/action-scripts.md)
     - [Events](development/services/events.md)
@@ -34,7 +39,7 @@
     - [Reference](development/app-interfaces/reference/README.md)
   - [Front-ends](development/front-ends/README.md)
     - [External apps](development/front-ends/external-apps.md)
-    - [User onboarding](development/front-ends/user-onboarding.md)
+    - [User onboarding]()
     - [Bundling](development/front-ends/bundling.md)
   - [Data formats](development/format/README.md)
     - [Account numbers](development/format/account-numbers.md)
@@ -81,10 +86,5 @@
   - [token-sys]()
   - [transact-sys](default-apps/transact-sys.md)
   - [verify-sys]()
-
-- [Core concepts]()
-  - [Invite-only networks](core-concepts/invite-only.md)
-  - [Psibase OS](core-concepts/psibase-os.md)
-  - [Smart authorization](core-concepts/smart-authorization.md)
 
 - [Contribute](contribute/README.md)

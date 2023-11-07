@@ -1,9 +1,0 @@
-# Invite-only networks
-
-A psibase deployment allows many applications to run on the same infrastructure, which allows for many benefits, such as account sharing, data sharing, and inter-application communication. Account sharing means that there is a concept of an "account" that exists independent of any particular application and that can be reused between them.
-
-In traditional web applications, the cost to create and store an account are borne by the company who produced the web application. This is usually done because the value of acquiring another user exceeds the associated creation and storage costs. But in many modern web applications (particularly those in the "web3" or blockchain space), accounts are paid for by the new user either explicitly through an account creation cost or implicitly through minimum account value requirements. This is because when value accrues to an application that gains a new user, that value does not necessarily compensate the infrastructure providers who initially bore the cost of the initial account creation.
-
-In psibase, new accounts are always created through an invitation process (facilitated by a psibase app such as the [invite-sys](../default-apps/invite-sys.md) default app). This provides minimal friction for the new user, who simply needs to accept an invite by clicking a web link. The cost to create the account is borne at the time of the creation of the invite. That may mean that the inviter bears the cost, but psibase apps also have the option of white-labeling the invite-generation process and covering the cost of the new accounts in order to mimic the "app-pays" model of the traditional web.
-
-Therefore, psibase is designed to be more of a [club good](https://en.wikipedia.org/wiki/Club_good) than a [public good](https://en.wikipedia.org/wiki/Public_good_(economics)). It is permissionless specifically in the sense that anyone is permitted to send an invite to anyone else.
