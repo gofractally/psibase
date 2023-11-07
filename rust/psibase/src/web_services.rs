@@ -1,6 +1,6 @@
 /// Interface for services which serve http
 ///
-/// [proxy.sys](https://doc-sys.psibase.io/system-service/proxy-sys.html) uses this
+/// [proxy.sys](https://doc-sys.psibase.io/default-apps/proxy-sys.html) uses this
 /// interface to call into services to respond to http requests.
 ///
 /// To implement this interface, add a [serveSys](ServerActions::serveSys) action to

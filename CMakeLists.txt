@@ -127,17 +127,23 @@ if(BUILD_DOC)
         BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
         INSTALL_COMMAND     ""
     )
+    
+    function(ADD_BOOK_FILES path extension)
+        file(COPY ${CMAKE_CURRENT_SOURCE_DIR}${path} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}${path})
+        file(GLOB DOC_FILES ${CMAKE_CURRENT_BINARY_DIR}${path}*.${extension})
+        set(doc-src ${doc-src} ${DOC_FILES} PARENT_SCOPE)
+    endfunction()
+    
     configure_file(doc/psidk/book.toml.in doc/psidk/book.toml)
-    configure_file(doc/psidk/mermaid.min.js doc/psidk/mermaid.min.js COPYONLY)
-    configure_file(doc/psidk/mermaid-init.js doc/psidk/mermaid-init.js COPYONLY)
-    configure_file(doc/psidk/applet-init.js doc/psidk/applet-init.js COPYONLY)
+    ADD_BOOK_FILES("/doc/psidk/theme/js/" "js")
+    ADD_BOOK_FILES("/doc/psidk/theme/css/" "css")
+    ADD_BOOK_FILES("/doc/psidk/src/_img/" "svg")
+    
     file(GLOB_RECURSE doc-src ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/*.md)
-    list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)
-    list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid.min.js)
-    list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/mermaid-init.js)
-    list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/applet-init.js)
-    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/services/cpp-service/*.cpp)
-    file(GLOB_RECURSE doc-cmake doc/src/services/cpp-service/*/CMakeLists.txt)
+    list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)   
+    
+    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/development/services/cpp-service/*.cpp)
+    file(GLOB_RECURSE doc-cmake doc/src/development/services/cpp-service/*/CMakeLists.txt)
     file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
     file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
     add_custom_command(
@@ -151,15 +157,15 @@ if(BUILD_DOC)
     )
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-        DEPENDS md2man doc/psidk/src/psibase/psinode.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/psibase/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
+        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psinode.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
     )
     add_custom_target(psinode.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1 TYPE MAN COMPONENT ServerData)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-        DEPENDS md2man doc/psidk/src/psibase/psibase.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/psibase/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
+        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psibase.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
     )
     add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
@@ -328,7 +334,7 @@ endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
-    add_subdirectory(doc/psidk/src/services/cpp-service doc-examples)
+    add_subdirectory(doc/psidk/src/development/services/cpp-service doc-examples)
 endif()
 
 include(CPackComponent)

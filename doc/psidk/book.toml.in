@@ -4,19 +4,35 @@ multilingual = false
 src = "${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src"
 title = "psidk"
 
+[build]
+create-missing = false
+
 [preprocessor.gen-cpp-doc]
 command = "/usr/bin/env WASI_SDK_PREFIX=${WASI_SDK_PREFIX} ${CMAKE_CURRENT_BINARY_DIR}/rust/release/gen-cpp-doc --srcdir '${CMAKE_CURRENT_SOURCE_DIR}' --builddir '${CMAKE_CURRENT_BINARY_DIR}'"
-# command = "../../rust/target/debug/gen-cpp-doc"
 after = ["links","index"]
 
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
 
+[preprocessor.pagetoc]
 [output.html]
 default-theme = "ayu"
 preferred-dark-theme = "ayu"
 git-repository-url = "https://github.com/gofractally/psibase"
-additional-js = ["mermaid.min.js", "mermaid-init.js", "applet-init.js"]
+edit-url-template = "https://github.com/gofractally/psibase/edit/main/{path}"
+additional-css = [
+    "theme/css/pagetoc.css", 
+    "theme/css/pagetoc-tock.css"
+]
+additional-js = [
+    "theme/js/mermaid-load.js", 
+    "theme/js/applet-init.js", 
+    "theme/js/fix-github-edit-link.js", 
+    "theme/js/pagetoc.js"
+]
+
+[output.html.print]
+enable = false
 
 [output.html.playground]
 runnable = false
@@ -24,4 +40,7 @@ runnable = false
 [output.html.fold]
 enable = true
 
-#[output.linkcheck]
+[output.linkcheck]
+follow-web-links = true
+traverse-parent-directories = false
+warning-policy = "ignore"

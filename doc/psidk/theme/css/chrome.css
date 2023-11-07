@@ -175,6 +175,10 @@ a > .hljs {
     right: var(--page-padding);
 }
 
+.nav-wide-wrapper {
+    display: none;
+}
+
 @media only screen and (max-width: 1080px) {
     .nav-wide-wrapper { display: none; }
     .nav-wrapper { display: block; }
