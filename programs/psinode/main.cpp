@@ -1310,6 +1310,7 @@ struct PsinodeConfig
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
    AccountNumber               producer;
+   std::vector<std::string>    pkcs11_modules;
    std::string                 host;
    std::vector<listen_spec>    listen;
    TLSConfig                   tls;
@@ -1323,6 +1324,7 @@ PSIO_REFLECT(PsinodeConfig,
              peers,
              autoconnect,
              producer,
+             pkcs11_modules,
              host,
              listen,
 #ifdef PSIBASE_ENABLE_SSL
@@ -1350,6 +1352,12 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    if (config.producer != AccountNumber())
    {
       file.set("", "producer", config.producer.str(), "The name to use for block production");
+   }
+   if (!config.pkcs11_modules.empty())
+   {
+      file.set(
+          "", "pkcs11-module", config.pkcs11_modules,
+          [](std::string_view text) { return std::string(text); }, "PKCS #11 modules to load");
    }
    if (!config.host.empty())
    {
@@ -1495,11 +1503,42 @@ void run(const std::string&              db_path,
    using PKCS11LibInfo = std::pair<std::shared_ptr<pkcs11::pkcs11_library>,
                                    std::map<pkcs11::slot_id_t, std::shared_ptr<pkcs11::session>>>;
 
-   std::vector<PKCS11LibInfo> pkcs11Libs;
-   for (const std::string& path : pkcs11_modules)
+   std::map<std::string, PKCS11LibInfo> pkcs11Libs;
+   auto setPKCS11Libs = [&pkcs11Libs](const std::vector<std::string>& new_modules)
    {
-      pkcs11Libs.push_back({std::make_shared<pkcs11::pkcs11_library>(path.c_str()), {}});
-   }
+      std::map<std::string, PKCS11LibInfo> newLibs;
+      std::vector<std::string>             added;
+      for (const std::string& path : new_modules)
+      {
+         if (auto node = pkcs11Libs.extract(path))
+         {
+            newLibs.insert(std::move(node));
+         }
+         else
+         {
+            added.push_back(path);
+         }
+      }
+      // Unload modules first to avoid issues if the old configuration and the
+      // new configuration include the same module under different names. Loading
+      // the same module more than once is a Bad Idea (TM). Note that deduplicating
+      // on the handle before calling C_Initialize is not sufficient, because
+      // some modules (p11-kit-proxy) can load others.
+      for (auto& [path, module] : pkcs11Libs)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), info)
+             << "Unloading PKCS #11 module: " << path;
+         module.second.clear();
+         module.first.reset();
+      }
+      pkcs11Libs = std::move(newLibs);
+      for (const std::string& path : added)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Loading PKCS #11 module: " << path;
+         pkcs11Libs.insert({path, {std::make_shared<pkcs11::pkcs11_library>(path.c_str()), {}}});
+      }
+   };
+   setPKCS11Libs(pkcs11_modules);
 
    auto getPKCS11Slot = [&pkcs11Libs](std::string_view uri)
    {
@@ -1507,8 +1546,9 @@ void run(const std::string&              db_path,
       std::optional<pkcs11::slot_id_t>         found;
       std::shared_ptr<pkcs11::pkcs11_library>* foundLib      = nullptr;
       PKCS11LibInfo::second_type*              foundSessions = nullptr;
-      for (auto& [lib, sessions] : pkcs11Libs)
+      for (auto& [k, v] : pkcs11Libs)
       {
+         auto& [lib, sessions] = v;
          if (token.matches(lib->GetInfo()))
          {
             for (auto slot : lib->GetSlotList(true))
@@ -1822,96 +1862,113 @@ void run(const std::string&              db_path,
 
       http_config->set_config =
           [&chainContext, &node, &db_path, &runResult, &http_config, &host, &admin, &admin_authz,
-           &services, &tls_cert, &tls_key, &root_ca,
-           &connect_one](std::vector<char> json, http::connect_callback callback)
+           &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one,
+           setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
 
-         boost::asio::post(
-             chainContext,
-             [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
-              &runResult, &http_config, &host, &services, &admin, &admin_authz, &tls_cert, &tls_key,
-              &root_ca, &connect_one, callback = std::move(callback)]() mutable
-             {
-                std::optional<http::services_t> new_services;
-                for (auto& entry : config.services)
-                {
-                   entry.root =
-                       parse_path(entry.root.native(), std::filesystem::current_path() / db_path);
-                }
-                if (services != config.services || host != config.host)
-                {
-                   new_services.emplace();
-                   for (const auto& entry : config.services)
-                   {
-                      load_service(entry, *new_services, config.host);
-                   }
-                }
-                node.set_producer_id(config.producer);
-                http_config->enable_p2p = config.p2p;
-                if (!http_config->status.load().shutdown)
-                {
-                   node.autoconnect(std::vector(config.peers), config.autoconnect.value,
-                                    connect_one);
-                }
-                host        = config.host;
-                services    = config.services;
-                admin       = config.admin;
-                admin_authz = config.admin_authz;
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
+                            &db_path, &runResult, &http_config, &host, &services, &admin,
+                            &admin_authz, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
+                            &connect_one, setPKCS11Libs, callback = std::move(callback)]() mutable
+                           {
+                              std::optional<http::services_t> new_services;
+                              for (auto& entry : config.services)
+                              {
+                                 entry.root = parse_path(entry.root.native(),
+                                                         std::filesystem::current_path() / db_path);
+                              }
+                              if (services != config.services || host != config.host)
+                              {
+                                 new_services.emplace();
+                                 for (const auto& entry : config.services)
+                                 {
+                                    load_service(entry, *new_services, config.host);
+                                 }
+                              }
+                              // Error handling for PKCS #11 modules loading is tricky because
+                              // it involves global state outside of our direct control
+                              try
+                              {
+                                 setPKCS11Libs(config.pkcs11_modules);
+                              }
+                              catch (std::runtime_error& e)
+                              {
+                                 PSIBASE_LOG(loggers::generic::get(), warning) << e.what();
+                                 PSIBASE_LOG(loggers::generic::get(), warning)
+                                     << "Rolling back config";
+                                 setPKCS11Libs(pkcs11_modules);
+                                 callback(e.what());
+                                 return;
+                              }
+                              // All configuration errors should be detected before this point
+                              node.set_producer_id(config.producer);
+                              http_config->enable_p2p = config.p2p;
+                              if (!http_config->status.load().shutdown)
+                              {
+                                 node.autoconnect(std::vector(config.peers),
+                                                  config.autoconnect.value, connect_one);
+                              }
+                              pkcs11_modules = config.pkcs11_modules;
+                              host           = config.host;
+                              services       = config.services;
+                              admin          = config.admin;
+                              admin_authz    = config.admin_authz;
 #ifdef PSIBASE_ENABLE_SSL
-                tls_cert = config.tls.certificate;
-                tls_key  = config.tls.key;
-                root_ca  = config.tls.trustfiles;
+                              tls_cert = config.tls.certificate;
+                              tls_key  = config.tls.key;
+                              root_ca  = config.tls.trustfiles;
 #endif
-                loggers::configure(config.loggers);
-                {
-                   std::shared_lock l{http_config->mutex};
-                   http_config->host                = host;
-                   http_config->listen              = config.listen;
-                   http_config->admin               = admin;
-                   http_config->admin_authz         = admin_authz;
-                   http_config->enable_transactions = !host.empty();
-                   if (new_services)
-                   {
-                      // Use swap instead of move to delay freeing the old
-                      // services until after releasing the mutex
-                      http_config->services.swap(*new_services);
-                   }
-                }
-                {
-                   auto       path = std::filesystem::path(db_path) / "config";
-                   ConfigFile file{config_options};
-                   {
-                      std::ifstream in(path);
-                      file.parse(in);
-                   }
-                   to_config(config, file);
-                   {
-                      std::ofstream out(path);
-                      file.write(out);
-                   }
-                   runResult.configChanged = true;
-                }
-                callback(std::nullopt);
-             });
+                              loggers::configure(config.loggers);
+                              {
+                                 std::shared_lock l{http_config->mutex};
+                                 http_config->host                = host;
+                                 http_config->listen              = config.listen;
+                                 http_config->admin               = admin;
+                                 http_config->admin_authz         = admin_authz;
+                                 http_config->enable_transactions = !host.empty();
+                                 if (new_services)
+                                 {
+                                    // Use swap instead of move to delay freeing the old
+                                    // services until after releasing the mutex
+                                    http_config->services.swap(*new_services);
+                                 }
+                              }
+                              {
+                                 auto       path = std::filesystem::path(db_path) / "config";
+                                 ConfigFile file{config_options};
+                                 {
+                                    std::ifstream in(path);
+                                    file.parse(in);
+                                 }
+                                 to_config(config, file);
+                                 {
+                                    std::ofstream out(path);
+                                    file.write(out);
+                                 }
+                                 runResult.configChanged = true;
+                              }
+                              callback(std::nullopt);
+                           });
       };
 
       http_config->get_config = [&chainContext, &node, &http_config, &host, &admin, &admin_authz,
-                                 &tls_cert, &tls_key, &root_ca,
+                                 &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
                                  &services](http::get_config_callback callback)
       {
          boost::asio::post(
              chainContext,
              [&chainContext, &node, &http_config, &host, &services, &admin, &admin_authz, &tls_cert,
-              &tls_key, &root_ca, callback = std::move(callback)]() mutable
+              &tls_key, &root_ca, &pkcs11_modules, callback = std::move(callback)]() mutable
              {
                 PsinodeConfig result;
                 result.p2p                                       = http_config->enable_p2p;
                 std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
                 result.producer                                  = node.producer_name();
-                result.host                                      = host;
-                result.listen                                    = http_config->listen;
+                result.pkcs11_modules = pkcs11_modules, result.host = host;
+                result.listen = http_config->listen;
 #ifdef PSIBASE_ENABLE_SSL
                 result.tls.certificate = tls_cert;
                 result.tls.key         = tls_key;
@@ -2081,8 +2138,9 @@ void run(const std::string&              db_path,
                               try
                               {
                                  std::vector<PKCS11TokenInfo> result;
-                                 for (const auto& [lib, sessions] : pkcs11Libs)
+                                 for (const auto& [k, v] : pkcs11Libs)
                                  {
+                                    const auto& [lib, sessions] = v;
                                     for (const auto& slot : lib->GetSlotList(true))
                                     {
                                        auto             tinfo = lib->GetTokenInfo(slot);
