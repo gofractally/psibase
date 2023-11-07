@@ -16,6 +16,6 @@ For each app that bundles React, for example, another copy of react will be stor
 
 ## App interfaces
 
-When bundling a front-end application, it is important that you only bundle calls to [app interfaces](../app-interfaces/README.md) that use the standard IAC libraries for facilitating calls into app-interfaces. Otherwise, you risk giving the developer of the app-interface root access to your application by allowing them to silently call into your own app interface or service.
+When developing a front-end application that depends on [app interfaces](../app-interfaces/README.md), it is highly recommended only to bundle javascript bindings that use the standard js libraries to interact with app interfaces, rather than bundling the app interfaces themselves. Otherwise, you risk giving the developer of the app-interface root access to your application by allowing them to silently call into your own app interface or service.
 
-Read more about how to correctly call into app interfaces [here](../app-interfaces/reference/README.md#calling-the-app-interface).
+Read more about how to correctly call into app interfaces [here](../app-interfaces/reference/README.md).
