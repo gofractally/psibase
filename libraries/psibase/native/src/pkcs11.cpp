@@ -3,6 +3,7 @@
 #include <psibase/check.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <cstdint>
 #include <ostream>
 #include <span>
@@ -866,9 +867,71 @@ namespace psibase::pkcs11
       }
    }
 
+   template <typename T>
+   T parseInt(std::string_view& uri)
+   {
+      T    result = 0;
+      auto err    = std::from_chars(uri.data(), uri.data() + uri.size(), result);
+      if (err.ec == std::errc{})
+      {
+         uri = uri.substr(err.ptr - uri.data());
+         return result;
+      }
+      else
+      {
+         check(false, "Expected integer");
+      }
+      return result;
+   }
+
+   version_t parseVersion(std::string_view& uri)
+   {
+      version_t result;
+      result.major = parseInt<std::uint8_t>(uri);
+      if (parseLiteral(uri, "."))
+      {
+         result.minor = parseInt<std::uint8_t>(uri);
+      }
+      else
+      {
+         result.minor = 0;
+      }
+      return result;
+   }
+
    void parsePAttr(std::string_view& uri, URI& out)
    {
-      if (parseLiteral(uri, "token="))
+      if (parseLiteral(uri, "library-manufacturer="))
+      {
+         check(!out.libraryDescription, "Duplicate library-manufacturer attribute");
+         out.libraryManufacturer = parsePStr(uri);
+      }
+      else if (parseLiteral(uri, "library-description="))
+      {
+         check(!out.libraryDescription, "Duplicate library-description attribute");
+         out.libraryDescription = parsePStr(uri);
+      }
+      else if (parseLiteral(uri, "library-version="))
+      {
+         check(!out.libraryVersion, "Duplicate library-version attribute");
+         out.libraryVersion = parseVersion(uri);
+      }
+      else if (parseLiteral(uri, "slot-manufacturer="))
+      {
+         check(!out.slotManufacturer, "Duplicate slot-manufacturer attribute");
+         out.slotManufacturer = parsePStr(uri);
+      }
+      else if (parseLiteral(uri, "slot-description="))
+      {
+         check(!out.slotDescription, "Duplicate slot-description attribute");
+         out.slotDescription = parsePStr(uri);
+      }
+      else if (parseLiteral(uri, "slot-id="))
+      {
+         check(!out.slotId, "Duplicate slot-id attribute");
+         out.slotId = parseInt<slot_id_t>(uri);
+      }
+      else if (parseLiteral(uri, "token="))
       {
          check(!out.token, "Duplicate token attribute");
          out.token = parsePStr(uri);
@@ -880,13 +943,53 @@ namespace psibase::pkcs11
       }
       else if (parseLiteral(uri, "manufacturer="))
       {
-         check(!out.serial, "Duplicate manufacturer attribute");
+         check(!out.manufacturer, "Duplicate manufacturer attribute");
          out.manufacturer = parsePStr(uri);
       }
       else if (parseLiteral(uri, "model="))
       {
-         check(!out.serial, "Duplicate model attribute");
+         check(!out.model, "Duplicate model attribute");
          out.model = parsePStr(uri);
+      }
+      else if (parseLiteral(uri, "id="))
+      {
+         check(!out.id, "Duplicate id attribute");
+         auto s = parsePStr(uri);
+         auto p = reinterpret_cast<const unsigned char*>(s.data());
+         out.id = std::vector(p, p + s.size());
+      }
+      else if (parseLiteral(uri, "object="))
+      {
+         check(!out.object, "Duplicate object attribute");
+         out.object = parsePStr(uri);
+      }
+      else if (parseLiteral(uri, "type="))
+      {
+         check(!out.type, "Duplicate type attribute");
+         if (parseLiteral(uri, "public"))
+         {
+            out.type = object_class::public_key;
+         }
+         else if (parseLiteral(uri, "private"))
+         {
+            out.type = object_class::private_key;
+         }
+         else if (parseLiteral(uri, "cert"))
+         {
+            out.type = object_class::certificate;
+         }
+         else if (parseLiteral(uri, "secret-key"))
+         {
+            out.type = object_class::secret_key;
+         }
+         else if (parseLiteral(uri, "data"))
+         {
+            out.type = object_class::data;
+         }
+         else
+         {
+            check(false, "invalid type");
+         }
       }
       else
       {
@@ -932,12 +1035,15 @@ namespace psibase::pkcs11
    {
       check(parseLiteral(uri, "pkcs11:"), "Expected PKCS #11 URI");
       // path
-      do
+      if (!uri.empty() && !uri.starts_with('?'))
       {
-         parsePAttr(uri, *this);
-      } while (parseLiteral(uri, ";"));
+         do
+         {
+            parsePAttr(uri, *this);
+         } while (parseLiteral(uri, ";"));
+      }
       // query
-      if (parseLiteral(uri, "?"))
+      if (parseLiteral(uri, "?") && !uri.empty())
       {
          do
          {
@@ -958,8 +1064,37 @@ namespace psibase::pkcs11
       return result.substr(0, pos + 1);
    }
 
-   bool URI::matches(const slot_info& sinfo)
+   bool URI::matches(const info& linfo)
    {
+      if (libraryDescription && *libraryDescription != getString(linfo.libraryDescription))
+      {
+         return false;
+      }
+      if (libraryManufacturer && *libraryManufacturer != getString(linfo.manufacturerID))
+      {
+         return false;
+      }
+      if (libraryVersion && *libraryVersion != linfo.libraryVersion)
+      {
+         return false;
+      }
+      return true;
+   }
+
+   bool URI::matches(slot_id_t slot, const slot_info& sinfo)
+   {
+      if (slotId && *slotId != slot)
+      {
+         return false;
+      }
+      if (slotManufacturer && *slotManufacturer != getString(sinfo.manufacturerID))
+      {
+         return false;
+      }
+      if (slotDescription && *slotDescription != getString(sinfo.slotDescription))
+      {
+         return false;
+      }
       return true;
    }
 

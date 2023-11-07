@@ -1509,14 +1509,18 @@ void run(const std::string&              db_path,
       PKCS11LibInfo::second_type*              foundSessions = nullptr;
       for (auto& [lib, sessions] : pkcs11Libs)
       {
-         for (auto slot : lib->GetSlotList(true))
+         if (token.matches(lib->GetInfo()))
          {
-            if (token.matches(lib->GetSlotInfo(slot)) && token.matches(lib->GetTokenInfo(slot)))
+            for (auto slot : lib->GetSlotList(true))
             {
-               check(!found, "Multiple tokens match URI");
-               found         = slot;
-               foundLib      = &lib;
-               foundSessions = &sessions;
+               if (token.matches(slot, lib->GetSlotInfo(slot)) &&
+                   token.matches(lib->GetTokenInfo(slot)))
+               {
+                  check(!found, "Multiple tokens match URI");
+                  found         = slot;
+                  foundLib      = &lib;
+                  foundSessions = &sessions;
+               }
             }
          }
       }

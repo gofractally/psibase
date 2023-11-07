@@ -96,6 +96,7 @@ namespace psibase::pkcs11
    {
       std::uint8_t major;
       std::uint8_t minor;
+      friend bool  operator==(const version_t&, const version_t&) = default;
    };
 
    struct info
@@ -741,15 +742,29 @@ namespace psibase::pkcs11
    {
       URI() = default;
       explicit URI(std::string_view uri);
-      bool                       matches(const slot_info&);
-      bool                       matches(const token_info&);
+      bool matches(const info&);
+      bool matches(slot_id_t, const slot_info&);
+      bool matches(const token_info&);
+      // module
       std::optional<std::string> modulePath;
       std::optional<std::string> pinValue;
+      // lib
+      std::optional<std::string> libraryManufacturer;
+      std::optional<std::string> libraryDescription;
+      std::optional<version_t>   libraryVersion;
+      // slot
+      std::optional<std::string> slotManufacturer;
+      std::optional<std::string> slotDescription;
+      std::optional<slot_id_t>   slotId;
+      // token
       std::optional<std::string> token;
       std::optional<std::string> serial;
       std::optional<std::string> manufacturer;
       std::optional<std::string> model;
-      //...
+      // object
+      std::optional<std::vector<unsigned char>> id;
+      std::optional<std::string>                object;
+      std::optional<object_class>               type;
    };
 
    std::string makeURI(const token_info&);
