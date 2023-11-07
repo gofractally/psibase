@@ -7,6 +7,7 @@
     - [Action scripts](development/services/action-scripts.md)
     - [Events](development/services/events.md)
     - [Standards](development/services/standards.md)
+    - [WebAssembly](development/services/webassembly.md)
     - [C++](development/services/cpp-service/README.md)
       - [Environment setup](development/services/cpp-service/setup.md)
       - [Basic Service](development/services/cpp-service/basic/README.md)
