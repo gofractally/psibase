@@ -28,20 +28,28 @@ namespace
 
    std::vector<unsigned char> getEcPrivateKeyData(EVP_PKEY* key)
    {
+#if OPENSSL_VERSION_PREREQ(3, 0)
       BIGNUM* bn = nullptr;
       if (!EVP_PKEY_get_bn_param(key, "priv", &bn))
       {
          handleOpenSSLError();
       }
       std::unique_ptr<BIGNUM, OpenSSLDeleter> cleanup(bn);
-      auto                                    len = BN_num_bytes(bn);
-      std::vector<unsigned char>              privkey(len);
+#else
+      auto eckey = EVP_PKEY_get0_EC_KEY(key);
+      check(!!eckey, "Not an EC_KEY");
+      const BIGNUM* bn = EC_KEY_get0_private_key(eckey);
+      check(!!bn, "Failed to get private key");
+#endif
+      auto                       len = BN_num_bytes(bn);
+      std::vector<unsigned char> privkey(len);
       BN_bn2bin(bn, &privkey[0]);
       return privkey;
    }
 
    std::vector<unsigned char> getKeyParams(EVP_PKEY* key)
    {
+#if OPENSSL_VERSION_PREREQ(3, 0)
       unsigned char* p = nullptr;
       auto           n = i2d_KeyParams(key, &p);
       if (n < 0)
@@ -50,6 +58,19 @@ namespace
       }
       std::unique_ptr<unsigned char, OpenSSLDeleter> cleanup(p);
       return std::vector(p, p + n);
+#else
+      auto eckey = EVP_PKEY_get0_EC_KEY(key);
+      check(!!eckey, "Not an EC_KEY");
+      int n = i2d_ECParameters(eckey, nullptr);
+      if (n < 0)
+      {
+         handleOpenSSLError();
+      }
+      std::vector<unsigned char> result(n);
+      unsigned char*             p = result.data();
+      i2d_ECParameters(eckey, &p);
+      return result;
+#endif
    }
 
    std::vector<unsigned char> encodeOctetString(std::span<const unsigned char> content)
@@ -175,20 +196,37 @@ namespace
       auto [params, point] =
           session.GetAttributeValues<attributes::ec_params, attributes::ec_point>(key);
       // sequence{{ecdsa, ec_params}, ec_point}
+      auto rawKey = decodeOctetString(point.value);
+#if OPENSSL_VERSION_PREREQ(3, 0)
       const unsigned char* p         = reinterpret_cast<const unsigned char*>(params.value.data());
       auto                 keyParams = d2i_KeyParams(EVP_PKEY_EC, nullptr, &p, params.value.size());
       if (!keyParams)
       {
          handleOpenSSLError();
       }
-      auto rawKey = decodeOctetString(point.value);
-      p           = reinterpret_cast<const unsigned char*>(rawKey.data());
+      p = reinterpret_cast<const unsigned char*>(rawKey.data());
       std::unique_ptr<EVP_PKEY, OpenSSLDeleter> finalKey(
           d2i_PublicKey(EVP_PKEY_EC, &keyParams, &p, rawKey.size()));
       if (!finalKey)
       {
          handleOpenSSLError();
       }
+      return getPublicKey(finalKey.get());
+#else
+      const unsigned char*                    p = params.value.data();
+      std::unique_ptr<EC_KEY, OpenSSLDeleter> eckey(
+          d2i_ECParameters(nullptr, &p, params.value.size()));
+      if (!eckey)
+      {
+         handleOpenSSLError();
+      }
+      if (!EC_KEY_oct2key(eckey.get(), rawKey.data(), rawKey.size(), nullptr))
+      {
+         handleOpenSSLError();
+      }
+      std::unique_ptr<EVP_PKEY, OpenSSLDeleter> finalKey(EVP_PKEY_new());
+      EVP_PKEY_assign_EC_KEY(finalKey.get(), eckey.release());
+#endif
       return getPublicKey(finalKey.get());
    }
 

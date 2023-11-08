@@ -18,6 +18,9 @@ namespace psibase
       void operator()(ASN1_OCTET_STRING* s) const { ASN1_OCTET_STRING_free(s); }
       void operator()(ASN1_OBJECT* o) const { ASN1_OBJECT_free(o); }
       void operator()(unsigned char* p) const { OPENSSL_free(p); }
+#if !OPENSSL_VERSION_PREREQ(3, 0)
+      void operator()(EC_KEY* p) const { EC_KEY_free(p); }
+#endif
    };
    std::vector<char>                         getPublicKey(EVP_PKEY* key);
    std::unique_ptr<EVP_PKEY, OpenSSLDeleter> generateKey();
