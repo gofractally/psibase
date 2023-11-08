@@ -557,7 +557,7 @@ fn document_struct(items: &[Item], index: usize, path: &str, result: &mut String
     def.push_str("};\n</code></pre>\n");
     let _ = write!(
         result,
-        "### {}\n\n{}\n{}\n",
+        "## {}\n\n{}\n{}\n",
         &path[2..],
         def,
         replace_bracket_links(&item.doc_str, items, index)

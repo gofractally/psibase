@@ -13,9 +13,9 @@ namespace SystemService
    /// - Else if the request references an unregistered subdomain, then route the request to `psispace-sys`.
    /// - Else route the request to [CommonSys]; this handles the chain's main domain.
    ///
-   /// See [C++ Web Services](../services/cpp-service/reference/web-services.md) or
-   /// [Rust Web Services](../services/rust-service/reference/web-services.md) for more detail, including how to write services
-   /// which serve HTTP requests.
+   /// See [C++ Web Services](../development/services/cpp-service/reference/web-services.md) or
+   /// [Rust Web Services](../development/services/rust-service/reference/web-services.md) for more detail, 
+   /// including how to write services which serve HTTP requests.
    ///
    /// #### serve export (not an action)
    ///
@@ -33,9 +33,16 @@ namespace SystemService
    {
       static constexpr auto service = psibase::proxyServiceNum;
 
-      /// Register senders's subdomain
+      /// Register sender's subdomain
       ///
-      /// `server` will handle requests to this subdomain.
+      /// When requests are made to the sender service subdomain, `proxy-sys` will 
+      /// forward the request into the `serveSys` action of the specified `server` 
+      /// for it to handle the request.
+      ///
+      /// Registered services may optionally:
+      /// * Serve files via HTTP
+      /// * Respond to RPC requests
+      /// * Respond to GraphQL requests
       void registerServer(psibase::AccountNumber server);
    };
    PSIO_REFLECT(ProxySys, method(registerServer, server))
