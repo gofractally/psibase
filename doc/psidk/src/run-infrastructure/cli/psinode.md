@@ -40,6 +40,10 @@ psinode - The psibase blockchain server
 
   Use this private key to sign blocks. Any number of keys may be provided, but only the one that matches the public key corresponding to the producer name will be used. If the correct key is not provided, then `psinode` will be unable to produce blocks.
 
+- `--pkcs11-module` *filename*
+
+  Loads a PKCS #11 module from *filename*. The server will be able to sign using keys from the module. The tokens that the module provides must be unlocked using the HTTP API before they can be used.
+
 ### P2P Network Options
 
 - `--p2p`
