@@ -1247,7 +1247,7 @@ namespace psibase::http
             }
             return;
          }
-         else if (req_target == "/native/admin/keyring/devices")
+         else if (req_target == "/native/admin/keys/devices")
          {
             if (req.method() != bhttp::verb::get)
             {
@@ -1271,7 +1271,7 @@ namespace psibase::http
                    }
                 });
          }
-         else if (req_target == "/native/admin/keyring/unlock")
+         else if (req_target == "/native/admin/keys/unlock")
          {
             if (req.method() != bhttp::verb::post)
             {
@@ -1288,6 +1288,36 @@ namespace psibase::http
             }
             run_native_handler(
                 server.http_config->unlock_keyring,
+                [error, ok_no_content,
+                 session = send.self.derived_session().shared_from_this()](auto&& err)
+                {
+                   if (err)
+                   {
+                      session->queue_(error(bhttp::status::internal_server_error, *err));
+                   }
+                   else
+                   {
+                      session->queue_(ok_no_content());
+                   }
+                });
+         }
+         else if (req_target == "/native/admin/keys/lock")
+         {
+            if (req.method() != bhttp::verb::post)
+            {
+               send(method_not_allowed(req.target(), req.method_string(), "POST"));
+            }
+            if (!check_admin_auth(authz::mode_type::write))
+            {
+               return;
+            }
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               return send(error(bhttp::status::unsupported_media_type,
+                                 "Content-Type must be application/json\n"));
+            }
+            run_native_handler(
+                server.http_config->lock_keyring,
                 [error, ok_no_content,
                  session = send.self.derived_session().shared_from_this()](auto&& err)
                 {

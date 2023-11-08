@@ -793,9 +793,15 @@ PSIO_REFLECT(NewKeyRequest, service, rawData, device);
 struct UnlockKeyringRequest
 {
    std::string pin;
-   std::string id;
+   std::string device;
 };
-PSIO_REFLECT(UnlockKeyringRequest, pin, id);
+PSIO_REFLECT(UnlockKeyringRequest, pin, device);
+
+struct LockKeyringRequest
+{
+   std::string device;
+};
+PSIO_REFLECT(LockKeyringRequest, device);
 
 struct PKCS11TokenInfo
 {
@@ -1505,7 +1511,8 @@ void run(const std::string&              db_path,
    {
       PKCS11SessionManager(const std::shared_ptr<pkcs11::pkcs11_library>& lib,
                            pkcs11::slot_id_t                              slot)
-          : session(std::make_shared<pkcs11::session>(lib, slot))
+          : session(std::make_shared<pkcs11::session>(lib, slot)),
+            sessionProver(std::make_shared<CompoundProver>())
       {
       }
       ~PKCS11SessionManager() { unlink(); }
@@ -1514,7 +1521,13 @@ void run(const std::string&              db_path,
          if (baseProver)
          {
             baseProver->remove(sessionProver);
+            baseProver.reset();
          }
+      }
+      void clear()
+      {
+         sessionProver->provers.clear();
+         unlink();
       }
       pkcs11::session*                 operator->() const { return session.get(); }
       std::shared_ptr<pkcs11::session> session;
@@ -1523,12 +1536,10 @@ void run(const std::string&              db_path,
    };
    auto loadSessionKeys = [&prover](PKCS11SessionManager& session, AccountNumber service)
    {
-      auto sessionProver = std::make_shared<CompoundProver>();
-      loadPKCS11Keys(session.session, service, *sessionProver);
+      loadPKCS11Keys(session.session, service, *session.sessionProver);
       session.unlink();
-      prover->add(sessionProver);
-      session.baseProver    = prover;
-      session.sessionProver = sessionProver;
+      prover->add(session.sessionProver);
+      session.baseProver = prover;
    };
 
    using PKCS11LibInfo = std::pair<std::shared_ptr<pkcs11::pkcs11_library>,
@@ -2152,10 +2163,36 @@ void run(const std::string&              db_path,
                            {
                               try
                               {
-                                 auto [lib, slot, sessions] = getPKCS11Slot(pin.id);
+                                 auto [lib, slot, sessions] = getPKCS11Slot(pin.device);
                                  auto pos = sessions->try_emplace(slot, lib, slot).first;
                                  pos->second->Login(pin.pin);
                                  loadSessionKeys(pos->second, AccountNumber{"verify-sys"});
+                                 callback(std::nullopt);
+                              }
+                              catch (std::exception& e)
+                              {
+                                 callback(e.what());
+                              }
+                           });
+      };
+
+      http_config->lock_keyring =
+          [&chainContext, loadSessionKeys, getPKCS11Slot](std::vector<char> json, auto callback)
+      {
+         json.push_back('\0');
+         psio::json_token_stream stream(json.data());
+         auto                    id = psio::from_json<LockKeyringRequest>(stream);
+         boost::asio::post(chainContext,
+                           [getPKCS11Slot, loadSessionKeys, callback = std::move(callback),
+                            id = std::move(id)]() mutable
+                           {
+                              try
+                              {
+                                 auto [lib, slot, sessions] = getPKCS11Slot(id.device);
+                                 auto pos                   = sessions->find(slot);
+                                 check(pos != sessions->end(), "Not logged in");
+                                 pos->second->Logout();
+                                 pos->second.clear();
                                  callback(std::nullopt);
                               }
                               catch (std::exception& e)

@@ -550,7 +550,7 @@ namespace psibase::pkcs11
       unused_func_t C_GetOperationState;
       unused_func_t C_SetOperationState;
       error (*C_Login)(session_handle, user_type, const char8_t* pin, unsigned long pinLen);
-      unused_func_t C_Logout;
+      error (*C_Logout)(session_handle);
       error (*C_CreateObject)(session_handle, attribute*, unsigned long, object_handle*);
       unused_func_t C_CopyObject;
       unused_func_t C_DestroyObject;
@@ -647,6 +647,7 @@ namespace psibase::pkcs11
       std::vector<mechanism_type> GetMechanismList();
       void                        Login();
       void                        Login(std::string_view pin);
+      void                        Logout();
       template <typename... Attrs>
       object_handle CreateObject(const Attrs&... attrs)
       {

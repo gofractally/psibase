@@ -611,6 +611,10 @@ namespace psibase::pkcs11
       handle_error(lib->functions->C_Login(
           handle, user_type::user, reinterpret_cast<const char8_t*>(pin.data()), pin.size()));
    }
+   void session::Logout()
+   {
+      handle_error(lib->functions->C_Logout(handle));
+   }
    std::vector<char> session::Sign(const mechanism&               m,
                                    object_handle                  obj,
                                    std::span<const unsigned char> data)

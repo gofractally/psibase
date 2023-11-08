@@ -72,6 +72,7 @@ namespace psibase::http
    using generic_json_t        = std::function<void(std::vector<char>, generic_json_callback)>;
 
    using unlock_keyring_t = connect_t;
+   using lock_keyring_t   = connect_t;
 
    using get_pkcs11_tokens_t = std::function<void(generic_json_callback)>;
 
@@ -303,6 +304,7 @@ namespace psibase::http
       get_config_t             get_keys               = {};
       generic_json_t           new_key                = {};
       unlock_keyring_t         unlock_keyring         = {};
+      lock_keyring_t           lock_keyring           = {};
       get_pkcs11_tokens_t      get_pkcs11_tokens      = {};
       admin_service            admin                  = {};
       std::vector<authz>       admin_authz;
