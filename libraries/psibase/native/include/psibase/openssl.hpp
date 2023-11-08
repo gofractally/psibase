@@ -18,7 +18,7 @@ namespace psibase
       void operator()(ASN1_OCTET_STRING* s) const { ASN1_OCTET_STRING_free(s); }
       void operator()(ASN1_OBJECT* o) const { ASN1_OBJECT_free(o); }
       void operator()(unsigned char* p) const { OPENSSL_free(p); }
-#if !OPENSSL_VERSION_PREREQ(3, 0)
+#if OPENSSL_VERSION_NUMBER < 0x30000000
       void operator()(EC_KEY* p) const { EC_KEY_free(p); }
 #endif
    };

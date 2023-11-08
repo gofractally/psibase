@@ -28,7 +28,7 @@ namespace
 
    std::vector<unsigned char> getEcPrivateKeyData(EVP_PKEY* key)
    {
-#if OPENSSL_VERSION_PREREQ(3, 0)
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
       BIGNUM* bn = nullptr;
       if (!EVP_PKEY_get_bn_param(key, "priv", &bn))
       {
@@ -49,7 +49,7 @@ namespace
 
    std::vector<unsigned char> getKeyParams(EVP_PKEY* key)
    {
-#if OPENSSL_VERSION_PREREQ(3, 0)
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
       unsigned char* p = nullptr;
       auto           n = i2d_KeyParams(key, &p);
       if (n < 0)
@@ -197,7 +197,7 @@ namespace
           session.GetAttributeValues<attributes::ec_params, attributes::ec_point>(key);
       // sequence{{ecdsa, ec_params}, ec_point}
       auto rawKey = decodeOctetString(point.value);
-#if OPENSSL_VERSION_PREREQ(3, 0)
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
       const unsigned char* p         = reinterpret_cast<const unsigned char*>(params.value.data());
       auto                 keyParams = d2i_KeyParams(EVP_PKEY_EC, nullptr, &p, params.value.size());
       if (!keyParams)
