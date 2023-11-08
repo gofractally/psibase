@@ -22,6 +22,7 @@ namespace psibase
    {
       std::vector<char> prove(std::span<const char> data, const Claim& claim) const;
       bool              remove(const Claim&);
+      void              remove(const std::shared_ptr<Prover>&);
       void              add(std::shared_ptr<Prover>);
       void              get(std::vector<Claim>&) const;
       void              get(std::vector<ClaimKey>&) const;

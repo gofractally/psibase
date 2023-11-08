@@ -1500,8 +1500,39 @@ void run(const std::string&              db_path,
       }
    }
 
+   // Manages the session and and unlinks all keys from prover on destruction
+   struct PKCS11SessionManager
+   {
+      PKCS11SessionManager(const std::shared_ptr<pkcs11::pkcs11_library>& lib,
+                           pkcs11::slot_id_t                              slot)
+          : session(std::make_shared<pkcs11::session>(lib, slot))
+      {
+      }
+      ~PKCS11SessionManager() { unlink(); }
+      void unlink()
+      {
+         if (baseProver)
+         {
+            baseProver->remove(sessionProver);
+         }
+      }
+      pkcs11::session*                 operator->() const { return session.get(); }
+      std::shared_ptr<pkcs11::session> session;
+      std::shared_ptr<CompoundProver>  baseProver;
+      std::shared_ptr<CompoundProver>  sessionProver;
+   };
+   auto loadSessionKeys = [&prover](PKCS11SessionManager& session, AccountNumber service)
+   {
+      auto sessionProver = std::make_shared<CompoundProver>();
+      loadPKCS11Keys(session.session, service, *sessionProver);
+      session.unlink();
+      prover->add(sessionProver);
+      session.baseProver    = prover;
+      session.sessionProver = sessionProver;
+   };
+
    using PKCS11LibInfo = std::pair<std::shared_ptr<pkcs11::pkcs11_library>,
-                                   std::map<pkcs11::slot_id_t, std::shared_ptr<pkcs11::session>>>;
+                                   std::map<pkcs11::slot_id_t, PKCS11SessionManager>>;
 
    std::map<std::string, PKCS11LibInfo> pkcs11Libs;
    auto setPKCS11Libs = [&pkcs11Libs](const std::vector<std::string>& new_modules)
@@ -2025,6 +2056,7 @@ void run(const std::string&              db_path,
                 try
                 {
                    std::shared_ptr<Prover> result;
+                   bool                    storeConfig = true;
                    if (key.service == AccountNumber{"verifyec-sys"})
                    {
                       if (key.rawData)
@@ -2044,20 +2076,29 @@ void run(const std::string&              db_path,
                       check(pos != sessions->end(), "Device locked");
                       if (key.rawData)
                       {
-                         result =
-                             std::make_shared<PKCS11Prover>(pos->second, key.service, *key.rawData);
+                         result = std::make_shared<PKCS11Prover>(pos->second.session, key.service,
+                                                                 *key.rawData);
                       }
                       else
                       {
-                         result = std::make_shared<PKCS11Prover>(pos->second, key.service);
+                         result = std::make_shared<PKCS11Prover>(pos->second.session, key.service);
                       }
+                      pos->second.sessionProver->add(result);
+                      storeConfig = false;
                    }
-                   std::vector<Claim> existing;
-                   prover->get(existing);
                    std::vector<Claim> claim;
                    result->get(claim);
-                   if (!claim.empty() &&
-                       std::find(existing.begin(), existing.end(), claim[0]) == existing.end())
+                   // Check for duplicates
+                   if (storeConfig)
+                   {
+                      std::vector<Claim> existing;
+                      prover->get(existing);
+                      if (claim.empty() || std::ranges::find(existing, claim[0]) != existing.end())
+                      {
+                         storeConfig = false;
+                      }
+                   }
+                   if (storeConfig)
                    {
                       prover->add(std::move(result));
 
@@ -2100,34 +2141,28 @@ void run(const std::string&              db_path,
       };
 
       http_config->unlock_keyring =
-          [&chainContext, &prover, getPKCS11Slot](std::vector<char> json, auto callback)
+          [&chainContext, loadSessionKeys, getPKCS11Slot](std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    pin = psio::from_json<UnlockKeyringRequest>(stream);
-         boost::asio::post(
-             chainContext,
-             [getPKCS11Slot, &prover, callback = std::move(callback),
-              pin = std::move(pin)]() mutable
-             {
-                try
-                {
-                   auto [lib, slot, sessions] = getPKCS11Slot(pin.id);
-                   auto pos                   = sessions->find(slot);
-                   if (pos == sessions->end())
-                   {
-                      pos = sessions->insert({slot, std::make_shared<pkcs11::session>(lib, slot)})
-                                .first;
-                   }
-                   pos->second->Login(pin.pin);
-                   loadPKCS11Keys(pos->second, AccountNumber{"verify-sys"}, *prover);
-                   callback(std::nullopt);
-                }
-                catch (std::exception& e)
-                {
-                   callback(e.what());
-                }
-             });
+         boost::asio::post(chainContext,
+                           [getPKCS11Slot, loadSessionKeys, callback = std::move(callback),
+                            pin = std::move(pin)]() mutable
+                           {
+                              try
+                              {
+                                 auto [lib, slot, sessions] = getPKCS11Slot(pin.id);
+                                 auto pos = sessions->try_emplace(slot, lib, slot).first;
+                                 pos->second->Login(pin.pin);
+                                 loadSessionKeys(pos->second, AccountNumber{"verify-sys"});
+                                 callback(std::nullopt);
+                              }
+                              catch (std::exception& e)
+                              {
+                                 callback(e.what());
+                              }
+                           });
       };
 
       http_config->get_pkcs11_tokens = [&chainContext, &pkcs11Libs](auto callback)
