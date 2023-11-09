@@ -2068,7 +2068,7 @@ void run(const std::string&              db_path,
                 {
                    std::shared_ptr<Prover> result;
                    bool                    storeConfig = true;
-                   if (key.service == AccountNumber{"verifyec-sys"})
+                   if (key.device.empty() && key.service == AccountNumber{"verifyec-sys"})
                    {
                       if (key.rawData)
                       {
@@ -2078,6 +2078,17 @@ void run(const std::string&              db_path,
                       else
                       {
                          result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
+                      }
+                   }
+                   else if (key.device.empty() && key.service == AccountNumber{"verify-sys"})
+                   {
+                      if (key.rawData)
+                      {
+                         result = std::make_shared<OpenSSLProver>(key.service, *key.rawData);
+                      }
+                      else
+                      {
+                         result = std::make_shared<OpenSSLProver>(key.service);
                       }
                    }
                    else
