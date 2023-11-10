@@ -13,4 +13,4 @@ The following standard actions exist for both Rust and C++, though only the C++ 
 - *serveSys* - `optional<HttpReply> serveSys(HttpRequest request)`
 - *storeSys* - `void storeSys(std::string path, std::string contentType, std::vector<char> content)`
 
-TODO - Document other standard actions
+> ➕ TODO - Document other standard actions

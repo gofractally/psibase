@@ -7,5 +7,3 @@
 - [Minimal UI](minimal-ui.md)
 - [Tables](tables.md)
 - [GraphQL](graphql.md)
-- [Reference](reference/)
-  - [Web Services](reference/web-services.md)

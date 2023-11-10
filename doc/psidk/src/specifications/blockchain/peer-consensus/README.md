@@ -11,8 +11,12 @@ All of these formulations are equivalent.
 
 # Consensus Algorithms
 
-- [CFT](cft.md)
-- [BFT](bft.md)
-- [Joint Consensus](joint-consensus.md)
-- [Special Cases](special-cases.md)
+Psibase supports running the following algorithms for peer consensus:
 
+- [CFT](cft.md) - Crash fault tolerant, ideal for non-adversarial (trusted) peers
+- [BFT](bft.md) - Byzantine fault tolerant, ideal for adversarial (non-trusted) peers
+- [Joint Consensus](joint-consensus.md) - An algorithm designed to allow for dynamically transitioning between consensus algorithms
+
+> Note on special cases: 
+> * Blocks with a single producer are immediately irreversible. This is a degenerate case for both algorithms and they behave identically.
+> * The genesis block is immediately irreversible. There is nothing to preserve pre-genesis.

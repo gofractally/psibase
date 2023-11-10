@@ -1,8 +1,6 @@
 # App interfaces
 
-Psibase allows anyone to write a service that maintains a server-side database and can respond to queries. That database can also store front-end code that clients download and use to interact with the service.
-
-In addition to UI code, psibase also introduces the concept of app interfaces, which are similar to services, but which run within a client's browser. These interfaces are intended to facilitate most interactions between users and services.
+App interfaces run within a client's browser. These interfaces are intended to facilitate most interactions between user interfaces and services.
 
 ```mermaid
 sequenceDiagram 
@@ -28,7 +26,7 @@ App interface->>psinode: Submit transaction
 
 Apps built on psibase make use of shared infrastructure, and as such have the option to interoperate in ways that are difficult or impossible for traditional web apps. On the server side, psibase services can simply call synchronous actions on each other. On the client-side, interfaces can make synchronous or asynchronous calls between each other.
 
-The libraries that are provided to service/interface developers make it easy to make such inter-app calls. On the client-side, when inter-app calls are made, each app interface is instantiated in its own domain, which ensures that local data remains isolated from all other apps except that which is intentionally exposed through an interface.
+On the client-side, an app may initiate a call to a function defined in the app-interface of another app. When this happens, a message is passed from the user interface of one app to the [supervisor](./supervisor.md), which then instantiates the target app interface in its own app domain, which ensures that local app data remains isolated except that which is intentionally exposed through an app interface.
 
 ```mermaid
 sequenceDiagram 
@@ -68,9 +66,10 @@ Therefore `postMessage` does not immediately (synchronously) post to the other d
 
 ## Cross-domain security considerations
 
-Listening for cross-domain messages has a reputation for being potentially dangerous. It is similar to the concerns that arise from the capability of one service to make synchronous calls into another. If the callee service does not do the proper checks and manually enforce the proper criteria to authorize actions, then they can be exploited.
+Cross-domain messaging can be dangerous if the proper checks are not in place to ensure that the messages are going to/from whoever is intended. 
 
-Similarly, cross-domain messaging can be dangerous if the proper checks are not in place to ensure that the messages are going to/from whoever is intended. For this reason, it is not recommended for UIs or interfaces to manually add message event listeners to handle cross-domain messaging.
+The supervisor shall only listen for cross-domain messages from apps that it instantiated. The s
+
 
 If interfaces make use of the core psibase libraries that enable inter-app communication, then many of the security concerns are handled automatically. For example, it is automatically enforced that messages into your interface are only allowed to come from the root domain. The root interface will also only accept messages from apps that it explicitly opened.
 

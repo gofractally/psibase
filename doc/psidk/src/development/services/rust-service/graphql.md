@@ -275,7 +275,7 @@ impl Query {
 }
 ```
 
-TODO: reduce boilerplate
+> ➕ TODO: reduce boilerplate
 
 After you deploy it, you should be able to run the following query, which fetches the first 10 records:
 

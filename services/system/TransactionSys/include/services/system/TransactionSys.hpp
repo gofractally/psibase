@@ -201,6 +201,7 @@ namespace SystemService
       /// The subsequent transactions listed must be pushed in order, and no
       /// other transactions will be accepted until finishBoot is run.
       void startBoot(psio::view<const std::vector<psibase::Checksum256>> bootTransactions);
+      
       /// Only called once during chain initialization
       ///
       /// This enables the auth checking system. Before this point, `TransactionSys`

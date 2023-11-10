@@ -2,8 +2,6 @@
 
 Psibase has a schema format which describes the fracpack-format data and JSON-format data it uses for action arguments, event content, and database content.
 
-TODO: implement schema
-
 ## Type Definitions
 
 Type definitions live in the `userTypes` array:

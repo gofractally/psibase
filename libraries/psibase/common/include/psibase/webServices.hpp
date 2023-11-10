@@ -5,16 +5,16 @@ namespace psibase
 {
    /// Interface for services which serve http
    ///
-   /// `proxy.sys` uses this interface to call into services to respond to http requests.
+   /// `proxy-sys` uses this interface to call into services to respond to http requests.
    ///
-   /// Do **not** inherit from this. To implement this interface, add a [serveSys] action
+   /// > ⚠️ Do **not** inherit from this. To implement this interface, add a [serveSys] action
    /// to your service and reflect it.
    struct ServerInterface
    {
       /// Handle HTTP requests
       ///
       /// Define this action in your service to handle HTTP requests. You'll also need to
-      /// [register your service](#registration).
+      /// register your service with [proxy-sys](/default-apps/proxy-sys.md).
       ///
       /// `serveSys` can do any of the following:
       ///
@@ -38,8 +38,11 @@ namespace psibase
    /// Some services support storing files which they then serve via HTTP.
    /// This is the standard interface for these services.
    ///
-   /// Do **not** inherit from this. To implement this interface, add a [storeSys] action
+   /// > ⚠️ Do **not** inherit from this. To implement this interface, add a [storeSys] action
    /// to your service and reflect it.
+   ///
+   /// > If you implement this interface, you must also implement the [psibase::ServerInterface]
+   /// in order to serve the files over HTTP.
    struct StorageInterface
    {
       /// Store a file
