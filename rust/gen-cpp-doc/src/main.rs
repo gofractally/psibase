@@ -763,8 +763,8 @@ fn parse<'tu>(
 
 fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
     let cpp_doc_re = Regex::new(r"[{][{] *#cpp-doc +(::[^ ]+)+ *[}][}]").unwrap();
-    // I got lazy here. ` within the diagram will cause svg_bob_re to not match.
-    let svg_bob_re = Regex::new(r"```svgbob([^`]+)```").unwrap();
+    let svg_bob_re = Regex::new(r"```svgbob((.|\n)*?)```").unwrap();
+
     for item in book.iter() {
         match item {
             BookItem::Chapter(chapter) => {
@@ -798,7 +798,16 @@ fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
             chapter.content = svg_bob_re
                 .replace_all(&chapter.content, |caps: &Captures| {
                     let markup = caps.get(1).unwrap().as_str();
-                    format!("<pre class=\"svgbob\">{}</pre>", svgbob::to_svg(markup))
+                    let svg = svgbob::to_svg(markup);
+
+                    // Custom dark theme for SvgBob
+                    let styled_svg = svg.replace("<rect ", "<rect style=\"fill:transparent; stroke:white;\" ");
+                    let styled_svg = styled_svg.replace("<text ", "<text style=\"fill:white;\" ");
+                    let styled_svg = styled_svg.replace("<line ", "<line style=\"stroke:white;stroke-width:2;\" ");
+                    let styled_svg = styled_svg.replace("<polygon ", "<polygon style=\"stroke:white;fill:white;\" ");
+                    let styled_svg = styled_svg.replace("<path", "<path style=\"stroke:white;stroke-width:2;\"");
+
+                    format!("<pre class=\"svgbob\">{}</pre>", styled_svg)
                 })
                 .to_string();
             // chapter.content = chapter.content.replace(
