@@ -135,6 +135,7 @@ if(BUILD_DOC)
     endfunction()
     
     configure_file(doc/psidk/book.toml.in doc/psidk/book.toml)
+    configure_file(doc/psidk/theme/index.hbs doc/psidk/theme/index.hbs)
     ADD_BOOK_FILES("/doc/psidk/theme/js/" "js")
     ADD_BOOK_FILES("/doc/psidk/theme/css/" "css")
     ADD_BOOK_FILES("/doc/psidk/src/_img/" "svg")
