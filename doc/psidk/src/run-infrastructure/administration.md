@@ -2,6 +2,27 @@
 
 Much of the administration of an individual node can be done via the graphical user interface provided at `admin-sys.your_host.com`, where `your-host` is the public address of your psibase infrastructure node (e.g. psibase.127.0.0.1.sslip.io for local nodes). To learn more about the administration app, see the documentation on [admin-sys](../default-apps/admin-sys.md). For more complex administration requirements, psinode exposes many services and configuration options over an http interface.
 
+## Booting a network
+
+This can be done either with the [`psibase`](./cli/psibase.md#boot) CLI tool, or by using the GUI provided by the [admin-sys](../default-apps/admin-sys.md) service. 
+Alternatively, the `POST /native/push_boot` endpoint can be used manually in conjunction with `POST /native/push_transaction` to perform a completely custom boot sequence. See [Understanding boot](#understanding-boot) to learn more.
+
+### Understanding boot
+
+Booting a chain often requires some setup transactions that perform various initialization actions, such as setting system account auth services, uploading default apps, etc. Uploading all the necessary files and performing the initialization sequence may be a process that takes more execution time than would fit into one block. Therefore, Psibase enables the boot procedure to be completely customized and split over multiple blocks.
+
+The first step is to call `POST /native/push_boot` (Endpoint only available if psinode does not yet have any chain). 
+
+The body of the `/native/push_boot` request should contain a list of two signed transactions:
+1. The first transaction is the genesis transaction, which is generally responsible for uploading the core services to accounts on the blockchain and initializing them.
+2. The second transactions contains only one action: a call to [SystemService::TransactionSys::startBoot].
+
+The `startBoot` action takes a list of transaction hashes. Each hash refers to an arbitrary transaction that must be pushed in the order in which they are found in the list sent to `startBoot`. These transaction must then each be pushed using [`POST /native/push_transaction`](../development/front-ends/reference/http-requests.md#push-transaction). The network will not accept other transactions until every transaction referenced in `startBoot` has been pushed. The final action of the final transaction committed to in `startBoot` should be a call to [SystemService::TransactionSys::finishBoot], which will signify to psinode that it should start checking account authorizations for subsequent transactions.
+
+## Peering with others
+
+> ➕ TODO: document the `/native/p2p` endpoint.
+
 ## Node administrator services
 
 The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). Authorization to access this API is controlled by the server's `admin-authz` configuration option.
@@ -395,8 +416,8 @@ Examples:
 
 `/native/admin/log` is a websocket endpoint that provides access to server logs as they are generated. Each message from the server contains one log record. Messages sent to the server should be JSON objects representing the desired logger configuration for the connection.
 
-| Field  | Type             | Description                                                                                                                                  |
-|--------|------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| Field  | Type             | Description                                                                                                                                          |
+|--------|------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | filter | String           | The [filter](./configuration/logging.md#log-filters) for this websocket. If no filter is provided, the default is to send all possible log messages. |
 | format | String or Object | The [format](./configuration/logging.md#log-formatters) for log messages. If no format is provided, the default is JSON.                             |
 
