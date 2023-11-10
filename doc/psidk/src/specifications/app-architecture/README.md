@@ -1,19 +1,48 @@
 # Psibase apps
 
-Psibase can host the full application stack. Accounts on psibase can double as domain names relative to each infrastructure provider's root domain name. For example, if an infrastructure provider is hosting their node at `my-node.com`, then an account `alice` could host content that is retrievable at `alice.my-node.com/`. If another infrastructure provider on the same network is hosting at `another-node.com`, then Alice's same content is also available at `alice.another-node.com`. Each full node on the network is responsible for hosting full applications and their state, and providing RPC access for those trying to interact with psibase apps.
-
-This design provides redundancy so that a community that self-hosts their applications using psibase is resilient to server unavailability and other faults. Furthermore, anyone can run their own infrastructure provider node and will effectively have all apps/services/state running on their local node, further eliminating dependency on external parties.
+Psibase networks can host the full application stack. Rather than needing to rent your own web server for your app's server side component, you can simply create a psibase account which doubles as a domain name and can handle HTTP server requests. For example, if an infrastructure provider is hosting their psibase node at `my-node.com`, then an account `alice` could host content that is retrievable at `alice.my-node.com/`. Another psibase node on the same network will serve the same content at `alice.another-node.com`.
 
 # Psibase app components
+
+```svgbob
+  .-------------------------------.
+ /          ~ Server ~            /|
++--------------------------------+/|
+| +----------------------------+ +/|
+| |         Database           | +/|
+| +-----^----------------^-----+ +/|
+|       |                |       +/|
+| +-----V-----+    +-----V-----+ +/|
+| | Service 1 |<-->| Service 2 | +/|
+| +--^--------+    +---------^-+ +/
+'---/-------------------------\--'
+   /                           \
+  /                             \
+ /                               \
+/ .-----------------------------. \
+| |         ~ Client ~          | |
+| | +----------+  +----------+  |/
+ \| | App1 intf|  | App2 intf|  /
+  \ +-----^----+  +-----^----+ /|
+  |\      |             |     / |
+  | V-----V-------------V----V  |
+  | |        Supervisor      |  |
+  | +------------^-----------+  |
+  |              |              |
+  | +------------V-----------+  |
+  | |      User interface    |  |
+  | +------------------------+  |
+  +-----------------------------+
+  
+```
 
 A psibase app is composed of various parts: 
 
 * The database
 * The service
 * The app interface
+* The supervisor
 * The user interface
-
-Most of these components should already be familiar to app developers, because they're standard app components. Part of what makes psibase powerful is that it feels very similar to publishing a standard application, but it's empowered with additional capabilities.
 
 ## Database
 
@@ -35,12 +64,22 @@ Services are unable to make web requests to external APIs and servers. Services 
 
 ## App interface
 
-A client-side component intedended to:
-1. Wrap complicated interactions with one or more services into concise and user-friendly APIs
-2. Manage and expose client-side local storage between apps
-3. Facilitate all interactions between an app and the [Supervisor](./supervisor.md)
+Psibase service developers can build components that run client-side known as app interfaces. App interfaces are responsible for:
+
+1. Wrapping complicated interactions with one or more services into concise and user-friendly APIs
+2. Managing and exposing client-side local storage between apps
+3. Using the supervisor to send and receive messages to and from other app interfaces
 
 Psibase apps enjoy unprecedented modularity and allow apps to define both client and server-side functionality that can be reused by other apps. App interfaces are the innovation that allow this client-side modularity. See the [app interfaces](./app-interfaces.md) specification for more details.
+
+## Supervisor
+
+Psibase apps are all loaded inside of a client-side component known as the supervisor. The supervisor is responsible for:
+1. Instantiating apps
+2. Facilitating all communication between UIs and app interfaces, app interfaces and other app interfaces, and app interfaces and services
+
+See the [supervisor](./supervisor.md) specification for more details.
+
 
 ## User interfaces
 
