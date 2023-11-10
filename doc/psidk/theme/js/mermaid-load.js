@@ -1,13 +1,9 @@
-const script = document.createElement('script');
-script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
-script.onload = () => {
+const mermaidScript = document.createElement('script');
+mermaidScript.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+mermaidScript.onload = () => {
   mermaid.initialize({ 
     startOnLoad: true,
-    theme: 'base',
-    themeVariables: { 
-        darkmode: 'true',
-        textColor: "#ddd"
-    }
+    theme: 'dark',
   });
 };
-document.head.appendChild(script);
+document.head.appendChild(mermaidScript);
