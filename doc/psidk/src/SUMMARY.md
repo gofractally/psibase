@@ -8,6 +8,7 @@
     - [TaPoS](specifications/blockchain/tapos.md)
     - [Smart authorization](specifications/blockchain/smart-authorization.md)
     - [Triedent](specifications/blockchain/triedent.md)
+    - [Validation](specifications/blockchain/validation.md)
     - [Peer consensus algorithms](specifications/blockchain/peer-consensus/README.md)
       - [CFT](specifications/blockchain/peer-consensus/cft.md)
       - [BFT](specifications/blockchain/peer-consensus/bft.md)
