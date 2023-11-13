@@ -42,7 +42,7 @@ The intention of the checksum is to ensure that if a fork block is proposed, any
 
 To accomplish this, the reference block ID is included as part of the transaction data in the TaPoS field during signing. Because the block ID is used during signing, it can be pruned before storing the transaction. Anyone verifying transactions can derive the block ID of the reference block from the chain state, and therefore transactions applied that reference a fork block will fail signature verification.
 
-Using the entire block ID as the checksum for signing prevents any possiblity of brute forcing the construction of blocks which modify transactions but change their contents. Therefore, even if an attacker managed to control over $ \frac{2}{3} $ of the block producer set, creating a fork block to double-spend would result in dropping all transactions that reference the block(s) they are rewriting. This design ensures there is no economic interest in such a hypothetical fork, and therefore long-range attacks of this nature are virtually impossible.
+Using the entire block ID as the checksum for signing prevents any possiblity of brute forcing the construction of blocks which modify transactions but change their contents. Therefore, even if an attacker managed to control over \\( \frac{2}{3} \\) of the block producer set, creating a fork block to double-spend would result in dropping all transactions that reference the block(s) they are rewriting. This design ensures there is no economic interest in such a hypothetical fork, and therefore long-range attacks of this nature are virtually impossible.
 
 # Conclusion
 
