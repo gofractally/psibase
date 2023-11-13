@@ -87,8 +87,6 @@ make install
 
 The built product lives in `CMAKE_INSTALL_PREFIX` (`$CMAKE_BINARY_DIR/psidk` in the above example).
 
-The technical documentation for psibase is part of this repository. To build & view it through the doc-sys applet of a deployed psibase instance, see the instructions in [the docs](https://doc-sys.psibase.io/documentation.html).
-
 #### Build flags
 
 The following are some of the common/useful build flags you can use to configure CMake that modify the build. Open the build directory and run `cmake -LH` to view a list of all options.
