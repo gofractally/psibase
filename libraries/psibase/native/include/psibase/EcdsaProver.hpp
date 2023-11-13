@@ -23,4 +23,7 @@ namespace psibase
       std::vector<char> pubKey;
       unsigned char     privateKey[32];
    };
+   struct PrivateKey;
+   struct PublicKey;
+   PublicKey getPublicKey(const PrivateKey& key);
 }  // namespace psibase

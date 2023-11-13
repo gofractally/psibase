@@ -2,6 +2,8 @@
 
 #include <openssl/rand.h>
 #include <openssl/sha.h>
+#include <openssl/x509.h>
+#include <psibase/EcdsaProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/log.hpp>
 #include <psibase/openssl.hpp>
@@ -12,7 +14,8 @@ using namespace psibase::pkcs11;
 namespace
 {
 
-   constexpr const char key_label[] = "psibase block signing key";
+   constexpr const char key_label[]   = "psibase block signing key";
+   constexpr const char eckey_label[] = "psibase block signing EC key";
 
    std::vector<unsigned char> getPublicKeyData(EVP_PKEY* key)
    {
@@ -262,14 +265,14 @@ namespace
       return result;
    }
 
-   pkcs11::object_handle generateKey(pkcs11::session& session, std::string_view label)
+   pkcs11::object_handle generateKey(pkcs11::session& session, std::string_view label, int nid)
    {
       auto tokenMechanisms = session.GetMechanismList();
       std::ranges::sort(tokenMechanisms);
       if (std::ranges::binary_search(tokenMechanisms, pkcs11::mechanism_type::ec_key_pair_gen))
       {
-         auto params = encodeObjectId(
-             std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter>(OBJ_nid2obj(NID_X9_62_prime256v1)).get());
+         auto params =
+             encodeObjectId(std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter>(OBJ_nid2obj(nid)).get());
          auto id          = newId(session);
          auto mechanism   = getEcdsaMechanism(tokenMechanisms);
          auto [pub, priv] = session.GenerateKeyPair(
@@ -285,17 +288,155 @@ namespace
       }
       // If there is no suitable key gen mechansim, fall back on generating and
       // importing a key
-      return storeKey(session, label, psibase::generateKey().get());
+      return storeKey(session, label, psibase::generateKey(nid).get());
+   }
+
+   // This converts a public key in SubjectPublicKeyInfo form
+   // to the service-specific form used in a Claim
+   std::vector<char> convertPublicKey(AccountNumber service, std::vector<char>&& in)
+   {
+      if (service == AccountNumber{"verify-sys"})
+      {
+         return std::move(in);
+      }
+      else if (service == AccountNumber{"verifyec-sys"})
+      {
+         const unsigned char* p = reinterpret_cast<const unsigned char*>(in.data());
+         std::unique_ptr<EVP_PKEY, OpenSSLDeleter> key(d2i_PUBKEY(nullptr, &p, in.size()));
+         if (!key)
+         {
+            handleOpenSSLError();
+         }
+         setCompressedKey(key.get());
+         check(EVP_PKEY_base_id(key.get()) == EVP_PKEY_EC, "Expected EC key");
+         auto         data = getPublicKeyData(key.get());
+         EccPublicKey eckey;
+         check(data.size() == eckey.size(), "Expected compressed public key");
+         std::ranges::copy(data, eckey.begin());
+         auto params = getKeyParams(key.get());
+         p           = params.data();
+         std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter> id(
+             d2i_ASN1_OBJECT(nullptr, &p, params.size()));
+         check(!!id, "Expected named curve");
+         auto nid = OBJ_obj2nid(id.get());
+         if (nid == NID_X9_62_prime256v1)
+         {
+            return psio::to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<1>, eckey}});
+         }
+         else if (nid == NID_secp256k1)
+         {
+            return psio::to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<0>, eckey}});
+         }
+         else
+         {
+            throw std::runtime_error("Unsupported curve for verifyec-sys");
+         }
+      }
+      else
+      {
+         throw std::runtime_error("Unsupported verify service");
+      }
+   }
+
+   pkcs11::object_handle parseAndStoreKey(pkcs11::session&      session,
+                                          AccountNumber         service,
+                                          std::span<const char> key)
+   {
+      if (service == AccountNumber{"verify-sys"})
+      {
+         return storeKey(session, key_label, parsePrivateKey(key).get());
+      }
+      else if (service == AccountNumber{"verifyec-sys"})
+      {
+         auto           k = psio::from_frac<PrivateKey>(key);
+         EccPrivateKey* eckey;
+         int            nid;
+         if (auto* k1 = std::get_if<0>(&k.data))
+         {
+            eckey = k1;
+            nid   = NID_secp256k1;
+         }
+         if (auto* r1 = std::get_if<1>(&k.data))
+         {
+            eckey = r1;
+            nid   = NID_X9_62_prime256v1;
+         }
+         else
+         {
+            throw std::runtime_error("Unexpected variant value");
+         }
+
+         auto tokenMechanisms = session.GetMechanismList();
+         std::ranges::sort(tokenMechanisms);
+         auto params =
+             encodeObjectId(std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter>(OBJ_nid2obj(nid)).get());
+         auto mechanism = getEcdsaMechanism(tokenMechanisms);
+         auto privkey   = std::vector<unsigned char>(eckey->begin(), eckey->end());
+         auto pubkey =
+             encodeOctetString(std::visit(std::identity(), psibase::getPublicKey(k).data));
+         std::vector<unsigned char> fingerprint(32);
+         SHA256(pubkey.data(), pubkey.size(), fingerprint.data());
+         std::string_view label = eckey_label;
+
+         auto priv = session.CreateObject(
+             attributes::class_{object_class::private_key}, attributes::key_type{key_type::ecdsa},
+             attributes::token{true}, attributes::label{std::string{label}},
+             attributes::allowed_mechanisms{mechanism}, attributes::id{fingerprint},
+             attributes::ec_params{params}, attributes::value{privkey});
+         auto pub = session.CreateObject(
+             attributes::class_{object_class::public_key}, attributes::key_type{key_type::ecdsa},
+             attributes::token{true}, attributes::label{std::string{label}},
+             attributes::allowed_mechanisms{mechanism}, attributes::id{fingerprint},
+             attributes::ec_params{params}, attributes::ec_point{pubkey});
+         return priv;
+      }
+      else
+      {
+         throw std::runtime_error("Unsupported verify service");
+      }
+   }
+
+   std::vector<char> formatSignature(AccountNumber            service,
+                                     const std::vector<char>& pubkey,
+                                     std::vector<char>&&      sig)
+   {
+      if (service == AccountNumber{"verify-sys"})
+      {
+         return std::move(sig);
+      }
+      else if (service == AccountNumber{"verifyec-sys"})
+      {
+         EccSignature result;
+         check(result.size() == sig.size(), "Wrong size for ECDSA signature");
+         std::memcpy(result.data(), sig.data(), sig.size());
+         psio::view<const PublicKey> pkey_view{pubkey};
+         switch (pkey_view.data().index())
+         {
+            case 0:
+               return psio::to_frac(
+                   Signature{Signature::variant_type{std::in_place_index<0>, result}});
+            case 1:
+               return psio::to_frac(
+                   Signature{Signature::variant_type{std::in_place_index<1>, result}});
+            default:
+               throw std::runtime_error("Wrong variant value");
+         }
+      }
+      else
+      {
+         throw std::runtime_error("Unsupported verify service");
+      }
    }
 }  // namespace
 
 void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
                              AccountNumber                    service,
+                             std::string_view                 label,
                              CompoundProver&                  out)
 {
-   auto keys =
-       session->FindObjects(attributes::class_{object_class::private_key},
-                            attributes::key_type{key_type::ecdsa}, attributes::label{key_label});
+   auto keys = session->FindObjects(attributes::class_{object_class::private_key},
+                                    attributes::key_type{key_type::ecdsa},
+                                    attributes::label{std::string{label}});
    for (pkcs11::object_handle key : keys)
    {
       try
@@ -309,11 +450,17 @@ void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
    }
 }
 
+void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session, CompoundProver& out)
+{
+   loadPKCS11Keys(session, AccountNumber{"verify-sys"}, key_label, out);
+   loadPKCS11Keys(session, AccountNumber{"verifyec-sys"}, eckey_label, out);
+}
+
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,
                                     AccountNumber                    service,
                                     pkcs11::object_handle            privateKey)
     : service(service),
-      pubKey(::getPublicKey(*session, privateKey)),
+      pubKey(convertPublicKey(service, ::getPublicKey(*session, privateKey))),
       session(session),
       privateKey(privateKey)
 {
@@ -338,12 +485,17 @@ psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,
                                     AccountNumber                    service,
                                     std::span<const char>            key)
-    : PKCS11Prover(session, service, storeKey(*session, key_label, parsePrivateKey(key).get()))
+    : PKCS11Prover(session, service, parseAndStoreKey(*session, service, key))
 {
 }
 
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session, AccountNumber service)
-    : PKCS11Prover(session, service, ::generateKey(*session, key_label))
+    : PKCS11Prover(session,
+                   service,
+                   ::generateKey(*session,
+                                 service == AccountNumber{"verify-sys"} ? key_label : eckey_label,
+                                 service == AccountNumber{"verify-sys"} ? NID_X9_62_prime256v1
+                                                                        : NID_secp256k1))
 {
 }
 
@@ -352,16 +504,18 @@ std::vector<char> psibase::PKCS11Prover::prove(std::span<const char> data, const
    if ((service == AccountNumber() || claim.service == service) && claim.rawData == pubKey)
    {
       auto data_cnvt = std::span{reinterpret_cast<const unsigned char*>(data.data()), data.size()};
+      std::vector<char> result;
       if (prehash)
       {
          std::array<unsigned char, 32> hash;
          SHA256(data_cnvt.data(), data_cnvt.size(), hash.data());
-         return session->Sign(mechanism, privateKey, hash);
+         result = session->Sign(mechanism, privateKey, hash);
       }
       else
       {
-         return session->Sign(mechanism, privateKey, data_cnvt);
+         result = session->Sign(mechanism, privateKey, data_cnvt);
       }
+      return formatSignature(service, pubKey, std::move(result));
    }
    else
    {

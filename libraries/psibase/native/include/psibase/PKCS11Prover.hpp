@@ -33,6 +33,8 @@ namespace psibase
    };
    void loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
                        AccountNumber                    service,
+                       std::string_view                 label,
                        CompoundProver&                  out);
+   void loadPKCS11Keys(std::shared_ptr<pkcs11::session> session, CompoundProver& out);
 
 }  // namespace psibase

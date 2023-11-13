@@ -1534,9 +1534,9 @@ void run(const std::string&              db_path,
       std::shared_ptr<CompoundProver>  baseProver;
       std::shared_ptr<CompoundProver>  sessionProver;
    };
-   auto loadSessionKeys = [&prover](PKCS11SessionManager& session, AccountNumber service)
+   auto loadSessionKeys = [&prover](PKCS11SessionManager& session)
    {
-      loadPKCS11Keys(session.session, service, *session.sessionProver);
+      loadPKCS11Keys(session.session, *session.sessionProver);
       session.unlink();
       prover->add(session.sessionProver);
       session.baseProver = prover;
@@ -2177,7 +2177,7 @@ void run(const std::string&              db_path,
                                  auto [lib, slot, sessions] = getPKCS11Slot(pin.device);
                                  auto pos = sessions->try_emplace(slot, lib, slot).first;
                                  pos->second->Login(pin.pin);
-                                 loadSessionKeys(pos->second, AccountNumber{"verify-sys"});
+                                 loadSessionKeys(pos->second);
                                  callback(std::nullopt);
                               }
                               catch (std::exception& e)
@@ -2188,29 +2188,29 @@ void run(const std::string&              db_path,
       };
 
       http_config->lock_keyring =
-          [&chainContext, loadSessionKeys, getPKCS11Slot](std::vector<char> json, auto callback)
+          [&chainContext, getPKCS11Slot](std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    id = psio::from_json<LockKeyringRequest>(stream);
-         boost::asio::post(chainContext,
-                           [getPKCS11Slot, loadSessionKeys, callback = std::move(callback),
-                            id = std::move(id)]() mutable
-                           {
-                              try
-                              {
-                                 auto [lib, slot, sessions] = getPKCS11Slot(id.device);
-                                 auto pos                   = sessions->find(slot);
-                                 check(pos != sessions->end(), "Not logged in");
-                                 pos->second->Logout();
-                                 pos->second.clear();
-                                 callback(std::nullopt);
-                              }
-                              catch (std::exception& e)
-                              {
-                                 callback(e.what());
-                              }
-                           });
+         boost::asio::post(
+             chainContext,
+             [getPKCS11Slot, callback = std::move(callback), id = std::move(id)]() mutable
+             {
+                try
+                {
+                   auto [lib, slot, sessions] = getPKCS11Slot(id.device);
+                   auto pos                   = sessions->find(slot);
+                   check(pos != sessions->end(), "Not logged in");
+                   pos->second->Logout();
+                   pos->second.clear();
+                   callback(std::nullopt);
+                }
+                catch (std::exception& e)
+                {
+                   callback(e.what());
+                }
+             });
       };
 
       http_config->get_pkcs11_tokens = [&chainContext, &pkcs11Libs](auto callback)

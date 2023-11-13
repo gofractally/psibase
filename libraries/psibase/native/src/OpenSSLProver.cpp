@@ -72,7 +72,21 @@ std::vector<char> psibase::getPublicKey(EVP_PKEY* key)
    return result;
 }
 
-std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::generateKey()
+void psibase::setCompressedKey(EVP_PKEY* pkey)
+{
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+   if (!EVP_PKEY_set_utf8_string_param(pkey, "point-format", "compressed"))
+   {
+      handleOpenSSLError();
+   }
+#else
+   auto eckey = EVP_PKEY_get0_EC_KEY(key);
+   check(!!eckey, "Not an EC_KEY");
+   EC_KEY_set_conv_form(eckey, POINT_CONVERSION_COMPRESSED);
+#endif
+}
+
+std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::generateKey(int nid)
 {
    std::unique_ptr<EVP_PKEY_CTX, OpenSSLDeleter> ctx(EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr));
    if (!ctx)
@@ -83,16 +97,18 @@ std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::generateKey()
    {
       handleOpenSSLError();
    }
-   if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx.get(), NID_X9_62_prime256v1) <= 0)
+   if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx.get(), nid) <= 0)
    {
       handleOpenSSLError();
    }
-   EVP_PKEY* result = nullptr;
-   if (EVP_PKEY_keygen(ctx.get(), &result) <= 0)
+   EVP_PKEY* pkey = nullptr;
+   if (EVP_PKEY_keygen(ctx.get(), &pkey) <= 0)
    {
       handleOpenSSLError();
    }
-   return std::unique_ptr<EVP_PKEY, OpenSSLDeleter>(result);
+   std::unique_ptr<EVP_PKEY, OpenSSLDeleter> result(pkey);
+   setCompressedKey(result.get());
+   return result;
 }
 
 std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::parsePrivateKey(std::span<const char> key)
@@ -103,7 +119,7 @@ std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::parsePrivateKey(std::span<con
 
 psibase::OpenSSLProver::OpenSSLProver(AccountNumber service) : service(service)
 {
-   auto pkey = generateKey();
+   auto pkey = generateKey(NID_X9_62_prime256v1);
    if (!pkey)
    {
       handleOpenSSLError();

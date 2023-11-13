@@ -22,7 +22,8 @@ namespace psibase
       void operator()(EC_KEY* p) const { EC_KEY_free(p); }
 #endif
    };
+   void                                      setCompressedKey(EVP_PKEY* pkey);
    std::vector<char>                         getPublicKey(EVP_PKEY* key);
-   std::unique_ptr<EVP_PKEY, OpenSSLDeleter> generateKey();
+   std::unique_ptr<EVP_PKEY, OpenSSLDeleter> generateKey(int nid);
    std::unique_ptr<EVP_PKEY, OpenSSLDeleter> parsePrivateKey(std::span<const char> key);
 }  // namespace psibase
