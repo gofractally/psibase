@@ -747,10 +747,7 @@ namespace psibase::pkcs11
       {
          finder(session* self, attribute* attrs, unsigned long count) : self(self)
          {
-            if (auto err = self->lib->functions->C_FindObjectsInit(self->handle, attrs, count))
-            {
-               throw std::system_error(make_error_code(err));
-            }
+            handle_error(self->lib->functions->C_FindObjectsInit(self->handle, attrs, count));
          }
          ~finder() { self->lib->functions->C_FindObjectsFinal(self->handle); }
          session* self;
@@ -765,10 +762,7 @@ namespace psibase::pkcs11
          {
             object_handle obj;
             unsigned long count;
-            if (auto err = lib->functions->C_FindObjects(handle, &obj, 1, &count))
-            {
-               throw std::system_error(make_error_code(err));
-            }
+            handle_error(lib->functions->C_FindObjects(handle, &obj, 1, &count));
             if (count == 0)
             {
                break;

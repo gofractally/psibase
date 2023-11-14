@@ -616,15 +616,9 @@ namespace psibase::pkcs11
       {
          throw std::runtime_error(::dlerror());
       }
-      if (auto err = get_function_list(&functions))
-      {
-         throw std::system_error(make_error_code(err));
-      }
+      handle_error(get_function_list(&functions));
       initialize_args args;
-      if (auto err = functions->C_Initialize(&args))
-      {
-         throw std::system_error(err, pkcs11_category());
-      }
+      handle_error(functions->C_Initialize(&args));
    }
    info pkcs11_library::GetInfo()
    {
@@ -652,7 +646,7 @@ namespace psibase::pkcs11
          }
          else
          {
-            throw std::system_error(make_error_code(err));
+            throw std::system_error(err);
          }
       }
    }
@@ -675,7 +669,7 @@ namespace psibase::pkcs11
          }
          else
          {
-            throw std::system_error(err, pkcs11_category());
+            throw std::system_error(err);
          }
       }
    }
@@ -699,10 +693,7 @@ namespace psibase::pkcs11
    mechanism_info pkcs11_library::GetMechanismInfo(slot_id_t slot, mechanism_type mechanism)
    {
       mechanism_info result;
-      if (auto err = functions->C_GetMechanismInfo(slot, mechanism, &result))
-      {
-         throw std::system_error(make_error_code(err));
-      }
+      handle_error(functions->C_GetMechanismInfo(slot, mechanism, &result));
       return result;
    }
    pkcs11_library::~pkcs11_library()
@@ -714,7 +705,7 @@ namespace psibase::pkcs11
    {
       if (err != error::ok)
       {
-         throw std::system_error(make_error_code(err));
+         throw std::system_error(err);
       }
    }
 
@@ -722,10 +713,7 @@ namespace psibase::pkcs11
        : lib(std::move(lib))
    {
       flags = static_cast<session_flags>(flags | session_flags::rw_session);
-      if (auto err = this->lib->functions->C_OpenSession(slot, flags, nullptr, nullptr, &handle))
-      {
-         throw std::system_error(err, pkcs11_category());
-      }
+      handle_error(this->lib->functions->C_OpenSession(slot, flags, nullptr, nullptr, &handle));
    }
    session_info session::GetSessionInfo()
    {
