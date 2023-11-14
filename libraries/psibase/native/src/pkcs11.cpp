@@ -22,33 +22,181 @@ namespace psibase::pkcs11
          switch (error(condition))
          {
             case error::ok:
-               return "no error";
+               return "ok";
+            case error::cancel:
+               return "cancel";
             case error::host_memory:
                return "host memory";
+            case error::slot_id_invalid:
+               return "slot id invalid";
+            case error::general_error:
+               return "general error";
             case error::function_failed:
                return "function failed";
             case error::arguments_bad:
                return "arguments bad";
+            case error::no_event:
+               return "no event";
+            case error::need_to_create_threads:
+               return "need to create threads";
+            case error::cant_lock:
+               return "cant lock";
+            case error::attribute_read_only:
+               return "attribute read only";
+            case error::attribute_sensitive:
+               return "attribute sensitive";
             case error::attribute_type_invalid:
                return "attribute type invalid";
+            case error::attribute_value_invalid:
+               return "attribute value invalid";
+            case error::copy_prohibited:
+               return "copy prohibited";
+            case error::action_prohibited:
+               return "action prohibited";
+            case error::data_invalid:
+               return "data invalid";
+            case error::data_len_range:
+               return "data len range";
             case error::device_error:
                return "device error";
+            case error::device_memory:
+               return "device memory";
+            case error::device_removed:
+               return "device removed";
+            case error::encrypted_data_invalid:
+               return "encrypted data invalid";
+            case error::encrypted_data_len_range:
+               return "encrypted data len range";
+            case error::function_canceled:
+               return "function canceled";
+            case error::function_not_parallel:
+               return "function not parallel";
+            case error::function_not_supported:
+               return "function not supported";
+            case error::key_handle_invalid:
+               return "key handle invalid";
+            case error::key_size_range:
+               return "key size range";
+            case error::key_type_inconsistent:
+               return "key type inconsistent";
+            case error::key_not_needed:
+               return "key not needed";
+            case error::key_changes:
+               return "key changes";
+            case error::key_needed:
+               return "key needed";
+            case error::key_indigestible:
+               return "key indigestible";
             case error::key_function_not_permitted:
                return "key function not permitted";
+            case error::key_not_wrappable:
+               return "key not wrappable";
+            case error::key_unextractable:
+               return "key unextractable";
+            case error::mechanism_invalid:
+               return "mechanism invalid";
+            case error::mechanism_param_invalid:
+               return "mechanism param invalid";
+            case error::object_handle_invalid:
+               return "object handle invalid";
+            case error::operation_active:
+               return "operation active";
+            case error::operation_not_initialized:
+               return "operation not initialized";
             case error::pin_incorrect:
                return "pin incorrect";
+            case error::pin_invalid:
+               return "pin invalid";
+            case error::pin_len_range:
+               return "pin len range";
+            case error::pin_expired:
+               return "pin expired";
+            case error::pin_locked:
+               return "pin locked";
+            case error::session_closed:
+               return "session closed";
+            case error::session_count:
+               return "session count";
+            case error::session_handle_invalid:
+               return "session handle invalid";
+            case error::session_parallel_not_supported:
+               return "session parallel not supported";
+            case error::session_read_only:
+               return "session read only";
+            case error::session_exists:
+               return "session exists";
+            case error::session_read_only_exists:
+               return "session read only exists";
+            case error::session_read_write_so_exists:
+               return "session read write so exists";
             case error::signature_invalid:
                return "signature invalid";
             case error::signature_len_range:
                return "signature len range";
+            case error::template_incomplete:
+               return "template incomplete";
             case error::template_inconsistent:
                return "template inconsistent";
+            case error::token_not_present:
+               return "token not present";
+            case error::token_not_recognized:
+               return "token not recognized";
+            case error::token_write_protected:
+               return "token write protected";
+            case error::unwrapping_key_handle_invalid:
+               return "unwrapping key handle invalid";
+            case error::unwrapping_key_size_range:
+               return "unwrapping key size range";
+            case error::unwrapping_key_type_inconsistent:
+               return "unwrapping key type inconsistent";
             case error::user_already_logged_in:
                return "user already logged in";
             case error::user_not_logged_in:
                return "user not logged in";
+            case error::user_pin_not_initialized:
+               return "user pin not initialized";
+            case error::user_type_invalid:
+               return "user type invalid";
+            case error::user_another_already_logged_in:
+               return "user another already logged in";
+            case error::user_too_many_types:
+               return "user too many types";
+            case error::wrapped_key_invalid:
+               return "wrapped key invalid";
+            case error::wrapped_key_len_range:
+               return "wrapped key len range";
+            case error::wrapping_key_handle_invalid:
+               return "wrapping key handle invalid";
+            case error::wrapping_key_size_range:
+               return "wrapping key size range";
+            case error::wrapping_key_type_inconsistent:
+               return "wrapping key type inconsistent";
+            case error::random_seed_not_supported:
+               return "random seed not supported";
+            case error::random_no_rng:
+               return "random no rng";
+            case error::domain_params_invalid:
+               return "domain params invalid";
+            case error::curve_not_supported:
+               return "curve not supported";
             case error::buffer_too_small:
                return "buffer too small";
+            case error::saved_state_invalid:
+               return "saved state invalid";
+            case error::information_sensitive:
+               return "information sensitive";
+            case error::state_unsaveable:
+               return "state unsaveable";
+            case error::cryptoki_not_initialized:
+               return "cryptoki not initialized";
+            case error::cryptoki_already_initialized:
+               return "cryptoki already initialized";
+            case error::mutex_bad:
+               return "mutex bad";
+            case error::mutex_not_locked:
+               return "mutex not locked";
+            case error::function_rejected:
+               return "function rejected";
             default:
                return "Unknown PKCS #11 error: " + std::to_string(condition);
          }
