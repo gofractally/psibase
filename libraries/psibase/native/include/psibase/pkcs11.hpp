@@ -795,6 +795,31 @@ namespace psibase::pkcs11
          // TODO: combine attributes into a single call
          return {GetAttributeValue<T>(obj)...};
       }
+      // Returns nullopt if the attribute is not present or not extractable
+      template <typename T>
+      std::optional<T> TryGetAttributeValue(object_handle obj)
+      {
+         T         result;
+         attribute template_[1];
+         if constexpr (variable_size_attribute<T>)
+         {
+            template_[0] = {T::type, nullptr, 0};
+            auto err     = lib->functions->C_GetAttributeValue(handle, obj, template_, 1);
+            if (err == error::attribute_sensitive || err == error::attribute_type_invalid)
+               return {};
+            handle_error(err);
+            template_[0] = make_attribute(&result, template_[0].valueLen);
+         }
+         else
+         {
+            template_[0] = make_attribute(&result);
+         }
+         auto err = lib->functions->C_GetAttributeValue(handle, obj, template_, 1);
+         if (err == error::attribute_sensitive || err == error::attribute_type_invalid)
+            return {};
+         handle_error(err);
+         return result;
+      }
       std::vector<char> Sign(const mechanism&               m,
                              object_handle                  obj,
                              std::span<const unsigned char> data);

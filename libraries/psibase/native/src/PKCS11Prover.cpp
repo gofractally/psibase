@@ -127,53 +127,26 @@ namespace
       return result;
    }
 
-   // pre: all must be sorted
-   std::vector<mechanism_type> getEcdsaMechanism(const std::vector<mechanism_type>& all)
-   {
-      std::vector<mechanism_type> result;
-      if (std::ranges::binary_search(all, pkcs11::mechanism_type::ecdsa_sha256))
-      {
-         result.push_back(pkcs11::mechanism_type::ecdsa_sha256);
-      }
-      else if (std::ranges::binary_search(all, pkcs11::mechanism_type::ecdsa))
-      {
-         result.push_back(pkcs11::mechanism_type::ecdsa);
-      }
-      return result;
-   }
-
    pkcs11::object_handle storeEcKey(pkcs11::session& s, std::string_view label, EVP_PKEY* key)
    {
       auto pubkey  = encodeOctetString(getPublicKeyData(key));
       auto privkey = getEcPrivateKeyData(key);
       auto params  = getKeyParams(key);
 
-      attributes::allowed_mechanisms mechanisms;
-      auto                           tokenMechanisms = s.GetMechanismList();
-      std::ranges::sort(tokenMechanisms);
-      if (std::ranges::binary_search(tokenMechanisms, pkcs11::mechanism_type::ecdsa_sha256))
-      {
-         mechanisms.value.push_back(pkcs11::mechanism_type::ecdsa_sha256);
-      }
-      else if (std::ranges::binary_search(tokenMechanisms, pkcs11::mechanism_type::ecdsa))
-      {
-         mechanisms.value.push_back(pkcs11::mechanism_type::ecdsa);
-      }
-
       // set id to sha-256 key fingerprint
       auto                       spki = getPublicKey(key);
       std::vector<unsigned char> fingerprint(32);
       SHA256(reinterpret_cast<const unsigned char*>(spki.data()), spki.size(), fingerprint.data());
 
-      auto priv = s.CreateObject(
-          attributes::class_{object_class::private_key}, attributes::key_type{key_type::ecdsa},
-          attributes::token{true}, attributes::label{std::string{label}}, mechanisms,
-          attributes::id{fingerprint}, attributes::ec_params{params}, attributes::value{privkey});
+      auto priv = s.CreateObject(attributes::class_{object_class::private_key},
+                                 attributes::key_type{key_type::ecdsa}, attributes::token{true},
+                                 attributes::label{std::string{label}}, attributes::id{fingerprint},
+                                 attributes::ec_params{params}, attributes::value{privkey});
       // Do we actually need to record a public key as a separate object?
-      auto pub = s.CreateObject(
-          attributes::class_{object_class::public_key}, attributes::key_type{key_type::ecdsa},
-          attributes::token{true}, attributes::label{std::string{label}}, mechanisms,
-          attributes::id{fingerprint}, attributes::ec_params{params}, attributes::ec_point{pubkey});
+      auto pub = s.CreateObject(attributes::class_{object_class::public_key},
+                                attributes::key_type{key_type::ecdsa}, attributes::token{true},
+                                attributes::label{std::string{label}}, attributes::id{fingerprint},
+                                attributes::ec_params{params}, attributes::ec_point{pubkey});
       return priv;
    }
 
@@ -274,15 +247,12 @@ namespace
          auto params =
              encodeObjectId(std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter>(OBJ_nid2obj(nid)).get());
          auto id          = newId(session);
-         auto mechanism   = getEcdsaMechanism(tokenMechanisms);
          auto [pub, priv] = session.GenerateKeyPair(
              pkcs11::mechanism{pkcs11::mechanism_type::ec_key_pair_gen},
              std::tuple(attributes::token{true}, attributes::id{id},
-                        attributes::allowed_mechanisms{mechanism},
                         attributes::label{std::string{label}}, attributes::verify{true},
                         attributes::ec_params{params}),
              std::tuple(attributes::token{true}, attributes::id{id},
-                        attributes::allowed_mechanisms{mechanism},
                         attributes::label{std::string{label}}, attributes::sign{true}));
          return priv;
       }
@@ -366,12 +336,9 @@ namespace
             throw std::runtime_error("Unexpected variant value");
          }
 
-         auto tokenMechanisms = session.GetMechanismList();
-         std::ranges::sort(tokenMechanisms);
          auto params =
              encodeObjectId(std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter>(OBJ_nid2obj(nid)).get());
-         auto mechanism = getEcdsaMechanism(tokenMechanisms);
-         auto privkey   = std::vector<unsigned char>(eckey->begin(), eckey->end());
+         auto privkey = std::vector<unsigned char>(eckey->begin(), eckey->end());
          auto pubkey =
              encodeOctetString(std::visit(std::identity(), psibase::getPublicKey(k).data));
          std::vector<unsigned char> fingerprint(32);
@@ -381,13 +348,13 @@ namespace
          auto priv = session.CreateObject(
              attributes::class_{object_class::private_key}, attributes::key_type{key_type::ecdsa},
              attributes::token{true}, attributes::label{std::string{label}},
-             attributes::allowed_mechanisms{mechanism}, attributes::id{fingerprint},
-             attributes::ec_params{params}, attributes::value{privkey});
+             attributes::id{fingerprint}, attributes::ec_params{params},
+             attributes::value{privkey});
          auto pub = session.CreateObject(
              attributes::class_{object_class::public_key}, attributes::key_type{key_type::ecdsa},
              attributes::token{true}, attributes::label{std::string{label}},
-             attributes::allowed_mechanisms{mechanism}, attributes::id{fingerprint},
-             attributes::ec_params{params}, attributes::ec_point{pubkey});
+             attributes::id{fingerprint}, attributes::ec_params{params},
+             attributes::ec_point{pubkey});
          return priv;
       }
       else
@@ -427,6 +394,21 @@ namespace
          throw std::runtime_error("Unsupported verify service");
       }
    }
+
+   // Use the CKA_ALLOWED_MECHANISMS attribute if available or the token's mechanism list otherwise.
+   std::vector<pkcs11::mechanism_type> getKeyMechanisms(pkcs11::session&      session,
+                                                        pkcs11::object_handle privateKey)
+   {
+      if (auto mechanisms =
+              session.TryGetAttributeValue<pkcs11::attributes::allowed_mechanisms>(privateKey))
+      {
+         if (!mechanisms->value.empty())
+         {
+            return std::move(mechanisms->value);
+         }
+      }
+      return session.GetMechanismList();
+   }
 }  // namespace
 
 void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
@@ -464,8 +446,7 @@ psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,
       session(session),
       privateKey(privateKey)
 {
-   auto mechanisms =
-       session->GetAttributeValue<pkcs11::attributes::allowed_mechanisms>(privateKey).value;
+   auto mechanisms = getKeyMechanisms(*session, privateKey);
    std::ranges::sort(mechanisms);
    if (std::ranges::binary_search(mechanisms, pkcs11::mechanism_type::ecdsa_sha256))
    {
