@@ -80,7 +80,7 @@ void psibase::setCompressedKey(EVP_PKEY* pkey)
       handleOpenSSLError();
    }
 #else
-   auto eckey = EVP_PKEY_get0_EC_KEY(key);
+   auto eckey = EVP_PKEY_get0_EC_KEY(pkey);
    check(!!eckey, "Not an EC_KEY");
    EC_KEY_set_conv_form(eckey, POINT_CONVERSION_COMPRESSED);
 #endif
