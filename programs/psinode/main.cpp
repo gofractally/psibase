@@ -1437,7 +1437,7 @@ void run(const std::string&              db_path,
 
    if (system->sharedDatabase.isSlow())
    {
-      PSIBASE_LOG(psibase::loggers::generic::get(), error)
+      PSIBASE_LOG(psibase::loggers::generic::get(), warning)
           << "unable to lock memory for " << db_path
           << ". Try upgrading your shell's limits using \"sudo prlimit --memlock=-1 --pid "
              "$$\". "
