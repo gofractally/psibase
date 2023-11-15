@@ -30,7 +30,7 @@ psinode - The psibase blockchain server
 
 - `-p` *name*, `--producer` *name*
 
-  Produce blocks using the given producer name. It will not start production on an empty chain until you boot the chain. psinode will only produce blocks when it is this producer's turn according to consensus. Multiple distinct nodes must not use the same producer name.
+  Produce blocks using the given producer name. It will not start production on an empty chain until you boot the chain. psinode will only produce blocks when it is this producer's turn according to consensus. Multiple distinct nodes must not use the same producer name. If the producer has an associated key, the server must have access to the corresponding private key, either by `--key` or though an unlocked PKCS #11 token.
 
 - `-o` *hostname*, `--host` *hostname*
 
@@ -38,11 +38,11 @@ psinode - The psibase blockchain server
 
 - `-k` *private-key*, `--key` *private-key*
 
-  Use this private key to sign blocks. Any number of keys may be provided, but only the one that matches the public key corresponding to the producer name will be used. If the correct key is not provided, then `psinode` will be unable to produce blocks.
+  Use this private key to sign blocks. Any number of keys may be provided, but only the one that matches the public key corresponding to the producer name will be used.
 
 - `--pkcs11-module` *filename*
 
-  Loads a PKCS #11 module from *filename*. The server will be able to sign using keys from the module. The tokens that the module provides must be unlocked using the HTTP API before they can be used.
+  Loads a PKCS #11 module from *filename*. The server will be able to sign blocks using keys from the module. The tokens that the module provides must be unlocked using the HTTP API before they can be used. This option can appear any number of times.
 
 ### P2P Network Options
 
