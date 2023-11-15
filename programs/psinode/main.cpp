@@ -2069,30 +2069,7 @@ void run(const std::string&              db_path,
                 {
                    std::shared_ptr<Prover> result;
                    bool                    storeConfig = true;
-                   if (key.device.empty() && key.service == AccountNumber{"verifyec-sys"})
-                   {
-                      if (key.rawData)
-                      {
-                         result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
-                             key.service, psio::from_frac<PrivateKey>(*key.rawData));
-                      }
-                      else
-                      {
-                         result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
-                      }
-                   }
-                   else if (key.device.empty() && key.service == AccountNumber{"verify-sys"})
-                   {
-                      if (key.rawData)
-                      {
-                         result = std::make_shared<OpenSSLProver>(key.service, *key.rawData);
-                      }
-                      else
-                      {
-                         result = std::make_shared<OpenSSLProver>(key.service);
-                      }
-                   }
-                   else
+                   if (!key.device.empty())
                    {
                       auto [lib, slot, sessions] = getPKCS11Slot(key.device);
                       auto pos                   = sessions->find(slot);
@@ -2108,6 +2085,35 @@ void run(const std::string&              db_path,
                       }
                       pos->second.sessionProver->add(result);
                       storeConfig = false;
+                   }
+                   else if (key.service == AccountNumber{"verifyec-sys"})
+                   {
+                      if (key.rawData)
+                      {
+                         result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
+                             key.service, psio::from_frac<PrivateKey>(*key.rawData));
+                      }
+                      else
+                      {
+                         result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
+                      }
+                   }
+                   else if (key.service == AccountNumber{"verify-sys"})
+                   {
+                      if (key.rawData)
+                      {
+                         result = std::make_shared<OpenSSLProver>(key.service, *key.rawData);
+                      }
+                      else
+                      {
+                         result = std::make_shared<OpenSSLProver>(key.service);
+                      }
+                   }
+                   else
+                   {
+                      check(
+                          false,
+                          "should not get here, because service should have been checked already");
                    }
                    std::vector<Claim> claim;
                    result->get(claim);
