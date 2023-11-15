@@ -2009,8 +2009,9 @@ void run(const std::string&              db_path,
                 result.p2p                                       = http_config->enable_p2p;
                 std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
                 result.producer                                  = node.producer_name();
-                result.pkcs11_modules = pkcs11_modules, result.host = host;
-                result.listen = http_config->listen;
+                result.pkcs11_modules                            = pkcs11_modules;
+                result.host                                      = host;
+                result.listen                                    = http_config->listen;
 #ifdef PSIBASE_ENABLE_SSL
                 result.tls.certificate = tls_cert;
                 result.tls.key         = tls_key;
