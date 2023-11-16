@@ -1203,6 +1203,10 @@ namespace psibase::http
          }
          else if (req_target == "/native/admin/keys")
          {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() == bhttp::verb::get)
             {
                if (!check_admin_auth(authz::mode_type::read))
@@ -1249,6 +1253,10 @@ namespace psibase::http
          }
          else if (req_target == "/native/admin/keys/devices")
          {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::get)
             {
                send(method_not_allowed(req.target(), req.method_string(), "GET"));
@@ -1273,6 +1281,10 @@ namespace psibase::http
          }
          else if (req_target == "/native/admin/keys/unlock")
          {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::post)
             {
                send(method_not_allowed(req.target(), req.method_string(), "POST"));
@@ -1303,6 +1315,10 @@ namespace psibase::http
          }
          else if (req_target == "/native/admin/keys/lock")
          {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(not_found(req.target()));
+            }
             if (req.method() != bhttp::verb::post)
             {
                send(method_not_allowed(req.target(), req.method_string(), "POST"));
