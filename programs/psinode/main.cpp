@@ -88,8 +88,8 @@ std::string to_string(const native_service& obj)
 
 struct autoconnect_t
 {
-   static constexpr std::size_t max   = std::numeric_limits<std::size_t>::max();
-   std::uint64_t                value = max;
+   static constexpr std::uint64_t max   = std::numeric_limits<std::size_t>::max();
+   uint64_t                       value = max;
 };
 
 void to_json(const autoconnect_t& obj, auto& stream)
@@ -802,11 +802,11 @@ struct ThreadInfo
 {
    pid_t       id;
    std::string group;
-   uint64_t     user;
-   uint64_t     system;
-   uint64_t     pageFaults;
-   uint64_t     read;
-   uint64_t     written;
+   uint64_t    user;
+   uint64_t    system;
+   uint64_t    pageFaults;
+   uint64_t    read;
+   uint64_t    written;
 };
 PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 
