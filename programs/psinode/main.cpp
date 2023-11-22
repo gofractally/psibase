@@ -89,7 +89,7 @@ std::string to_string(const native_service& obj)
 struct autoconnect_t
 {
    static constexpr std::size_t max   = std::numeric_limits<std::size_t>::max();
-   std::uint64_t value = max;
+   std::uint64_t                value = max;
 };
 
 void to_json(const autoconnect_t& obj, auto& stream)
@@ -231,7 +231,7 @@ std::filesystem::path get_prefix()
    {
       prefix = prefix.parent_path();
    }
-   std::cerr << "prefix: " << prefix <<"\n";
+   std::cerr << "prefix: " << prefix << "\n";
    return prefix;
 }
 
@@ -800,13 +800,13 @@ PSIO_REFLECT(RestartInfo, shouldRestart);
 
 struct ThreadInfo
 {
-   pid_t        id;
-   std::string  group;
-   int64_t user;
-   int64_t system;
-   int64_t pageFaults;
-   int64_t read;
-   int64_t written;
+   pid_t       id;
+   std::string group;
+   int64_t     user;
+   int64_t     system;
+   int64_t     pageFaults;
+   int64_t     read;
+   int64_t     written;
 };
 PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 
@@ -2208,7 +2208,7 @@ int main(int argc, char* argv[])
          auto db_root     = std::filesystem::path(vm["database"].as<std::string>());
          option_path      = option_path / db_root;
          auto config_path = db_root / "config";
-         std::cout << "expecting config file: " << config_path<<"\n";
+         std::cout << "expecting config file: " << config_path << "\n";
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
@@ -2216,7 +2216,7 @@ int main(int argc, char* argv[])
          }
          else if (!exists(config_path))
          {
-            std::cout << "creating config file: " << config_path<<"\n";
+            std::cout << "creating config file: " << config_path << "\n";
             auto template_path = config_template_path();
             if (std::filesystem::is_regular_file(template_path))
             {
