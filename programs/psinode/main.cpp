@@ -1437,7 +1437,7 @@ void run(const std::string&              db_path,
 
    if (system->sharedDatabase.isSlow())
    {
-      PSIBASE_LOG(psibase::loggers::generic::get(), error)
+      PSIBASE_LOG(psibase::loggers::generic::get(), warning)
           << "unable to lock memory for " << db_path
           << ". Try upgrading your shell's limits using \"sudo prlimit --memlock=-1 --pid "
              "$$\". "
@@ -2125,7 +2125,6 @@ int main(int argc, char* argv[])
    std::string                 tls_key;
    byte_size                   db_cache_size;
    byte_size                   db_size;
-   bool                        version;
 
    namespace po = boost::program_options;
 
@@ -2165,13 +2164,16 @@ int main(int argc, char* argv[])
 #endif
    opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in µs.");
-   opt("version,V", po::bool_switch(&version), "Print version information");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
+   // database should be available on the command line, but should not be listed in help
    opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
        "Path to database");
-   opt("help,h", "Show this message");
+   // These should be usable on the command line and shown in help
+   auto add_cmdonly = [](auto& opts)
+   { opts.add_options()("help,h", "Show this message")("version,V", "Print version information"); };
+   add_cmdonly(desc);
 
    po::positional_options_description p;
    p.add("database", 1);
@@ -2226,12 +2228,13 @@ int main(int argc, char* argv[])
 
    if (vm.count("help"))
    {
+      add_cmdonly(common_opts);
       std::cerr << usage << "\n\n";
       std::cerr << common_opts << "\n";
       return 1;
    }
 
-   if (version)
+   if (vm.count("version"))
    {
       std::cerr << "psinode " << PSIBASE_VERSION_MAJOR << "." << PSIBASE_VERSION_MINOR << "."
                 << PSIBASE_VERSION_PATCH << "\n";

@@ -27,6 +27,7 @@ TEST_CASE("bft crash", "[bft]")
    TEST_START(logger);
 
    boost::asio::io_context ctx;
+   auto                    work = boost::asio::make_work_guard(ctx);
    NodeSet<node_type>      nodes(ctx);
 
    setup<BftConsensus>(nodes, {"a", "b", "c", "d"});
