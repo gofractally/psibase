@@ -32,6 +32,8 @@
 #include <mutex>
 #include <thread>
 
+#include <libproc.h>
+
 using namespace psibase;
 using namespace psibase::net;
 
@@ -212,11 +214,24 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
 
 std::filesystem::path get_prefix()
 {
-   auto prefix = std::filesystem::read_symlink("/proc/self/exe").parent_path();
+   int   ret;
+   pid_t pid;
+   char  pathbuf[2048];
+
+   pid = getpid();
+   ret = proc_pidpath(pid, pathbuf, sizeof(pathbuf));
+
+   if (ret <= 0)
+      throw std::runtime_error("unable to get process path");
+
+   std::filesystem::path prefix(std::string(pathbuf, ret));
+   prefix = prefix.parent_path();
+
    if (prefix.filename() == "bin")
    {
       prefix = prefix.parent_path();
    }
+   std::cerr << "prefix: " << prefix <<"\n";
    return prefix;
 }
 
@@ -2193,6 +2208,7 @@ int main(int argc, char* argv[])
          auto db_root     = std::filesystem::path(vm["database"].as<std::string>());
          option_path      = option_path / db_root;
          auto config_path = db_root / "config";
+         std::cout << "expecting config file: " << config_path<<"\n";
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
@@ -2200,6 +2216,7 @@ int main(int argc, char* argv[])
          }
          else if (!exists(config_path))
          {
+            std::cout << "creating config file: " << config_path<<"\n";
             auto template_path = config_template_path();
             if (std::filesystem::is_regular_file(template_path))
             {

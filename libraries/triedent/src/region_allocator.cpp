@@ -45,11 +45,7 @@ namespace triedent
          load_queue();
          _thread = std::thread{[this]
                                {
-#ifndef __APPLE__
-                                  pthread_setname_np(pthread_self(), "swap");
-#else
-                                  pthread_setname_np("swap");
-#endif
+                                  set_current_thread_name("swap");
                                   run();
                                }};
       }

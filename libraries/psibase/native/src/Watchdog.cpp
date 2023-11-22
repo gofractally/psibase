@@ -72,7 +72,7 @@ namespace psibase
          handler(handler)
    {
 #ifdef __APPLE__
-      cpuclock = CLOCK_UPTIME_RAW;
+      cpuclock = CLOCK_MONOTONIC;
 #else
       if (int err = pthread_getcpuclockid(pthread_self(), &cpuclock))
       {

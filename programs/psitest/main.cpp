@@ -2,7 +2,7 @@
 #include <debug_eos_vm/debug_eos_vm.hpp>
 #include <psibase/ActionContext.hpp>
 #include <psibase/RawNativeFunctions.hpp>
-#include <psibase/nativeFunctions.hpp>
+#include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/log.hpp>

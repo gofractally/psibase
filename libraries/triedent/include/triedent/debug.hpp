@@ -41,6 +41,14 @@ namespace triedent
       std::cerr << "\n";
    }
 
+   inline auto set_current_thread_name( const char* name ) { 
+#ifdef __APPLE__
+      return pthread_setname_np(name); 
+#else
+      return pthread_setname_np( pthread_self(), name); 
+#endif
+   }
+
 #if 1  //__DEBUG__
 #define TRIEDENT_DEBUG(...) triedent::debug(__func__, __LINE__, __VA_ARGS__)
 #define TRIEDENT_WARN(...) triedent::debug(__func__, __LINE__, "\033[31m", __VA_ARGS__, "\033[0m")

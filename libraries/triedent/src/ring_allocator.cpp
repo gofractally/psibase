@@ -50,7 +50,7 @@ namespace triedent
    {
       // The lock here is needed to synchronize-with wait_swap
       // even through no data is accessed while holding the lock.
-      std::lock_guard g{_free_mutex};
+      (void)std::lock_guard{_free_mutex};
       _swap_cond.notify_all();
    }
 
