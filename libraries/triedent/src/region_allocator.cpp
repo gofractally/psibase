@@ -45,8 +45,11 @@ namespace triedent
          load_queue();
          _thread = std::thread{[this]
                                {
-                              // doesn't compile on mac   pthread_setname_np(pthread_self(), "swap");
+#ifndef __APPLE__
+                                  pthread_setname_np(pthread_self(), "swap");
+#else
                                   pthread_setname_np("swap");
+#endif
                                   run();
                                }};
       }

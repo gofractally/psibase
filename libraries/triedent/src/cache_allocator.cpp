@@ -21,14 +21,20 @@ namespace triedent
              [this]()
              {
                 thread_name("swap");
-                // no mac - pthread_setname_np(pthread_self(), "swap");
+#ifndef __APPLE__
+                pthread_setname_np(pthread_self(), "swap");
+#else // if __APPLE__
                 pthread_setname_np("swap");
+#endif
                 swap_loop();
              });
          _gc_thread = std::thread{[this]
                                   {
-                                    // doesn't work on mac  pthread_setname_np(pthread_self(), "swap");
+#ifndef __APPLE__
+                                    pthread_setname_np(pthread_self(), "swap");
+#else // if __APPLE__
                                     pthread_setname_np("swap");
+#endif
                                      _gc.run(&_done);
                                   }};
       }
