@@ -12,7 +12,7 @@ System apps are the applications responsible for the core functionality of the n
 - [cpu-sys]()
 - [producer-sys]()
 - [proxy-sys](proxy-sys.md)
-- [setcode-sys]()
+- [setcode-sys](setcode-sys.md)
 - [transact-sys](transact-sys.md)
 - [verify-sys]()
 

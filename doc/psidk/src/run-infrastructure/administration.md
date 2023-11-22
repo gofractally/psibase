@@ -4,20 +4,12 @@ Much of the administration of an individual node can be done via the graphical u
 
 ## Booting a network
 
-This can be done either with the [`psibase`](./cli/psibase.md#boot) CLI tool, or by using the GUI provided by the [admin-sys](../default-apps/admin-sys.md) service. 
-Alternatively, the `POST /native/push_boot` endpoint can be used manually in conjunction with `POST /native/push_transaction` to perform a completely custom boot sequence. See [Understanding boot](#understanding-boot) to learn more.
+Booting a network is only a valid operation if psinode does not yet have any chain. It can be done either with the [`psibase`](./cli/psibase.md#boot) CLI tool, or by using the GUI provided by the [admin-sys](../default-apps/admin-sys.md) service.
+Alternatively, the `POST /native/push_boot` endpoint can be used manually in conjunction with `POST /native/push_transaction` to perform a custom boot sequence. 
 
-### Understanding boot
+The body of the `POST /native/push_boot` request contains a list of transactions that will each be executed in order in the first block. The first transaction is a special transaction known as the genesis transaction. The genesis transaction must use [SystemService::SetCodeSys::setCode] to upload the core services to accounts on the blockchain, and it is not permitted to do anything else.
 
-Booting a chain often requires some setup transactions that perform various initialization actions, such as setting system account auth services, uploading default apps, etc. Uploading all the necessary files and performing the initialization sequence may be a process that takes more execution time than would fit into one block. Therefore, Psibase enables the boot procedure to be completely customized and split over multiple blocks.
-
-The first step is to call `POST /native/push_boot` (Endpoint only available if psinode does not yet have any chain). 
-
-The body of the `/native/push_boot` request should contain a list of two signed transactions:
-1. The first transaction is the genesis transaction, which is generally responsible for uploading the core services to accounts on the blockchain and initializing them.
-2. The second transactions contains only one action: a call to [SystemService::TransactionSys::startBoot].
-
-The `startBoot` action takes a list of transaction hashes. Each hash refers to an arbitrary transaction that must be pushed in the order in which they are found in the list sent to `startBoot`. These transaction must then each be pushed using [`POST /native/push_transaction`](../development/front-ends/reference/http-requests.md#push-transaction). The network will not accept other transactions until every transaction referenced in `startBoot` has been pushed. The final action of the final transaction committed to in `startBoot` should be a call to [SystemService::TransactionSys::finishBoot], which will signify to psinode that it should start checking account authorizations for subsequent transactions.
+A typical boot sequence contains more configuration than is able to fit in a single block. To understand how such a boot sequence is accomplished, see the description of [SystemService::TransactionSys::startBoot].
 
 ## Peering with others
 

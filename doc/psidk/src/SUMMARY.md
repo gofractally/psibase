@@ -91,7 +91,7 @@
   - [producer-sys]()
   - [proxy-sys](default-apps/proxy-sys.md)
   - [psispace-sys](default-apps/psispace-sys.md)
-  - [setcode-sys]()
+  - [setcode-sys](default-apps/setcode-sys.md)
   - [symbol-sys]()
   - [token-sys]()
   - [transact-sys](default-apps/transact-sys.md)
