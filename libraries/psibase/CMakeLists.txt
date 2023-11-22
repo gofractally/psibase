@@ -220,7 +220,7 @@ if(IS_WASM)
     install(DIRECTORY tester/include/psibase TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY wasm32-wasi TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.h")
     install(PROGRAMS sdk/psidk-cmake-args TYPE BIN COMPONENT libpsibase)
-    install(FILES sdk/psibase-config.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/psidk COMPONENT libpsibase)
+    install(FILES sdk/psibase-config.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/psibase COMPONENT libpsibase)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements.a ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements-debug.a TYPE LIB COMPONENT libpsibase)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libc-simple-malloc.a ${CMAKE_CURRENT_BINARY_DIR}/libc-simple-malloc-debug.a TYPE LIB COMPONENT libpsibase)
     install(TARGETS psibase psibase-service-base psibase-service-wasi-polyfill psitestlib
