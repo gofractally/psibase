@@ -802,22 +802,22 @@ struct ThreadInfo
 {
    pid_t       id;
    std::string group;
-   int64_t     user;
-   int64_t     system;
-   int64_t     pageFaults;
-   int64_t     read;
-   int64_t     written;
+   uint64_t     user;
+   uint64_t     system;
+   uint64_t     pageFaults;
+   uint64_t     read;
+   uint64_t     written;
 };
 PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 
 struct MemStats
 {
-   int64_t database;
-   int64_t code;
-   int64_t data;
-   int64_t wasmMemory;
-   int64_t wasmCode;
-   int64_t unclassified;
+   uint64_t database;
+   uint64_t code;
+   uint64_t data;
+   uint64_t wasmMemory;
+   uint64_t wasmCode;
+   uint64_t unclassified;
 };
 PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
 
