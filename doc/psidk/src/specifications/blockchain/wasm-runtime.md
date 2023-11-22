@@ -2,7 +2,7 @@
 
 All WebAssembly modules must execute in a highly performant and fully deterministic WebAssembly virtual machine. The WebAssembly specification has made some [non-deterministic design choices](https://github.com/WebAssembly/design/blob/main/Nondeterminism.md), because of which the default runtimes are insufficient for a blockchain use-case.
 
-Psibase therefore defines a custom WebAssembly run-time based on a battle-tested and deterministic runtime called [EOS VM](https://github.com/eosnetworkfoundation/mandel-eos-vm). The psibase VM specification adds further requirements above and beyond the EOS VM implementation.
+Psibase therefore defines a custom WebAssembly run-time based on a battle-tested and deterministic runtime called [EOS VM](https://github.com/AntelopeIO/eos-vm). The psibase VM specification adds further requirements above and beyond the EOS VM implementation.
 
 # Goals
 

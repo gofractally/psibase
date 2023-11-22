@@ -58,7 +58,7 @@ Psibase services are intended to take the place of the server-side component for
 
 ### Limitations
 
-All data stored in a service is public and accessible at least by the infrastructure providers and is therefore not suitable for storing private data unless it is first encrypted.
+All data stored in a service is public and accessible at least by the infrastructure providers. Therefore, services are not suitable for storing private data unless the data is encrypted.
 
 Services are unable to make web requests to external APIs and servers. Services are sandboxed and their functionality is limited to whatever is explicitly exposed to the service, such as the key/value API and the forwarding of web-requests into their RPC handling functions.
 

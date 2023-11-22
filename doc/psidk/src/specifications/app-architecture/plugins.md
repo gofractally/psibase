@@ -255,7 +255,7 @@ TokenCreator app->>Token plugin: CreateToken
     Token plugin-->>TokenCreator app: reply
 ```
 
-As you can see, someone creating an app to facilitate the creation of tokens would simply need to call the correct Token plugin action. The Token plugin allows you to specify a symbol and will automatically purchase a symbol from a symbol market and map it to the new token. All of the various interactions result in calling three separate actions in psibase services. Those three actions will automatically be packaged into one single transaction, enabling for maximally efficient processing of the action on the server (authentication logic only runs once to verify the sender is authorized for the whole transaction, rather than authorization logic executing once for each action submitted in separate transactions).
+As you can see, someone creating an app to facilitate the creation of tokens would simply need to call the correct Token plugin action. The Token plugin allows you to specify a symbol and will automatically purchase a symbol from a symbol market and map it to the new token. All of the various interactions result in calling three separate actions in psibase services. Those three actions will automatically be packaged into one single transaction, enabling maximally efficient processing of the action on the server (authentication logic only runs once to verify the sender is authorized for the whole transaction, rather than authorization logic executing once for each action submitted in separate transactions).
 
 
 # Plugin developers
