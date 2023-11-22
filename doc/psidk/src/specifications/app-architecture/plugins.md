@@ -68,7 +68,7 @@ Therefore `postMessage` does not immediately (synchronously) post to the other d
 
 Cross-domain messaging can be dangerous if the proper checks are not in place to ensure that the messages are going to/from whoever is intended. 
 
-The supervisor will only listen for cross-domain messages from apps that it instantiated, and plugins will only listen more messages that come directly from the supervisor.
+The supervisor will only listen for cross-domain messages from apps that it instantiated, and plugins will only listen for messages that come directly from the supervisor.
 
 If plugins make use of the standard psibase development libraries, then many of the security concerns are handled automatically. For example, it is automatically enforced that messages into your plugin are only allowed to come from the root domain.
 
