@@ -1,4 +1,5 @@
-#include <psibase/NativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/nativeFunctions.hpp>
 
 #include <psibase/ActionContext.hpp>
 

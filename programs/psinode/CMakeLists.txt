@@ -13,6 +13,7 @@ target_link_libraries(psinode
     debug_eos_vm
     psibase_net
 )
+target_link_directories( psinode PUBLIC ${ICU_LIBRARY_DIR} )
 
 if(ENABLE_SSL)
     target_compile_definitions(psinode PUBLIC PSIBASE_ENABLE_SSL)

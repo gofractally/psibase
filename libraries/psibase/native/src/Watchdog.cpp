@@ -71,10 +71,14 @@ namespace psibase
          elapsedOrStart(CpuClock::now().time_since_epoch()),
          handler(handler)
    {
+#ifdef __APPLE__
+      cpuclock = CLOCK_UPTIME_RAW;
+#else
       if (int err = pthread_getcpuclockid(pthread_self(), &cpuclock))
       {
          throw std::system_error(err, std::system_category());
       }
+#endif
       manager->add(this);
    }
    Watchdog::~Watchdog()

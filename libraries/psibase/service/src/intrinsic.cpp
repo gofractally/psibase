@@ -1,4 +1,4 @@
-#include <psibase/nativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
 
 #include <psio/from_bin.hpp>
 

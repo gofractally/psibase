@@ -29,7 +29,7 @@ TEST_CASE("location_lock")
       }
    };
 
-   std::vector<std::jthread> threads;
+   std::vector<std::thread> threads;
    for (int i = 0; i < 16; ++i)
    {
       threads.emplace_back(
@@ -46,6 +46,11 @@ TEST_CASE("location_lock")
    }
    std::this_thread::sleep_for(100ms);
    done.store(true);
+
+   for( auto& t : threads ) {
+      t.join();
+   }
+
    threads.clear();
    CHECK(!failed.load());
 }

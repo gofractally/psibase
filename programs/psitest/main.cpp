@@ -1,7 +1,8 @@
 #include <boost/filesystem/operations.hpp>
 #include <debug_eos_vm/debug_eos_vm.hpp>
 #include <psibase/ActionContext.hpp>
-#include <psibase/NativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/nativeFunctions.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/log.hpp>
@@ -559,9 +560,11 @@ struct callbacks
          result.filetype = wasi_filetype_regular_file;
          result.nlink    = stat.st_nlink;
          result.size     = stat.st_size;
+#ifndef __APPLE__
          result.atim     = to_nsec(stat.st_atim);
          result.mtim     = to_nsec(stat.st_mtim);
          result.ctim     = to_nsec(stat.st_ctim);
+#endif  // apple
       }
       else
       {

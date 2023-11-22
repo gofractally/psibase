@@ -33,7 +33,7 @@ TEST_CASE("CpuClock should be associated with the current thread")
    std::atomic<bool>        done{false};
    std::chrono::nanoseconds t0_elapsed;
    auto                     start = CpuClock::now();
-   std::jthread             t0{[&]
+   std::thread             t0{[&]
                    {
                       auto start = CpuClock::now();
                       std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -47,6 +47,7 @@ TEST_CASE("CpuClock should be associated with the current thread")
    auto end = CpuClock::now();
    CHECK(t0_elapsed < std::chrono::microseconds(500));
    CHECK(end - start > std::chrono::microseconds(500));
+   t0.join();
 }
 
 TEST_CASE("Watchdog zero limit")
@@ -96,7 +97,7 @@ TEST_CASE("Watchdog threaded")
 
    static constexpr int      num_threads = 2;
    std::chrono::nanoseconds  durations[num_threads];
-   std::vector<std::jthread> threads;
+   std::vector<std::thread> threads;
 
    for (int i = 0; i < num_threads; ++i)
    {
@@ -115,6 +116,7 @@ TEST_CASE("Watchdog threaded")
           });
    }
 
+   for( auto& t : threads ) t.join();
    threads.clear();
    for (int i = 0; i < num_threads; ++i)
    {

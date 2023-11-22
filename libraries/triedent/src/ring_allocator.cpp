@@ -50,7 +50,7 @@ namespace triedent
    {
       // The lock here is needed to synchronize-with wait_swap
       // even through no data is accessed while holding the lock.
-      std::lock_guard{_free_mutex};
+      std::lock_guard g{_free_mutex};
       _swap_cond.notify_all();
    }
 
@@ -83,8 +83,8 @@ namespace triedent
                _self->_end_free_p = end_free_p | end_free_x;
                if constexpr (debug_gc)
                {
-                  std::osyncstream(std::cout)
-                      << "end_free_p: " << _self->_level << ":" << end_free_p << std::endl;
+             //     std::osyncstream(std::cout)
+             //         << "end_free_p: " << _self->_level << ":" << end_free_p << std::endl;
                }
             }
             _self->_free_cond.notify_all();

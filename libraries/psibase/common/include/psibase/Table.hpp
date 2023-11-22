@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <psibase/blob.hpp>
-#include <psibase/nativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/to_key.hpp>
 #include <span>

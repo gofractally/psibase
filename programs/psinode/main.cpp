@@ -87,7 +87,7 @@ std::string to_string(const native_service& obj)
 struct autoconnect_t
 {
    static constexpr std::size_t max   = std::numeric_limits<std::size_t>::max();
-   std::size_t                  value = max;
+   std::uint64_t value = max;
 };
 
 void to_json(const autoconnect_t& obj, auto& stream)
@@ -787,33 +787,33 @@ struct ThreadInfo
 {
    pid_t        id;
    std::string  group;
-   std::int64_t user;
-   std::int64_t system;
-   std::int64_t pageFaults;
-   std::int64_t read;
-   std::int64_t written;
+   int64_t user;
+   int64_t system;
+   int64_t pageFaults;
+   int64_t read;
+   int64_t written;
 };
 PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 
 struct MemStats
 {
-   std::size_t database;
-   std::size_t code;
-   std::size_t data;
-   std::size_t wasmMemory;
-   std::size_t wasmCode;
-   std::size_t unclassified;
+   int64_t database;
+   int64_t code;
+   int64_t data;
+   int64_t wasmMemory;
+   int64_t wasmCode;
+   int64_t unclassified;
 };
 PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
 
 // TODO: this will need to be reworked when we have more complete transaction tracking
 struct TransactionStats
 {
-   std::uint64_t unprocessed;
-   std::uint64_t total;
-   std::uint64_t failed;
-   std::uint64_t succeeded;
-   std::uint64_t skipped;
+   uint64_t unprocessed;
+   uint64_t total;
+   uint64_t failed;
+   uint64_t succeeded;
+   uint64_t skipped;
 };
 PSIO_REFLECT(TransactionStats, unprocessed, total, failed, succeeded, skipped)
 

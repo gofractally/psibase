@@ -2,7 +2,8 @@
 #include <atomic>
 #include <iomanip>
 #include <iostream>
-#include <syncstream>
+#include <thread>
+//#include <syncstream>
 
 namespace triedent
 {

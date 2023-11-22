@@ -22,7 +22,7 @@ TEST_CASE("gc_queue")
       std::atomic<int>* p;
    };
 
-   std::vector<std::jthread> threads;
+   std::vector<std::thread> threads;
 
    for (int i = 0; i < 10; ++i)
    {
@@ -56,6 +56,11 @@ TEST_CASE("gc_queue")
 
    std::this_thread::sleep_for(10ms);
    done = true;
+
+   for( auto& t : threads ) {
+      t.join();
+   }
+
    threads.clear();
    {
       INFO("limit: " << limit.load());

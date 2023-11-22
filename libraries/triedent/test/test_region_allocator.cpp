@@ -137,7 +137,7 @@ TEST_CASE("region_allocator threaded")
       }
    };
 
-   std::vector<std::jthread> threads;
+   std::vector<std::thread> threads;
    threads.emplace_back(
        [&]
        {
@@ -176,6 +176,11 @@ TEST_CASE("region_allocator threaded")
    done.store(true);
    gc.notify_run();
    gc.push(std::make_shared<int>(0));
+   
+   for( auto& t : threads ) {
+      t.join();
+   }
+
    threads.clear();
    CHECK(!failed.load());
 }

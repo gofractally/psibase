@@ -459,14 +459,14 @@ namespace psibase::net
          if (new_producers || active_producers[1] != prods.second)
          {
             PSIBASE_LOG(logger, info) << "Active producers: " << *prods.first
-                                      << print_function(
+                                      << print_function{
                                              [&](std::ostream& os)
                                              {
                                                 if (prods.second)
                                                 {
                                                    os << ", " << *prods.second;
                                                 }
-                                             });
+                                             }};
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
@@ -550,7 +550,7 @@ namespace psibase::net
                 << (active_producers[0]->activeProducers.begin() + get_leader_index(current_term))
                        ->first.str()
                 << " not in current term " << current_term << ": "
-                << print_function([&](std::ostream& os) { print_views(os, 0); });
+                << print_function{[&](std::ostream& os) { print_views(os, 0); }};
             return nullptr;
          }
          if (!leader_view.best_message)
@@ -598,16 +598,16 @@ namespace psibase::net
          {
             PSIBASE_LOG(logger, debug)
                 << "Not enough producers in the current term " << current_term << ": "
-                << print_function([&](std::ostream& os)
-                                  { print_views(os, 0, *leader_view.best_message); });
+                << print_function{[&](std::ostream& os)
+                                  { print_views(os, 0, *leader_view.best_message); }};
             return nullptr;
          }
          if (active_producers[1] && !is_term_ready(1, *leader_view.best_message))
          {
             PSIBASE_LOG(logger, debug)
                 << "Not enough joint producers in the current term " << current_term << ": "
-                << print_function([&](std::ostream& os)
-                                  { print_views(os, 1, *leader_view.best_message); });
+                << print_function{[&](std::ostream& os)
+                                  { print_views(os, 1, *leader_view.best_message); }};
             return nullptr;
          }
          PSIBASE_LOG(logger, debug) << "Term " << current_term << " ready";

@@ -121,7 +121,7 @@ namespace psibase::net
                                }
                             });
       }
-      bool        is_open() const { return !closed; }
+      bool        is_open() const override { return !closed; }
       static auto translate_close_code(close_code code)
       {
          namespace websocket = boost::beast::websocket;
@@ -140,7 +140,7 @@ namespace psibase::net
          }
          __builtin_unreachable();
       }
-      void close(close_code code)
+      void close(close_code code) override
       {
          if (!closed)
          {
@@ -156,7 +156,7 @@ namespace psibase::net
                 });
          }
       }
-      std::string endpoint() const
+      std::string endpoint() const override 
       {
          auto               result = get_lowest_layer(stream).socket().remote_endpoint();
          std::ostringstream ss;

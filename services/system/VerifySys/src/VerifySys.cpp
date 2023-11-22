@@ -4,7 +4,7 @@
 #include <botan/pubkey.h>
 #include <botan/x509_key.h>
 #include <psibase/dispatch.hpp>
-#include <psibase/nativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/serviceEntry.hpp>
 
 using namespace psibase;

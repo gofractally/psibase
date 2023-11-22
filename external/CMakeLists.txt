@@ -94,7 +94,7 @@ if(NOT IS_WASM)
     BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/secp256k1
     EXCLUDE_FROM_ALL 1
     CONFIGURE_COMMAND
-            cp -aur ${CMAKE_CURRENT_SOURCE_DIR}/secp256k1 ${CMAKE_CURRENT_BINARY_DIR}/secp256k1-build
+            cp -a ${CMAKE_CURRENT_SOURCE_DIR}/secp256k1 ${CMAKE_CURRENT_BINARY_DIR}/secp256k1-build
             && cd ${CMAKE_CURRENT_BINARY_DIR}/secp256k1-build
             && ./autogen.sh
             && export "CC=${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}"
