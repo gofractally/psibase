@@ -24,18 +24,6 @@ These are instructions for building **psibase** on Mac OS X Sonoma 14.1 using M-
   https://github.com/WebAssembly/wasi-sdk/releases
   set WASI_SDK_PREFIX to the root of the wasi-sdk release you downloaded
 
-4. Patch up Catch2
-
-
-```
-Catch2: 
-psibase/external/Catch2/include/reporters/catch_reporter_bases.cpp:39:14: error: 'sprintf' is deprecated: This function is provided for compatibility reasons only.  Due to security concerns inherent in the design of sprintf(3), it is highly recommended that you use snprintf(3) instead. [-Werror,-Wdeprecated-declarations]
-        std::sprintf(buffer, "%.3f", duration);
-```
-with:
-```
-        std::snprintf(buffer, sizeof(buffer), "%.3f", duration);
-```
 
 5. Install icu4c 
 
