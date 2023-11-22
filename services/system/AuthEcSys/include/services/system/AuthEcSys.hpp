@@ -39,8 +39,8 @@ namespace SystemService
 
       /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
       /// 
-      /// It will be automatically called by `transact-sys` when it is processing a transaction from a user who
-      /// has set this service as their auth service. 
+      /// This action is automatically called by `transact-sys` when an account using this auth service submits a 
+      /// transaction.
       ///
       /// This action verifies that the transaction contains a claim for the user's public key.
       void checkAuthSys(uint32_t                    flags,
@@ -51,8 +51,7 @@ namespace SystemService
 
       /// This is an implementation of the standard auth service interface defined by [SystemService::AuthInterface]
       /// 
-      /// It will be automatically called by `account-sys` when a user attempts to configure their account to use this
-      /// auth service. 
+      /// This action is automatically called by `account-sys` when an account is configured to use this auth service.
       ///
       /// Verifies that a particular user is allowed to use a particular auth service. 
       ///
