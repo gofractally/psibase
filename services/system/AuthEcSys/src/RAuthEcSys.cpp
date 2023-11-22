@@ -44,7 +44,7 @@ namespace SystemService
             return ret;
          };
 
-         return makeConnection<Connection<AuthEc::AuthRecord, "AuthConnection", "AuthEdge">>(
+         return makeConnection<Connection<AuthEcRecord::AuthRecord, "AuthConnection", "AuthEdge">>(
              idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last, before,
              after);
       }
@@ -54,7 +54,7 @@ namespace SystemService
          AuthEcSys::Tables db{AuthEcSys::service};
          auto              account = db.open<AuthEcSys::AuthTable>().get(name);
 
-         return account.value_or(AuthEc::AuthRecord{});
+         return account.value_or(AuthEcRecord::AuthRecord{});
       }
    };
    PSIO_REFLECT(AuthEcQuery,

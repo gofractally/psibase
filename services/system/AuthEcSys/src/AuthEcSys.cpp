@@ -5,7 +5,7 @@
 #include <cstdio>
 
 using namespace psibase;
-using SystemService::AuthEc::AuthRecord;
+using SystemService::AuthEcRecord::AuthRecord;
 
 static constexpr bool enable_print = false;
 

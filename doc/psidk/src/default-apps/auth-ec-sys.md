@@ -6,4 +6,4 @@
 
 # Tables
 
-{{#cpp-doc ::SystemService::AuthEc::AuthRecord}}
+{{#cpp-doc ::SystemService::AuthEcRecord::AuthRecord}}
