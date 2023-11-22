@@ -40,7 +40,7 @@ A psibase app is composed of various parts:
 
 * The database
 * The service
-* The app interface
+* The plugin
 * The supervisor
 * The user interface
 
@@ -62,21 +62,21 @@ All data stored in a service is public and accessible at least by the infrastruc
 
 Services are unable to make web requests to external APIs and servers. Services are sandboxed and their functionality is limited to whatever is explicitly exposed to the service, such as the key/value API and the forwarding of web-requests into their RPC handling functions.
 
-## App interface
+## Plugin
 
-Psibase service developers can build components that run client-side known as app interfaces. App interfaces are responsible for:
+Psibase service developers can build components that run client-side known as plugins. Plugins are responsible for:
 
 1. Wrapping complicated interactions with one or more services into concise and user-friendly APIs
 2. Managing and exposing client-side local storage between apps
-3. Using the supervisor to send and receive messages to and from other app interfaces
+3. Using the supervisor to send and receive messages to and from other plugins
 
-Psibase apps enjoy unprecedented modularity and allow apps to define both client and server-side functionality that can be reused by other apps. App interfaces are the innovation that allow this client-side modularity. See the [app interfaces](./app-interfaces.md) specification for more details.
+Psibase apps enjoy unprecedented modularity and allow apps to define both client and server-side functionality that can be reused by other apps. Plugins are the innovation that allow this client-side modularity. See the [plugins](./plugins.md) specification for more details.
 
 ## Supervisor
 
 Psibase apps are all loaded inside of a client-side component known as the supervisor. The supervisor is responsible for:
 1. Instantiating apps
-2. Facilitating all communication between UIs and app interfaces, app interfaces and other app interfaces, and app interfaces and services
+2. Facilitating all communication between UIs and plugins, plugins and other plugins, and plugins and services
 
 See the [supervisor](./supervisor.md) specification for more details.
 

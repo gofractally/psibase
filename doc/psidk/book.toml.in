@@ -27,7 +27,7 @@ additional-css = [
 ]
 additional-js = [
     "theme/js/mermaid-load.js", 
-    "theme/js/applet-init.js", 
+    "theme/js/app-init.js", 
     "theme/js/fix-github-edit-link.js", 
     "theme/js/pagetoc.js"
 ]

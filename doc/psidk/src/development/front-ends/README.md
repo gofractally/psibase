@@ -8,7 +8,7 @@ A more in depth guide will be added later, but this is a rough outline of the st
 2. Deploy a service to the account
 3. Implement the [psibase::ServerInterface] and [psibase::StorageInterface]
 4. Register the account as a web-server by calling the `registerServer` action on the [proxy-sys](../../default-apps/proxy-sys.md) service. This gives the account a domain name according to the rules specified in the [routing](#virtual-hosting) docs.
-5. Develop your user interface, using [HTTP requests](./reference/http-requests.md), [JS libraries](./reference/js-libraries.md) as needed, as well as [app interfaces](../../specifications/app-architecture/app-interfaces.md) to interact with your service or third-party apps.
+5. Develop your user interface, using [HTTP requests](./reference/http-requests.md), [JS libraries](./reference/js-libraries.md) as needed, as well as [plugins](../../specifications/app-architecture/plugins.md) to interact with your service or third-party apps.
 6. Bundle your front-end if needed and upload it to your service for storage and serving.
 
 ## Virtual hosting

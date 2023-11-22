@@ -65,41 +65,41 @@ When building Psibase apps, the construction of each transaction submitted to th
 sequenceDiagram
 
 participant app
-participant auth app interface
+participant auth plugin
 participant supervisor
-participant app interface
+participant plugin
 
-app->>supervisor: 1. action@app-interface
+app->>supervisor: 1. action@plugin
 activate supervisor
-supervisor->>auth app interface: 2. GetClaim()
-activate auth app interface
-auth app interface-->>supervisor: <claim>
-deactivate auth app interface
+supervisor->>auth plugin: 2. GetClaim()
+activate auth plugin
+auth plugin-->>supervisor: <claim>
+deactivate auth plugin
 note over supervisor: Add <claim> to transaction
 
-supervisor->>app interface: 3. Call action
-activate app interface
-app interface->>supervisor: 4. AddClaim(claim)
+supervisor->>plugin: 3. Call action
+activate plugin
+plugin->>supervisor: 4. AddClaim(claim)
 activate supervisor
 note over supervisor: Add <claim> to transaction
-supervisor-->>app interface: 
+supervisor-->>plugin: 
 deactivate supervisor
-app interface-->>supervisor: 
-deactivate app interface
+plugin-->>supervisor: 
+deactivate plugin
 
 supervisor->>supervisor: 5. Generate `hashedTransaction`<br>from the transaction<br>and its claims
 
-supervisor->>auth app interface: 6. getProof(hashedTransaction, claim)
-activate auth app interface
-auth app interface->>supervisor: <proof>
-deactivate auth app interface
+supervisor->>auth plugin: 6. getProof(hashedTransaction, claim)
+activate auth plugin
+auth plugin->>supervisor: <proof>
+deactivate auth plugin
 note over supervisor: Add <proof> to transaction
 
 loop For each added claim
-   supervisor->>app interface: 7. getProof(hashedTransaction, claim)
-   activate app interface
-   app interface->>supervisor: <proof>
-   deactivate app interface
+   supervisor->>plugin: 7. getProof(hashedTransaction, claim)
+   activate plugin
+   plugin->>supervisor: <proof>
+   deactivate plugin
    note over supervisor: Add <proof> to transaction
 end
 
@@ -109,13 +109,13 @@ deactivate supervisor
 
 The following is an explanation of each step in the diagram to aid understanding:
 
-1. Alice calls an action on an app interface.
-2. Supervisor gives the user's configured auth app interface the opportunity to add a claim to the transaction.
-3. Supervisor calls the app interface action
-4. If (and only if) an app interface calls a service action, then it is allowed to add a claim to the transaction.
+1. Alice calls an action on a plugin.
+2. Supervisor gives the user's configured auth plugin the opportunity to add a claim to the transaction.
+3. Supervisor calls the plugin action
+4. If (and only if) a plugin calls a service action, then it is allowed to add a claim to the transaction.
 5. Supervisor has accumulated all actions and claims for this transaction, so it calculates the hash of the transaction object which can be used for the generation of proofs (such as digital signatures).
-6. The user's configured auth app interface is asked to generate a proof for the claim it added.
-7. Each app interface that added a claim is asked for a proof of the claim.
+6. The user's configured auth plugin is asked to generate a proof for the claim it added.
+7. Each plugin that added a claim is asked for a proof of the claim.
 8. Supervisor has collected all claims and proofs, therefore the final transaction object is packed and submitted to the network.
 
 ## Conclusion

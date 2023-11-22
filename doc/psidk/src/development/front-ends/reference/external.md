@@ -2,7 +2,7 @@
 
 An external app is any client code that is not served from a psibase service. This implies that the client code is untrusted, and therefore it cannot interact with any of the client-side psibase infrastructure, such as that which automates transaction packing, digital signing, or transaction submission. All of this must be done manually by those building external apps.
 
-External apps are also unable to engage [app interfaces](../../../specifications/app-architecture/app-interfaces.md) and use inter-app communication.
+External apps are also unable to use [plugins](../../../specifications/app-architecture/plugins.md).
 
 ## Basic transaction execution script
 

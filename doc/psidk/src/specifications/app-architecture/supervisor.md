@@ -11,9 +11,9 @@ The supervisor is the name of the client-side infrastructure that is the parent 
 
 ## How it works
 
-The supervisor is served by each infrastructure provider at the root domain. Whenever a request is made to a root endpoint at the root domain, the client-side code for the supervisor is returned.
+The supervisor is served by each infrastructure provider at the root domain. Whenever a request is made to a root endpoint ('`/`') at the root domain, the client-side code for the supervisor is returned.
 
-The supervisor is responsible for instantiating psibase apps and app interfaces in their own subdomains using iframes. If the root domain is requested with no specified subpath, then the supervisor may display a default "home page" for the psibase network. If the request specifies a subpath beginning with "`/applet/`", then the supervisor is responsible for instantiating the specified child app. 
+The supervisor is responsible for instantiating psibase apps and plugins in their own subdomains using iframes. If the root domain is requested with no specified subpath, then the supervisor may display a default "home page" for the psibase network. If the request specifies a subpath beginning with "`/applet/`", then the supervisor is responsible for instantiating the specified child app. 
 
 For example, if `rootdomain.com/applet/myapp` is requested from a psibase infrastructure provider, then the supervisor is returned to the requesting client. When the supervisor loads, it sees that a subpath of `/applet/myapp` was specified, and will therefore embed an iframe into the browser interface whose `src` attribute is set to `myapp.rootdomain.com` in order to load the document stored at the root path of the service subdomain. If the request specifies any more specific subpath or query string, it is passed as a subpath to the service subdomain request (For example `rootdomain.com/applet/myapp/subpage2?var=foo` would result in a request for `myapp.rootdomain.com/subpage2?var=foo`).
 
@@ -25,7 +25,7 @@ Supervisor facilitates:
 
 * Client side peering using WebRTC
 * Providing event subscription feeds for services to react to server-side [events](./events.md)
-* [Inter-app communication](./app-interfaces.md#inter-app-communication)
+* [Communication with plugins](./plugins.md#communication-with-plugins)
 * Constructing transactions from called actions
 * Transaction signing and authorization ([Smart authorization](../blockchain/smart-authorization.md))
 * Packing transactions into the [`fracpack`](../data-formats/fracpack.md) binary format
@@ -38,17 +38,17 @@ Supervisor facilitates:
 
 Psibase apps may be interested in reacting to the emission of an [events](./events.md) from a service. In psibase networks, it is the supervisor that is responsible for providing an interface that allows a psibase app to subscribe to notifications for certain events.
 
-The supervisor will poll the root domain to watch for events that have been subscribed to by any psibase apps. When an event occurs, it will notify the psibase app using an [Inter-app communication](#inter-app-communication) `"Event"` message. 
+The supervisor will poll the root domain to watch for events that have been subscribed to by any psibase apps. When an event occurs, it will notify the psibase app using an `"Event"` message. 
 
 > Note: These events are polled at a particular frequency, such as once per second. This notification system is therefore not designed to benefit apps which have hard real time event notification requirements. For such requirements it is recommended to run your own infrastructure provider node.
 
-### Inter-app communication
+### Plugin communication
 
-The supervisor is responsible for facilitating client-side communication between psibase app interfaces. To accomplish this, it listens for and responds to messages from apps that it instantiates within its managed iframes. All messaging happens via the [`Window.PostMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) API.
+The supervisor is responsible for facilitating client-side communication between psibase plugins. To accomplish this, it listens for and responds to messages from apps that it instantiates within its managed iframes. All messaging happens via the [`Window.PostMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) API.
 
 > ⚠️ For security, the supervisor should only listens for messages from an app whose origin matches one that it explicitly opened. Similarly, it should only send messages to apps whose origins it explicitly opened.
 
-> ⚠️ For security, app interfaces should only listen for messages from the supervisor. Otherwise, an attacker app could instantiate the victim app within its own iframe and impersonate the supervisor.
+> ⚠️ For security, plugins should only listen for messages from the supervisor. Otherwise, an attacker app could instantiate the victim app within its own iframe and impersonate the supervisor.
 
 #### Message handling
 
@@ -65,7 +65,7 @@ The supervisor listens for messages posted to its window messages with the follo
 
 Supported supervisor message types:
 * `"Action"` - Used when requesting the supervisor add an action to the pending transaction
-* `"IAC"` - Used when calling a function defined in an app interface of another application
+* `"IAC"` - Used when calling a function defined in a plugin of another application
 * `"IACResponse"` - A response to a prior IAC
 * `"Event"` - A notification from the supervisor that an event to which your app subscribed has been emitted
 * `"TransactionReceipt"` - A response with the payload returned by the node to whom a transaction was submitted
@@ -79,13 +79,13 @@ Depending on the type of message, the payload is required to contain different p
 
 A user interface can call an `"Action"` message on the supervisor, and the supervisor will attempt to package that service action into a transaction and submit it. However, this is not the optimal way for psibase apps to call service actions. 
 
-It is far preferable for a user interface to call an `"IAC"` message on a supervisor, and let the app interfaces handle reqesting actions. Done this way, a transaction may be packed with multiple actions, which eases the authentication burden on the infrastructure providers who only need to run the authorization code once for the entire set of actions in the transaction, rather than once for each independent transaction. 
+It is far preferable for a user interface to call an `"IAC"` message on a supervisor, and let the plugins handle reqesting actions. Done this way, a transaction may be packed with multiple actions, which eases the authentication burden on the infrastructure providers who only need to run the authorization code once for the entire set of actions in the transaction, rather than once for each independent transaction. 
 
-The supervisor will open a transaction at the start of a call to an app interface. App interfaces may send the `"Action"` message to the supervisor to attempt to add the action into the transaction. Furthermore, app interfaces may themselves use the `"IAC"` message to call into other app interfaces. The supervisor will handle packing all the transactions (depth-first) that were requested by each app interface accessed by the entire interaction.
+The supervisor will open a transaction at the start of a call to a plugin. Plugins may send the `"Action"` message to the supervisor to attempt to add the action into the transaction. Furthermore, plugins may themselves use the `"IAC"` message to call into other plugins. The supervisor will handle packing all the transactions (depth-first) that were requested by each plugin accessed by the entire interaction.
 
-An app interface signals that it is complete by sending the `"IACResponse"` message to the supervisor. Once the initial app interface function sends its `"IACResponse"` message, the transaction (which may now have many actions added to it) is considered closed to new actions.
+A plugin signals that it is complete by sending the `"IACResponse"` message to the supervisor. Once the initial plugin function sends its `"IACResponse"` message, the transaction (which may now have many actions added to it) is considered closed to new actions.
 
-> 🕓 Timeouts: If the supervisor does not receive an `"IACResponse"` message from an app interface in less than 100ms after it is initially called, then it will consider it failed. Caller app interfaces will be notified of the failure.
+> 🕓 Timeouts: If the supervisor does not receive an `"IACResponse"` message from a plugin in less than 100ms after it is initially called, then it will consider it failed. Caller plugins will be notified of the failure.
 
 ## Transaction authorization
 

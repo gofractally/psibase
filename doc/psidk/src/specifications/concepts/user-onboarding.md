@@ -28,15 +28,15 @@ The user may then proceed to explore the community and its applications with the
 
 Embedded in the query string of the generated HTTP link is a private key, generated at the time of the invite. A corresponding invite public key is also saved in a service database. This public key is also known as the `invite ID`. For example, the query string may look like this: `?id=ABC123&signKey=DEF456`.
 
-After the invitee clicks the link, and fills out their new account details in the invite app interface, they submit a transaction that prompts its creation. However, every transaction submitted to a psibase infrastructure provider must have a sender. Therefore, in order to submit this transaction, the invite service provides the account from which the transaction is sent (since the user may not have one yet). This sender account should use a custom auth service which authorizes actions if and only if the transaction is digitally signed with a private key that corresponds to an `invite ID`.
+After the invitee clicks the link, and fills out their new account details in the invite plugin, they submit a transaction that prompts its creation. However, every transaction submitted to a psibase infrastructure provider must have a sender. Therefore, in order to submit this transaction, the invite service provides the account from which the transaction is sent (since the user may not have one yet). This sender account should use a custom auth service which authorizes actions if and only if the transaction is digitally signed with a private key that corresponds to an `invite ID`.
 
 If the new account uses a PKI authorization service, such as [auth-sys](../../default-apps/auth-sys.md), it should not be configured to use the `invite ID` as its public key, since the invite creator also knows its corresponding private key.
 
 ### App onboarding
 
-When an app needs to generate an invite link, it can use the `generateInvite` app interface function of the invite app. 
+When an app needs to generate an invite link, it can use the `generateInvite` plugin function of the invite app. 
 
-The invite app interface submits an action on behalf of the user to the psibase app's service to initiate the creation of an invite. The app's service should then call into the invite service to create the invite. This ensures that it is the psibase app's service who pays for the invite.
+The invite plugin submits an action on behalf of the user to the psibase app's service to initiate the creation of an invite. The app's service should then call into the invite service to create the invite. This ensures that it is the psibase app's service who pays for the invite.
 
 The invite service should allow psibase apps to register with it to configure rate-limiting details such as the number of open invites allowed per user, and the minimum age of an account that is permitted to generate invites.
 
@@ -51,18 +51,18 @@ sequenceDiagram
     title Creating an invite
     participant App
     participant Invite app
-    participant Invite interface
+    participant Invite plugin
     participant Auth
     participant App service
     participant Invite service
 
     note over App: Alice generates<br>an invite
-    App->>Invite interface: generateInvite(alice,<br>"welcome-page")
-    note over Invite interface: Generate keypair<br>{PUB_ABC, PRIV_ABC}
-    Invite interface->>App service: createInvite(alice, <br>PUB_ABC)
+    App->>Invite plugin: generateInvite(alice,<br>"welcome-page")
+    note over Invite plugin: Generate keypair<br>{PUB_ABC, PRIV_ABC}
+    Invite plugin->>App service: createInvite(alice, <br>PUB_ABC)
     App service->>Invite service: createInvite(<br>PUB_ABC)
     note over Invite service: Invite created
-    Invite interface-->>App: invite link("/invite?id=PUB_ABC<br>&signKey=PRIV_ABC&redirect=welcome-page)
+    Invite plugin-->>App: invite link("/invite?id=PUB_ABC<br>&signKey=PRIV_ABC&redirect=welcome-page)
 ```
 
 ```mermaid
@@ -70,19 +70,19 @@ sequenceDiagram
     title Accepting an invite
     participant App
     participant Invite app
-    participant Invite interface
+    participant Invite plugin
     participant Auth
     participant App service
     participant Invite service
 
     note over Invite app: Bob uses invite link<br>to submit new user details
-    Invite app->>Invite interface: acceptCreate(bob,<br>PUB_ABC, PRIV_ABC)
-    Invite interface->>Auth: Get keypair<br>for new account
-    Auth-->>Invite interface: {PUB_DEF}
-    Invite interface->>Invite service: acceptCreate(bob,<br>PUB_ABC, PUB_DEF)
+    Invite app->>Invite plugin: acceptCreate(bob,<br>PUB_ABC, PRIV_ABC)
+    Invite plugin->>Auth: Get keypair<br>for new account
+    Auth-->>Invite plugin: {PUB_DEF}
+    Invite plugin->>Invite service: acceptCreate(bob,<br>PUB_ABC, PUB_DEF)
     note over Invite service: Creates account
-    Note over Invite interface: Wait for account created
-    Invite interface-->>Invite app: Account created
+    Note over Invite plugin: Wait for account created
+    Invite plugin-->>Invite app: Account created
     Note over Invite app: Redirect Bob to /subpage
 ```
 

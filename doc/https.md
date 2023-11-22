@@ -1,6 +1,6 @@
 # HTTPS
 
-Some web technologies require a secure context when not operating over `localhost`. This includes things like clipboard access and WebRTC--two technologies used within the `FractalSys` applet. For this reason, we need a means of running psinode with an SSL.
+Some web technologies require a secure context when not operating over `localhost`. This includes things like clipboard access and WebRTC--two technologies used within the `FractalSys` app. For this reason, we need a means of running psinode with an SSL.
 
 ## Generating certs on local machine
 
@@ -55,16 +55,16 @@ If you're running `psinode` within a container, commands sent to psinode via the
 ## Notes & Caveats
 
 - Firefox uses its own certificate store and may not pick up the mkcert certificates automatically.
-- If you update applets, you will need to take additional action for the changes to be served by psinode. You have a couple options:
+- If you update apps, you will need to take additional action for the changes to be served by psinode. You have a couple options:
   1. After making your changes and rebuilding, delete the `db` file and `data` directory within the `psinode_db_secure` directory, restart psinode and boot the chain again. This will, of course, wipe the chain.
-  2. Use the `psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree` command to upload updated applet build artifacts.
+  2. Use the `psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree` command to upload updated app build artifacts.
 
-## Running an applet server in dev mode for faster iteration
+## Running an app server in dev mode for faster iteration
 
-This uses the existing `FractalSys` applet at `services/user/FractalSys/ui` as the example.
+This uses the existing `FractalSys` app at `services/user/FractalSys/ui` as the example.
 
 1. Create a copy of `.env.sample` named `.env` in the `ui` directory with `VITE_SECURE_LOCAL_DEV=true`
 2. Verify that the `vite.config.ts` file points at the proper location for the SSL cert and key.
 3. Run the dev server: `yarn dev`
 
-Assuming port 8081 is properly exposed, psibase will now be accessible via port 8081 at https://psibase.127.0.0.1.sslip.io:8081 and the applet will be accessible at its path (https://psibase.127.0.0.1.sslip.io:8081/applet/fractal-sys in this case). Modifications to the applet code should be reflected immediately via Vite's HMR.
+Assuming port 8081 is properly exposed, psibase will now be accessible via port 8081 at https://psibase.127.0.0.1.sslip.io:8081 and the app will be accessible at its path (https://psibase.127.0.0.1.sslip.io:8081/app/fractal-sys in this case). Modifications to the app code should be reflected immediately via Vite's HMR.

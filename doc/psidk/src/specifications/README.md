@@ -28,7 +28,7 @@
         User 1                   User 2
 ```
 
-A blockchain to synchronize data across the community (BFT or CFT [consensus mechanism](./blockchain/peer-consensus/README.md)), stateful web [services](./blockchain/services.md) that handle HTTP requests to serve applications, applications that can talk to each other and share information *client-side* (Inter-App Communication via [App interfaces](./app-architecture/app-interfaces.md)), and users who can peer directly (using [WebRTC](https://webrtc.org/)) to each other with no server middleman.
+The diagram above shows a blockchain to synchronize data across the community (BFT or CFT [consensus mechanism](./blockchain/peer-consensus/README.md)), stateful web [services](./blockchain/services.md) that handle HTTP requests to serve applications, applications that can interact with each other through [plugins](./app-architecture/plugins.md)) on the *client-side*, and users who can peer directly (using [WebRTC](https://webrtc.org/)) to each other with no server middleman.
 
 Ultimately, psibase is a protocol that defines decentralized app hosting infrastucture. Reference implementations may imperfectly instantiate any particular specification, and there are currently no reference implementations that instantiate the complete psibase protocol.
 

@@ -34,7 +34,7 @@ A demonstration deployment is currently hosted at [psibase.io](https://psibase.i
 
 ## Technical docs 📓
 
-Documentation is hosted on the [doc-sys applet](https://doc-sys.psibase.io/) of our demo deployment.
+Documentation is hosted on the [doc-sys app](https://doc-sys.psibase.io/) of our demo deployment.
 
 ## Build from source 🛠️
 

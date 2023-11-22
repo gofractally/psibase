@@ -6,7 +6,7 @@
 
 Increasingly, individuals need online applications that they can self-host in order to protect their data, guarantee the app's future availability, and eliminate censorship concerns. Communities have similar needs and often want to avoid depending too heavily on any one member or third party. That's what psibase is for - It's a powerful protocol that enables communities to come together to collectively "self-host" a web application ecosystem. 
 
-The psibase protocol encapsulates a host of open-source innovations from a low-level data serialization format and a database architecture, to a high-level full-stack web application framework and inter-app communication protocol. Intended to be a best-in-class base-layer infrastructure that can be trusted to facilitate better human collaboration and reliably power the next generation of community-hosted web apps.
+The psibase protocol encapsulates a host of open-source innovations from a low-level data serialization format and a database architecture, to a high-level full-stack web application framework and client-side plugin protocol. Intended to be a best-in-class base-layer infrastructure that can be trusted to facilitate better human collaboration and reliably power the next generation of community-hosted web apps.
 
 ## This documentation
 
