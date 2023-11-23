@@ -138,6 +138,9 @@ int main(int argc, char** argv)
          root_t rr;
 
          std::mt19937 gen(c);
+         std::vector<char> found_key;
+         std::vector<char> found_value;
+         std::vector<root_t> result_roots;
 
          uint64_t ch = 0;
          while (not done.load(std::memory_order_acquire))
@@ -149,16 +152,19 @@ int main(int argc, char** argv)
             while (r.load(std::memory_order_relaxed) == v)
             {
                uint64_t h = (uint64_t(gen()) << 32) | gen();
-               // TODO
-               // auto     itr = rs->lower_bound(rr, std::string_view((char*)&h, sizeof(h)));
-               // if (itr.valid())
-               //    ++total_lookups[c].total_lookups;
+               bool found = rs->get_less_than(rr, std::string_view((char*)&h, sizeof(h)), &found_key, &found_value, &result_roots);
+               if (found) {
+                  ++total_lookups[c].total_lookups;
+               }
+               else {
+               //   std::cerr<< "no got value\n";
+               }
                if (done.load(std::memory_order_relaxed))
                   break;
             }
 
             v = r.load();
-            //  TRIEDENT_WARN( "revs[",c,"] = ", v );
+            //TRIEDENT_WARN( "revs[",c,"] = ", v );
             revs[c].store(v);
          }
       }
@@ -244,6 +250,17 @@ int main(int argc, char** argv)
             db.print_stats(std::cerr);
             std::cerr << "\n";
          }
+         auto add_comma = []( uint64_t s )
+         {
+            if( s < 1000 ) return std::to_string(s);
+            if( s < 1000000 ) {
+               return std::to_string(s/1000) + ',' + std::to_string( (s % 1000)+1000 ).substr(1); 
+            }
+            if( s < 1000000000 ) {
+               return std::to_string(s/1000000) + ',' + std::to_string( ((s % 1000000)/1000)+1000 ).substr(1) + "," + std::to_string( (s % 1000)+1000 ).substr(1);
+            }
+            return std::to_string(s);
+         };
 
          if (i % status_count == 0)
          {
@@ -253,13 +270,12 @@ int main(int argc, char** argv)
             auto read_end   = get_total_lookups();
             auto delta_read = read_end - read_start;
             read_start      = read_end;
+            uint64_t r_per_sec = delta_read / ((std::chrono::duration<double, std::milli>(delta).count() / 1000));
             std::cerr << std::setw(12)
-                      << int64_t(status_count /
-                                 (std::chrono::duration<double, std::milli>(delta).count() / 1000))
-                      << " items/sec   " << i << " total  reads/sec: " << std::setw(12)
-                      << uint64_t(
-                             delta_read /
-                             ((std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << add_comma(int64_t(status_count /
+                                 (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << " items/sec   " << add_comma(i) << " total  reads/sec: " << std::setw(12)
+                      << add_comma(r_per_sec)
                       << "\n";
          }
 
