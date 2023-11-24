@@ -32,7 +32,9 @@
 #include <mutex>
 #include <thread>
 
+#ifdef __APPLE__
 #include <libproc.h>
+#endif
 
 using namespace psibase;
 using namespace psibase::net;
@@ -214,6 +216,7 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
 
 std::filesystem::path get_prefix()
 {
+#ifdef __APPLE__
    int   ret;
    pid_t pid;
    char  pathbuf[2048];
@@ -226,6 +229,9 @@ std::filesystem::path get_prefix()
 
    std::filesystem::path prefix(std::string(pathbuf, ret));
    prefix = prefix.parent_path();
+#else
+   auto prefix = std::filesystem::read_symlink("/proc/self/exe").parent_path();
+#endif
 
    if (prefix.filename() == "bin")
    {
