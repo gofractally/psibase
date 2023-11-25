@@ -297,15 +297,12 @@ namespace triedent
    {
       uint64_t used_size = alloc_size(size);
 
-      std::unique_lock l{_free_mutex};
-      if (check_contiguous_free_space(used_size))
+      std::unique_lock l(_free_mutex,std::defer_lock);
+      if( l.try_lock() and check_contiguous_free_space(used_size) )
       {
          return allocate_impl(size, used_size, id, init);
       }
-      else
-      {
-         return nullptr;
-      }
+      return nullptr;
    }
 
    template <typename F>

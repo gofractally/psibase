@@ -46,6 +46,7 @@ int main(int argc, char** argv)
    auto                    opt = desc.add_options();
    opt("help,h", "print this message");
    opt("reset", "reset the database");
+   opt("read-only", "just query existing db");
    opt("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys");
    opt("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
        "the folder that contains the database");
@@ -85,6 +86,10 @@ int main(int argc, char** argv)
                                                             .warm_bytes = 1ull << warm_page_c,
                                                             .cool_bytes = 1ull << cool_page_c,
                                                             .cold_bytes = 1ull << cold_page_c});
+   }
+   bool read_only = false;
+   if (vm.count("read-only")) {
+      read_only = true;
    }
 
    if (num_read_threads > 64)
@@ -152,7 +157,7 @@ int main(int argc, char** argv)
             while (r.load(std::memory_order_relaxed) == v)
             {
                uint64_t h = (uint64_t(gen()) << 32) | gen();
-               bool found = rs->get_less_than(rr, std::string_view((char*)&h, sizeof(h)), &found_key, &found_value, &result_roots);
+               bool found = rs->get_less_than(rr, std::string_view((char*)&h, sizeof(h)), &found_key, &found_value );
                if (found) {
                   ++total_lookups[c].total_lookups;
                }
@@ -298,32 +303,36 @@ int main(int argc, char** argv)
 
          if (i < total)
          {
-            //base.emplace( std::make_pair(k,std::string((char*)&h, sizeof(h))) );
-            if (use_string)
-            {
-               if (check_content)
-                  comparison_map[str] = str;
-               int inserted;
-               inserted = s->upsert(root, str, str);
-               if (inserted >= 0)
+            if( read_only ) {
+               usleep( 2 );
+            } else {
+               //base.emplace( std::make_pair(k,std::string((char*)&h, sizeof(h))) );
+               if (use_string)
                {
-                  // TRIEDENT_WARN("failed to insert: ", h);
-                  break;
+                  if (check_content)
+                     comparison_map[str] = str;
+                  int inserted;
+                  inserted = s->upsert(root, str, str);
+                  if (inserted >= 0)
+                  {
+                     // TRIEDENT_WARN("failed to insert: ", h);
+                     break;
+                  }
+                  assert(inserted < 0);
                }
-               assert(inserted < 0);
-            }
-            else
-            {
-               if (check_content)
-                  comparison_map[(std::string)hk] = (std::string)hk;
-               int inserted;
-               inserted = s->upsert(root, hk, hk);
-               if (inserted >= 0)
+               else
                {
-                  // TRIEDENT_WARN("failed to insert: ", h);
-                  break;
+                  if (check_content)
+                     comparison_map[(std::string)hk] = (std::string)hk;
+                  int inserted;
+                  inserted = s->upsert(root, hk, hk);
+                  if (inserted >= 0)
+                  {
+                     // TRIEDENT_WARN("failed to insert: ", h);
+                     break;
+                  }
+                  assert(inserted < 0);
                }
-               assert(inserted < 0);
             }
          }
       }

@@ -103,14 +103,14 @@ namespace triedent
       // notify _queue_cond.
       static constexpr size_type wait_bit = ~(npos >> 1);
       friend class session;
-      std::mutex                         _session_mutex;
-      std::vector<session*>              _sessions;
-      std::mutex                         _queue_mutex;
-      std::condition_variable            _queue_cond;
-      std::atomic<size_type>             _end;
-      std::size_t                        _size;
-      std::vector<std::shared_ptr<void>> _queue;
-      bool                               _waiting;
+      alignas(64) std::mutex                    _session_mutex;
+      std::vector<session*>                     _sessions;
+      alignas(64) std::mutex                    _queue_mutex;
+      alignas(64) std::condition_variable       _queue_cond;
+      alignas(64) std::atomic<size_type>        _end;
+      std::size_t                               _size;
+      std::vector<std::shared_ptr<void>>        _queue;
+      bool                                      _waiting;
    };
 
    using gc_session = gc_queue::session;

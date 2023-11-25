@@ -45,7 +45,7 @@ namespace triedent
 
    struct mutex_group
    {
-      static constexpr std::size_t count = 64;
+      static constexpr std::size_t count = 128;
       static constexpr std::size_t align = 64;
       explicit mutex_group() : _items(new location_mutex[count]) {}
       location_mutex& operator()(void* base, void* ptr) const
@@ -104,6 +104,7 @@ namespace triedent
          // If the object has already been moved, don't bother locking
          if (object_info info{atomic.load()}; info.ref != 0 && info == loc)
          {
+            // grab a mutex based upon object id.
             location_lock l{_location_mutexes(h, &atomic), id};
             if (object_info info{atomic.load()}; info.ref != 0 && info == loc)
             {

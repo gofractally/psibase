@@ -28,6 +28,52 @@ namespace triedent
 
    inline key_type from_key6(const key_view sixb);
 
+   template<typename KeyType>
+   inline void from_key6(const key_view sixb, KeyType& out);
+
+
+   // used to avoid malloc, because keys can be at most 256,
+   // this one change produced 13% improvment with 12 threads
+   struct temp_key6 {
+      uint32_t _size = 0;
+      char     _buffer[256];
+
+      uint32_t size()const { return _size; }
+      const char* begin()const { return _buffer; }
+      const char* end()const   { return _buffer + _size; }
+      char* begin(){ return _buffer; }
+      char* end() { return _buffer + _size; }
+
+      void append( const char* p, const char* e ) {
+         int s = e - p;
+         if( _size + s > 256 ) 
+            throw std::runtime_error( "key length overflow" );
+         memcpy( end(), p, s );
+         _size += s;
+      }
+      void push_back( char c ) {
+         if( _size < 256 ) {
+            *end() = c;
+            ++_size;
+         } else {
+            throw std::runtime_error( "key length overflow" );
+         }
+      }
+      void resize( uint32_t s ) {
+         if( s < 256 ) {
+            _size = s;
+         } else {
+            throw std::runtime_error( "key length overflow" );
+         }
+      }
+      const char* data()const { return begin(); }
+
+        temp_key6():_size(0){}
+      private:
+        temp_key6( const temp_key6& ) = delete; // should not be copied
+   };
+
+
    // Write thread usage notes:
    // * To create a new tree, default-initialize a shared_ptr<root>
    // * To get the upper-most root, use write_session::get_top_root
@@ -168,21 +214,47 @@ namespace triedent
       std::optional<std::vector<char>> get(const std::shared_ptr<root>& r,
                                            std::span<const char>        key) const;
 
+      ///    Assume keys a-z  
+      ///
+      ///    key = m
+      ///
+      ///    greater_equal is m, or if m isn't present then it is n
+      ///    less_than is l
+      ///    max is z
+      ///    next = m+1 or n, if keys are strings then next is 'ma'
+      /**
+       *  TODO: verify these docs
+       *  finds the first key greater than or equal to key, this can be used to find
+       *  the first element by using an empty key()
+       *
+       *  ie. lower_bound
+       */
       bool get_greater_equal(const std::shared_ptr<root>&        r,
                              std::span<const char>               key,
                              std::vector<char>*                  result_key,
-                             std::vector<char>*                  result_bytes,
-                             std::vector<std::shared_ptr<root>>* result_roots) const;
+                             std::vector<char>*                  result_bytes = nullptr,
+                             std::vector<std::shared_ptr<root>>* result_roots = nullptr) const;
+
+      /**
+       *  TODO: verify these docs
+       *  finds the largest key less than key
+       */
       bool get_less_than(const std::shared_ptr<root>&        r,
                          std::span<const char>               key,
                          std::vector<char>*                  result_key,
-                         std::vector<char>*                  result_bytes,
-                         std::vector<std::shared_ptr<root>>* result_roots) const;
+                         std::vector<char>*                  result_bytes = nullptr,
+                         std::vector<std::shared_ptr<root>>* result_roots = nullptr) const;
+      /**
+       *  TODO: verify these docs
+       *  
+       *  finds the largest key with the given prefix, this can be used to find
+       *  the last key by using an empty prefix.
+       */
       bool get_max(const std::shared_ptr<root>&        r,
                    std::span<const char>               prefix,
                    std::vector<char>*                  result_key,
-                   std::vector<char>*                  result_bytes,
-                   std::vector<std::shared_ptr<root>>* result_roots) const;
+                   std::vector<char>*                  result_bytes = nullptr,
+                   std::vector<std::shared_ptr<root>>* result_roots = nullptr) const;
 
       void print(const std::shared_ptr<root>& r);
       void validate(const std::shared_ptr<root>& r);
@@ -226,7 +298,7 @@ namespace triedent
           const std::shared_ptr<triedent::root>&        ancestor,
           object_id                                     root,
           std::optional<std::string_view>               key,
-          std::vector<char>&                            result_key,
+          temp_key6&                                    result_key,
           std::vector<char>*                            result_bytes,
           std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
@@ -1190,8 +1262,7 @@ namespace triedent
          return false;
       if (result_key)
       {
-         auto s = from_key6({result_key6.data(), result_key6.size()});
-         result_key->assign(s.begin(), s.end());
+         from_key6({result_key6.data(), result_key6.size()}, *result_key);
       }
       return true;
    }
@@ -1257,6 +1328,8 @@ namespace triedent
          key = {};
       }
    }  // unguarded_get_greater_equal
+      
+
 
    template <typename AccessMode>
    bool session<AccessMode>::get_less_than(const std::shared_ptr<root>&        r,
@@ -1266,7 +1339,8 @@ namespace triedent
                                            std::vector<std::shared_ptr<root>>* result_roots) const
    {
       swap_guard        g(*this);
-      std::vector<char> result_key6;
+      //std::vector<char> result_key6;
+      temp_key6 result_key6;
       if (!unguarded_get_less_than(g, r, get_id(r), to_key6({key.data(), key.size()}), result_key6,
                                    result_bytes, result_roots))
          return false;
@@ -1284,7 +1358,7 @@ namespace triedent
        const std::shared_ptr<triedent::root>&        ancestor,
        object_id                                     root,
        std::optional<std::string_view>               key,
-       std::vector<char>&                            result_key,
+       temp_key6&                                    result_key,
        std::vector<char>*                            result_bytes,
        std::vector<std::shared_ptr<triedent::root>>* result_roots) const
    {
@@ -1297,7 +1371,8 @@ namespace triedent
          auto  vn_key = vn.key();
          if (key && vn_key >= *key)
             return false;
-         result_key.insert(result_key.end(), vn_key.begin(), vn_key.end());
+         //result_key.insert(result_key.end(), vn_key.begin(), vn_key.end());
+         result_key.append(vn_key.begin(), vn_key.end());
          return fill_result(ancestor, vn, n.type(), result_bytes, result_roots);
       }
       auto&   in     = n.as_inner_node();
@@ -1316,7 +1391,8 @@ namespace triedent
          else
             key = std::nullopt;
       }
-      result_key.insert(result_key.end(), in_key.begin(), in_key.end());
+      //result_key.insert(result_key.end(), in_key.begin(), in_key.end());
+      result_key.append( in_key.begin(), in_key.end());
       auto b = in.reverse_lower_bound(last_b);
       if (b < last_b)
          key = std::nullopt;
@@ -1744,9 +1820,15 @@ namespace triedent
       }
    }
 
-   inline key_type from_key6(const key_view sixb)
+   inline key_type from_key6(const key_view sixb) {
+      key_type tmp;
+      from_key6( sixb, tmp ); 
+      return tmp;
+   }
+
+   template<typename KeyType>
+   inline void from_key6(const key_view sixb, KeyType& out)
    {
-      std::string out;
       out.resize((sixb.size() * 6) / 8);
 
       const uint8_t* pos6     = (uint8_t*)sixb.data();
@@ -1776,7 +1858,6 @@ namespace triedent
             pos8[0] = (pos6[0] << 2);  // 6 + 2-0
             break;
       }
-      return out;
    }
    inline key_view to_key6(key_type& key_buf, key_view v)
    {
