@@ -237,7 +237,6 @@ std::filesystem::path get_prefix()
    {
       prefix = prefix.parent_path();
    }
-   std::cerr << "prefix: " << prefix << "\n";
    return prefix;
 }
 
@@ -2214,7 +2213,6 @@ int main(int argc, char* argv[])
          auto db_root     = std::filesystem::path(vm["database"].as<std::string>());
          option_path      = option_path / db_root;
          auto config_path = db_root / "config";
-         std::cout << "expecting config file: " << config_path << "\n";
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
@@ -2222,7 +2220,6 @@ int main(int argc, char* argv[])
          }
          else if (!exists(config_path))
          {
-            std::cout << "creating config file: " << config_path << "\n";
             auto template_path = config_template_path();
             if (std::filesystem::is_regular_file(template_path))
             {
