@@ -2081,7 +2081,11 @@ namespace psibase::http
          threads.emplace_back(
              [this, i, _ = std::unique_lock{thread_count}]() mutable
              {
+#ifdef __APPLE__
+                pthread_setname_np(("http-" + std::to_string(i)).c_str());
+#else
                 pthread_setname_np(pthread_self(), ("http-" + std::to_string(i)).c_str());
+#endif
                 ioc.run();
              });
       }

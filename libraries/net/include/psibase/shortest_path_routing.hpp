@@ -153,7 +153,7 @@ namespace psibase::net
       };
       struct NeighborData
       {
-         RouteMetric transmissionCost = 1;
+         RouteMetric transmissionCost = {1};
       };
       struct CachedSeqnoRequest
       {

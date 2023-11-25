@@ -1,5 +1,6 @@
 add_compile_options( -Wall -Wstrict-aliasing -fstrict-aliasing )
 
+    link_directories(psibase-common-tests ${ICU_LIBRARY_DIR} )
 if(DEFINED IS_NATIVE)
     find_package(Threads REQUIRED)
     add_executable(psibase-common-tests

@@ -32,6 +32,10 @@
 #include <mutex>
 #include <thread>
 
+#ifdef __APPLE__
+#include <libproc.h>
+#endif
+
 using namespace psibase;
 using namespace psibase::net;
 
@@ -86,8 +90,8 @@ std::string to_string(const native_service& obj)
 
 struct autoconnect_t
 {
-   static constexpr std::size_t max   = std::numeric_limits<std::size_t>::max();
-   std::size_t                  value = max;
+   static constexpr std::uint64_t max   = std::numeric_limits<std::size_t>::max();
+   uint64_t                       value = max;
 };
 
 void to_json(const autoconnect_t& obj, auto& stream)
@@ -212,7 +216,23 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
 
 std::filesystem::path get_prefix()
 {
+#ifdef __APPLE__
+   int   ret;
+   pid_t pid;
+   char  pathbuf[2048];
+
+   pid = getpid();
+   ret = proc_pidpath(pid, pathbuf, sizeof(pathbuf));
+
+   if (ret <= 0)
+      throw std::runtime_error("unable to get process path");
+
+   std::filesystem::path prefix(std::string(pathbuf, ret));
+   prefix = prefix.parent_path();
+#else
    auto prefix = std::filesystem::read_symlink("/proc/self/exe").parent_path();
+#endif
+
    if (prefix.filename() == "bin")
    {
       prefix = prefix.parent_path();
@@ -785,35 +805,35 @@ PSIO_REFLECT(RestartInfo, shouldRestart);
 
 struct ThreadInfo
 {
-   pid_t        id;
-   std::string  group;
-   std::int64_t user;
-   std::int64_t system;
-   std::int64_t pageFaults;
-   std::int64_t read;
-   std::int64_t written;
+   pid_t       id;
+   std::string group;
+   uint64_t    user;
+   uint64_t    system;
+   uint64_t    pageFaults;
+   uint64_t    read;
+   uint64_t    written;
 };
 PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 
 struct MemStats
 {
-   std::size_t database;
-   std::size_t code;
-   std::size_t data;
-   std::size_t wasmMemory;
-   std::size_t wasmCode;
-   std::size_t unclassified;
+   uint64_t database;
+   uint64_t code;
+   uint64_t data;
+   uint64_t wasmMemory;
+   uint64_t wasmCode;
+   uint64_t unclassified;
 };
 PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
 
 // TODO: this will need to be reworked when we have more complete transaction tracking
 struct TransactionStats
 {
-   std::uint64_t unprocessed;
-   std::uint64_t total;
-   std::uint64_t failed;
-   std::uint64_t succeeded;
-   std::uint64_t skipped;
+   uint64_t unprocessed;
+   uint64_t total;
+   uint64_t failed;
+   uint64_t succeeded;
+   uint64_t skipped;
 };
 PSIO_REFLECT(TransactionStats, unprocessed, total, failed, succeeded, skipped)
 

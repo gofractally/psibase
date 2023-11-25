@@ -64,7 +64,7 @@ TEST_CASE("cache_allocator")
       }
    };
 
-   std::vector<std::jthread> threads;
+   std::vector<std::thread> threads;
    std::atomic<bool>         done{false};
    threads.emplace_back(
        [&]
@@ -81,6 +81,9 @@ TEST_CASE("cache_allocator")
       write_some(session);
    }
    done = true;
+   for( auto& t : threads ) {
+      t.join();
+   }
    threads.clear();
 
    CHECK(!failed.load());
@@ -158,13 +161,15 @@ TEST_CASE("cache_allocator long")
       }
       if (copy != data[idx])
       {
-         std::osyncstream(std::cout) << copy << " != " << data[idx] << std::endl;
+        // not supported on mac, std::osyncstream(std::cout) << copy << " != " << data[idx] << std::endl;
+         std::cout << copy << " != " << data[idx] << std::endl;
+         
          failed.store(true);
          done.store(true);
       }
    };
 
-   std::vector<std::jthread> threads;
+   std::vector<std::thread> threads;
    threads.emplace_back(
        [&]
        {
@@ -214,6 +219,9 @@ TEST_CASE("cache_allocator long")
    std::this_thread::sleep_for(100ms);
 #endif
    done.store(true);
+   for( auto& t : threads ) {
+      t.join();
+   }
    threads.clear();
    CHECK(!failed.load());
 }

@@ -1,6 +1,8 @@
 find_package(Threads REQUIRED)
 find_package(Boost REQUIRED)
 
+link_directories( ${ICU_LIBRARY_DIR} )
+
 add_executable(test_random_timer test_random_timer.cpp)
 target_include_directories(test_random_timer PUBLIC ../include)
 target_link_libraries(test_random_timer PUBLIC catch2 Threads::Threads Boost::headers)

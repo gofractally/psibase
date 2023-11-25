@@ -78,7 +78,7 @@ namespace debug_eos_vm
    struct wasm_frame
    {
       wasm_frame(const eosio::vm::module& mod, std::uint32_t idx)
-          : _params(&mod.types[mod.functions[idx]]), _locals(mod.code[idx].locals)
+          : _params(&mod.types[mod.functions[idx]]), _locals{mod.code[idx].locals}
       {
       }
       int32_t get_frame_offset(uint32_t local_idx) const

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psibase/nativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/nativeTables.hpp>
 
 namespace SystemService

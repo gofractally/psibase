@@ -1048,12 +1048,12 @@ namespace psibase::loggers
             {
                targetDirectory = log_file_path;
             }
-            auto get_int = [&](std::string_view key) -> std::uintmax_t
+            auto get_int = [&](std::string_view key) -> std::uint64_t
             {
                auto iter = args.find(key);
                if (iter != args.end())
                {
-                  std::uintmax_t result;
+                  std::uint64_t result;
                   const auto&    s   = as_string(iter->second);
                   auto           err = std::from_chars(s.data(), s.data() + s.size(), result);
                   if (err.ptr != s.data() + s.size() || err.ec != std::errc())
@@ -1064,7 +1064,7 @@ namespace psibase::loggers
                }
                else
                {
-                  return std::numeric_limits<std::uintmax_t>::max();
+                  return std::numeric_limits<std::uint64_t>::max();
                }
             };
             maxFiles     = get_int("maxFiles");
@@ -1141,9 +1141,9 @@ namespace psibase::loggers
          std::filesystem::path          targetDirectory;
          std::filesystem::path          filename;
          std::filesystem::path          target;
-         std::uintmax_t                 maxFiles;
-         std::uintmax_t                 maxSize;
-         std::uintmax_t                 rotationSize;
+         std::uint64_t                 maxFiles;
+         std::uint64_t                 maxSize;
+         std::uint64_t                 rotationSize;
          std::string                    rotationTime;
          bool                           flush = false;
          std::shared_ptr<time_rotation> rotationTimeFunc;
@@ -1167,7 +1167,7 @@ namespace psibase::loggers
             stream.write(':');
             psio::to_json(obj.target.native(), stream);
          }
-         if (obj.rotationSize != std::numeric_limits<std::uintmax_t>::max())
+         if (obj.rotationSize != std::numeric_limits<std::uint64_t>::max())
          {
             stream.write(',');
             psio::to_json("rotationSize", stream);
@@ -1181,14 +1181,14 @@ namespace psibase::loggers
             stream.write(':');
             psio::to_json(obj.rotationTime, stream);
          }
-         if (obj.maxFiles != std::numeric_limits<std::uintmax_t>::max())
+         if (obj.maxFiles != std::numeric_limits<std::uint64_t>::max())
          {
             stream.write(',');
             psio::to_json("maxFiles", stream);
             stream.write(':');
             psio::to_json(obj.maxFiles, stream);
          }
-         if (obj.maxSize != std::numeric_limits<std::uintmax_t>::max())
+         if (obj.maxSize != std::numeric_limits<std::uint64_t>::max())
          {
             stream.write(',');
             psio::to_json("maxSize", stream);
@@ -1468,7 +1468,7 @@ namespace psibase::loggers
 
       std::string translate_size(std::string_view s)
       {
-         std::uintmax_t v;
+         std::uint64_t v;
          auto           err = std::from_chars(s.begin(), s.end(), v);
          if (err.ec != std::errc())
          {
@@ -2539,6 +2539,10 @@ namespace psibase::loggers
          core->add_global_attribute(
              "TimeStamp", boost::log::attributes::function<std::chrono::system_clock::time_point>(
                               []() { return std::chrono::system_clock::now(); }));
+
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 255 // not defined on mac
+#endif
          char hostname[HOST_NAME_MAX + 1];
          if (gethostname(hostname, sizeof(hostname)))
          {
@@ -2871,7 +2875,7 @@ namespace psibase::loggers
       {
          file.set(section, "target", obj.target.native(), "The pattern for rotated log files");
       }
-      if (obj.rotationSize != std::numeric_limits<std::uintmax_t>::max())
+      if (obj.rotationSize != std::numeric_limits<std::uint64_t>::max())
       {
          file.set(section, "rotationSize", std::to_string(obj.rotationSize),
                   "Rotate logs when they reach this size");
@@ -2880,12 +2884,12 @@ namespace psibase::loggers
       {
          file.set(section, "rotationTime", obj.rotationTime, "Time when logs are rotated");
       }
-      if (obj.maxFiles != std::numeric_limits<std::uintmax_t>::max())
+      if (obj.maxFiles != std::numeric_limits<std::uint64_t>::max())
       {
          file.set(section, "maxFiles", std::to_string(obj.maxFiles),
                   "Maximum number of log files retained");
       }
-      if (obj.maxSize != std::numeric_limits<std::uintmax_t>::max())
+      if (obj.maxSize != std::numeric_limits<std::uint64_t>::max())
       {
          file.set(section, "maxSize", std::to_string(obj.maxSize),
                   "Maximum total size of log files retained");

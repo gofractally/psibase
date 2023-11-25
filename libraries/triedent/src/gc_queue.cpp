@@ -108,7 +108,7 @@ namespace triedent
 
    void gc_queue::notify_run()
    {
-      std::lock_guard{_queue_mutex};
+      std::lock_guard g{_queue_mutex};
       _queue_cond.notify_all();
    }
 
@@ -133,7 +133,7 @@ namespace triedent
       {
          if constexpr (debug_gc)
          {
-            std::osyncstream(std::cout) << "run gc: " << start << std::endl;
+         //   std::osyncstream(std::cout) << "run gc: " << start << std::endl;
          }
          out.push_back(std::move(_queue[start]));
          --_size;

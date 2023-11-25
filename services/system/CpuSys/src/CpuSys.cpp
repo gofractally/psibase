@@ -2,7 +2,7 @@
 
 #include <time.h>
 #include <psibase/dispatch.hpp>
-#include <psibase/nativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
 
 #include <services/system/AccountSys.hpp>
 

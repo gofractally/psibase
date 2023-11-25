@@ -176,14 +176,14 @@ namespace psibase::net
          if (active_producers[0] != prods.first || active_producers[1] != prods.second)
          {
             PSIBASE_LOG(logger, info) << "Active producers: " << *prods.first
-                                      << print_function(
+                                      << print_function{
                                              [&](std::ostream& os)
                                              {
                                                 if (prods.second)
                                                 {
                                                    os << ", " << *prods.second;
                                                 }
-                                             });
+                                             }};
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);

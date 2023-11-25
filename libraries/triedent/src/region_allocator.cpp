@@ -45,7 +45,7 @@ namespace triedent
          load_queue();
          _thread = std::thread{[this]
                                {
-                                  pthread_setname_np(pthread_self(), "swap");
+                                  set_current_thread_name("swap");
                                   run();
                                }};
       }

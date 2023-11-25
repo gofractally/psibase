@@ -467,7 +467,7 @@ namespace psio
       static bool is_empty_container(const T& value) { return value.empty(); }
       static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
       {
-         uint32_t fixed_size;
+         uint32_t fixed_size = 0;
          if (!unpack_numeric<true>(&fixed_size, src, pos, end_pos))
             return false;
          return fixed_size == 0;
@@ -481,7 +481,7 @@ namespace psio
                                        uint32_t&   pos,
                                        uint32_t    end_pos)
       {
-         uint32_t fixed_size;
+         uint32_t fixed_size = 0;
          if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
             return false;
          uint32_t size    = fixed_size / sizeof(typename T::value_type);
@@ -1221,7 +1221,7 @@ namespace psio
       {
          if constexpr (is_variable_size)
          {
-            uint16_t fixed_size;
+            uint16_t fixed_size = 0;
             if constexpr (reflect<T>::definitionWillNotChange)
                fixed_size = members_fixed_size;
             else if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))

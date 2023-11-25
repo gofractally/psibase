@@ -2,7 +2,7 @@
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
-#include <psibase/nativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/fracpack.hpp>
 

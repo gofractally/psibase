@@ -18,6 +18,8 @@ elseif(UNIX)
     )
 endif()
 
+target_link_directories(psitest PUBLIC ${ICU_LIBRARY_DIR} )
+
 set_target_properties(psitest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
 install(TARGETS psitest RUNTIME COMPONENT Tester)

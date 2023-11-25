@@ -673,7 +673,7 @@ namespace triedent
       }
       else
       {
-         if constexpr (debug_roots)
+         if constexpr (debug_roots) {
             if (r == nullptr)
             {
                std::cout << id.id << ": update_root original was nullptr" << std::endl;
@@ -683,6 +683,7 @@ namespace triedent
                std::cout << id.id << ": update_root replacing as new root:" << r->id.id
                          << std::endl;
             }
+         }
          r = std::make_shared<root>(root{_db, nullptr, id});
       }
    }

@@ -2,7 +2,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/name.hpp>
-#include <psibase/nativeFunctions.hpp>
+#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/chrono.hpp>
 

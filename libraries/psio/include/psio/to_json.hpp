@@ -173,6 +173,7 @@ template <typename S> void to_json(unsigned char value, S& stream)      { return
 template <typename S> void to_json(uint16_t value, S& stream)           { return int_to_json(value, stream); }
 template <typename S> void to_json(uint32_t value, S& stream)           { return int_to_json(value, stream); }
 template <typename S> void to_json(uint64_t value, S& stream)           { return int_to_json(value, stream); }
+//template <typename S> void to_json(unsigned long value, S& stream)      { return int_to_json(value, stream); }
 template <typename S> void to_json(unsigned __int128 value, S& stream)  { return int_to_json(value, stream); }
 template <typename S> void to_json(char value, S& stream)               { return int_to_json(value, stream); }
 template <typename S> void to_json(signed char value, S& stream)        { return int_to_json(value, stream); }
