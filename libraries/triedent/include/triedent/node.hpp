@@ -418,7 +418,7 @@ namespace triedent
             ++pos;
          }
       }
-      if (ptr && type == node_type::roots)
+      else if (ptr && type == node_type::roots)
       {
          auto& vn    = *reinterpret_cast<value_node*>(ptr);
          auto  n     = vn.num_roots();

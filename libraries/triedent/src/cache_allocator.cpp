@@ -21,20 +21,13 @@ namespace triedent
              [this]()
              {
                 thread_name("swap");
-#ifndef __APPLE__
-                pthread_setname_np(pthread_self(), "swap");
-#else // if __APPLE__
-                pthread_setname_np("swap");
-#endif
+                set_current_thread_name( "swap" );
                 swap_loop();
              });
+
          _gc_thread = std::thread{[this]
                                   {
-#ifndef __APPLE__
-                                    pthread_setname_np(pthread_self(), "swap");
-#else // if __APPLE__
-                                    pthread_setname_np("swap");
-#endif
+                                     set_current_thread_name( "gc" );
                                      _gc.run(&_done);
                                   }};
       }

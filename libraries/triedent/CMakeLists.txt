@@ -22,9 +22,6 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(X86_64)|(amd64)|(AMD64)")
    endif()
 endif()
 
-add_executable(mermaid src/mermaid.cpp)
-target_link_libraries(mermaid PUBLIC Boost::program_options triedent)
-target_include_directories(mermaid PUBLIC ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include)
-set_target_properties(mermaid PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
+add_subdirectory(programs)
 add_subdirectory(test)

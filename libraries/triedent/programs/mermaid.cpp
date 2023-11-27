@@ -20,6 +20,7 @@ int main(int argc, char** argv)
 
       po::options_description desc("Allowed options");
       auto                    opt = desc.add_options();
+      opt("about", "about mermaid");
       opt("help,h", "print this message");
       opt("reset", "reset the database");
       opt("status", "print status of the database");
@@ -41,6 +42,10 @@ int main(int argc, char** argv)
       po::store(po::parse_command_line(argc, argv, desc), vm);
       po::notify(vm);
 
+      if (vm.count("about" )) {
+         std::cout<<"Mermaid helps maintain, migrate, and repair triedent databases\n";
+         return 0;
+      }
       if (vm.count("help"))
       {
          std::cout << desc << "\n";
