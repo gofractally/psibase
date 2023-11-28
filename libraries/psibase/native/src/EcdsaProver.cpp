@@ -11,7 +11,35 @@ namespace
       static secp256k1_context* result = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
       return result;
    }
+
+   psibase::EccPublicKey getK1PublicKey(std::span<const unsigned char, 32> privateKey)
+   {
+      auto             ctx = get_context();
+      secp256k1_pubkey pub;
+      if (!secp256k1_ec_pubkey_create(ctx, &pub, privateKey.data()))
+      {
+         throw std::runtime_error("invalid private key");
+      }
+
+      psibase::EccPublicKey eccPubKey;
+      std::size_t           sz = eccPubKey.size();
+      secp256k1_ec_pubkey_serialize(ctx, reinterpret_cast<unsigned char*>(eccPubKey.data()), &sz,
+                                    &pub, SECP256K1_EC_COMPRESSED);
+      return eccPubKey;
+   }
 }  // namespace
+
+psibase::PublicKey psibase::getPublicKey(const PrivateKey& key)
+{
+   if (const EccPrivateKey* k1 = std::get_if<0>(&key.data))
+   {
+      return PublicKey{PublicKey::variant_type{std::in_place_index<0>, getK1PublicKey(*k1)}};
+   }
+   else
+   {
+      throw std::runtime_error("Only k1 keys are supported");
+   }
+}
 
 psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber service)
     : service(service)
@@ -36,18 +64,8 @@ psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber se
          ptr += res;
       }
    }
-   auto             ctx = get_context();
-   secp256k1_pubkey pub;
-   if (!secp256k1_ec_pubkey_create(ctx, &pub, privateKey))
-   {
-      throw std::runtime_error("invalid private key");
-   }
-
-   EccPublicKey eccPubKey;
-   std::size_t  sz = eccPubKey.size();
-   secp256k1_ec_pubkey_serialize(ctx, reinterpret_cast<unsigned char*>(eccPubKey.data()), &sz, &pub,
-                                 SECP256K1_EC_COMPRESSED);
-   pubKey = psio::to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<0>, eccPubKey}});
+   pubKey = psio::to_frac(
+       PublicKey{PublicKey::variant_type{std::in_place_index<0>, getK1PublicKey(privateKey)}});
 }
 
 psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber     service,
@@ -56,18 +74,8 @@ psibase::EcdsaSecp256K1Sha256Prover::EcdsaSecp256K1Sha256Prover(AccountNumber   
 {
    const auto& k1key = std::get<0>(key.data);
    std::memcpy(privateKey, k1key.data(), sizeof(privateKey));
-   auto             ctx = get_context();
-   secp256k1_pubkey pub;
-   if (!secp256k1_ec_pubkey_create(ctx, &pub, privateKey))
-   {
-      throw std::runtime_error("invalid private key");
-   }
-
-   EccPublicKey eccPubKey;
-   std::size_t  sz = eccPubKey.size();
-   secp256k1_ec_pubkey_serialize(ctx, reinterpret_cast<unsigned char*>(eccPubKey.data()), &sz, &pub,
-                                 SECP256K1_EC_COMPRESSED);
-   pubKey = psio::to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<0>, eccPubKey}});
+   pubKey = psio::to_frac(
+       PublicKey{PublicKey::variant_type{std::in_place_index<0>, getK1PublicKey(privateKey)}});
 }
 
 std::vector<char> psibase::EcdsaSecp256K1Sha256Prover::prove(std::span<const char> data,

@@ -1,6 +1,7 @@
 #include <psibase/ConfigFile.hpp>
 #include <psibase/EcdsaProver.hpp>
 #include <psibase/OpenSSLProver.hpp>
+#include <psibase/PKCS11Prover.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/bft.hpp>
 #include <psibase/cft.hpp>
@@ -457,6 +458,23 @@ namespace psibase
          }
       }
    }  // namespace http
+
+   namespace pkcs11
+   {
+      void validate(boost::any& v, const std::vector<std::string>& values, URI*, int)
+      {
+         boost::program_options::validators::check_first_occurrence(v);
+         const auto& s = boost::program_options::validators::get_single_string(values);
+         try
+         {
+            v = URI(s);
+         }
+         catch (std::exception& e)
+         {
+            throw boost::program_options::invalid_option_value(s);
+         }
+      }
+   }  // namespace pkcs11
 }  // namespace psibase
 
 struct transaction_queue
@@ -788,8 +806,30 @@ struct NewKeyRequest
 {
    AccountNumber                    service;
    std::optional<std::vector<char>> rawData;
+   std::string                      device;
 };
-PSIO_REFLECT(NewKeyRequest, service, rawData);
+PSIO_REFLECT(NewKeyRequest, service, rawData, device);
+
+struct UnlockKeyringRequest
+{
+   std::string pin;
+   std::string device;
+};
+PSIO_REFLECT(UnlockKeyringRequest, pin, device);
+
+struct LockKeyringRequest
+{
+   std::string device;
+};
+PSIO_REFLECT(LockKeyringRequest, device);
+
+struct PKCS11TokenInfo
+{
+   std::string name;
+   std::string id;
+   bool        unlocked;
+};
+PSIO_REFLECT(PKCS11TokenInfo, name, id, unlocked);
 
 struct RestartInfo
 {
@@ -1296,6 +1336,7 @@ struct PsinodeConfig
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
    AccountNumber               producer;
+   std::vector<std::string>    pkcs11_modules;
    std::string                 host;
    std::vector<listen_spec>    listen;
    TLSConfig                   tls;
@@ -1309,6 +1350,7 @@ PSIO_REFLECT(PsinodeConfig,
              peers,
              autoconnect,
              producer,
+             pkcs11_modules,
              host,
              listen,
 #ifdef PSIBASE_ENABLE_SSL
@@ -1336,6 +1378,12 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    if (config.producer != AccountNumber())
    {
       file.set("", "producer", config.producer.str(), "The name to use for block production");
+   }
+   if (!config.pkcs11_modules.empty())
+   {
+      file.set(
+          "", "pkcs11-module", config.pkcs11_modules,
+          [](std::string_view text) { return std::string(text); }, "PKCS #11 modules to load");
    }
    if (!config.host.empty())
    {
@@ -1427,6 +1475,7 @@ void run(const std::string&              db_path,
          const DbConfig&                 db_conf,
          AccountNumber                   producer,
          std::shared_ptr<CompoundProver> prover,
+         std::vector<std::string>&       pkcs11_modules,
          const std::vector<std::string>& peers,
          autoconnect_t                   autoconnect,
          bool                            enable_incoming_p2p,
@@ -1476,6 +1525,110 @@ void run(const std::string&              db_path,
          }
       }
    }
+
+   // Manages the session and and unlinks all keys from prover on destruction
+   struct PKCS11SessionManager
+   {
+      PKCS11SessionManager(const std::shared_ptr<pkcs11::pkcs11_library>& lib,
+                           pkcs11::slot_id_t                              slot)
+          : session(std::make_shared<pkcs11::session>(lib, slot)),
+            sessionProver(std::make_shared<CompoundProver>())
+      {
+      }
+      ~PKCS11SessionManager() { unlink(); }
+      void unlink()
+      {
+         if (baseProver)
+         {
+            baseProver->remove(sessionProver);
+            baseProver.reset();
+         }
+      }
+      void clear()
+      {
+         sessionProver->provers.clear();
+         unlink();
+      }
+      pkcs11::session*                 operator->() const { return session.get(); }
+      std::shared_ptr<pkcs11::session> session;
+      std::shared_ptr<CompoundProver>  baseProver;
+      std::shared_ptr<CompoundProver>  sessionProver;
+   };
+   auto loadSessionKeys = [&prover](PKCS11SessionManager& session)
+   {
+      loadPKCS11Keys(session.session, *session.sessionProver);
+      session.unlink();
+      prover->add(session.sessionProver);
+      session.baseProver = prover;
+   };
+
+   using PKCS11LibInfo = std::pair<std::shared_ptr<pkcs11::pkcs11_library>,
+                                   std::map<pkcs11::slot_id_t, PKCS11SessionManager>>;
+
+   std::map<std::string, PKCS11LibInfo> pkcs11Libs;
+   auto setPKCS11Libs = [&pkcs11Libs](const std::vector<std::string>& new_modules)
+   {
+      std::map<std::string, PKCS11LibInfo> newLibs;
+      std::vector<std::string>             added;
+      for (const std::string& path : new_modules)
+      {
+         if (auto node = pkcs11Libs.extract(path))
+         {
+            newLibs.insert(std::move(node));
+         }
+         else
+         {
+            added.push_back(path);
+         }
+      }
+      // Unload modules first to avoid issues if the old configuration and the
+      // new configuration include the same module under different names. Loading
+      // the same module more than once is a Bad Idea (TM). Note that deduplicating
+      // on the handle before calling C_Initialize is not sufficient, because
+      // some modules (p11-kit-proxy) can load others.
+      for (auto& [path, module] : pkcs11Libs)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), info)
+             << "Unloading PKCS #11 module: " << path;
+         module.second.clear();
+         module.first.reset();
+      }
+      pkcs11Libs = std::move(newLibs);
+      for (const std::string& path : added)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Loading PKCS #11 module: " << path;
+         pkcs11Libs.insert({path, {std::make_shared<pkcs11::pkcs11_library>(path.c_str()), {}}});
+      }
+   };
+   setPKCS11Libs(pkcs11_modules);
+
+   auto getPKCS11Slot = [&pkcs11Libs](std::string_view uri)
+   {
+      pkcs11::URI                              token(uri);
+      std::optional<pkcs11::slot_id_t>         found;
+      std::shared_ptr<pkcs11::pkcs11_library>* foundLib      = nullptr;
+      PKCS11LibInfo::second_type*              foundSessions = nullptr;
+      for (auto& [k, v] : pkcs11Libs)
+      {
+         auto& [lib, sessions] = v;
+         if (token.matches(lib->GetInfo()))
+         {
+            for (auto slot : lib->GetSlotList(true))
+            {
+               if (token.matches(slot, lib->GetSlotInfo(slot)) &&
+                   token.matches(lib->GetTokenInfo(slot)))
+               {
+                  check(!found, "Multiple tokens match URI");
+                  found         = slot;
+                  foundLib      = &lib;
+                  foundSessions = &sessions;
+               }
+            }
+         }
+      }
+      check(!!found, "No token matches URI");
+      return std::tuple{*foundLib, *found, foundSessions};
+   };
 
    // http_config must live until server shutdown which happens when chainContext
    // is destroyed.
@@ -1771,94 +1924,112 @@ void run(const std::string&              db_path,
 
       http_config->set_config =
           [&chainContext, &node, &db_path, &runResult, &http_config, &host, &admin, &admin_authz,
-           &services, &tls_cert, &tls_key, &root_ca,
-           &connect_one](std::vector<char> json, http::connect_callback callback)
+           &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one,
+           setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
 
-         boost::asio::post(
-             chainContext,
-             [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
-              &runResult, &http_config, &host, &services, &admin, &admin_authz, &tls_cert, &tls_key,
-              &root_ca, &connect_one, callback = std::move(callback)]() mutable
-             {
-                std::optional<http::services_t> new_services;
-                for (auto& entry : config.services)
-                {
-                   entry.root =
-                       parse_path(entry.root.native(), std::filesystem::current_path() / db_path);
-                }
-                if (services != config.services || host != config.host)
-                {
-                   new_services.emplace();
-                   for (const auto& entry : config.services)
-                   {
-                      load_service(entry, *new_services, config.host);
-                   }
-                }
-                node.set_producer_id(config.producer);
-                http_config->enable_p2p = config.p2p;
-                if (!http_config->status.load().shutdown)
-                {
-                   node.autoconnect(std::vector(config.peers), config.autoconnect.value,
-                                    connect_one);
-                }
-                host        = config.host;
-                services    = config.services;
-                admin       = config.admin;
-                admin_authz = config.admin_authz;
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
+                            &db_path, &runResult, &http_config, &host, &services, &admin,
+                            &admin_authz, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
+                            &connect_one, setPKCS11Libs, callback = std::move(callback)]() mutable
+                           {
+                              std::optional<http::services_t> new_services;
+                              for (auto& entry : config.services)
+                              {
+                                 entry.root = parse_path(entry.root.native(),
+                                                         std::filesystem::current_path() / db_path);
+                              }
+                              if (services != config.services || host != config.host)
+                              {
+                                 new_services.emplace();
+                                 for (const auto& entry : config.services)
+                                 {
+                                    load_service(entry, *new_services, config.host);
+                                 }
+                              }
+                              // Error handling for PKCS #11 modules loading is tricky because
+                              // it involves global state outside of our direct control
+                              try
+                              {
+                                 setPKCS11Libs(config.pkcs11_modules);
+                              }
+                              catch (std::runtime_error& e)
+                              {
+                                 PSIBASE_LOG(loggers::generic::get(), warning) << e.what();
+                                 PSIBASE_LOG(loggers::generic::get(), warning)
+                                     << "Rolling back config";
+                                 setPKCS11Libs(pkcs11_modules);
+                                 callback(e.what());
+                                 return;
+                              }
+                              // All configuration errors should be detected before this point
+                              node.set_producer_id(config.producer);
+                              http_config->enable_p2p = config.p2p;
+                              if (!http_config->status.load().shutdown)
+                              {
+                                 node.autoconnect(std::vector(config.peers),
+                                                  config.autoconnect.value, connect_one);
+                              }
+                              pkcs11_modules = config.pkcs11_modules;
+                              host           = config.host;
+                              services       = config.services;
+                              admin          = config.admin;
+                              admin_authz    = config.admin_authz;
 #ifdef PSIBASE_ENABLE_SSL
-                tls_cert = config.tls.certificate;
-                tls_key  = config.tls.key;
-                root_ca  = config.tls.trustfiles;
+                              tls_cert = config.tls.certificate;
+                              tls_key  = config.tls.key;
+                              root_ca  = config.tls.trustfiles;
 #endif
-                loggers::configure(config.loggers);
-                {
-                   std::shared_lock l{http_config->mutex};
-                   http_config->host                = host;
-                   http_config->listen              = config.listen;
-                   http_config->admin               = admin;
-                   http_config->admin_authz         = admin_authz;
-                   http_config->enable_transactions = !host.empty();
-                   if (new_services)
-                   {
-                      // Use swap instead of move to delay freeing the old
-                      // services until after releasing the mutex
-                      http_config->services.swap(*new_services);
-                   }
-                }
-                {
-                   auto       path = std::filesystem::path(db_path) / "config";
-                   ConfigFile file{config_options};
-                   {
-                      std::ifstream in(path);
-                      file.parse(in);
-                   }
-                   to_config(config, file);
-                   {
-                      std::ofstream out(path);
-                      file.write(out);
-                   }
-                   runResult.configChanged = true;
-                }
-                callback(std::nullopt);
-             });
+                              loggers::configure(config.loggers);
+                              {
+                                 std::shared_lock l{http_config->mutex};
+                                 http_config->host                = host;
+                                 http_config->listen              = config.listen;
+                                 http_config->admin               = admin;
+                                 http_config->admin_authz         = admin_authz;
+                                 http_config->enable_transactions = !host.empty();
+                                 if (new_services)
+                                 {
+                                    // Use swap instead of move to delay freeing the old
+                                    // services until after releasing the mutex
+                                    http_config->services.swap(*new_services);
+                                 }
+                              }
+                              {
+                                 auto       path = std::filesystem::path(db_path) / "config";
+                                 ConfigFile file{config_options};
+                                 {
+                                    std::ifstream in(path);
+                                    file.parse(in);
+                                 }
+                                 to_config(config, file);
+                                 {
+                                    std::ofstream out(path);
+                                    file.write(out);
+                                 }
+                                 runResult.configChanged = true;
+                              }
+                              callback(std::nullopt);
+                           });
       };
 
       http_config->get_config = [&chainContext, &node, &http_config, &host, &admin, &admin_authz,
-                                 &tls_cert, &tls_key, &root_ca,
+                                 &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
                                  &services](http::get_config_callback callback)
       {
          boost::asio::post(
              chainContext,
              [&chainContext, &node, &http_config, &host, &services, &admin, &admin_authz, &tls_cert,
-              &tls_key, &root_ca, callback = std::move(callback)]() mutable
+              &tls_key, &root_ca, &pkcs11_modules, callback = std::move(callback)]() mutable
              {
                 PsinodeConfig result;
                 result.p2p                                       = http_config->enable_p2p;
                 std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
                 result.producer                                  = node.producer_name();
+                result.pkcs11_modules                            = pkcs11_modules;
                 result.host                                      = host;
                 result.listen                                    = http_config->listen;
 #ifdef PSIBASE_ENABLE_SSL
@@ -1899,8 +2070,8 @@ void run(const std::string&              db_path,
                            });
       };
 
-      http_config->new_key =
-          [&chainContext, &prover, &db_path, &runResult](std::vector<char> json, auto callback)
+      http_config->new_key = [&chainContext, &prover, &db_path, &runResult, getPKCS11Slot](
+                                 std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
@@ -1911,13 +2082,31 @@ void run(const std::string&              db_path,
          }
          boost::asio::post(
              chainContext,
-             [&prover, &db_path, &runResult, callback = std::move(callback),
+             [&prover, &db_path, &runResult, getPKCS11Slot, callback = std::move(callback),
               key = std::move(key)]() mutable
              {
                 try
                 {
                    std::shared_ptr<Prover> result;
-                   if (key.service == AccountNumber{})
+                   bool                    storeConfig = true;
+                   if (!key.device.empty())
+                   {
+                      auto [lib, slot, sessions] = getPKCS11Slot(key.device);
+                      auto pos                   = sessions->find(slot);
+                      check(pos != sessions->end(), "Device locked");
+                      if (key.rawData)
+                      {
+                         result = std::make_shared<PKCS11Prover>(pos->second.session, key.service,
+                                                                 *key.rawData);
+                      }
+                      else
+                      {
+                         result = std::make_shared<PKCS11Prover>(pos->second.session, key.service);
+                      }
+                      pos->second.sessionProver->add(result);
+                      storeConfig = false;
+                   }
+                   else if (key.service == AccountNumber{"verifyec-sys"})
                    {
                       if (key.rawData)
                       {
@@ -1929,7 +2118,7 @@ void run(const std::string&              db_path,
                          result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
                       }
                    }
-                   else
+                   else if (key.service == AccountNumber{"verify-sys"})
                    {
                       if (key.rawData)
                       {
@@ -1940,12 +2129,25 @@ void run(const std::string&              db_path,
                          result = std::make_shared<OpenSSLProver>(key.service);
                       }
                    }
-                   std::vector<Claim> existing;
-                   prover->get(existing);
+                   else
+                   {
+                      check(
+                          false,
+                          "should not get here, because service should have been checked already");
+                   }
                    std::vector<Claim> claim;
                    result->get(claim);
-                   if (!claim.empty() &&
-                       std::find(existing.begin(), existing.end(), claim[0]) == existing.end())
+                   // Check for duplicates
+                   if (storeConfig)
+                   {
+                      std::vector<Claim> existing;
+                      prover->get(existing);
+                      if (claim.empty() || std::ranges::find(existing, claim[0]) != existing.end())
+                      {
+                         storeConfig = false;
+                      }
+                   }
+                   if (storeConfig)
                    {
                       prover->add(std::move(result));
 
@@ -1985,6 +2187,99 @@ void run(const std::string&              db_path,
                    callback(e.what());
                 }
              });
+      };
+
+      http_config->unlock_keyring =
+          [&chainContext, loadSessionKeys, getPKCS11Slot](std::vector<char> json, auto callback)
+      {
+         json.push_back('\0');
+         psio::json_token_stream stream(json.data());
+         auto                    pin = psio::from_json<UnlockKeyringRequest>(stream);
+         boost::asio::post(chainContext,
+                           [getPKCS11Slot, loadSessionKeys, callback = std::move(callback),
+                            pin = std::move(pin)]() mutable
+                           {
+                              try
+                              {
+                                 auto [lib, slot, sessions] = getPKCS11Slot(pin.device);
+                                 auto pos = sessions->try_emplace(slot, lib, slot).first;
+                                 pos->second->Login(pin.pin);
+                                 loadSessionKeys(pos->second);
+                                 callback(std::nullopt);
+                              }
+                              catch (std::exception& e)
+                              {
+                                 callback(e.what());
+                              }
+                           });
+      };
+
+      http_config->lock_keyring =
+          [&chainContext, getPKCS11Slot](std::vector<char> json, auto callback)
+      {
+         json.push_back('\0');
+         psio::json_token_stream stream(json.data());
+         auto                    id = psio::from_json<LockKeyringRequest>(stream);
+         boost::asio::post(
+             chainContext,
+             [getPKCS11Slot, callback = std::move(callback), id = std::move(id)]() mutable
+             {
+                try
+                {
+                   auto [lib, slot, sessions] = getPKCS11Slot(id.device);
+                   auto pos                   = sessions->find(slot);
+                   check(pos != sessions->end(), "Not logged in");
+                   pos->second->Logout();
+                   pos->second.clear();
+                   callback(std::nullopt);
+                }
+                catch (std::exception& e)
+                {
+                   callback(e.what());
+                }
+             });
+      };
+
+      http_config->get_pkcs11_tokens = [&chainContext, &pkcs11Libs](auto callback)
+      {
+         boost::asio::post(chainContext,
+                           [&pkcs11Libs, callback = std::move(callback)]() mutable
+                           {
+                              try
+                              {
+                                 std::vector<PKCS11TokenInfo> result;
+                                 for (const auto& [k, v] : pkcs11Libs)
+                                 {
+                                    const auto& [lib, sessions] = v;
+                                    for (const auto& slot : lib->GetSlotList(true))
+                                    {
+                                       auto             tinfo = lib->GetTokenInfo(slot);
+                                       std::string_view label = pkcs11::getString(tinfo.label);
+                                       std::string      id    = pkcs11::makeURI(tinfo);
+                                       auto             session_pos = sessions.find(slot);
+                                       bool             unlocked =
+                                           session_pos != sessions.end() &&
+                                           session_pos->second->GetSessionInfo().state ==
+                                               pkcs11::state_t::rw_user_functions;
+                                       result.push_back({.name     = std::string(label),
+                                                         .id       = std::move(id),
+                                                         .unlocked = unlocked});
+                                    }
+                                 }
+                                 callback(
+                                     [result = std::move(result)]() mutable
+                                     {
+                                        std::vector<char>   json;
+                                        psio::vector_stream stream(json);
+                                        to_json(result, stream);
+                                        return json;
+                                     });
+                              }
+                              catch (std::exception& e)
+                              {
+                                 callback(e.what());
+                              }
+                           });
       };
 
       boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
@@ -2131,7 +2426,8 @@ int main(int argc, char* argv[])
    std::string                 db_path;
    std::string                 producer = {};
    auto                        keys     = std::make_shared<CompoundProver>();
-   std::string                 host     = {};
+   std::vector<std::string>    pkcs11_modules;
+   std::string                 host = {};
    std::vector<listen_spec>    listen;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
@@ -2182,6 +2478,10 @@ int main(int argc, char* argv[])
    opt("tls-key", po::value(&tls_key)->default_value("")->value_name("path"),
        "The file containing the private key corresponding to --tls-cert in PEM format");
 #endif
+   opt("pkcs11-module",
+       po::value(&pkcs11_modules)->composing()->default_value({}, "")->value_name("path"),
+       "Path to a PKCS #11 module to load");
+   // specify default token/service
    opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in µs.");
    desc.add(common_opts);
@@ -2271,9 +2571,9 @@ int main(int argc, char* argv[])
          restart.shutdownRequested = false;
          restart.shouldRestart     = true;
          restart.soft              = true;
-         run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, peers, autoconnect,
-             enable_incoming_p2p, host, listen, services, admin, admin_authz, root_ca, tls_cert,
-             tls_key, leeway_us, restart);
+         run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, pkcs11_modules, peers,
+             autoconnect, enable_incoming_p2p, host, listen, services, admin, admin_authz, root_ca,
+             tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

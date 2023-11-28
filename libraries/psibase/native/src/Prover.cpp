@@ -26,6 +26,11 @@ namespace psibase
       return false;
    }
 
+   void CompoundProver::remove(const std::shared_ptr<Prover>& member)
+   {
+      std::erase(provers, member);
+   }
+
    void CompoundProver::add(std::shared_ptr<Prover> prover)
    {
       provers.push_back(prover);

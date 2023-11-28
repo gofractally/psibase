@@ -6,20 +6,23 @@ Much of the administration of an individual node can be done via the graphical u
 
 The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). Authorization to access this API is controlled by the server's `admin-authz` configuration option.
 
-| Method | URL                        | Description                                                                   |
-|--------|----------------------------|-------------------------------------------------------------------------------|
-| `GET`  | `/native/admin/status`     | Returns status conditions currently affecting the server                      |
-| `POST` | `/native/admin/login`      | Returns a bearer token that can be used to access the admin API               |
-| `POST` | `/native/admin/shutdown`   | Stops or restarts the server                                                  |
-| `GET`  | `/native/admin/peers`      | Returns a JSON array of all the peers that the node is currently connected to |
-| `POST` | `/native/admin/connect`    | Connects to another node                                                      |
-| `POST` | `/native/admin/disconnect` | Disconnects an existing peer connection                                       |
-| `GET`  | `/native/admin/keys`       | Returns a JSON array of the public keys that the server can sign for          |
-| `POST` | `/native/admin/keys`       | Creates or imports a key pair                                                 |
-| `GET`  | `/native/admin/config`     | Returns the current [server configuration](#server-configuration)             |
-| `PUT`  | `/native/admin/config`     | Sets the [server configuration](#server-configuration)                        |
-| `GET`  | `/native/admin/perf`       | Returns [performance monitoring](#performance-monitoring) data                |
-| `GET`  | `/native/admin/log`        | Websocket that provides access to [live server logs](#websocket-logger)       |
+| Method | URL                          | Description                                                                   |
+|--------|------------------------------|-------------------------------------------------------------------------------|
+| `GET`  | `/native/admin/status`       | Returns status conditions currently affecting the server                      |
+| `POST` | `/native/admin/login`        | Returns a bearer token that can be used to access the admin API               |
+| `POST` | `/native/admin/shutdown`     | Stops or restarts the server                                                  |
+| `GET`  | `/native/admin/peers`        | Returns a JSON array of all the peers that the node is currently connected to |
+| `POST` | `/native/admin/connect`      | Connects to another node                                                      |
+| `POST` | `/native/admin/disconnect`   | Disconnects an existing peer connection                                       |
+| `GET`  | `/native/admin/keys`         | Returns a JSON array of the public keys that the server can sign for          |
+| `POST` | `/native/admin/keys`         | Creates or imports a key pair                                                 |
+| `GET`  | `/native/admin/keys/devices` | Lists available cryptographic devices                                         |
+| `POST` | `/native/admin/keys/unlock`  | Unlocks a cryptographic device                                                |
+| `POST` | `/native/admin/keys/lock`    | Locks a cryptographic device                                                  |
+| `GET`  | `/native/admin/config`       | Returns the current [server configuration](#server-configuration)             |
+| `PUT`  | `/native/admin/config`       | Sets the [server configuration](#server-configuration)                        |
+| `GET`  | `/native/admin/perf`         | Returns [performance monitoring](#performance-monitoring) data                |
+| `GET`  | `/native/admin/log`          | Websocket that provides access to [live server logs](#websocket-logger)       |
 
 ### Server status
 
@@ -80,9 +83,9 @@ Each peer has the following fields:
 
 `GET` on `/native/admin/keys` lists the public keys that the server can sign for.
 
-| Field     | Type   | Description                                                                                     |
-|-----------|--------|-------------------------------------------------------------------------------------------------|
-| `service` | String | The name of the service that verifies signatures made with this key                            |
+| Field     | Type   | Description                                                                                       |
+|-----------|--------|---------------------------------------------------------------------------------------------------|
+| `service` | String | The name of the service that verifies signatures made with this key                               |
 | `rawData` | String | A hex string containing public key information. The interpretation depends on the verify service. |
 
 `POST` to `/native/admin/keys` creates or uploads a new key pair. It returns the corresponding public key.
@@ -91,6 +94,28 @@ Each peer has the following fields:
 |-----------|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `service` | String | The name of the verify service                                                                                                                                      |
 | `rawData` | String | A hex string containing private key information. The interpretation depends on the verify service. If `rawData` is not present, the server will generate a new key. |
+| `device`  | String | The id of the cryptographic device which will hold the new key. The device must be unlocked.                                                                        |
+
+`GET` on `/native/admin/keys/devices` lists available cryptographic devices that can store keys.
+
+| Field      | Type    | Description                                          |
+|------------|---------|------------------------------------------------------|
+| `name`     | String  | The human readable name of the device                |
+| `id`       | String  | An opaque string that uniquely identifies the device |
+| `unlocked` | Boolean | `true` if the device is currently unlocked           |
+
+`POST` to `/native/admin/keys/unlock` unlocks a cryptographic device.
+
+| Field    | Type   | Description                 |
+|----------|--------|-----------------------------|
+| `device` | String | The device id.              |
+| `pin`    | String | The user pin for the device |
+
+`POST` to `/native/admin/keys/lock` locks a cryptographic device.
+
+| Field    | Type   | Description    |
+|----------|--------|----------------|
+| `device` | String | The device id. |
 
 ### Server configuration
 
@@ -102,6 +127,7 @@ Each peer has the following fields:
 | `peers`                  | Array             | A list of peer URLs that the server may connect to. To manage the active connections, see [peer management](#peer-management)                                                                             |
 | `autoconnect`            | Number or Boolean | The target number of out-going connections. If set to true, the server will try to connect to all configured peers.                                                                                       |
 | `producer`               | String            | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
+| `pkcs11-modules`         | Array             | PKCS #11 modules that provide access to cryptographic devices.                                                                                                                                            |
 | `host`                   | String            | The server's hostname.                                                                                                                                                                                    |
 | `listen`                 | Array             | Interfaces that the server will listen on. Changes to the set of interfaces will take effect the next time the server starts.                                                                             |
 | `listen[n].protocol`     | String            | One of `http`, `https`, or `local`                                                                                                                                                                        |
@@ -127,6 +153,7 @@ Example:
     "p2p": true,
     "peers": ["http://psibase.io/"],
     "producer": "prod",
+    "pkcs11-modules": ["libsofthsm2.so"],
     "host": "127.0.0.1.sslip.io",
     "listen": [
         {
