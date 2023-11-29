@@ -28,51 +28,69 @@ namespace triedent
 
    inline key_type from_key6(const key_view sixb);
 
-   template<typename KeyType>
+   template <typename KeyType>
    inline void from_key6(const key_view sixb, KeyType& out);
-
 
    // used to avoid malloc, because keys can be at most 256,
    // this one change produced 13% improvment with 12 threads
-   struct temp_key6 {
+   struct temp_key6
+   {
       uint32_t _size = 0;
-      char     _buffer[256];
+      char     _buffer[128];
 
-      uint32_t size()const { return _size; }
-      const char* begin()const { return _buffer; }
-      const char* end()const   { return _buffer + _size; }
-      char* begin(){ return _buffer; }
-      char* end() { return _buffer + _size; }
+      uint32_t    size() const { return _size; }
+      const char* begin() const { return _buffer; }
+      const char* end() const { return _buffer + _size; }
+      char*       begin() { return _buffer; }
+      char*       end() { return _buffer + _size; }
 
-      void append( const char* p, const char* e ) {
+      void append(const char* p, const char* e)
+      {
          int s = e - p;
-         if( _size + s > 256 ) 
-            throw std::runtime_error( "key length overflow" );
-         memcpy( end(), p, s );
+         if (_size + s > sizeof(_buffer))
+            throw std::runtime_error("key length overflow");
+         memcpy(end(), p, s);
          _size += s;
       }
-      void push_back( char c ) {
-         if( _size < 256 ) {
+      void push_back(char c)
+      {
+         if (_size < sizeof(_buffer))
+         {
             *end() = c;
             ++_size;
-         } else {
-            throw std::runtime_error( "key length overflow" );
+         }
+         else
+         {
+            throw std::runtime_error("key length overflow");
          }
       }
-      void resize( uint32_t s ) {
-         if( s < 256 ) {
+      void resize(uint32_t s)
+      {
+         if (s < sizeof(_buffer))
+         {
             _size = s;
-         } else {
-            throw std::runtime_error( "key length overflow" );
+         }
+         else
+         {
+            throw std::runtime_error("key length overflow");
          }
       }
-      const char* data()const { return begin(); }
+      const char* data() const { return begin(); }
+      char*       data() { return begin(); }
 
-        temp_key6():_size(0){}
-      private:
-        temp_key6( const temp_key6& ) = delete; // should not be copied
+      void insert(char* pos, const char* begin, const char* end)
+      {
+         assert(pos >= _buffer and pos < _buffer + sizeof(buffer));
+         assert(pos + end - begin < _buffer + sizeof(buffer));
+         memcpy(pos, begin, end - begin);
+         _size += end - begin;
+      }
+
+      temp_key6() : _size(0) {}
+
+     private:
+      temp_key6(const temp_key6&) = delete;  // should not be copied
    };
-
 
    // Write thread usage notes:
    // * To create a new tree, default-initialize a shared_ptr<root>
@@ -214,7 +232,7 @@ namespace triedent
       std::optional<std::vector<char>> get(const std::shared_ptr<root>& r,
                                            std::span<const char>        key) const;
 
-      ///    Assume keys a-z  
+      ///    Assume keys a-z
       ///
       ///    key = m
       ///
@@ -289,7 +307,7 @@ namespace triedent
           const std::shared_ptr<triedent::root>&        ancestor,
           object_id                                     root,
           std::string_view                              key,
-          std::vector<char>&                            result_key,
+          temp_key6&                                    result_key,
           std::vector<char>*                            result_bytes,
           std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
@@ -307,7 +325,7 @@ namespace triedent
                              object_id                                     root,
                              std::string_view                              prefix_min,
                              std::string_view                              prefix_max,
-                             std::vector<char>&                            result_key,
+                             temp_key6&                                    result_key,
                              std::vector<char>*                            result_bytes,
                              std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
@@ -745,7 +763,8 @@ namespace triedent
       }
       else
       {
-         if constexpr (debug_roots) {
+         if constexpr (debug_roots)
+         {
             if (r == nullptr)
             {
                std::cout << id.id << ": update_root original was nullptr" << std::endl;
@@ -1255,8 +1274,8 @@ namespace triedent
        std::vector<char>*                  result_bytes,
        std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      swap_guard        g(*this);
-      std::vector<char> result_key6;
+      swap_guard g(*this);
+      temp_key6  result_key6;
       if (!unguarded_get_greater_equal(g, r, get_id(r), to_key6({key.data(), key.size()}),
                                        result_key6, result_bytes, result_roots))
          return false;
@@ -1273,7 +1292,7 @@ namespace triedent
        const std::shared_ptr<triedent::root>&        ancestor,
        object_id                                     root,
        std::string_view                              key,
-       std::vector<char>&                            result_key,
+       temp_key6&                                    result_key,
        std::vector<char>*                            result_bytes,
        std::vector<std::shared_ptr<triedent::root>>* result_roots) const
    {
@@ -1328,8 +1347,6 @@ namespace triedent
          key = {};
       }
    }  // unguarded_get_greater_equal
-      
-
 
    template <typename AccessMode>
    bool session<AccessMode>::get_less_than(const std::shared_ptr<root>&        r,
@@ -1338,7 +1355,7 @@ namespace triedent
                                            std::vector<char>*                  result_bytes,
                                            std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      swap_guard        g(*this);
+      swap_guard g(*this);
       //std::vector<char> result_key6;
       temp_key6 result_key6;
       if (!unguarded_get_less_than(g, r, get_id(r), to_key6({key.data(), key.size()}), result_key6,
@@ -1392,7 +1409,7 @@ namespace triedent
             key = std::nullopt;
       }
       //result_key.insert(result_key.end(), in_key.begin(), in_key.end());
-      result_key.append( in_key.begin(), in_key.end());
+      result_key.append(in_key.begin(), in_key.end());
       auto b = in.reverse_lower_bound(last_b);
       if (b < last_b)
          key = std::nullopt;
@@ -1431,7 +1448,7 @@ namespace triedent
       auto       prefix_max = (std::string)prefix_min;
       if (!prefix_max.empty())
          prefix_max.back() |= (1 << extra_bits) - 1;
-      std::vector<char> result_key6;
+      temp_key6 result_key6;
       if (!unguarded_get_max(g, r, get_id(r), prefix_min, prefix_max, result_key6, result_bytes,
                              result_roots))
          return false;
@@ -1450,7 +1467,7 @@ namespace triedent
        object_id                                     root,
        std::string_view                              prefix_min,
        std::string_view                              prefix_max,
-       std::vector<char>&                            result_key,
+       temp_key6&                                    result_key,
        std::vector<char>*                            result_bytes,
        std::vector<std::shared_ptr<triedent::root>>* result_roots) const
    {
@@ -1820,13 +1837,14 @@ namespace triedent
       }
    }
 
-   inline key_type from_key6(const key_view sixb) {
+   inline key_type from_key6(const key_view sixb)
+   {
       key_type tmp;
-      from_key6( sixb, tmp ); 
+      from_key6(sixb, tmp);
       return tmp;
    }
 
-   template<typename KeyType>
+   template <typename KeyType>
    inline void from_key6(const key_view sixb, KeyType& out)
    {
       out.resize((sixb.size() * 6) / 8);

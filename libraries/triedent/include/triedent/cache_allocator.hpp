@@ -164,11 +164,11 @@ namespace triedent
 
       if constexpr (CopyToHot)
       {
-         if (loc.cache != hot_cache && obj->size <= 4096)
+         if ( false and loc.cache != hot_cache and loc.cache!= warm_cache and obj->size <= 4096)
          {
             // MUST NOT wait for free memory while holding a location lock
             if (auto copy =
-                    try_move_object(session, hot(), _obj_ids.lock(i), obj->data(), obj->size))
+                    try_move_object(session, warm(), _obj_ids.lock(i), obj->data(), obj->size))
             {
                if constexpr (debug_cache)
                {
