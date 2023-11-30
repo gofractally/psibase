@@ -7,7 +7,7 @@ Much of the administration of an individual node can be done via the graphical u
 Booting a network is only a valid operation if psinode does not yet have any chain. It can be done either with the [`psibase`](./cli/psibase.md#boot) CLI tool, or by using the GUI provided by the [admin-sys](../default-apps/admin-sys.md) service.
 Alternatively, the `POST /native/push_boot` endpoint can be used manually in conjunction with `POST /native/push_transaction` to perform a custom boot sequence. 
 
-The body of the `POST /native/push_boot` request contains a list of transactions that will each be executed in order in the first block. The first transaction is a special transaction known as the genesis transaction. The genesis transaction must use [SystemService::SetCodeSys::setCode] to upload the core services to accounts on the blockchain, and it is not permitted to do anything else.
+The body of the `POST /native/push_boot` request contains a list of transactions that will each be executed in order in the first block. The first transaction is a special transaction known as the genesis transaction. The genesis transaction uploads the core services to the blockchain and it is not permitted to do anything else.
 
 A typical boot sequence contains more configuration than is able to fit in a single block. To understand how such a boot sequence is accomplished, see the description of [SystemService::TransactionSys::startBoot].
 
