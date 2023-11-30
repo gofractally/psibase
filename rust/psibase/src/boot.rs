@@ -400,7 +400,7 @@ pub fn get_initial_actions(
         new_account_action(account_sys::SERVICE, account!("doc-sys")), //
     ];
     fill_dir(
-        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc"),
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc/html"),
         &mut doc_actions,
         account!("doc-sys"),
         psispace_sys::SERVICE,
