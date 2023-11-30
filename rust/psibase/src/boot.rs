@@ -180,7 +180,6 @@ fn genesis_transaction(expiration: TimePointSec) -> SignedTransaction {
         sgc!("common-sys", 0, "CommonSys.wasm"),
         sgc!("core-frac-sys", 0, "CoreFractalSys.wasm"),
         sgc!("cpu-sys", 0b100100, "CpuSys.wasm"),
-        sgc!("doc-sys", 0, "DocSys.wasm"),
         sgc!("explore-sys", 0, "ExploreSys.wasm"),
         sgc!("fractal-sys", 0, "FractalSys.wasm"),
         sgc!("invite-sys", 0, "InviteSys.wasm"),
@@ -270,12 +269,6 @@ pub fn get_initial_actions(
         Action {
             sender: account!("invite-sys"),
             service: account!("invite-sys"),
-            method: method!("init"),
-            rawData: ().packed().into(),
-        },
-        Action {
-            sender: account!("doc-sys"),
-            service: account!("doc-sys"),
             method: method!("init"),
             rawData: ().packed().into(),
         },
@@ -391,14 +384,6 @@ pub fn get_initial_actions(
             account!("invite-sys"),
         );
 
-        let mut doc_sys_files = vec![];
-        fill_dir(
-            &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc/html"),
-            &mut doc_sys_files,
-            account!("doc-sys"),
-            account!("doc-sys"),
-        );
-
         actions.append(&mut reg_actions);
         actions.append(&mut common_sys_files);
         actions.append(&mut common_sys_3rd_party_files);
@@ -409,8 +394,18 @@ pub fn get_initial_actions(
         actions.append(&mut token_sys_files);
         actions.append(&mut psispace_sys_files);
         actions.append(&mut invite_sys_files);
-        actions.append(&mut doc_sys_files);
     }
+
+    let mut doc_actions = vec![
+        new_account_action(account_sys::SERVICE, account!("doc-sys")), //
+    ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/doc"),
+        &mut doc_actions,
+        account!("doc-sys"),
+        psispace_sys::SERVICE,
+    );
+    actions.append(&mut doc_actions);
 
     if install_token_users {
         #[allow(clippy::inconsistent_digit_grouping)]
