@@ -764,8 +764,9 @@ fn parse<'tu>(
 
 fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
     let cpp_doc_re = Regex::new(r"[{][{] *#cpp-doc +(::[^ ]+)+ *[}][}]").unwrap();
-    let svg_bob_re = Regex::new(r"```svgbob((.|\n)*?)```").unwrap();
-
+    //let svg_bob_re = Regex::new(r"```svgbob((.|\n)*?)```").unwrap();
+    let svg_bob_re = Regex::new(r"(?s)```svgbob(.*?)```").unwrap();
+    
     for item in book.iter() {
         match item {
             BookItem::Chapter(chapter) => {
