@@ -8,7 +8,6 @@ using namespace psibase;
 using namespace UserService;
 using namespace UserService::Errors;
 
-using psio::view;
 using std::nullopt;
 using std::optional;
 using std::string;
