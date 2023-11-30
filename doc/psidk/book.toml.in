@@ -18,6 +18,7 @@ command = "mdbook-mermaid"
 [output.html]
 default-theme = "ayu"
 preferred-dark-theme = "ayu"
+mathjax-support = true
 git-repository-url = "https://github.com/gofractally/psibase"
 edit-url-template = "https://github.com/gofractally/psibase/edit/main/{path}"
 additional-css = [
@@ -26,7 +27,7 @@ additional-css = [
 ]
 additional-js = [
     "theme/js/mermaid-load.js", 
-    "theme/js/applet-init.js", 
+    "theme/js/app-init.js", 
     "theme/js/fix-github-edit-link.js", 
     "theme/js/pagetoc.js"
 ]

@@ -77,7 +77,7 @@ namespace SystemService
             return;
          }
       }
-      abortMessage("transaction is not signed with key " + keyFingerprint(row->pubkey) +
+      abortMessage("transaction does not include a claim for the key " + keyFingerprint(row->pubkey) +
                    " needed to authenticate sender " + action.sender.str() + " for action " +
                    action.service.str() + "::" + action.method.str());
    }

@@ -64,7 +64,7 @@ If you're running a test chain locally, then it will typically be at `http://psi
 - [psibase::serve_simple_ui](https://docs.rs/psibase/latest/psibase/fn.serve_simple_ui.html) handles the following requests:
   - `GET /` returns a minimal html file which references the `/common/SimpleUI.mjs` script. This script generates the UI dynamically.
   - `GET /action_templates` returns a template json structure (below). This lets the UI know which actions are available and sample values for their arguments. This isn't a schema; it's only suitable for simple cases.
-  - `GET /schema` returns the service's [schema](../../format/schema.md).
+  - `GET /schema` returns the service's [schema](../../../specifications/data-formats/schema.md).
   - `POST /pack_action/add` accepts the arguments for the `add` action as a JSON object, converts it to binary, and returns the result.
 
 For more detail, see [Web Services](reference/web-services.html).

@@ -7,7 +7,6 @@ This consensus algorithm is based on RAFT and has the following properties:
 The nodes start by electing a leader with a simple majority vote. The leader is responsible for producing blocks and tracking irreversibility. If a node does not receive new blocks after a randomly chosen timeout, it will attempt to promote itself to be the leader by starting a new term and requesting votes from other nodes. In any term, a node will vote for the first candidate that is up-to-date.
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
 stateDiagram-v2
 state prod <<choice>>
 state lprod <<choice>>

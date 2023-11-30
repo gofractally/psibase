@@ -41,7 +41,7 @@ TEST_CASE("ec")
               .sender  = sue,
               .service = test_service,
           }})),
-          "transaction is not signed with key");
+          "transaction does not include a claim for the key");
 
    auto ec_trx = t.makeTransaction({{
        .sender  = sue,
@@ -81,7 +81,7 @@ TEST_CASE("ec")
                                 .rawData = psio::convert_to_frac(test_cntr::payload{}),
                             }}),
                             {{pub_key2, priv_key2}}),
-          "transaction is not signed with key");
+          "transaction does not include a claim for the key");
 
    expect(t.pushTransaction(t.makeTransaction({{
                                 .sender  = sue,

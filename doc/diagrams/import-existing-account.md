@@ -3,26 +3,26 @@
 
 sequenceDiagram
    actor Alice
-   participant Account applet
-   participant Keystore applet
+   participant Account app
+   participant Keystore plugin
    participant Psibase
-   note over Alice, Keystore applet: client-side
+   note over Alice, Keystore plugin: client-side
 
-   Note over Alice: Navigates to psibase homepage, <br>navigates to Account applet
-   Note over Account applet: Shows "No accounts" with button for "Import with private key"
-   Alice->>Account applet: Clicks import
-   Account applet-->>Keystore applet: Import by key
-   activate Keystore applet
-   Keystore applet-->>Alice: Modal prompt for key
-   Alice->>Keystore applet: Enters private key, clicks "Import"
-   Keystore applet->>Psibase: Check that key has corresponding account
-   Psibase-->>Keystore applet: 
-   Note over Keystore applet: Save private key to local storage
-   Keystore applet-->>Account applet: public key
-   deactivate Keystore applet
+   Note over Alice: Navigates to psibase homepage, <br>navigates to Account app
+   Note over Account app: Shows "No accounts" with button for "Import with private key"
+   Alice->>Account app: Clicks import
+   Account app-->>Keystore plugin: Import by key
+   activate Keystore plugin
+   Keystore plugin-->>Alice: Modal prompt for key
+   Alice->>Keystore plugin: Enters private key, clicks "Import"
+   Keystore plugin->>Psibase: Check that key has corresponding account
+   Psibase-->>Keystore plugin: 
+   Note over Keystore plugin: Save private key to local storage
+   Keystore plugin-->>Account app: public key
+   deactivate Keystore plugin
    
-   Account applet->>Alice: Offer list of accounts to import
-   Alice-->>Account applet: Makes selection
-   Note over Account applet: Imports selected accounts
+   Account app->>Alice: Offer list of accounts to import
+   Alice-->>Account app: Makes selection
+   Note over Account app: Imports selected accounts
 
 ```

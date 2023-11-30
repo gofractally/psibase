@@ -1,8 +1,8 @@
-# AuthSys Applet
+# AuthSys plugin
 
-Authorization with public key applet.
+Authorization with public key plugin.
 
-The only responsibility of this applet is to serve queries about accounts and their pub keys, and vice-versa. It abstracts away applets calling the `auth-sys` service directly.
+The only responsibility of this plugin is to serve queries about accounts and their pub keys, and vice-versa. This way, apps don't need to call into the `auth-sys` service directly.
 
 Main queries:
 
@@ -11,7 +11,7 @@ Main queries:
 
 ## Development Workflow
 
-Since it's a super basic and simple applet, we decided to leave it as a single vanilla javascript file.
+Since it's a super basic and simple plugin, we decided to leave it as a single vanilla javascript file.
 
 The workflow is simply updating the js file and running `psibase upload-tree r-auth-sys / .`
 

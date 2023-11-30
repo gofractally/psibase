@@ -253,3 +253,8 @@ blockquote {
 .result-no-output {
     font-style: italic;
 }
+
+/* svgbob */
+.backdrop {
+    stroke: none !important;
+}

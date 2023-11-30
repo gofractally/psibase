@@ -34,7 +34,7 @@ A demonstration deployment is currently hosted at [psibase.io](https://psibase.i
 
 ## Technical docs 📓
 
-Documentation is hosted on the [doc-sys applet](https://doc-sys.psibase.io/) of our demo deployment.
+Documentation is hosted on the [doc-sys app](https://doc-sys.psibase.io/) of our demo deployment.
 
 ## Build from source 🛠️
 
@@ -86,8 +86,6 @@ make install
 ```
 
 The built product lives in `CMAKE_INSTALL_PREFIX` (`$CMAKE_BINARY_DIR/psidk` in the above example).
-
-The technical documentation for psibase is part of this repository. To build & view it through the doc-sys applet of a deployed psibase instance, see the instructions in [the docs](https://doc-sys.psibase.io/documentation.html).
 
 #### Build flags
 

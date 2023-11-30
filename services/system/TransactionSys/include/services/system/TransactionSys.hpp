@@ -196,11 +196,16 @@ namespace SystemService
       using Tables =
           psibase::ServiceTables<TransactionSysStatusTable, BlockSummaryTable, IncludedTrxTable>;
 
-      /// Only called once, immediately after the boot transaction.
+      /// This action enables the boot procedure to be split across multiple blocks
       ///
-      /// The subsequent transactions listed must be pushed in order, and no
-      /// other transactions will be accepted until finishBoot is run.
+      /// It is only called once, immediately after the boot transaction. 
+      ///
+      /// `bootTransactions` defines the list of subsequent transaction hashes to which 
+      /// the node operator is committing as part of the boot sequence. The subsequent 
+      /// transactions listed must then be pushed in order, and no other transactions 
+      /// will be accepted until [finishBoot] is run.
       void startBoot(psio::view<const std::vector<psibase::Checksum256>> bootTransactions);
+      
       /// Only called once during chain initialization
       ///
       /// This enables the auth checking system. Before this point, `TransactionSys`
