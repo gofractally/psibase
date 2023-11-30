@@ -1,6 +1,6 @@
 # Plugins
 
-Plugins run within a client's browser. They are intended to facilitate interactions between user interfaces and services.
+Plugins run within a client's browser in the context of the [supervisor](./supervisor.md). They are intended to facilitate interactions between user interfaces and services.
 
 ```mermaid
 sequenceDiagram 
@@ -68,9 +68,9 @@ Therefore `postMessage` does not immediately (synchronously) post to the other d
 
 Cross-domain messaging can be dangerous if the proper checks are not in place to ensure that the messages are going to/from whoever is intended. 
 
-The supervisor will only listen for cross-domain messages from apps that it instantiated, and plugins will only listen for messages that come directly from the supervisor.
+The supervisor listens for cross-domain messages from its parent window and from the plugins it instantiates, and plugins will only listen for messages that come directly from the supervisor.
 
-If plugins make use of the standard psibase development libraries, then many of the security concerns are handled automatically. For example, it is automatically enforced that messages into your plugin are only allowed to come from the root domain.
+If plugins make use of the standard psibase development libraries, then many of the security concerns are handled automatically. For example, it is automatically enforced that messages into your plugin are only allowed to come from the supervisor.
 
 # Transaction packing
 
@@ -111,7 +111,7 @@ Plugin->>psinode: Submit transaction
 
 For simplicity, the previous diagrams have shown the plugin as the component that submits the final transaction. But that would conflict with the principle of only allowing a plugin to know about the actions that it was itself responsible for adding to the transaction.
 
-Instead, that responsibility is given to the [supervisor](./supervisor.md). The supervisor refers to the code running on the root domain which is actually the primary domain loaded in the client's browser (specific apps are all loaded within their own domains using iFrames).
+Instead, that responsibility is given to the [supervisor](./supervisor.md).
 
 The sequence looks more like the following, if we include the Root domain: 
 
@@ -124,7 +124,7 @@ participant UI
 participant Plugin
 end
 
-box rgb(85,85,85) client-side, Root domain
+box rgb(85,85,85) client-side, Supervisor domain
 participant supervisor
 end
 
@@ -160,7 +160,7 @@ participant UI
 participant plugin
 end
 
-box rgb(85,85,85) client-side, Root domain
+box rgb(85,85,85) client-side, Supervisor domain
 participant supervisor
 end
 
@@ -264,7 +264,7 @@ Although the code executes client-side, plugins are very similar to services. Fo
 
 Furthermore, writing a plugin often requires detailed knowledge about how to correctly call service actions, and in what order. 
 
-For these reasons, plugins should be thought of as the responsibility of the back-end / service developer. Correspondingly, they can be written in the same programming language as services (Rust).
+For these reasons, plugins should be thought of as the responsibility of the back-end / service developer. Correspondingly, they can be written in the same programming language as services.
 
 # Updating plugins
 

@@ -14,25 +14,26 @@ Psibase networks can host the full application stack. Rather than needing to ren
 |       |                |       +/|
 | +-----V-----+    +-----V-----+ +/|
 | | Service 1 |<-->| Service 2 | +/|
-| +--^--------+    +---------^-+ +/
-'---/-------------------------\--'
-   /                           \
-  /                             \
- /                               \
-/ .-----------------------------. \
-| |         ~ Client ~          | |
-| | +----------+  +----------+  |/
- \| | App1 intf|  | App2 intf|  /
-  \ +-----^----+  +-----^----+ /|
-  |\      |             |     / |
-  | V-----V-------------V----V  |
-  | |        Supervisor      |  |
-  | +------------^-----------+  |
-  |              |              |
-  | +------------V-----------+  |
-  | |      User interface    |  |
+| +--------^--+    +--------^--+ +/
+'----------|----------------|----'
+           |                |  
+           +----------------+------+
+                                   |
+  .-----------------------------.  |
+  |         ~ Client ~          |  |
+  | +----------+  +----------+  |  |
+  | | Plugin 1 |  | Plugin 2 |  |  |
+  | +-----^----+  +-----^----+  |  |
+  |       |             |       |  |
+  | +-----V-------------V----+  |  |
+  | |        Supervisor    <-|--|--|
+  | +------------^-----------+  |  |
+  |              |              |  |
+  | +------------V-----------+  |  |
+  | |      User interface  <-|--|--+
   | +------------------------+  |
   +-----------------------------+
+
   
 ```
 
@@ -74,9 +75,10 @@ Psibase apps enjoy unprecedented modularity and allow apps to define both client
 
 ## Supervisor
 
-Psibase apps are all loaded inside of a client-side component known as the supervisor. The supervisor is responsible for:
-1. Instantiating apps
+Psibase apps make use of a client-side component known as the supervisor. The supervisor is responsible for:
+1. Instantiating plugins
 2. Facilitating all communication between UIs and plugins, plugins and other plugins, and plugins and services
+3. Constructing and submitting transactions (write operations) to the server
 
 See the [supervisor](./supervisor.md) specification for more details.
 

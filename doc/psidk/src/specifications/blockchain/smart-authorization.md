@@ -7,7 +7,6 @@ Account authorization can be done in many different ways: simple signature verif
 * Enable accounts to have complete programmatic control over how their account can be authorized
 * Allow developers to develop, deploy, and use custom cryptographic verification programs without requiring coordinated upgrades to the native node software
 
-
 ## Design overview
 
 ### Definitions
@@ -59,7 +58,7 @@ The submitted `SignedTransaction` is sent to the AuthService defined by an accou
 
 ## Supervisor
 
-When building Psibase apps, the construction of each transaction submitted to the network is done automatically, including any claim and proof aggregation. The following sequence diagram shows the client-side interactions involved when PsibaseOS aggregates claims and proofs.
+When building Psibase apps, the construction of each transaction submitted to the network is done automatically, including any claim and proof aggregation. The following sequence diagram shows how the supervisor aggregates claims and proofs. This entire interaction happens on the client-side.
 
 ```mermaid
 sequenceDiagram
