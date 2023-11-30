@@ -2,7 +2,7 @@
 language = "en"
 multilingual = false
 src = "${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src"
-title = "psidk"
+title = "doc-sys"
 
 [build]
 create-missing = false

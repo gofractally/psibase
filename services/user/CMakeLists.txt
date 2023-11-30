@@ -3,6 +3,7 @@ function(add_user_service suffix name)
     target_include_directories(${name}${suffix} PUBLIC
         include
         ../CommonSys/include
+        ../DocSys/include
         ../FractalSys/include
         ../InviteSys/include
         ../NftSys/include
@@ -75,6 +76,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(AdminSys)
     add_subdirectory(CommonSys)
     add_subdirectory(InviteSys)
+    add_subdirectory(DocSys)
     add_subdirectory(ExploreSys)
     add_subdirectory(FractalSys)
     add_subdirectory(launchTestChain)
