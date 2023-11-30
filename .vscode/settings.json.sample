@@ -1,5 +1,5 @@
 {
-    "clang-format.executable": "/opt/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format",
+    "clang-format.executable": "/usr/lib/llvm-16/bin/clang-format",
     "search.exclude": {
         "**/target": true
     },
