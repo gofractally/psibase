@@ -32,12 +32,12 @@ env:
               "ignore_labels": ["no-notes"],
               "categories": [
                 {
-                    "title": "## 💻 App development",
+                    "title": "## 💻 Development experience",
                     "labels": ["Dev Experience", "Front-end Infra"],
                     "exclude_labels": ["documentation", "bug"]
                 },
                 {
-                    "title": "### Developer experience bugfixes",
+                    "title": "### Dev experience bugfixes",
                     "labels": ["Dev Experience", "bug"],
                     "exhaustive": true
                 },
@@ -47,7 +47,7 @@ env:
                     "exhaustive": true
                 },
                 {
-                    "title": "### Developer experience docs",
+                    "title": "### Dev experience docs",
                     "labels": ["Dev Experience", "documentation"],
                     "exhaustive": true
                 },
