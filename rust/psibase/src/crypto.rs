@@ -807,30 +807,6 @@ fn load_pkcs11_private_key(key: &str) -> Result<Box<dyn Signer>, anyhow::Error> 
             let session_mutex = get_session(context, sessions, slot)?;
             let session = session_mutex.lock().unwrap();
             login(context, &session, &uri, slot, true)?;
-            /*
-            if let Some(pin) = &uri.pin_value {
-                session.login(UserType::User, Some(&AuthPin::from_str(pin)?))?;
-            } else if let Some(pin_source) = &uri.pin_source {
-                if let Ok(pin_url) = Url::parse(pin_source) {
-                    if pin_url.scheme() == "file" {
-                        let pin = std::fs::read(pin_url.path())?;
-                        session.login_with_raw(UserType::User, &RawAuthPin::from(pin))?;
-                    } else {
-                        Err(Error::BadPinSource)?;
-                    }
-                } else if pin_source.starts_with('|') {
-                    let pin = Exec::shell(&pin_source[1..]).stdout(Redirection::Pipe).capture()?.stdout;
-                    session.login_with_raw(UserType::User, &RawAuthPin::from(pin))?;
-                } else {
-                    Err(Error::BadPinSource)?;
-                }
-            } else if context.get_token_info(slot)?.protected_authentication_path() {
-                session.login(UserType::User, None)?;
-            } else {
-                // TODO: identify token
-                let pin = rpassword::prompt_password("Enter pin: ")?;
-                session.login(UserType::User, Some(&AuthPin::from_str(&pin)?))?;
-            }*/
 
             for obj in session.find_objects(&attrs)? {
                 let result = PKCS11PrivateKey {
