@@ -1,4 +1,4 @@
-name: Generate release notes
+name: Generate changelog
 
 on:
   workflow_dispatch:
@@ -22,14 +22,14 @@ on:
     outputs:
       changelog:
         description: "The generated changelog"
-        value: ${{ jobs.auto-generate-release-notes.outputs.changelog }}
+        value: ${{ jobs.auto-generate-changelog.outputs.changelog }}
 
 env:
   CONFIG_JSON: |
             {
-              "template": "# Release Notes\n#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n\n# Associated docker images\n\nDocker images for this release of the psinode and psibase tools are available in GitHub container registry.\n* [psinode](https://github.com/orgs/${{ github.repository_owner }}/packages/container/package/psinode)\n* [psibase](https://github.com/orgs/${{ github.repository_owner }}/packages/container/package/psibase)\n",
+              "template": "# Changelog\n#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n\n",
               "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}})  |  #{{TITLE}}",
-              "ignore_labels": ["no-notes"],
+              "ignore_labels": ["no-log"],
               "categories": [
                 {
                     "title": "## 💻 Development experience",
@@ -37,22 +37,22 @@ env:
                     "exclude_labels": ["documentation", "bug"]
                 },
                 {
-                    "title": "### Dev experience bugfixes",
+                    "title": "### Bugfixes",
                     "labels": ["Dev Experience", "bug"],
                     "exhaustive": true
                 },
                 {
-                    "title": "### Front-end infrastructure bugfixes",
+                    "title": "### Front-end bugfixes",
                     "labels": ["Front-end Infra", "bug"],
                     "exhaustive": true
                 },
                 {
-                    "title": "### Dev experience docs",
+                    "title": "### Docs",
                     "labels": ["Dev Experience", "documentation"],
                     "exhaustive": true
                 },
                 {
-                    "title": "### Front-end infrastructure docs",
+                    "title": "### Front-end docs",
                     "labels": ["Front-end Infra", "documentation"],
                     "exhaustive": true
                 },
@@ -105,7 +105,7 @@ env:
             }
 
 jobs:
-  generate-custom-release-notes:
+  generate-custom-changelog:
     if: github.event_name == 'workflow_dispatch'
     name: Gen notes ${{ github.event.inputs.starttag }} - ${{ github.event.inputs.endtag }}
     runs-on: ubuntu-latest
@@ -131,7 +131,7 @@ jobs:
           path: changelog.md
 
 
-  auto-generate-release-notes:
+  auto-generate-changelog:
     if: ${{ inputs.externalCall }}
     name: Gen ${{ inputs.endtag }} notes
     runs-on: ubuntu-latest
