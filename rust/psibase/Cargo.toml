@@ -22,6 +22,7 @@ getrandom = { version = "0.2", features = ["js"] }
 include_dir = "0.7.3"
 sha2 = "0.10"
 mime_guess = "2.0"
+percent-encoding = "2.3"
 psibase_macros = { path = "../psibase_macros" }
 psibase_names = { path = "../psibase_names" }
 ripemd = "0.1"
@@ -33,6 +34,7 @@ wasm-bindgen = "0.2"
 sec1 = "0.7"
 spki = "0.7"
 der = { version = "0.7", features = ["alloc", "pem", "std"] }
+url = "2.4"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = {version = "3.1", features = ["derive", "env"]}
@@ -45,3 +47,6 @@ secp256k1 = { version="0.27", features = ["global-context", "bitcoin_hashes"] }
 sha2 = "0.10"
 tokio = { version = "1", features = ["full"] }
 pkcs8 = { version = "0.10", features = ["pem"] }
+subprocess = "0.2"
+cryptoki = "0.6"
+cryptoki-sys = "0.1"
