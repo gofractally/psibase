@@ -458,7 +458,7 @@ pub fn get_initial_actions(
     if let Some(k) = initial_key {
         for account in ACCOUNTS {
             actions.push(set_key_action(account, k));
-            actions.push(set_auth_service_action(account, auth_ec_sys::SERVICE));
+            actions.push(set_auth_service_action(account, k.auth_service()));
         }
     }
 
