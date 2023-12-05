@@ -1,6 +1,7 @@
 #pragma once
-#include <triedent/lehmer64.h>
 #include <triedent/block_allocator.hpp>
+#include <triedent/file_fwd.hpp>
+#include <triedent/mapping.hpp>
 #include <triedent/object_fwd.hpp>
 
 namespace triedent
@@ -90,203 +91,173 @@ namespace triedent
       static const uint32_t id_block_size = 1024 * 1024 * 128;
       static_assert(id_block_size % 64 == 0, "should be divisible by cacheline");
 
-     public:
+      inline static constexpr uint64_t extract_next_ptr(uint64_t x) { return (x >> object_info::location_rshift); }
+      inline static constexpr uint64_t create_next_ptr(uint64_t x) { return (x << object_info::location_rshift); }
+
       id_allocator(std::filesystem::path id_file)
-          : _data_dir(id_file), _block_alloc(id_file, id_block_size, 8192 /*1TB*/)
+          : _data_dir(id_file),
+            _block_alloc(id_file, id_block_size, 8192 /*1TB*/),
+            _ids_header_file(id_file.native() + ".header", access_mode::read_write)
       {
-         auto nb = _block_alloc.num_blocks();
-         if (not nb)
+         if (_ids_header_file.size() == 0)
          {
-            _block_alloc.alloc();
-            ++nb;
+            _ids_header_file.resize(round_to_page(sizeof(ids_header)));
+            auto idh = new (_ids_header_file.data()) ids_header();
+            idh->_next_alloc.store(1);
+            idh->_end_id.store(0);
+            idh->_first_free.store(0);
          }
-
-         auto data    = (std::atomic<uint64_t>*)_block_alloc.get(0);
-         _block_size  = data;
-         _free_slots  = data + 1;
-         _total_slots = data + 2;
-         _block_size->store(2 * id_block_size + 1);
-         _total_slots->store((2 * nb * id_block_size) / sizeof(object_info) + 1);
-         _num_slots = _total_slots->load() / 2;
-
-         if (not _free_slots->load())
-         {
-            /// first 3 slots are reserved this meta data, sub 6 and not 3 because
-            /// we want to preserve the first bit to always be 1
-            _free_slots->store(_num_slots - 6);
-         }
+         _idheader = reinterpret_cast<ids_header*>(_ids_header_file.data());
       }
 
-      uint64_t get_free_count() const { return _free_slots->load(std::memory_order_relaxed) / 2; }
-
-      uint64_t get_capacity() const { return _num_slots; }
+      uint64_t get_capacity() const { return _idheader->_end_id.load(std::memory_order_relaxed); }
 
       std::atomic<uint64_t>& get(object_id id)
       {
-         assert(id.id > 2);  // first 3 ids are reserved
          auto abs_pos        = id.id * sizeof(uint64_t);
          auto block_num      = abs_pos / id_block_size;
-         auto index_in_block = abs_pos - (block_num * id_block_size);
+         auto index_in_block = uint64_t(abs_pos) & uint64_t(id_block_size - 1);
          auto ptr            = ((char*)_block_alloc.get(block_num)) + index_in_block;
          return reinterpret_cast<std::atomic<uint64_t>&>(*ptr);
       }
 
-      void free(object_id id)
-      {
-         assert(id.id > 2);  // first 3 ids are reserved
-         get(id).store(0, std::memory_order_relaxed);
-
-         // while store may be reordered, the purpose of free slots
-         // is only to calculate an estimated load, likewise allcoators
-         // do not depend upon storing 0 above happening before or after
-         // adding 2 to preserve the first bit
-         _free_slots->fetch_add(2, std::memory_order_relaxed);
-      }
-
       /**
-       * Holds random number generator so that each thread has its own
-       * rng to avoid collisions.  Only alloc session can call object
-       * allocator.alloc()
-       *
-       * At 80% full, there is an 80% chance of any particular slot
-       * being occupied.  The each probe checks 8 slots (one cacheline)
-       * which means there is a 16% chance of collision on the first probe
-       * and a 3% chance on the second probe and 0.5% by the 3rd probe.
-       *
-       * When it reaches 80% the capacity will grow by a block size, say
-       * 128MB. This will be a smaller and smaller percentage of the total size
-       * growth over time which means performance will level out around 80% 
-       * full with 1 out of 1000 taking 3 probes.  85% of allocs will
-       * take only 1 probe.
-       */
-      struct alloc_session
-      {
-        public:
-         static const uint64_t default_id_value = obj_val(node_type::undefined, 1);
-
-         /**
           * The value stored at the returned object_id is equal to
           * alloc_session::default_id_value which indicates undefined type with
           * a reference count of 1. If you store 0 at this location the allocator
           * will think it is free and invariants about load capacity will be broken.
           */
-         std::pair<std::atomic<uint64_t>&, object_id> get_new_id()
+      std::pair<std::atomic<uint64_t>&, object_id> get_new_id()
+      {
+     //    std::cerr << "get new id...\n";
+      //   std::cerr << "   pre alloc free list: ";
+       //  print_free_list();
+
+         auto brand_new = [&]()
          {
-            auto load = (_oa._total_slots->load(std::memory_order_relaxed)) /
-                        _oa._free_slots->load(std::memory_order_relaxed);
-            if (load > 4)  // more than 80% full
-               _oa.grow();
+            grow();  // ensure that there should be new id
+            object_id id{_idheader->_next_alloc.fetch_add(1, std::memory_order_relaxed)};
 
-            int reprobes = 0;
-            while (true)  // reprobe
+            auto& atom = get(id);
+            atom.store(obj_val(node_type::undefined, 1), std::memory_order_relaxed);
+
+        //    std::cerr << " brand new id: " << id.id << "\n";
+            return std::pair<std::atomic<uint64_t>&, object_id>(atom, id);
+         };
+
+         std::unique_lock<std::mutex> l{_alloc_mutex};
+         uint64_t                     ff = _idheader->_first_free.load(std::memory_order_acquire);
+        // std::cerr << "first free: " << extract_next_ptr(ff) << "\n";
+         do
+         {
+            if (ff == 0)
             {
-               // TODO make this a shift operation
+         //      std::cerr << "alloc brand new! \n";
+               _alloc_mutex.unlock();
+               l.release();
+               return brand_new();
+            }
+         } while (not _idheader->_first_free.compare_exchange_strong(
+             ff, get({extract_next_ptr(ff)}).load(std::memory_order_relaxed)));
 
-               uint64_t test_id = _rng.next() % _oa._num_slots;
-               // triggers assert in debug, but is ok
-               //if( test_id <= 2 ) [[unlikely]] test_id = 3; //TODO: do somethinb better with this
-               //             std::cerr<<" probe: " << test_id << "  \n";
-               //  std::cerr<< "test id: " << test_id <<" of " << _oa._num_slots <<"\n";
+         ff = extract_next_ptr(ff);
+   //      std::cerr << "  reused id: " << ff << "\n";
+         auto& ffa = get({ff});
+         // store 1 = ref count 1 prevents object as being interpreted as unalloc
+         ffa.store(obj_val(node_type::undefined, 1), std::memory_order_relaxed);
 
-               auto& atomic = _oa.get({test_id});
 
-               auto start_cache = ((uintptr_t)&atomic) & ~(0x3full);  // round down to cache line
+    //     std::cerr << "   post alloc free list: ";
+     //    print_free_list();
+         return {ffa, {ff}};
+      }
 
-               auto cacheline = (std::atomic<uint64_t>*)start_cache;
-               int  init_pos  = &atomic - cacheline;
-               int  pos       = init_pos;
-
-               // linear scan in case of collision, because the
-               // cache line is already loaded, this should have low 
-               // cost and ensure we stay in the same memory block as
-               // the initial probe. A 64 byte cache line has 8 ids
-               for (uint32_t i = 0; i < 8; ++i)
-               {
-                  auto& atom = cacheline[pos];
-
-                  auto cur_val = atom.load(std::memory_order_relaxed);
-                  if (cur_val == 0)  // try to claim it
-                  {
-                     uint64_t expected = 0;
-                     if (atom.compare_exchange_weak(expected, default_id_value, std::memory_order_relaxed, std::memory_order_relaxed))
-                     {
-                        if( reprobes > 8 ) {
-                           std::cerr << "a lot of reprobing going on: " << reprobes <<"\n";
-                        }
-                        // presere the first bit
-                        _oa._free_slots->fetch_sub(2, std::memory_order_relaxed);
-                        //           std::cerr<< "total free: " << _oa.get_free_count() <<"\n";
-                        return std::pair<std::atomic<uint64_t>&, object_id>(
-                            atom, test_id + pos - init_pos);
-                     }
-                     else
-                     {
-                        break;  // another thread randomly trying to allocate
-                                // on our cache line, might as well randomly reprobe
-                                // elsewhere.
-                     }
-                  }
-                  //      std::cerr <<"cur: " << cur_val <<" i: " <<i <<"   pos: " << pos <<"  ptr: " <<cacheline <<"  \n";
-                  pos = (++pos) & 7;  // wrap the end of cacheline
-               }                      // current cache line
-               ++reprobes;
-            }                         // while true
+      void print_free_list() {
+         uint64_t id = extract_next_ptr(_idheader->_first_free.load());
+         std::cerr << id;
+         while( id ) {
+            id = extract_next_ptr(get({id}));
+            std::cerr << ", " << id;
          }
+         std::cerr << " END\n";
+      }
 
-        private:
-         friend class id_allocator;
-         alloc_session(id_allocator& oa) : _oa(oa), _rng(0*(uint64_t)this) {}// TODO randomize this
+      void free_id(object_id id)
+      {
+     //    std::cerr << "                            free " << id.id << "\n";
+         // store the head of the free list into the pointer section of get(id)
+         // set the head of the free list to id if and only if the head of the free list
+         // has not changed
 
-         id_allocator& _oa;
-         lehmer64_rng  _rng;
-      };
+         auto& head_free_list = _idheader->_first_free;
+         auto& next_free      = get(id);
+    //     std::cerr << "               free _first_free: " << extract_next_ptr(head_free_list.load())
+    //               << "\n";
 
-      auto start_session() { return alloc_session(*this); }
+         auto new_head = create_next_ptr(id.id);
+
+         uint64_t cur_head = _idheader->_first_free.load(std::memory_order_acquire);
+         assert( not (cur_head & object_info::ref_mask) );
+         do
+         {
+            next_free.store(cur_head, std::memory_order_release);
+         } while (not head_free_list.compare_exchange_strong(cur_head, new_head));
+     //    std::cerr <<"  post free free list: ";
+     //    print_free_list();
+      }
 
      private:
       friend class alloc_session;
 
       void grow()
       {
-         std::lock_guard l{_grow_mutex};
-
-         // two threads might try to grow at the same time because they
-         // both saw the load condition, by putting this within the mutex
-         // only one thread will actually result in a grow.
-         auto load = (_total_slots->load()) /
-                     _free_slots->load();
-         if (load < 4)
+         // optimistic...
+         if (_idheader->_next_alloc.load(std::memory_order_relaxed) <
+             _idheader->_end_id.load(std::memory_order_relaxed))
             return;
 
-         auto ptr = _block_alloc.get(_block_alloc.alloc());
+         void* ptr;
+         {
+            std::lock_guard l{_grow_mutex};
+            if (_idheader->_next_alloc.load() < _idheader->_end_id.load())
+               return;  // no need to grow, another thread grew first
 
-         if (not ::mlock(ptr, id_block_size))
+      //      std::cerr << "growing obj id db\n";
+            ptr = _block_alloc.get(_block_alloc.alloc());
+            _idheader->_end_id.store(_block_alloc.num_blocks() * _block_alloc.block_size() / 8);
+         }  // don't hold lock while doing mlock
+
+         if (::mlock(ptr, id_block_size))
          {
             std::cerr << "WARNING: unable to mlock ID lookups\n";
             ::madvise(ptr, id_block_size, MADV_RANDOM);
          }
-
-         // 2* because we have to preserve the first bit
-         _free_slots->fetch_add(2 * id_block_size / sizeof(object_info));
-         _total_slots->fetch_add(2 * id_block_size / sizeof(object_info));
-
-         _num_slots = _total_slots->load() / 2;
       }
 
+      std::mutex            _alloc_mutex;
       std::mutex            _grow_mutex;
       std::filesystem::path _data_dir;
       block_allocator       _block_alloc;
 
-      uint64_t _num_slots;
+      /**
+       * Mapped from disk to track meta data associated with the IDs
+       */
+      struct ids_header
+      {
+         uint64_t _magic      = 0;
+         uint64_t _block_size = id_block_size;
 
-      // IDs 1, 2 and 3 are used to store some general
-      // accounting overhead rather than create a separate shared memory
-      // file.  However, these values must never be 0 and the first bit must
-      // never be zero (the ref count bit) so that other code can never think
-      // that these slots are available. Therefore the value stored in these
-      // variables is 2x + 1 greater than the real value.
-      std::atomic<uint64_t>* _block_size;
-      std::atomic<uint64_t>* _free_slots;
-      std::atomic<uint64_t>* _total_slots;
+         std::atomic<uint64_t> _next_alloc;  /// the next new ID to be allocated
+         std::atomic<uint64_t> _end_id;      /// the first ID beyond the end of file
+
+         // the lower 15 bits represent the alloc_session number of the last write
+         // the upper bits represent the index of the first free ID, the value
+         // stored at that index is the index of the next free ID or 0 if there
+         // are no unused ids available.
+         std::atomic<uint64_t> _first_free;  /// index of an ID that has the index of the next ID
+      };
+
+      ids_header* _idheader;
+      mapping     _ids_header_file;
    };
 };  // namespace triedent

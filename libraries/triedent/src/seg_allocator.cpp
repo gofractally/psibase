@@ -41,12 +41,9 @@ namespace triedent
    {
       auto [loc, ptr] = _session.alloc_data(size + sizeof(object_header));
 
-      // TODO: hopefully this isn't needed
-      // memset(ptr, 0, size + sizeof(object_header));
-
       auto oh = ((object_header*)ptr);
 
-      auto [atom, id] = _session._id_alloc.get_new_id();
+      auto [atom, id] = _session._sega._id_alloc.get_new_id();
       oh->id          = id.id;
       oh->size        = size;
 

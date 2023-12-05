@@ -330,7 +330,6 @@ namespace triedent
              : _session_num(ses_num),
                _alloc_seg_num(-1ull),
                _alloc_seg_ptr(nullptr),
-               _id_alloc(a._id_alloc.start_session()),
                _sega(a)
          {
          }
@@ -338,7 +337,7 @@ namespace triedent
          session()               = delete;
          session(const session&) = delete;
 
-         session(session&& mv) : _sega(mv._sega), _id_alloc(mv._id_alloc)
+         session(session&& mv) : _sega(mv._sega)
          {
             _alloc_seg_num    = mv._alloc_seg_num;
             _alloc_seg_ptr    = mv._alloc_seg_ptr;
@@ -354,7 +353,6 @@ namespace triedent
                auto [num, ptr] = _sega.get_new_segment();
                _alloc_seg_num  = num;
                _alloc_seg_ptr  = ptr;
-               assert( _alloc_seg_num < 30 );
             }
 
             auto* sh           = _alloc_seg_ptr;
@@ -394,7 +392,6 @@ namespace triedent
          segment_number                 _alloc_seg_num = -1ull;
          mapped_memory::segment_header* _alloc_seg_ptr = nullptr;
 
-         id_allocator::alloc_session _id_alloc;
          seg_allocator&              _sega;
       };
 
@@ -625,6 +622,8 @@ namespace triedent
          auto obj_ptr = (const object_header*)((char*)_rlock._session._sega._block_alloc.get(seg) +
                                                loc.index());
 
+
+         _rlock._session._sega._id_alloc.free_id( _id );
          _rlock._session._sega._header->seg_meta[seg].free_object(obj_ptr->data_capacity());
          return true;
       }
