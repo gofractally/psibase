@@ -1,5 +1,6 @@
 #include <triedent/database.hpp>
 #include <triedent/debug.hpp>
+#include <triedent/file_fwd.hpp>
 
 namespace triedent
 {
@@ -7,9 +8,9 @@ namespace triedent
                       const config&                cfg,
                       access_mode                  mode,
                       bool                         allow_gc)
-       : _ring{dir / "data", cfg, mode, allow_gc},
+       : _sega{dir},
          _file{dir / "db", mode},
-         _root_release_session{_ring}
+         _root_release_session{_sega}
    {
       if (_file.size() == 0)
       {
@@ -49,6 +50,6 @@ namespace triedent
 
    void database::print_stats(std::ostream& os, bool detail)
    {
-      _ring.print_stats(os, detail);
+      _sega.dump();
    }
 }  // namespace triedent

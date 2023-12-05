@@ -10,7 +10,6 @@
 #include <triedent/debug.hpp>
 #include <triedent/file_fwd.hpp>
 #include <triedent/gc_queue.hpp>
-#include <triedent/location_lock.hpp>
 #include <triedent/mapping.hpp>
 #include <triedent/object_fwd.hpp>
 
@@ -32,7 +31,6 @@ namespace triedent
       std::uint64_t          offset() const { return _offset * 8; }
       constexpr object_info& set_location(object_location loc)
       {
-         cache   = loc.cache;
          _offset = loc.offset / 8;
          return *this;
       }
@@ -40,21 +38,9 @@ namespace triedent
       {
          return ref | (_type << 15) | (cache << 17) | (_offset << 19);
       }
-      constexpr operator object_location() const { return {.offset = _offset * 8, .cache = cache}; }
+      constexpr operator object_location() const { return {.offset = _offset * 8}; }
    };
 
-   struct mutex_group
-   {
-      static constexpr std::size_t count = 128;
-      static constexpr std::size_t align = 64;
-      explicit mutex_group() : _items(new location_mutex[count]) {}
-      location_mutex& operator()(void* base, void* ptr) const
-      {
-         auto diff = reinterpret_cast<std::uintptr_t>(ptr) - reinterpret_cast<std::uintptr_t>(base);
-         return _items[(diff / align) % count];
-      }
-      std::unique_ptr<location_mutex[]> _items;
-   };
 
    /**
     * Assignes unique ids to objects, tracks their reference counts,
@@ -62,7 +48,7 @@ namespace triedent
     */
    class object_db
    {
-      friend location_lock;
+  //    friend location_lock;
 
      public:
       using object_id = triedent::object_id;
@@ -92,35 +78,8 @@ namespace triedent
          return true;
       }
 
-      // A thread which holds a location_lock may:
-      // * Move the object to another location
-      // * Modify the object if it's not already exposed to reader threads
 
-      // Only acquire the lock if id points to loc
-      location_lock lock(object_id id, object_location loc)
-      {
-         auto* h      = header();
-         auto& atomic = h->objects[id.id];
-         // If the object has already been moved, don't bother locking
-         if (object_info info{atomic.load()}; info.ref != 0 && info == loc)
-         {
-            // grab a mutex based upon object id.
-            location_lock l{_location_mutexes(h, &atomic), id};
-            if (object_info info{atomic.load()}; info.ref != 0 && info == loc)
-            {
-               return l;
-            }
-         }
-         return location_lock{};
-      }
-      location_lock lock(object_id id)
-      {
-         auto* h      = header();
-         auto& atomic = h->objects[id.id];
-         return location_lock{_location_mutexes(h, &atomic), id};
-      }
-
-      void move(const location_lock& lock, object_location loc)
+      void move( object_location loc)
       {
          auto& atomic = header()->objects[lock.get_id().id];
          auto  obj    = atomic.load();
@@ -131,6 +90,7 @@ namespace triedent
          debug(lock.get_id().id, "move");
       }
 
+      /*
       bool compare_and_move(const location_lock& lock,
                             object_location      expected,
                             object_location      loc)
@@ -150,6 +110,7 @@ namespace triedent
             }
          }
       }
+      */
 
       // The id must not be accessible to any thread
       // besides the creator.
@@ -162,7 +123,7 @@ namespace triedent
          atomic.store(info.to_int());
       }
 
-      object_id alloc(std::unique_lock<gc_session>&, node_type type);
+      object_id alloc(node_type type);
 
       object_info release(object_id id);
 
@@ -184,11 +145,14 @@ namespace triedent
       void gc_finish();
 
       bool                  pinned() const { return _region.pinned(); }
+
+      /*
       std::span<const char> span() const
       {
          std::lock_guard l{_region_mutex};
          return {reinterpret_cast<const char*>(_region.data()), _region.size()};
       }
+      */
 
      private:
       static constexpr uint64_t ref_count_mask = (1ull << 15) - 1;
@@ -199,8 +163,8 @@ namespace triedent
       // 19-63    offset         or next_ptr
 
       // clang-format off
-      static uint64_t    extract_next_ptr(uint64_t x)   { return x >> 15; }
-      static uint64_t    create_next_ptr(uint64_t x)    { return x << 15; }
+      static inline uint64_t    extract_next_ptr(uint64_t x)   { return x >> 15; }
+      static inline uint64_t    create_next_ptr(uint64_t x)    { return x << 15; }
       // clang-format on
 
       static uint64_t obj_val(node_type type, uint16_t ref)
@@ -229,7 +193,7 @@ namespace triedent
       gc_queue&          _gc;
       mapping            _region;
       mutable std::mutex _region_mutex;
-      mutex_group        _location_mutexes;
+      //mutex_group        _location_mutexes;
 
       object_db_header* header() { return reinterpret_cast<object_db_header*>(_region.data()); }
 
@@ -283,7 +247,7 @@ namespace triedent
                                   idfile.native());
    }
 
-   inline object_id object_db::alloc(std::unique_lock<gc_session>& session, node_type type)
+   inline object_id object_db::alloc(node_type type)
    {
       std::lock_guard l{_region_mutex};
       auto            _header = header();

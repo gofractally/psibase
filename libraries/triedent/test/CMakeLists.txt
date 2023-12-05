@@ -17,3 +17,10 @@ add_executable(triedent-tests-bigdb big.cpp)
 target_link_libraries(triedent-tests-bigdb PUBLIC Boost::program_options triedent)
 target_include_directories(triedent-tests-bigdb PUBLIC ${Boost_INCLUDE_DIRS})
 set_target_properties(triedent-tests-bigdb PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+
+add_executable(dtester dtester.cpp)
+target_link_libraries(dtester PUBLIC Boost::program_options triedent)
+target_include_directories(dtester PUBLIC ${Boost_INCLUDE_DIRS})
+set_target_properties(dtester PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+
+

@@ -16,16 +16,6 @@
 
 namespace triedent
 {
-   struct object_header
-   {
-      // size might not be a multiple of 8, next object is at data() + (size+7)&-8
-      uint64_t size : 24;  // bytes of data, not including header
-      uint64_t id : 40;
-
-      inline uint64_t data_size() const { return size; }
-      inline uint32_t data_capacity() const { return (size + 7) & -8; }
-      inline void*    data() const { return (char*)(this + 1); }
-   };
 
    // ring_allocator allocates memory from a single circular buffer.
    // The buffer is divided into three regions

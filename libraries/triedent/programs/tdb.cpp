@@ -102,11 +102,7 @@ int main(int argc, char** argv)
    {
       std::cerr << "resetting database\n";
       std::filesystem::remove_all(db_dir);
-      triedent::database::create(db_dir,
-                                 triedent::database::config{.hot_bytes  = 1ull << hot_page_c,
-                                                            .warm_bytes = 1ull << warm_page_c,
-                                                            .cool_bytes = 1ull << cool_page_c,
-                                                            .cold_bytes = 1ull << cold_page_c});
+      triedent::database::create(db_dir,{ });
    }
    bool read_only = false;
    if (vm.count("read-only"))

@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <triedent/key6.hpp>
 #include <triedent/node.hpp>
 
 namespace triedent
@@ -21,76 +22,7 @@ namespace triedent
    struct read_access;
 
    template <typename T = node>
-   struct deref;
-
-   template <typename T = node>
    struct mutable_deref;
-
-   inline key_type from_key6(const key_view sixb);
-
-   template <typename KeyType>
-   inline void from_key6(const key_view sixb, KeyType& out);
-
-   // used to avoid malloc, because keys can be at most 256,
-   // this one change produced 13% improvment with 12 threads
-   struct temp_key6
-   {
-      uint32_t _size = 0;
-      char     _buffer[128];
-
-      uint32_t    size() const { return _size; }
-      const char* begin() const { return _buffer; }
-      const char* end() const { return _buffer + _size; }
-      char*       begin() { return _buffer; }
-      char*       end() { return _buffer + _size; }
-
-      void append(const char* p, const char* e)
-      {
-         int s = e - p;
-         if (_size + s > sizeof(_buffer))
-            throw std::runtime_error("key length overflow");
-         memcpy(end(), p, s);
-         _size += s;
-      }
-      void push_back(char c)
-      {
-         if (_size < sizeof(_buffer))
-         {
-            *end() = c;
-            ++_size;
-         }
-         else
-         {
-            throw std::runtime_error("key length overflow");
-         }
-      }
-      void resize(uint32_t s)
-      {
-         if (s < sizeof(_buffer))
-         {
-            _size = s;
-         }
-         else
-         {
-            throw std::runtime_error("key length overflow");
-         }
-      }
-      const char* data() const { return begin(); }
-      char*       data() { return begin(); }
-
-      void insert(char* pos, const char* begin, const char* end)
-      {
-         assert(pos >= _buffer and pos < _buffer + sizeof(buffer));
-         assert(pos + end - begin < _buffer + sizeof(buffer));
-         memcpy(pos, begin, end - begin);
-         _size += end - begin;
-      }
-
-      temp_key6() : _size(0) {}
-
-     private:
-      temp_key6(const temp_key6&) = delete;  // should not be copied
-   };
 
    // Write thread usage notes:
    // * To create a new tree, default-initialize a shared_ptr<root>
@@ -197,17 +129,18 @@ namespace triedent
       using string_view = std::string_view;
       using id          = object_id;
 
+      auto lock()const { return _session.lock(); }
+
      protected:
-      using swap_guard = std::lock_guard<gc_session>;
-      explicit session_base(cache_allocator& a);
-      operator gc_session&() const { return _session; }
+      explicit session_base(seg_allocator& a);
+      operator seg_allocator::session&() const { return _session; }
 
      public:
       key_view to_key6(key_view v) const;
 
      private:
-      mutable gc_session _session;
-      mutable key_type   key_buf;
+      mutable seg_allocator::session _session;  // or read_lock...?
+      mutable key_type               key_buf;
    };
 
    /**
@@ -228,7 +161,7 @@ namespace triedent
       bool                             get(const std::shared_ptr<root>&        r,
                                            std::span<const char>               key,
                                            std::vector<char>*                  result_bytes,
-                                           std::vector<std::shared_ptr<root>>* result_roots) const;
+                                           std::vector<std::shared_ptr<root>>* result_roots = nullptr) const;
       std::optional<std::vector<char>> get(const std::shared_ptr<root>& r,
                                            std::span<const char>        key) const;
 
@@ -284,12 +217,12 @@ namespace triedent
       session(const session&) = delete;
 
       inline object_id   get_id(const std::shared_ptr<root>& r) const;
-      void               validate(session_lock_ref<> l, id);
+      void               validate(session_rlock& l, id);
       void               print(id n, string_view prefix = "", std::string k = "");
-      inline deref<node> get_by_id(session_lock_ref<> l, object_id i) const;
-      inline deref<node> get_by_id(session_lock_ref<> l, object_id i, bool& unique) const;
+      inline deref<node> get_by_id(session_rlock& l, object_id i) const;
+      inline deref<node> get_by_id(session_rlock& l, object_id i, bool& unique) const;
 
-      bool unguarded_get(session_lock_ref<>                            l,
+      bool unguarded_get(session_rlock&                                l,
                          const std::shared_ptr<triedent::root>&        ancestor,
                          object_id                                     root,
                          std::string_view                              key,
@@ -303,7 +236,7 @@ namespace triedent
                        std::vector<std::shared_ptr<root>>* result_roots) const;
 
       bool unguarded_get_greater_equal(
-          session_lock_ref<>                            l,
+          session_rlock&                                l,
           const std::shared_ptr<triedent::root>&        ancestor,
           object_id                                     root,
           std::string_view                              key,
@@ -312,7 +245,7 @@ namespace triedent
           std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
       bool unguarded_get_less_than(
-          session_lock_ref<>                            l,
+          session_rlock&                                l,
           const std::shared_ptr<triedent::root>&        ancestor,
           object_id                                     root,
           std::optional<std::string_view>               key,
@@ -320,7 +253,7 @@ namespace triedent
           std::vector<char>*                            result_bytes,
           std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
-      bool unguarded_get_max(session_lock_ref<>                            l,
+      bool unguarded_get_max(session_rlock&                                l,
                              const std::shared_ptr<triedent::root>&        ancestor,
                              object_id                                     root,
                              std::string_view                              prefix_min,
@@ -329,13 +262,13 @@ namespace triedent
                              std::vector<char>*                            result_bytes,
                              std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
-      inline id   retain(std::unique_lock<gc_session>&, id);
-      inline void release(session_lock_ref<> l, id);
+      inline id   retain(session_rlock&, id);   // bump or copy
+      inline void release(session_rlock&, id);  // polymorphic release node
 
       friend class database;
       std::shared_ptr<database> _db;
 
-      cache_allocator& ring() const;
+      seg_allocator& sega() const;
    };
    using read_session = session<read_access>;
 
@@ -375,83 +308,125 @@ namespace triedent
 
      private:
       inline bool get_unique(std::shared_ptr<root>& r);
-      inline void update_root(session_lock_ref<> l, std::shared_ptr<root>& r, object_id id);
+      inline void update_root(session_rlock& l, std::shared_ptr<root>& r, object_id id);
 
-      void recursive_retain(session_lock_ref<> l, object_id id);
+      void recursive_retain(session_rlock& l, object_id id);
 
-      mutable_deref<value_node> make_value(std::unique_lock<gc_session>& session,
-                                           node_type                     type,
-                                           string_view                   k,
-                                           string_view                   v);
-      mutable_deref<value_node> clone_value(std::unique_lock<gc_session>& session,
-                                            object_id                     origin,
-                                            node_type                     type,
-                                            string_view                   key,
-                                            std::uint32_t                 key_offset,
-                                            string_view                   val);
+      mutable_deref<value_node> make_value(session_rlock& state,
+                                           node_type      type,
+                                           string_view    k,
+                                           string_view    v);
 
-      mutable_deref<value_node>        clone_value(std::unique_lock<gc_session>& session,
-                                                   object_id                     origin,
-                                                   node_type                     type,
-                                                   const std::string&            key,
-                                                   string_view                   val);
-      inline mutable_deref<inner_node> make_inner(std::unique_lock<gc_session>& session,
-                                                  string_view                   pre,
-                                                  id                            val,
-                                                  uint64_t                      branches);
-      inline mutable_deref<inner_node> clone_inner(std::unique_lock<gc_session>& session,
-                                                   object_id                     id,
-                                                   const inner_node&             cpy,
-                                                   string_view                   pre,
-                                                   std::uint32_t                 offset,
-                                                   object_id                     val,
-                                                   uint64_t                      branches);
-      inline mutable_deref<inner_node> clone_inner(std::unique_lock<gc_session>& session,
-                                                   object_id                     id,
-                                                   const inner_node&             cpy,
-                                                   const std::string&            pre,
-                                                   object_id                     val,
-                                                   uint64_t                      branches);
+      inline object_id make_value_id(session_rlock& state,
+                                     node_type      type,
+                                     string_view    k,
+                                     string_view    v);
+
+      mutable_deref<value_node> clone_value(session_rlock& state,
+                                            object_id      origin,
+                                            node_type      type,
+                                            string_view    key,
+                                            std::uint32_t  key_offset,
+                                            string_view    val);
+
+      // like clone_value but doesn't construct a mutable_deref which does
+      // unnecessary locking
+      inline object_id clone_value_id(session_rlock& state,
+                                      object_id      origin,
+                                      node_type      type,
+                                      string_view    key,
+                                      std::uint32_t  key_offset,
+                                      string_view    val);
+
+      inline mutable_deref<value_node> clone_value(session_rlock&     state,
+                                                   object_id          origin,
+                                                   node_type          type,
+                                                   const std::string& key,
+                                                   string_view        val);
+
+      inline object_id clone_value_id(session_rlock&     state,
+                                      object_id          origin,
+                                      node_type          type,
+                                      const std::string& key,
+                                      string_view        val);
+
+      inline mutable_deref<inner_node> make_inner(session_rlock& state,
+                                                  string_view    pre,
+                                                  id             val,
+                                                  uint64_t       branches);
+
+      inline object_id make_inner_id(session_rlock& state,
+                                     string_view    pre,
+                                     id             val,
+                                     uint64_t       branches);
+
+      inline mutable_deref<inner_node> clone_inner(session_rlock&    state,
+                                                   object_id         id,
+                                                   const inner_node& cpy,
+                                                   string_view       pre,
+                                                   std::uint32_t     offset,
+                                                   object_id         val,
+                                                   uint64_t          branches);
+      inline mutable_deref<inner_node> clone_inner(session_rlock&     state,
+                                                   object_id          id,
+                                                   const inner_node&  cpy,
+                                                   const std::string& pre,
+                                                   object_id          val,
+                                                   uint64_t           branches);
+
+      inline object_id clone_inner_id(session_rlock&    state,
+                                      object_id         id,
+                                      const inner_node& cpy,
+                                      string_view       pre,
+                                      std::uint32_t     offset,
+                                      object_id         val,
+                                      uint64_t          branches);
+      inline object_id clone_inner_id(session_rlock&     state,
+                                      object_id          id,
+                                      const inner_node&  cpy,
+                                      const std::string& pre,
+                                      object_id          val,
+                                      uint64_t           branches);
 
       template <typename T>
       inline mutable_deref<T> lock(const deref<T>& obj);
 
-      inline id add_child(std::unique_lock<gc_session>& session,
-                          id                            root,
-                          bool                          unique,
-                          node_type                     type,
-                          string_view                   key,
-                          string_view                   val,
-                          int&                          old_size);
-      inline id remove_child(std::unique_lock<gc_session>& session,
-                             id                            root,
-                             bool                          unique,
-                             string_view                   key,
-                             int&                          removed_size);
+      inline id add_child(session_rlock& state,
+                          id             root,
+                          bool           unique,
+                          node_type      type,
+                          string_view    key,
+                          string_view    val,
+                          int&           old_size);
+      inline id remove_child(session_rlock& state,
+                             id             root,
+                             bool           unique,
+                             string_view    key,
+                             int&           removed_size);
 
-      inline void modify_value(session_lock_ref<>        l,
+      inline void modify_value(session_rlock&            state,
                                mutable_deref<value_node> mut,
                                string_view               val);
-      inline id   set_value(std::unique_lock<gc_session>& session,
-                            deref<node>                   n,
-                            bool                          unique,
-                            node_type                     type,
-                            string_view                   key,
-                            string_view                   val);
-      inline id   set_inner_value(std::unique_lock<gc_session>& session,
-                                  deref<inner_node>             n,
-                                  bool                          unique,
-                                  node_type                     type,
-                                  string_view                   val);
-      inline id   combine_value_nodes(std::unique_lock<gc_session>& session,
-                                      node_type                     t1,
-                                      string_view                   k1,
-                                      string_view                   v1,
-                                      object_id                     origin1,
-                                      node_type                     t2,
-                                      string_view                   k2,
-                                      string_view                   v2,
-                                      object_id                     origin2);
+      inline id   set_value(session_rlock& state,
+                            deref<node>    n,
+                            bool           unique,
+                            node_type      type,
+                            string_view    key,
+                            string_view    val);
+      inline id   set_inner_value(session_rlock&    state,
+                                  deref<inner_node> n,
+                                  bool              unique,
+                                  node_type         type,
+                                  string_view       val);
+      inline id   combine_value_nodes(session_rlock& state,
+                                      node_type      t1,
+                                      string_view    k1,
+                                      string_view    v1,
+                                      object_id      origin1,
+                                      node_type      t2,
+                                      string_view    k2,
+                                      string_view    v2,
+                                      object_id      origin2);
    };
 
    class database : public std::enable_shared_from_this<database>
@@ -464,7 +439,9 @@ namespace triedent
       friend root;
 
      public:
-      using config                     = cache_allocator::config;
+      struct config
+      {
+      };
       static constexpr auto read_write = access_mode::read_write;
       static constexpr auto read_only  = access_mode::read_only;
 
@@ -485,11 +462,11 @@ namespace triedent
 
       void print_stats(std::ostream& os, bool detail = false);
 
-      bool is_slow() const { return _ring.is_slow(); }
-      auto span() const { return _ring.span(); }
+      // bool is_slow() const { return _ring.is_slow(); }
+      // auto span() const { return _ring.span(); }
 
      private:
-      inline void release(session_lock_ref<> l, id);
+      inline void release(session_rlock& l, id);
 
       struct database_memory
       {
@@ -504,7 +481,7 @@ namespace triedent
          std::atomic<uint64_t> top_root;
       };
 
-      cache_allocator  _ring;
+      seg_allocator    _sega;
       mapping          _file;
       database_memory* _dbm;
 
@@ -524,99 +501,22 @@ namespace triedent
       if (db && id && !ancestor)
       {
          std::lock_guard<std::mutex> lock(db->_root_release_session_mutex);
-         session_base::swap_guard    guard(db->_root_release_session);
-         db->release(guard, id);
+         auto                        state = db->_root_release_session.lock();
+         db->release(state, id);
       }
    }
 
-   template <typename T>
-   struct deref
-   {
-      using id = object_id;
-
-      deref(std::pair<id, value_node*> p, node_type t)
-          : _id(p.first), ptr((char*)p.second), _type(t)
-      {
-      }
-      deref(std::pair<id, inner_node*> p)
-          : _id(p.first), ptr((char*)p.second), _type(node_type::inner)
-      {
-      }
-      template <typename Other>
-      deref(deref<Other> p) : _id(p._id), ptr((char*)p.ptr), _type(p._type)
-      {
-      }
-      deref(id i, void* p, node_type t) : _id(i), ptr(p), _type(t) {}
-
-      explicit inline operator bool() const { return bool(_id); }
-      inline          operator id() const { return _id; }
-
-      auto         type() const { return _type; }
-      bool         is_leaf_node() const { return _type != node_type::inner; }
-      inline auto& as_value_node() const { return *reinterpret_cast<const value_node*>(ptr); }
-      inline auto& as_inner_node() const { return *reinterpret_cast<const inner_node*>(ptr); }
-
-      inline const T* operator->() const { return reinterpret_cast<const T*>(ptr); }
-      inline const T& operator*() const { return *reinterpret_cast<const T*>(ptr); }
-
-      int64_t as_id() const { return _id.id; }
-
-      // Allocation invalidates pointers. reload will make the deref object
-      // valid again after an allocation.
-      void reload(cache_allocator& a, session_lock_ref<> session)
-      {
-         auto [p, type, ref] = a.get_cache<false>(session, _id);
-         ptr                 = p;
-      }
-
-     protected:
-      template <typename Other>
-      friend class deref;
-
-      id        _id;
-      void*     ptr;
-      node_type _type;
-   };  // deref
-
-   template <typename T>
-   struct mutable_deref : deref<T>
-   {
-      mutable_deref() = default;
-      mutable_deref(std::pair<location_lock, value_node*> p, node_type type)
-          : deref<T>{{p.first.get_id(), p.second}, type}, lock{std::move(p.first)}
-      {
-      }
-      mutable_deref(std::pair<location_lock, inner_node*> p)
-          : deref<T>{{p.first.get_id(), p.second}}, lock{std::move(p.first)}
-      {
-      }
-      mutable_deref(location_lock lock, const deref<T>& src) : lock{std::move(lock)}, deref<T>{src}
-      {
-      }
-
-      inline auto& as_value_node() const { return *reinterpret_cast<value_node*>(this->ptr); }
-      inline auto& as_inner_node() const { return *reinterpret_cast<inner_node*>(this->ptr); }
-
-      inline T* operator->() const { return reinterpret_cast<T*>(this->ptr); }
-      inline T& operator*() const { return *reinterpret_cast<T*>(this->ptr); }
-
-      auto get_id() { return lock.get_id(); }
-
-     private:
-      location_lock lock;
-   };  // mutable_deref
-
-   inline session_base::session_base(cache_allocator& a) : _session(a.start_session()) {}
+   inline session_base::session_base(seg_allocator& a) : _session(a.start_session()) {}
 
    template <typename AccessMode>
-   inline cache_allocator& session<AccessMode>::ring() const
+   inline seg_allocator& session<AccessMode>::sega() const
    {
-      return _db->_ring;
+      return _db->_sega;
    }
 
    template <typename AccessMode>
    session<AccessMode>::session(std::shared_ptr<database> db)
-       : session_base{db->_ring}, _db(std::move(db))
+       : session_base{db->_sega}, _db(std::move(db))
    {
    }
    template <typename AccessMode>
@@ -635,18 +535,19 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   inline deref<node> session<AccessMode>::get_by_id(session_lock_ref<> l, id i) const
+   inline deref<node> session<AccessMode>::get_by_id(session_rlock& state, id i) const
    {
-      auto [ptr, type, ref] = ring().template get_cache<true>(l, i);
-      return {i, ptr, type};
+      return deref<node>(state.get(i, true));
+      //    auto [ptr, type, ref] = ring().template get_cache<true>(l, i);
+      //    return {i, ptr, type};
    }
 
    template <typename AccessMode>
-   inline deref<node> session<AccessMode>::get_by_id(session_lock_ref<> l, id i, bool& unique) const
+   inline deref<node> session<AccessMode>::get_by_id(session_rlock& state, id i, bool& unique) const
    {
-      auto [ptr, type, ref] = ring().template get_cache<true>(l, i);
-      unique &= ref == 1;
-      return {i, ptr, type};
+      auto ob = state.get(i);
+      unique &= (ob.ref_count() == 1);
+      return deref<node>(ob);
    }
 
    template <typename AccessMode>
@@ -659,29 +560,29 @@ namespace triedent
                       << std::endl;
       if (r.use_count() == 1 && r->db && !r->ancestor && r->id)
       {
-         auto id = r->id;
-         r->id   = {};
-         swap_guard g(*this);
-         release(g, id);
+         auto id    = r->id;
+         r->id      = {};
+         auto state = lock();
+         release(state, id);
       }
       r = {};
    }
 
    template <typename AccessMode>
-   inline void session<AccessMode>::release(session_lock_ref<> l, id obj)
+   inline void session<AccessMode>::release(session_rlock& state, id obj)
    {
-      _db->release(l, obj);
+      _db->release(state, obj);
    }
 
-   inline void database::release(session_lock_ref<> l, id obj)
+   inline void database::release(session_rlock& state, id obj)
    {
-      release_node(l, _ring, obj);
+      release_node(state, obj);
    }
 
    template <typename AccessMode>
-   inline database::id session<AccessMode>::retain(std::unique_lock<gc_session>& session, id obj)
+   inline database::id session<AccessMode>::retain(session_rlock& state, id obj)
    {
-      return bump_refcount_or_copy(ring(), session, obj);
+      return bump_refcount_or_copy(state, obj);
    }
 
    // This always returns a view into the first argument
@@ -707,8 +608,8 @@ namespace triedent
          return result;
       }
 
-      std::unique_lock<gc_session> l(*this);
-      id = retain(l, {id}).id;
+      auto state = session_base::lock();
+      id         = retain(state, {id}).id;
       return std::make_shared<root>(root{_db, nullptr, {id}});
    }
 
@@ -724,12 +625,12 @@ namespace triedent
          return;
       }
 
-      std::unique_lock<gc_session> l(*this);
+      auto state = session_base::lock();
       if constexpr (debug_roots)
          std::cout << id.id << ": set_top_root: old=" << current << std::endl;
-      id = retain(l, id);
+      id = retain(state, id);
       _db->_dbm->top_root.store(id.id);
-      release(l, {current});
+      release(state, {current});
    }
 
    inline bool write_session::get_unique(std::shared_ptr<root>& r)
@@ -738,9 +639,7 @@ namespace triedent
       return r && r->db && !r->ancestor && r.use_count() == 1;
    }
 
-   inline void write_session::update_root(session_lock_ref<>     l,
-                                          std::shared_ptr<root>& r,
-                                          object_id              id)
+   inline void write_session::update_root(session_rlock& l, std::shared_ptr<root>& r, object_id id)
    {
       if (r && r->db && r->id == id)
       {
@@ -779,87 +678,126 @@ namespace triedent
       }
    }
 
-   inline mutable_deref<value_node> write_session::make_value(std::unique_lock<gc_session>& session,
-                                                              node_type                     type,
-                                                              string_view                   key,
-                                                              string_view                   val)
+   inline mutable_deref<value_node> write_session::make_value(session_rlock& state,
+                                                              node_type      type,
+                                                              string_view    key,
+                                                              string_view    val)
    {
-      return {value_node::make(ring(), session, key, val, type), type};
+      return {value_node::make(state, key, val, type)};
    }
 
-   inline mutable_deref<value_node> write_session::clone_value(
-       std::unique_lock<gc_session>& session,
-       object_id                     origin,
-       node_type                     type,
-       string_view                   key,
-       std::uint32_t                 key_offset,
-       string_view                   val)
+   inline object_id write_session::make_value_id(session_rlock& state,
+                                                 node_type      type,
+                                                 string_view    key,
+                                                 string_view    val)
    {
-      return {value_node::clone(ring(), session, origin, key, key_offset, val, type), type};
+      return value_node::make(state, key, val, type).id();
    }
 
-   inline mutable_deref<value_node> write_session::clone_value(
-       std::unique_lock<gc_session>& session,
-       object_id                     origin,
-       node_type                     type,
-       const std::string&            key,
-       string_view                   val)
+   inline object_id write_session::clone_value_id(session_rlock& state,
+                                                  object_id      origin,
+                                                  node_type      type,
+                                                  string_view    key,
+                                                  std::uint32_t  key_offset,
+                                                  string_view    val)
    {
-      return {value_node::clone(ring(), session, origin, key, -1, val, type), type};
+      return value_node::clone(state, origin, key, key_offset, val, type).id();
    }
 
-   inline mutable_deref<inner_node> write_session::make_inner(std::unique_lock<gc_session>& session,
-                                                              string_view                   pre,
-                                                              id                            val,
-                                                              uint64_t branches)
+   inline mutable_deref<value_node> write_session::clone_value(session_rlock&     state,
+                                                               object_id          origin,
+                                                               node_type          type,
+                                                               const std::string& key,
+                                                               string_view        val)
    {
-      return inner_node::make(ring(), session, pre, val, branches);
+      return {value_node::clone(state, origin, key, -1, val, type)};
+   }
+   inline object_id write_session::clone_value_id(session_rlock&     state,
+                                                               object_id          origin,
+                                                               node_type          type,
+                                                               const std::string& key,
+                                                               string_view        val)
+   {
+      return value_node::clone(state, origin, key, -1, val, type).id();
    }
 
-   inline mutable_deref<inner_node> write_session::clone_inner(
-       std::unique_lock<gc_session>& session,
-       object_id                     id,
-       const inner_node&             cpy,
-       string_view                   pre,
-       std::uint32_t                 offset,
-       object_id                     val,
-       uint64_t                      branches)
+   inline mutable_deref<inner_node> write_session::make_inner(session_rlock& state,
+                                                              string_view    pre,
+                                                              id             val,
+                                                              uint64_t       branches)
    {
-      return inner_node::clone(ring(), session, id, &cpy, pre, offset, val, branches);
+      return inner_node::make(state, pre, val, branches);
+   }
+   inline object_id write_session::make_inner_id(session_rlock& state,
+                                                 string_view    pre,
+                                                 id             val,
+                                                 uint64_t       branches)
+   {
+      return inner_node::make(state, pre, val, branches).id();
    }
 
-   inline mutable_deref<inner_node> write_session::clone_inner(
-       std::unique_lock<gc_session>& session,
-       object_id                     id,
-       const inner_node&             cpy,
-       const std::string&            pre,
-       object_id                     val,
-       uint64_t                      branches)
+   inline mutable_deref<inner_node> write_session::clone_inner(session_rlock&    state,
+                                                               object_id         id,
+                                                               const inner_node& cpy,
+                                                               string_view       pre,
+                                                               std::uint32_t     offset,
+                                                               object_id         val,
+                                                               uint64_t          branches)
    {
-      return inner_node::clone(ring(), session, id, &cpy, pre, -1, val, branches);
+      return inner_node::clone(state, id, &cpy, pre, offset, val, branches);
+   }
+
+   inline object_id write_session::clone_inner_id(session_rlock&    state,
+                                                  object_id         id,
+                                                  const inner_node& cpy,
+                                                  string_view       pre,
+                                                  std::uint32_t     offset,
+                                                  object_id         val,
+                                                  uint64_t          branches)
+   {
+      return inner_node::clone(state, id, &cpy, pre, offset, val, branches).id();
+   }
+
+   inline mutable_deref<inner_node> write_session::clone_inner(session_rlock&     state,
+                                                               object_id          id,
+                                                               const inner_node&  cpy,
+                                                               const std::string& pre,
+                                                               object_id          val,
+                                                               uint64_t           branches)
+   {
+      return inner_node::clone(state, id, &cpy, pre, -1, val, branches);
+   }
+   inline object_id write_session::clone_inner_id(session_rlock&     state,
+                                                  object_id          id,
+                                                  const inner_node&  cpy,
+                                                  const std::string& pre,
+                                                  object_id          val,
+                                                  uint64_t           branches)
+   {
+      return inner_node::clone(state, id, &cpy, pre, -1, val, branches).id();
    }
 
    template <typename T>
    inline mutable_deref<T> write_session::lock(const deref<T>& obj)
    {
-      return {ring().lock(obj), obj};
+      return {obj};
    }
 
    /**
     *  Given an existing value node and a new key/value to insert
     */
-   database::id write_session::combine_value_nodes(std::unique_lock<gc_session>& session,
-                                                   node_type                     t1,
-                                                   string_view                   k1,
-                                                   string_view                   v1,
-                                                   object_id                     origin1,
-                                                   node_type                     t2,
-                                                   string_view                   k2,
-                                                   string_view                   v2,
-                                                   object_id                     origin2)
+   database::id write_session::combine_value_nodes(session_rlock& state,
+                                                   node_type      t1,
+                                                   string_view    k1,
+                                                   string_view    v1,
+                                                   object_id      origin1,
+                                                   node_type      t2,
+                                                   string_view    k2,
+                                                   string_view    v2,
+                                                   object_id      origin2)
    {
       if (k1.size() > k2.size())
-         return combine_value_nodes(session, t2, k2, v2, origin2, t1, k1, v1, origin1);
+         return combine_value_nodes(state, t2, k2, v2, origin2, t1, k1, v1, origin1);
 
       //std::cerr << __func__ << ":" << __LINE__ << "\n";
       auto cpre = common_prefix(k1, k2);
@@ -891,33 +829,36 @@ namespace triedent
       if (cpre == k1)
       {
          auto [inner_id, branch_id] = build_children(
-             [&] { return clone_value(session, origin1, t1, k1, k1.size(), v1); },
-             [&] { return clone_value(session, origin2, t2, k2, cpre.size() + 1, v2); });
+             [&] { return clone_value_id(state, origin1, t1, k1, k1.size(), v1); },
+             [&] { return clone_value_id(state, origin2, t2, k2, cpre.size() + 1, v2); });
 
-         auto in = make_inner(session, cpre, id(), 1ull << b2);
+         // TODO: this could use the non-locking deref because
+         // no allocs occur between here and the return statement
+         auto in = make_inner(state, cpre, id(), 1ull << b2);
          // Set value separately, because we don't want to increment its refcount
          in->set_value(inner_id);
          in->branch(b2) = branch_id;
 
-         return in;
+         return in.id();
       }
       else
       {
          auto b1sfx        = k1.substr(cpre.size());
          auto b1           = b1sfx.front();
          auto [b1id, b2id] = build_children(
-             [&] { return clone_value(session, origin1, t1, k1, cpre.size() + 1, v1); },
-             [&] { return clone_value(session, origin2, t2, k2, cpre.size() + 1, v2); });
+             [&] { return clone_value_id(state, origin1, t1, k1, cpre.size() + 1, v1); },
+             [&] { return clone_value_id(state, origin2, t2, k2, cpre.size() + 1, v2); });
 
-         auto in        = make_inner(session, cpre, id(), inner_node::branches(b1, b2));
+         // TODO: this could use the non-locking deref because
+         auto in        = make_inner(state, cpre, id(), inner_node::branches(b1, b2));
          in->branch(b1) = b1id;
          in->branch(b2) = b2id;
 
-         return in;
+         return in.id();
       }
    }
 
-   void write_session::modify_value(session_lock_ref<>        l,
+   void write_session::modify_value(session_rlock&            l,
                                     mutable_deref<value_node> mut,
                                     string_view               val)
    {
@@ -925,7 +866,7 @@ namespace triedent
       {
          if constexpr (debug_roots)
          {
-            std::cout << mut.get_id().id << ": modify_value; old:";
+            std::cout << mut.id().id << ": modify_value; old:";
             for (unsigned i = 0; i < mut->num_roots(); ++i)
                std::cout << " " << mut->roots()[i].id;
             std::cout << std::endl;
@@ -943,7 +884,7 @@ namespace triedent
 
          if constexpr (debug_roots)
          {
-            std::cout << mut.get_id().id << ": modify_value; new:";
+            std::cout << mut.id().id << ": modify_value; new:";
             for (unsigned i = 0; i < mut->num_roots(); ++i)
                std::cout << " " << mut->roots()[i].id;
             std::cout << std::endl;
@@ -953,63 +894,65 @@ namespace triedent
          memcpy(mut->data_ptr(), val.data(), val.size());
    }
 
-   database::id write_session::set_value(std::unique_lock<gc_session>& session,
-                                         deref<node>                   n,
-                                         bool                          unique,
-                                         node_type                     type,
-                                         string_view                   key,
-                                         string_view                   val)
+   database::id write_session::set_value(session_rlock& state,
+                                         deref<node>    n,
+                                         bool           unique,
+                                         node_type      type,
+                                         string_view    key,
+                                         string_view    val)
    {
       if (!n || !unique || type != n.type())
-         return make_value(session, type, key, val);
+         return make_value_id(state, type, key, val);
 
       assert(n.is_leaf_node());
 
       auto& vn = n.as_value_node();
       if (vn.data_size() == val.size())
       {
-         modify_value(session, lock(deref<value_node>(n)), val);
-         return n;
+         modify_value(state, deref<value_node>(n), val);
+         return n.id();
       }
 
-      return make_value(session, type, key, val);
+      return make_value_id(state, type, key, val);
    }
 
-   database::id write_session::set_inner_value(std::unique_lock<gc_session>& session,
-                                               deref<inner_node>             n,
-                                               bool                          unique,
-                                               node_type                     type,
-                                               string_view                   val)
+   database::id write_session::set_inner_value(session_rlock&    state,
+                                               deref<inner_node> n,
+                                               bool              unique,
+                                               node_type         type,
+                                               string_view       val)
    {
       if (unique)
       {
          if (auto old_value = n->value())
          {
-            auto  v  = get_by_id(session, old_value);
+            auto  v  = state.get(old_value, false);  // TODO copy to cache?
             auto& vn = v.as_value_node();
-            if (v.type() == type && vn.data_size() == val.size() && ring().ref(old_value) == 1)
+            if (v.type() == type && vn.data_size() == val.size() && v.ref_count() == 1)
             {
-               modify_value(session, lock(deref<value_node>(v)), val);
-               return n;
+               modify_value(state, deref<value_node>(v), val);
+               return n.id();
             }
             else
             {
-               ring().release(session, old_value);
+               v.release();
             }
          }
-         object_id val_id = make_value(session, type, string_view(), val);
-         n.reload(ring(), session);
-         auto locked = lock(n);
-         locked->set_value(val_id);
-         return n;
+         object_id val_id = make_value_id(state, type, string_view(), val);
+         // This lock is necessary because we alloc above and n was deref
+         // before
+         lock(n)->set_value(val_id);
+         return n.id();
       }
       else
       {
-         object_id new_val = make_value(session, type, string_view(), val);
-         n.reload(ring(), session);
-         auto result = clone_inner(session, n, *n, n->key(), 0, object_id{}, n->branches());
+         object_id new_val = make_value_id(state, type, string_view(), val);
+
+         // TODO: clone_inner could return deref because no allocs occur between
+         // return and reducing to an id
+         auto result = clone_inner(state, n.id(), *n, n->key(), 0, object_id{}, n->branches());
          result->set_value(new_val);
-         return result;
+         return result.id();
       }
    }
 
@@ -1017,28 +960,28 @@ namespace triedent
     *  Given an existing tree node (root) add a new key/value under it and return the id
     *  of the new node if a new node had to be allocated.
     */
-   inline database::id write_session::add_child(std::unique_lock<gc_session>& session,
-                                                id                            root,
-                                                bool                          unique,
-                                                node_type                     type,
-                                                string_view                   key,
-                                                string_view                   val,
-                                                int&                          old_size)
+   inline database::id write_session::add_child(session_rlock& state,
+                                                id             root,
+                                                bool           unique,
+                                                node_type      type,
+                                                string_view    key,
+                                                string_view    val,
+                                                int&           old_size)
    {
       if (not root)  // empty case
-         return make_value(session, type, key, val);
+         return make_value_id(state, type, key, val);
 
-      auto n = get_by_id(session, root, unique);
+      auto n = get_by_id(state, root, unique);
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
          if (vn.key() != key)
-            return combine_value_nodes(session, n.type(), vn.key(), vn.data(), root, type, key, val,
+            return combine_value_nodes(state, n.type(), vn.key(), vn.data(), root, type, key, val,
                                        object_id{});
          else
          {
             old_size = vn.data_size();
-            return set_value(session, n, unique, type, key, val);
+            return set_value(state, n, unique, type, key, val);
          }
       }
 
@@ -1048,8 +991,8 @@ namespace triedent
       if (in_key == key)  // whose prefix is same as key, therefore set the value
       {
          if (in->value())
-            old_size = get_by_id(session, in->value()).as_value_node().data_size();
-         return set_inner_value(session, n, unique, type, val);
+            old_size = state.get(in->value()).as_value_node().data_size();
+         return set_inner_value(state, n, unique, type, val);
       }
 
       // key should be the first argument, because (unlike in_key)
@@ -1063,29 +1006,30 @@ namespace triedent
          {
             object_id cur_b = in->has_branch(b) ? in->branch(b) : object_id{};
             auto      new_b =
-                add_child(session, cur_b, false, type, key.substr(cpre.size() + 1), val, old_size);
-            in.reload(ring(), session);
-            auto new_in = clone_inner(session, root, *in, in->key(), 0, in->value(),
+                add_child(state, cur_b, false, type, key.substr(cpre.size() + 1), val, old_size);
+
+            // TODO: this could use the non-locking deref because no alloc between here
+            // and return.
+            auto new_in = clone_inner(state, root, *in, in->key(), 0, in->value(),
                                       in->branches() | 1ull << b);
 
             if (new_b != cur_b)
             {
                new_in->branch(b) = new_b;
-               release(session, cur_b);
+               release(state, cur_b);
             }
 
-            return new_in;
+            return new_in.id();
          }  // else modify in place
 
          auto cur_b = in->branch(b);
          auto new_b =
-             add_child(session, cur_b, unique, type, key.substr(cpre.size() + 1), val, old_size);
+             add_child(state, cur_b, unique, type, key.substr(cpre.size() + 1), val, old_size);
 
          if (new_b != cur_b)
          {
-            in.reload(ring(), session);
             lock(in)->branch(b) = new_b;
-            release(session, cur_b);
+            release(state, cur_b);
          }
          return root;
       }
@@ -1095,15 +1039,16 @@ namespace triedent
          {
             auto b1 = in_key[cpre.size()];
             // MUST convert to id to release the location_lock
-            id b1val =
-                clone_inner(session, in, *in, in_key, cpre.size() + 1, in->value(), in->branches());
-            id b0val = make_value(session, type, string_view(), val);
+            id b1val = clone_inner_id(state, in.id(), *in, in_key, cpre.size() + 1, in->value(),
+                                      in->branches());
+            id b0val = make_value_id(state, type, string_view(), val);
 
-            auto nin = make_inner(session, cpre, object_id{}, inner_node::branches(b1));
+            // TODO: this could use non-locking deref
+            auto nin = make_inner(state, cpre, object_id{}, inner_node::branches(b1));
             // Set separately because we don't need to inc ref
             nin->set_value(b0val);
             nin->branch(b1) = b1val;
-            return nin;
+            return nin.id();
          }
          else  // there are two branches
          {
@@ -1112,17 +1057,19 @@ namespace triedent
             auto b1key = key.substr(cpre.size() + 1);
             // Handle sub first, because b2key is invalidated by allocation.
             // cpre and b1key are safe because they point into key, which is externally owned
-            id sub =
-                clone_inner(session, in, *in, in_key, cpre.size() + 1, in->value(), in->branches());
-            id   b1val = make_value(session, type, b1key, val);
-            auto nin   = make_inner(session, cpre, id(), inner_node::branches(b1, b2));
+            id sub   = clone_inner_id(state, in.id(), *in, in_key, cpre.size() + 1, in->value(),
+                                      in->branches());
+            id b1val = make_value_id(state, type, b1key, val);
+
+            // TODO: this could use non-locking deref
+            auto nin = make_inner(state, cpre, id(), inner_node::branches(b1, b2));
 
             assert(not nin->branch(b1));
             nin->branch(b1) = b1val;
             assert(not nin->branch(b2));
             nin->branch(b2) = sub;
 
-            return nin;
+            return nin.id();
          }
       }
    }  // write_session::add_child
@@ -1131,14 +1078,14 @@ namespace triedent
                                     std::span<const char>  key,
                                     std::span<const char>  val)
    {
-      std::unique_lock<gc_session> l(*this);
+      auto state = session_base::lock();
 
       int  old_size = -1;
       auto new_root =
-          add_child(l, get_id(r), get_unique(r), node_type::bytes,
+          add_child(state, get_id(r), get_unique(r), node_type::bytes,
                     to_key6({key.data(), key.size()}), {val.data(), val.size()}, old_size);
       assert(new_root.id);
-      update_root(l, r, new_root);
+      update_root(state, r, new_root);
       return old_size;
    }
 
@@ -1146,19 +1093,19 @@ namespace triedent
                                     std::span<const char>                  key,
                                     std::span<const std::shared_ptr<root>> roots)
    {
-      std::unique_lock<gc_session> l(*this);
+      auto state = session_base::lock();
 
       std::vector<object_id> ids;
       ids.reserve(roots.size());
       for (auto& r : roots)
-         ids.push_back(retain(l, get_id(r)));
+         ids.push_back(retain(state, get_id(r)));
 
       int  old_size = -1;
       auto new_root = add_child(
-          l, get_id(r), get_unique(r), node_type::roots, to_key6({key.data(), key.size()}),
+          state, get_id(r), get_unique(r), node_type::roots, to_key6({key.data(), key.size()}),
           {reinterpret_cast<const char*>(ids.data()), ids.size() * sizeof(object_id)}, old_size);
       assert(new_root.id);
-      update_root(l, r, new_root);
+      update_root(state, r, new_root);
       return old_size;
    }
 
@@ -1178,14 +1125,14 @@ namespace triedent
                                  std::vector<char>*                  result_bytes,
                                  std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      swap_guard g(*this);
-      return unguarded_get(g, r, get_id(r), to_key6({key.data(), key.size()}), result_bytes,
+      auto state = session_base::lock();
+      return unguarded_get(state, r, get_id(r), to_key6({key.data(), key.size()}), result_bytes,
                            result_roots);
    }
 
    template <typename AccessMode>
    bool session<AccessMode>::unguarded_get(
-       session_lock_ref<>                            l,
+       session_rlock&                                l,
        const std::shared_ptr<triedent::root>&        ancestor,
        object_id                                     root,
        std::string_view                              key,
@@ -1274,9 +1221,9 @@ namespace triedent
        std::vector<char>*                  result_bytes,
        std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      swap_guard g(*this);
-      temp_key6  result_key6;
-      if (!unguarded_get_greater_equal(g, r, get_id(r), to_key6({key.data(), key.size()}),
+      auto      state = session_base::lock();
+      temp_key6 result_key6;
+      if (!unguarded_get_greater_equal(state, r, get_id(r), to_key6({key.data(), key.size()}),
                                        result_key6, result_bytes, result_roots))
          return false;
       if (result_key)
@@ -1288,7 +1235,7 @@ namespace triedent
 
    template <typename AccessMode>
    bool session<AccessMode>::unguarded_get_greater_equal(
-       session_lock_ref<>                            l,
+       session_rlock&                                state,
        const std::shared_ptr<triedent::root>&        ancestor,
        object_id                                     root,
        std::string_view                              key,
@@ -1298,7 +1245,7 @@ namespace triedent
    {
       if (!root)
          return false;
-      auto n = get_by_id(l, root);
+      auto n = state.get<node>(root);//get_by_id(l, root);
       if (n.is_leaf_node())
       {
          auto& vn     = n.as_value_node();
@@ -1326,7 +1273,7 @@ namespace triedent
       }
       else if (in.value())
       {
-         auto  v  = get_by_id(l, in.value());
+         auto  v  = state.get(in.value());//get_by_id(l, in.value());
          auto& vn = v.as_value_node();
          return fill_result(ancestor, vn, v.type(), result_bytes, result_roots);
       }
@@ -1339,7 +1286,7 @@ namespace triedent
             return false;
          auto rk = result_key.size();
          result_key.push_back(b);
-         if (unguarded_get_greater_equal(l, ancestor, in.branch(b), key, result_key, result_bytes,
+         if (unguarded_get_greater_equal(state, ancestor, in.branch(b), key, result_key, result_bytes,
                                          result_roots))
             return true;
          result_key.resize(rk);
@@ -1355,12 +1302,13 @@ namespace triedent
                                            std::vector<char>*                  result_bytes,
                                            std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      swap_guard g(*this);
-      //std::vector<char> result_key6;
       temp_key6 result_key6;
-      if (!unguarded_get_less_than(g, r, get_id(r), to_key6({key.data(), key.size()}), result_key6,
-                                   result_bytes, result_roots))
-         return false;
+      { // scope the lock as narrow as possible
+         auto state = session_base::lock();
+         if (!unguarded_get_less_than(state, r, get_id(r), to_key6({key.data(), key.size()}),
+                                      result_key6, result_bytes, result_roots))
+            return false;
+      }
       if (result_key)
       {
          auto s = from_key6({result_key6.data(), result_key6.size()});
@@ -1371,7 +1319,7 @@ namespace triedent
 
    template <typename AccessMode>
    bool session<AccessMode>::unguarded_get_less_than(
-       session_lock_ref<>                            l,
+       session_rlock&                                l,
        const std::shared_ptr<triedent::root>&        ancestor,
        object_id                                     root,
        std::optional<std::string_view>               key,
@@ -1442,16 +1390,19 @@ namespace triedent
                                      std::vector<char>*                  result_bytes,
                                      std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      swap_guard g(*this);
       auto       prefix_min = to_key6({prefix.data(), prefix.size()});
       auto       extra_bits = prefix_min.size() * 6 - prefix.size() * 8;
       auto       prefix_max = (std::string)prefix_min;
       if (!prefix_max.empty())
          prefix_max.back() |= (1 << extra_bits) - 1;
       temp_key6 result_key6;
-      if (!unguarded_get_max(g, r, get_id(r), prefix_min, prefix_max, result_key6, result_bytes,
-                             result_roots))
-         return false;
+
+      {
+         auto state = session_base::lock();
+         if (!unguarded_get_max(state, r, get_id(r), prefix_min, prefix_max, result_key6, result_bytes,
+                                result_roots))
+            return false;
+      }
       if (result_key)
       {
          auto s = from_key6({result_key6.data(), result_key6.size()});
@@ -1462,7 +1413,7 @@ namespace triedent
 
    template <typename AccessMode>
    bool session<AccessMode>::unguarded_get_max(
-       session_lock_ref<>                            l,
+       session_rlock&                                l,
        const std::shared_ptr<triedent::root>&        ancestor,
        object_id                                     root,
        std::string_view                              prefix_min,
@@ -1520,16 +1471,15 @@ namespace triedent
 
    inline int write_session::remove(std::shared_ptr<root>& r, std::span<const char> key)
    {
-      std::unique_lock<gc_session> l(*this);
-
       int  removed_size = -1;
-      auto new_root = remove_child(l, get_id(r), get_unique(r), to_key6({key.data(), key.size()}),
+      auto state = session_base::lock();
+      auto new_root = remove_child(state, get_id(r), get_unique(r), to_key6({key.data(), key.size()}),
                                    removed_size);
-      update_root(l, r, new_root);
+      update_root(state, r, new_root);
       return removed_size;
    }
 
-   inline database::id write_session::remove_child(std::unique_lock<gc_session>& session,
+   inline database::id write_session::remove_child(session_rlock& state,
                                                    id                            root,
                                                    bool                          unique,
                                                    string_view                   key,
@@ -1538,7 +1488,7 @@ namespace triedent
       if (not root)
          return root;
 
-      auto n = get_by_id(session, root, unique);
+      auto n = get_by_id(state, root, unique);
       if (n.is_leaf_node())  // current root is value
       {
          auto& vn = n.as_value_node();
@@ -1561,12 +1511,12 @@ namespace triedent
          auto iv = in->value();
          if (not iv)
             return root;
-         removed_size = get_by_id(session, iv).as_value_node().data_size();
+         removed_size = get_by_id(state, iv).as_value_node().data_size();
 
          if (in->num_branches() == 1)
          {
             char        b  = std::countr_zero(in->branches());
-            auto        bn = get_by_id(session, *in->children());
+            auto        bn = get_by_id(state, *in->children());
             std::string new_key;
             new_key += in_key;
             new_key += b;
@@ -1576,14 +1526,14 @@ namespace triedent
                auto& vn = bn.as_value_node();
                new_key += vn.key();
                //           TRIEDENT_DEBUG( "clone value" );
-               return clone_value(session, bn, bn.type(), new_key, vn.data());
+               return clone_value_id(state, bn.id(), bn.type(), new_key, vn.data());
             }
             else
             {
                auto& bin = bn.as_inner_node();
                new_key += bin.key();
                //          TRIEDENT_DEBUG( "clone inner " );
-               return clone_inner(session, bn, bin, new_key, bin.value(), bin.branches());
+               return clone_inner_id(state, bn.id(), bin, new_key, bin.value(), bin.branches());
             }
          }
 
@@ -1591,11 +1541,11 @@ namespace triedent
          {
             auto prev = in->value();
             lock(in)->set_value(id());
-            release(session, prev);
+            release(state, prev);
             return root;
          }
          else
-            return clone_inner(session, in, *in, key, 0, id(), in->branches());
+            return clone_inner_id(state, in.id(), *in, key, 0, id(), in->branches());
       }
 
       auto cpre = common_prefix(in_key, key);
@@ -1609,24 +1559,24 @@ namespace triedent
       object_id cur_b = in->branch(b);
 
       auto new_b =
-          remove_child(session, cur_b, unique, key.substr(in_key.size() + 1), removed_size);
+          remove_child(state, cur_b, unique, key.substr(in_key.size() + 1), removed_size);
       if (new_b != cur_b)
       {
-         in.reload(ring(), session);
          if (new_b and unique)
          {
             lock(in)->branch(b) = new_b;
-            release(session, cur_b);
+            release(state, cur_b);
             return root;
          }
          if (new_b)  // update branch
          {
+            // TODO: this could use non-locking deref because id is returned before alloc
             auto new_root =
-                clone_inner(session, in, *in, in->key(), 0, in->value(), in->branches());
+                clone_inner(state, in.id(), *in, in->key(), 0, in->value(), in->branches());
             auto& new_br = new_root->branch(b);
-            release(session, new_br);
+            release(state, new_br);
             new_br = new_b;
-            return new_root;
+            return new_root.id();
          }
          else  // remove branch
          {
@@ -1634,7 +1584,7 @@ namespace triedent
             if (std::popcount(new_branches) + bool(in->value()) > 1)
             {  // multiple branches remain, nothing to merge up, just realloc without branch
                //   TRIEDENT_WARN( "clone without branch" );
-               return clone_inner(session, in, *in, in->key(), 0, in->value(), new_branches);
+               return clone_inner_id(state, in.id(), *in, in->key(), 0, in->value(), new_branches);
             }
             if (not new_branches)
             {
@@ -1644,11 +1594,11 @@ namespace triedent
                // in this case, not branches means it must have a value
                assert(in->value() and "expected value because we removed a branch");
 
-               auto  cur_v = get_by_id(session, in->value());
+               auto  cur_v = state.get(in->value());//get_by_id(state, in->value());
                auto& cv    = cur_v.as_value_node();
                // make a copy because key and data come from different objects, which clone doesn't handle.
                std::string new_key{in->key()};
-               return clone_value(session, cur_v, cur_v.type(), new_key, cv.data());
+               return clone_value_id(state, cur_v.id(), cur_v.type(), new_key, cv.data());
             }
             else
             {  // there must be only 1 branch left
@@ -1657,7 +1607,7 @@ namespace triedent
                auto  lb          = std::countr_zero(in->branches() ^ inner_node::branches(b));
                auto& last_branch = in->branch(lb);
                // the one branch is either a value or a inner node
-               auto cur_v = get_by_id(session, last_branch);
+               auto cur_v = get_by_id(state, last_branch);
                if (cur_v.is_leaf_node())
                {
                   auto&       cv = cur_v.as_value_node();
@@ -1665,7 +1615,7 @@ namespace triedent
                   new_key += in->key();
                   new_key += char(lb);
                   new_key += cv.key();
-                  return clone_value(session, cur_v, cur_v.type(), new_key, cv.data());
+                  return clone_value_id(state, cur_v.id(), cur_v.type(), new_key, cv.data());
                }
                else
                {
@@ -1674,7 +1624,7 @@ namespace triedent
                   new_key += in->key();
                   new_key += char(lb);
                   new_key += cv.key();
-                  return clone_inner(session, cur_v, cv, new_key, cv.value(), cv.branches());
+                  return clone_inner_id(state, cur_v.id(), cv, new_key, cv.value(), cv.branches());
                }
             }
          }
@@ -1691,8 +1641,8 @@ namespace triedent
    template <typename AccessMode>
    void session<AccessMode>::validate(const std::shared_ptr<root>& r)
    {
-      swap_guard l{*this};
-      validate(l, get_id(r));
+      auto state = session_base::lock();
+      validate(state, get_id(r));
    }
 
    template <typename AccessMode>
@@ -1754,26 +1704,27 @@ namespace triedent
          std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
          id = {_db->_dbm->top_root.load()};
       }
-      swap_guard l{*this};
-      recursive_retain(l, id);
+      auto state = session_base::lock();
+      recursive_retain(state, id);
    }
 
-   inline void write_session::recursive_retain(session_lock_ref<> l, id r)
+   inline void write_session::recursive_retain(session_rlock& state, id r)
    {
       if (not r)
          return;
 
-      if (!ring().gc_retain(r))
-         return;  // retaining this node indirectly retains all children
 
-      auto dr = get_by_id(l, r);
+      auto dr = state.get(r);
+      if( not dr.retain() )
+         return;
+
       if (dr.type() == node_type::inner)
       {
          auto& in = dr.as_inner_node();
-         recursive_retain(l, in.value());
+         recursive_retain(state, in.value());
          for (auto child : std::span{in.children(), in.num_branches()})
          {
-            recursive_retain(l, child);
+            recursive_retain(state, child);
          }
       }
       else if (dr.type() == node_type::roots)
@@ -1781,18 +1732,20 @@ namespace triedent
          auto& rt = dr.as_value_node();
          for (auto child : std::span{rt.roots(), rt.num_roots()})
          {
-            recursive_retain(l, child);
+            recursive_retain(state, child);
          }
       }
    }
 
    inline void write_session::start_collect_garbage()
    {
-      ring().gc_start();
+      throw std::runtime_error("not impl yet" );
+      //ring().gc_start();
    }
    inline void write_session::end_collect_garbage()
    {
-      ring().gc_finish();
+      throw std::runtime_error("not impl yet" );
+      //ring().gc_finish();
    }
 
    template <typename AccessMode>
@@ -1806,114 +1759,37 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   void session<AccessMode>::validate(session_lock_ref<> l, id r)
+   void session<AccessMode>::validate(session_rlock& state, id r)
    {
       if (not r)
          return;
 
       auto validate_id = [&](auto i)
       {
-         ring().validate(r);
-         if (0 == ring().ref(r))
+         auto rv = state.validate(r);
+         if( 0 == rv.ref_count() )
             throw std::runtime_error("found reference to object with 0 ref count: " +
                                      std::to_string(r.id));
       };
 
       validate_id(r);
 
-      auto dr = get_by_id(l, r);
+      auto dr = state.get(r);//get_by_id(state, r);
       if (not dr.is_leaf_node())
       {
          auto& in = dr.as_inner_node();
-         validate(l, in.value());
+         validate(state, in.value());
 
          auto* c = in.children();
          auto* e = c + in.num_branches();
          while (c != e)
          {
-            validate(l, *c);
+            validate(state, *c);
             ++c;
          }
       }
    }
 
-   inline key_type from_key6(const key_view sixb)
-   {
-      key_type tmp;
-      from_key6(sixb, tmp);
-      return tmp;
-   }
-
-   template <typename KeyType>
-   inline void from_key6(const key_view sixb, KeyType& out)
-   {
-      out.resize((sixb.size() * 6) / 8);
-
-      const uint8_t* pos6     = (uint8_t*)sixb.data();
-      const uint8_t* pos6_end = (uint8_t*)sixb.data() + sixb.size();
-      uint8_t*       pos8     = (uint8_t*)out.data();
-
-      while (pos6_end - pos6 >= 4)
-      {
-         pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
-         pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
-         pos8[2] = (pos6[2] << 6) | pos6[3];         // 2b + 6
-         pos6 += 4;
-         pos8 += 3;
-      }
-      switch (pos6_end - pos6)
-      {
-         case 3:
-            pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
-            pos8[1] = (pos6[1] << 4) | (pos6[2] >> 2);  // 4b + 4t
-            //    pos8[2] = (pos6[2] << 6);                   // 2b + 6-0
-            break;
-         case 2:
-            pos8[0] = (pos6[0] << 2) | (pos6[1] >> 4);  // 6 + 2t
-            //     pos8[1] = (pos6[1] << 4);                   // 4b + 4-0
-            break;
-         case 1:
-            pos8[0] = (pos6[0] << 2);  // 6 + 2-0
-            break;
-      }
-   }
-   inline key_view to_key6(key_type& key_buf, key_view v)
-   {
-      uint32_t bits  = v.size() * 8;
-      uint32_t byte6 = (bits + 5) / 6;
-
-      key_buf.resize(byte6);
-
-      uint8_t*       pos6     = (uint8_t*)key_buf.data();
-      const uint8_t* pos8     = (uint8_t*)v.data();
-      const uint8_t* pos8_end = (uint8_t*)v.data() + v.size();
-
-      while (pos8_end - pos8 >= 3)
-      {
-         pos6[0] = pos8[0] >> 2;
-         pos6[1] = (pos8[0] & 0x3) << 4 | pos8[1] >> 4;
-         pos6[2] = (pos8[1] & 0xf) << 2 | (pos8[2] >> 6);
-         pos6[3] = pos8[2] & 0x3f;
-         pos8 += 3;
-         pos6 += 4;
-      }
-
-      switch (pos8_end - pos8)
-      {
-         case 2:
-            pos6[0] = pos8[0] >> 2;
-            pos6[1] = (pos8[0] & 0x3) << 4 | pos8[1] >> 4;
-            pos6[2] = (pos8[1] & 0xf) << 2;
-            break;
-         case 1:
-            pos6[0] = pos8[0] >> 2;
-            pos6[1] = (pos8[0] & 0x3) << 4;
-            break;
-         default:
-            break;
-      }
-      return {key_buf.data(), key_buf.size()};
-   }
    inline key_view session_base::to_key6(key_view v) const
    {
       return triedent::to_key6(key_buf, v);

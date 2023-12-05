@@ -1,5 +1,6 @@
 #pragma once
 #include <triedent/database.hpp>
+#include <shared_mutex>
 
 namespace triedent
 {
@@ -53,7 +54,7 @@ namespace triedent
 
            private:
             friend class ReadSession;
-            Transaction(ReadSession& s) : _rs(s), _root(s._db._root) {}
+            Transaction(ReadSession& s) : _rs(s), _root(s._db.getRoot()) {}
 
 
             ReadSession& _rs;
@@ -139,7 +140,7 @@ namespace triedent
          void setRoot(std::shared_ptr<root> r)
          {
             _ws->set_top_root(r);
-            _db._root = std::move(r);
+            _db.setRoot( std::move(r) );
          }
 
          DB&                            _db;
@@ -159,15 +160,27 @@ namespace triedent
       auto createReadSession() { return std::make_shared<ReadSession>(std::ref(*this)); }
       WriteSession& writeSession() { return _ws; }
 
+      root_ptr getRoot()const {
+         std::shared_lock m(_root_mutex);
+         return _root;
+      }
+      ~DB() {
+         _db->print_stats( std::cout, true );
+      }
      private:  // DB
-      friend class WriteSession;
-      friend class ReadSession;
-
-      void setRoot(std::shared_ptr<root> r) { _root = r; }
+      void     setRoot( root_ptr p ) {
+         auto tmp = _root; // don't want ref-count to go to zero while holding lock
+         {
+            std::unique_lock l(_root_mutex);
+            _root = std::move(p);
+         }
+      }
 
       std::shared_ptr<database>     _db;
       WriteSession                  _ws;
-      root_ptr                      _root;
+
+      mutable std::shared_mutex _root_mutex;
+      root_ptr          _root;
    };
 
 }  // namespace triedent
