@@ -2,7 +2,11 @@
 
 Account names on a psibase network are, in fact, numbers. These string-like names are compressed into 64-bit numeric values using a custom name compression algorithm. 
 
-This custom account-name encoding allows for names that still compress into 64-bit values but may be from 0 to 18 characters long and contain the characters a-z, 0-9, and - (hyphen). Non-empty names must begin with a letter.
+This custom account-name encoding allows for names that still compress into 64-bit values but they must follow the following rules:
+* Name length is between 0 and 18 characters
+* Names may only include the following character: a-z, 0-9, and - (hyphen)
+* A hyphen may not be the second or last character in an account name
+* Non-empty names must begin with a letter
 
 To get 64-bit values out of 18-character names, some names will fail to compress down to 64 bits. The compression algorithm is designed to prefer names that are more likely to appear in user handles, and less likely to compress names that look non-human (e.g. no vowels).
 
