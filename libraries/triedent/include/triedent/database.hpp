@@ -832,9 +832,9 @@ namespace triedent
              [&] { return clone_value_id(state, origin1, t1, k1, k1.size(), v1); },
              [&] { return clone_value_id(state, origin2, t2, k2, cpre.size() + 1, v2); });
 
-         // TODO: this could use the non-locking deref because
-         // no allocs occur between here and the return statement
-         auto in = make_inner(state, cpre, id(), 1ull << b2);
+         // this usesthe non-locking deref because no alloc before return
+         auto in = inner_node::make( state, cpre, id(), 1ull<<b2 );
+         
          // Set value separately, because we don't want to increment its refcount
          in->set_value(inner_id);
          in->branch(b2) = branch_id;
@@ -849,8 +849,8 @@ namespace triedent
              [&] { return clone_value_id(state, origin1, t1, k1, cpre.size() + 1, v1); },
              [&] { return clone_value_id(state, origin2, t2, k2, cpre.size() + 1, v2); });
 
-         // TODO: this could use the non-locking deref because
-         auto in        = make_inner(state, cpre, id(), inner_node::branches(b1, b2));
+         // this usesthe non-locking deref because there are no alloc before return
+         auto in        = inner_node::make(state, cpre, id(), inner_node::branches(b1, b2));
          in->branch(b1) = b1id;
          in->branch(b2) = b2id;
 
@@ -948,9 +948,7 @@ namespace triedent
       {
          object_id new_val = make_value_id(state, type, string_view(), val);
 
-         // TODO: clone_inner could return deref because no allocs occur between
-         // return and reducing to an id
-         auto result = clone_inner(state, n.id(), *n, n->key(), 0, object_id{}, n->branches());
+         auto result = inner_node::clone(state, n.id(), &*n, n->key(), 0, object_id{}, n->branches());
          result->set_value(new_val);
          return result.id();
       }
@@ -1008,9 +1006,7 @@ namespace triedent
             auto      new_b =
                 add_child(state, cur_b, false, type, key.substr(cpre.size() + 1), val, old_size);
 
-            // TODO: this could use the non-locking deref because no alloc between here
-            // and return.
-            auto new_in = clone_inner(state, root, *in, in->key(), 0, in->value(),
+            auto new_in = inner_node::clone(state, root, &*in, in->key(), 0, in->value(),
                                       in->branches() | 1ull << b);
 
             if (new_b != cur_b)
@@ -1043,8 +1039,7 @@ namespace triedent
                                       in->branches());
             id b0val = make_value_id(state, type, string_view(), val);
 
-            // TODO: this could use non-locking deref
-            auto nin = make_inner(state, cpre, object_id{}, inner_node::branches(b1));
+            auto nin = inner_node::make(state, cpre, object_id{}, inner_node::branches(b1));
             // Set separately because we don't need to inc ref
             nin->set_value(b0val);
             nin->branch(b1) = b1val;
@@ -1061,8 +1056,7 @@ namespace triedent
                                       in->branches());
             id b1val = make_value_id(state, type, b1key, val);
 
-            // TODO: this could use non-locking deref
-            auto nin = make_inner(state, cpre, id(), inner_node::branches(b1, b2));
+            auto nin = inner_node::make(state, cpre, id(), inner_node::branches(b1, b2));
 
             assert(not nin->branch(b1));
             nin->branch(b1) = b1val;
@@ -1570,9 +1564,8 @@ namespace triedent
          }
          if (new_b)  // update branch
          {
-            // TODO: this could use non-locking deref because id is returned before alloc
             auto new_root =
-                clone_inner(state, in.id(), *in, in->key(), 0, in->value(), in->branches());
+                inner_node::clone(state, in.id(), &*in, in->key(), 0, in->value(), in->branches());
             auto& new_br = new_root->branch(b);
             release(state, new_br);
             new_br = new_b;

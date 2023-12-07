@@ -401,7 +401,7 @@ namespace triedent
          if (oref.type() == node_type::inner)
          {
             auto& in =
-                oref.as_inner_node();  //*reinterpret_cast<inner_node*>(oref.data()); TODO clean
+                oref.as_inner_node(); 
             if constexpr (debug_nodes)
                std::cout << obj.id << ": destroying; release value " << in.value().id << std::endl;
             release_node(state, in.value());
@@ -419,7 +419,7 @@ namespace triedent
          }
          else if (oref.type() == node_type::roots)
          {
-            auto& vn = oref.as_value_node();  // TODO *reinterpret_cast<value_node*>(oref.data());
+            auto& vn = oref.as_value_node();  
             auto  n  = vn.num_roots();
             auto  roots = vn.roots();
             while (n--)
@@ -436,12 +436,12 @@ namespace triedent
    {
       if (oref.type() != node_type::inner)  // value or roots
       {
-         auto& src = oref.as_value_node();  // TODO reinterpret_cast<value_node*>(oref.data());
+         auto& src = oref.as_value_node();  
          return value_node::clone(state, oref.id(), src.key(), 0, src.data(), oref.type());
       }
       else
       {
-         auto& src = oref.as_inner_node();  // TODO reinterpret_cast<inner_node*>(oref.data());
+         auto& src = oref.as_inner_node(); 
          return inner_node::clone(state, oref.id(), &src, src.key(), 0, src.value(),
                                   src.branches());
       }

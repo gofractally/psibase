@@ -218,6 +218,7 @@ namespace triedent
                inline auto&    as_inner_node() const { return *this->template as<const inner_node>(); }
 
                inline const T* operator->() const { return this->template as<const T>(); }
+               inline T* operator->() { return this->template as<T>(); }
                inline const T& operator*() const { return *(this->template as<const T>()); }
 
                int64_t as_id() const { return _id.id; }
@@ -229,6 +230,8 @@ namespace triedent
                // moves location and releases the lock in one operation
                // so that two C&E are not required for updating the state
                void move(object_location loc, std::unique_lock<object_info_lock>&);
+
+               void cache_object(bool wait); 
 
                void refresh(){ _cached = object_info(_atom_loc.load(std::memory_order_relaxed)); }
               protected:
@@ -629,5 +632,48 @@ namespace triedent
       }
       return false;
    }
+   /**
+    *  Given obj, if it isn't already located in the allocation segment of
+    *  this thread or in the allocation segment of another thread then
+    *  move it to the allocation segment of the current thread.
+    *
+    *  - do not move it if the object ref is 0...
+    *
+    *  @return true if the object was moved
+   bool seg_allocator::session::read_lock::object_ref::cache_object( bool wait)
+   {
+      auto lk = create_lock();
+      auto ul =
+          wait ? std::unique_lock(lk, std::adopt_lock) : std::unique_lock(lk, std::try_to_lock);
+
+      if (ul.owns_lock())
+      {
+         auto cur_loc = location()._offset;
+
+         assert(ref_count());
+         assert(cur_loc);
+         assert(cur_loc & (segment_size - 1));
+
+         auto           cur_seg     = cur_loc / segment_size;
+         auto           cur_seg_ptr = _rlock._session._sega.get_segment(cur_seg);
+         object_header* cur_obj_ptr =
+             (object_header*)(((char*)cur_seg_ptr) + (cur_loc & (segment_size - 1)));
+
+         assert(0 != cur_seg_ptr->_alloc_pos);  // this would be on a freed segment
+
+         // this would mean its currently located in an active alloc thread
+         if (cur_seg_ptr->_alloc_pos == uint32_t(-1))
+            return false;
+
+         auto obj_size   = cur_obj_ptr->object_size();
+         auto [loc, ptr] = _rlock._session.alloc_data(obj_size);
+         memcpy(ptr, cur_obj_ptr, obj_size);
+         move(loc, ul);
+         return true;
+      }
+      return false;
+   }
+    */
+
 
 }  // namespace triedent
