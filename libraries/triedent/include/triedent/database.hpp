@@ -1024,7 +1024,10 @@ namespace triedent
 
          if (new_b != cur_b)
          {
-            lock(in)->branch(b) = new_b;
+            {
+            auto li = lock(in);
+            li->branch(b) = new_b;
+            }
             release(state, cur_b);
          }
          return root;
@@ -1534,7 +1537,10 @@ namespace triedent
          if (unique)
          {
             auto prev = in->value();
-            lock(in)->set_value(id());
+            {
+            auto lin = lock(in);
+            lin->set_value(id());
+            }
             release(state, prev);
             return root;
          }
@@ -1558,7 +1564,10 @@ namespace triedent
       {
          if (new_b and unique)
          {
-            lock(in)->branch(b) = new_b;
+            {
+            auto lin=lock(in);
+            lin->branch(b) = new_b;
+            }
             release(state, cur_b);
             return root;
          }

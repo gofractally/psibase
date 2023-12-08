@@ -124,7 +124,7 @@ int main(int argc, char** argv)
    auto  db = triedent::DB::open(options, db_dir);
    auto& ws = db->writeSession();
 
-   uint32_t count = 1000 * 1000 * 10;
+   uint32_t count = 1000 * 1000 * 1;
    int64_t  key   = 0;
 
    /*
@@ -264,6 +264,8 @@ int main(int argc, char** argv)
                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                    << " items/sec   \n";
       }
+   }
+   if( 1 ) {
 
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
                 << " random key/values\n";
@@ -291,6 +293,11 @@ int main(int argc, char** argv)
                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                    << " items/sec   \n";
       }
+   }
+   if( 0 ){
+
+      auto rs = db->createReadSession();
+      auto rt = rs->startTransaction();
       std::cout << "Starting to find lower bound " << rounds << " rounds of " << add_comma(count)
                 << " random key/values\n";
       std::vector<char> result_key;

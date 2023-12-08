@@ -50,6 +50,7 @@ namespace triedent
       object_info info(atom.load(std::memory_order_relaxed));
       info.set_location(loc);
       info.set_type(type);
+    //  info._ref = 1;
       atom.store(info.to_int(), std::memory_order_release);
 
       return object_ref(*this, id, atom, oh);
@@ -208,11 +209,25 @@ namespace triedent
             auto [loc, ptr] = ses.alloc_data(obj_size);
             memcpy(ptr, foo, obj_size);
             obj_ref.move(loc, ul);
+            /*
+
+            auto check = state.get({foo->id},false);
+            assert(foo->id == check.id().id);
+            assert(check.obj()->id == foo->id );
+            assert(check.obj()->data_capacity() == foo->data_capacity() );
+            assert(check.obj() != foo );
+            assert((char*)check.obj() == ptr );
+            assert( 0 == memcmp( check.obj(), foo, foo->object_size() ) );
+            */
          }
+         /*
          auto check = state.get({foo->id},false);
          assert(foo->id == check.id().id);
          assert(check.obj()->id == foo->id );
          assert(check.obj()->data_capacity() == foo->data_capacity() );
+         assert(check.obj() != foo );
+         assert( 0 == memcmp( check.obj(), foo, foo->object_size() ) );
+         */
 
          foo = foo->next();
       }
@@ -227,10 +242,10 @@ namespace triedent
 
       // only one thread can move the end_ptr or this will break
      // std::cerr<<"done freeing end_ptr: " << _header->end_ptr.load() <<" <== " << seg_num <<"\n";
-      _header->free_seg_buffer[_header->end_ptr.load()] =  seg_num;
-      _header->end_ptr.fetch_add(1, std::memory_order_release );
-   //   _header->free_seg_buffer[_header->end_ptr.fetch_add(1)] = seg_num;
-   //   _header->free_seg_buffer[_header->end_ptr.fetch_add(1)] = seg_num;
+   // TODO restore   _header->free_seg_buffer[_header->end_ptr.load()] =  seg_num;
+   //   _header->end_ptr.fetch_add(1, std::memory_order_release );
+   //
+
    }
 
    /**

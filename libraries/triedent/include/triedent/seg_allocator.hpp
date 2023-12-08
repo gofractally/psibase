@@ -75,7 +75,7 @@ namespace triedent
             uint64_t so = size;
             so <<= 32;
             so += 1;
-            _free_space_and_obj.fetch_add(so, std::memory_order_relaxed );
+            _free_space_and_obj.fetch_add(so, std::memory_order_relaxed);
          }
 
          // doesn't increment object count
@@ -181,25 +181,33 @@ namespace triedent
 
                template <typename Other>
                object_ref(object_ref<Other> p)
-                   : _rlock(p._rlock), _id(p._id), _atom_loc(p._atom_loc), _cached(p._cached), _ptr(p._ptr)
+                   : _rlock(p._rlock),
+                     _id(p._id),
+                     _atom_loc(p._atom_loc),
+                     _cached(p._cached)
+                 //    _ptr(p._ptr)
                {
-                  assert( _ptr == nullptr or (_ptr and (_ptr->id == _id.id)) );
+            //      assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
                }
 
-               object_id id() const { return _id; }
-               uint32_t  ref_count() const { return _cached.ref(); }
-               node_type type() const { return _cached.type(); }
-               bool      is_locked() const { return _cached.locked(); }
-               object_location location()const { return _cached.location(); }
+               object_id       id() const { return _id; }
+               uint32_t        ref_count() const { return _cached.ref(); }
+               node_type       type() const { return _cached.type(); }
+               bool            is_locked() const { return _cached.locked(); }
+               object_location location() const { return _cached.location(); }
 
                // return false if ref count overflow
                bool retain();
                // return true if object is deleted
-               bool           release();
-               const object_header* obj()const;  // TODO: rename header()
-               object_header* obj();  // TODO: rename header()
-                                      
-               char* data(){ assert(obj()); return obj()->data(); }                  
+               bool                 release();
+               const object_header* obj() const;  // TODO: rename header()
+               object_header*       obj();        // TODO: rename header()
+
+               char* data()
+               {
+                  assert(obj());
+                  return obj()->data();
+               }
 
                template <typename Type>
                Type* as()
@@ -207,18 +215,18 @@ namespace triedent
                   return reinterpret_cast<Type*>(obj()->data());
                };
                template <typename Type>
-               const Type* as()const
+               const Type* as() const
                {
                   return reinterpret_cast<const Type*>(obj()->data());
                };
 
                explicit inline operator bool() const { return bool(id()); }
                bool            is_leaf_node() const { return type() != node_type::inner; }
-               inline auto&    as_value_node() const { return *this->template as<const value_node>(); }
-               inline auto&    as_inner_node() const { return *this->template as<const inner_node>(); }
+               inline auto& as_value_node() const { return *this->template as<const value_node>(); }
+               inline auto& as_inner_node() const { return *this->template as<const inner_node>(); }
 
                inline const T* operator->() const { return this->template as<const T>(); }
-               inline T* operator->() { return this->template as<T>(); }
+               inline T*       operator->() { return this->template as<T>(); }
                inline const T& operator*() const { return *(this->template as<const T>()); }
 
                int64_t as_id() const { return _id.id; }
@@ -231,9 +239,10 @@ namespace triedent
                // so that two C&E are not required for updating the state
                void move(object_location loc, std::unique_lock<object_info_lock>&);
 
-               void cache_object(bool wait); 
+               void cache_object(bool wait);
 
-               void refresh(){ _cached = object_info(_atom_loc.load(std::memory_order_relaxed)); }
+               void refresh() { _cached = object_info(_atom_loc.load(std::memory_order_relaxed)); }
+
               protected:
                friend class seg_allocator;
                friend class seg_allocator::session;
@@ -245,17 +254,17 @@ namespace triedent
                    : _rlock(rlock),
                      _id(id),
                      _atom_loc(atom_loc),
-                     _cached(atom_loc.load(std::memory_order_relaxed)),
-                     _ptr(p)
+                     _cached(atom_loc.load(std::memory_order_relaxed))
+                     //_ptr(p)
                {
-                  assert( _ptr == nullptr or (_ptr and (_ptr->id == _id.id)) );
+              //    assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
                }
 
                seg_allocator::session::read_lock& _rlock;
                object_id                          _id;
                std::atomic<uint64_t>&             _atom_loc;
                object_info                        _cached;  // cached read of atomic _atom_loc
-               mutable object_header*             _ptr = nullptr;
+         //      mutable object_header*             _ptr = nullptr;
             };
 
             object_ref<char> alloc(uint32_t size, node_type type);
@@ -275,8 +284,9 @@ namespace triedent
             //   node_type is known and defined
             //   ptr is in a valid range
             //   others?
-            object_ref<char> validate( object_id id )const {
-               throw std::runtime_error( "read_lock::validate not impl" );
+            object_ref<char> validate(object_id id) const
+            {
+               throw std::runtime_error("read_lock::validate not impl");
             }
 
             ~read_lock() { _session.release_read_lock(); }
@@ -302,7 +312,23 @@ namespace triedent
          {
             if (_alloc_seg_ptr)  // not moved
             {
+               if( segment_size - _alloc_seg_ptr->_alloc_pos >= 8 ) {
+                  memset( ((char*)_alloc_seg_ptr)+_alloc_seg_ptr->_alloc_pos, 0, sizeof(uint64_t) ); // mark last object
+               }
+               _sega._header->seg_meta[_alloc_seg_num].free(segment_size - _alloc_seg_ptr->_alloc_pos);
+               _alloc_seg_ptr->_alloc_pos = uint32_t(-1);
+               _alloc_seg_num = -1ull;
+
+
+
+               /*
                _sega.finalize_segment(_alloc_seg_num);
+               auto sh = _alloc_seg_ptr;
+               if (sh->_alloc_pos + 8 < segment_size)
+                  memset(((char*)sh) + sh->_alloc_pos, 0, sizeof(uint64_t));
+               _alloc_seg_ptr = nullptr;
+               _alloc_seg_num = -1ull;
+               */
             }
             _sega.release_session_num(_session_num);
          }
@@ -317,7 +343,8 @@ namespace triedent
             auto pt = _sega._session_ptrs[_session_num].load(std::memory_order_acquire);
             if (pt == -1ull)
                _sega._session_ptrs[_session_num].store(
-                   _sega._header->end_ptr.load(std::memory_order_acquire), std::memory_order_relaxed);
+                   _sega._header->end_ptr.load(std::memory_order_acquire),
+                   std::memory_order_relaxed);
             else  // TODO: this may be ok, but if so then
                throw std::runtime_error("attempt to double-lock");
          }
@@ -330,10 +357,7 @@ namespace triedent
          }
 
          session(seg_allocator& a, uint32_t ses_num)
-             : _session_num(ses_num),
-               _alloc_seg_num(-1ull),
-               _alloc_seg_ptr(nullptr),
-               _sega(a)
+             : _session_num(ses_num), _alloc_seg_num(-1ull), _alloc_seg_ptr(nullptr), _sega(a)
          {
          }
 
@@ -364,8 +388,9 @@ namespace triedent
 
             if (sh->_alloc_pos + rounded_size > segment_size)
             {
-               assert( sh->_alloc_pos + sizeof(uint64_t) <= segment_size );
-               memset( ((char*)sh) + sh->_alloc_pos, 0, sizeof(uint64_t) );
+               assert(sh->_alloc_pos + sizeof(uint64_t) <= segment_size);
+               // TODO: is this necessary?
+               memset(((char*)sh) + sh->_alloc_pos, 0, sizeof(uint64_t));
 
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
                sh->_alloc_pos = uint32_t(-1);
@@ -378,7 +403,7 @@ namespace triedent
             sh->_alloc_pos += rounded_size;
             sh->_num_objects++;
 
-            auto loc = _alloc_seg_num*segment_size + idx;
+            auto loc = _alloc_seg_num * segment_size + idx;
             if (sh->_alloc_pos == segment_size)
             {
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
@@ -395,7 +420,7 @@ namespace triedent
          segment_number                 _alloc_seg_num = -1ull;
          mapped_memory::segment_header* _alloc_seg_ptr = nullptr;
 
-         seg_allocator&              _sega;
+         seg_allocator& _sega;
       };
 
       session start_session() { return session(*this, alloc_session_num()); }
@@ -418,8 +443,7 @@ namespace triedent
          auto fs          = std::countr_zero(fs_bits);
          auto new_fs_bits = fs_bits & ~(1 << fs);
 
-         while (not _free_sessions.compare_exchange_weak(
-             fs_bits, new_fs_bits))
+         while (not _free_sessions.compare_exchange_weak(fs_bits, new_fs_bits))
          {
             if (fs_bits == 0)
             {
@@ -428,9 +452,9 @@ namespace triedent
             fs          = std::countr_zero(fs_bits);
             new_fs_bits = fs_bits & ~(1 << fs);
          }
-     //    std::cerr << "   alloc session bits: " << fs << " " <<std::bitset<64>(new_fs_bits) << "\n";
-     //    std::cerr << "   new fs bits: " << std::bitset<64>(new_fs_bits) << "\n";
-     //    _free_sessions.store(new_fs_bits);
+         //    std::cerr << "   alloc session bits: " << fs << " " <<std::bitset<64>(new_fs_bits) << "\n";
+         //    std::cerr << "   new fs bits: " << std::bitset<64>(new_fs_bits) << "\n";
+         //    _free_sessions.store(new_fs_bits);
          return fs;
       }
       void release_session_num(uint32_t sn)
@@ -438,12 +462,11 @@ namespace triedent
          auto fs_bits     = _free_sessions.load(std::memory_order_relaxed);
          auto new_fs_bits = fs_bits | (1 << sn);
 
-         while (not _free_sessions.compare_exchange_weak(
-             fs_bits, new_fs_bits))
+         while (not _free_sessions.compare_exchange_weak(fs_bits, new_fs_bits))
          {
             new_fs_bits = fs_bits | (1 << sn);
          }
-     //    std::cerr << "   release session bits: " << sn << " " <<std::bitset<64>(new_fs_bits) << "\n";
+         //    std::cerr << "   release session bits: " << sn << " " <<std::bitset<64>(new_fs_bits) << "\n";
       }
 
       std::pair<segment_number, mapped_memory::segment_header*> get_new_segment();
@@ -533,18 +556,27 @@ namespace triedent
    template <typename T>
    inline object_header* seg_allocator::session::read_lock::object_ref<T>::obj()
    {
+         auto _ptr = _rlock.get_object_pointer(object_info(_atom_loc.load()));
+         return _ptr;
+         /*
       if (not _ptr)
          _ptr = _rlock.get_object_pointer(_cached);
-      assert( _ptr and _ptr->id == _id.id ); // something broke
+      assert(_ptr and _ptr->id == _id.id);  // something broke
       return _ptr;
+      */
    }
    template <typename T>
-   inline const object_header* seg_allocator::session::read_lock::object_ref<T>::obj()const
+   inline const object_header* seg_allocator::session::read_lock::object_ref<T>::obj() const
    {
+         //auto _ptr = _rlock.get_object_pointer(_cached);
+         auto _ptr = _rlock.get_object_pointer(object_info(_atom_loc.load()));
+         return _ptr;
+         /*
       if (not _ptr)
          _ptr = _rlock.get_object_pointer(_cached);
-      assert( _ptr and _ptr->id == _id.id ); // something broke
+      assert(_ptr and _ptr->id == _id.id);  // something broke
       return _ptr;
+      */
    }
 
    template <typename T>
@@ -560,8 +592,7 @@ namespace triedent
    {
       using location_lock = std::unique_lock<object_info_lock>;
 
-      mutable_deref(const deref<T>& src) : deref<T>(src), 
-      oil(src.create_lock()), lock(oil){}
+      mutable_deref(const deref<T>& src) : deref<T>(src), oil(src.create_lock()), lock(oil) {}
 
       mutable_deref(location_lock lock, const deref<T>& src) : deref<T>(src), lock{std::move(lock)}
       {
@@ -575,48 +606,63 @@ namespace triedent
 
      private:
       object_info_lock oil;
-      location_lock lock;
+      location_lock    lock;
    };  // mutable_deref
        //
-   template<typename T>
-   void seg_allocator::session::read_lock::object_ref<T>::move(object_location                     loc,
-                                                            std::unique_lock<object_info_lock>& l)
+   template <typename T>
+   void seg_allocator::session::read_lock::object_ref<T>::move(
+       object_location                     loc,
+       std::unique_lock<object_info_lock>& l)
    {
       assert(l.owns_lock());
-      uint64_t expected;
+      uint64_t expected = _atom_loc.load(std::memory_order_relaxed);
       uint64_t updated;
       do
       {
-         expected = _atom_loc.load(std::memory_order_relaxed);
          assert(expected & object_info::lock_mask);
-         updated = object_info(expected).set_location(loc).to_int() & ~object_info::lock_mask;
+         updated = object_info(expected).set_location(loc).to_int();// & ~object_info::lock_mask;
       } while (not _atom_loc.compare_exchange_weak(expected, updated));
-      l.release();
+    //  l.release();
    }
 
-   template<typename T>
+   template <typename T>
    bool seg_allocator::session::read_lock::object_ref<T>::retain()
    {
+         object_info_lock                   lk(_atom_loc);
+         std::scoped_lock<object_info_lock> l(lk);
       uint64_t cur = _atom_loc.load(std::memory_order_relaxed);
       do
       {
-         assert(cur & object_info::ref_mask);
+         assert((cur & object_info::ref_mask) < 100);
+         //assert((cur & object_info::ref_mask) >= 1);
          if ((cur & object_info::ref_mask) >= object_info::max_ref_count)
             return false;
-      } while (not _atom_loc.compare_exchange_weak(cur, cur + 1, std::memory_order_relaxed, std::memory_order_relaxed));
+      } while (not _atom_loc.compare_exchange_weak(cur, cur + 1) ); 
+      //, std::memory_order_relaxed, std::memory_order_relaxed));
       _cached = object_info(cur + 1);  // TODO: may be unnessary work
       return true;
    }
-   template<typename T>
+   template <typename T>
    bool seg_allocator::session::read_lock::object_ref<T>::release()
    {
-      assert(_cached.ref() != 0);
-
-      _cached = object_info(_atom_loc.fetch_sub(1, std::memory_order_relaxed) - 1);
-      if (_cached.ref() == 0)
-      {
          object_info_lock                   lk(_atom_loc);
          std::scoped_lock<object_info_lock> l(lk);
+      uint64_t cur = _atom_loc.load();//std::memory_order_relaxed);
+      do
+      {
+         assert((cur & object_info::ref_mask) < 100);
+         assert((cur & object_info::ref_mask) >= 1);
+         if ((cur & object_info::ref_mask) >= object_info::max_ref_count)
+            return false;
+      } while (not _atom_loc.compare_exchange_weak(cur, cur - 1) ); 
+      //, std::memory_order_relaxed, std::memory_order_relaxed));
+      _cached = object_info(cur - 1);  // TODO: may be unnessary work
+
+
+
+      //_cached = object_info(_atom_loc.fetch_sub(1, std::memory_order_relaxed) - 1);
+      if ( _cached.ref() == 0 ) //(cur & object_info::ref_mask) == 0)
+      {
          // TODO: did anything change before lock?
 
          auto loc = _cached.location();
@@ -625,8 +671,7 @@ namespace triedent
          auto obj_ptr = (const object_header*)((char*)_rlock._session._sega._block_alloc.get(seg) +
                                                loc.index());
 
-
-         _rlock._session._sega._id_alloc.free_id( _id );
+         _rlock._session._sega._id_alloc.free_id(_id);
          _rlock._session._sega._header->seg_meta[seg].free_object(obj_ptr->data_capacity());
          return true;
       }
@@ -674,6 +719,5 @@ namespace triedent
       return false;
    }
     */
-
 
 }  // namespace triedent

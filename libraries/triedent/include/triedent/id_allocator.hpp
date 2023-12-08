@@ -91,8 +91,25 @@ namespace triedent
       static const uint32_t id_block_size = 1024 * 1024 * 128;
       static_assert(id_block_size % 64 == 0, "should be divisible by cacheline");
 
-      inline static constexpr uint64_t extract_next_ptr(uint64_t x) { return (x >> object_info::location_rshift); }
-      inline static constexpr uint64_t create_next_ptr(uint64_t x) { return (x << object_info::location_rshift); }
+      /*
+      inline static constexpr uint64_t extract_next_ptr(uint64_t x)
+      {
+         return (x >> object_info::location_rshift);
+      }
+      inline static constexpr uint64_t create_next_ptr(uint64_t x)
+      {
+         return (x << object_info::location_rshift);
+      }
+      */
+      inline static constexpr uint64_t extract_next_ptr(uint64_t x)
+      {
+         assert((x >> 15 & 3) == uint64_t(node_type::undefined));
+         return (x >> object_info::location_rshift);
+      }
+      inline static constexpr uint64_t create_next_ptr(uint64_t x)
+      {
+         return (x << object_info::location_rshift) | (uint64_t(node_type::undefined) << 15);
+      }
 
       id_allocator(std::filesystem::path id_file)
           : _data_dir(id_file),
@@ -129,9 +146,9 @@ namespace triedent
           */
       std::pair<std::atomic<uint64_t>&, object_id> get_new_id()
       {
-     //    std::cerr << "get new id...\n";
-      //   std::cerr << "   pre alloc free list: ";
-       //  print_free_list();
+         //    std::cerr << "get new id...\n";
+         //   std::cerr << "   pre alloc free list: ";
+         //  print_free_list();
 
          auto brand_new = [&]()
          {
@@ -141,18 +158,18 @@ namespace triedent
             auto& atom = get(id);
             atom.store(obj_val(node_type::undefined, 1), std::memory_order_relaxed);
 
-        //    std::cerr << " brand new id: " << id.id << "\n";
+            //    std::cerr << " brand new id: " << id.id << "\n";
             return std::pair<std::atomic<uint64_t>&, object_id>(atom, id);
          };
 
          std::unique_lock<std::mutex> l{_alloc_mutex};
          uint64_t                     ff = _idheader->_first_free.load(std::memory_order_acquire);
-        // std::cerr << "first free: " << extract_next_ptr(ff) << "\n";
+         // std::cerr << "first free: " << extract_next_ptr(ff) << "\n";
          do
          {
             if (ff == 0)
             {
-         //      std::cerr << "alloc brand new! \n";
+               //      std::cerr << "alloc brand new! \n";
                _alloc_mutex.unlock();
                l.release();
                return brand_new();
@@ -161,21 +178,22 @@ namespace triedent
              ff, get({extract_next_ptr(ff)}).load(std::memory_order_relaxed)));
 
          ff = extract_next_ptr(ff);
-   //      std::cerr << "  reused id: " << ff << "\n";
+         //      std::cerr << "  reused id: " << ff << "\n";
          auto& ffa = get({ff});
          // store 1 = ref count 1 prevents object as being interpreted as unalloc
          ffa.store(obj_val(node_type::undefined, 1), std::memory_order_relaxed);
 
-
-    //     std::cerr << "   post alloc free list: ";
-     //    print_free_list();
+         //     std::cerr << "   post alloc free list: ";
+         //    print_free_list();
          return {ffa, {ff}};
       }
 
-      void print_free_list() {
+      void print_free_list()
+      {
          uint64_t id = extract_next_ptr(_idheader->_first_free.load());
          std::cerr << id;
-         while( id ) {
+         while (id)
+         {
             id = extract_next_ptr(get({id}));
             std::cerr << ", " << id;
          }
@@ -184,26 +202,26 @@ namespace triedent
 
       void free_id(object_id id)
       {
-     //    std::cerr << "                            free " << id.id << "\n";
+         //    std::cerr << "                            free " << id.id << "\n";
          // store the head of the free list into the pointer section of get(id)
          // set the head of the free list to id if and only if the head of the free list
          // has not changed
 
          auto& head_free_list = _idheader->_first_free;
          auto& next_free      = get(id);
-    //     std::cerr << "               free _first_free: " << extract_next_ptr(head_free_list.load())
-    //               << "\n";
+         //     std::cerr << "               free _first_free: " << extract_next_ptr(head_free_list.load())
+         //               << "\n";
 
          auto new_head = create_next_ptr(id.id);
 
          uint64_t cur_head = _idheader->_first_free.load(std::memory_order_acquire);
-         assert( not (cur_head & object_info::ref_mask) );
+         assert(not(cur_head & object_info::ref_mask));
          do
          {
             next_free.store(cur_head, std::memory_order_release);
          } while (not head_free_list.compare_exchange_strong(cur_head, new_head));
-     //    std::cerr <<"  post free free list: ";
-     //    print_free_list();
+         //    std::cerr <<"  post free free list: ";
+         //    print_free_list();
       }
 
      private:
@@ -222,7 +240,7 @@ namespace triedent
             if (_idheader->_next_alloc.load() < _idheader->_end_id.load())
                return;  // no need to grow, another thread grew first
 
-      //      std::cerr << "growing obj id db\n";
+            //      std::cerr << "growing obj id db\n";
             ptr = _block_alloc.get(_block_alloc.alloc());
             _idheader->_end_id.store(_block_alloc.num_blocks() * _block_alloc.block_size() / 8);
          }  // don't hold lock while doing mlock
