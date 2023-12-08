@@ -4,43 +4,35 @@ Requests made over HTTP to a psibase infrastructure provider must follow a parti
 
 ## URL Encoding
 
-The request URL encoding is as follows: `app.branch.scope.domain/path`
-This encoding includes three familiar attributes, namely the app, domain, and path. Additional attributes specific to psibase infrastructure are detailed below.
+The following attributes are used in the URL of a request:
 
-| Attribute | Prefix | Values<br>(Defaults **bold**)                                | Description                                                      |
-|-----------|--------|--------------------------------------------------------------|------------------------------------------------------------------|
-| app       | n/a    | *                                                            | Specifies the app the name of the app requested by the user      |
-| branch    | "b-"   | **"b-head"**,<br>"b-< block_height >",<br>"b-< branch_tag >" | Specifies the branch of the chain state being accessed           |
-| scope     | "s-"   | **"s-shared"**, "s-local"                                    | Specifies the scope in which to look for the app                 |
-| domain    | n/a    | *                                                            | Specifies the root domain of the node serving the infrastructure |
-| path      | n/a    | *                                                            | Specifies the requested subpage of the requested app             |
+| Position | Attribute | Prefix | Possible Values    | Description                                                      |
+|----------|-----------|--------|--------------------|------------------------------------------------------------------|
+|    1     | app       | n/a    | *                  | Specifies the app the name of the app requested by the user      |
+|    2     | branch    | "b-"   | "b-< branch_tag >" | Specifies the branch of the chain state being accessed           |
+|    2     | scope     | "s-"   | "s-local"          | Specifies the scope of the service being requested               |
+|    3     | domain    | n/a    | *                  | Specifies the root domain of the node serving the infrastructure |
+|    4     | path      | n/a    | *                  | Specifies the requested subpage of the requested app             |
 
-### Attribute value prefixes
-
-Different attributes have a special associated prefix for their values. For example, all values for the "branch" attribute begin with the prefix "b-", in order to indicate that the specified attribute is a value for the branch attribute. Relatedly, no account name may have the dash character "-" as the first, second, or last character, which prevents attribute values from colliding with the name of the specified app (which is an account name). For more information on account name rules, see the [account numbers data format specification](../data-formats/account-numbers.md).
+A branch can only be specified when a request is not targeting the head branch. A scope can only be specified when a request is targeting the head branch.
+The branch and scope are never both specified. Therefore the encoding results in the following request formats: `app.branch.domain/path` and `app.scope.domain/path`.
+Most requests will use the default values for branch and scope (head branch in shared scope) and therefore most requests will have the simpler format: `app.domain/path`.
 
 ### Branch
 
-Due to the psibase [database](./database.md) design, it is trivial for psibase networks to maintain multiple branches of chain state simultaneously. Because of this, when making an HTTP request to the chain, it is possible to query the state of the network as it exists on one of multiple state branches. A typical request will simply request the branch of the state at "b-head" which is the latest canonical version of the state. Requests made to the head branch may omit the branch attribute specifier, as it is the default and will be assumed.
+Due to the psibase [database](./database.md) design, it is trivial for psibase networks to maintain multiple branches of chain state simultaneously. Because of this, when making an HTTP request to the chain, it is possible to query the state of the network as it exists on one of multiple state branches. A typical request will simply request the state on the head branch, which is the latest canonical version of the state. The head branch is the assumed default request target and therefore only requests made to alternative branches should specify a branch target.
 
-To make a request at a particular block height, a request could specify a numeric branch, such as "b-1000". In this example, it would imply that the query is meant to apply to the state as of block height 1000. Requests made to branches at a block height are read only.
-
-Lastly, the branch attribute may contain a name, which allows for long-lived write-enabled alternative state branches. These named branches start off at a particular block height, but can accept transactions and therefore may have state that is maintained separately from the main branch state. This allows for the rapid creation and deletion of test networks for development purposes.
+Branches can be long-lived writeable alternatives to the head branch. These named branches may start identical to the head branch at a particular block height but can accept transactions and diverge into a separate state. Such branches may commonly be used as networks to deploy test code before using the head branch for production deployment. 
 
 ### Scope
 
-Two state scopes exist for psibase networks: shared scope and local scope. Shared scope is the scope for data that is synchronized across all psibase nodes (chain state). Locally scoped data is local to the node at which it is written to or read from. For example, node administration and configuration data is definitionally specific to a particular node, and therefore queries to such information would be locally scoped queries.
+Two state scopes exist for psibase networks: shared scope and local scope. Shared scope data is synchronized across all psibase nodes (chain state). The shared scope is the assumed default request target and therefore only requests made to the local scope should specify a scope target. Locally scoped data is local to the node at which it is written to or read from. For example, node administration and configuration data is specific to a particular node and that information is not synchronized across all nodes. Infrastructure providers can upload locally scoped services that manage node-specific data. They could even expose such functionality to users in order to give users local server space. Such local information is exposed over locally scoped queries.
 
-This is a generic design however and infrastructure providers can manually upload locally scoped services that manage node-specific data. This could enable users to run private services and store private data that is not synchronized across all nodes.
+To make a scoped query, the request URL format is `app.scope.domain/path`. Currently, the only alternative scope to the default shared scope is the local scope, which is identified by the value: "s-local". An administration app called "admin" could therefore be found at `admin.s-local.rootdomain.com/`.
 
-> ⚠️ Locally scoped data is not required to be branchable. and therefore if the scope attribute is specified as "s-local", then the only permitted branch value is "b-head". 
+> Note: Locally scoped data is not branchable.
 
-## URL resolution
+### Attribute value prefixes
 
-Attributes encoded in the URL must always appear in the correct relative order: `app.branch.scope.domain/path`. However, some attributes such as branch and scope have default values and can therefore be omitted. 
+Different attributes have a special associated prefix for their values. For example, all values for the "branch" attribute begin with the prefix "b-" to indicate that the specified attribute is a value for the branch attribute. Importantly, no account name may use a hyphen character "-" as the second character in an account name to ensure that attribute values can never conflict with account names. For more information on account name rules, see the [account numbers data format specification](../data-formats/account-numbers.md).
 
-If the branch is omitted, then the URL could have the following format: `app.scope.domain/path`. 
-If the scope is omitted, then the URL could have the following format: `app.branch.domain/path`.
-If both the branch and scope are omitted, then the URL could have the following format: `app.domain/path`.
-
-It is never valid to encode these attributes in a different relative order, such as `scope.branch.app.domain/path`.
