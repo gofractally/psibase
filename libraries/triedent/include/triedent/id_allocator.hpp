@@ -4,6 +4,8 @@
 #include <triedent/mapping.hpp>
 #include <triedent/object_fwd.hpp>
 
+#include <mutex>
+
 namespace triedent
 {
    /**

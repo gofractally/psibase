@@ -155,7 +155,7 @@ int main(int argc, char** argv)
       return 0;
       */
 
-   if (0)
+   if (1)
    {
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
                 << " sequential key/values\n";
@@ -265,7 +265,7 @@ int main(int argc, char** argv)
                    << " items/sec   \n";
       }
    }
-   if( 0 ) {
+   if( 1 ) {
 
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
                 << " random key/values\n";

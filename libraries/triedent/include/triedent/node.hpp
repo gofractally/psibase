@@ -439,7 +439,7 @@ namespace triedent
       }
    }
 
-   inline object_ref<> copy_node(session_rlock& state, object_ref<> oref)
+   inline object_ref<node> copy_node(session_rlock& state, object_ref<node> oref)
    {
       if (oref.type() != node_type::inner)  // value or roots
       {
