@@ -19,7 +19,7 @@ namespace triedent
    // each thread will have a segment this size, so larger values
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
-   static const uint64_t segment_size = 1024 * 1024 * 8;  // 256mb
+   static const uint64_t segment_size = 1024 * 1024 * 128;  // 256mb
 
    /// object pointers can only address 48 bits
    /// 128 TB limit on database size with 47 bits, this saves us
@@ -68,6 +68,8 @@ namespace triedent
       static const uint64_t ref_mask        = 0x7fff;
       static const uint64_t max_ref_count   = ref_mask - 1;
       static const uint64_t lock_mask       = 3 << 17;
+      static const uint64_t type_mask       = 3 << 15;
+      static const uint64_t location_mask   = ~(type_mask|lock_mask|ref_mask);
       static const uint32_t location_lshift = 45;
       static const uint32_t location_rshift = 64 - location_lshift;
 
@@ -78,6 +80,11 @@ namespace triedent
             _ref(x & ref_mask)
       {
       }
+      object_info( node_type t, uint64_t loc = -1):_type((int)t){
+         _ref = 0;
+         _locked = 0;
+         _location = loc;
+      };
 
       bool      locked() const { return _locked; }
       uint32_t  ref() const { return _ref; }

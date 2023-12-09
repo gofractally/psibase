@@ -23,7 +23,7 @@ uint64_t bswap(uint64_t x)
 
 int64_t rand64()
 {
-   static std::mt19937 gen(rand());
+   thread_local static std::mt19937 gen(rand());
    return uint64_t(gen()) << 32 | gen();
 }
 
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
    auto  db = triedent::DB::open(options, db_dir);
    auto& ws = db->writeSession();
 
-   uint32_t count = 1000 * 1000 * 1;
+   uint32_t count = 1000 * 1000 * 10;
    int64_t  key   = 0;
 
    /*
@@ -265,7 +265,7 @@ int main(int argc, char** argv)
                    << " items/sec   \n";
       }
    }
-   if( 1 ) {
+   if( 0 ) {
 
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
                 << " random key/values\n";
@@ -395,7 +395,7 @@ int main(int argc, char** argv)
 
             std::vector<char> result_key;
             std::vector<char> result_val;
-            key = 0;
+            uint64_t key = 0;
 
             auto rt = lrs->startTransaction();
             for (uint32_t i = 0; i < count; ++i)

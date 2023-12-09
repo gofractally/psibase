@@ -62,7 +62,8 @@ namespace triedent
          uint32_t alloc_size = sizeof(value_node) + key.size() + val.size();
          auto     r          = state.alloc(alloc_size, type);
          if constexpr (debug_nodes)
-            std::cout << r.id().id << ": construct value_node: type=" << (int)type << std::endl;
+            std::cout << r.id().id << ": construct value_node: type=" << (int)type << 
+                    " ref = " <<r.ref_count() << std::endl;
          new (r.data()) value_node(key, val);
          return r;
       }
@@ -291,7 +292,7 @@ namespace triedent
 
       auto newid = p.id();
       if constexpr (debug_nodes)
-         std::cout << newid.id << ": construct inner_node" << std::endl;
+         std::cout << newid.id << ": construct inner_node " << std::endl;
 
       new (p.data()) inner_node(newid, key, value, branches, children);
       return p;
@@ -307,7 +308,7 @@ namespace triedent
       auto p  = state.alloc(alloc_size, node_type::inner);
       auto id = p.id();
       if constexpr (debug_nodes)
-         std::cout << p.id().id << ": construct inner_node" << std::endl;
+         std::cout << p.id().id << ": construct inner_node val="<<val.id<< " ref: " << p.ref_count()<<std::endl;
 
       new (p.data()) inner_node(id, prefix, val, branches);
       return p;
@@ -396,12 +397,17 @@ namespace triedent
       if (!obj)
          return;
       auto oref = state.get(obj, false);  // don't try to cache, we are releasing!
+      auto ctype = oref.type();
+
+//      std::cerr << "before release node: " << obj.id <<" type: " << (int)oref.type() <<" loc: " << oref.location()._offset <<" ref: " << oref.ref_count()<<"\n";
+
+      auto& in = oref.as_inner_node();
       if (oref.release())
       {
-         if (oref.type() == node_type::inner)
+         if (ctype == node_type::inner)
          {
-            auto& in =
-                oref.as_inner_node(); 
+      //      auto& in =
+      //          oref.as_inner_node(); 
             if constexpr (debug_nodes)
                std::cout << obj.id << ": destroying; release value " << in.value().id << std::endl;
             release_node(state, in.value());
@@ -417,9 +423,9 @@ namespace triedent
                ++pos;
             }
          }
-         else if (oref.type() == node_type::roots)
+         else if (ctype == node_type::roots)
          {
-            auto& vn = oref.as_value_node();  
+            auto& vn = reinterpret_cast<const value_node&>(in);//oref.as_value_node();  
             auto  n  = vn.num_roots();
             auto  roots = vn.roots();
             while (n--)

@@ -34,47 +34,8 @@ namespace triedent
          _compact_thread.join();
    }
 
-   template <typename T>
-   using object_ref = seg_allocator::session::read_lock::object_ref<T>;
 
-   object_ref<char> seg_allocator::session::read_lock::alloc(uint32_t size, node_type type)
-   {
-      auto [loc, ptr] = _session.alloc_data(size + sizeof(object_header));
 
-      auto oh = ((object_header*)ptr);
-
-      auto [atom, id] = _session._sega._id_alloc.get_new_id();
-      oh->id          = id.id;
-      oh->size        = size;
-
-      object_info info(atom.load(std::memory_order_relaxed));
-      info.set_location(loc);
-      info.set_type(type);
-    //  info._ref = 1;
-      atom.store(info.to_int(), std::memory_order_release);
-
-      return object_ref(*this, id, atom, oh);
-   }
-
-   object_ref<char> seg_allocator::session::read_lock::get(object_header* oh)
-   {
-      object_id oid(oh->id);
-      return object_ref(*this, oid, _session._sega._id_alloc.get(oid), nullptr);
-   }
-
-   object_header* seg_allocator::session::read_lock::get_object_pointer(object_location loc)
-   {
-      auto segment = (mapped_memory::segment_header*)_session._sega._block_alloc.get( loc.segment() );
-      // 0 means we are accessing a swapped object on a segment that hasn't started new allocs
-      // if alloc_pos > loc.index() then we haven't overwriten this object yet, we are accessing
-      // data behind the alloc pointer which should be safe
-      // to access data we had to get the location from obj id database and we should read
-      // with memory_order_acquire, when updating an object_info we need to write with 
-      // memory_order_release otherwise the data written may not be visible yet to the reader coming
-      // along behind 
-      assert( segment->_alloc_pos == 0 or segment->_alloc_pos > loc.index() );
-      return (object_header*)((char*)_session._sega._block_alloc.get(loc.segment()) + loc.index());
-   }
 
    /**
     * This must be called via a session because the session is responsible
@@ -82,7 +43,6 @@ namespace triedent
     *
     * All objects are const because they cannot be modified after being
     * written.
-    */
    const object_header* seg_allocator::get_object(object_location loc) const
    {
       return nullptr;
@@ -91,6 +51,7 @@ namespace triedent
    {
       return nullptr;
    }
+    */
 
    /**
     *  After all writes are complete, and there is not enough space
@@ -134,7 +95,7 @@ namespace triedent
             {
                // only consider segs that are not actively allocing
                // or that haven't already been processed
-               if ( get_segment(s)->_alloc_pos == uint32_t(-1))
+               if ( get_segment(s)->_alloc_pos.load(std::memory_order_relaxed) == uint32_t(-1))
                {
                   most_empty_seg_num  = s;
                   most_empty_seg_free = fso.first;
@@ -209,25 +170,21 @@ namespace triedent
             auto [loc, ptr] = ses.alloc_data(obj_size);
             memcpy(ptr, foo, obj_size);
             obj_ref.move(loc, ul);
-            /*
 
-            auto check = state.get({foo->id},false);
+            //auto check = state.get({foo->id},false);
             assert(foo->id == check.id().id);
             assert(check.obj()->id == foo->id );
             assert(check.obj()->data_capacity() == foo->data_capacity() );
             assert(check.obj() != foo );
             assert((char*)check.obj() == ptr );
             assert( 0 == memcmp( check.obj(), foo, foo->object_size() ) );
-            */
          }
-         /*
-         auto check = state.get({foo->id},false);
+         //auto check = state.get({foo->id},false);
          assert(foo->id == check.id().id);
          assert(check.obj()->id == foo->id );
          assert(check.obj()->data_capacity() == foo->data_capacity() );
          assert(check.obj() != foo );
          assert( 0 == memcmp( check.obj(), foo, foo->object_size() ) );
-         */
 
          foo = foo->next();
       }
@@ -242,8 +199,8 @@ namespace triedent
 
       // only one thread can move the end_ptr or this will break
      // std::cerr<<"done freeing end_ptr: " << _header->end_ptr.load() <<" <== " << seg_num <<"\n";
-   // TODO restore   _header->free_seg_buffer[_header->end_ptr.load()] =  seg_num;
-   //   _header->end_ptr.fetch_add(1, std::memory_order_release );
+      _header->free_seg_buffer[_header->end_ptr.load()] =  seg_num;
+      _header->end_ptr.fetch_add(1, std::memory_order_release );
    //
 
    }

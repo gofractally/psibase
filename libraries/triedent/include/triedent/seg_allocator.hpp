@@ -100,7 +100,7 @@ namespace triedent
          // used by the thread that owns this segment and
          // set to uint64_t max when this segment is ready
          // to be marked read only to the seg_allocator
-         segment_offset _alloc_pos = 16;
+         std::atomic<uint64_t> _alloc_pos = 16;
          // used to calculate object density of segment header,
          // to establish madvise
          uint32_t _num_objects = 0;  // inc on alloc
@@ -181,13 +181,10 @@ namespace triedent
 
                template <typename Other>
                object_ref(object_ref<Other> p)
-                   : _rlock(p._rlock),
-                     _id(p._id),
-                     _atom_loc(p._atom_loc),
-                     _cached(p._cached)
-                 //    _ptr(p._ptr)
+                   : _rlock(p._rlock), _id(p._id), _atom_loc(p._atom_loc), _cached(p._cached)
+               //    _ptr(p._ptr)
                {
-            //      assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
+                  //      assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
                }
 
                object_id       id() const { return _id; }
@@ -241,7 +238,7 @@ namespace triedent
 
                void cache_object(bool wait);
 
-               void refresh() { _cached = object_info(_atom_loc.load(std::memory_order_relaxed)); }
+               void refresh() { _cached = object_info(_atom_loc.load(std::memory_order_acquire)); }
 
               protected:
                friend class seg_allocator;
@@ -254,17 +251,17 @@ namespace triedent
                    : _rlock(rlock),
                      _id(id),
                      _atom_loc(atom_loc),
-                     _cached(atom_loc.load(std::memory_order_relaxed))
-                     //_ptr(p)
+                     _cached(atom_loc.load(std::memory_order_acquire))
+               //_ptr(p)
                {
-              //    assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
+                  //    assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
                }
 
                seg_allocator::session::read_lock& _rlock;
                object_id                          _id;
                std::atomic<uint64_t>&             _atom_loc;
                object_info                        _cached;  // cached read of atomic _atom_loc
-         //      mutable object_header*             _ptr = nullptr;
+               //      mutable object_header*             _ptr = nullptr;
             };
 
             object_ref<char> alloc(uint32_t size, node_type type);
@@ -312,14 +309,15 @@ namespace triedent
          {
             if (_alloc_seg_ptr)  // not moved
             {
-               if( segment_size - _alloc_seg_ptr->_alloc_pos >= 8 ) {
-                  memset( ((char*)_alloc_seg_ptr)+_alloc_seg_ptr->_alloc_pos, 0, sizeof(uint64_t) ); // mark last object
+               if (segment_size - _alloc_seg_ptr->_alloc_pos >= 8)
+               {
+                  memset(((char*)_alloc_seg_ptr) + _alloc_seg_ptr->_alloc_pos, 0,
+                         sizeof(uint64_t));  // mark last object
                }
-               _sega._header->seg_meta[_alloc_seg_num].free(segment_size - _alloc_seg_ptr->_alloc_pos);
+               _sega._header->seg_meta[_alloc_seg_num].free(segment_size -
+                                                            _alloc_seg_ptr->_alloc_pos);
                _alloc_seg_ptr->_alloc_pos = uint32_t(-1);
-               _alloc_seg_num = -1ull;
-
-
+               _alloc_seg_num             = -1ull;
 
                /*
                _sega.finalize_segment(_alloc_seg_num);
@@ -384,35 +382,38 @@ namespace triedent
 
             auto* sh           = _alloc_seg_ptr;
             auto  rounded_size = (size + 7) & -8;
-            auto  idx          = sh->_alloc_pos;
 
-            if (sh->_alloc_pos + rounded_size > segment_size)
+            auto cur_apos  = sh->_alloc_pos.load(std::memory_order_relaxed);
+            auto spec_size = cur_apos + rounded_size;
+
+            if (spec_size > segment_size)
             {
-               assert(sh->_alloc_pos + sizeof(uint64_t) <= segment_size);
-               // TODO: is this necessary?
-               memset(((char*)sh) + sh->_alloc_pos, 0, sizeof(uint64_t));
+               assert(cur_apos + sizeof(uint64_t) <= segment_size);
+               memset(((char*)sh) + cur_apos, 0, sizeof(uint64_t));
 
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
-               sh->_alloc_pos = uint32_t(-1);
+               sh->_alloc_pos.store(uint32_t(-1), std::memory_order_relaxed);
                _alloc_seg_ptr = nullptr;
                _alloc_seg_num = -1ull;
 
                return alloc_data(size);  // recurse
             }
 
-            sh->_alloc_pos += rounded_size;
+            auto new_alloc_pos =
+                rounded_size + sh->_alloc_pos.fetch_add(rounded_size, std::memory_order_relaxed);
+            assert(new_alloc_pos == cur_apos + rounded_size);
             sh->_num_objects++;
 
-            auto loc = _alloc_seg_num * segment_size + idx;
-            if (sh->_alloc_pos == segment_size)
+            auto loc = _alloc_seg_num * segment_size + cur_apos;
+            if (new_alloc_pos == segment_size)
             {
-               _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
-               sh->_alloc_pos = uint32_t(-1);
+               _sega._header->seg_meta[_alloc_seg_num].free(segment_size - new_alloc_pos);
+               sh->_alloc_pos.store(uint32_t(-1), std::memory_order_relaxed);
                _alloc_seg_ptr = nullptr;
                _alloc_seg_num = -1ull;
             }
 
-            return {object_location{loc}, ((char*)sh) + idx};
+            return {object_location{loc}, ((char*)sh) + cur_apos};
          }
 
          uint32_t _session_num;  // index into _sega's active sessions list
@@ -556,27 +557,14 @@ namespace triedent
    template <typename T>
    inline object_header* seg_allocator::session::read_lock::object_ref<T>::obj()
    {
-         auto _ptr = _rlock.get_object_pointer(object_info(_atom_loc.load()));
-         return _ptr;
-         /*
-      if (not _ptr)
-         _ptr = _rlock.get_object_pointer(_cached);
-      assert(_ptr and _ptr->id == _id.id);  // something broke
-      return _ptr;
-      */
+      object_location loc{ ._offset = 8*(_atom_loc.load( std::memory_order_relaxed ) >> object_info::location_rshift) }; 
+      return _rlock.get_object_pointer(loc);
    }
    template <typename T>
    inline const object_header* seg_allocator::session::read_lock::object_ref<T>::obj() const
    {
-         //auto _ptr = _rlock.get_object_pointer(_cached);
-         auto _ptr = _rlock.get_object_pointer(object_info(_atom_loc.load()));
-         return _ptr;
-         /*
-      if (not _ptr)
-         _ptr = _rlock.get_object_pointer(_cached);
-      assert(_ptr and _ptr->id == _id.id);  // something broke
-      return _ptr;
-      */
+      object_location loc{ ._offset = 8*(_atom_loc.load( std::memory_order_relaxed ) >> object_info::location_rshift) }; 
+      return _rlock.get_object_pointer(loc);
    }
 
    template <typename T>
@@ -620,16 +608,23 @@ namespace triedent
       do
       {
          assert(expected & object_info::lock_mask);
-         updated = object_info(expected).set_location(loc).to_int();// & ~object_info::lock_mask;
-      } while (not _atom_loc.compare_exchange_weak(expected, updated));
-    //  l.release();
+         updated = object_info(expected).set_location(loc).to_int() & ~object_info::lock_mask;
+      } while (not _atom_loc.compare_exchange_weak(expected, updated, std::memory_order_relaxed ));
+      l.release();
    }
 
    template <typename T>
    bool seg_allocator::session::read_lock::object_ref<T>::retain()
    {
-         object_info_lock                   lk(_atom_loc);
-         std::scoped_lock<object_info_lock> l(lk);
+      auto prior = _atom_loc.fetch_add(1, std::memory_order_relaxed);
+      if ((prior & object_info::ref_mask) >= object_info::max_ref_count) [[unlikely]]
+      {
+         _atom_loc.fetch_sub(1, std::memory_order_relaxed);
+         return false;
+      }
+      // _cached = object_info(prior + 1);  // TODO: may be unnessary work
+      return true;
+
       uint64_t cur = _atom_loc.load(std::memory_order_relaxed);
       do
       {
@@ -637,46 +632,97 @@ namespace triedent
          //assert((cur & object_info::ref_mask) >= 1);
          if ((cur & object_info::ref_mask) >= object_info::max_ref_count)
             return false;
-      } while (not _atom_loc.compare_exchange_weak(cur, cur + 1) ); 
+      } while (not _atom_loc.compare_exchange_weak(cur, cur + 1));
       //, std::memory_order_relaxed, std::memory_order_relaxed));
-      _cached = object_info(cur + 1);  // TODO: may be unnessary work
+
+      //    std::cerr<<"retain: "<<_id.id <<" ref="<< (_atom_loc.load()&object_info::ref_mask) <<"\n";
       return true;
    }
    template <typename T>
    bool seg_allocator::session::read_lock::object_ref<T>::release()
    {
-         object_info_lock                   lk(_atom_loc);
-         std::scoped_lock<object_info_lock> l(lk);
-      uint64_t cur = _atom_loc.load();//std::memory_order_relaxed);
+      assert(type() != node_type::undefined);
+      auto prior = _atom_loc.fetch_sub(1, std::memory_order_relaxed);
+      if ((prior & object_info::ref_mask) > 1)
+         return false;
+
+      object_info_lock                   lk(_atom_loc);
+      std::scoped_lock<object_info_lock> l(lk);
+
+      refresh();
+      auto loc = _cached.location();
+      auto seg = loc.segment();
+
+      /*
+      uint64_t cur = _atom_loc.load();  //std::memory_order_relaxed);
       do
       {
          assert((cur & object_info::ref_mask) < 100);
          assert((cur & object_info::ref_mask) >= 1);
          if ((cur & object_info::ref_mask) >= object_info::max_ref_count)
             return false;
-      } while (not _atom_loc.compare_exchange_weak(cur, cur - 1) ); 
-      //, std::memory_order_relaxed, std::memory_order_relaxed));
-      _cached = object_info(cur - 1);  // TODO: may be unnessary work
+      } while (not _atom_loc.compare_exchange_weak(cur, cur - 1));
+      */
 
+      // TODO: did anything change before lock?
+      //   std::cerr<<"release: "<<_id.id <<" ref=0 type="<<(int)type()<<"\n";
 
+      auto obj_ptr =
+          (const object_header*)((char*)_rlock._session._sega._block_alloc.get(seg) + loc.index());
 
-      //_cached = object_info(_atom_loc.fetch_sub(1, std::memory_order_relaxed) - 1);
-      if ( _cached.ref() == 0 ) //(cur & object_info::ref_mask) == 0)
-      {
-         // TODO: did anything change before lock?
-
-         auto loc = _cached.location();
-         auto seg = loc.segment();
-
-         auto obj_ptr = (const object_header*)((char*)_rlock._session._sega._block_alloc.get(seg) +
-                                               loc.index());
-
-         _rlock._session._sega._id_alloc.free_id(_id);
-         _rlock._session._sega._header->seg_meta[seg].free_object(obj_ptr->data_capacity());
-         return true;
-      }
-      return false;
+      _rlock._session._sega._id_alloc.free_id(_id);
+      _rlock._session._sega._header->seg_meta[seg].free_object(obj_ptr->data_capacity());
+      refresh();
+      return true;
    }
+
+   template <typename T>
+   using object_ref = seg_allocator::session::read_lock::object_ref<T>;
+   inline object_ref<char> seg_allocator::session::read_lock::alloc(uint32_t size, node_type type)
+   {
+      auto [loc, ptr] = _session.alloc_data(size + sizeof(object_header));
+
+      auto oh = ((object_header*)ptr);
+
+      auto [atom, id] = _session._sega._id_alloc.get_new_id();
+      oh->id          = id.id;
+      oh->size        = size;
+
+      //atom.store( object_info(type, loc._offset/8).to_int(), std::memory_order_relaxed );
+
+      /*
+      object_info info(atom.load(std::memory_order_relaxed));
+      info.set_location(loc);
+      info.set_type(type);
+      info._ref = 1;
+      */
+
+      atom.store(1 | (uint64_t(type)<<15) | ((loc._offset/8)<<19), std::memory_order_relaxed);
+      //atom.store(info.to_int(), std::memory_order_relaxed);
+
+      return object_ref(*this, id, atom, oh);
+   }
+
+   inline object_ref<char> seg_allocator::session::read_lock::get(object_header* oh)
+   {
+      object_id oid(oh->id);
+      return object_ref(*this, oid, _session._sega._id_alloc.get(oid), nullptr);
+   }
+
+   inline object_header* seg_allocator::session::read_lock::get_object_pointer(object_location loc)
+   {
+      auto segment = (mapped_memory::segment_header*)_session._sega._block_alloc.get(loc.segment());
+      // 0 means we are accessing a swapped object on a segment that hasn't started new allocs
+      // if alloc_pos > loc.index() then we haven't overwriten this object yet, we are accessing
+      // data behind the alloc pointer which should be safe
+      // to access data we had to get the location from obj id database and we should read
+      // with memory_order_acquire, when updating an object_info we need to write with
+      // memory_order_release otherwise the data written may not be visible yet to the reader coming
+      // along behind
+      assert(segment->_alloc_pos == 0 or segment->_alloc_pos > loc.index());
+      return (object_header*)((char*)_session._sega._block_alloc.get(loc.segment()) + loc.index());
+   }
+
    /**
     *  Given obj, if it isn't already located in the allocation segment of
     *  this thread or in the allocation segment of another thread then

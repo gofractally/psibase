@@ -93,7 +93,7 @@ namespace triedent
             {
                if (_root)
                {
-                  _ws._db._root = _root;
+                  //_ws._db._root = _root;
                   _ws.setRoot(std::move(_root));
                   return {};
                }
@@ -161,8 +161,12 @@ namespace triedent
       WriteSession& writeSession() { return _ws; }
 
       root_ptr getRoot()const {
-         std::shared_lock m(_root_mutex);
-         return _root;
+         root_ptr tmp;
+         {
+            std::shared_lock m(_root_mutex);
+            tmp =  _root;
+         }
+         return tmp;
       }
       ~DB() {
          _db->print_stats( std::cout, true );

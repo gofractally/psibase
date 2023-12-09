@@ -16,6 +16,17 @@ namespace triedent
       object_info_lock(std::atomic<uint64_t>& obj) : _obj(obj) {}
       void lock() noexcept
       {
+         while (not try_lock())
+         {
+            // __builtin_ia32_pause(); not supported by clang
+#if defined(__i386__) || defined(__x86_64__)
+            asm volatile("pause");
+#elif defined(__arm__)
+            asm volatile("yield");
+#endif
+         }
+         return;
+
          uint64_t cur = _obj.load(std::memory_order_relaxed);
          do
          {
@@ -38,20 +49,29 @@ namespace triedent
 
       bool try_lock() noexcept
       {
+         return not(_obj.fetch_or(object_info::lock_mask, std::memory_order_acquire) &
+                    object_info::lock_mask);
+
+         /*
          uint64_t cur = _obj.load(std::memory_order_relaxed);
          if (cur & object_info::lock_mask)
             return false;
          return _obj.compare_exchange_weak(cur, cur | object_info::lock_mask,
                                            std::memory_order_acquire, std::memory_order_relaxed);
+         */
       }
 
       void unlock() noexcept
       {
+         _obj.fetch_and(~object_info::lock_mask, std::memory_order_release);
+
+         /*
          auto cur = _obj.load(std::memory_order_relaxed);
          while (not _obj.compare_exchange_weak(cur, cur & ~object_info::lock_mask,
                                                std::memory_order_release,
                                                std::memory_order_relaxed))
             ;
+            */
       }
 
      private:
@@ -65,6 +85,15 @@ namespace triedent
       result._location = (1ull << object_info::location_rshift) - 1;
       result._ref      = ref;
       result._type     = static_cast<std::uint64_t>(type);
+      return result.to_int();
+   }
+   inline constexpr uint64_t free_val(uint64_t loc)
+   {
+      object_info result{0};
+      // This is distinct from any valid offset
+      result._location = loc;
+      result._ref      = 0;
+      result._type     = static_cast<std::uint64_t>(node_type::undefined);
       return result.to_int();
    }
 
@@ -91,25 +120,22 @@ namespace triedent
       static const uint32_t id_block_size = 1024 * 1024 * 128;
       static_assert(id_block_size % 64 == 0, "should be divisible by cacheline");
 
+      inline static constexpr uint64_t extract_next_ptr(uint64_t x) { return (x >> 19); }
+      inline static constexpr uint64_t create_next_ptr(uint64_t x) { return (x << 19); }
       /*
       inline static constexpr uint64_t extract_next_ptr(uint64_t x)
       {
-         return (x >> object_info::location_rshift);
+        // assert((x >> 15 & 3) == uint64_t(node_type::undefined));
+         return (x & object_info::location_mask) >> object_info::location_rshift;
+         //return (x >> object_info::location_rshift) & object_info::location_mask;
       }
       inline static constexpr uint64_t create_next_ptr(uint64_t x)
       {
-         return (x << object_info::location_rshift);
+         auto r = (x << object_info::location_rshift) | (uint64_t(node_type::undefined) << 15);
+         assert( extract_next_ptr(r) == x );
+         return r;
       }
       */
-      inline static constexpr uint64_t extract_next_ptr(uint64_t x)
-      {
-         assert((x >> 15 & 3) == uint64_t(node_type::undefined));
-         return (x >> object_info::location_rshift);
-      }
-      inline static constexpr uint64_t create_next_ptr(uint64_t x)
-      {
-         return (x << object_info::location_rshift) | (uint64_t(node_type::undefined) << 15);
-      }
 
       id_allocator(std::filesystem::path id_file)
           : _data_dir(id_file),
@@ -161,13 +187,14 @@ namespace triedent
             //    std::cerr << " brand new id: " << id.id << "\n";
             return std::pair<std::atomic<uint64_t>&, object_id>(atom, id);
          };
+         auto r = brand_new();
+         //std::cerr << "get new id: " << r.second.id << "\n";
 
          std::unique_lock<std::mutex> l{_alloc_mutex};
          uint64_t                     ff = _idheader->_first_free.load(std::memory_order_acquire);
-         // std::cerr << "first free: " << extract_next_ptr(ff) << "\n";
          do
          {
-            if (ff == 0)
+            if (extract_next_ptr(ff) == 0)
             {
                //      std::cerr << "alloc brand new! \n";
                _alloc_mutex.unlock();
@@ -202,17 +229,9 @@ namespace triedent
 
       void free_id(object_id id)
       {
-         //    std::cerr << "                            free " << id.id << "\n";
-         // store the head of the free list into the pointer section of get(id)
-         // set the head of the free list to id if and only if the head of the free list
-         // has not changed
-
          auto& head_free_list = _idheader->_first_free;
          auto& next_free      = get(id);
-         //     std::cerr << "               free _first_free: " << extract_next_ptr(head_free_list.load())
-         //               << "\n";
-
-         auto new_head = create_next_ptr(id.id);
+         auto  new_head       = object_info(node_type::undefined, id.id).to_int();
 
          uint64_t cur_head = _idheader->_first_free.load(std::memory_order_acquire);
          assert(not(cur_head & object_info::ref_mask));
@@ -220,8 +239,7 @@ namespace triedent
          {
             next_free.store(cur_head, std::memory_order_release);
          } while (not head_free_list.compare_exchange_strong(cur_head, new_head));
-         //    std::cerr <<"  post free free list: ";
-         //    print_free_list();
+         //print_free_list();
       }
 
      private:

@@ -13,6 +13,8 @@ add_library(triedent
             )
 target_include_directories(triedent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
 target_link_libraries(triedent PUBLIC Threads::Threads)
+#target_compile_options(triedent PUBLIC -fsanitize=thread )
+#target_link_options(triedent PUBLIC -fsanitize=thread )
 
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(X86_64)|(amd64)|(AMD64)")
    if( NOT APPLE )

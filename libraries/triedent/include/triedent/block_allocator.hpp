@@ -29,7 +29,8 @@ namespace triedent
                       bool                  read_write = true)
           : _filename(file), _block_size(block_size)
       {
-         _block_mapping.reserve(max_blocks);
+         _max_blocks = max_blocks;
+         _block_mapping = new char_ptr[max_blocks];
 
          int flags = O_CLOEXEC;
          int flock_operation;
@@ -78,7 +79,8 @@ namespace triedent
                auto  end  = data + _file_size;
                while (data != end)
                {
-                  _block_mapping.push_back(data);
+                  _block_mapping[ _num_blocks.fetch_add(1) ] = data;
+                  //_block_mapping.push_back(data);
                   data += _block_size;
                }
                // try_pin(&_pinned, addr, _size);
@@ -96,20 +98,18 @@ namespace triedent
       {
          if (_fd)
          {
-            for (auto ptr : _block_mapping)
-            {
-               ::munmap(ptr, _block_size);
-            }
+            for( uint32_t i = 0; i < _num_blocks.load(); ++i )
+               ::munmap(_block_mapping[i], _block_size);
             ::close(_fd);
          }
       }
 
       uint64_t block_size() const { return _block_size; }
-      uint64_t num_blocks()const  { return _file_size / _block_size; }
+      uint64_t num_blocks()const  { return _num_blocks.load( std::memory_order_relaxed ); } //_file_size / _block_size; }
 
       // return the base pointer for the mapped segment
       inline void* get(id i) { 
-         assert( i < _block_mapping.size() );
+         assert( i < _num_blocks.load(std::memory_order_relaxed) );
          // this is safe because block mapping reserved capacity so 
          // resize should never move the data
          return _block_mapping[i]; 
@@ -129,18 +129,13 @@ namespace triedent
          if (auto addr = ::mmap(nullptr, _block_size, prot, MAP_SHARED, _fd, _file_size);
              addr != MAP_FAILED)
          {
-            // we have a threading problem if block mapping is accessed during resize,
-            // so make sure there is capacity for resize
-            if (_block_mapping.capacity() > _block_mapping.size())
-            {
-               _block_mapping.push_back(addr);
-               _file_size = new_size;
-               return _block_mapping.size() - 1;
-            }
-            else
-            {
+            auto nb = _num_blocks.load( std::memory_order_relaxed );
+            if( nb == _max_blocks )
                throw std::runtime_error("maximum block number reached");
-            }
+
+               _block_mapping[_num_blocks.load(std::memory_order_relaxed)] = (char*)addr;
+               _file_size = new_size;
+               return _num_blocks.fetch_add(1, std::memory_order_release);
          }
          if (::ftruncate(_fd, _file_size) < 0)
          {
@@ -152,9 +147,13 @@ namespace triedent
      private:
       std::filesystem::path _filename;
       uint64_t              _block_size;
+      uint64_t              _max_blocks;
       uint64_t              _file_size;
       int                   _fd;
-      std::vector<void*>    _block_mapping;
+      std::atomic<uint64_t> _num_blocks;
+    //  std::vector<void*>    _block_mapping;
+      using char_ptr = char*;
+      char_ptr*             _block_mapping;
       mutable std::mutex    _resize_mutex;
    };
 }  // namespace triedent
