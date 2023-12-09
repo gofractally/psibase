@@ -129,7 +129,7 @@ namespace triedent
       using string_view = std::string_view;
       using id          = object_id;
 
-      auto lock()const { return _session.lock(); }
+      auto lock() const { return _session.lock(); }
 
      protected:
       explicit session_base(seg_allocator& a);
@@ -537,9 +537,7 @@ namespace triedent
    template <typename AccessMode>
    inline deref<node> session<AccessMode>::get_by_id(session_rlock& state, id i) const
    {
-      return deref<node>(state.get(i, true));
-      //    auto [ptr, type, ref] = ring().template get_cache<true>(l, i);
-      //    return {i, ptr, type};
+      return deref<node>(state.get(i));  // TODO: cache
    }
 
    template <typename AccessMode>
@@ -713,10 +711,10 @@ namespace triedent
       return {value_node::clone(state, origin, key, -1, val, type)};
    }
    inline object_id write_session::clone_value_id(session_rlock&     state,
-                                                               object_id          origin,
-                                                               node_type          type,
-                                                               const std::string& key,
-                                                               string_view        val)
+                                                  object_id          origin,
+                                                  node_type          type,
+                                                  const std::string& key,
+                                                  string_view        val)
    {
       return value_node::clone(state, origin, key, -1, val, type).id();
    }
@@ -833,8 +831,8 @@ namespace triedent
              [&] { return clone_value_id(state, origin2, t2, k2, cpre.size() + 1, v2); });
 
          // this usesthe non-locking deref because no alloc before return
-         auto in = inner_node::make( state, cpre, id(), 1ull<<b2 );
-         
+         auto in = inner_node::make(state, cpre, id(), 1ull << b2);
+
          // Set value separately, because we don't want to increment its refcount
          in->set_value(inner_id);
          in->branch(b2) = branch_id;
@@ -926,7 +924,7 @@ namespace triedent
       {
          if (auto old_value = n->value())
          {
-            auto  v  = state.get(old_value, false);  // TODO copy to cache?
+            auto  v  = state.get(old_value);  // TODO copy to cache?
             auto& vn = v.as_value_node();
             if (v.type() == type && vn.data_size() == val.size() && v.ref_count() == 1)
             {
@@ -948,7 +946,8 @@ namespace triedent
       {
          object_id new_val = make_value_id(state, type, string_view(), val);
 
-         auto result = inner_node::clone(state, n.id(), &*n, n->key(), 0, object_id{}, n->branches());
+         auto result =
+             inner_node::clone(state, n.id(), &*n, n->key(), 0, object_id{}, n->branches());
          result->set_value(new_val);
          return result.id();
       }
@@ -1007,7 +1006,7 @@ namespace triedent
                 add_child(state, cur_b, false, type, key.substr(cpre.size() + 1), val, old_size);
 
             auto new_in = inner_node::clone(state, root, &*in, in->key(), 0, in->value(),
-                                      in->branches() | 1ull << b);
+                                            in->branches() | 1ull << b);
 
             if (new_b != cur_b)
             {
@@ -1025,8 +1024,8 @@ namespace triedent
          if (new_b != cur_b)
          {
             {
-            auto li = lock(in);
-            li->branch(b) = new_b;
+               auto li       = lock(in);
+               li->branch(b) = new_b;
             }
             release(state, cur_b);
          }
@@ -1242,7 +1241,8 @@ namespace triedent
    {
       if (!root)
          return false;
-      auto n = state.get<node>(root);//get_by_id(l, root);
+      auto n = state.get<node>(root);  //get_by_id(l, root);
+      n.cache_object();
       if (n.is_leaf_node())
       {
          auto& vn     = n.as_value_node();
@@ -1270,7 +1270,7 @@ namespace triedent
       }
       else if (in.value())
       {
-         auto  v  = state.get(in.value());//get_by_id(l, in.value());
+         auto  v  = state.get(in.value());  //get_by_id(l, in.value());
          auto& vn = v.as_value_node();
          return fill_result(ancestor, vn, v.type(), result_bytes, result_roots);
       }
@@ -1283,8 +1283,8 @@ namespace triedent
             return false;
          auto rk = result_key.size();
          result_key.push_back(b);
-         if (unguarded_get_greater_equal(state, ancestor, in.branch(b), key, result_key, result_bytes,
-                                         result_roots))
+         if (unguarded_get_greater_equal(state, ancestor, in.branch(b), key, result_key,
+                                         result_bytes, result_roots))
             return true;
          result_key.resize(rk);
          b   = in.lower_bound(b + 1);
@@ -1300,7 +1300,7 @@ namespace triedent
                                            std::vector<std::shared_ptr<root>>* result_roots) const
    {
       temp_key6 result_key6;
-      { // scope the lock as narrow as possible
+      {  // scope the lock as narrow as possible
          auto state = session_base::lock();
          if (!unguarded_get_less_than(state, r, get_id(r), to_key6({key.data(), key.size()}),
                                       result_key6, result_bytes, result_roots))
@@ -1327,6 +1327,7 @@ namespace triedent
       if (!root)
          return false;
       auto n = get_by_id(l, root);
+      n.cache_object();
       if (n.is_leaf_node())
       {
          auto& vn     = n.as_value_node();
@@ -1387,17 +1388,17 @@ namespace triedent
                                      std::vector<char>*                  result_bytes,
                                      std::vector<std::shared_ptr<root>>* result_roots) const
    {
-      auto       prefix_min = to_key6({prefix.data(), prefix.size()});
-      auto       extra_bits = prefix_min.size() * 6 - prefix.size() * 8;
-      auto       prefix_max = (std::string)prefix_min;
+      auto prefix_min = to_key6({prefix.data(), prefix.size()});
+      auto extra_bits = prefix_min.size() * 6 - prefix.size() * 8;
+      auto prefix_max = (std::string)prefix_min;
       if (!prefix_max.empty())
          prefix_max.back() |= (1 << extra_bits) - 1;
       temp_key6 result_key6;
 
       {
          auto state = session_base::lock();
-         if (!unguarded_get_max(state, r, get_id(r), prefix_min, prefix_max, result_key6, result_bytes,
-                                result_roots))
+         if (!unguarded_get_max(state, r, get_id(r), prefix_min, prefix_max, result_key6,
+                                result_bytes, result_roots))
             return false;
       }
       if (result_key)
@@ -1425,6 +1426,7 @@ namespace triedent
       while (true)
       {
          auto n = get_by_id(l, root);
+         n.cache_object();
          if (n.is_leaf_node())
          {
             auto& vn     = n.as_value_node();
@@ -1469,18 +1471,18 @@ namespace triedent
    inline int write_session::remove(std::shared_ptr<root>& r, std::span<const char> key)
    {
       int  removed_size = -1;
-      auto state = session_base::lock();
-      auto new_root = remove_child(state, get_id(r), get_unique(r), to_key6({key.data(), key.size()}),
-                                   removed_size);
+      auto state        = session_base::lock();
+      auto new_root     = remove_child(state, get_id(r), get_unique(r),
+                                       to_key6({key.data(), key.size()}), removed_size);
       update_root(state, r, new_root);
       return removed_size;
    }
 
    inline database::id write_session::remove_child(session_rlock& state,
-                                                   id                            root,
-                                                   bool                          unique,
-                                                   string_view                   key,
-                                                   int&                          removed_size)
+                                                   id             root,
+                                                   bool           unique,
+                                                   string_view    key,
+                                                   int&           removed_size)
    {
       if (not root)
          return root;
@@ -1538,8 +1540,8 @@ namespace triedent
          {
             auto prev = in->value();
             {
-            auto lin = lock(in);
-            lin->set_value(id());
+               auto lin = lock(in);
+               lin->set_value(id());
             }
             release(state, prev);
             return root;
@@ -1558,15 +1560,14 @@ namespace triedent
 
       object_id cur_b = in->branch(b);
 
-      auto new_b =
-          remove_child(state, cur_b, unique, key.substr(in_key.size() + 1), removed_size);
+      auto new_b = remove_child(state, cur_b, unique, key.substr(in_key.size() + 1), removed_size);
       if (new_b != cur_b)
       {
          if (new_b and unique)
          {
             {
-            auto lin=lock(in);
-            lin->branch(b) = new_b;
+               auto lin       = lock(in);
+               lin->branch(b) = new_b;
             }
             release(state, cur_b);
             return root;
@@ -1596,7 +1597,7 @@ namespace triedent
                // in this case, not branches means it must have a value
                assert(in->value() and "expected value because we removed a branch");
 
-               auto  cur_v = state.get(in->value());//get_by_id(state, in->value());
+               auto  cur_v = state.get(in->value());  //get_by_id(state, in->value());
                auto& cv    = cur_v.as_value_node();
                // make a copy because key and data come from different objects, which clone doesn't handle.
                std::string new_key{in->key()};
@@ -1715,9 +1716,8 @@ namespace triedent
       if (not r)
          return;
 
-
       auto dr = state.get(r);
-      if( not dr.retain() )
+      if (not dr.retain())
          return;
 
       if (dr.type() == node_type::inner)
@@ -1741,12 +1741,12 @@ namespace triedent
 
    inline void write_session::start_collect_garbage()
    {
-      throw std::runtime_error("not impl yet" );
+      throw std::runtime_error("not impl yet");
       //ring().gc_start();
    }
    inline void write_session::end_collect_garbage()
    {
-      throw std::runtime_error("not impl yet" );
+      throw std::runtime_error("not impl yet");
       //ring().gc_finish();
    }
 
@@ -1769,14 +1769,14 @@ namespace triedent
       auto validate_id = [&](auto i)
       {
          auto rv = state.validate(r);
-         if( 0 == rv.ref_count() )
+         if (0 == rv.ref_count())
             throw std::runtime_error("found reference to object with 0 ref count: " +
                                      std::to_string(r.id));
       };
 
       validate_id(r);
 
-      auto dr = state.get(r);//get_by_id(state, r);
+      auto dr = state.get(r);  //get_by_id(state, r);
       if (not dr.is_leaf_node())
       {
          auto& in = dr.as_inner_node();

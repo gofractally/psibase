@@ -286,7 +286,8 @@ namespace triedent
       auto p = state.alloc(alloc_size, node_type::inner);
       if (key_offset != std::uint32_t(-1))
       {
-         in  = state.get(id, false).as<inner_node>();
+         in  = state.get(id).as<inner_node>();
+         // TODO: cache?
          key = in->key().substr(key_offset);
       }
 
@@ -396,7 +397,7 @@ namespace triedent
    {
       if (!obj)
          return;
-      auto oref = state.get(obj, false);  // don't try to cache, we are releasing!
+      auto oref = state.get(obj);  // don't try to cache, we are releasing!
       auto ctype = oref.type();
 
 //      std::cerr << "before release node: " << obj.id <<" type: " << (int)oref.type() <<" loc: " << oref.location()._offset <<" ref: " << oref.ref_count()<<"\n";
@@ -459,7 +460,7 @@ namespace triedent
          return id;
       if constexpr (debug_nodes)
          std::cout << id.id << ": bump_refcount_or_copy" << std::endl;
-      auto oref = state.get(id, false);
+      auto oref = state.get(id); // TODO cache?
       if (oref.retain())
          return oref.id();
       return copy_node(state, oref).id();

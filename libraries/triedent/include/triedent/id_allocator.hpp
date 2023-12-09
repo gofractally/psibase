@@ -27,6 +27,7 @@ namespace triedent
          }
          return;
 
+         /*
          uint64_t cur = _obj.load(std::memory_order_relaxed);
          do
          {
@@ -45,6 +46,7 @@ namespace triedent
                                            std::memory_order_acquire, std::memory_order_relaxed))
                return;
          } while (true);
+         */
       }
 
       bool try_lock() noexcept

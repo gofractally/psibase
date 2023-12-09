@@ -66,7 +66,7 @@ namespace triedent
    {
      public:
       static const uint64_t ref_mask        = 0x7fff;
-      static const uint64_t max_ref_count   = ref_mask - 1;
+      static const uint64_t max_ref_count   = ref_mask - 64; // allow some overflow bits for retain
       static const uint64_t lock_mask       = 3 << 17;
       static const uint64_t type_mask       = 3 << 15;
       static const uint64_t location_mask   = ~(type_mask|lock_mask|ref_mask);

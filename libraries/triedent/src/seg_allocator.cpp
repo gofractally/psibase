@@ -82,7 +82,6 @@ namespace triedent
       using namespace std::chrono_literals;
       auto cses = start_session();
 
-      std::cerr << "compact loop starting\n";
       while (not _done.load())
       {
          uint64_t most_empty_seg_num  = -1ll;
@@ -117,7 +116,6 @@ namespace triedent
          // move it to my own personal write session
          // add it to the free segment queue
       }
-      std::cerr << "compact loop ending\n";
    }
 
    void seg_allocator::compact_segment(session& ses, uint64_t seg_num)
@@ -138,7 +136,7 @@ namespace triedent
       madvise(s, segment_size, MADV_SEQUENTIAL);
       while (foo < send and foo->id)
       {
-         auto obj_ref = state.get({foo->id},false);
+         auto obj_ref = state.get({foo->id});
 
          auto foo_idx = (char*)foo - (char*)s;
          auto loc = obj_ref.location()._offset;
