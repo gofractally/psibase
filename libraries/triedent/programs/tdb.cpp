@@ -64,6 +64,11 @@ int main(int argc, char** argv)
    auto                    opt = desc.add_options();
    opt("help,h", "print this message");
    opt("reset", "reset the database");
+   opt("seq-write", "perform seq writes");
+   opt("seq-read", "perform seq reads");
+   opt("seq-update", "perform seq updates, assumes after preform seq writes");
+   opt("rand-write", "perform random writes");
+   opt("rand-write-read", "perform random writes while reading");
    opt("read-only", "just query existing db");
    opt("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys");
    opt("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
@@ -155,7 +160,7 @@ int main(int argc, char** argv)
       return 0;
       */
 
-   if (1)
+   if ( vm.count("seq-write") )
    {
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
                 << " sequential key/values\n";
@@ -187,6 +192,8 @@ int main(int argc, char** argv)
                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                    << " items/sec   \n";
       }
+   }
+   if( vm.count("seq-read" ) ) {
 
       std::cout << "Starting to get" << rounds << " rounds of " << add_comma(count)
                 << " sequential key/values\n";
@@ -229,6 +236,8 @@ int main(int argc, char** argv)
                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                    << " items/sec   \n";
       }
+   }
+   if( vm.count("seq-update") ) {
 
       std::cout << "Starting to update " << rounds << " rounds of " << add_comma(count)
                 << " sequential key/values\n";
@@ -265,7 +274,7 @@ int main(int argc, char** argv)
                    << " items/sec   \n";
       }
    }
-   if( 1 ) {
+   if( vm.count("rand-write" ) ) {
 
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
                 << " random key/values\n";
@@ -372,6 +381,7 @@ int main(int argc, char** argv)
    */
    }
 
+   if( vm.count("rand-write-read" ) ) {
    auto rs = db->createReadSession();
    auto rt = rs->startTransaction();
 
@@ -440,6 +450,7 @@ int main(int argc, char** argv)
 
       for (auto& r : rthreads)
          r->join();
+   }
    }
 
    /*

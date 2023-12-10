@@ -446,10 +446,7 @@ namespace triedent
          //    _free_sessions.store(new_fs_bits);
          return fs;
       }
-      void release_session_num(uint32_t sn)
-      {
-         _free_sessions.fetch_or( uint64_t(1) <<sn);
-      }
+      void release_session_num(uint32_t sn) { _free_sessions.fetch_or(uint64_t(1) << sn); }
 
       std::pair<segment_number, mapped_memory::segment_header*> get_new_segment();
 
@@ -538,13 +535,15 @@ namespace triedent
    template <typename T>
    inline object_header* seg_allocator::session::read_lock::object_ref<T>::obj()
    {
-      object_location loc{ ._offset = 8*(_atom_loc.load( std::memory_order_relaxed ) >> object_info::location_rshift) }; 
+      object_location loc{._offset = 8 * (_atom_loc.load(std::memory_order_relaxed) >>
+                                          object_info::location_rshift)};
       return _rlock.get_object_pointer(loc);
    }
    template <typename T>
    inline const object_header* seg_allocator::session::read_lock::object_ref<T>::obj() const
    {
-      object_location loc{ ._offset = 8*(_atom_loc.load( std::memory_order_relaxed ) >> object_info::location_rshift) }; 
+      object_location loc{._offset = 8 * (_atom_loc.load(std::memory_order_relaxed) >>
+                                          object_info::location_rshift)};
       return _rlock.get_object_pointer(loc);
    }
 
@@ -678,7 +677,7 @@ namespace triedent
       info._ref = 1;
       */
 
-      atom.store(1 | (uint64_t(type)<<15) | ((loc._offset/8)<<19), std::memory_order_relaxed);
+      atom.store(1 | (uint64_t(type) << 15) | ((loc._offset / 8) << 19), std::memory_order_relaxed);
       //atom.store(info.to_int(), std::memory_order_relaxed);
 
       return object_ref(*this, id, atom);
@@ -687,7 +686,7 @@ namespace triedent
    inline object_ref<char> seg_allocator::session::read_lock::get(object_header* oh)
    {
       object_id oid(oh->id);
-      return object_ref(*this, oid, _session._sega._id_alloc.get(oid) );
+      return object_ref(*this, oid, _session._sega._id_alloc.get(oid));
    }
 
    inline object_header* seg_allocator::session::read_lock::get_object_pointer(object_location loc)
@@ -715,12 +714,12 @@ namespace triedent
     *
     *  @return true if the object was moved
     */
-   template<typename T>
+   template <typename T>
    bool seg_allocator::session::read_lock::object_ref<T>::cache_object()
    {
-      auto lk = create_lock();
+      auto       lk   = create_lock();
       const bool wait = false;
-      auto ul =
+      auto       ul =
           wait ? std::unique_lock(lk, std::adopt_lock) : std::unique_lock(lk, std::try_to_lock);
 
       if (ul.owns_lock())
@@ -746,6 +745,11 @@ namespace triedent
          auto [loc, ptr] = _rlock._session.alloc_data(obj_size);
          memcpy(ptr, cur_obj_ptr, obj_size);
          move(loc, ul);
+
+         // note that this item has been freed from the segment so the segment can be 
+         // recovered
+         _rlock._session._sega._header->seg_meta[cur_seg].free_object(obj_size);
+
          return true;
       }
       return false;
