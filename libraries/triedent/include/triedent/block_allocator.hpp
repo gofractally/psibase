@@ -15,6 +15,8 @@
 #include <iostream>
 #include <vector>
 
+#include <triedent/mapping.hpp>
+
 namespace triedent
 {
 
@@ -105,7 +107,20 @@ namespace triedent
       }
 
       uint64_t block_size() const { return _block_size; }
-      uint64_t num_blocks()const  { return _num_blocks.load( std::memory_order_relaxed ); } //_file_size / _block_size; }
+      uint64_t num_blocks()const  { return _num_blocks.load( std::memory_order_relaxed ); } 
+      
+      /**
+       * This method brute forces syncing all blocks which likely
+       * flushes more than needed.
+       */
+      void sync(sync_type st) {
+         if (_fd and sync_type::none != st )
+         {
+            uint64_t nb = num_blocks();
+            for( uint32_t i = 0; i < nb; ++i )
+               ::msync(_block_mapping[i], _block_size, msync_flag(st) );
+         }
+      }
 
       // return the base pointer for the mapped segment
       inline void* get(id i) { 

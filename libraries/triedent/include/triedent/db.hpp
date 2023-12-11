@@ -24,6 +24,7 @@ namespace triedent
       {
          bool create_if_missing = false;
          bool error_if_exists   = false;
+         database::config config;
       };
       typedef std::shared_ptr<root> root_ptr;
 
@@ -149,7 +150,7 @@ namespace triedent
 
       static std::shared_ptr<DB> open(Options opt, std::filesystem::path dir)
       {
-         return std::make_shared<DB>(std::make_shared<database>(dir.c_str(), database::read_write));
+         return std::make_shared<DB>(std::make_shared<database>(dir.c_str(), opt.config, database::read_write));
       }
 
       DB(std::shared_ptr<database> d) : _db(std::move(d)),_ws(*this)

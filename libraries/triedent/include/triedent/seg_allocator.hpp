@@ -86,11 +86,16 @@ namespace triedent
             _free_space_and_obj.fetch_add(so, std::memory_order_relaxed);
          }
 
-         void clear() { _free_space_and_obj.store(0, std::memory_order_relaxed); }
+         void clear()
+         {
+            _free_space_and_obj.store(0, std::memory_order_relaxed);
+            _last_sync_pos.store(segment_size, std::memory_order_relaxed);
+         }
 
          /// the total number of bytes freed by swap
          /// or by being moved to other segments.
          std::atomic<uint64_t> _free_space_and_obj;
+         std::atomic<uint64_t> _last_sync_pos;  // position of alloc pointer when last synced
       };
 
       /// should align on a page boundary
@@ -159,6 +164,8 @@ namespace triedent
       ~seg_allocator();
 
       void dump();
+      void sync(sync_type st = sync_type::sync);
+      void start_compact_thread();
 
       class session
       {
@@ -366,6 +373,8 @@ namespace triedent
                auto [num, ptr] = _sega.get_new_segment();
                _alloc_seg_num  = num;
                _alloc_seg_ptr  = ptr;
+               _sega._header->seg_meta[_alloc_seg_num]._last_sync_pos.store(
+                   0, std::memory_order_relaxed);
             }
 
             auto* sh           = _alloc_seg_ptr;
@@ -746,7 +755,7 @@ namespace triedent
          memcpy(ptr, cur_obj_ptr, obj_size);
          move(loc, ul);
 
-         // note that this item has been freed from the segment so the segment can be 
+         // note that this item has been freed from the segment so the segment can be
          // recovered
          _rlock._session._sega._header->seg_meta[cur_seg].free_object(obj_size);
 

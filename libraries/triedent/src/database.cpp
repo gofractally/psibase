@@ -8,9 +8,7 @@ namespace triedent
                       const config&                cfg,
                       access_mode                  mode,
                       bool                         allow_gc)
-       : _sega{dir},
-         _file{dir / "db", mode},
-         _root_release_session{_sega}
+       : _sega{dir}, _file{dir / "db", mode}, _root_release_session{_sega}, _config(cfg)
    {
       if (_file.size() == 0)
       {
@@ -28,6 +26,8 @@ namespace triedent
          throw std::runtime_error("Not a triedent file: " + (dir / "db").native());
       if ((_dbm->flags & file_type_mask) != file_type_database_root)
          throw std::runtime_error("Not a triedent db file: " + (dir / "db").native());
+      if( cfg.run_compact_thread )
+         _sega.start_compact_thread();
    }
 
    database::database(const std::filesystem::path& dir, access_mode mode, bool allow_gc)

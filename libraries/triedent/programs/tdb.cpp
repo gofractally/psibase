@@ -58,6 +58,10 @@ int main(int argc, char** argv)
    uint64_t    status_count;
    bool        check_content = false;
    uint32_t    rounds        = 10;
+   uint32_t    count         = 1000*1000*10;
+   uint32_t    group         = 16;
+   uint32_t    sync_mode     = 0;
+   bool cor = true;
 
    uint32_t                num_read_threads = 6;
    po::options_description desc("Allowed options");
@@ -75,8 +79,16 @@ int main(int argc, char** argv)
        "the folder that contains the database");
    opt("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
        "number of read threads to launch");
+   opt("sync-mode", po::value<uint32_t>(&sync_mode)->default_value(sync_mode),
+       "0 = none, 1 = aysnc, 2 = blocking");
+   opt("cache-on-read", po::value<bool>(&cor)->default_value(cor),
+       "copy read objects to cache, higher");
    opt("rounds", po::value<uint32_t>(&rounds)->default_value(10),
        "the number of times to run each segment");
+   opt("count", po::value<uint32_t>(&count)->default_value(count),
+       "the number of times to run each round");
+   opt("group", po::value<uint32_t>(&group)->default_value(group),
+       "the number of items in each logical transaction");
    opt("hot-size,H", po::value<uint32_t>(&hot_page_c)->default_value(33),
        "the power of 2 for the amount of RAM for the hot ring, RAM = 2^(hot_size) bytes");
    opt("warm-size,w", po::value<uint32_t>(&warm_page_c)->default_value(33),
@@ -107,7 +119,7 @@ int main(int argc, char** argv)
    {
       std::cerr << "resetting database\n";
       std::filesystem::remove_all(db_dir);
-      triedent::database::create(db_dir,{ });
+      triedent::database::create(db_dir, {});
    }
    bool read_only = false;
    if (vm.count("read-only"))
@@ -122,14 +134,17 @@ int main(int argc, char** argv)
    }
 
    triedent::DB::Options options{
-
+        .config = {
+           .cache_on_read = cor,
+           .sync_mode = (triedent::sync_type)sync_mode
+        }
    };
 
    std::cout << "opening database '" << db_dir << "'\n";
    auto  db = triedent::DB::open(options, db_dir);
    auto& ws = db->writeSession();
 
-   uint32_t count = 1000 * 1000 * 10;
+//   uint32_t count = 1000 * 1000 * 10;
    int64_t  key   = 0;
 
    /*
@@ -160,29 +175,34 @@ int main(int argc, char** argv)
       return 0;
       */
 
-   if ( vm.count("seq-write") )
+   if (vm.count("seq-write"))
    {
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
                 << " sequential key/values\n";
       for (uint32_t round = 0; round < rounds; ++round)
       {
          auto start = std::chrono::steady_clock::now();
-         auto wt    = ws.startTransaction();
 
-         for (uint32_t i = 0; i < count; ++i)
+         for (uint32_t g= 0; g< (count / group); ++g)
          {
-            ++key;
-            auto kv = bswap(key);
-            auto old_size =
-                wt->put(std::span<char>((char*)&kv, 8), std::span<char>((char*)&key, 8));
-            if (old_size != -1)
+            auto wt    = ws.startTransaction();
+
+            for (uint32_t i = 0; i < group; ++i)
             {
-               std::cerr << "this should be a new value! : " << old_size << "\n";
-               return 0;
+               ++key;
+               auto kv = bswap(key);
+               auto old_size =
+                   wt->put(std::span<char>((char*)&kv, 8), std::span<char>((char*)&key, 8));
+               if (old_size != -1)
+               {
+                  std::cerr << "this should be a new value! : " << old_size << "\n";
+                  return 0;
+               }
+
             }
+            wt->commit();
          }
 
-         wt->commit();
          auto end   = std::chrono::steady_clock::now();
          auto delta = end - start;
 
@@ -193,8 +213,8 @@ int main(int argc, char** argv)
                    << " items/sec   \n";
       }
    }
-   if( vm.count("seq-read" ) ) {
-
+   if (vm.count("seq-read"))
+   {
       std::cout << "Starting to get" << rounds << " rounds of " << add_comma(count)
                 << " sequential key/values\n";
       auto rs = db->createReadSession();
@@ -237,8 +257,8 @@ int main(int argc, char** argv)
                    << " items/sec   \n";
       }
    }
-   if( vm.count("seq-update") ) {
-
+   if (vm.count("seq-update"))
+   {
       std::cout << "Starting to update " << rounds << " rounds of " << add_comma(count)
                 << " sequential key/values\n";
       key = 0;
@@ -274,25 +294,27 @@ int main(int argc, char** argv)
                    << " items/sec   \n";
       }
    }
-   if( vm.count("rand-write" ) ) {
-
+   if (vm.count("rand-write"))
+   {
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
                 << " random key/values\n";
       key = 0;
       for (uint32_t round = 0; round < rounds; ++round)
       {
          auto start = std::chrono::steady_clock::now();
-         auto wt    = ws.startTransaction();
-
-         for (uint32_t i = 0; i < count; ++i)
+         for (uint32_t g= 0; g< (count / group); ++g)
          {
-            key         = rand64();
-            int64_t val = i;
-            auto    old_size =
-                wt->put(std::span<char>((char*)&key, 8), std::span<char>((char*)&val, 8));
-         }
+            auto wt    = ws.startTransaction();
 
-         wt->commit();
+            for (uint32_t i = 0; i < group; ++i)
+            {
+               key         = rand64();
+               int64_t val = 16 * g + i;
+               auto    old_size =
+                   wt->put(std::span<char>((char*)&key, 8), std::span<char>((char*)&val, 8));
+            }
+            wt->commit();
+         }
          auto end   = std::chrono::steady_clock::now();
          auto delta = end - start;
 
@@ -303,8 +325,8 @@ int main(int argc, char** argv)
                    << " items/sec   \n";
       }
    }
-   if( 0 ){
-
+   if (0)
+   {
       auto rs = db->createReadSession();
       auto rt = rs->startTransaction();
       std::cout << "Starting to find lower bound " << rounds << " rounds of " << add_comma(count)
@@ -381,76 +403,78 @@ int main(int argc, char** argv)
    */
    }
 
-   if( vm.count("rand-write-read" ) ) {
-   auto rs = db->createReadSession();
-   auto rt = rs->startTransaction();
-
-   std::cout << "Starting to find lower bound " << rounds << " rounds of " << add_comma(count)
-             << " random key/values in " << num_read_threads << " threads while writing\n";
-
-   uint64_t total_writes = 0;
-   for (uint32_t round = 0; round < rounds; ++round)
+   if (vm.count("rand-write-read"))
    {
-      std::vector<std::unique_ptr<std::thread>> rthreads;
-      rthreads.reserve(num_read_threads);
+      auto rs = db->createReadSession();
+      auto rt = rs->startTransaction();
 
-      auto             start = std::chrono::steady_clock::now();
-      std::atomic<int> done  = 0;
+      std::cout << "Starting to find lower bound " << rounds << " rounds of " << add_comma(count)
+                << " random key/values in " << num_read_threads << " threads while writing\n";
 
-      for (uint32_t i = 0; i < num_read_threads; ++i)
+      uint64_t total_writes = 0;
+      for (uint32_t round = 0; round < rounds; ++round)
       {
-         auto read_loop = [&]()
+         std::vector<std::unique_ptr<std::thread>> rthreads;
+         rthreads.reserve(num_read_threads);
+
+         auto             start = std::chrono::steady_clock::now();
+         std::atomic<int> done  = 0;
+
+         for (uint32_t i = 0; i < num_read_threads; ++i)
          {
-            auto lrs = db->createReadSession();
-
-            std::vector<char> result_key;
-            std::vector<char> result_val;
-            uint64_t key = 0;
-
-            auto rt = lrs->startTransaction();
-            for (uint32_t i = 0; i < count; ++i)
+            auto read_loop = [&]()
             {
-               key         = rand64();
-               int64_t val = i;
-               rt->get_greater_equal(std::span<const char>((const char*)&key, 8), &result_key,
-                                     &result_val);
-            }
-            ++done;
-         };
-         rthreads.emplace_back(new std::thread(read_loop));
+               auto lrs = db->createReadSession();
+
+               std::vector<char> result_key;
+               std::vector<char> result_val;
+               uint64_t          key = 0;
+
+               auto rt = lrs->startTransaction();
+               for (uint32_t i = 0; i < count; ++i)
+               {
+                  key         = rand64();
+                  int64_t val = i;
+                  rt->get_greater_equal(std::span<const char>((const char*)&key, 8), &result_key,
+                                        &result_val);
+               }
+               ++done;
+            };
+            rthreads.emplace_back(new std::thread(read_loop));
+         }
+
+         int64_t writes = 0;
+         while (done.load() < num_read_threads)
+         {
+            auto wt = ws.startTransaction();
+
+            key         = rand64();
+            int64_t val = key;
+            auto    old_size =
+                wt->put(std::span<char>((char*)&key, 8), std::span<char>((char*)&val, 8));
+
+            wt->commit();
+            ++writes;
+            ++total_writes;
+         }
+
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         std::cerr << std::setw(4) << round << std::setw(12)
+                   << add_comma(int64_t(
+                          (num_read_threads * count) /
+                          (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                   << " read items/sec  ";
+         std::cerr << std::setw(12)
+                   << add_comma(int64_t(
+                          (writes) /
+                          (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                   << " write items/sec   "
+                   << " items in db: " << add_comma(total_writes) << " \n";
+
+         for (auto& r : rthreads)
+            r->join();
       }
-
-      int64_t writes = 0;
-      while (done.load() < num_read_threads)
-      {
-         auto wt = ws.startTransaction();
-
-         key           = rand64();
-         int64_t val   = key;
-         auto old_size = wt->put(std::span<char>((char*)&key, 8), std::span<char>((char*)&val, 8));
-
-         wt->commit();
-         ++writes;
-         ++total_writes;
-      }
-
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-      std::cerr << std::setw(4) << round << std::setw(12)
-                << add_comma(
-                       int64_t((num_read_threads * count) /
-                               (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                << " read items/sec  ";
-      std::cerr << std::setw(12)
-                << add_comma(
-                       int64_t((writes) /
-                               (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                << " write items/sec   "
-                << " items in db: " << add_comma(total_writes) <<" \n";
-
-      for (auto& r : rthreads)
-         r->join();
-   }
    }
 
    /*

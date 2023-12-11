@@ -15,13 +15,6 @@ namespace triedent
       }
       _header = reinterpret_cast<mapped_memory::allocator_header*>(_header_file.data());
 
-      _compact_thread = std::thread(
-          [this]()
-          {
-             thread_name("compactor");
-             set_current_thread_name("compactor");
-             compact_loop();
-          });
       for (auto& sptr : _session_ptrs)
          sptr.store(-1ull);
       _done.store(false);
@@ -34,8 +27,17 @@ namespace triedent
          _compact_thread.join();
    }
 
-
-
+   void seg_allocator::start_compact_thread() {
+      if( not _compact_thread.joinable() ) {
+      _compact_thread = std::thread(
+          [this]()
+          {
+             thread_name("compactor");
+             set_current_thread_name("compactor");
+             compact_loop();
+          });
+      }
+   }
 
    /**
     * This must be called via a session because the session is responsible
@@ -94,7 +96,7 @@ namespace triedent
             {
                // only consider segs that are not actively allocing
                // or that haven't already been processed
-               if ( get_segment(s)->_alloc_pos.load(std::memory_order_relaxed) == uint32_t(-1))
+               if (get_segment(s)->_alloc_pos.load(std::memory_order_relaxed) == uint32_t(-1))
                {
                   most_empty_seg_num  = s;
                   most_empty_seg_free = fso.first;
@@ -120,18 +122,21 @@ namespace triedent
 
    void seg_allocator::compact_segment(session& ses, uint64_t seg_num)
    {
-  //    std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num <<"\n";
+      //    std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num <<"\n";
       auto           state = ses.lock();
       auto           s     = get_segment(seg_num);
       auto           send  = (object_header*)((char*)s + segment_size);
       char*          foc   = (char*)s + 16;
       object_header* foo   = (object_header*)(foc);
 
-      assert( s->_alloc_pos == segment_offset(-1) );
-   //   std::cerr << "seg " << seg_num <<" alloc pos: " << s->_alloc_pos <<"\n";
+      assert(s->_alloc_pos == segment_offset(-1));
+      //   std::cerr << "seg " << seg_num <<" alloc pos: " << s->_alloc_pos <<"\n";
 
       auto seg_state = seg_num * segment_size;
-      auto seg_end   = (seg_num+1) * segment_size;
+      auto seg_end   = (seg_num + 1) * segment_size;
+
+      auto start_seg_ptr = ses._alloc_seg_ptr;
+      auto start_seg_num = ses._alloc_seg_num;
 
       madvise(s, segment_size, MADV_SEQUENTIAL);
       while (foo < send and foo->id)
@@ -139,8 +144,9 @@ namespace triedent
          auto obj_ref = state.get({foo->id});
 
          auto foo_idx = (char*)foo - (char*)s;
-         auto loc = obj_ref.location()._offset;
-         if( (loc & (segment_size-1)) != foo_idx or obj_ref.ref_count() == 0) {
+         auto loc     = obj_ref.location()._offset;
+         if ((loc & (segment_size - 1)) != foo_idx or obj_ref.ref_count() == 0)
+         {
             foo = foo->next();
             continue;
          }
@@ -150,15 +156,16 @@ namespace triedent
          // move it.
 
          auto             lk = obj_ref.create_lock();
-         std::unique_lock ul(lk);//, std::try_to_lock);
+         std::unique_lock ul(lk);  //, std::try_to_lock);
          if (ul.owns_lock())
          {
             obj_ref.refresh();
 
             {
                auto foo_idx = (char*)foo - (char*)s;
-               auto loc = obj_ref.location()._offset;
-               if( (loc & (segment_size-1)) != foo_idx or obj_ref.ref_count() == 0) {
+               auto loc     = obj_ref.location()._offset;
+               if ((loc & (segment_size - 1)) != foo_idx or obj_ref.ref_count() == 0)
+               {
                   foo = foo->next();
                   continue;
                }
@@ -171,24 +178,56 @@ namespace triedent
 
             //auto check = state.get({foo->id},false);
             assert(foo->id == check.id().id);
-            assert(check.obj()->id == foo->id );
-            assert(check.obj()->data_capacity() == foo->data_capacity() );
-            assert(check.obj() != foo );
-            assert((char*)check.obj() == ptr );
-            assert( 0 == memcmp( check.obj(), foo, foo->object_size() ) );
+            assert(check.obj()->id == foo->id);
+            assert(check.obj()->data_capacity() == foo->data_capacity());
+            assert(check.obj() != foo);
+            assert((char*)check.obj() == ptr);
+            assert(0 == memcmp(check.obj(), foo, foo->object_size()));
          }
          //auto check = state.get({foo->id},false);
          assert(foo->id == check.id().id);
-         assert(check.obj()->id == foo->id );
-         assert(check.obj()->data_capacity() == foo->data_capacity() );
-         assert(check.obj() != foo );
-         assert( 0 == memcmp( check.obj(), foo, foo->object_size() ) );
+         assert(check.obj()->id == foo->id);
+         assert(check.obj()->data_capacity() == foo->data_capacity());
+         assert(check.obj() != foo);
+         assert(0 == memcmp(check.obj(), foo, foo->object_size()));
 
+         // if ses.alloc_data() was forced to make space in a new segment
+         // then we need to sync() the old write segment before moving forward
+         if (not start_seg_ptr)
+         {
+            start_seg_ptr = ses._alloc_seg_ptr;
+            start_seg_num = ses._alloc_seg_num;
+         }
+         else if (start_seg_ptr != ses._alloc_seg_ptr)
+         {
+            // TODO: only sync from alloc pos at last sync
+            msync(start_seg_ptr, segment_size, MS_SYNC);
+            _header->seg_meta[start_seg_num]._last_sync_pos.store(segment_size,
+                                                                  std::memory_order_relaxed);
+            start_seg_ptr = ses._alloc_seg_ptr;
+            start_seg_num = ses._alloc_seg_num;
+         }
          foo = foo->next();
+      }
+
+      // in order to maintain the invariant that the segment we just cleared
+      // can be reused, we must make sure that the data we moved out has persisted to
+      // disk.
+      if (start_seg_ptr)
+      {
+         if (-1 == msync(start_seg_ptr, start_seg_ptr->_alloc_pos, MS_SYNC))
+         {
+            std::cerr << "msync errorno: " << errno << "\n";
+         }
+         _header->seg_meta[seg_num]._last_sync_pos.store(start_seg_ptr->_alloc_pos,
+                                                         std::memory_order_relaxed);
       }
 
       s->_num_objects = 0;
       s->_alloc_pos   = 0;
+      // the segment we just cleared, so its free space and objects get reset to 0
+      // and its last_sync pos gets put to the end because there is no need to sync it
+      // because its data has already been synced by the compactor
       _header->seg_meta[seg_num].clear();
 
       munlock(s, segment_size);
@@ -196,11 +235,10 @@ namespace triedent
       madvise(s, segment_size, MADV_RANDOM);
 
       // only one thread can move the end_ptr or this will break
-     // std::cerr<<"done freeing end_ptr: " << _header->end_ptr.load() <<" <== " << seg_num <<"\n";
-      _header->free_seg_buffer[_header->end_ptr.load()] =  seg_num;
-      _header->end_ptr.fetch_add(1, std::memory_order_release );
-   //
-
+      // std::cerr<<"done freeing end_ptr: " << _header->end_ptr.load() <<" <== " << seg_num <<"\n";
+      _header->free_seg_buffer[_header->end_ptr.load()] = seg_num;
+      _header->end_ptr.fetch_add(1, std::memory_order_release);
+      //
    }
 
    /**
@@ -281,23 +319,53 @@ namespace triedent
          //memset( sp, 0, segment_size );
 
          auto shp = new (sp) mapped_memory::segment_header();
-         assert( shp->_alloc_pos == 16 );
+         assert(shp->_alloc_pos == 16);
 
          return std::pair<segment_number, mapped_memory::segment_header*>(sn, shp);
       };
-    //  std::cout <<"get new seg ap: " << ap << "  min: " << min <<"  min-ap:" << min - ap << "\n";
+      //  std::cout <<"get new seg ap: " << ap << "  min: " << min <<"  min-ap:" << min - ap << "\n";
 
-      while ( min - ap >= 1 )
+      while (min - ap >= 1)
       {
          if (_header->alloc_ptr.compare_exchange_weak(ap, ap + 1))
          {
-            auto free_seg = _header->free_seg_buffer[ap];
+            auto free_seg                = _header->free_seg_buffer[ap];
             _header->free_seg_buffer[ap] = segment_number(-1);
-     //       std::cerr << "reusing segment..." << free_seg <<"\n";
-            return prepare_segment( free_seg );
+            //       std::cerr << "reusing segment..." << free_seg <<"\n";
+            return prepare_segment(free_seg);
          }
       }
       return prepare_segment(_block_alloc.alloc());
+   }
+   void seg_allocator::sync( sync_type st ) {
+      if( st == sync_type::none ) 
+         return;
+
+      auto total_segs = _block_alloc.num_blocks();
+
+      for (uint32_t i = 0; i < total_segs; ++i)
+      {
+         auto seg        = get_segment(i);
+         auto last_sync = _header->seg_meta[i]._last_sync_pos.load(std::memory_order_relaxed);
+         auto last_alloc= seg->_alloc_pos.load(std::memory_order_relaxed);
+
+         if( last_alloc > segment_size ) 
+            last_alloc = segment_size;
+
+         static const uint64_t page_size = getpagesize();
+         static const uint64_t page_size_mask = ~(page_size-1);
+
+         auto sync_bytes = last_alloc - (last_sync & page_size_mask);
+         auto seg_sync_ptr   = (((intptr_t)seg + last_sync)&page_size_mask);
+
+         if( last_alloc > last_sync ) {
+            if( -1 == msync( (char*)seg_sync_ptr, sync_bytes, msync_flag(st) ) ) {
+               std::cerr << "ps: " << getpagesize() <<" len: " << sync_bytes <<" rounded:  \n";
+               std::cerr << "msync errno: " << std::string(strerror(errno)) << " seg_alloc::sync() seg: " << i<<"\n";
+            }
+            _header->seg_meta[i]._last_sync_pos.store(last_alloc);
+         }
+      }
    }
 
    void seg_allocator::dump()

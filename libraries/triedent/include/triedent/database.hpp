@@ -269,6 +269,8 @@ namespace triedent
       std::shared_ptr<database> _db;
 
       seg_allocator& sega() const;
+
+      void cache( auto& objref )const;
    };
    using read_session = session<read_access>;
 
@@ -278,7 +280,7 @@ namespace triedent
       write_session(std::shared_ptr<database> db) : read_session(db) {}
 
       std::shared_ptr<root> get_top_root();
-      void                  set_top_root(const std::shared_ptr<root>& r);
+      void                  set_top_root(const std::shared_ptr<root>& r, bool sync = false);
 
       int upsert(std::shared_ptr<root>& r, std::span<const char> key, std::span<const char> val);
 
@@ -441,6 +443,45 @@ namespace triedent
      public:
       struct config
       {
+
+         /**
+          *  Read threads can move the accessed data into
+          *  a warm cache to improve cache locality and separate
+          *  infrequently used data from frequently used data.
+          *
+          *  If used with anything other than sync_type::none, this
+          *  will produce write amplification somewhat less than
+          *  the total data read because on sync() the moved cache
+          *  values must be flushed to disk.
+          */
+         bool cache_on_read = false;
+
+         /**
+          * By default triedent starts a background thread which
+          * will compact data ones a segment 
+          */
+         bool run_compact_thread = true;
+
+         /**
+          * The max amount of a segment that is allowed to be empty
+          * before the compactor thread will move the remaining contents
+          * to a new segment. 
+          *
+          * Lower values save space, but produce more write amplification when
+          * using sync_type other than none.  Lower values improve cache
+          * locality and reduce page misses by keeping the data denser.
+          */
+         int  compact_empty_threshold_percent  = 20;
+
+         /**
+          * Triedent will discourage the OS from swapping out 
+          * the most recently used segments by using mlock(),
+          * may want a higher compaction threshold if using mlock()
+          *
+          */
+         uint64_t max_pinnable_segments = 64;
+
+         sync_type sync_mode = sync_type::none;
       };
       static constexpr auto read_write = access_mode::read_write;
       static constexpr auto read_only  = access_mode::read_only;
@@ -454,6 +495,10 @@ namespace triedent
                bool                         allow_gc = false);
       database(const std::filesystem::path& dir, access_mode mode, bool allow_gc = false);
       ~database();
+
+      void start_compact_thread() {
+         _sega.start_compact_thread();
+      }
 
       static void create(std::filesystem::path dir, config);
 
@@ -490,6 +535,7 @@ namespace triedent
 
       std::mutex   _root_release_session_mutex;
       session_base _root_release_session;
+      config       _config;
    };
 
    inline root::~root()
@@ -611,7 +657,7 @@ namespace triedent
       return std::make_shared<root>(root{_db, nullptr, {id}});
    }
 
-   inline void write_session::set_top_root(const std::shared_ptr<root>& r)
+   inline void write_session::set_top_root(const std::shared_ptr<root>& r, bool sync)
    {
       std::lock_guard<std::mutex> lock(_db->_root_change_mutex);
       auto                        current = _db->_dbm->top_root.load();
@@ -628,6 +674,11 @@ namespace triedent
          std::cout << id.id << ": set_top_root: old=" << current << std::endl;
       id = retain(state, id);
       _db->_dbm->top_root.store(id.id);
+      if (_db->_config.sync_mode != sync_type::none )
+      {
+         _db->_sega.sync(_db->_config.sync_mode);  // data backing it is written here
+         _db->_file.sync(_db->_config.sync_mode);  // top root is written here
+      }
       release(state, {current});
    }
 
@@ -1241,8 +1292,8 @@ namespace triedent
    {
       if (!root)
          return false;
-      auto n = state.get<node>(root);  //get_by_id(l, root);
-      n.cache_object();
+      auto n = state.get<node>(root);  
+      cache(n);
       if (n.is_leaf_node())
       {
          auto& vn     = n.as_value_node();
@@ -1327,7 +1378,7 @@ namespace triedent
       if (!root)
          return false;
       auto n = get_by_id(l, root);
-      n.cache_object();
+      cache(n);
       if (n.is_leaf_node())
       {
          auto& vn     = n.as_value_node();
@@ -1426,7 +1477,7 @@ namespace triedent
       while (true)
       {
          auto n = get_by_id(l, root);
-         n.cache_object();
+         cache(n);
          if (n.is_leaf_node())
          {
             auto& vn     = n.as_value_node();
@@ -1796,5 +1847,13 @@ namespace triedent
    {
       return triedent::to_key6(key_buf, v);
    }
+
+   template <typename AccessMode>
+   void session<AccessMode>::cache( auto& objref )const
+      {
+         if( _db->_config.cache_on_read ) {
+            objref.cache_object();
+         }
+      }
 
 }  // namespace triedent
