@@ -10,14 +10,15 @@ use psibase::services::{account_sys, auth_ec_sys, auth_sys, proxy_sys, psispace_
 use psibase::{
     account, apply_proxy, create_boot_transactions, get_tapos_for_head, push_transaction,
     sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
-    ExactAccountNumber, PublicKey, SignedTransaction, Tapos, TaposRefBlock, TimePointSec,
-    Transaction,
+    DirectoryRegistry, ExactAccountNumber, PackageRegistry, PublicKey, SignedTransaction, Tapos,
+    TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
 use std::fs::{metadata, read_dir};
+use std::path::PathBuf;
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
@@ -60,6 +61,8 @@ enum Command {
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
         producer: ExactAccountNumber,
+
+        services: Vec<String>,
     },
 
     /// Create or modify an account
@@ -508,18 +511,41 @@ async fn monitor_trx(
     Ok(())
 }
 
+fn data_directory() -> Result<PathBuf, anyhow::Error> {
+    let exe = std::env::current_exe()?.canonicalize()?;
+    let Some(parent) = exe.parent() else {
+        return Err(anyhow!("Parent not found"));
+    };
+    let base = if parent.ends_with("bin") {
+        parent.parent().unwrap()
+    } else if parent.ends_with("rust/release") {
+        parent.parent().unwrap().parent().unwrap()
+    } else {
+        parent
+    };
+    Ok(base.join("share/psibase"))
+}
+
 async fn boot(
     args: &Args,
     client: reqwest::Client,
     key: &Option<AnyPublicKey>,
     producer: ExactAccountNumber,
+    services: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let now_plus_30secs = Utc::now() + Duration::seconds(30);
     let expiration = TimePointSec {
         seconds: now_plus_30secs.timestamp() as u32,
     };
+    let default_services = vec!["Default".to_string()];
+    let package_registry = DirectoryRegistry::new(data_directory()?.join("services"));
+    let mut packages = package_registry.resolve(if services.is_empty() {
+        &default_services[..]
+    } else {
+        &services[..]
+    })?;
     let (boot_transactions, transactions) =
-        create_boot_transactions(key, producer.into(), true, true, expiration);
+        create_boot_transactions(key, producer.into(), true, true, expiration, &mut packages);
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
@@ -666,7 +692,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let (client, _proxy) = build_client(&args).await?;
     match &args.command {
-        Command::Boot { key, producer } => boot(&args, client, key, *producer).await?,
+        Command::Boot {
+            key,
+            producer,
+            services,
+        } => boot(&args, client, key, *producer, services).await?,
         Command::Create {
             account,
             key,
