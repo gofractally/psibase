@@ -1,6 +1,6 @@
 [package]
 name = "cargo-psibase"
-version = "0.2.0"
+version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
