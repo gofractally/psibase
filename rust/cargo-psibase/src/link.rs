@@ -218,7 +218,8 @@ fn fill_functions(
 // Link polyfill to code and strip out unused functions
 pub fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
     let poly: parity_wasm::elements::Module = deserialize_buffer(polyfill)
-        .map_err(|_| anyhow!("Parity-wasm failed to parse polyfill"))?;
+        .map_err(|e| anyhow!("Parity-wasm failed to parse polyfill: {}", e))?;
+    
     if poly.table_section().is_some()
         || poly.start_section().is_some()
         || poly.elements_section().is_some()
