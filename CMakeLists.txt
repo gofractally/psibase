@@ -105,6 +105,33 @@ if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
             -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
             -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
+        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/CpuSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
