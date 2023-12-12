@@ -2,7 +2,64 @@
 
 DWNs are used as the mechanism to ensure that users remain sovereign over any data that is not stored as public blockchain data. Using DWNs allows users to change devices, browsers, or root domains, and still enjoy the same app user experience.
 
-## Example diagrams
+## Creation of a psibase account
+
+Creating a psibase account has two steps:
+1. Sign into your DWN
+2. Create your new account
+
+```mermaid
+sequenceDiagram
+title Alice signs into DWN
+
+alice->>account-app: Clicks sign in
+activate account-app
+    account-app->>supervisor: sign-in@account-plugin
+    activate supervisor
+        supervisor->>account-plugin: Sign in
+        activate account-plugin
+            account-plugin->>supervisor: Auth(/signin)
+            supervisor->>alice: `account.psibase.io/signin`
+            alice->>account-plugin: Sign into DWN with passkey
+        deactivate account-plugin
+        account-plugin-->>supervisor: 
+    deactivate supervisor
+    supervisor-->>account-app: 
+deactivate account-app
+```
+
+```mermaid
+sequenceDiagram
+title Create new account
+
+alice->>account-app: Create account "alice"
+activate account-app
+    account-app->>supervisor: create@account-plugin(alice)
+    activate supervisor
+        supervisor->>account-plugin: create(alice)
+        activate account-plugin
+            account-plugin->>auth-plugin: generate key-pair
+            activate auth-plugin
+            note over auth-plugin: generates {pub_k1, priv_k1}
+            note over auth-plugin: write keypair to DWN
+            auth-plugin-->>account-plugin: pub_k1
+            deactivate auth-plugin
+            account-plugin->>supervisor: create(alice, pub_k1)
+            activate supervisor
+                note over supervisor: creates transaction with<br>create(alice, pub_k1)
+                note over supervisor: submit transaction
+                supervisor->>account-plugin: success
+            deactivate supervisor
+            account-plugin->>supervisor: Done (success)
+        deactivate account-plugin
+    deactivate supervisor
+    supervisor->>account-app: Done (success)
+deactivate account-app
+```
+
+
+
+## Reading DWN state
 
 Diagram 1: Alice's game app wants access to alice's contacts
 
