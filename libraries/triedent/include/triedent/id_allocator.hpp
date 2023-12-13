@@ -182,8 +182,8 @@ namespace triedent
 
          auto brand_new = [&]()
          {
-            grow();  // ensure that there should be new id
             object_id id{_idheader->_next_alloc.fetch_add(1, std::memory_order_relaxed)};
+            grow(id);  // ensure that there should be new id
 
             auto& atom = get(id);
             atom.store(obj_val(node_type::undefined, 1), std::memory_order_relaxed);
@@ -249,22 +249,22 @@ namespace triedent
      private:
       friend class alloc_session;
 
-      void grow()
+      void grow(object_id id)
       {
          // optimistic...
-         if (_idheader->_next_alloc.load(std::memory_order_relaxed) <
+         if ( id.id <
              _idheader->_end_id.load(std::memory_order_relaxed))
             return;
 
          void* ptr;
          {
             std::lock_guard l{_grow_mutex};
-            if (_idheader->_next_alloc.load() < _idheader->_end_id.load())
+            if (id.id < _idheader->_end_id.load())
                return;  // no need to grow, another thread grew first
 
             //      std::cerr << "growing obj id db\n";
             ptr = _block_alloc.get(_block_alloc.alloc());
-            _idheader->_end_id.store(_block_alloc.num_blocks() * _block_alloc.block_size() / 8);
+            _idheader->_end_id.store(_block_alloc.num_blocks() * _block_alloc.block_size() / 8, std::memory_order_release);
          }  // don't hold lock while doing mlock
 
          if (::mlock(ptr, id_block_size))

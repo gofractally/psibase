@@ -176,20 +176,24 @@ namespace triedent
             memcpy(ptr, foo, obj_size);
             obj_ref.move(loc, ul);
 
-            //auto check = state.get({foo->id},false);
+#ifdef NDEBUG
+            auto check = state.get({foo->id},false);
             assert(foo->id == check.id().id);
             assert(check.obj()->id == foo->id);
             assert(check.obj()->data_capacity() == foo->data_capacity());
             assert(check.obj() != foo);
             assert((char*)check.obj() == ptr);
             assert(0 == memcmp(check.obj(), foo, foo->object_size()));
+#endif
          }
-         //auto check = state.get({foo->id},false);
+#ifdef NDEBUG
+         auto check = state.get({foo->id},false);
          assert(foo->id == check.id().id);
          assert(check.obj()->id == foo->id);
          assert(check.obj()->data_capacity() == foo->data_capacity());
          assert(check.obj() != foo);
          assert(0 == memcmp(check.obj(), foo, foo->object_size()));
+#endif
 
          // if ses.alloc_data() was forced to make space in a new segment
          // then we need to sync() the old write segment before moving forward
@@ -372,8 +376,11 @@ namespace triedent
    {
       std::cerr << "\n--- segment allocator state ---\n";
       auto total_segs = _block_alloc.num_blocks();
+      uint64_t total_free_space = 0;
       std::cerr << "total segments: " << total_segs << "\n";
       std::cerr << std::setw(6) << "#"
+                << " | ";
+      std::cerr << std::setw(8) << "freed %"
                 << " | ";
       std::cerr << std::setw(12) << "freed bytes"
                 << " | ";
@@ -389,12 +396,15 @@ namespace triedent
          auto space_objs = _header->seg_meta[i].get_free_space_and_objs();
 
          std::cerr << std::setw(6) << i << " | ";
+         std::cerr << std::setw(8) << int(100*double(space_objs.first)/segment_size) << " | ";
+         total_free_space += space_objs.first;
          std::cerr << std::setw(12) << space_objs.first << " | ";
          std::cerr << std::setw(12) << space_objs.second << " | ";
          std::cerr << std::setw(12)
                    << (seg->_alloc_pos == -1 ? "END" : std::to_string(seg->_alloc_pos)) << " | ";
          std::cerr << std::setw(12) << seg->_num_objects << " \n";
       }
+      std::cerr << "total free: " << total_free_space / 1024 / 1024. << "Mb  "<< (100*total_free_space/double(total_segs*segment_size)) << "%\n";
 
       std::cerr << "---- free segment Q ------\n";
       std::cerr << "[---A---R*---E------]\n";

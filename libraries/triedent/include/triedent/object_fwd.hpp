@@ -20,7 +20,7 @@ namespace triedent
    // each thread will have a segment this size, so larger values
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
-   static const uint64_t segment_size = 1024 * 1024 * 128;  // 256mb
+   static const uint64_t segment_size = 1024 * 1024 * 32;  // 256mb
 
    /// object pointers can only address 48 bits
    /// 128 TB limit on database size with 47 bits, this saves us

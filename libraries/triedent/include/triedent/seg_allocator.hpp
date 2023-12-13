@@ -544,14 +544,14 @@ namespace triedent
    template <typename T>
    inline object_header* seg_allocator::session::read_lock::object_ref<T>::obj()
    {
-      object_location loc{._offset = 8 * (_atom_loc.load(std::memory_order_relaxed) >>
+      object_location loc{._offset = 8 * (_atom_loc.load(std::memory_order_acquire) >>
                                           object_info::location_rshift)};
       return _rlock.get_object_pointer(loc);
    }
    template <typename T>
    inline const object_header* seg_allocator::session::read_lock::object_ref<T>::obj() const
    {
-      object_location loc{._offset = 8 * (_atom_loc.load(std::memory_order_relaxed) >>
+      object_location loc{._offset = 8 * (_atom_loc.load(std::memory_order_acquire) >>
                                           object_info::location_rshift)};
       return _rlock.get_object_pointer(loc);
    }
