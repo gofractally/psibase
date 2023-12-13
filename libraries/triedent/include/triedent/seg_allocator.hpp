@@ -366,9 +366,11 @@ namespace triedent
             mv._alloc_seg_num = -1ull;
          }
 
+
          std::pair<object_location, char*> alloc_data(uint32_t size, object_id id)
          {
             assert(size < segment_size - 16);
+            // if no segment get a new segment
             if (not _alloc_seg_ptr)
             {
                auto [num, ptr] = _sega.get_new_segment();
@@ -383,12 +385,15 @@ namespace triedent
 
             auto cur_apos  = sh->_alloc_pos.load(std::memory_order_relaxed);
             auto spec_size = cur_apos + rounded_size;
+            auto free_space = segment_size - cur_apos;
 
-            if (spec_size > segment_size)
+            // if there isn't enough space, notify compactor go to A
+            if (spec_size > free_space )
             {
-               assert(cur_apos + sizeof(uint64_t) <= segment_size);
-               memset(((char*)sh) + cur_apos, 0, sizeof(uint64_t));
-
+               if( free_space >= 8 ) {
+                  assert(cur_apos + sizeof(uint64_t) <= segment_size);
+                  memset(((char*)sh) + cur_apos, 0, sizeof(uint64_t));
+               }
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
                sh->_alloc_pos.store(uint32_t(-1), std::memory_order_release);
                _alloc_seg_ptr = nullptr;
@@ -406,6 +411,7 @@ namespace triedent
             sh->_num_objects++;
 
             auto loc = _alloc_seg_num * segment_size + cur_apos;
+            /*
             if (new_alloc_pos == segment_size)
             {
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size - new_alloc_pos);
@@ -413,6 +419,7 @@ namespace triedent
                _alloc_seg_ptr = nullptr;
                _alloc_seg_num = -1ull;
             }
+            */
 
             return {object_location{loc}, obj}; //((char*)sh) + cur_apos};
          }
