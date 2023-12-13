@@ -31,9 +31,9 @@ jobs:
         id: output
         run: true
 
-  generate-release-notes:
-    name: Generate release notes
-    uses: ./.github/workflows/generate-release-notes.yml
+  generate-changelog:
+    name: Generate changelog
+    uses: ./.github/workflows/generate-changelog.yml
     with:
       endtag: ${{ github.ref_name }}
 
@@ -43,7 +43,7 @@ jobs:
     needs:
       - build-psibase
       - prerelease-check
-      - generate-release-notes
+      - generate-changelog
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v3
@@ -60,4 +60,4 @@ jobs:
           prerelease: ${{needs.prerelease-check.outputs.prerelease}}
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref }}
-          body: ${{ needs.generate-release-notes.outputs.changelog }}
+          body: ${{ needs.generate-changelog.outputs.changelog }}

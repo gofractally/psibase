@@ -183,7 +183,7 @@ pub fn get_initial_actions<R: Read + Seek>(
         for s in &service_packages[..] {
             for account in s.get_accounts() {
                 actions.push(set_key_action(*account, k));
-                actions.push(set_auth_service_action(*account, auth_ec_sys::SERVICE));
+                actions.push(set_auth_service_action(*account, k.auth_service()));
             }
         }
     }
