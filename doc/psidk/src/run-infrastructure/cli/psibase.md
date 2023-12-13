@@ -66,7 +66,7 @@ Create or modify an account
 
 - `-k`, `--key` *public-key*
 
-  Set the account to authenticate using this key. Also works if the account already exists.The public key can be any of the following:
+  Set the account to authenticate using this key. Also works if the account already exists. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
   - An EOS style base58-encoded public key beginning `PUB_K1_`
