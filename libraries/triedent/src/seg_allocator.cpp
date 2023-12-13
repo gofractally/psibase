@@ -172,7 +172,7 @@ namespace triedent
             }
 
             auto obj_size   = foo->object_size();
-            auto [loc, ptr] = ses.alloc_data(obj_size);
+            auto [loc, ptr] = ses.alloc_data(obj_size, {foo->id});
             memcpy(ptr, foo, obj_size);
             obj_ref.move(loc, ul);
 

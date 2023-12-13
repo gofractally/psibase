@@ -105,7 +105,8 @@ namespace triedent
          // used by the thread that owns this segment and
          // set to uint64_t max when this segment is ready
          // to be marked read only to the seg_allocator
-         std::atomic<uint64_t> _alloc_pos = 16;
+         std::atomic<uint32_t> _alloc_pos = 16;
+         uint32_t _unused;
          // used to calculate object density of segment header,
          // to establish madvise
          uint32_t _num_objects = 0;  // inc on alloc
@@ -365,7 +366,7 @@ namespace triedent
             mv._alloc_seg_num = -1ull;
          }
 
-         std::pair<object_location, char*> alloc_data(uint32_t size)
+         std::pair<object_location, char*> alloc_data(uint32_t size, object_id id)
          {
             assert(size < segment_size - 16);
             if (not _alloc_seg_ptr)
@@ -389,16 +390,19 @@ namespace triedent
                memset(((char*)sh) + cur_apos, 0, sizeof(uint64_t));
 
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
-               sh->_alloc_pos.store(uint32_t(-1), std::memory_order_relaxed);
+               sh->_alloc_pos.store(uint32_t(-1), std::memory_order_release);
                _alloc_seg_ptr = nullptr;
                _alloc_seg_num = -1ull;
 
-               return alloc_data(size);  // recurse
+               return alloc_data(size, id);  // recurse
             }
 
-            auto new_alloc_pos =
-                rounded_size + sh->_alloc_pos.fetch_add(rounded_size, std::memory_order_relaxed);
-            assert(new_alloc_pos == cur_apos + rounded_size);
+            auto obj = ((char*)sh) + sh->_alloc_pos.load(std::memory_order_relaxed);
+            auto head = (object_header*)obj;
+            head->size = size-sizeof(object_header);
+            head->id = id.id;
+
+            auto new_alloc_pos = rounded_size + sh->_alloc_pos.fetch_add(rounded_size, std::memory_order_relaxed);
             sh->_num_objects++;
 
             auto loc = _alloc_seg_num * segment_size + cur_apos;
@@ -410,7 +414,7 @@ namespace triedent
                _alloc_seg_num = -1ull;
             }
 
-            return {object_location{loc}, ((char*)sh) + cur_apos};
+            return {object_location{loc}, obj}; //((char*)sh) + cur_apos};
          }
 
          uint32_t _session_num;  // index into _sega's active sessions list
@@ -669,13 +673,12 @@ namespace triedent
    using object_ref = seg_allocator::session::read_lock::object_ref<T>;
    inline object_ref<char> seg_allocator::session::read_lock::alloc(uint32_t size, node_type type)
    {
-      auto [loc, ptr] = _session.alloc_data(size + sizeof(object_header));
-
-      auto oh = ((object_header*)ptr);
-
       auto [atom, id] = _session._sega._id_alloc.get_new_id();
-      oh->id          = id.id;
-      oh->size        = size;
+      auto [loc, ptr] = _session.alloc_data(size + sizeof(object_header), id);
+
+      //auto oh = ((object_header*)ptr);
+      //oh->id          = id.id;
+      //oh->size        = size;
 
       //atom.store( object_info(type, loc._offset/8).to_int(), std::memory_order_relaxed );
 
@@ -751,7 +754,7 @@ namespace triedent
             return false;
 
          auto obj_size   = cur_obj_ptr->object_size();
-         auto [loc, ptr] = _rlock._session.alloc_data(obj_size);
+         auto [loc, ptr] = _rlock._session.alloc_data(obj_size, _id);
          memcpy(ptr, cur_obj_ptr, obj_size);
          move(loc, ul);
 
