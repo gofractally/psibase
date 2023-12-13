@@ -224,10 +224,12 @@ function(psibase_package)
         ACCOUNTS ${_ACCOUNTS} ${_SERVICES}
         DEPENDS ${_PACKAGE_DEPENDS}
     )
+    string(REGEX REPLACE "/[^/]+/?$" "" output-dir ${_OUTPUT})
     add_custom_command(
         OUTPUT ${_OUTPUT}
         DEPENDS ${zip-deps} ${deps} ${_DEPENDS}
         WORKING_DIRECTORY ${outdir}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${output-dir}
         COMMAND ${CMAKE_COMMAND} -E rm -f ${_OUTPUT}
         COMMAND zip -r -x*/.* -x.* -x*~ ${_OUTPUT} ${contents}
     )
