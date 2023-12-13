@@ -297,6 +297,7 @@ psibase_package(
     SERVICE transact-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm
     FLAGS allowSudo allowWriteNative
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -311,6 +312,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist /
     DEPENDS ${AccountSys_js_dep}
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -327,6 +329,7 @@ psibase_package(
     SERVICE verify-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
         FLAGS isAuthService
+    DEPENDS wasm
 )
 
 set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
@@ -356,6 +359,7 @@ psibase_package(
         DATA GLOB ${COMMON_SYS}/ui/dist/*                     /
         DATA GLOB ${THIRD_FILES}                              common
     DEPENDS ${CommonSys_js_dep}
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -372,6 +376,7 @@ psibase_package(
     SERVICE verifyec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
         FLAGS isAuthService
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -380,6 +385,7 @@ psibase_package(
     DESCRIPTION "Insecure auth service that allows any access"
     SERVICE auth-any-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -389,6 +395,7 @@ psibase_package(
     SERVICE cpu-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuSys.wasm
     FLAGS isSubjective canSetTimeLimit
+    DEPENDS wasm
 )
 
 if(BUILD_DOC)
@@ -411,6 +418,7 @@ psibase_package(
     WASM ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
     DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui/dist /
     SERVER psispace-sys
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -423,6 +431,7 @@ psibase_package(
         SERVER r-prod-sys
     SERVICE r-prod-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -434,6 +443,7 @@ psibase_package(
         SERVER r-proxy-sys
     SERVICE r-proxy-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -442,6 +452,7 @@ psibase_package(
     DESCRIPTION "All compiled code is uploaded to the chain through this service"
     SERVICE setcode-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -453,6 +464,7 @@ psibase_package(
     SERVER explore-sys
     DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist /
     DEPENDS ExploreSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist/index.html
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -468,6 +480,7 @@ psibase_package(
     SERVICE auth-inv-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
     DEPENDS InviteSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist/index.html
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -477,6 +490,7 @@ psibase_package(
     PACKAGE_DEPENDS AccountSys ProxySys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
     INIT
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -492,6 +506,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist /
     DEPENDS TokenSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist/index.html
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -502,6 +517,7 @@ psibase_package(
     SERVICE symbol-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
         INIT
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -512,6 +528,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
     SERVICE core-frac-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
+    DEPENDS wasm
 )
 
 psibase_package(
