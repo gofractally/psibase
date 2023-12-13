@@ -7,7 +7,7 @@ homepage.workspace = true
 edition = "2021"
 description = "Library and command-line tool for interacting with psibase blockchains"
 license = "MIT"
-include = ["boot-image/**/*"]
+include = ["src/**/*", "boot-image/**/*", "Cargo.toml"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

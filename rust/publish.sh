@@ -27,6 +27,14 @@ done
 for dir in "${dirs[@]}"; do
     cd "$dir"
     echo "Publishing $dir..."
-    cargo publish --dry-run
+
+    # psibase crate needs `--allow-dirty` to be published because the boot-image directory
+    #   is copied into the project directory but is not added to git.
+    extra_flags=""
+    if [ "$dir" = "psibase" ]; then
+        extra_flags="--allow-dirty"
+    fi
+
+    cargo publish $extra_flags
     cd ..
 done
