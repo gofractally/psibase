@@ -1,11 +1,44 @@
-import { getJson, postJson, postArrayBuffer, postArrayBufferGetJson } from "common/rpc.mjs";
+import { getArrayBuffer, getJson, postJson, postArrayBuffer, postArrayBufferGetJson } from "common/rpc.mjs";
 import { Button } from "../components";
 import { Divider } from "../components/divider";
 import React, { useState, useEffect } from 'react';
+import JSZip from "jszip";
 import * as wasm from 'wasm-psibase';
 
 interface PowerPageProps {
     producer?: string;
+}
+
+async function dfs(names: string[], found: {[key: string]:boolean}, result: ArrayBuffer[]) {
+    for (let name of names) {
+        let complete = found[name];
+        if(complete === false) {
+            throw new Error(`package ${name} depends on itself`);
+        } else if(complete === undefined) {
+            found[name] = false;
+            console.log(`package ${name}`);
+            let contents = await getArrayBuffer(`/packages/${name}.psi`);
+            let zip = new JSZip();
+            let unpacked = await zip.loadAsync(contents);
+            let meta_file = unpacked.file("meta.json");
+            if (!meta_file) {
+                throw new Error("${name}.psi missing meta.json");
+            }
+            let json_str = await meta_file.async("string");
+            let meta = JSON.parse(json_str);
+            console.log(`meta.json for ${name}: ${json_str}`);
+            await dfs(meta.depends, found, result);
+            result.push(contents);
+            found[name] = true;
+        }
+    }
+}
+
+async function getBoot(names: [string]) {
+    let found = {};
+    let result: ArrayBuffer[] = [];
+    await dfs(names, found, result);
+    return result;
 }
 
 export const PowerPage = ({producer} : PowerPageProps) => {
@@ -23,7 +56,8 @@ export const PowerPage = ({producer} : PowerPageProps) => {
             {
                 // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
                 // in a dev environment.
-                let [boot_transactions, transactions] = wasm.js_create_boot_transactions(producer);
+                let packages = await getBoot(["Default"]);
+                let [boot_transactions, transactions] = wasm.js_create_boot_transactions(producer, packages);
                 await postArrayBuffer("/native/push_boot", boot_transactions.buffer);
                 let i = 0;
                 for (const t of transactions) {

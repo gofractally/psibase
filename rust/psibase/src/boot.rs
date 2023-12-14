@@ -271,8 +271,19 @@ pub fn create_boot_transactions<R: Read + Seek>(
 /// is used to generate a wasm that may be called from the browser to construct the boot
 /// transactions when booting the chain from the GUI.
 #[wasm_bindgen]
-pub fn js_create_boot_transactions(producer: String) -> Result<JsValue, JsValue> {
+pub fn js_create_boot_transactions(
+    producer: String,
+    js_services: JsValue,
+) -> Result<JsValue, JsValue> {
     let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
+    let deserialized_services: Vec<ByteBuf> = serde_wasm_bindgen::from_value(js_services)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    for s in &deserialized_services[..] {
+        services.push(
+            PackagedService::new(Cursor::new(&s[..]))
+                .map_err(|e| JsValue::from_str(&e.to_string()))?,
+        );
+    }
     let now_plus_30secs = chrono::Utc::now() + chrono::Duration::seconds(30);
     let expiration = TimePointSec {
         seconds: now_plus_30secs.timestamp() as u32,
