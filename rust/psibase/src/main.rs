@@ -538,7 +538,7 @@ async fn boot(
         seconds: now_plus_30secs.timestamp() as u32,
     };
     let default_services = vec!["Default".to_string()];
-    let package_registry = DirectoryRegistry::new(data_directory()?.join("services"));
+    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
     let mut packages = package_registry.resolve(if services.is_empty() {
         &default_services[..]
     } else {

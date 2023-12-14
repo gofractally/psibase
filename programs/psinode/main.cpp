@@ -318,7 +318,8 @@ void load_service(const native_service& config,
    auto& service = services[host];
    if (config.root.empty())
       return;
-   for (const auto& entry : std::filesystem::recursive_directory_iterator{config.root})
+   for (const auto& entry : std::filesystem::recursive_directory_iterator{
+            config.root, std::filesystem::directory_options::follow_directory_symlink})
    {
       auto                 extension = entry.path().filename().extension().native();
       http::native_content result;
@@ -345,6 +346,10 @@ void load_service(const native_service& config,
       else if (extension == ".wasm")
       {
          result.content_type = "application/wasm";
+      }
+      else if (extension == ".psi")
+      {
+         result.content_type = "application/zip";
       }
       if (!result.content_type.empty() && entry.is_regular_file())
       {

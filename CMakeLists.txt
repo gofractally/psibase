@@ -276,6 +276,7 @@ if(BUILD_JS)
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/rpc.mjs ${pfx}/share/psibase/services/admin-sys/common/
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/keyConversions.mjs ${pfx}/share/psibase/services/admin-sys/common/
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/admin-sys/packages
     )
     endfunction()
 
@@ -286,12 +287,13 @@ if(BUILD_JS)
     install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
     install(DIRECTORY services/user/CommonSys/common/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
     install(FILES services/user/CommonSys/common/rpc.mjs services/user/CommonSys/common/keyConversions.mjs DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/admin-sys/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
 endif()
 
 # Build services
 include(pack_service.cmake)
 
-set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services)
+set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactionSys.psi
@@ -544,6 +546,30 @@ psibase_package(
                     PsiSpaceSys SetCodeSys SymbolSys TokenSys TransactionSys
 )
 
+
+install(
+    FILES ${SERVICE_DIR}/AccountSys.psi
+          ${SERVICE_DIR}/AuthAnySys.psi
+          ${SERVICE_DIR}/AuthSys.psi
+          ${SERVICE_DIR}/AuthEcSys.psi
+          ${SERVICE_DIR}/CommonSys.psi
+          ${SERVICE_DIR}/Default.psi
+          ${SERVICE_DIR}/CpuSys.psi
+          ${SERVICE_DIR}/DocSys.psi
+          ${SERVICE_DIR}/ExploreSys.psi
+          ${SERVICE_DIR}/FractalSys.psi
+          ${SERVICE_DIR}/InviteSys.psi
+          ${SERVICE_DIR}/NftSys.psi
+          ${SERVICE_DIR}/ProducerSys.psi
+          ${SERVICE_DIR}/ProxySys.psi
+          ${SERVICE_DIR}/PsiSpaceSys.psi
+          ${SERVICE_DIR}/SetCodeSys.psi
+          ${SERVICE_DIR}/SymbolSys.psi
+          ${SERVICE_DIR}/TokenSys.psi
+          ${SERVICE_DIR}/TransactionSys.psi
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
+    COMPONENT ServerData)
+
 option(BUILD_RUST "Build rust" ON)
 if(BUILD_RUST)
     ExternalProject_Add(
@@ -552,6 +578,7 @@ if(BUILD_RUST)
         BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
         CONFIGURE_COMMAND ""
         BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+        BUILD_ALWAYS 1
         INSTALL_COMMAND ""
     )
     install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
