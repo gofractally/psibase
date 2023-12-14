@@ -510,6 +510,16 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/SupervisorSys.psi
+    NAME SupervisorSys
+    DESCRIPTION "Token service"
+    PACKAGE_DEPENDS NftSys ProxySys
+    SERVICE token-sys
+        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
+    DEPENDS SupervisorSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist/index.html
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenSys.psi
     NAME TokenSys
     DESCRIPTION "Token service"
@@ -575,7 +585,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
                     ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
-                    PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys
+                    PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys
 )
 
 psibase_package(
@@ -602,7 +612,7 @@ endfunction()
 write_package_index(${SERVICE_DIR}/index.json
     AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
     DocSys ExploreSys FractalSys InviteSys NftSys Minimal PackageSys ProducerSys ProxySys
-    PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys)
+    PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -625,6 +635,7 @@ install(
           ${SERVICE_DIR}/ProxySys.psi
           ${SERVICE_DIR}/PsiSpaceSys.psi
           ${SERVICE_DIR}/SetCodeSys.psi
+          ${SERVICE_DIR}/SupervisorSys.psi
           ${SERVICE_DIR}/SymbolSys.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/TokenSys.psi

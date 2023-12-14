@@ -1,0 +1,1 @@
+/root/psibase/services/user/TokenSys/wasm/target/wasm32-wasi/release/token_sys.wasm: /root/psibase/services/user/TokenSys/wasm/src/lib.rs /root/psibase/services/user/TokenSys/wasm/target/bindings/token-sys/bindings.rs
