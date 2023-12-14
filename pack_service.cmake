@@ -225,13 +225,16 @@ function(psibase_package)
         DEPENDS ${_PACKAGE_DEPENDS}
     )
     string(REGEX REPLACE "/[^/]+/?$" "" output-dir ${_OUTPUT})
+    set(tempdir ${outdir}.tmp)
     add_custom_command(
         OUTPUT ${_OUTPUT}
         DEPENDS ${zip-deps} ${deps} ${_DEPENDS}
         WORKING_DIRECTORY ${outdir}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${output-dir}
-        COMMAND ${CMAKE_COMMAND} -E rm -f ${_OUTPUT}
-        COMMAND zip -r -x*/.* -x.* -x*~ ${_OUTPUT} ${contents}
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${_OUTPUT}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${outdir} ${tempdir}
+        COMMAND cd ${tempdir} && ${CMAKE_COMMAND} -E tar cf ${_OUTPUT} --format=zip ${contents}
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${tempdir}
     )
     add_custom_target(${_NAME}.psi ALL DEPENDS ${_OUTPUT})
 endfunction()
