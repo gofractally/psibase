@@ -421,6 +421,7 @@ psibase_package(
     WASM ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
     DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui/dist /
     SERVER psispace-sys
+    DEPENDS ${PsiSpaceSys_js_dep}
     DEPENDS wasm
 )
 
