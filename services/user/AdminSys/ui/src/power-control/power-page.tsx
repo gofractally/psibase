@@ -16,7 +16,6 @@ async function dfs(names: string[], found: {[key: string]:boolean}, result: Arra
             throw new Error(`package ${name} depends on itself`);
         } else if(complete === undefined) {
             found[name] = false;
-            console.log(`package ${name}`);
             let contents = await getArrayBuffer(`/packages/${name}.psi`);
             let zip = new JSZip();
             let unpacked = await zip.loadAsync(contents);
@@ -26,7 +25,6 @@ async function dfs(names: string[], found: {[key: string]:boolean}, result: Arra
             }
             let json_str = await meta_file.async("string");
             let meta = JSON.parse(json_str);
-            console.log(`meta.json for ${name}: ${json_str}`);
             await dfs(meta.depends, found, result);
             result.push(contents);
             found[name] = true;
