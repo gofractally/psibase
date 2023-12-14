@@ -185,14 +185,12 @@ namespace triedent
             continue;
          }
 
+
+         {
          // optimistically we should move it, but first we must try to
          // lock the ID to prevent anyone else from moving it while we
          // move it.
-
-         auto             lk = obj_ref.create_lock();
-         std::unique_lock ul(lk);  //, std::try_to_lock);
-         if (ul.owns_lock())
-         {
+            std::unique_lock ul(obj_ref.get_mutex());  
             obj_ref.refresh();
 
             {
@@ -208,8 +206,15 @@ namespace triedent
             auto obj_size   = foo->object_size();
             auto [loc, ptr] = ses.alloc_data(obj_size, {foo->id});
             memcpy(ptr, foo, obj_size);
-            obj_ref.move(loc, ul);
+            obj_ref.move(loc);
          }
+         // it is possible that the object was released between locking
+         // and copying, if it was 0 after the move then we must mark the space
+         // free even though we just alloced it, womp, womp...
+         if( obj_ref.ref_count() == 0 ) {
+            _header->seg_meta[start_seg_num].free_object(foo->object_size());
+         }
+         
 
          // if ses.alloc_data() was forced to make space in a new segment
          // then we need to sync() the old write segment before moving forward

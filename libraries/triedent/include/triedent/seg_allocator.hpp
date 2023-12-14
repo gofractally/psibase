@@ -202,7 +202,7 @@ namespace triedent
                object_id       id() const { return _id; }
                uint32_t        ref_count() const { return _cached.ref(); }
                node_type       type() const { return _cached.type(); }
-               bool            is_locked() const { return _cached.locked(); }
+               auto            read() const { return _cached.read(); }
                object_location location() const { return _cached.location(); }
 
                // return false if ref count overflow
@@ -242,11 +242,9 @@ namespace triedent
 
                auto loc() const { return _cached.location(); }
 
-               auto create_lock() const { return object_info_lock(_atom_loc); }
+               auto& get_mutex() const { return _rlock._session._sega._id_alloc.get_mutex(_id); }
 
-               // moves location and releases the lock in one operation
-               // so that two C&E are not required for updating the state
-               void move(object_location loc, std::unique_lock<object_info_lock>&);
+               void move(object_location loc);
 
                bool cache_object();
 
@@ -571,13 +569,15 @@ namespace triedent
    template <typename T>
    struct mutable_deref : public deref<T>
    {
-      using location_lock = std::unique_lock<object_info_lock>;
 
-      mutable_deref(const deref<T>& src) : deref<T>(src), oil(src.create_lock()), lock(oil) {}
+      mutable_deref(const deref<T>& src) : deref<T>(src), lock(src.get_mutex()) {}
 
-      mutable_deref(location_lock lock, const deref<T>& src) : deref<T>(src), lock{std::move(lock)}
+      /*
+      mutable_deref(std::unique_lock<std::mutex>& m, const deref<T>& src) 
+         : deref<T>(src), lock(m)
       {
       }
+      */
 
       inline auto& as_value_node() const { return *this->template as<value_node>(); }
       inline auto& as_inner_node() const { return *this->template as<inner_node>(); }
@@ -586,24 +586,17 @@ namespace triedent
       inline T& operator*() const { return const_cast<T&>(*this->template as<T>()); }
 
      private:
-      object_info_lock oil;
-      location_lock    lock;
+      std::unique_lock<std::mutex> lock;
    };  // mutable_deref
-       //
+   
    template <typename T>
-   void seg_allocator::session::read_lock::object_ref<T>::move(
-       object_location                     loc,
-       std::unique_lock<object_info_lock>& l)
+   void seg_allocator::session::read_lock::object_ref<T>::move( object_location loc )
    {
-      assert(l.owns_lock());
       uint64_t expected = _atom_loc.load(std::memory_order_acquire);
-      uint64_t updated;
       do
       {
-         assert(expected & object_info::lock_mask);
-         updated = object_info(expected).set_location(loc).to_int() & ~object_info::lock_mask;
-      } while (not _atom_loc.compare_exchange_weak(expected, updated, std::memory_order_release));
-      l.release();
+         _cached = object_info(expected).set_location(loc).to_int();
+      } while (not _atom_loc.compare_exchange_weak(expected, _cached.to_int(), std::memory_order_release));
    }
 
    template <typename T>
@@ -639,33 +632,15 @@ namespace triedent
       if ((prior & object_info::ref_mask) > 1)
          return false;
 
-      object_info_lock                   lk(_atom_loc);
-      std::scoped_lock<object_info_lock> l(lk);
-
-      refresh();
+      _cached = object_info( prior -1 );
       auto loc = _cached.location();
       auto seg = loc.segment();
-
-      /*
-      uint64_t cur = _atom_loc.load();  //std::memory_order_relaxed);
-      do
-      {
-         assert((cur & object_info::ref_mask) < 100);
-         assert((cur & object_info::ref_mask) >= 1);
-         if ((cur & object_info::ref_mask) >= object_info::max_ref_count)
-            return false;
-      } while (not _atom_loc.compare_exchange_weak(cur, cur - 1));
-      */
-
-      // TODO: did anything change before lock?
-      //   std::cerr<<"release: "<<_id.id <<" ref=0 type="<<(int)type()<<"\n";
 
       auto obj_ptr =
           (const object_header*)((char*)_rlock._session._sega._block_alloc.get(seg) + loc.index());
 
       _rlock._session._sega._id_alloc.free_id(_id);
       _rlock._session._sega._header->seg_meta[seg].free_object(obj_ptr->data_capacity());
-      refresh();
       return true;
    }
 
@@ -676,22 +651,8 @@ namespace triedent
       auto [atom, id] = _session._sega._id_alloc.get_new_id();
       auto [loc, ptr] = _session.alloc_data(size + sizeof(object_header), id);
 
-      //auto oh = ((object_header*)ptr);
-      //oh->id          = id.id;
-      //oh->size        = size;
-
-      //atom.store( object_info(type, loc._offset/8).to_int(), std::memory_order_relaxed );
-
-      /*
-      object_info info(atom.load(std::memory_order_relaxed));
-      info.set_location(loc);
-      info.set_type(type);
-      info._ref = 1;
-      */
-
+      // TODO: this could break if object_info changes
       atom.store(1 | (uint64_t(type) << 15) | ((loc._offset / 8) << 19), std::memory_order_relaxed);
-      //atom.store(info.to_int(), std::memory_order_relaxed);
-
       return object_ref(*this, id, atom);
    }
 
@@ -729,10 +690,7 @@ namespace triedent
    template <typename T>
    bool seg_allocator::session::read_lock::object_ref<T>::cache_object()
    {
-      auto       lk   = create_lock();
-      const bool wait = false;
-      auto       ul =
-          wait ? std::unique_lock(lk, std::adopt_lock) : std::unique_lock(lk, std::try_to_lock);
+      std::unique_lock ul(get_mutex(), std::try_to_lock);
 
       if (ul.owns_lock())
       {
@@ -756,7 +714,7 @@ namespace triedent
          auto obj_size   = cur_obj_ptr->object_size();
          auto [loc, ptr] = _rlock._session.alloc_data(obj_size, _id);
          memcpy(ptr, cur_obj_ptr, obj_size);
-         move(loc, ul);
+         move(loc);
 
          // note that this item has been freed from the segment so the segment can be
          // recovered

@@ -8,79 +8,6 @@
 
 namespace triedent
 {
-   /**
-    *  A simple spin lock that uses object_info::locked to grab / release
-    *  the lock.
-    */
-   class object_info_lock
-   {
-     public:
-      object_info_lock(std::atomic<uint64_t>& obj) : _obj(obj) {}
-      void lock() noexcept
-      {
-         while (not try_lock())
-         {
-            // __builtin_ia32_pause(); not supported by clang
-#if defined(__i386__) || defined(__x86_64__)
-            asm volatile("pause");
-#elif defined(__arm__)
-            asm volatile("yield");
-#endif
-         }
-         return;
-
-         /*
-         uint64_t cur = _obj.load(std::memory_order_relaxed);
-         do
-         {
-            while (cur & object_info::lock_mask)
-            {
-               // __builtin_ia32_pause(); not supported by clang
-#if defined(__i386__) || defined(__x86_64__)
-               asm volatile("pause");
-#elif defined(__arm__)
-               asm volatile("yield");
-#endif
-
-               cur = _obj.load(std::memory_order_relaxed);
-            }
-            if (_obj.compare_exchange_weak(cur, cur | object_info::lock_mask,
-                                           std::memory_order_acquire, std::memory_order_relaxed))
-               return;
-         } while (true);
-         */
-      }
-
-      bool try_lock() noexcept
-      {
-         return not(_obj.fetch_or(object_info::lock_mask, std::memory_order_acquire) &
-                    object_info::lock_mask);
-
-         /*
-         uint64_t cur = _obj.load(std::memory_order_relaxed);
-         if (cur & object_info::lock_mask)
-            return false;
-         return _obj.compare_exchange_weak(cur, cur | object_info::lock_mask,
-                                           std::memory_order_acquire, std::memory_order_relaxed);
-         */
-      }
-
-      void unlock() noexcept
-      {
-         _obj.fetch_and(~object_info::lock_mask, std::memory_order_release);
-
-         /*
-         auto cur = _obj.load(std::memory_order_relaxed);
-         while (not _obj.compare_exchange_weak(cur, cur & ~object_info::lock_mask,
-                                               std::memory_order_release,
-                                               std::memory_order_relaxed))
-            ;
-            */
-      }
-
-     private:
-      std::atomic<uint64_t>& _obj;
-   };
 
    inline constexpr uint64_t obj_val(node_type type, uint16_t ref)
    {
@@ -246,6 +173,10 @@ namespace triedent
          //print_free_list();
       }
 
+      auto& get_mutex( object_id id ) {
+        return _locks[id.id&(8192-1)]; 
+      }
+
      private:
       friend class alloc_session;
 
@@ -299,5 +230,6 @@ namespace triedent
 
       ids_header* _idheader;
       mapping     _ids_header_file;
+      std::mutex  _locks[8192];
    };
 };  // namespace triedent

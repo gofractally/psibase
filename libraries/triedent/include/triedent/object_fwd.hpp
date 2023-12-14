@@ -63,31 +63,57 @@ namespace triedent
       uint64_t _offset : 48;
    };
 
+   /** future replacement for object info, designed to 
+    * get rid of the bit fields and unnecessary shifting/setting on construction
+    * so that this type can be used everywhere rather than manually twiddling bits
+    * all over the code that could get out of sync with the header
+    *
+   struct object_meta {
+      public:
+         explicit object_meta( uint64_t v = 0 ):_value(v){};
+         object_meta& set_location( uint64_t loc ) {
+            assert( not loc & 0x7 );
+            assert( (loc >> 3) == (loc / 8) );
+            loc << (location_rshift-3);
+            value = (value & ~location_mask) | loc;
+            return *this;
+         }
+         object_meta& set_type( node_type type ) {
+            value = (value & ~type_mask ) | (uint64_t(type) << type_lshift);
+         }
+         uint32_t  ref() { return _value & ref_mask; }
+         node_type type(){ return node_type( (_value & type_mask) >> type_lshift); }
+         uint64_t& data(){ return _value; }
+      private:
+         uint64_t _value;
+   };
+   */
+
    class object_info
    {
      public:
       static const uint64_t ref_mask        = 0x7fff;
       static const uint64_t max_ref_count   = ref_mask - 64; // allow some overflow bits for retain
-      static const uint64_t lock_mask       = 3 << 17;
+      static const uint64_t read_mask       = 3 << 17;
       static const uint64_t type_mask       = 3 << 15;
-      static const uint64_t location_mask   = ~(type_mask|lock_mask|ref_mask);
+      static const uint64_t location_mask   = ~(type_mask|read_mask|ref_mask);
       static const uint32_t location_lshift = 45;
       static const uint32_t location_rshift = 64 - location_lshift;
 
       explicit constexpr object_info(uint64_t x)
           : _location(x >> location_rshift),
-            _locked((x >> 17) & 3),
+            _read((x >> 17) & 3),
             _type((x >> 15) & 3),
             _ref(x & ref_mask)
       {
       }
       object_info( node_type t, uint64_t loc = -1):_type((int)t){
          _ref = 0;
-         _locked = 0;
+         _read = 0;
          _location = loc;
       };
 
-      bool      locked() const { return _locked; }
+      uint8_t   read() const { return _read; }
       uint32_t  ref() const { return _ref; }
       node_type type() const { return static_cast<node_type>(_type); }
       auto      location() const { return object_location{_location * 8}; }
@@ -103,7 +129,7 @@ namespace triedent
 
       constexpr uint64_t to_int() const
       {
-         return _ref | (_type << 15) | (_locked << 17) | (_location << 19);
+         return _ref | (_type << 15) | (_read<< 17) | (_location << 19);
       }
       constexpr operator object_location() const
       {
@@ -114,7 +140,7 @@ namespace triedent
       friend class object_location;
       uint64_t _ref : 15;
       uint64_t _type : 2;
-      uint64_t _locked : 2;
+      uint64_t _read: 2;
       uint64_t _location : 45;
    };
    static_assert(sizeof(object_info) == sizeof(uint64_t), "unexpected padding");
