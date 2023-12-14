@@ -499,6 +499,7 @@ namespace triedent
       void start_compact_thread() {
          _sega.start_compact_thread();
       }
+      void compact_next_segment() { _sega.compact_next_segment(); }
 
       static void create(std::filesystem::path dir, config);
 

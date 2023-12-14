@@ -172,6 +172,13 @@ namespace triedent
       ~DB() {
          _db->print_stats( std::cout, true );
       }
+
+      void print() {
+         _db->print_stats( std::cout, true );
+      }
+      void compact() {
+         _db->compact_next_segment();
+      }
      private:  // DB
       void     setRoot( root_ptr p ) {
          auto tmp = _root; // don't want ref-count to go to zero while holding lock

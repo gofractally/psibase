@@ -136,7 +136,9 @@ int main(int argc, char** argv)
    triedent::DB::Options options{
         .config = {
            .cache_on_read = cor,
+           .run_compact_thread = true,
            .sync_mode = (triedent::sync_type)sync_mode
+
         }
    };
 
@@ -324,6 +326,17 @@ int main(int argc, char** argv)
                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                    << " items/sec   \n";
       }
+            using namespace std::chrono_literals;
+            /*
+      db->print();
+      std::cerr<< "compact one\n";
+      for( uint32_t i = 0; i < 30; ++i ) {
+      db->compact();
+      }
+      db->print();
+      std::cerr<< "\nsleeping for 3 seconds... so compact can work\n\n";
+            std::this_thread::sleep_for(3000ms);
+      */
    }
    if (0)
    {

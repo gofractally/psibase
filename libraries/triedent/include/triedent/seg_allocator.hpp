@@ -4,6 +4,7 @@
 #include <triedent/id_allocator.hpp>
 #include <triedent/mapping.hpp>
 
+
 /**
  *  @file seg_allocator.hpp
  *
@@ -105,13 +106,14 @@ namespace triedent
          // used by the thread that owns this segment and
          // set to uint64_t max when this segment is ready
          // to be marked read only to the seg_allocator
-         std::atomic<uint32_t> _alloc_pos = 16;
-         uint32_t _unused;
+         std::atomic<uint32_t> _alloc_pos = 16; // sizeof(segment_header)
+         uint32_t _age; // every time a segment is allocated it is assigned an age which aids in reconstruction
          // used to calculate object density of segment header,
          // to establish madvise
          uint32_t _num_objects = 0;  // inc on alloc
+         uint32_t _checksum = 0; // TODO
       };
-      static_assert(sizeof(segment_header) <= 16);
+      static_assert(sizeof(segment_header) == 16);
 
       struct allocator_header
       {
@@ -121,6 +123,7 @@ namespace triedent
 
          // set to 0 just before exit, set to 1 when opening database
          std::atomic<bool> clean_exit_flag;
+         std::atomic<uint32_t> next_alloc_age = 0; 
 
          // meta data associated with each segment, indexed by segment number
          segment_meta seg_meta[max_segment_count];
@@ -167,6 +170,7 @@ namespace triedent
       void dump();
       void sync(sync_type st = sync_type::sync);
       void start_compact_thread();
+      bool compact_next_segment();
 
       class session
       {
@@ -312,6 +316,7 @@ namespace triedent
 
          ~session()
          {
+            if( _session_num == -1 ) return;
             if (_alloc_seg_ptr)  // not moved
             {
                if (segment_size - _alloc_seg_ptr->_alloc_pos >= 8)
@@ -325,6 +330,10 @@ namespace triedent
                _alloc_seg_num             = -1ull;
             }
             _sega.release_session_num(_session_num);
+         }
+
+         session( session&& mv ):_sega(mv._sega), _session_num(mv._session_num), _alloc_seg_num(mv._alloc_seg_num), _alloc_seg_ptr(mv._alloc_seg_ptr) {
+            mv._session_num = -1;
          }
 
         private:
@@ -358,20 +367,11 @@ namespace triedent
          session()               = delete;
          session(const session&) = delete;
 
-         session(session&& mv) : _sega(mv._sega)
-         {
-            _alloc_seg_num    = mv._alloc_seg_num;
-            _alloc_seg_ptr    = mv._alloc_seg_ptr;
-            mv._alloc_seg_ptr = nullptr;
-            mv._alloc_seg_num = -1ull;
-         }
-
-
          std::pair<object_location, char*> alloc_data(uint32_t size, object_id id)
          {
             assert(size < segment_size - 16);
-            // if no segment get a new segment
-            if (not _alloc_seg_ptr)
+            // A - if no segment get a new segment
+            if (not _alloc_seg_ptr or _alloc_seg_ptr->_alloc_pos.load( std::memory_order_relaxed) > segment_size )
             {
                auto [num, ptr] = _sega.get_new_segment();
                _alloc_seg_num  = num;
@@ -384,11 +384,11 @@ namespace triedent
             auto  rounded_size = (size + 7) & -8;
 
             auto cur_apos  = sh->_alloc_pos.load(std::memory_order_relaxed);
-            auto spec_size = cur_apos + rounded_size;
+            auto spec_pos  = uint64_t(cur_apos) + rounded_size;
             auto free_space = segment_size - cur_apos;
 
-            // if there isn't enough space, notify compactor go to A
-            if (spec_size > free_space )
+            // B - if there isn't enough space, notify compactor go to A
+            if ( spec_pos > segment_size )
             {
                if( free_space >= 8 ) {
                   assert(cur_apos + sizeof(uint64_t) <= segment_size);
@@ -411,17 +411,8 @@ namespace triedent
             sh->_num_objects++;
 
             auto loc = _alloc_seg_num * segment_size + cur_apos;
-            /*
-            if (new_alloc_pos == segment_size)
-            {
-               _sega._header->seg_meta[_alloc_seg_num].free(segment_size - new_alloc_pos);
-               sh->_alloc_pos.store(uint32_t(-1), std::memory_order_relaxed);
-               _alloc_seg_ptr = nullptr;
-               _alloc_seg_num = -1ull;
-            }
-            */
 
-            return {object_location{loc}, obj}; //((char*)sh) + cur_apos};
+            return {object_location{loc}, obj}; 
          }
 
          uint32_t _session_num;  // index into _sega's active sessions list
@@ -430,12 +421,14 @@ namespace triedent
          mapped_memory::segment_header* _alloc_seg_ptr = nullptr;
 
          seg_allocator& _sega;
+
       };
 
       session start_session() { return session(*this, alloc_session_num()); }
 
      private:
       friend class session;
+      std::optional<session> cses;
 
       mapped_memory::segment_header* get_segment(segment_number seg)
       {

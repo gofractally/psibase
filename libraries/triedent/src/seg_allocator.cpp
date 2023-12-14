@@ -22,20 +22,23 @@ namespace triedent
 
    seg_allocator::~seg_allocator()
    {
+      cses.reset();
       _done.store(true);
       if (_compact_thread.joinable())
          _compact_thread.join();
    }
 
-   void seg_allocator::start_compact_thread() {
-      if( not _compact_thread.joinable() ) {
-      _compact_thread = std::thread(
-          [this]()
-          {
-             thread_name("compactor");
-             set_current_thread_name("compactor");
-             compact_loop();
-          });
+   void seg_allocator::start_compact_thread()
+   {
+      if (not _compact_thread.joinable())
+      {
+         _compact_thread = std::thread(
+             [this]()
+             {
+                thread_name("compactor");
+                set_current_thread_name("compactor");
+                compact_loop();
+             });
       }
    }
 
@@ -82,37 +85,21 @@ namespace triedent
    void seg_allocator::compact_loop()
    {
       using namespace std::chrono_literals;
-      auto cses = start_session();
+      if( not cses ) 
+         cses.emplace(start_session());
 
       while (not _done.load())
       {
-         uint64_t most_empty_seg_num  = -1ll;
-         uint64_t most_empty_seg_free = 0;
-         auto     total_segs          = _block_alloc.num_blocks();
-         for (uint32_t s = 0; s < total_segs; ++s)
-         {
-            auto fso = _header->seg_meta[s].get_free_space_and_objs();
-            if (fso.first > most_empty_seg_free)
-            {
-               // only consider segs that are not actively allocing
-               // or that haven't already been processed
-               if (get_segment(s)->_alloc_pos.load(std::memory_order_relaxed) == uint32_t(-1))
-               {
-                  most_empty_seg_num  = s;
-                  most_empty_seg_free = fso.first;
-               }
-            }
-         }
 
-         // segments must be at least 25% empty before compaction is considered
-         if (most_empty_seg_num == -1ull or most_empty_seg_free < segment_size / 8)
-         {
+         if( not compact_next_segment() ) {
+            /*
+            std::cerr << "sleeping because most seg: " << most_empty_seg_num
+                      << " empty: " << most_empty_seg_free << " "
+                      << 100 * most_empty_seg_free / double(segment_size) << "\n";
+                      */
             using namespace std::chrono_literals;
             std::this_thread::sleep_for(2ms);
-            continue;
          }
-
-         compact_segment(cses, most_empty_seg_num);
 
          // find most empty segment
          // move it to my own personal write session
@@ -120,14 +107,61 @@ namespace triedent
       }
    }
 
+   bool seg_allocator::compact_next_segment() {
+      if( not cses ) 
+         cses.emplace(start_session());
+
+      uint64_t most_empty_seg_num  = -1ll;
+      uint64_t most_empty_seg_free = 0;
+      auto     total_segs          = _block_alloc.num_blocks();
+      auto     oldest              = -1ul;
+      for (uint32_t s = 0; s < total_segs; ++s)
+      {
+         auto fso = _header->seg_meta[s].get_free_space_and_objs();
+         if (fso.first > most_empty_seg_free)
+         if (fso.first > segment_size / 16)  // most_empty_seg_free)
+         {
+            auto seg = get_segment(s);
+            // only consider segs that are not actively allocing
+            // or that haven't already been processed
+            if (seg->_alloc_pos.load(std::memory_order_relaxed) == uint32_t(-1))
+            {
+         //      if (seg->_age <= oldest)
+               {
+                  most_empty_seg_num  = s;
+                  most_empty_seg_free = fso.first;
+                  oldest              = seg->_age;
+               }
+            }
+         }
+      }
+
+      // segments must be at least 25% empty before compaction is considered
+      if (most_empty_seg_num == -1ull or most_empty_seg_free < segment_size / 16)
+      {
+         return false;
+      }
+
+      compact_segment(*cses, most_empty_seg_num);
+      return true;
+   }
+
    void seg_allocator::compact_segment(session& ses, uint64_t seg_num)
    {
-      //    std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num <<"\n";
       auto           state = ses.lock();
       auto           s     = get_segment(seg_num);
       auto           send  = (object_header*)((char*)s + segment_size);
       char*          foc   = (char*)s + 16;
       object_header* foo   = (object_header*)(foc);
+
+      /*
+      std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num << " "
+      << "seg free: " << _header->seg_meta[seg_num].get_free_space_and_objs().first << " "
+      << "seg alloc_pos: " << s->_alloc_pos <<" ";
+      if( ses._alloc_seg_ptr ) {
+         std::cerr << "comp-alloc: " << ses._alloc_seg_ptr->_alloc_pos <<" comp-free: " << _header->seg_meta[ses._alloc_seg_num].get_free_space_and_objs().first <<"\n";
+      } else std::cerr<<"\n";
+      */
 
       assert(s->_alloc_pos == segment_offset(-1));
       //   std::cerr << "seg " << seg_num <<" alloc pos: " << s->_alloc_pos <<"\n";
@@ -175,25 +209,7 @@ namespace triedent
             auto [loc, ptr] = ses.alloc_data(obj_size, {foo->id});
             memcpy(ptr, foo, obj_size);
             obj_ref.move(loc, ul);
-
-#ifdef NDEBUG
-            auto check = state.get({foo->id},false);
-            assert(foo->id == check.id().id);
-            assert(check.obj()->id == foo->id);
-            assert(check.obj()->data_capacity() == foo->data_capacity());
-            assert(check.obj() != foo);
-            assert((char*)check.obj() == ptr);
-            assert(0 == memcmp(check.obj(), foo, foo->object_size()));
-#endif
          }
-#ifdef NDEBUG
-         auto check = state.get({foo->id},false);
-         assert(foo->id == check.id().id);
-         assert(check.obj()->id == foo->id);
-         assert(check.obj()->data_capacity() == foo->data_capacity());
-         assert(check.obj() != foo);
-         assert(0 == memcmp(check.obj(), foo, foo->object_size()));
-#endif
 
          // if ses.alloc_data() was forced to make space in a new segment
          // then we need to sync() the old write segment before moving forward
@@ -229,6 +245,7 @@ namespace triedent
 
       s->_num_objects = 0;
       s->_alloc_pos   = 0;
+      s->_age         = -1;
       // the segment we just cleared, so its free space and objects get reset to 0
       // and its last_sync pos gets put to the end because there is no need to sync it
       // because its data has already been synced by the compactor
@@ -322,8 +339,8 @@ namespace triedent
 
          //memset( sp, 0, segment_size );
 
-         auto shp = new (sp) mapped_memory::segment_header();
-         assert(shp->_alloc_pos == 16);
+         auto shp  = new (sp) mapped_memory::segment_header();
+         shp->_age = _header->next_alloc_age.fetch_add(1, std::memory_order_relaxed);
 
          return std::pair<segment_number, mapped_memory::segment_header*>(sn, shp);
       };
@@ -341,8 +358,9 @@ namespace triedent
       }
       return prepare_segment(_block_alloc.alloc());
    }
-   void seg_allocator::sync( sync_type st ) {
-      if( st == sync_type::none ) 
+   void seg_allocator::sync(sync_type st)
+   {
+      if (st == sync_type::none)
          return;
 
       auto total_segs = _block_alloc.num_blocks();
@@ -350,22 +368,25 @@ namespace triedent
       for (uint32_t i = 0; i < total_segs; ++i)
       {
          auto seg        = get_segment(i);
-         auto last_sync = _header->seg_meta[i]._last_sync_pos.load(std::memory_order_relaxed);
-         auto last_alloc= seg->_alloc_pos.load(std::memory_order_relaxed);
+         auto last_sync  = _header->seg_meta[i]._last_sync_pos.load(std::memory_order_relaxed);
+         auto last_alloc = seg->_alloc_pos.load(std::memory_order_relaxed);
 
-         if( last_alloc > segment_size ) 
+         if (last_alloc > segment_size)
             last_alloc = segment_size;
 
-         static const uint64_t page_size = getpagesize();
-         static const uint64_t page_size_mask = ~(page_size-1);
+         static const uint64_t page_size      = getpagesize();
+         static const uint64_t page_size_mask = ~(page_size - 1);
 
-         auto sync_bytes = last_alloc - (last_sync & page_size_mask);
-         auto seg_sync_ptr   = (((intptr_t)seg + last_sync)&page_size_mask);
+         auto sync_bytes   = last_alloc - (last_sync & page_size_mask);
+         auto seg_sync_ptr = (((intptr_t)seg + last_sync) & page_size_mask);
 
-         if( last_alloc > last_sync ) {
-            if( -1 == msync( (char*)seg_sync_ptr, sync_bytes, msync_flag(st) ) ) {
-               std::cerr << "ps: " << getpagesize() <<" len: " << sync_bytes <<" rounded:  \n";
-               std::cerr << "msync errno: " << std::string(strerror(errno)) << " seg_alloc::sync() seg: " << i<<"\n";
+         if (last_alloc > last_sync)
+         {
+            if (-1 == msync((char*)seg_sync_ptr, sync_bytes, msync_flag(st)))
+            {
+               std::cerr << "ps: " << getpagesize() << " len: " << sync_bytes << " rounded:  \n";
+               std::cerr << "msync errno: " << std::string(strerror(errno))
+                         << " seg_alloc::sync() seg: " << i << "\n";
             }
             _header->seg_meta[i]._last_sync_pos.store(last_alloc);
          }
@@ -375,7 +396,8 @@ namespace triedent
    void seg_allocator::dump()
    {
       std::cerr << "\n--- segment allocator state ---\n";
-      auto total_segs = _block_alloc.num_blocks();
+      auto     total_segs       = _block_alloc.num_blocks();
+      auto     total_retained   = 0;
       uint64_t total_free_space = 0;
       std::cerr << "total segments: " << total_segs << "\n";
       std::cerr << std::setw(6) << "#"
@@ -389,6 +411,10 @@ namespace triedent
       std::cerr << std::setw(12) << "alloc pos"
                 << " | ";
       std::cerr << std::setw(12) << "alloced obj"
+                << " | ";
+      std::cerr << std::setw(12) << "num obj"
+                << " | ";
+      std::cerr << std::setw(8) << "age"
                 << " \n";
       for (uint32_t i = 0; i < total_segs; ++i)
       {
@@ -396,15 +422,20 @@ namespace triedent
          auto space_objs = _header->seg_meta[i].get_free_space_and_objs();
 
          std::cerr << std::setw(6) << i << " | ";
-         std::cerr << std::setw(8) << int(100*double(space_objs.first)/segment_size) << " | ";
+         std::cerr << std::setw(8) << int(100 * double(space_objs.first) / segment_size) << " | ";
          total_free_space += space_objs.first;
          std::cerr << std::setw(12) << space_objs.first << " | ";
          std::cerr << std::setw(12) << space_objs.second << " | ";
          std::cerr << std::setw(12)
                    << (seg->_alloc_pos == -1 ? "END" : std::to_string(seg->_alloc_pos)) << " | ";
-         std::cerr << std::setw(12) << seg->_num_objects << " \n";
+         std::cerr << std::setw(12) << seg->_num_objects << " | ";
+         total_retained += seg->_num_objects - space_objs.second;
+         std::cerr << std::setw(12) << seg->_num_objects - space_objs.second << " | ";
+         std::cerr << std::setw(8) << seg->_age << " \n";
       }
-      std::cerr << "total free: " << total_free_space / 1024 / 1024. << "Mb  "<< (100*total_free_space/double(total_segs*segment_size)) << "%\n";
+      std::cerr << "total free: " << total_free_space / 1024 / 1024. << "Mb  "
+                << (100 * total_free_space / double(total_segs * segment_size)) << "%\n";
+      std::cerr << "total retained: " << total_retained << " objects\n";
 
       std::cerr << "---- free segment Q ------\n";
       std::cerr << "[---A---R*---E------]\n";
