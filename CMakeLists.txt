@@ -315,6 +315,7 @@ if(BUILD_RUST)
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist        ${BOOT_IMAGE}/TokenSys/ui/dist
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui/dist     ${BOOT_IMAGE}/PsiSpaceSys/ui/dist
         COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist       ${BOOT_IMAGE}/InviteSys/ui/dist
+        COMMAND         cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys           ${BOOT_IMAGE}/SupervisorSys
 
         COMMAND         bash -c "cp -a ${CMAKE_CURRENT_BINARY_DIR}/book                     ${BOOT_IMAGE}/doc 2>/dev/null || mkdir -p ${BOOT_IMAGE}/doc"
 

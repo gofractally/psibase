@@ -27,7 +27,7 @@ macro_rules! method {
     };
 }
 
-const ACCOUNTS: [AccountNumber; 30] = [
+const ACCOUNTS: [AccountNumber; 31] = [
     account_sys::SERVICE,
     account!("alice"),
     auth_ec_sys::SERVICE,
@@ -38,6 +38,7 @@ const ACCOUNTS: [AccountNumber; 30] = [
     common_sys::SERVICE,
     cpu_sys::SERVICE,
     account!("doc-sys"),
+    account!("supervisor-sys"),
     account!("explore-sys"),
     account!("fractal-sys"),
     account!("core-frac-sys"),
@@ -395,6 +396,17 @@ pub fn get_initial_actions(
         actions.append(&mut psispace_sys_files);
         actions.append(&mut invite_sys_files);
     }
+
+    let mut supervisor_actions = vec![
+        new_account_action(account_sys::SERVICE, account!("supervisor-sys")), //
+    ];
+    fill_dir(
+        &include_dir!("$CARGO_MANIFEST_DIR/boot-image/contents/SupervisorSys"),
+        &mut supervisor_actions,
+        account!("supervisor-sys"),
+        psispace_sys::SERVICE,
+    );
+    actions.append(&mut supervisor_actions);
 
     let mut doc_actions = vec![
         new_account_action(account_sys::SERVICE, account!("doc-sys")), //
