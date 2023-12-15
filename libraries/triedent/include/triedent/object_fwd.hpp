@@ -3,15 +3,17 @@
 #include <cstdint>
 #include <cstring>
 
+#define XXH_INLINE_ALL
+#include <triedent/xxhash.h>
+
 namespace triedent
 {
    using segment_offset = uint32_t;  /// offset pointer from base of segment
    using segment_number = uint64_t;  /// segment_offset / segment_size
-                                     
+
    class node;
    class value_node;
    class inner_node;
-                                     
 
    // must be a power of 2
    // size of the data segments data is allocated in
@@ -20,7 +22,7 @@ namespace triedent
    // each thread will have a segment this size, so larger values
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
-   static const uint64_t segment_size = 1024 * 1024 * 32;  // 256mb
+   static const uint64_t segment_size = 1024 * 1024 * 64;  // 256mb
 
    /// object pointers can only address 48 bits
    /// 128 TB limit on database size with 47 bits, this saves us
@@ -93,10 +95,10 @@ namespace triedent
    {
      public:
       static const uint64_t ref_mask        = 0x7fff;
-      static const uint64_t max_ref_count   = ref_mask - 64; // allow some overflow bits for retain
+      static const uint64_t max_ref_count   = ref_mask - 64;  // allow some overflow bits for retain
       static const uint64_t read_mask       = 3 << 17;
       static const uint64_t type_mask       = 3 << 15;
-      static const uint64_t location_mask   = ~(type_mask|read_mask|ref_mask);
+      static const uint64_t location_mask   = ~(type_mask | read_mask | ref_mask);
       static const uint32_t location_lshift = 45;
       static const uint32_t location_rshift = 64 - location_lshift;
 
@@ -107,9 +109,10 @@ namespace triedent
             _ref(x & ref_mask)
       {
       }
-      object_info( node_type t, uint64_t loc = -1):_type((int)t){
-         _ref = 0;
-         _read = 0;
+      object_info(node_type t, uint64_t loc = -1) : _type((int)t)
+      {
+         _ref      = 0;
+         _read     = 0;
          _location = loc;
       };
 
@@ -129,7 +132,7 @@ namespace triedent
 
       constexpr uint64_t to_int() const
       {
-         return _ref | (_type << 15) | (_read<< 17) | (_location << 19);
+         return _ref | (_type << 15) | (_read << 17) | (_location << 19);
       }
       constexpr operator object_location() const
       {
@@ -140,15 +143,18 @@ namespace triedent
       friend class object_location;
       uint64_t _ref : 15;
       uint64_t _type : 2;
-      uint64_t _read: 2;
+      uint64_t _read : 2;
       uint64_t _location : 45;
    };
    static_assert(sizeof(object_info) == sizeof(uint64_t), "unexpected padding");
 
    struct object_header
    {
+      uint32_t check = 0;
+      uint32_t type: 4;
+      uint32_t size: 28;
       // size might not be a multiple of 8, next object is at data() + (size+7)&-8
-      uint64_t size : 24;  // bytes of data, not including header
+      uint64_t unused: 24;  // bytes of data, not including header
       uint64_t id : 40;
 
       inline uint64_t data_size() const { return size; }
@@ -156,14 +162,9 @@ namespace triedent
       inline char*    data() const { return (char*)(this + 1); }
 
       // returns the end of data_capacity() cast as another object_header
-      inline object_header* next() const
-      {
-         return (object_header*)(((char*)this) + object_size());
-      }
+      inline object_header* next() const { return (object_header*)(((char*)this) + object_size()); }
 
       // capacity + sizeof(object_header)
-      inline uint32_t object_size()const {
-         return data_capacity() + sizeof(object_header);
-      }
+      inline uint32_t object_size() const { return data_capacity() + sizeof(object_header); }
    };
 }  // namespace triedent

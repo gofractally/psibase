@@ -62,6 +62,7 @@ int main(int argc, char** argv)
    uint32_t    group         = 16;
    uint32_t    sync_mode     = 0;
    bool cor = true;
+   bool run_compactor = true;
 
    uint32_t                num_read_threads = 6;
    po::options_description desc("Allowed options");
@@ -75,6 +76,7 @@ int main(int argc, char** argv)
    opt("rand-write-read", "perform random writes while reading");
    opt("read-only", "just query existing db");
    opt("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys");
+   opt("compact", po::value<bool>(&run_compactor)->default_value(true), "enable/disable the compactor thread");
    opt("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
        "the folder that contains the database");
    opt("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
@@ -136,7 +138,7 @@ int main(int argc, char** argv)
    triedent::DB::Options options{
         .config = {
            .cache_on_read = cor,
-           .run_compact_thread = true,
+           .run_compact_thread = run_compactor,
            .sync_mode = (triedent::sync_type)sync_mode
 
         }
@@ -325,6 +327,13 @@ int main(int argc, char** argv)
                           count /
                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                    << " items/sec   \n";
+         if( not run_compactor ) {
+            std::cerr << "run compact\n";
+            while( db->compact() ){
+               ws.validate();
+            }
+            std::cerr << "done compact\n";
+         }
       }
             using namespace std::chrono_literals;
             /*

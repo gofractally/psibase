@@ -151,7 +151,7 @@ namespace triedent
       auto           state = ses.lock();
       auto           s     = get_segment(seg_num);
       auto           send  = (object_header*)((char*)s + segment_size);
-      char*          foc   = (char*)s + 16;
+      char*          foc   = (char*)s + sizeof( mapped_memory::segment_header );
       object_header* foo   = (object_header*)(foc);
 
       /*
@@ -159,7 +159,7 @@ namespace triedent
       << "seg free: " << _header->seg_meta[seg_num].get_free_space_and_objs().first << " "
       << "seg alloc_pos: " << s->_alloc_pos <<" ";
       if( ses._alloc_seg_ptr ) {
-         std::cerr << "comp-alloc: " << ses._alloc_seg_ptr->_alloc_pos <<" comp-free: " << _header->seg_meta[ses._alloc_seg_num].get_free_space_and_objs().first <<"\n";
+         std::cerr << "calloc: " << ses._alloc_seg_ptr->_alloc_pos <<" cfree: " << _header->seg_meta[ses._alloc_seg_num].get_free_space_and_objs().first <<"\n";
       } else std::cerr<<"\n";
       */
 
@@ -176,14 +176,39 @@ namespace triedent
       while (foo < send and foo->id)
       {
          auto obj_ref = state.get({foo->id});
+         if( obj_ref.ref_count() == 0 ) {
+            foo = foo->next();
+            continue;
+         }
+
 
          auto foo_idx = (char*)foo - (char*)s;
-         auto loc     = obj_ref.location()._offset;
-         if ((loc & (segment_size - 1)) != foo_idx or obj_ref.ref_count() == 0)
+         auto l = obj_ref.location();
+         if( l._offset != seg_num*segment_size + foo_idx ) {
+               foo = foo->next();
+               continue;
+         }
+         /*
+         if( l.segment() == seg_num ) {
+            if( foo_idx != l.index() ) {
+               //char* check = (char*)s + l.index();
+               // assert( ((object_header*)check)->id == foo->id);
+               foo = foo->next();
+               continue;
+            }
+         } else {
+            foo = foo->next();
+            continue;
+         }
+         */
+         /*
+         auto loc     = obj_ref.location().index();
+         if ((loc & (segment_size - 1)) != foo_idx )
          {
             foo = foo->next();
             continue;
          }
+         */
 
 
          {
@@ -206,15 +231,11 @@ namespace triedent
             auto obj_size   = foo->object_size();
             auto [loc, ptr] = ses.alloc_data(obj_size, {foo->id});
             memcpy(ptr, foo, obj_size);
-            obj_ref.move(loc);
+            if( not obj_ref.move(loc) )
+            {
+               _header->seg_meta[start_seg_num].free_object(foo->object_size());
+            }
          }
-         // it is possible that the object was released between locking
-         // and copying, if it was 0 after the move then we must mark the space
-         // free even though we just alloced it, womp, womp...
-         if( obj_ref.ref_count() == 0 ) {
-            _header->seg_meta[start_seg_num].free_object(foo->object_size());
-         }
-         
 
          // if ses.alloc_data() was forced to make space in a new segment
          // then we need to sync() the old write segment before moving forward
@@ -225,6 +246,16 @@ namespace triedent
          }
          else if (start_seg_ptr != ses._alloc_seg_ptr)
          {
+            /*
+            std::cerr << "current segment full, compacting to next...\n";
+      std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num << " "
+      << "seg free: " << _header->seg_meta[seg_num].get_free_space_and_objs().first << " "
+      << "seg alloc_pos: " << s->_alloc_pos <<" ";
+      if( ses._alloc_seg_ptr ) {
+         std::cerr << "calloc: " << ses._alloc_seg_ptr->_alloc_pos <<" cfree: " << _header->seg_meta[ses._alloc_seg_num].get_free_space_and_objs().first <<"\n";
+      } else std::cerr<<"\n";
+      */
+
             // TODO: only sync from alloc pos at last sync
             msync(start_seg_ptr, segment_size, MS_SYNC);
             _header->seg_meta[start_seg_num]._last_sync_pos.store(segment_size,
@@ -255,6 +286,7 @@ namespace triedent
       // and its last_sync pos gets put to the end because there is no need to sync it
       // because its data has already been synced by the compactor
       _header->seg_meta[seg_num].clear();
+
 
       munlock(s, segment_size);
       // it is unlikely to be accessed, and if it is don't pre-fetch
@@ -342,7 +374,7 @@ namespace triedent
             std::cerr << "MLOCK: " << r << "  " << EINVAL << "  " << EAGAIN << "\n";
             */
 
-         //memset( sp, 0, segment_size );
+         memset( sp, 0, segment_size ); // TODO: is this necessary?
 
          auto shp  = new (sp) mapped_memory::segment_header();
          shp->_age = _header->next_alloc_age.fetch_add(1, std::memory_order_relaxed);

@@ -134,6 +134,10 @@ namespace triedent
             _db._root = _ws->get_top_root();
          }
 
+         void validate() {
+            _ws->validate();
+         }
+
         private:
          friend class Transaction;
          friend class DB;
@@ -176,8 +180,8 @@ namespace triedent
       void print() {
          _db->print_stats( std::cout, true );
       }
-      void compact() {
-         _db->compact_next_segment();
+      bool compact() {
+         return _db->compact_next_segment();
       }
      private:  // DB
       void     setRoot( root_ptr p ) {

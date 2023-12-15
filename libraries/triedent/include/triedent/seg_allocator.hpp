@@ -244,7 +244,8 @@ namespace triedent
 
                auto& get_mutex() const { return _rlock._session._sega._id_alloc.get_mutex(_id); }
 
-               void move(object_location loc);
+               // return false if object is released while atempting to move
+               bool move(object_location loc);
 
                bool cache_object();
 
@@ -317,10 +318,10 @@ namespace triedent
             if( _session_num == -1 ) return;
             if (_alloc_seg_ptr)  // not moved
             {
-               if (segment_size - _alloc_seg_ptr->_alloc_pos >= 8)
+               if (segment_size - _alloc_seg_ptr->_alloc_pos >=  sizeof(object_header) )
                {
                   memset(((char*)_alloc_seg_ptr) + _alloc_seg_ptr->_alloc_pos, 0,
-                         sizeof(uint64_t));  // mark last object
+                         sizeof(object_header));  // mark last object
                }
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size -
                                                             _alloc_seg_ptr->_alloc_pos);
@@ -386,9 +387,9 @@ namespace triedent
             auto free_space = segment_size - cur_apos;
 
             // B - if there isn't enough space, notify compactor go to A
-            if ( spec_pos > segment_size )
+            if ( spec_pos > (segment_size-sizeof(object_header)) )
             {
-               if( free_space >= 8 ) {
+               if( free_space >= sizeof(object_header) ) {
                   assert(cur_apos + sizeof(uint64_t) <= segment_size);
                   memset(((char*)sh) + cur_apos, 0, sizeof(uint64_t));
                }
@@ -590,13 +591,18 @@ namespace triedent
    };  // mutable_deref
    
    template <typename T>
-   void seg_allocator::session::read_lock::object_ref<T>::move( object_location loc )
+   bool seg_allocator::session::read_lock::object_ref<T>::move( object_location loc )
    {
       uint64_t expected = _atom_loc.load(std::memory_order_acquire);
       do
       {
-         _cached = object_info(expected).set_location(loc).to_int();
+         _cached = object_info(expected).set_location(loc);
+         if( _cached.ref() == 0 ) {
+            return false; 
+         }
+         assert( type() != node_type::undefined );
       } while (not _atom_loc.compare_exchange_weak(expected, _cached.to_int(), std::memory_order_release));
+      return true;
    }
 
    template <typename T>
@@ -627,6 +633,7 @@ namespace triedent
    template <typename T>
    bool seg_allocator::session::read_lock::object_ref<T>::release()
    {
+      assert(ref_count() != 0 );
       assert(type() != node_type::undefined);
       auto prior = _atom_loc.fetch_sub(1, std::memory_order_relaxed);
       if ((prior & object_info::ref_mask) > 1)
@@ -648,11 +655,15 @@ namespace triedent
    using object_ref = seg_allocator::session::read_lock::object_ref<T>;
    inline object_ref<char> seg_allocator::session::read_lock::alloc(uint32_t size, node_type type)
    {
+      assert(type != node_type::undefined);
+
       auto [atom, id] = _session._sega._id_alloc.get_new_id();
       auto [loc, ptr] = _session.alloc_data(size + sizeof(object_header), id);
 
       // TODO: this could break if object_info changes
       atom.store(1 | (uint64_t(type) << 15) | ((loc._offset / 8) << 19), std::memory_order_relaxed);
+
+      assert( object_ref(*this, id, atom).type() != node_type::undefined );
       return object_ref(*this, id, atom);
    }
 
@@ -714,11 +725,11 @@ namespace triedent
          auto obj_size   = cur_obj_ptr->object_size();
          auto [loc, ptr] = _rlock._session.alloc_data(obj_size, _id);
          memcpy(ptr, cur_obj_ptr, obj_size);
-         move(loc);
-
-         // note that this item has been freed from the segment so the segment can be
-         // recovered
-         _rlock._session._sega._header->seg_meta[cur_seg].free_object(obj_size);
+         if( move(loc) ) {
+            // note that this item has been freed from the segment so the segment can be
+            // recovered
+            _rlock._session._sega._header->seg_meta[cur_seg].free_object(obj_size);
+         }
 
          return true;
       }

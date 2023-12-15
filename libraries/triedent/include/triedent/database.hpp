@@ -308,6 +308,12 @@ namespace triedent
       void end_collect_garbage();
       ///@}
 
+      void validate() {
+         auto tr = get_id(get_top_root());
+         auto state = session_base::lock();
+         validate_node( state, tr );
+      }
+
      private:
       inline bool get_unique(std::shared_ptr<root>& r);
       inline void update_root(session_rlock& l, std::shared_ptr<root>& r, object_id id);
@@ -499,7 +505,7 @@ namespace triedent
       void start_compact_thread() {
          _sega.start_compact_thread();
       }
-      void compact_next_segment() { _sega.compact_next_segment(); }
+      bool compact_next_segment() { return _sega.compact_next_segment(); }
 
       static void create(std::filesystem::path dir, config);
 
@@ -671,6 +677,12 @@ namespace triedent
       }
 
       auto state = session_base::lock();
+      /*
+      if( id.id and not validate_node( state, id ) ) {
+         throw std::runtime_error( "invalid node!" );
+      }
+      */
+
       if constexpr (debug_roots)
          std::cout << id.id << ": set_top_root: old=" << current << std::endl;
       id = retain(state, id);

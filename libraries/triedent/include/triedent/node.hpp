@@ -62,8 +62,8 @@ namespace triedent
          uint32_t alloc_size = sizeof(value_node) + key.size() + val.size();
          auto     r          = state.alloc(alloc_size, type);
          if constexpr (debug_nodes)
-            std::cout << r.id().id << ": construct value_node: type=" << (int)type << 
-                    " ref = " <<r.ref_count() << std::endl;
+            std::cout << r.id().id << ": construct value_node: type=" << (int)type
+                      << " ref = " << r.ref_count() << std::endl;
          new (r.data()) value_node(key, val);
          return r;
       }
@@ -88,7 +88,7 @@ namespace triedent
       }
 
       inline static object_ref<value_node> clone_bytes(session_rlock& state,
-                                                       object_id    id,
+                                                       object_id      id,
                                                        key_view       key,
                                                        std::uint32_t  key_offset,
                                                        value_view     val,
@@ -142,7 +142,7 @@ namespace triedent
             if (key_offset != std::uint32_t(-1))
             {
                auto& in = state.get(id).as_value_node();
-               key     = in.key().substr(key_offset);
+               key      = in.key().substr(key_offset);
             }
             val = {reinterpret_cast<const char*>(&roots[0]), value_size};
          }
@@ -261,7 +261,7 @@ namespace triedent
       object_id         children[n + 1];
       if (in->_present_bits == branches)
       {
-         std::memcpy(&children[0], in->children(), n*sizeof(object_id));
+         std::memcpy(&children[0], in->children(), n * sizeof(object_id));
       }
       else
       {
@@ -286,7 +286,7 @@ namespace triedent
       auto p = state.alloc(alloc_size, node_type::inner);
       if (key_offset != std::uint32_t(-1))
       {
-         in  = state.get(id).as<inner_node>();
+         in = state.get(id).as<inner_node>();
          // TODO: cache?
          key = in->key().substr(key_offset);
       }
@@ -309,7 +309,8 @@ namespace triedent
       auto p  = state.alloc(alloc_size, node_type::inner);
       auto id = p.id();
       if constexpr (debug_nodes)
-         std::cout << p.id().id << ": construct inner_node val="<<val.id<< " ref: " << p.ref_count()<<std::endl;
+         std::cout << p.id().id << ": construct inner_node val=" << val.id
+                   << " ref: " << p.ref_count() << std::endl;
 
       new (p.data()) inner_node(id, prefix, val, branches);
       return p;
@@ -393,22 +394,76 @@ namespace triedent
       return b >= 63 ? 64 : std::countr_zero(_present_bits & mask);
    }
 
+   // makes sure all nodes are reachable with a ref-count of 1+
+   // TODO make sure all object hashes check out
+   inline bool validate_node(session_rlock& state, object_id obj)
+   {
+      if( not obj.id ) {
+         return true;
+      }
+      auto  oref  = state.get(obj);  // don't try to cache, we are releasing!
+                                     //
+      if( not oref.ref_count() ) {
+         throw std::runtime_error( "0 ref count!" );
+      }
+
+      auto  ctype = oref.type();
+      auto& in    = oref.as_inner_node();
+
+      if (ctype == node_type::inner)
+      {
+         if constexpr (debug_nodes)
+            std::cout << obj.id << ": validating; release value " << in.value().id << std::endl;
+         if( not validate_node(state, in.value()) ) return false;
+         auto nb  = in.num_branches();
+         auto pos = in.children();
+         auto end = pos + nb;
+         while (pos != end)
+         {
+            assert(*pos);
+            if constexpr (debug_nodes)
+               std::cout << obj.id << ": validating; release child " << pos->id << std::endl;
+            if( not validate_node(state, *pos) ) return false;
+            ++pos;
+         }
+      }
+      else if (ctype == node_type::roots)
+      {
+         auto& vn    = reinterpret_cast<const value_node&>(in);  
+         auto  n     = vn.num_roots();
+         auto  roots = vn.roots();
+         while (n--)
+         {
+            if constexpr (debug_nodes)
+               std::cout << obj.id << ": destroying; release root " << roots->id << std::endl;
+            if( not validate_node(state, *roots++) ) 
+               return false;
+         }
+      }
+      else if (ctype == node_type::bytes ){
+      }
+      else {
+         throw std::runtime_error( "validating unknown node type" );
+         return false;
+      }
+      return true;
+   }
    inline void release_node(session_rlock& state, object_id obj)
    {
       if (!obj)
          return;
-      auto oref = state.get(obj);  // don't try to cache, we are releasing!
+      auto oref  = state.get(obj);  // don't try to cache, we are releasing!
       auto ctype = oref.type();
 
-//      std::cerr << "before release node: " << obj.id <<" type: " << (int)oref.type() <<" loc: " << oref.location()._offset <<" ref: " << oref.ref_count()<<"\n";
+      //      std::cerr << "before release node: " << obj.id <<" type: " << (int)oref.type() <<" loc: " << oref.location()._offset <<" ref: " << oref.ref_count()<<"\n";
 
+      // save the pointer in advance, because if released oref will return null
+      // the in pointer is still valid for the duration of state
       auto& in = oref.as_inner_node();
       if (oref.release())
       {
          if (ctype == node_type::inner)
          {
-      //      auto& in =
-      //          oref.as_inner_node(); 
             if constexpr (debug_nodes)
                std::cout << obj.id << ": destroying; release value " << in.value().id << std::endl;
             release_node(state, in.value());
@@ -426,8 +481,8 @@ namespace triedent
          }
          else if (ctype == node_type::roots)
          {
-            auto& vn = reinterpret_cast<const value_node&>(in);//oref.as_value_node();  
-            auto  n  = vn.num_roots();
+            auto& vn    = reinterpret_cast<const value_node&>(in);  //oref.as_value_node();
+            auto  n     = vn.num_roots();
             auto  roots = vn.roots();
             while (n--)
             {
@@ -443,12 +498,12 @@ namespace triedent
    {
       if (oref.type() != node_type::inner)  // value or roots
       {
-         auto& src = oref.as_value_node();  
+         auto& src = oref.as_value_node();
          return value_node::clone(state, oref.id(), src.key(), 0, src.data(), oref.type());
       }
       else
       {
-         auto& src = oref.as_inner_node(); 
+         auto& src = oref.as_inner_node();
          return inner_node::clone(state, oref.id(), &src, src.key(), 0, src.value(),
                                   src.branches());
       }
@@ -460,7 +515,7 @@ namespace triedent
          return id;
       if constexpr (debug_nodes)
          std::cout << id.id << ": bump_refcount_or_copy" << std::endl;
-      auto oref = state.get(id); // TODO cache?
+      auto oref = state.get(id);  // TODO cache?
       if (oref.retain())
          return oref.id();
       return copy_node(state, oref).id();
