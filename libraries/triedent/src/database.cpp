@@ -28,6 +28,7 @@ namespace triedent
          throw std::runtime_error("Not a triedent db file: " + (dir / "db").native());
       if( cfg.run_compact_thread )
          _sega.start_compact_thread();
+
    }
 
    database::database(const std::filesystem::path& dir, access_mode mode, bool allow_gc)
@@ -35,7 +36,9 @@ namespace triedent
    {
    }
 
-   database::~database() {}
+   database::~database() {
+      
+   }
 
    void database::create(std::filesystem::path dir, config cfg)
    {
@@ -45,7 +48,7 @@ namespace triedent
 
       std::filesystem::create_directories(dir / "data");
 
-      (void)database{dir, cfg, access_mode::read_write};
+      std::make_shared<database>(dir, cfg, access_mode::read_write);
    }
 
    void database::print_stats(std::ostream& os, bool detail)

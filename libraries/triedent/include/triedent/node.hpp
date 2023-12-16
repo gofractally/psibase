@@ -242,10 +242,11 @@ namespace triedent
       uint8_t   _prefix_length = 0;  // mirrors value nodes to signal type and prefix length
       uint8_t   _reserved_a    = 0;  // future use
       uint8_t   _reserved_b    = 0;  // future use
+      uint8_t   _reserved_c    = 0;  // future use
       object_id _value;              // this is 5 bytes
       uint64_t  _present_bits = 0;   // keep this 8 byte aligned for popcount instructions
    } __attribute__((packed));
-   static_assert(sizeof(inner_node) == 3 + 5 + 8, "unexpected padding");
+   static_assert(sizeof(inner_node) == 4 + sizeof(object_id)  + 8, "unexpected padding");
 
    inline object_ref<inner_node> inner_node::clone(session_rlock&    state,
                                                    object_id         id,

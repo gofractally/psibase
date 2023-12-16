@@ -270,7 +270,7 @@ namespace triedent
 
       seg_allocator& sega() const;
 
-      void cache( auto& objref )const;
+      void cache(auto& objref) const;
    };
    using read_session = session<read_access>;
 
@@ -308,10 +308,11 @@ namespace triedent
       void end_collect_garbage();
       ///@}
 
-      void validate() {
-         auto tr = get_id(get_top_root());
+      void validate()
+      {
+         auto tr    = get_id(get_top_root());
          auto state = session_base::lock();
-         validate_node( state, tr );
+         validate_node(state, tr);
       }
 
      private:
@@ -449,7 +450,6 @@ namespace triedent
      public:
       struct config
       {
-
          /**
           *  Read threads can move the accessed data into
           *  a warm cache to improve cache locality and separate
@@ -477,7 +477,7 @@ namespace triedent
           * using sync_type other than none.  Lower values improve cache
           * locality and reduce page misses by keeping the data denser.
           */
-         int  compact_empty_threshold_percent  = 20;
+         int compact_empty_threshold_percent = 20;
 
          /**
           * Triedent will discourage the OS from swapping out 
@@ -502,9 +502,7 @@ namespace triedent
       database(const std::filesystem::path& dir, access_mode mode, bool allow_gc = false);
       ~database();
 
-      void start_compact_thread() {
-         _sega.start_compact_thread();
-      }
+      void start_compact_thread() { _sega.start_compact_thread(); }
       bool compact_next_segment() { return _sega.compact_next_segment(); }
 
       static void create(std::filesystem::path dir, config);
@@ -516,6 +514,7 @@ namespace triedent
 
       // bool is_slow() const { return _ring.is_slow(); }
       // auto span() const { return _ring.span(); }
+
 
      private:
       inline void release(session_rlock& l, id);
@@ -625,6 +624,7 @@ namespace triedent
       _db->release(state, obj);
    }
 
+
    inline void database::release(session_rlock& state, id obj)
    {
       release_node(state, obj);
@@ -687,7 +687,7 @@ namespace triedent
          std::cout << id.id << ": set_top_root: old=" << current << std::endl;
       id = retain(state, id);
       _db->_dbm->top_root.store(id.id);
-      if (_db->_config.sync_mode != sync_type::none )
+      if (_db->_config.sync_mode != sync_type::none)
       {
          _db->_sega.sync(_db->_config.sync_mode);  // data backing it is written here
          _db->_file.sync(_db->_config.sync_mode);  // top root is written here
@@ -719,7 +719,9 @@ namespace triedent
          // bumped.
          if constexpr (debug_roots)
             std::cout << id.id << ": update_root replacing:" << r->id.id << std::endl;
+
          release(l, r->id);
+
          r->id = id;
       }
       else
@@ -987,7 +989,7 @@ namespace triedent
       if (vn.data_size() == val.size())
       {
          modify_value(state, deref<value_node>(n), val);
-         assert( n.obj()->validate_checksum() );
+         assert(n.obj()->validate_checksum());
          return n.id();
       }
 
@@ -1009,7 +1011,7 @@ namespace triedent
             if (v.type() == type && vn.data_size() == val.size() && v.ref_count() == 1)
             {
                modify_value(state, deref<value_node>(v), val);
-               assert( v.obj()->validate_checksum() );
+               assert(v.obj()->validate_checksum());
                return n.id();
             }
             else
@@ -1021,7 +1023,7 @@ namespace triedent
          // This lock is necessary because we alloc above and n was deref
          // before
          lock(n)->set_value(val_id);
-         assert( n.obj()->validate_checksum() );
+         assert(n.obj()->validate_checksum());
          return n.id();
       }
       else
@@ -1165,7 +1167,7 @@ namespace triedent
 
       int  old_size = -1;
       auto new_root =
-          add_child(state, get_id(r), false &get_unique(r), node_type::bytes,
+          add_child(state, get_id(r), false & get_unique(r), node_type::bytes,
                     to_key6({key.data(), key.size()}), {val.data(), val.size()}, old_size);
       assert(new_root.id);
       assert(state.get(new_root).obj()->validate_checksum());
@@ -1329,7 +1331,7 @@ namespace triedent
    {
       if (!root)
          return false;
-      auto n = state.get<node>(root);  
+      auto n = state.get<node>(root);
       cache(n);
       if (n.is_leaf_node())
       {
@@ -1886,11 +1888,12 @@ namespace triedent
    }
 
    template <typename AccessMode>
-   void session<AccessMode>::cache( auto& objref )const
+   void session<AccessMode>::cache(auto& objref) const
+   {
+      if (_db->_config.cache_on_read)
       {
-         if( _db->_config.cache_on_read ) {
-            objref.cache_object();
-         }
+         objref.cache_object();
       }
+   }
 
 }  // namespace triedent

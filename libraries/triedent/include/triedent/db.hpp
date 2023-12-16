@@ -159,8 +159,7 @@ namespace triedent
 
       static std::shared_ptr<DB> open(Options opt, std::filesystem::path dir)
       {
-         return std::make_shared<DB>(
-             std::make_shared<database>(dir.c_str(), opt.config, database::read_write));
+         return std::make_shared<DB>(std::make_shared<database>(dir.c_str(), opt.config, database::read_write));
       }
 
       DB(std::shared_ptr<database> d) : _db(std::move(d)), _ws(*this)

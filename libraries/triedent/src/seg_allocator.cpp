@@ -98,7 +98,7 @@ namespace triedent
                       << 100 * most_empty_seg_free / double(segment_size) << "\n";
                       */
             using namespace std::chrono_literals;
-            std::this_thread::sleep_for(2ms);
+            std::this_thread::sleep_for(100ms);
          }
 
          // find most empty segment
@@ -120,7 +120,7 @@ namespace triedent
       {
          auto fso = _header->seg_meta[s].get_free_space_and_objs();
          if (fso.first > most_empty_seg_free)
-            if (fso.first > segment_size / 16)  // most_empty_seg_free)
+            if (fso.first > segment_size / 8)  // most_empty_seg_free)
             {
                auto seg = get_segment(s);
                // only consider segs that are not actively allocing
@@ -245,11 +245,12 @@ namespace triedent
             // valid. This will difinitively prove that a clean copy was made.
             else if (not moved_foo->validate_checksum())
             {
+               bool source_still_valid = foo->validate_checksum();
                // if it was invalid it means a modification in place was made without a lock
                // it could also mean memory corruption in the application and this error
                // should be raised to the user TODO: how to report errors from the
                // background process
-               std::cerr << foo->id << ": checksum '" << moved_foo->check << "' invalid\n";
+               std::cerr << foo->id << ": mv checksum invalid: '" << moved_foo->check << "' src check: "<<foo->check <<" src valid:"<<source_still_valid <<"\n";
                _header->seg_meta[start_seg_num].free_object(foo->object_size());
             }
             // try move compare and exchange
@@ -304,6 +305,7 @@ namespace triedent
       munlock(s, segment_size);
       // it is unlikely to be accessed, and if it is don't pre-fetch
       madvise(s, segment_size, MADV_RANDOM);
+      //madvise(s, segment_size, MADV_DONTNEED);
 
       // only one thread can move the end_ptr or this will break
       // std::cerr<<"done freeing end_ptr: " << _header->end_ptr.load() <<" <== " << seg_num <<"\n";
@@ -379,15 +381,15 @@ namespace triedent
       auto prepare_segment = [&](segment_number sn)
       {
          auto sp = _block_alloc.get(sn);
-         madvise(sp, segment_size, MADV_WILLNEED);
-         /*
+         madvise(sp, segment_size, MADV_FREE); // zero's pages if they happen to be accessed
+         madvise(sp, segment_size, MADV_RANDOM);
+
          auto r = mlock(sp, segment_size);
 
          if (r)
             std::cerr << "MLOCK: " << r << "  " << EINVAL << "  " << EAGAIN << "\n";
-            */
 
-         memset(sp, 0, segment_size);  // TODO: is this necessary?
+         //memset(sp, 0, segment_size);  // TODO: is this necessary?
 
          auto shp  = new (sp) mapped_memory::segment_header();
          shp->_age = _header->next_alloc_age.fetch_add(1, std::memory_order_relaxed);

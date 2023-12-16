@@ -404,7 +404,7 @@ namespace triedent
                if (free_space >= sizeof(object_header))
                {
                   assert(cur_apos + sizeof(uint64_t) <= segment_size);
-                  memset(((char*)sh) + cur_apos, 0, sizeof(uint64_t));
+                  memset(((char*)sh) + cur_apos, 0, sizeof(object_header));
                }
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
                sh->_alloc_pos.store(uint32_t(-1), std::memory_order_release);
@@ -676,7 +676,10 @@ namespace triedent
 
       // signal to compactor that this data is no longer valid before
       // we allow the ID to be reused.
-      obj_ptr->check = -1;
+      
+      // by touching this we are forcing pages to be written that were previously constant,
+      // but with recent changes to move() this check is almost redundant
+       obj_ptr->check = -1; //TODO: does this prevent false invalid checksum in validate
 
 
       // This ID can be reused almost immediately after calling this method
@@ -738,7 +741,6 @@ namespace triedent
    template <typename T>
    bool seg_allocator::session::read_lock::object_ref<T>::cache_object()
    {
-      return false;
       std::unique_lock ul(get_mutex(), std::try_to_lock);
 
       if (ul.owns_lock())

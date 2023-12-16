@@ -332,16 +332,10 @@ int main(int argc, char** argv)
                    << " items/sec   \n";
          if (not run_compactor)
          {
-            std::cerr << "validating\n";
             ws.validate();
-            std::cerr << "run compact\n";
             while (db->compact())
-            {
-            }
-            std::cerr << "done compact\n";
-            std::cerr << "validating\n";
+               ;
             ws.validate();
-            std::cerr << "done\n";
          }
          else
          {
