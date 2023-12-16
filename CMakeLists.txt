@@ -270,8 +270,9 @@ if(BUILD_JS)
     ALL
     DEPENDS AdminSys_js
     COMMAND rm -rf ${pfx}/share/psibase/services/admin-sys
-    COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
+    COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist ${pfx}/share/psibase/services/admin-sys
+    COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/rpc.mjs ${pfx}/share/psibase/services/admin-sys/common/
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/keyConversions.mjs ${pfx}/share/psibase/services/admin-sys/common/
