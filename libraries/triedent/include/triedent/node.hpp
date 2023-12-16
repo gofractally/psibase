@@ -112,6 +112,7 @@ namespace triedent
          if constexpr (debug_nodes)
             std::cout << r.id().id << ": construct value_node: type=" << (int)type << std::endl;
          new (r.data()) value_node(key, val);
+      //   r.obj()->update_checksum();
          return r;
       }
 
@@ -396,25 +397,43 @@ namespace triedent
 
    // makes sure all nodes are reachable with a ref-count of 1+
    // TODO make sure all object hashes check out
-   inline bool validate_node(session_rlock& state, object_id obj)
+   inline bool validate_node(session_rlock& state, object_id obj, int depth = 0)
    {
-      if( not obj.id ) {
+      if (not obj.id)
+      {
          return true;
       }
-      auto  oref  = state.get(obj);  // don't try to cache, we are releasing!
-                                     //
-      if( not oref.ref_count() ) {
-         throw std::runtime_error( "0 ref count!" );
+      auto oref = state.get(obj);  // don't try to cache, we are releasing!
+                                   //
+      if (not oref.ref_count())
+      {
+         throw std::runtime_error("0 ref count!");
       }
 
+      if( not oref.obj()->validate_checksum() ) {
+         std::cout << obj.id <<": validate checkusm failed "<<oref.obj()->check <<" != " << oref.obj()->calculate_checksum() <<"\n";
+         return false;
+      } 
       auto  ctype = oref.type();
       auto& in    = oref.as_inner_node();
+
+      bool error = false;
+      auto oj = oref.obj();
+      if (oj->get_type() != oref.type())
+      {
+         std::cerr << "obj: " << obj.id << " invariant violation id.type (" << (int)oref.type()
+                   << ") and obj->type (" << (int)oj->get_type() << ") are not equal!\n";
+         std::cerr << "             obj->size: " << oj->size <<"  id: " << oj->id<<" ";
+         std::cerr << " refc: " << oref.ref_count() <<" check: " << oj->check <<"\n";
+         error = true;
+      }
 
       if (ctype == node_type::inner)
       {
          if constexpr (debug_nodes)
-            std::cout << obj.id << ": validating; release value " << in.value().id << std::endl;
-         if( not validate_node(state, in.value()) ) return false;
+            std::cout << obj.id << ": validating; inner value " << in.value().id << std::endl;
+         if (not validate_node(state, in.value(), depth+1))
+            return false;
          auto nb  = in.num_branches();
          auto pos = in.children();
          auto end = pos + nb;
@@ -422,28 +441,35 @@ namespace triedent
          {
             assert(*pos);
             if constexpr (debug_nodes)
-               std::cout << obj.id << ": validating; release child " << pos->id << std::endl;
-            if( not validate_node(state, *pos) ) return false;
+               std::cout << obj.id << ": validating; inner child child " << pos->id << std::endl;
+            if (not validate_node(state, *pos, depth+1))
+               return false;
             ++pos;
          }
       }
       else if (ctype == node_type::roots)
       {
-         auto& vn    = reinterpret_cast<const value_node&>(in);  
+         auto& vn    = reinterpret_cast<const value_node&>(in);
          auto  n     = vn.num_roots();
          auto  roots = vn.roots();
          while (n--)
          {
             if constexpr (debug_nodes)
                std::cout << obj.id << ": destroying; release root " << roots->id << std::endl;
-            if( not validate_node(state, *roots++) ) 
+            if (not validate_node(state, *roots++, depth+1))
                return false;
          }
       }
-      else if (ctype == node_type::bytes ){
+      else if (ctype == node_type::bytes)
+      {
+         auto& vn    = reinterpret_cast<const value_node&>(in);
+         if( error )
+         TRIEDENT_WARN( "value.key_size(): ", vn.key_size(), " data size: " , 
+                        vn.data_size(), " depth: ", depth );
       }
-      else {
-         throw std::runtime_error( "validating unknown node type" );
+      else
+      {
+         throw std::runtime_error("validating unknown node type");
          return false;
       }
       return true;

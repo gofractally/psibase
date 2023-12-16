@@ -79,7 +79,7 @@ namespace triedent
             auto idh = new (_ids_header_file.data()) ids_header();
             idh->_next_alloc.store(1);
             idh->_end_id.store(0);
-            idh->_first_free.store(0);
+            idh->_first_free.store(object_info(node_type::undefined, 0).to_int());
          }
          _idheader = reinterpret_cast<ids_header*>(_ids_header_file.data());
       }
@@ -118,7 +118,7 @@ namespace triedent
             //    std::cerr << " brand new id: " << id.id << "\n";
             return std::pair<std::atomic<uint64_t>&, object_id>(atom, id);
          };
-         auto r = brand_new();
+         //auto r = brand_new();
          //std::cerr << "get new id: " << r.second.id << "\n";
 
          std::unique_lock<std::mutex> l{_alloc_mutex};
@@ -166,10 +166,11 @@ namespace triedent
 
          uint64_t cur_head = _idheader->_first_free.load(std::memory_order_acquire);
          assert(not(cur_head & object_info::ref_mask));
+         assert(not(next_free & object_info::ref_mask));
          do
          {
             next_free.store(cur_head, std::memory_order_release);
-         } while (not head_free_list.compare_exchange_strong(cur_head, new_head));
+         } while (not head_free_list.compare_exchange_weak(cur_head, new_head, std::memory_order_release));
          //print_free_list();
       }
 

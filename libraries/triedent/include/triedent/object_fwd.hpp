@@ -1,4 +1,5 @@
 #pragma once
+#include <triedent/debug.hpp>
 
 #include <cstdint>
 #include <cstring>
@@ -150,21 +151,33 @@ namespace triedent
 
    struct object_header
    {
-      uint32_t check = 0;
+      uint32_t check = 0; // xxhash checksum of thre next size bytes
       uint32_t type: 4;
       uint32_t size: 28;
       // size might not be a multiple of 8, next object is at data() + (size+7)&-8
       uint64_t unused: 24;  // bytes of data, not including header
       uint64_t id : 40;
 
+      node_type       get_type()const { return (node_type)type; }
+      void            set_type( node_type t ) { type = (uint8_t) t; }
+      void            set_id( object_id d )   { id = d.id; }
+      object_id       get_id()const { return {id}; }
       inline uint64_t data_size() const { return size; }
       inline uint32_t data_capacity() const { return (size + 7) & -8; }
       inline char*    data() const { return (char*)(this + 1); }
+
+      uint32_t calculate_checksum() {
+        return XXH3_64bits( &check+1, size + sizeof(object_header) - sizeof(check) );
+      }
+      void update_checksum()   { check = calculate_checksum();         }
+      bool validate_checksum() { return check == calculate_checksum(); }
+
 
       // returns the end of data_capacity() cast as another object_header
       inline object_header* next() const { return (object_header*)(((char*)this) + object_size()); }
 
       // capacity + sizeof(object_header)
       inline uint32_t object_size() const { return data_capacity() + sizeof(object_header); }
-   };
+   }__attribute__((packed)) __attribute__((aligned(8)));
+
 }  // namespace triedent

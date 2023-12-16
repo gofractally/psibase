@@ -4,11 +4,14 @@
 #include <iostream>
 #include <thread>
 //#include <syncstream>
+// #undef NDEBUG
+#include <cassert>
 
 namespace triedent
 {
    static constexpr bool debug_cache = false;
    static constexpr bool debug_gc    = false;
+   static constexpr bool debug_invariant = true;
 
    struct scope
    {
@@ -22,7 +25,7 @@ namespace triedent
       }
    };
 
-   inline const char* thread_name(const char* n = "default")
+   inline const char* thread_name(const char* n = nullptr)
    {
       static thread_local const char* thread_name = n;
       if (n)
@@ -42,6 +45,7 @@ namespace triedent
    }
 
    inline auto set_current_thread_name( const char* name ) { 
+      thread_name(name);
 #ifdef __APPLE__
       return pthread_setname_np(name); 
 #else

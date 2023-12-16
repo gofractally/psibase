@@ -1,6 +1,8 @@
 #pragma once
-#include <triedent/database.hpp>
+#include <future>
+#include <list>
 #include <shared_mutex>
+#include <triedent/database.hpp>
 
 namespace triedent
 {
@@ -22,8 +24,8 @@ namespace triedent
      public:
       struct Options
       {
-         bool create_if_missing = false;
-         bool error_if_exists   = false;
+         bool             create_if_missing = false;
+         bool             error_if_exists   = false;
          database::config config;
       };
       typedef std::shared_ptr<root> root_ptr;
@@ -49,21 +51,26 @@ namespace triedent
             }
 
             template <typename Span>
-            bool get_greater_equal( const Span& key, std::vector<char>* result_key, std::vector<char>* result_val = nullptr ) {
-               return _rs._rs->get_greater_equal( _root, {key.data(), key.size()}, result_key, result_val );
+            bool get_greater_equal(const Span&        key,
+                                   std::vector<char>* result_key,
+                                   std::vector<char>* result_val = nullptr)
+            {
+               return _rs._rs->get_greater_equal(_root, {key.data(), key.size()}, result_key,
+                                                 result_val);
             }
+
+            ~Transaction() {}
 
            private:
             friend class ReadSession;
             Transaction(ReadSession& s) : _rs(s), _root(s._db.getRoot()) {}
-
 
             ReadSession& _rs;
             root_ptr     _root;
          };  // Transaction
 
          //auto startTransaction() { return std::make_shared<Transaction>(std::ref(*this)); }
-         auto startTransaction() { return new Transaction(*this); }
+         auto startTransaction() { return std::shared_ptr<Transaction>(new Transaction(*this)); }
 
          ReadSession(DB& d) : _db(d) { _rs = _db._db->start_read_session(); }
 
@@ -115,7 +122,7 @@ namespace triedent
             int put(const KeySpan& key, const ValueSpan& value)
             {
                return _ws._ws->upsert(_root, {key.data(), key.size()},
-                                                   {value.data(), value.size()});
+                                      {value.data(), value.size()});
             }
 
            private:
@@ -134,9 +141,7 @@ namespace triedent
             _db._root = _ws->get_top_root();
          }
 
-         void validate() {
-            _ws->validate();
-         }
+         void validate() { _ws->validate(); }
 
         private:
          friend class Transaction;
@@ -145,7 +150,7 @@ namespace triedent
          void setRoot(std::shared_ptr<root> r)
          {
             _ws->set_top_root(r);
-            _db.setRoot( std::move(r) );
+            _db.setRoot(std::move(r));
          }
 
          DB&                            _db;
@@ -154,49 +159,92 @@ namespace triedent
 
       static std::shared_ptr<DB> open(Options opt, std::filesystem::path dir)
       {
-         return std::make_shared<DB>(std::make_shared<database>(dir.c_str(), opt.config, database::read_write));
+         return std::make_shared<DB>(
+             std::make_shared<database>(dir.c_str(), opt.config, database::read_write));
       }
 
-      DB(std::shared_ptr<database> d) : _db(std::move(d)),_ws(*this)
+      DB(std::shared_ptr<database> d) : _db(std::move(d)), _ws(*this)
       {
-         _root = _ws._ws->get_top_root();
+         _root           = _ws._ws->get_top_root();
+         _release_thread = std::thread([this]() { release_loop(); });
       }
 
-      auto createReadSession() { return std::make_shared<ReadSession>(std::ref(*this)); }
+      auto          createReadSession() { return std::make_shared<ReadSession>(std::ref(*this)); }
       WriteSession& writeSession() { return _ws; }
 
-      root_ptr getRoot()const {
+      root_ptr getRoot() const
+      {
          root_ptr tmp;
          {
             std::shared_lock m(_root_mutex);
-            tmp =  _root;
+            tmp = _root;
          }
          return tmp;
       }
-      ~DB() {
-         _db->print_stats( std::cout, true );
+      ~DB()
+      {
+         _done = true;
+         _release_thread.join();
+         _db->print_stats(std::cout, true);
       }
 
-      void print() {
-         _db->print_stats( std::cout, true );
-      }
-      bool compact() {
-         return _db->compact_next_segment();
-      }
+      void print() { _db->print_stats(std::cout, true); }
+      bool compact() { return _db->compact_next_segment(); }
+
      private:  // DB
-      void     setRoot( root_ptr p ) {
-         auto tmp = _root; // don't want ref-count to go to zero while holding lock
+      void setRoot(root_ptr p)
+      {
          {
             std::unique_lock l(_root_mutex);
-            _root = std::move(p);
+            root_ptr         tmp = _root;  // delay release until unlock
+            _root                = std::move(p);
+            std::unique_lock l2(_release_mutex);
+            _release_queue.push_back(std::move(tmp));
+            // TODO: notify release thread
          }
       }
 
-      std::shared_ptr<database>     _db;
-      WriteSession                  _ws;
+      std::shared_ptr<database> _db;
+      WriteSession              _ws;
 
+      void release_loop()
+      {
+         while (not _done)
+         {
+            bool rest = false;
+            {
+               root_ptr tmp;
+               {
+                  std::unique_lock l(_release_mutex);
+                  if (not _release_queue.empty())
+                  {
+                     tmp = _release_queue.front();
+                     _release_queue.pop_front();
+                  }
+                  else
+                  {
+                     rest = true;
+                  }
+               }
+            }
+            if (rest)
+            {
+               // TODO: wait conditiopn
+               using namespace std::chrono_literals;
+               std::this_thread::sleep_for(30ms);
+            }
+         }
+         // clean up
+         std::unique_lock l(_root_mutex);
+         _release_queue.clear();
+      }
+
+      std::atomic<bool>         _done;
+      std::thread               _release_thread;
+      std::list<root_ptr>       _release_queue;
       mutable std::shared_mutex _root_mutex;
-      root_ptr          _root;
+      mutable std::shared_mutex _release_mutex;
+      root_ptr                  _root;
    };
 
 }  // namespace triedent

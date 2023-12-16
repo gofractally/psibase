@@ -13,6 +13,7 @@
 
 #include <triedent/db.hpp>
 
+      using namespace std::chrono_literals;
 uint64_t bswap(uint64_t x)
 {
    x = (x & 0x00000000FFFFFFFF) << 32 | (x & 0xFFFFFFFF00000000) >> 32;
@@ -46,6 +47,8 @@ std::string add_comma(uint64_t s)
 
 int main(int argc, char** argv)
 {
+   triedent::set_current_thread_name("main");
+   TRIEDENT_WARN("Hello, Welcome to Triedent!");
    namespace po            = boost::program_options;
    uint32_t    hot_page_c  = 34;
    uint32_t    warm_page_c = 33;
@@ -58,11 +61,12 @@ int main(int argc, char** argv)
    uint64_t    status_count;
    bool        check_content = false;
    uint32_t    rounds        = 10;
-   uint32_t    count         = 1000*1000*10;
+   uint32_t    count         = 1000 * 1000 * 10;
    uint32_t    group         = 16;
    uint32_t    sync_mode     = 0;
-   bool cor = true;
-   bool run_compactor = true;
+   bool        cor           = true;
+   bool        run_compactor = true;
+   bool        run_validate  = false;
 
    uint32_t                num_read_threads = 6;
    po::options_description desc("Allowed options");
@@ -76,7 +80,10 @@ int main(int argc, char** argv)
    opt("rand-write-read", "perform random writes while reading");
    opt("read-only", "just query existing db");
    opt("sparce", po::value<bool>(&use_string)->default_value(false), "use sparse string keys");
-   opt("compact", po::value<bool>(&run_compactor)->default_value(true), "enable/disable the compactor thread");
+   opt("compact", po::value<bool>(&run_compactor)->default_value(true),
+       "enable/disable background compactor, will compact between rounds instead");
+   opt("validate", po::value<bool>(&run_validate)->default_value(false),
+       "enable/disable state validation between rounds");
    opt("data-dir", po::value<std::string>(&db_dir)->default_value("./big.dir"),
        "the folder that contains the database");
    opt("read-threads,r", po::value<uint32_t>(&num_read_threads)->default_value(6),
@@ -135,21 +142,18 @@ int main(int argc, char** argv)
       return 0;
    }
 
-   triedent::DB::Options options{
-        .config = {
-           .cache_on_read = cor,
-           .run_compact_thread = run_compactor,
-           .sync_mode = (triedent::sync_type)sync_mode
+   triedent::DB::Options options{.config = {.cache_on_read      = cor,
+                                            .run_compact_thread = run_compactor,
+                                            .sync_mode          = (triedent::sync_type)sync_mode
 
-        }
-   };
+                                 }};
 
    std::cout << "opening database '" << db_dir << "'\n";
    auto  db = triedent::DB::open(options, db_dir);
    auto& ws = db->writeSession();
 
-//   uint32_t count = 1000 * 1000 * 10;
-   int64_t  key   = 0;
+   //   uint32_t count = 1000 * 1000 * 10;
+   int64_t key = 0;
 
    /*
    for( int i = 0; i  < 7; ++i ) {
@@ -187,9 +191,9 @@ int main(int argc, char** argv)
       {
          auto start = std::chrono::steady_clock::now();
 
-         for (uint32_t g= 0; g< (count / group); ++g)
+         for (uint32_t g = 0; g < (count / group); ++g)
          {
-            auto wt    = ws.startTransaction();
+            auto wt = ws.startTransaction();
 
             for (uint32_t i = 0; i < group; ++i)
             {
@@ -202,7 +206,6 @@ int main(int argc, char** argv)
                   std::cerr << "this should be a new value! : " << old_size << "\n";
                   return 0;
                }
-
             }
             wt->commit();
          }
@@ -306,9 +309,9 @@ int main(int argc, char** argv)
       for (uint32_t round = 0; round < rounds; ++round)
       {
          auto start = std::chrono::steady_clock::now();
-         for (uint32_t g= 0; g< (count / group); ++g)
+         for (uint32_t g = 0; g < (count / group); ++g)
          {
-            auto wt    = ws.startTransaction();
+            auto wt = ws.startTransaction();
 
             for (uint32_t i = 0; i < group; ++i)
             {
@@ -327,16 +330,26 @@ int main(int argc, char** argv)
                           count /
                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                    << " items/sec   \n";
-         if( not run_compactor ) {
+         if (not run_compactor)
+         {
+            std::cerr << "validating\n";
+            ws.validate();
             std::cerr << "run compact\n";
-            while( db->compact() ){
-               ws.validate();
+            while (db->compact())
+            {
             }
             std::cerr << "done compact\n";
+            std::cerr << "validating\n";
+            ws.validate();
+            std::cerr << "done\n";
+         }
+         else
+         {
+            ws.validate();
          }
       }
-            using namespace std::chrono_literals;
-            /*
+      using namespace std::chrono_literals;
+      /*
       db->print();
       std::cerr<< "compact one\n";
       for( uint32_t i = 0; i < 30; ++i ) {
@@ -446,20 +459,27 @@ int main(int argc, char** argv)
          {
             auto read_loop = [&]()
             {
+               triedent::set_current_thread_name("read");
                auto lrs = db->createReadSession();
 
                std::vector<char> result_key;
                std::vector<char> result_val;
                uint64_t          key = 0;
 
-               auto rt = lrs->startTransaction();
-               for (uint32_t i = 0; i < count; ++i)
+               for (uint32_t g = 0; g < group; ++g)
                {
-                  key         = rand64();
-                  int64_t val = i;
-                  rt->get_greater_equal(std::span<const char>((const char*)&key, 8), &result_key,
-                                        &result_val);
+                  auto rt = lrs->startTransaction();
+                  for (uint32_t i = 0; i < count / group; ++i)
+                  {
+                     key         = rand64();
+                     int64_t val = g * (count / group) + i;
+                     rt->get_greater_equal(std::span<const char>((const char*)&key, 8), &result_key,
+                                           &result_val);
+                  }
                }
+         //   std::this_thread::sleep_for(1000ms);
+          //     rt.reset();
+
                ++done;
             };
             rthreads.emplace_back(new std::thread(read_loop));
@@ -469,15 +489,18 @@ int main(int argc, char** argv)
          while (done.load() < num_read_threads)
          {
             auto wt = ws.startTransaction();
+            for( uint32_t i = 0; i < group; ++i ) {
+               key         = rand64();
+               int64_t val = key;
+               auto    old_size =
+                   wt->put(std::span<char>((char*)&key, 8), std::span<char>((char*)&val, 8));
 
-            key         = rand64();
-            int64_t val = key;
-            auto    old_size =
-                wt->put(std::span<char>((char*)&key, 8), std::span<char>((char*)&val, 8));
-
+               ++writes;
+               ++total_writes;
+               if( done.load( std::memory_order_relaxed ) >= num_read_threads )
+                  break;
+            }
             wt->commit();
-            ++writes;
-            ++total_writes;
          }
 
          auto end   = std::chrono::steady_clock::now();
@@ -487,6 +510,10 @@ int main(int argc, char** argv)
                           (num_read_threads * count) /
                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                    << " read items/sec  ";
+
+         for (auto& r : rthreads)
+            r->join();
+
          std::cerr << std::setw(12)
                    << add_comma(int64_t(
                           (writes) /
@@ -494,8 +521,14 @@ int main(int argc, char** argv)
                    << " write items/sec   "
                    << " items in db: " << add_comma(total_writes) << " \n";
 
-         for (auto& r : rthreads)
-            r->join();
+         if( run_validate )
+            ws.validate();
+         if (not run_compactor)
+         {
+            while (db->compact())
+            {
+            }
+         }
       }
    }
 

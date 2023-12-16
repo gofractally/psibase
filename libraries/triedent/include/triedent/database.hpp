@@ -753,7 +753,9 @@ namespace triedent
                                                  string_view    key,
                                                  string_view    val)
    {
-      return value_node::make(state, key, val, type).id();
+      auto obr = value_node::make(state, key, val, type);
+      obr.obj()->update_checksum();
+      return obr.id();
    }
 
    inline object_id write_session::clone_value_id(session_rlock& state,
@@ -763,7 +765,9 @@ namespace triedent
                                                   std::uint32_t  key_offset,
                                                   string_view    val)
    {
-      return value_node::clone(state, origin, key, key_offset, val, type).id();
+      auto obr = value_node::clone(state, origin, key, key_offset, val, type);
+      obr.obj()->update_checksum();
+      return obr.id();
    }
 
    inline mutable_deref<value_node> write_session::clone_value(session_rlock&     state,
@@ -780,7 +784,9 @@ namespace triedent
                                                   const std::string& key,
                                                   string_view        val)
    {
-      return value_node::clone(state, origin, key, -1, val, type).id();
+      auto obr = value_node::clone(state, origin, key, -1, val, type);
+      obr.obj()->update_checksum();
+      return obr.id();
    }
 
    inline mutable_deref<inner_node> write_session::make_inner(session_rlock& state,
@@ -795,7 +801,9 @@ namespace triedent
                                                  id             val,
                                                  uint64_t       branches)
    {
-      return inner_node::make(state, pre, val, branches).id();
+      auto obr = inner_node::make(state, pre, val, branches);
+      obr.obj()->update_checksum();
+      return obr.id();
    }
 
    inline mutable_deref<inner_node> write_session::clone_inner(session_rlock&    state,
@@ -817,7 +825,9 @@ namespace triedent
                                                   object_id         val,
                                                   uint64_t          branches)
    {
-      return inner_node::clone(state, id, &cpy, pre, offset, val, branches).id();
+      auto obr = inner_node::clone(state, id, &cpy, pre, offset, val, branches);
+      obr.obj()->update_checksum();
+      return obr.id();
    }
 
    inline mutable_deref<inner_node> write_session::clone_inner(session_rlock&     state,
@@ -836,7 +846,9 @@ namespace triedent
                                                   object_id          val,
                                                   uint64_t           branches)
    {
-      return inner_node::clone(state, id, &cpy, pre, -1, val, branches).id();
+      auto obr = inner_node::clone(state, id, &cpy, pre, -1, val, branches);
+      obr.obj()->update_checksum();
+      return obr.id();
    }
 
    template <typename T>
@@ -901,6 +913,8 @@ namespace triedent
          in->set_value(inner_id);
          in->branch(b2) = branch_id;
 
+         in.obj()->update_checksum();
+
          return in.id();
       }
       else
@@ -916,6 +930,7 @@ namespace triedent
          in->branch(b1) = b1id;
          in->branch(b2) = b2id;
 
+         in.obj()->update_checksum();
          return in.id();
       }
    }
@@ -972,6 +987,7 @@ namespace triedent
       if (vn.data_size() == val.size())
       {
          modify_value(state, deref<value_node>(n), val);
+         assert( n.obj()->validate_checksum() );
          return n.id();
       }
 
@@ -993,6 +1009,7 @@ namespace triedent
             if (v.type() == type && vn.data_size() == val.size() && v.ref_count() == 1)
             {
                modify_value(state, deref<value_node>(v), val);
+               assert( v.obj()->validate_checksum() );
                return n.id();
             }
             else
@@ -1004,6 +1021,7 @@ namespace triedent
          // This lock is necessary because we alloc above and n was deref
          // before
          lock(n)->set_value(val_id);
+         assert( n.obj()->validate_checksum() );
          return n.id();
       }
       else
@@ -1013,6 +1031,7 @@ namespace triedent
          auto result =
              inner_node::clone(state, n.id(), &*n, n->key(), 0, object_id{}, n->branches());
          result->set_value(new_val);
+         result.obj()->update_checksum();
          return result.id();
       }
    }
@@ -1078,6 +1097,7 @@ namespace triedent
                release(state, cur_b);
             }
 
+            new_in.obj()->update_checksum();
             return new_in.id();
          }  // else modify in place
 
@@ -1107,8 +1127,10 @@ namespace triedent
 
             auto nin = inner_node::make(state, cpre, object_id{}, inner_node::branches(b1));
             // Set separately because we don't need to inc ref
-            nin->set_value(b0val);
-            nin->branch(b1) = b1val;
+            auto& ninr = *nin;
+            ninr.set_value(b0val);
+            ninr.branch(b1) = b1val;
+            nin.obj()->update_checksum();
             return nin.id();
          }
          else  // there are two branches
@@ -1128,6 +1150,7 @@ namespace triedent
             nin->branch(b1) = b1val;
             assert(not nin->branch(b2));
             nin->branch(b2) = sub;
+            nin.obj()->update_checksum();
 
             return nin.id();
          }
@@ -1142,9 +1165,10 @@ namespace triedent
 
       int  old_size = -1;
       auto new_root =
-          add_child(state, get_id(r), get_unique(r), node_type::bytes,
+          add_child(state, get_id(r), false &get_unique(r), node_type::bytes,
                     to_key6({key.data(), key.size()}), {val.data(), val.size()}, old_size);
       assert(new_root.id);
+      assert(state.get(new_root).obj()->validate_checksum());
       update_root(state, r, new_root);
       return old_size;
    }
