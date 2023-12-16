@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PsinodeConfig } from "./configuration/interfaces";
 import { NavHeader } from "./components/nav-header";
 import { StatusBanner } from "./components/status-banner";
+import { BootPage } from "./boot-wizard/boot-page";
 import { ConfigurationPage } from "./configuration/configuration-page";
 import { usePollJson } from "./hooks";
 import { LogsPage } from "./log/logs-page";
@@ -13,7 +14,14 @@ import { Peer } from "./peers/interfaces";
 
 import "./App.css";
 
-const MENU_ITEMS = ["Dashboard", "Peers", "Logs", "Configuration", "Power"];
+const MENU_ITEMS = [
+    "Dashboard",
+    "Peers",
+    "Logs",
+    "Configuration",
+    "Power",
+    "Boot",
+];
 
 function App() {
     const [activeItem, setActiveItem] = useState("");
@@ -57,8 +65,12 @@ function App() {
                     refetchConfig={refetchConfig}
                 />
             ) : activeItem === "Power" ? (
-                <PowerPage
+                <PowerPage producer={config?.producer} />
+            ) : activeItem === "Boot" ? (
+                <BootPage
                     producer={config?.producer}
+                    config={config}
+                    refetchConfig={refetchConfig}
                 />
             ) : null}
         </>

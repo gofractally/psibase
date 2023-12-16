@@ -546,9 +546,24 @@ psibase_package(
                     PsiSpaceSys SetCodeSys SymbolSys TokenSys TransactionSys
 )
 
+function(write_package_index out)
+    set(result)
+    foreach(package IN LISTS ARGN)
+        file(READ ${CMAKE_CURRENT_BINARY_DIR}/${package}/meta.json contents)
+        list(APPEND result ${contents})
+    endforeach()
+    list(JOIN result "," result)
+    file(GENERATE OUTPUT ${out} CONTENT "[${result}]")
+endfunction()
+
+write_package_index(${SERVICE_DIR}/index.json
+    AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
+    DocSys ExploreSys FractalSys InviteSys NftSys ProducerSys ProxySys
+    PsiSpaceSys SetCodeSys SymbolSys TokenSys TransactionSys)
 
 install(
-    FILES ${SERVICE_DIR}/AccountSys.psi
+    FILES ${SERVICE_DIR}/index.json
+          ${SERVICE_DIR}/AccountSys.psi
           ${SERVICE_DIR}/AuthAnySys.psi
           ${SERVICE_DIR}/AuthSys.psi
           ${SERVICE_DIR}/AuthEcSys.psi

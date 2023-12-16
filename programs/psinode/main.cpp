@@ -347,6 +347,10 @@ void load_service(const native_service& config,
       {
          result.content_type = "application/wasm";
       }
+      else if (extension == ".json")
+      {
+         result.content_type = "application/json";
+      }
       else if (extension == ".psi")
       {
          result.content_type = "application/zip";
