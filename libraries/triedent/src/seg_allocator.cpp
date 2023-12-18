@@ -402,8 +402,9 @@ namespace triedent
       {
          if (_header->alloc_ptr.compare_exchange_weak(ap, ap + 1))
          {
-            auto free_seg                = _header->free_seg_buffer[ap];
-            _header->free_seg_buffer[ap] = segment_number(-1);
+            auto apidx = ap & (max_session_count-1);
+            auto free_seg                = _header->free_seg_buffer[apidx];
+            _header->free_seg_buffer[apidx] = segment_number(-1);
             //       std::cerr << "reusing segment..." << free_seg <<"\n";
             return prepare_segment(free_seg);
          }

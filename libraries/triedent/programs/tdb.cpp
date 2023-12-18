@@ -183,6 +183,8 @@ int main(int argc, char** argv)
       return 0;
       */
 
+   if( count < group ) group = count;
+
    if (vm.count("seq-write"))
    {
       std::cout << "Starting to insert " << rounds << " rounds of " << add_comma(count)
