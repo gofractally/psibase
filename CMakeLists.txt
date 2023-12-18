@@ -550,7 +550,7 @@ psibase_package(
 function(write_package_index out)
     set(deps ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh)
     foreach(service IN LISTS ARGN)
-        list(APPEND deps ${service} ${SERVICE_DIR}/${service}.psi)
+        list(APPEND deps ${service}.psi ${SERVICE_DIR}/${service}.psi)
     endforeach()
     add_custom_command(
         OUTPUT ${SERVICE_DIR}/index.json
