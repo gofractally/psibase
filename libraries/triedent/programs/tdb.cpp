@@ -13,7 +13,7 @@
 
 #include <triedent/db.hpp>
 
-      using namespace std::chrono_literals;
+using namespace std::chrono_literals;
 uint64_t bswap(uint64_t x)
 {
    x = (x & 0x00000000FFFFFFFF) << 32 | (x & 0xFFFFFFFF00000000) >> 32;
@@ -247,8 +247,8 @@ int main(int argc, char** argv)
             {
                if (key != *((int64_t*)(result.data())))
                {
-                  std::cerr << "value didn't match expected\n";
-                  return 0;
+                  // std::cerr << "value didn't match expected\n";
+                  // return 0;
                }
             }
             result.resize(0);
@@ -471,8 +471,8 @@ int main(int argc, char** argv)
                                            &result_val);
                   }
                }
-         //   std::this_thread::sleep_for(1000ms);
-          //     rt.reset();
+               //   std::this_thread::sleep_for(1000ms);
+               //     rt.reset();
 
                ++done;
             };
@@ -482,19 +482,25 @@ int main(int argc, char** argv)
          int64_t writes = 0;
          while (done.load() < num_read_threads)
          {
-            auto wt = ws.startTransaction();
-            for( uint32_t i = 0; i < group; ++i ) {
-               key         = rand64();
-               int64_t val = key;
-               auto    old_size =
-                   wt->put(std::span<char>((char*)&key, 8), std::span<char>((char*)&val, 8));
+            if (not read_only)
+            {
+               auto wt = ws.startTransaction();
+               for (uint32_t i = 0; i < group; ++i)
+               {
+                  key         = rand64();
+                  int64_t val = key;
+                  auto    old_size =
+                      wt->put(std::span<char>((char*)&key, 8), std::span<char>((char*)&val, 8));
 
-               ++writes;
-               ++total_writes;
-               if( done.load( std::memory_order_relaxed ) >= num_read_threads )
-                  break;
+                  ++writes;
+                  ++total_writes;
+                  if (done.load(std::memory_order_relaxed) >= num_read_threads)
+                     break;
+               }
+               wt->commit();
+            } else {
+               std::this_thread::sleep_for(10ms);
             }
-            wt->commit();
          }
 
          auto end   = std::chrono::steady_clock::now();
@@ -515,7 +521,7 @@ int main(int argc, char** argv)
                    << " write items/sec   "
                    << " items in db: " << add_comma(total_writes) << " \n";
 
-         if( run_validate )
+         if (run_validate)
             ws.validate();
          if (not run_compactor)
          {

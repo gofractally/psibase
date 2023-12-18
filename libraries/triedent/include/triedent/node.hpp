@@ -19,13 +19,7 @@ namespace triedent
 
    object_id bump_refcount_or_copy(session_rlock& state, object_id id);
 
-   class node
-   {
-     public:
-      inline uint8_t key_size() const { return (*reinterpret_cast<const uint8_t*>(this)); }
-   };
-
-   class value_node : public node
+   class value_node 
    {
      public:
       inline uint32_t    key_size() const { return _key_size; }
@@ -174,7 +168,7 @@ namespace triedent
    };
    static_assert(sizeof(value_node) == 1, "unexpected padding");
 
-   class inner_node : public node
+   class inner_node 
    {
      public:
       inline object_id&       branch(uint8_t b);
@@ -212,6 +206,7 @@ namespace triedent
 
       inline bool has_branch(uint32_t b) const { return _present_bits & (1ull << b); }
 
+      inline uint8_t key_size() const { return _prefix_length; }
       inline key_view key() const { return key_view(key_ptr(), key_size()); }
 
       inline int32_t     branch_index(uint32_t branch) const;

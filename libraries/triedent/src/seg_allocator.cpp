@@ -309,7 +309,7 @@ namespace triedent
 
       // only one thread can move the end_ptr or this will break
       // std::cerr<<"done freeing end_ptr: " << _header->end_ptr.load() <<" <== " << seg_num <<"\n";
-      _header->free_seg_buffer[_header->end_ptr.load()] = seg_num;
+      _header->free_seg_buffer[_header->end_ptr.load(std::memory_order_relaxed) & (max_session_count-1)] = seg_num;
       _header->end_ptr.fetch_add(1, std::memory_order_release);
       //
    }
