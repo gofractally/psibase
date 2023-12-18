@@ -548,13 +548,16 @@ psibase_package(
 )
 
 function(write_package_index out)
-    set(result)
-    foreach(package IN LISTS ARGN)
-        file(READ ${CMAKE_CURRENT_BINARY_DIR}/${package}/meta.json contents)
-        list(APPEND result ${contents})
+    set(deps ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh)
+    foreach(service IN LISTS ARGN)
+        list(APPEND deps ${service} ${SERVICE_DIR}/${service}.psi)
     endforeach()
-    list(JOIN result "," result)
-    file(GENERATE OUTPUT ${out} CONTENT "[${result}]")
+    add_custom_command(
+        OUTPUT ${SERVICE_DIR}/index.json
+        DEPENDS ${deps}
+        COMMAND /usr/bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${SERVICE_DIR} >${SERVICE_DIR}/index.json
+    )
+    add_custom_target(index.json ALL DEPENDS ${SERVICE_DIR}/index.json)
 endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
