@@ -143,6 +143,7 @@ namespace triedent
    // \post
    // for each index in [start, R):
    //   either U happens before W or P happens before L
+   // \return the sequence of the session with the lowest sequence
    gc_queue::size_type gc_queue::start_wait(size_type start, size_type end)
    {
       std::size_t     lowest_sequence = end;

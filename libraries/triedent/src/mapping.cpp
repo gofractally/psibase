@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <iostream>
+
 namespace triedent
 {
    namespace
@@ -79,12 +81,15 @@ namespace triedent
          {
             _data = addr;
             try_pin(&_pinned, addr, _size);
+      //      std::cerr<<"madvise random  " << int64_t(addr) <<"   " << _size << " \n";
+      //      madvise(addr, _size, MADV_RANDOM );
          }
          else
          {
             ::close(_fd);
             throw std::system_error{errno, std::generic_category()};
          }
+
       }
    }
 

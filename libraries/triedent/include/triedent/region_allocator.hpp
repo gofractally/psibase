@@ -28,6 +28,9 @@ namespace triedent
                        access_mode                  mode,
                        std::uint64_t                initial_size = 64 * 1024 * 1024);
       ~region_allocator();
+
+
+      // TODO: how is this a try?  This is a do or hang/die trying?
       void* try_allocate(std::unique_lock<gc_session>& session,
                          object_id                     id,
                          std::uint32_t                 size,

@@ -21,20 +21,13 @@ namespace triedent
              [this]()
              {
                 thread_name("swap");
-#ifndef __APPLE__
-                pthread_setname_np(pthread_self(), "swap");
-#else // if __APPLE__
-                pthread_setname_np("swap");
-#endif
+                set_current_thread_name( "swap" );
                 swap_loop();
              });
+
          _gc_thread = std::thread{[this]
                                   {
-#ifndef __APPLE__
-                                    pthread_setname_np(pthread_self(), "swap");
-#else // if __APPLE__
-                                    pthread_setname_np("swap");
-#endif
+                                     set_current_thread_name( "gc" );
                                      _gc.run(&_done);
                                   }};
       }
@@ -63,8 +56,8 @@ namespace triedent
 
    bool cache_allocator::swap(gc_session& session)
    {
-      constexpr uint64_t      target     = 1024 * 1024 * 40ull;
-      constexpr std::uint64_t min_target = 1024 * 1024 * 33ull;
+      constexpr uint64_t      target     = 1024 * 1024 * 256ull;
+      constexpr std::uint64_t min_target = 1024 * 1024 * 128ull;
       bool                    did_work   = false;
       auto                    do_swap    = [&](auto& from, auto& to)
       {
@@ -82,6 +75,8 @@ namespace triedent
             //
             if (auto lock = _obj_ids.lock({.id = o->id}, loc))
             {
+               // note swap will fail on lock contention, will not wait for
+               // free space at the next level down.
                void* p = to.try_allocate(sl, lock.get_id(), o->size,
                                          [&](void* ptr, object_location newloc)
                                          {

@@ -1,5 +1,6 @@
 #include <triedent/database.hpp>
 #include <triedent/debug.hpp>
+#include <triedent/file_fwd.hpp>
 
 namespace triedent
 {
@@ -7,9 +8,7 @@ namespace triedent
                       const config&                cfg,
                       access_mode                  mode,
                       bool                         allow_gc)
-       : _ring{dir / "data", cfg, mode, allow_gc},
-         _file{dir / "db", mode},
-         _root_release_session{_ring}
+       : _sega{dir}, _file{dir / "db", mode}, _root_release_session{_sega}, _config(cfg)
    {
       if (_file.size() == 0)
       {
@@ -27,6 +26,9 @@ namespace triedent
          throw std::runtime_error("Not a triedent file: " + (dir / "db").native());
       if ((_dbm->flags & file_type_mask) != file_type_database_root)
          throw std::runtime_error("Not a triedent db file: " + (dir / "db").native());
+      if( cfg.run_compact_thread )
+         _sega.start_compact_thread();
+
    }
 
    database::database(const std::filesystem::path& dir, access_mode mode, bool allow_gc)
@@ -34,7 +36,9 @@ namespace triedent
    {
    }
 
-   database::~database() {}
+   database::~database() {
+      
+   }
 
    void database::create(std::filesystem::path dir, config cfg)
    {
@@ -44,11 +48,11 @@ namespace triedent
 
       std::filesystem::create_directories(dir / "data");
 
-      (void)database{dir, cfg, access_mode::read_write};
+      std::make_shared<database>(dir, cfg, access_mode::read_write);
    }
 
    void database::print_stats(std::ostream& os, bool detail)
    {
-      _ring.print_stats(os, detail);
+      _sega.dump();
    }
 }  // namespace triedent
