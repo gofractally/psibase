@@ -925,7 +925,14 @@ namespace psibase::http
                   return;
                }
                auto status = server.http_config->status.load();
-               //
+               if (status.needgenesis)
+               {
+                  if (!server.sharedState->needGenesis())
+                  {
+                     status = atomic_set_field(server.http_config->status,
+                                               [](auto& tmp) { tmp.needgenesis = false; });
+                  }
+               }
                std::vector<char>   body;
                psio::vector_stream stream{body};
                to_json(status, stream);

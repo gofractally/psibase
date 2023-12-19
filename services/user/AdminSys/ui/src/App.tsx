@@ -43,11 +43,28 @@ function App() {
     const [config, configError, refetchConfig] = usePollJson<PsinodeConfig>(
         "/native/admin/config"
     );
+    const [status, statusError] = usePollJson<string[]>("/native/admin/status");
+
+    let activeMenuItems = [
+        "Dashboard",
+        "Peers",
+        "Logs",
+        "Configuration",
+        "Power",
+    ];
+    if (status && status.includes("needgenesis")) {
+        activeMenuItems.push("Boot");
+    }
 
     return (
         <>
-            <NavHeader menuItems={MENU_ITEMS} activeItem={activeItem} />
-            <StatusBanner peersError={peersError} configError={configError} />
+            <NavHeader menuItems={activeMenuItems} activeItem={activeItem} />
+            <StatusBanner
+                status={status}
+                statusError={statusError}
+                peersError={peersError}
+                configError={configError}
+            />
             {activeItem === "Dashboard" ? (
                 <DashboardPage />
             ) : activeItem === "Logs" ? (
@@ -65,13 +82,9 @@ function App() {
                     refetchConfig={refetchConfig}
                 />
             ) : activeItem === "Power" ? (
-                <PowerPage producer={config?.producer} />
+                <PowerPage />
             ) : activeItem === "Boot" ? (
-                <BootPage
-                    producer={config?.producer}
-                    config={config}
-                    refetchConfig={refetchConfig}
-                />
+                <BootPage config={config} refetchConfig={refetchConfig} />
             ) : null}
         </>
     );

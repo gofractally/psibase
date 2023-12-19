@@ -25,14 +25,14 @@ interface PackageMeta {
     accounts: string[];
 }
 
-//interface PackageInfo extends PackageMeta {
-//    url: string;
-//    sha256: string;
-//}
+interface PackageInfo extends PackageMeta {
+    file: string;
+    sha256: string;
+}
 
-type PackageIndex = PackageMeta[];
+type PackageIndex = PackageInfo[];
 
-type PackageMap = { [key: string]: PackageMeta };
+type PackageMap = { [key: string]: PackageInfo };
 
 interface TypeFormProps {
     typeForm: UseFormReturn<InstallType>;
@@ -67,7 +67,6 @@ interface InstallFormProps {
 }
 
 interface BootPageProps {
-    producer?: string;
     config?: PsinodeConfig;
     refetchConfig: () => void;
 }
@@ -353,11 +352,7 @@ function resolvePackages(index: PackageMap, names: string[]): string[] {
     return result;
 }
 
-export const BootPage = ({
-    producer,
-    config,
-    refetchConfig,
-}: BootPageProps) => {
+export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
     const [bootState, setBootState] = useState<BootState>();
 
     let [serviceIndex, serviceIndexError] = useGetJson<PackageIndex>(
@@ -370,7 +365,7 @@ export const BootPage = ({
     });
     const servicesForm = useForm<ServicesType>();
     const producerForm = useForm<ProducerType>({
-        defaultValues: { producer: producer || "" },
+        defaultValues: { producer: config?.producer || "" },
     });
 
     const [currentPage, setCurrentPage] = useState<string>("type");
