@@ -18,6 +18,7 @@
         "@dnd-kit/utilities": "^3.2.0",
         "@headlessui/react": "^1.6.4",
         "@heroicons/react": "v1",
+        "@psibase/plugin": "^0.0.1-development",
         "@rollup/plugin-alias": "^4.0.2",
         "@tanstack/react-query": "^4.20.4",
         "classnames": "^2.3.1",

@@ -376,6 +376,13 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
+"@psibase/plugin@^0.0.1-development":
+  version "0.0.1-development"
+  resolved "https://registry.yarnpkg.com/@psibase/plugin/-/plugin-0.0.1-development.tgz#edfb9eeaf924e368ea03e22012ebf62a3fb19fd4"
+  integrity sha512-xvgsaVFpmofu4I24+LNCjXSTgoXlLiYAdCrpMbfuamQpxiqjkie4Oi6sutJhEunqn8nvS4i+vtYrid1loyXvww==
+  dependencies:
+    penpal "^6.2.2"
+
 "@remix-run/router@1.8.0":
   version "1.8.0"
   resolved "https://registry.yarnpkg.com/@remix-run/router/-/router-1.8.0.tgz#e848d2f669f601544df15ce2a313955e4bf0bafc"
@@ -1709,6 +1716,11 @@ pathval@^1.1.1:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/pathval/-/pathval-1.1.1.tgz#8534e77a77ce7ac5a2512ea21e0fdb8fcf6c3d8d"
   integrity sha512-Dp6zGqpTdETdR63lehJYPeIOqpiNBNtc7BpWSLrOje7UaIsE5aY92r/AunQA7rsXvet3lrJ3JnZX29UPTKXyKQ==
+
+penpal@^6.2.2:
+  version "6.2.2"
+  resolved "https://registry.yarnpkg.com/penpal/-/penpal-6.2.2.tgz#20a0a0592881a959e8c87116d854f9528b1aa601"
+  integrity sha512-RQD7hTx14/LY7QoS3tQYO3/fzVtwvZI+JeS5udgsu7FPaEDjlvfK9HBcme9/ipzSPKnrxSgacI9PI7154W62YQ==
 
 picocolors@^1.0.0:
   version "1.0.0"
