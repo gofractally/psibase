@@ -304,6 +304,7 @@ psibase_package(
     WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm
     FLAGS allowSudo allowWriteNative
     DEPENDS wasm
+    PACKAGE_DEPENDS AccountSys CpuSys
 )
 
 psibase_package(
@@ -319,6 +320,7 @@ psibase_package(
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist /
     DEPENDS ${AccountSys_js_dep}
     DEPENDS wasm
+    PACKAGE_DEPENDS AuthAnySys
 )
 
 psibase_package(
