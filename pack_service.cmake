@@ -218,6 +218,7 @@ function(psibase_package)
         add_custom_command(
             OUTPUT ${outdir}/script/postinstall.json
             DEPENDS ${_POSTINSTALL}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${outdir}/script
             COMMAND ${CMAKE_COMMAND} -E create_symlink ${_POSTINSTALL} ${outdir}/script/postinstall.json
         )
         list(APPEND contents script/postinstall.json)
