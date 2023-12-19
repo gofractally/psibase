@@ -106,7 +106,6 @@ pub fn get_initial_actions<R: Read + Seek>(
     initial_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
-    install_token_users: bool,
     service_packages: &mut [PackagedService<R>],
 ) -> Vec<Action> {
     let mut actions = Vec::new();
@@ -131,41 +130,8 @@ pub fn get_initial_actions<R: Read + Seek>(
         }
     }
 
-    if install_token_users {
-        #[allow(clippy::inconsistent_digit_grouping)]
-        let mut create_and_fund_example_users = vec![
-            new_account_action(account_sys::SERVICE, account!("alice")),
-            new_account_action(account_sys::SERVICE, account!("bob")),
-            Action {
-                sender: account!("symbol-sys"),
-                service: account!("token-sys"),
-                method: method!("setTokenConf"),
-                rawData: (1u32, method!("untradeable"), false).packed().into(),
-            },
-            Action {
-                sender: account!("symbol-sys"),
-                service: account!("token-sys"),
-                method: method!("mint"),
-                rawData: (1u32, (1_000_000_00000000_u64,), "memo").packed().into(),
-            },
-            Action {
-                sender: account!("symbol-sys"),
-                service: account!("token-sys"),
-                method: method!("credit"),
-                rawData: (1u32, account!("alice"), (1_000_00000000_u64,), "memo")
-                    .packed()
-                    .into(),
-            },
-            Action {
-                sender: account!("symbol-sys"),
-                service: account!("token-sys"),
-                method: method!("credit"),
-                rawData: (1u32, account!("bob"), (1_000_00000000_u64,), "memo")
-                    .packed()
-                    .into(),
-            },
-        ];
-        actions.append(&mut create_and_fund_example_users);
+    for s in &mut service_packages[..] {
+        s.postinstall(&mut actions).unwrap()
     }
 
     actions.push(set_producers_action(
@@ -220,18 +186,12 @@ pub fn create_boot_transactions<R: Read + Seek>(
     initial_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
-    install_token_users: bool,
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
 ) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)];
-    let mut actions = get_initial_actions(
-        initial_key,
-        initial_producer,
-        install_ui,
-        install_token_users,
-        service_packages,
-    );
+    let mut actions =
+        get_initial_actions(initial_key, initial_producer, install_ui, service_packages);
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -291,14 +251,8 @@ pub fn js_create_boot_transactions(
     let prod =
         ExactAccountNumber::from_str(&producer).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-    let (boot_transactions, transactions) = create_boot_transactions(
-        &None,
-        prod.into(),
-        true,
-        true,
-        expiration,
-        &mut services[..],
-    );
+    let (boot_transactions, transactions) =
+        create_boot_transactions(&None, prod.into(), true, expiration, &mut services[..]);
 
     let boot_transactions = boot_transactions.packed();
     let transactions: Vec<ByteBuf> = transactions
@@ -319,7 +273,7 @@ pub fn js_get_initial_actions(producer: String) -> Result<JsValue, JsValue> {
     let prod =
         ExactAccountNumber::from_str(&producer).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-    let actions = get_initial_actions(&None, prod.into(), true, true, &mut services[..]);
+    let actions = get_initial_actions(&None, prod.into(), true, &mut services[..]);
 
     Ok(serde_wasm_bindgen::to_value(&actions)?)
 }

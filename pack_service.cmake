@@ -76,7 +76,7 @@ endfunction()
 #   DATA GLOB <path>... <dir> - Uploads multiple files to a directory
 #   INIT                    - The service has an init action that should be run with no arguments
 function(psibase_package)
-    set(keywords NAME DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA WASM FLAGS SERVER INIT)
+    set(keywords NAME DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA WASM FLAGS SERVER INIT POSTINSTALL)
     foreach(keyword IN LISTS keywords)
         set(_${keyword})
     endforeach()
@@ -128,6 +128,8 @@ function(psibase_package)
                 list(APPEND _FLAGS_${_SERVICE} ${ARGV${n}})
             elseif(current_keyword STREQUAL "SERVER")
                 set(_SERVER_${_SERVICE} ${ARGV${n}})
+            elseif(current_keyword STREQUAL "POSTINSTALL")
+                set(_POSTINSTALL ${ARGV${n}})
             else()
                 message(FATAL_ERROR "Invalid arguments to psibase_package")
             endif()
@@ -211,6 +213,15 @@ function(psibase_package)
             list(APPEND contents data/${service})
         endif()
     endforeach()
+
+    if(_POSTINSTALL)
+        add_custom_command(
+            OUTPUT ${outdir}/script/postinstall.json
+            DEPENDS ${_POSTINSTALL}
+            COMMAND ${CMAKE_COMMAND} -E create_symlink ${_POSTINSTALL} ${outdir}/script/postinstall.json
+        )
+        list(APPEND contents script/postinstall.json)
+    endif()
 
     set(deps)
     foreach(file IN LISTS contents)

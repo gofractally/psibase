@@ -196,6 +196,14 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn get_accounts(&self) -> &[AccountNumber] {
         &self.meta.accounts
     }
+    pub fn postinstall(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            actions.append(&mut serde_json::de::from_str(&std::io::read_to_string(
+                file,
+            )?)?);
+        }
+        Ok(())
+    }
 }
 
 fn dfs<T: PackageRegistry + ?Sized>(

@@ -539,12 +539,21 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/TokenUsers.psi
+    NAME TokenUsers
+    DESCRIPTION "Initial token users"
+    ACCOUNTS alice bob
+    PACKAGE_DEPENDS TokenSys SymbolSys
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/src/TokenUsers.json
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Default.psi
     NAME Default
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys DocSys
                     ExploreSys FractalSys InviteSys NftSys ProducerSys ProxySys
-                    PsiSpaceSys SetCodeSys SymbolSys TokenSys TransactionSys
+                    PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys
 )
 
 function(write_package_index out)
@@ -563,7 +572,7 @@ endfunction()
 write_package_index(${SERVICE_DIR}/index.json
     AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
     DocSys ExploreSys FractalSys InviteSys NftSys ProducerSys ProxySys
-    PsiSpaceSys SetCodeSys SymbolSys TokenSys TransactionSys)
+    PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -584,6 +593,7 @@ install(
           ${SERVICE_DIR}/PsiSpaceSys.psi
           ${SERVICE_DIR}/SetCodeSys.psi
           ${SERVICE_DIR}/SymbolSys.psi
+          ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/TokenSys.psi
           ${SERVICE_DIR}/TransactionSys.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/

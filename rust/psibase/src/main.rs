@@ -545,7 +545,7 @@ async fn boot(
         &services[..]
     })?;
     let (boot_transactions, transactions) =
-        create_boot_transactions(key, producer.into(), true, true, expiration, &mut packages);
+        create_boot_transactions(key, producer.into(), true, expiration, &mut packages);
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
