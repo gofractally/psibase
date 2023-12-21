@@ -1,6 +1,5 @@
 import "./App.css";
 import reactLogo from "./assets/react.svg";
-import { helloWorld } from "./lib/hello.js";
 import viteLogo from "/vite.svg";
 import { connect } from "@psibase/plugin";
 import { useEffect, useState } from "react";
@@ -20,9 +19,7 @@ function App() {
   };
 
   useEffect(() => {
-    const res = helloWorld();
     init();
-    console.log(res, "was res");
   }, []);
 
   return (
