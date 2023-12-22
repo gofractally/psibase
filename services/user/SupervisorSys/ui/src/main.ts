@@ -1,4 +1,3 @@
-import { helloWorld } from "./lib/hello.js";
 import { connectToParent } from "penpal";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -20,13 +19,24 @@ const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
   "method" in param &&
   "params" in param;
 
+const wasmUrl = (service: string) => `./${service}.wasm`;
+
 const functionCall = async (param: FunctionCallParam) => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
-  console.log(param, "I should handle");
 
-  const res = await helloWorld();
-  return res;
+  const { service } = param;
+
+  const { load } = await import("rollup-plugin-wit-component");
+
+  const url = wasmUrl(service);
+
+  const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
+
+  // @ts-expect-error fff
+  const module = await load(/* @vite-ignore */ wasmBytes);
+
+  return module.call();
 };
 
 const connection = connectToParent({
