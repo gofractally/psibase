@@ -748,7 +748,6 @@ namespace arbtrie
                                                                              node_type type,
                                                                              auto      init)
    {
-      assert( size < 8000 ); // TODO remove
    //   std::cerr << "realloc " << id <<" size: " << size <<" \n";
       // TODO: mark the free space associated with the current location of id
       assert(size >= sizeof(node_header));
@@ -772,7 +771,6 @@ namespace arbtrie
                                                                            node_type type,
                                                                            auto      init)
    {
-      assert( size < 8000 ); // TODO remove
       assert(size >= sizeof(node_header));
       assert(type != node_type::undefined);
 
