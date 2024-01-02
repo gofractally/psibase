@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 
 import {
     useAccountsWithKeys,
@@ -16,6 +16,10 @@ import {
 } from "./components";
 import { getLoggedInUser, updateAccountInCommonNav } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
+import { connect } from "@psibase/plugin";
+
+// deploy the wasm
+// install the plugin
 
 // needed for common files that won't necessarily use bundles
 window.React = React;
@@ -39,6 +43,8 @@ export interface AccountWithKey extends AccountWithAuth {
     privateKey: KeyPairWithAccounts["privateKey"];
 }
 
+//  psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree r-account-sys / ./dist/ -S r-account-sys
+
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
     const [allAccounts, refreshAccounts] = useAccounts();
@@ -60,6 +66,33 @@ function App() {
         }
         dropAccount(account);
     };
+
+    const ran = useRef(false);
+
+    const init = async () => {
+        if (ran.current) return;
+        ran.current = true;
+        console.count("init");
+        // psibase -a http://psibase.127.0.0.1.sslip.io:8079 create supervisor-sys --insecure
+
+        const supervisor = await connect({});
+        console.log(supervisor, "came back casey");
+        try {
+            const res = await supervisor.functionCall({
+                service: "account-sys",
+                method: "helloWorld",
+                params: {},
+            });
+
+            console.log({ supervisor, res, x: 111 });
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    useEffect(() => {
+        init();
+    }, []);
 
     useInitialized(async () => {
         try {

@@ -9,6 +9,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@psibase/plugin": "^0.0.7",
         "@rollup/plugin-alias": "^3.1.9",
         "@types/node": "^18.7.7",
         "classnames": "^2.3.2",
