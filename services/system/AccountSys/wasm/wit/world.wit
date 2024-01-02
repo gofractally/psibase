@@ -1,0 +1,6 @@
+package component:account-sys;
+
+world example {
+    export hello-world: func() -> string;
+    export call: func() -> string;
+}
