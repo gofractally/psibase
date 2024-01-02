@@ -1,0 +1,19 @@
+{
+  "name": "app2",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8"
+  },
+  "dependencies": {
+    "penpal": "^6.2.2",
+    "rollup-plugin-wit-component": "^0.1.3"
+  }
+}

@@ -1,4 +1,4 @@
-import { connectToParent } from "penpal";
+import { connectToParent, connectToChild } from "penpal";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -12,6 +12,10 @@ interface FunctionCallParam<T = any> {
   params: T;
 }
 
+interface PenpalObj {
+  functionCall: (param: FunctionCallParam) => Promise<any>;
+}
+
 const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
   typeof param === "object" &&
   param !== null &&
@@ -19,24 +23,73 @@ const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
   "method" in param &&
   "params" in param;
 
-const wasmUrl = (service: string) => `./${service}.wasm`;
+const loadedServices: { service: string; obj: PenpalObj }[] = [];
+
+// Connect spins up the supervisor iframe,
+// The app sends a message to supervisor for app2,
+// Supervisor spins up app2 in an iframe
+// Sends a message to app2, app2 sends a message back to supervisor
+// Supervisor sends a message back to app1
+
+const getSupervisorHref = (subDomain = "supervisor-sys"): string => {
+  const currentUrl = window.location.href;
+  const url = new URL(currentUrl);
+  const hostnameParts = url.hostname.split(".");
+
+  hostnameParts.shift();
+  hostnameParts.unshift(subDomain);
+  url.hostname = hostnameParts.join(".");
+
+  return url.origin;
+};
+
+const createIFrameService = async (service: string): Promise<PenpalObj> => {
+  const iframe = document.createElement("iframe");
+  iframe.src = getSupervisorHref(service);
+  iframe.style.display = "none";
+
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    document.body.appendChild(iframe);
+  } else {
+    document.addEventListener("DOMContentLoaded", () => {
+      document.body.appendChild(iframe);
+    });
+  }
+
+  const connection = connectToChild({
+    iframe,
+    methods: {
+      add: (a: number, b: number) => a + b,
+    },
+  });
+
+  return connection.promise as unknown as Promise<PenpalObj>;
+};
+
+const getConnection = async (service: string): Promise<PenpalObj> => {
+  const existingService = loadedServices.find((s) => s.service === service);
+  if (existingService) return existingService.obj;
+  const obj = await createIFrameService(service);
+  loadedServices.push({ service, obj });
+
+  return obj;
+};
 
 const functionCall = async (param: FunctionCallParam) => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
   const { service } = param;
+  const connection = await getConnection(service);
+  const res = await connection.functionCall(param);
 
-  const { load } = await import("rollup-plugin-wit-component");
-
-  const url = wasmUrl(service);
-
-  const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
-
-  // @ts-expect-error fff
-  const module = await load(/* @vite-ignore */ wasmBytes);
-
-  return module.call();
+  return {
+    res,
+    service,
+  };
 };
 
 const connection = connectToParent({
@@ -62,3 +115,6 @@ connection.promise.then((parent) => {
 // Await the compiled WASM
 // Just create a vanilla VITE and figure out how to transpile it in the vanilla world.
 // Function is called `call` no params, returns a string
+
+// npm create vite@latest App1 -- --template react-ts
+// psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree psispace-sys / ./dist/ -S app2
