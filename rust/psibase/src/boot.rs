@@ -259,15 +259,3 @@ pub fn js_create_boot_transactions(
         transactions,
     ))?)
 }
-
-/// Gets an unpacked view of the transactions committed to during boot.
-#[wasm_bindgen]
-pub fn js_get_initial_actions(producer: String) -> Result<JsValue, JsValue> {
-    let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
-    let prod =
-        ExactAccountNumber::from_str(&producer).map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-    let actions = get_initial_actions(&None, prod.into(), true, &mut services[..]);
-
-    Ok(serde_wasm_bindgen::to_value(&actions)?)
-}
