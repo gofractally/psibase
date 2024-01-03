@@ -977,8 +977,7 @@ namespace triedent
 
          if (!unique or not in->has_branch(b))  // copy on write
          {
-            auto      original_value = in->value();
-            object_id cur_b          = in->has_branch(b) ? in->branch(b) : object_id{};
+            object_id cur_b = in->has_branch(b) ? in->branch(b) : object_id{};
             auto      new_b =
                 add_child(session, cur_b, false, type, key.substr(cpre.size() + 1), val, old_size);
             in.reload(ring(), session);
