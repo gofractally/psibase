@@ -65,7 +65,7 @@ endfunction()
 # NAME <name>               - The name of the package
 # DESCRIPTION <text>        - The package description
 # OUTPUT <filename>         - The package file. Defaults to ${NAME}.psi
-# ACCONTS <name>...         - Additional non-service accounts to create
+# ACCOUNTS <name>...        - Additional non-service accounts to create
 # DEPENDS <targets>...      - Targets that this target depends on
 # PACKAGE_DEPENDS <name>... - Other psibase packages that the package depends on
 # SERVICE <name>            - The account name of a service
@@ -75,6 +75,7 @@ endfunction()
 #   DATA <path> <dest>      - Uploads a file or directory to the target location
 #   DATA GLOB <path>... <dir> - Uploads multiple files to a directory
 #   INIT                    - The service has an init action that should be run with no arguments
+#   POSTINSTALL <filename>  - Additional actions that should be run at the end of installation
 function(psibase_package)
     set(keywords NAME DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA WASM FLAGS SERVER INIT POSTINSTALL)
     foreach(keyword IN LISTS keywords)
