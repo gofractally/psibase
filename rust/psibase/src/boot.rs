@@ -176,12 +176,6 @@ pub fn get_initial_actions<R: Read + Seek>(
 /// If it is not set, then this initializes all accounts to use
 /// `auth-any-sys` (no keys required) and sets it up so producers
 /// don't need to sign blocks.
-///
-/// The interface to this function doesn't support customization.
-/// If you want a custom boot, then use `boot.rs` as a guide to
-/// create your own.
-// TODO: switch to builder pattern
-// TODO: sometimes tries to set keys on non-existing accounts
 pub fn create_boot_transactions<R: Read + Seek>(
     initial_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
