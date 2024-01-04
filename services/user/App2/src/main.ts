@@ -48,3 +48,16 @@ connection.promise.then((parent) => {
   // @ts-ignore
   parent.add(3, 1).then((total) => console.log(total));
 });
+
+
+// Rust function
+
+const rustFunction = () => {
+  // do stuff
+  // 
+  this.addActions(['fwefweh']);
+
+  setTimeout(() => {
+    this.addActions(['fewfew'], 3000)
+  })
+}
