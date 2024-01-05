@@ -1,0 +1,14 @@
+package component:wasm1;
+
+interface types {
+    record numbers {
+        num-a: s32,
+        num-b: s32,
+    }
+}
+
+world wasm1 {
+    use types.{numbers};
+    export sum: func(numbers: numbers) -> s32;
+    export multiply: func(numbers: numbers) -> s32;
+}
