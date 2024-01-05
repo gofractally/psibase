@@ -31,7 +31,7 @@ const loadedServices: { service: string; obj: PenpalObj }[] = [];
 // Sends a message to app2, app2 sends a message back to supervisor
 // Supervisor sends a message back to app1
 
-const getSupervisorHref = (subDomain = "supervisor-sys"): string => {
+const getLoaderDomain = (subDomain = "supervisor-sys"): string => {
   const currentUrl = window.location.href;
   const url = new URL(currentUrl);
   const hostnameParts = url.hostname.split(".");
@@ -40,12 +40,12 @@ const getSupervisorHref = (subDomain = "supervisor-sys"): string => {
   hostnameParts.unshift(subDomain);
   url.hostname = hostnameParts.join(".");
 
-  return url.origin;
+  return url.origin + "/loader";
 };
 
 const createIFrameService = async (service: string): Promise<PenpalObj> => {
   const iframe = document.createElement("iframe");
-  iframe.src = getSupervisorHref(service);
+  iframe.src = getLoaderDomain(service);
   iframe.style.display = "none";
 
   if (
@@ -82,8 +82,19 @@ const functionCall = async (param: FunctionCallParam) => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
+  console.log("functionCall", param);
+
   const { service } = param;
+
+  // if (service == "account-sys") {
+  //   return {
+  //     res: "account-sys shortcut",
+  //     service,
+  //   };
+  // }
+
   const connection = await getConnection(service);
+  console.log("connection", connection);
   const res = await connection.functionCall(param);
 
   return {
