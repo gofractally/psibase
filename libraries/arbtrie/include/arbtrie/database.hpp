@@ -59,17 +59,16 @@ namespace arbtrie
       read_session(database& db);
       database&              _db;
 
-      void release( object_id id);
-
      public:
       // TODO make private
       seg_allocator::session _segas;
 
       root get_root();
       /**
-             * @return -1 if not found, otherwise the size of the value
-             */
+       * @return -1 if not found, otherwise the size of the value
+       */
       int get(root& r, key_view key, std::vector<char>* result = nullptr);
+      bool validate( const root& r );
    };
 
    class write_session : public read_session
@@ -79,7 +78,6 @@ namespace arbtrie
 
       object_id upsert(session_rlock& state,
                        object_id   root,
-                       bool        unique,
                        key_view    key,
                        value_view  val,
                        int&        old_size);
@@ -87,7 +85,7 @@ namespace arbtrie
      public:
       ~write_session();
 
-      root create_root() { return root(*this); }
+      node_handle create_root() { return node_handle(*this); }
 
       void set_root(const root&);
 
@@ -96,7 +94,7 @@ namespace arbtrie
       /**
              * @return -1 on insert, otherwise the size of the old value
              */
-      int upsert(root& r, key_view key, value_view val);
+      int upsert(node_handle& r, key_view key, value_view val);
 
       // r must not be a reference to subtree, but it can be
       // a reference to a copy of subtree
@@ -118,6 +116,7 @@ namespace arbtrie
       read_session  start_read_session();
 
       void start_compact_thread();
+      void stop_compact_thread();
       bool compact_next_segment();
 
       void print_stats(std::ostream& os, bool detail = false);

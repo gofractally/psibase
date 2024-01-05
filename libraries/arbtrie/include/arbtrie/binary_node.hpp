@@ -75,8 +75,10 @@ namespace arbtrie
 
       static_assert(sizeof(key_val_pair) == 2);
 
+      uint16_t _start_key_pos;  // bytes from tail of first key_val_pair
       uint16_t _key_offsets[];
 
+      int spare_capacity() const { return (tail() - _start_key_pos) - end_offsets(); }
       static const node_type type = node_type::binary;
       inline static bool can_inline(value_view val) { return val.size() <= max_inline_value_size; }
 
@@ -93,13 +95,17 @@ namespace arbtrie
       inline const uint16_t* key_offsets() const { return _key_offsets; }
       inline const uint16_t& key_offset(int p) const { return _key_offsets[p]; }
 
-      inline key_val_pair* start_keys() { return (key_val_pair*)(key_offsets() + num_branches()); }
+      inline char*       end_offsets() { return (char*)(_key_offsets + num_branches()); }
+      inline const char* end_offsets() const { return (const char*)(_key_offsets + num_branches()); }
+
+      inline key_val_pair*       start_keys() { return (key_val_pair*)(tail() - _start_key_pos); }
       inline const key_val_pair* start_keys() const
       {
-         return (const key_val_pair*)(key_offsets() + num_branches());
+         return (const key_val_pair*)(tail() - _start_key_pos);
       }
 
-      inline uint16_t key_val_section_size() const { return tail() - (char*)start_keys(); }
+      inline uint16_t key_val_section_size() const { return _start_key_pos; }
+      //tail() - (char*)start_keys(); }
 
       inline key_val_pair* get_key_val_ptr(int n)
       {
@@ -148,20 +154,32 @@ namespace arbtrie
          return right;
       }
 
-      bool validate()const {
-         assert( _nsize < 65000 );
+      bool validate() const
+      {
+         assert(_nsize < 65000);
          auto nb = num_branches();
-         for( int i = 0; i < nb; ++i ) {
+         for (int i = 0; i < nb; ++i)
+         {
             auto kvp = get_key_val_ptr(i);
-            assert( (char*)kvp < tail() );
-            assert( kvp->value_size() > 0 );
-            assert( kvp->key_size() < 130);
+            assert((char*)kvp < tail());
+            assert(kvp->value_size() > 0);
+            assert(kvp->key_size() < 130);
          }
 
          return true;
       }
 
+      // returns the space required to add a key/val, counts:
+      //   2 byte offset
+      //   2 byte sizes of key/val
+      //   the actual data of key/val
+      static int space_required(key_view key, value_view val)
+      {
+         return 4 + key.size() + (can_inline(val) ? val.size() : sizeof(object_id));
+      }
+
    } __attribute((packed));
+   static_assert(sizeof(binary_node) == sizeof(node_header) + 2);
 
 }  // namespace arbtrie
 

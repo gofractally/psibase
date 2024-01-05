@@ -9,6 +9,77 @@ namespace arbtrie
    class read_session;
    using root_ptr = std::shared_ptr<root>;
 
+
+
+  /**
+   * Responsible for maintaining reference count for id and
+   * releasing it.
+   */
+  class node_handle {
+     public:
+        node_handle( read_session& s ):_session(&s){}
+        ~node_handle() {
+           release();
+        }
+
+        node_handle( node_handle&& mv )
+        :_id(mv._id),_session(mv._session) { mv._id = {}; }
+
+        node_handle( const node_handle& cp)
+        :_id(cp._id),_session(cp._session) { 
+          retain();   
+        }
+
+        node_handle& operator=(const node_handle& other ) {
+           if( this == &other ) return *this;
+           release();
+           _id = other._id;
+           retain();
+           return *this;
+        }
+
+        node_handle& operator=(node_handle&& other ) {
+           if( this == &other ) return *this;
+           return give( other.take() );
+        }
+
+        object_id id()const{ return _id; }
+        int ref()const;
+
+        /** The caller takes responsibility for releasing the id
+         * that is returned.
+         */
+        object_id take() { 
+           auto tmp = _id;
+           _id = {};//.id = 0;
+           return tmp;
+        }
+
+        /**
+         * Give this handle the responsiblity of releasing the given_id
+         */
+        node_handle& give( object_id given_id ) {
+           release();
+           _id = given_id;
+           return *this;
+        }
+
+
+     private:
+        void release();
+        void retain();
+
+        object_id     _id;
+        read_session* _session;
+
+  };
+
+
+
+
+
+
+
    class root_data
    {
       friend class root;
@@ -41,13 +112,15 @@ namespace arbtrie
 
 
      public:
-      root_data(read_session* ses, std::shared_ptr<root_data> ancestor = {}, object_id id = {})
+      root_data(read_session* ses, std::shared_ptr<root_data> ancestor = {}, object_id id = {});
+      /*
           : session(ses), ancestor(std::move(ancestor)), id(id)
       {
          if constexpr (debug_roots)
             std::cout << id.id << ": root(): ancestor=" << (ancestor ? ancestor->id.id : 0)
                       << std::endl;
       }
+      */
 
 
       root_data(const root_data&) = delete;
@@ -63,13 +136,16 @@ namespace arbtrie
      public:
       friend class read_session;
       friend class write_session;
-      bool is_unique() const { return _data and _data.use_count() == 1 and not _data->ancestor; }
+      bool is_unique() const;
       object_id id()const { return _data->id; }
+      int references() const { return _data.use_count(); }
 
       root(root&& mv)      = default;
       root(const root& cp) = default;
-      ~root()              = default;
+      ~root() = default;
 
+      root& operator = ( root&& r ) = default;
+      root& operator = ( const root& r ) = default;
      private:
       root(read_session& rs) { _data = std::make_shared<root_data>(&rs, nullptr, object_id()); }
       root(read_session& rs, object_id id)

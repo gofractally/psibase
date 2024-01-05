@@ -2,6 +2,9 @@
 #include <arbtrie/node_meta.hpp>
 #include <string_view>
 
+#define XXH_INLINE_ALL
+#include <arbtrie/xxhash.h>
+
 namespace arbtrie
 {
    struct node_header
@@ -10,7 +13,7 @@ namespace arbtrie
       uint32_t _ntype : 4;         // bytes allocated for this node
       uint32_t _nsize : 28;        // bytes allocated for this node
       uint64_t _num_branches : 9;  // number of branches space is reserved for
-      uint64_t _unused : 5;        // number of branches actually set
+      uint64_t _unused : 5;        
       uint64_t _prefix_len : 10;   // number of bytes in up to 1024
       uint64_t _node_id : 40;
 
@@ -60,12 +63,12 @@ namespace arbtrie
       inline uint32_t     object_capacity() const { return (_nsize + 15) & -16; }
       inline node_header* next() const { return (node_header*)(((char*)this) + object_capacity()); }
 
-      bool validate_checksum() const
-      {
-         return true;  // TODO
+      uint32_t calculate_checksum() {
+        return XXH3_64bits( ((char*)this)+sizeof(checksum), size() - sizeof(checksum) );
       }
-      void update_checksum() {}
-   } __attribute((packed)) __attribute((aligned(16)));
+      void update_checksum()   { checksum = calculate_checksum();         }
+      bool validate_checksum() { return checksum == calculate_checksum(); }
+   } __attribute((packed));
 
    static_assert(sizeof(node_header) == 16);
 

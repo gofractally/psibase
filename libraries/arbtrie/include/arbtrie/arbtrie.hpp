@@ -107,6 +107,7 @@ namespace arbtrie
 
       inline void set_prefix(key_view pre)
       {
+         assert( _spare_capacity == 0 );
          assert(pre.size() <= prefix_capacity());
          _prefix_truncate = prefix_capacity() - pre.size();
          memcpy(prefix, pre.data(), pre.size());
@@ -123,6 +124,7 @@ namespace arbtrie
       }
       inline id_type get_branch(uint8_t br) const
       {
+         assert( _spare_capacity == 0 );
          auto pos = get_setlist().find(br);
          if (pos != key_view::npos)
          {
@@ -133,30 +135,16 @@ namespace arbtrie
 
       std::pair<uint8_t, object_id> get_by_index(int index) const
       {
+         assert( _spare_capacity == 0 );
          return std::pair<uint8_t, object_id>(setlist()[index], branches()[index + _has_eof_value]);
       }
-
-      /*
-      inline static setlist_node* make(uint16_t nbranch, key_view cprefix, bool has_eof)
-      {
-         //    std::cerr << "make nbr: " << nbranch << " cpre: '" << cprefix << "' eof: " << int(has_eof)
-         //             << "\n";
-         auto asize = sizeof(node_header) + 1 + cprefix.size() + nbranch - 1 +
-                      has_eof * sizeof(id_type) + nbranch * (sizeof(id_type));
-         //     std::cerr << "asize: " << asize << "\n";
-         auto sln              = node_header::make<setlist_node>(asize, nbranch, cprefix.size());
-         sln->_has_eof_value   = has_eof;
-         sln->_prefix_truncate = 0;
-         memcpy(sln->prefix, cprefix.data(), cprefix.size());
-         return sln;
-      }
-      */
 
       // @param index is the index in the setlist, exclusive of the eof byte
       // @param byte is the radix of the branch that child is associated with
       // @param byte is the value
       inline void set_index(int index, int8_t byte, id_type child)
       {
+         assert( _spare_capacity == 0 );
          assert(index < num_branches());
          setlist()[index]                   = byte;
          branches()[index + _has_eof_value] = child;
@@ -165,6 +153,7 @@ namespace arbtrie
       // @pre has_value() == true
       inline void set_eof_branch(id_type child)
       {
+         assert( _spare_capacity == 0 );
          assert(_has_eof_value);
          branches()[0] = child;
       }
@@ -178,21 +167,25 @@ namespace arbtrie
       // the eof branch isn't in the set list, so we sub 1 from num_branches
       id_type* branches()
       {
+         assert( _spare_capacity == 0 );
          assert(_has_eof_value + num_branches() > 0);
-         return (id_type*)(setlist() + num_branches()-has_eof_value());
+         return (id_type*)(setlist() + num_branches()-has_eof_value()+_spare_capacity);
       }
       const id_type* branches() const
       {
+         assert( _spare_capacity == 0 );
          assert(_has_eof_value + num_branches() > 0);
-         return (id_type*)(setlist() + num_branches()-has_eof_value());
+         return (id_type*)(setlist() + num_branches()-has_eof_value()+_spare_capacity);
       }
 
       inline std::string_view get_setlist() const
       {
+         assert( _spare_capacity == 0 );
          return std::string_view((char*)setlist(), num_branches() - has_eof_value());
       }
 
      //private:
+      uint8_t _spare_capacity = 0;
       uint8_t _has_eof_value : 1;
       uint8_t _prefix_truncate : 7;
       uint8_t prefix[];
@@ -200,23 +193,30 @@ namespace arbtrie
 
       static constexpr uint32_t calc_expected_size( uint32_t prefix_len,
                                                uint32_t branches,
-                                               bool     has_eof ) {
-        return sizeof(node_header) + 1 + prefix_len + (branches-has_eof) + branches*sizeof(object_id); 
+                                               bool     has_eof,
+                                               int spare = 0 ) {
+        assert( branches + spare < 258 );
+        return sizeof(node_header) + 2 + prefix_len + (branches-has_eof+spare) + (spare+branches)*sizeof(object_id); 
       }
 
       uint32_t expected_size()const {
-         return sizeof(node_header) + 1 + _prefix_len + 
-            (_num_branches - _has_eof_value) + (_num_branches * sizeof(object_id));
+         assert( _spare_capacity == 0 );
+         return sizeof(node_header) + 2 + _prefix_len + 
+            (_num_branches - _has_eof_value + _spare_capacity) + ((_spare_capacity+_num_branches) * sizeof(object_id));
       }
-      bool check_size()const { return expected_size() == _nsize; }
+      bool check_size()const { 
+         assert( _spare_capacity == 0 );
+         return expected_size() == _nsize; 
+      }
 
       // notional data layout
       // --------------------
+      // uint8_t spare_capacity
       // uint8_t has_value:1;  // because there are 257 possible branches and uint8 only suppors 256
       // uint8_t prefix_trunc:7;  // bytes subtracted from prefix_capacity to get prefix size
       // char    prefix[prefix_capacity];
-      // uint8_t setlist[ num_branches-_has_eof_value ];
-      // id_type branches[ num_branches ];
+      // uint8_t setlist[ num_branches-_has_eof_value + _spare_capacity ];
+      // id_type branches[ num_branches + _spare_capacity ];
    } __attribute((packed));
 
    struct bitfield_node : node_header

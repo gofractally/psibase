@@ -3,8 +3,13 @@
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/mapping.hpp>
 #include <arbtrie/node_meta.hpp>
+#include <arbtrie/debug.hpp>
 
 #include <mutex>
+
+#define XXH_INLINE_ALL
+#include <arbtrie/xxhash.h>
+
 
 namespace arbtrie
 {
@@ -32,8 +37,8 @@ namespace arbtrie
       static const uint32_t id_block_size = 1024 * 1024 * 128;
       static_assert(id_block_size % 64 == 0, "should be divisible by cacheline");
 
-      inline static constexpr uint64_t extract_next_ptr(uint64_t x) { return (x >> 19); }
-      inline static constexpr uint64_t create_next_ptr(uint64_t x) { return (x << 19); }
+     // inline static constexpr uint64_t extract_next_ptr(uint64_t x) { return (x >> 19); }
+     // inline static constexpr uint64_t create_next_ptr(uint64_t x) { return (x << 19); }
 
       id_allocator(std::filesystem::path id_file)
           : _data_dir(id_file),
@@ -56,7 +61,7 @@ namespace arbtrie
       std::atomic<uint64_t>& get(object_id id)
       {
          auto abs_pos        = id.id * sizeof(uint64_t);
-         auto block_num      = abs_pos / id_block_size;
+         auto block_num      = abs_pos / id_block_size; // TODO: use a shift
          auto index_in_block = uint64_t(abs_pos) & uint64_t(id_block_size - 1);
          auto ptr            = ((char*)_block_alloc.get(block_num)) + index_in_block;
          return reinterpret_cast<std::atomic<uint64_t>&>(*ptr);
@@ -70,10 +75,7 @@ namespace arbtrie
           */
       std::pair<std::atomic<uint64_t>&, object_id> get_new_id()
       {
-         //    std::cerr << "get new id...\n";
-         //   std::cerr << "   pre alloc free list: ";
-         //  print_free_list();
-
+         ++free_release_count;
          auto brand_new = [&]()
          {
             object_id id{_idheader->_next_alloc.fetch_add(1, std::memory_order_relaxed)};
@@ -82,17 +84,14 @@ namespace arbtrie
             auto& atom = get(id);
             atom.store(object_meta( node_type::undefined ).set_ref(1).to_int(), std::memory_order_relaxed);
 
-            //    std::cerr << " brand new id: " << id.id << "\n";
             return std::pair<std::atomic<uint64_t>&, object_id>(atom, id);
          };
-         //auto r = brand_new();
-         //std::cerr << "get new id: " << r.second.id << "\n";
 
          std::unique_lock<std::mutex> l{_alloc_mutex};
          uint64_t                     ff = _idheader->_first_free.load(std::memory_order_acquire);
          do
          {
-            if (extract_next_ptr(ff) == 0)
+            if ( ff == object_meta(node_type::freelist).to_int() )
             {
                //      std::cerr << "alloc brand new! \n";
                _alloc_mutex.unlock();
@@ -100,9 +99,9 @@ namespace arbtrie
                return brand_new();
             }
          } while (not _idheader->_first_free.compare_exchange_strong(
-             ff, get({extract_next_ptr(ff)}).load(std::memory_order_relaxed)));
+             ff, get({object_meta(ff).raw_loc()}).load(std::memory_order_relaxed)));
 
-         ff = extract_next_ptr(ff);
+         ff = object_meta(ff).raw_loc();
          //      std::cerr << "  reused id: " << ff << "\n";
          auto& ffa = get({ff});
          // store 1 = ref count 1 prevents object as being interpreted as unalloc
@@ -115,35 +114,48 @@ namespace arbtrie
 
       void print_free_list()
       {
-         uint64_t id = extract_next_ptr(_idheader->_first_free.load());
-         std::cerr << id;
+         uint64_t id = object_meta(_idheader->_first_free.load()).raw_loc();
+         std::cerr << "'"<<id<<"'";
          while (id)
          {
-            id = extract_next_ptr(get({id}));
-            std::cerr << ", " << id;
+            id = object_meta(get({id})).raw_loc();
+            if( id )
+               std::cerr << ", " << id;
          }
          std::cerr << " END\n";
       }
 
       void free_id(object_id id)
       {
+         --free_release_count;
+         assert( id );
+         //TRIEDENT_WARN( "free id: ", id );
+         //std::cerr << "flist before free id: ";
+         //print_free_list();
+
          auto& head_free_list = _idheader->_first_free;
          auto& next_free      = get(id);
          auto  new_head       = object_meta(node_type::freelist, id.id).to_int();
 
          uint64_t cur_head = _idheader->_first_free.load(std::memory_order_acquire);
-         assert(not(cur_head & object_meta::ref_mask));
-         assert(not(next_free & object_meta::ref_mask));
          do
          {
+            assert(not(cur_head & object_meta::ref_mask));
+            assert(not(next_free & object_meta::ref_mask));
             next_free.store(cur_head, std::memory_order_release);
          } while (not head_free_list.compare_exchange_weak(cur_head, new_head, std::memory_order_release));
+         //std::cerr << "flist after free id: ";
          //print_free_list();
+         //std::cerr<<"\n\n";
       }
 
       auto& get_mutex( object_id id ) {
-        return _locks[id.id&(8192-1)]; 
+         auto has = XXH3_64bits(&id,sizeof(id));
+        return _locks[has&((4*8192)-1)]; 
       }
+
+      
+      int64_t free_release_count = 0;
 
      private:
       friend class alloc_session;
@@ -198,6 +210,6 @@ namespace arbtrie
 
       ids_header* _idheader;
       mapping     _ids_header_file;
-      std::mutex  _locks[8192];
+      std::mutex  _locks[4*8192];
    };
 };  // namespace arbtrie

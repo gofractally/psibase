@@ -22,10 +22,8 @@ namespace arbtrie
 
    seg_allocator::~seg_allocator()
    {
+      stop_compact_thread();
       cses.reset();
-      _done.store(true);
-      if (_compact_thread.joinable())
-         _compact_thread.join();
    }
 
    void seg_allocator::start_compact_thread()
@@ -40,6 +38,11 @@ namespace arbtrie
                 compact_loop();
              });
       }
+   }
+   void seg_allocator::stop_compact_thread() {
+      _done.store(true);
+      if (_compact_thread.joinable())
+         _compact_thread.join();
    }
 
    /**
@@ -177,11 +180,12 @@ namespace arbtrie
       while (foo < send and foo->id())
       {
          // if the object has been deleted, skip it
-         if (foo->checksum == uint32_t(-1))
+         /*if (foo->checksum == uint32_t(-1))
          {
             foo = foo->next();
             continue;
          }
+         */
 
          // skip anything that has been freed
          // note the ref can go to 0 before foo->check is set to -1
@@ -204,65 +208,94 @@ namespace arbtrie
             foo = foo->next();
             continue;
          }
+         //      std::cerr << "current_loc._offset: " <<current_loc._offset << "  raw: " << obj_ref.raw_loc()
+         //                << "expected: " << (seg_num*segment_size + foo_idx) <<"\n";
 
-         // attempt to move the object requires a lock because the
-         // object could be modified in place while trying to move it.
          {
-            // lock the ID to prevent anyone else from moving or modifying it while we copy
-            std::unique_lock ul(obj_ref.get_mutex());
-
-            // reload the atomic variable and check the invariant that it is
-            // still pointing at us after the lock.
-            obj_ref.refresh();
-
-            auto foo_idx    = (char*)foo - (char*)s;
-            auto expect_loc = obj_ref.loc();
-            if (expect_loc.index() != foo_idx or obj_ref.ref() == 0)
+          //  auto lock_scope = obj_ref.modify();
+            //std::unique_lock lock_scope( obj_ref.get_mutex() );
+            /*
+            if (foo != lock_scope.as<node_header>())
             {
+               TRIEDENT_DEBUG("object moved");
                foo = foo->next();
                continue;
             }
+            */
 
-            // the object hasn't moved nor has its ref count gone to zero so
-            // we commit to alloc memory and memcpy the data
             auto obj_size   = foo->size();
             auto [loc, ptr] = ses.alloc_data(obj_size, foo->id(), foo->get_type());
-            memcpy(ptr, foo, obj_size);
-
-            // get an node_header* to the newly move object to run some checks
-            auto moved_foo = ((node_header*)ptr);
-
-            // release() does not grab the lock, so while we were copying the
-            // object may have been released and foo->check set to -1
-            if (moved_foo->checksum == uint32_t(-1))
+            auto try_move   = [&]()
             {
-               // since we alocated data, we need to indicate that it is not being
-               // used. TODO: investigating resetting the alloc_ptr by -foo->object_size()
-               _header->seg_meta[start_seg_num].free_object(foo->object_capacity());
-            }
+               int count = 0;
+               while (obj_ref.try_start_move(obj_ref.raw_loc()))
+               {
+                  memcpy(ptr, foo, obj_size);
+                //  if( ptr->validate_checksum()) 
+                  switch (obj_ref.move(obj_ref.loc(), loc))
+                  {
+                     case move_result::freed:
+                     case move_result::moved:
+                        // TRIEDENT_DEBUG("object moved or freed while copying");
+                        return false;
+                     case move_result::dirty:
+                        //TRIEDENT_WARN("compactor moving dirty obj, try again");
+                        ++count;
+                        continue;
+                     case move_result::success:
+                        if( count ) {
+                           TRIEDENT_WARN( "success on attempt: ", count );
+                        }
+                        return true;
+                  }
+               }
+           //    TRIEDENT_WARN( "try_move failed in try_start_move" );
+               return false;
+            };
 
-            // after moving the data, check to make sure that the checksum is still
-            // valid. This will difinitively prove that a clean copy was made.
-            else if (not moved_foo->validate_checksum())
+            if (not try_move())
             {
-               bool source_still_valid = foo->validate_checksum();
-               // if it was invalid it means a modification in place was made without a lock
-               // it could also mean memory corruption in the application and this error
-               // should be raised to the user todo: how to report errors from the
-               // background process
-               std::cerr << foo->id() << ": mv checksum invalid: '" << moved_foo->checksum
-                         << "' src check: " << foo->checksum << " src valid:" << source_still_valid
-                         << "\n";
-               _header->seg_meta[start_seg_num].free_object(foo->object_capacity());
+               TRIEDENT_WARN("try move failed, unalloc...", foo->id());
+               _header->seg_meta[start_seg_num].free_object(foo->size());
+              // ses.unalloc(ptr->_nsize);
             }
-            // try move compare and exchange
-            else if (not obj_ref.move(expect_loc, loc))
+            if (not foo->validate_checksum())
             {
-               // if it failed because the object was released or moved by
-               // someone else, then note the free space and move on with life
-               _header->seg_meta[start_seg_num].free_object(foo->object_capacity());
+               TRIEDENT_WARN("moved object with invalid checksum: expected: ",
+                             foo->calculate_checksum(), " != ", foo->checksum);
             }
-         }  // end lock scope
+         }
+
+         // release() does not grab the lock, so while we were copying the
+         // object may have been released (and realloc) and foo->check set to -1
+         // - this fixed bugs in mutex based version, TBD if this is needed now
+         /*
+         if (moved_foo->checksum == uint32_t(-1))
+         {
+            // since we alocated data, we need to indicate that it is not being
+            // used. TODO: investigating resetting the alloc_ptr by -foo->object_size()
+            _header->seg_meta[start_seg_num].free_object(foo->object_capacity());
+         }
+         */
+
+         // after moving the data, check to make sure that the checksum is still
+         // valid. This will difinitively prove that a clean copy was made.
+         // this is not safe because anyone could modify it while doing this calc,
+         // so a try_start_move, end_move would be required and this would have to
+         // run in a loop in case it was modified.
+         /*if (not ptr->validate_checksum())
+         {
+            bool source_still_valid = foo->validate_checksum();
+            // if it was invalid it means a modification in place was made without a lock
+            // it could also mean memory corruption in the application and this error
+            // should be raised to the user todo: how to report errors from the
+            // background process
+            std::cerr << foo->id() << ": mv checksum invalid: '" << moved_foo->checksum
+                      << "' src check: " << foo->checksum << " src valid:" << source_still_valid
+                      << "\n";
+            _header->seg_meta[start_seg_num].free_object(foo->object_capacity());
+         }
+         */
 
          // if ses.alloc_data() was forced to make space in a new segment
          // then we need to sync() the old write segment before moving forward
@@ -281,7 +314,7 @@ namespace arbtrie
             start_seg_num = ses._alloc_seg_num;
          }
          foo = foo->next();
-      }
+      }  // segment object iteration loop
 
       // in order to maintain the invariant that the segment we just cleared
       // can be reused, we must make sure that the data we moved out has persisted to
@@ -311,8 +344,10 @@ namespace arbtrie
 
       // only one thread can move the end_ptr or this will break
       // std::cerr<<"done freeing end_ptr: " << _header->end_ptr.load() <<" <== " << seg_num <<"\n";
+   
+      assert( seg_num != segment_number(-1) );
       _header->free_seg_buffer[_header->end_ptr.load(std::memory_order_relaxed) &
-                               (max_session_count - 1)] = seg_num;
+                               (max_segment_count - 1)] = seg_num;
       _header->end_ptr.fetch_add(1, std::memory_order_release);
       //
    }
@@ -390,7 +425,7 @@ namespace arbtrie
          auto r = mlock(sp, segment_size);
 
          if (r)
-            std::cerr << "MLOCK: " << r << "  " << EINVAL << "  " << EAGAIN << "\n";
+            std::cerr << "MLOCK RETURNED: " << r << "  EINVAL:" << EINVAL << "  EAGAIN:" << EAGAIN << "\n";
 
          //memset(sp, 0, segment_size);  // TODO: is this necessary?
 
@@ -405,9 +440,19 @@ namespace arbtrie
       {
          if (_header->alloc_ptr.compare_exchange_weak(ap, ap + 1))
          {
-            auto apidx                      = ap & (max_session_count - 1);
-            auto free_seg                   = _header->free_seg_buffer[apidx];
+            auto apidx                          = ap & (max_segment_count - 1);
+            uint64_t free_seg                   = _header->free_seg_buffer[apidx];
+            if( free_seg == segment_number(-1) )[[unlikely]] {
+               TRIEDENT_WARN( "something bad happend!" );
+               abort();
+            }
+
             _header->free_seg_buffer[apidx] = segment_number(-1);
+
+            if( free_seg == segment_number(-1) )[[unlikely]] {
+               TRIEDENT_WARN( "something bad happend!" );
+               abort();
+            }
             //       std::cerr << "reusing segment..." << free_seg <<"\n";
             return prepare_segment(free_seg);
          }
@@ -522,5 +567,6 @@ namespace arbtrie
          std::cerr << x << "] " << _header->free_seg_buffer[x & (max_segment_count - 1)] << "\n";
       }
       std::cerr << "--------------------------\n";
+      std::cerr << "free release +/- = " << _id_alloc.free_release_count <<" \n";
    }
 };  // namespace arbtrie
