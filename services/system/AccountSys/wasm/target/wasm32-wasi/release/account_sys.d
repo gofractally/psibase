@@ -1,1 +1,0 @@
-/root/psibase/services/system/AccountSys/wasm/target/wasm32-wasi/release/account_sys.wasm: /root/psibase/services/system/AccountSys/wasm/src/lib.rs /root/psibase/services/system/AccountSys/wasm/target/bindings/account-sys/bindings.rs
