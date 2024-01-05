@@ -264,7 +264,7 @@ namespace triedent
       object_id         children[n + 1];
       if (in->_present_bits == branches)
       {
-         std::memcpy(&children[0], in->children(), sizeof(children));
+         std::memcpy(&children[0], in->children(), n * sizeof(object_id));
       }
       else
       {

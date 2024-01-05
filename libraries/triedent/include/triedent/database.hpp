@@ -324,7 +324,7 @@ namespace triedent
                                                    uint64_t                      branches);
 
       template <typename T>
-      inline mutable_deref<T> lock(const deref<T>& obj);
+      inline mutable_deref<T> lock(const deref<T>& obj, session_lock_ref<> session);
 
       inline id add_child(std::unique_lock<gc_session>& session,
                           id                            root,
@@ -459,7 +459,7 @@ namespace triedent
       deref(id i, void* p, node_type t) : _id(i), ptr(p), _type(t) {}
 
       explicit inline operator bool() const { return bool(_id); }
-      inline          operator id() const { return _id; }
+      inline operator id() const { return _id; }
 
       auto         type() const { return _type; }
       bool         is_leaf_node() const { return _type != node_type::inner; }
@@ -500,7 +500,8 @@ namespace triedent
           : deref<T>{{p.first.get_id(), p.second}}, lock{std::move(p.first)}
       {
       }
-      mutable_deref(location_lock lock, const deref<T>& src) : lock{std::move(lock)}, deref<T>{src}
+      mutable_deref(location_lock l, void* p, node_type t)
+          : deref<T>{l.get_id(), p, t}, lock{std::move(l)}
       {
       }
 
@@ -673,7 +674,8 @@ namespace triedent
       }
       else
       {
-         if constexpr (debug_roots) {
+         if constexpr (debug_roots)
+         {
             if (r == nullptr)
             {
                std::cout << id.id << ": update_root original was nullptr" << std::endl;
@@ -749,9 +751,14 @@ namespace triedent
    }
 
    template <typename T>
-   inline mutable_deref<T> write_session::lock(const deref<T>& obj)
+   inline mutable_deref<T> write_session::lock(const deref<T>& obj, session_lock_ref<> session)
    {
-      return {ring().lock(obj), obj};
+      cache_allocator& r = ring();
+      auto             l = r.lock(obj);
+      // We MUST get an updated pointer after acquiring the lock, because if the
+      // object has moved, modifications made to the old location will be lost.
+      auto [p, type, ref] = r.get_cache<false>(session, obj);
+      return {std::move(l), p, type};
    }
 
    /**
@@ -877,7 +884,7 @@ namespace triedent
       auto& vn = n.as_value_node();
       if (vn.data_size() == val.size())
       {
-         modify_value(session, lock(deref<value_node>(n)), val);
+         modify_value(session, lock(deref<value_node>(n), session), val);
          return n;
       }
 
@@ -898,7 +905,7 @@ namespace triedent
             auto& vn = v.as_value_node();
             if (v.type() == type && vn.data_size() == val.size() && ring().ref(old_value) == 1)
             {
-               modify_value(session, lock(deref<value_node>(v)), val);
+               modify_value(session, lock(deref<value_node>(v), session), val);
                return n;
             }
             else
@@ -908,7 +915,7 @@ namespace triedent
          }
          object_id val_id = make_value(session, type, string_view(), val);
          n.reload(ring(), session);
-         auto locked = lock(n);
+         auto locked = lock(n, session);
          locked->set_value(val_id);
          return n;
       }
@@ -993,7 +1000,7 @@ namespace triedent
          if (new_b != cur_b)
          {
             in.reload(ring(), session);
-            lock(in)->branch(b) = new_b;
+            lock(in, session)->branch(b) = new_b;
             release(session, cur_b);
          }
          return root;
@@ -1497,7 +1504,7 @@ namespace triedent
          if (unique)
          {
             auto prev = in->value();
-            lock(in)->set_value(id());
+            lock(in, session)->set_value(id());
             release(session, prev);
             return root;
          }
@@ -1522,7 +1529,7 @@ namespace triedent
          in.reload(ring(), session);
          if (new_b and unique)
          {
-            lock(in)->branch(b) = new_b;
+            lock(in, session)->branch(b) = new_b;
             release(session, cur_b);
             return root;
          }
