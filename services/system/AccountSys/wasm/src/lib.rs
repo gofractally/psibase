@@ -9,4 +9,8 @@ impl Guest for Component {
     fn hello_world() -> String {
         "Hello, World John!".to_string()
     }
+
+    fn call() -> String {
+        "DerpCasey".to_string()
+    }
 }
