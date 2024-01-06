@@ -109,8 +109,8 @@ function App() {
             };
             const strings = await supervisor.functionCall({
                 service: "account-sys",
-                method: "hire",
-                params: [user],
+                method: "strings",
+                params: ["user"],
             });
             console.log(strings, "strings *");
             const peoples = await supervisor.functionCall({
