@@ -3,7 +3,7 @@
     <h1>App 2 / Loader</h1>
     <p>This is a generated SPA designed to act as the loader, its sole purpose is to be rendered in an iframe and run a WASM Component, then execute functions in the WASM component and send the results back to its parent iframe.</p>
   </div>
-`;const X=e=>typeof e=="object"&&e!==null&&"service"in e&&"method"in e&&"params"in e,Z=async e=>{if(!X(e))throw new Error("Invalid function call param.");const{load:r}=await O(()=>import("./index-mF64q04d.js"),__vite__mapDeps([])),i=await fetch("./loader/functions.wasm").then(n=>n.arrayBuffer()),t=await r(i);return console.log(t,"is the module I have"),t[e.method]()},ee=J({methods:{functionCall:Z}});ee.promise.then(e=>{e.add(3,1).then(r=>console.log(r))});export{O as _};
+`;const X=e=>typeof e=="object"&&e!==null&&"service"in e&&"method"in e&&"params"in e,Z=async e=>{if(!X(e))throw new Error("Invalid function call param.");const{load:r}=await O(()=>import("./index-BoscZegT.js"),__vite__mapDeps([])),i=await fetch("/loader/functions.wasm").then(n=>n.arrayBuffer()),t=await r(i);return console.log(t,"is the module I have"),t[e.method](...e.params)},ee=J({methods:{functionCall:Z}});ee.promise.then(e=>{e.add(3,1).then(r=>console.log(r))});export{O as _};
 function __vite__mapDeps(indexes) {
   if (!__vite__mapDeps.viteFileDeps) {
     __vite__mapDeps.viteFileDeps = []

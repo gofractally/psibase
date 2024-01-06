@@ -82,20 +82,17 @@ const functionCall = async (param: FunctionCallParam) => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
-  console.log("functionCall", param);
+  console.log(
+    "Received params on the supervisor, now passing to the loader...",
+    param
+  );
 
   const { service } = param;
 
-  // if (service == "account-sys") {
-  //   return {
-  //     res: "account-sys shortcut",
-  //     service,
-  //   };
-  // }
-
   const connection = await getConnection(service);
-  console.log("connection", connection);
+  console.log(`Created / Fetched connection to ${service}`, connection);
   const res = await connection.functionCall(param);
+  console.log(`Received ${res} from ${service}`);
 
   return {
     res,
