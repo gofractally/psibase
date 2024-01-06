@@ -11,6 +11,12 @@ const psibase = (appletContract: string) => {
             config: () => {
                 return {
                     build: {
+                        target: "esnext",
+                        optimizeDeps: {
+                            esbuildOptions: {
+                                target: "esnext", // you can also use 'es2020' here
+                            },
+                        },
                         assetsDir: "",
                         cssCodeSplit: false,
                         rollupOptions: {

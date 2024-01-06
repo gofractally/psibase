@@ -1,6 +1,19 @@
 package component:account-sys;
 
+interface types {
+    record user {
+        name: string,
+        age: u8
+    }
+}
+
 world example {
-    export hello-world: func() -> string;
+    use types.{user};
+    export hire: func(user: user) -> string;
+
+    export peoples: func(users: list<user>) -> string;
+
+    export numbers: func(num1: u8, num2: u8, doubleup: bool) -> string;
+    export strings: func(word: string) -> string;
     export call: func() -> string;
 }
