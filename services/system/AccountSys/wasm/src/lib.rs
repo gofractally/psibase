@@ -18,6 +18,7 @@ impl Guest for Component {
     }
 
     fn strings(word: String) -> String {
+        bindings::component::account_sys::imports::prnt("Calling prnt from Rust");
         format!("The word you gave me was {}", word)
     }
 

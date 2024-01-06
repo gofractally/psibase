@@ -1,5 +1,10 @@
 package component:account-sys;
 
+
+interface imports {
+   prnt: func(msg: string);
+}
+
 interface types {
     record user {
         name: string,
@@ -8,6 +13,9 @@ interface types {
 }
 
 world example {
+
+    import imports;
+
     use types.{user};
     export hire: func(user: user) -> string;
 
