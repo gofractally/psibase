@@ -295,12 +295,6 @@ pub fn get_initial_actions(
         ];
 
         let mut common_sys_files = vec![
-            store!(
-                "common-sys",
-                "/ui/common.index.html",
-                html,
-                "CommonSys/ui/vanilla/common.index.html"
-            ),
             store_common!("keyConversions.mjs", js),
             store_common!("common-lib.js", js),
             store_common!("rpc.mjs", js),
