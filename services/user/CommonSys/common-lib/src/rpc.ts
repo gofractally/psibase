@@ -500,31 +500,6 @@ function sendToParent(message: any) {
     }
 }
 
-const redirectIfAccessedDirectly = async () => {
-    try {
-        if (window.self === window.top) {
-            // We are the top window. Redirect needed.
-            const applet = window.location.hostname.substring(
-                0,
-                window.location.hostname.indexOf(".")
-            );
-            const appletUrl = await siblingUrl(
-                undefined,
-                "",
-                "/applet/" + applet
-            );
-            const appletUrlFull =
-                appletUrl +
-                (window.location.search || "") +
-                (window.location.hash || "");
-            window.location.replace(appletUrlFull);
-        }
-    } catch (e) {
-        // The browser blocked access to window.top due to the same origin policy,
-        //   therefore we are in an iframe, all is well.
-    }
-};
-
 export function verifyFields(obj: any, fieldNames: string[]) {
     let missingField = false;
 
@@ -671,7 +646,6 @@ const messageRouting = [
 ];
 
 export async function initializeApplet(initializer = () => {}) {
-    await redirectIfAccessedDirectly();
 
     const rootUrl = await siblingUrl(undefined, undefined, undefined);
 
