@@ -14,9 +14,6 @@ using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace SystemService
 {
-   static constexpr std::pair<const char*, const char*> commonResMap[]{
-       {"/", "/ui/common.index.html"}};
-
    std::optional<HttpReply> CommonSys::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
@@ -30,10 +27,6 @@ namespace SystemService
 
       if (request.method == "GET")
       {
-         if (request.target.starts_with("/applet/"))
-         {
-            request.target = "/";
-         }
          if (request.target == "/common/thisservice")
          {
             std::string serviceName;
