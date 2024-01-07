@@ -375,7 +375,6 @@ void DefaultTestChain::registerSysRpc()
    const std::string css  = "text/css";
    const std::string ttf  = "font/ttf";
    const std::string svg  = "image/svg+xml";
-   const std::string wasm = "application/wasm";
 
    std::vector<Action> b{
        // CommonSys Fancy UI
@@ -460,9 +459,6 @@ void DefaultTestChain::registerSysRpc()
        rpcAccount.storeSys("/app-account.svg", svg,
                            readWholeFile(accDir + "/ui/dist/app-account.svg")),
        rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/dist/index.html")),
-
-       rpcAccount.storeSys("/yes.html", html, readWholeFile(accDir + "/ui/dist/yes.html")),
-       rpcAccount.storeSys("/account_sys.wasm", wasm, readWholeFile(accDir + "/ui/dist/account_sys.wasm")),
 
        rpcAccount.storeSys("/index.js", js, readWholeFile(accDir + "/ui/dist/index.js")),
        rpcAccount.storeSys("/lock-closed.svg", svg,
