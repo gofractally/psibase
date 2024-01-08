@@ -110,28 +110,20 @@ pub fn get_initial_actions<R: Read + Seek>(
 ) -> Vec<Action> {
     let mut actions = Vec::new();
     for s in &mut service_packages[..] {
-        s.init(&mut actions).unwrap()
-    }
+        s.init(&mut actions).unwrap();
 
-    for s in &mut service_packages[..] {
         for account in s.get_accounts() {
             if !s.has_service(*account) {
                 actions.push(new_account_action(account_sys::SERVICE, *account))
             }
         }
-    }
 
-    if install_ui {
-        for s in &mut service_packages[..] {
-            s.reg_server(&mut actions).unwrap()
+        if install_ui {
+            s.reg_server(&mut actions).unwrap();
+            s.store_data(&mut actions).unwrap();
         }
-        for s in &mut service_packages[..] {
-            s.store_data(&mut actions).unwrap()
-        }
-    }
 
-    for s in &mut service_packages[..] {
-        s.postinstall(&mut actions).unwrap()
+        s.postinstall(&mut actions).unwrap();
     }
 
     actions.push(set_producers_action(
