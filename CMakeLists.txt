@@ -320,7 +320,7 @@ psibase_package(
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist /
     DEPENDS ${AccountSys_js_dep}
     DEPENDS wasm
-    PACKAGE_DEPENDS AuthAnySys
+    PACKAGE_DEPENDS AuthAnySys ProxySys
 )
 
 psibase_package(
@@ -338,6 +338,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
         FLAGS isAuthService
     DEPENDS wasm
+    PACKAGE_DEPENDS ProxySys
 )
 
 set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
@@ -368,6 +369,7 @@ psibase_package(
         DATA GLOB ${THIRD_FILES}                              common
     DEPENDS ${CommonSys_js_dep}
     DEPENDS wasm
+    PACKAGE_DEPENDS ProxySys
 )
 
 psibase_package(
@@ -385,6 +387,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
         FLAGS isAuthService
     DEPENDS wasm
+    PACKAGE_DEPENDS ProxySys
 )
 
 psibase_package(
@@ -428,6 +431,7 @@ psibase_package(
     SERVER psispace-sys
     DEPENDS ${PsiSpaceSys_js_dep}
     DEPENDS wasm
+    PACKAGE_DEPENDS ProxySys
 )
 
 psibase_package(
@@ -474,6 +478,7 @@ psibase_package(
     DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist /
     DEPENDS ExploreSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist/index.html
     DEPENDS wasm
+    PACKAGE_DEPENDS ProxySys
 )
 
 psibase_package(
