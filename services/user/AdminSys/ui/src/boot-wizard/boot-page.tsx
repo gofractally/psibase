@@ -215,7 +215,15 @@ async function runBoot(
         for (const t of transactions) {
             console.log(`Pushing transaction number: ${i}`);
             setBootState(["push", i, transactions.length + 1]);
-            await postArrayBufferGetJson("/native/push_transaction", t.buffer);
+            let trace = await postArrayBufferGetJson(
+                "/native/push_transaction",
+                t.buffer
+            );
+            if (trace.error) {
+                setBootState(`Boot failed: ${trace.error}`);
+                console.error(trace.error);
+                return;
+            }
             i++;
         }
         setBootState("Boot successful.");
