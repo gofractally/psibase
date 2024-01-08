@@ -1,7 +1,6 @@
 use crate::services::{proxy_sys, psispace_sys};
-use crate::{AccountNumber, Action, GenesisService, MethodNumber};
+use crate::{AccountNumber, Action, GenesisService};
 use custom_error::custom_error;
-use fracpack::Pack;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -33,9 +32,6 @@ struct Meta {
 struct ServiceInfo {
     flags: Vec<String>,
     server: Option<AccountNumber>,
-    // TODO: This only allows a simple init with no arguments.
-    // Consider some kind of generic preinstall script.
-    init: Option<bool>,
 }
 
 pub struct PackagedService<R: Read + Seek> {
@@ -106,7 +102,6 @@ impl<R: Read + Seek> PackagedService<R> {
                 None => ServiceInfo {
                     flags: vec![],
                     server: None,
-                    init: Some(false),
                 },
             };
             services.push((account, file, info));
@@ -168,19 +163,6 @@ impl<R: Read + Seek> PackagedService<R> {
                 Err(Error::UnknownFileType {
                     path: file.name().to_string(),
                 })?
-            }
-        }
-        Ok(())
-    }
-    pub fn init(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
-        for (account, _, info) in &self.services {
-            if let Some(true) = info.init {
-                actions.push(Action {
-                    sender: *account,
-                    service: *account,
-                    method: MethodNumber::from("init"),
-                    rawData: ().packed().into(),
-                })
             }
         }
         Ok(())

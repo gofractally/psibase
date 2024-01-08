@@ -110,8 +110,6 @@ pub fn get_initial_actions<R: Read + Seek>(
 ) -> Vec<Action> {
     let mut actions = Vec::new();
     for s in &mut service_packages[..] {
-        s.init(&mut actions).unwrap();
-
         for account in s.get_accounts() {
             if !s.has_service(*account) {
                 actions.push(new_account_action(account_sys::SERVICE, *account))
