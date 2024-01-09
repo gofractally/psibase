@@ -141,9 +141,7 @@ Booting the network with either the psibase CLI tool or with the admin-sys app w
 
 ## Root endpoints
 
-The root domain always serves the code for the [supervisor](../../../specifications/app-architecture/supervisor.md). If a subpage of the root domain is accessed, the supervisor client-code is what evaluates the subpage and determines how to react.
-
-Currently, the supervisor uses the `/applet/` prefix to trigger loading a psibase app within a managed iframe according to the supervisor specification.
+The root document at `/` is the homepage of the network.
 
 ## Service-provided endpoints
 

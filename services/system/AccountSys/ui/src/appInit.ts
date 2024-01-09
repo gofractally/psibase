@@ -1,5 +1,4 @@
 import {
-    initializeApplet,
     action,
     operation,
     setOperations,
@@ -195,12 +194,17 @@ class KeyStore {
 
 const keystore = new KeyStore();
 
-export const initAppFn = (setAppInitialized: () => void) =>
-    initializeApplet(async () => {
-        const thisApplet = await getJson<string>("/common/thisservice");
-        const accountSysApplet = new AppletId(thisApplet, "");
 
-        setOperations([
+export const initAppFn = (setAppInitialized: () => void) =>
+{
+    setAppInitialized();
+}
+
+/*
+
+TODO: All of these operations and queries should be made into functions in the accountsys plugin
+
+setOperations([
             {
                 id: "newAcc",
                 exec: async ({ name, pubKey }: execArgs) => {
@@ -325,5 +329,5 @@ export const initAppFn = (setAppInitialized: () => void) =>
                 },
             },
         ]);
-        setAppInitialized();
-    });
+
+*/

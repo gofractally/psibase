@@ -1,6 +1,5 @@
 import { BrowserRouter, Route } from "react-router-dom";
 
-import { appletPrefix } from "./config";
 import { Applet, Dashboard, Nav } from "./views";
 import { useApplets } from "./hooks/useApplets";
 
@@ -14,12 +13,6 @@ const App = () => {
             <BrowserRouter>
                 <Route path="/" exact>
                     <Dashboard currentUser={currentUser} />
-                </Route>
-                <Route path={appletPrefix}>
-                    <Applet
-                        applet={primaryApplet}
-                        handleMessage={handleMessage}
-                    />
                 </Route>
             </BrowserRouter>
             {subApplets.map((subApplet) => (
