@@ -3,14 +3,16 @@ import { usePollJson } from "../hooks";
 interface StatusBannerProps {
     peersError?: string;
     configError?: string;
+    status?: string[];
+    statusError?: string;
 }
 
 export const StatusBanner = ({
     peersError,
     configError,
+    status,
+    statusError,
 }: StatusBannerProps) => {
-    const [status, statusError] = usePollJson<string[]>("/native/admin/status");
-
     let serverStatus = [
         ...(status || []),
         ...(!statusError ? [] : [statusError]),
@@ -19,11 +21,23 @@ export const StatusBanner = ({
     ].map((s) => {
         switch (s) {
             case "startup":
-                return "Initializing";
+                return <>Initializing</>;
             case "slow":
-                return "Failed to lock database memory. Performance may be degraded.";
+                return (
+                    <>
+                        Failed to lock database memory. Performance may be
+                        degraded.
+                    </>
+                );
+            case "needgenesis":
+                return (
+                    <>
+                        No chain running. <a href="#Boot">Create a new chain</a>{" "}
+                        or <a href="#Peers">connect to an existing chain</a>
+                    </>
+                );
             default:
-                return s;
+                return <>{s}</>;
         }
     });
 
@@ -41,7 +55,7 @@ export const StatusBanner = ({
             <div className="text-lg font-semibold">{statusTitle}</div>
             <div>
                 {serverStatus.map((status, idx) => (
-                    <StatusMessage key={idx} message={status} />
+                    <StatusMessage key={idx}>{status}</StatusMessage>
                 ))}
             </div>
         </Banner>
@@ -60,6 +74,6 @@ const Banner = ({ children, disconnected }: BannerProps) => {
     return <div className={className}>{children}</div>;
 };
 
-const StatusMessage = ({ message }: { message: string }) => (
-    <div className="ml-2 mt-2 text-sm">{message}</div>
+const StatusMessage = ({ children }: { children: React.ReactNode }) => (
+    <div className="ml-2 mt-2 text-sm">{children}</div>
 );

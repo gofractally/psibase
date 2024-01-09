@@ -318,7 +318,8 @@ void load_service(const native_service& config,
    auto& service = services[host];
    if (config.root.empty())
       return;
-   for (const auto& entry : std::filesystem::recursive_directory_iterator{config.root})
+   for (const auto& entry : std::filesystem::recursive_directory_iterator{
+            config.root, std::filesystem::directory_options::follow_directory_symlink})
    {
       auto                 extension = entry.path().filename().extension().native();
       http::native_content result;
@@ -345,6 +346,14 @@ void load_service(const native_service& config,
       else if (extension == ".wasm")
       {
          result.content_type = "application/wasm";
+      }
+      else if (extension == ".json")
+      {
+         result.content_type = "application/json";
+      }
+      else if (extension == ".psi")
+      {
+         result.content_type = "application/zip";
       }
       if (!result.content_type.empty() && entry.is_regular_file())
       {
@@ -1737,8 +1746,8 @@ void run(const std::string&              db_path,
       http_config->listen              = listen;
       http_config->host                = host;
       http_config->enable_transactions = !host.empty();
-      http_config->status =
-          http::http_status{.slow = system->sharedDatabase.isSlow(), .startup = 1};
+      http_config->status              = http::http_status{
+                       .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
 
       for (const auto& entry : services)
       {
@@ -1811,9 +1820,8 @@ void run(const std::string&              db_path,
                               [&chainContext, &node, &connect_one, &http_config, &timer, &runResult,
                                &server_work, restart, soft]()
                               {
-                                 auto status     = http_config->status.load();
-                                 status.shutdown = true;
-                                 http_config->status.store(status);
+                                 atomic_set_field(http_config->status,
+                                                  [](auto& status) { status.shutdown = true; });
                                  boost::asio::use_service<http::server_service>(
                                      static_cast<boost::asio::execution_context&>(chainContext))
                                      .async_close(restart,
@@ -2300,10 +2308,7 @@ void run(const std::string&              db_path,
    node.set_producer_id(producer);
    http_config->enable_p2p = enable_incoming_p2p;
    {
-      // For now no one else writes the status, so we don't need an atomic RMW.
-      auto status         = http_config->status.load();
-      status.startup      = false;
-      http_config->status = status;
+      atomic_set_field(http_config->status, [](auto& status) { status.startup = false; });
    }
 
    bool showedBootMsg = false;

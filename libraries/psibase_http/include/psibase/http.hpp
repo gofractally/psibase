@@ -78,9 +78,11 @@ namespace psibase::http
 
    struct http_status
    {
-      unsigned slow : 1;
-      unsigned startup : 1;
-      unsigned shutdown : 1;
+      unsigned    slow : 1;
+      unsigned    startup : 1;
+      unsigned    shutdown : 1;
+      unsigned    needgenesis : 1;
+      friend bool operator==(const http_status&, const http_status&) = default;
    };
    template <typename S>
    void to_json(http_status obj, S& stream)
@@ -113,7 +115,25 @@ namespace psibase::http
          maybe_comma();
          to_json("shutdown", stream);
       }
+      if (obj.needgenesis)
+      {
+         maybe_comma();
+         to_json("needgenesis", stream);
+      }
       stream.write(']');
+   }
+   inline http_status atomic_set_field(std::atomic<http_status>& status, auto&& f)
+   {
+      auto current = status.load();
+      while (true)
+      {
+         auto next = current;
+         f(next);
+         if (next == current)
+            return next;
+         if (status.compare_exchange_weak(current, next))
+            return next;
+      }
    }
 
    template <bool Secure>
@@ -290,28 +310,29 @@ namespace psibase::http
 #ifdef PSIBASE_ENABLE_SSL
       tls_context_ptr tls_context = {};
 #endif
-      push_boot_t              push_boot_async        = {};
-      push_transaction_t       push_transaction_async = {};
-      accept_p2p_websocket_t   accept_p2p_websocket   = {};
-      shutdown_t               shutdown               = {};
-      get_config_t             get_perf               = {};
-      get_config_t             get_metrics            = {};
-      get_peers_t              get_peers              = {};
-      connect_t                connect                = {};
-      connect_t                disconnect             = {};
-      get_config_t             get_config             = {};
-      connect_t                set_config             = {};
-      get_config_t             get_keys               = {};
-      generic_json_t           new_key                = {};
-      unlock_keyring_t         unlock_keyring         = {};
-      lock_keyring_t           lock_keyring           = {};
-      get_pkcs11_tokens_t      get_pkcs11_tokens      = {};
-      admin_service            admin                  = {};
-      std::vector<authz>       admin_authz;
-      services_t               services;
-      std::atomic<bool>        enable_p2p;
-      std::atomic<bool>        enable_transactions;
-      std::atomic<http_status> status;
+      push_boot_t            push_boot_async        = {};
+      push_transaction_t     push_transaction_async = {};
+      accept_p2p_websocket_t accept_p2p_websocket   = {};
+      shutdown_t             shutdown               = {};
+      get_config_t           get_perf               = {};
+      get_config_t           get_metrics            = {};
+      get_peers_t            get_peers              = {};
+      connect_t              connect                = {};
+      connect_t              disconnect             = {};
+      get_config_t           get_config             = {};
+      connect_t              set_config             = {};
+      get_config_t           get_keys               = {};
+      generic_json_t         new_key                = {};
+      unlock_keyring_t       unlock_keyring         = {};
+      lock_keyring_t         lock_keyring           = {};
+      get_pkcs11_tokens_t    get_pkcs11_tokens      = {};
+      admin_service          admin                  = {};
+      std::vector<authz>     admin_authz;
+      services_t             services;
+      std::atomic<bool>      enable_p2p;
+      std::atomic<bool>      enable_transactions;
+      // This contains some cached state that the reader thread might modify
+      mutable std::atomic<http_status> status;
 
       mutable std::shared_mutex mutex;
    };
