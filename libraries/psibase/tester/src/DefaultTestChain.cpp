@@ -339,14 +339,7 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/app-psispace-mobile.svg", svg,
                           readWholeFile(comDir + "/ui/dist/app-psispace-mobile.svg")),
 
-       // CommonSys Basic UI
-       //    rpcCommon.storeSys("/index.html", html, readWholeFile(comDir + "/ui/vanilla/index.html")),
-       //    rpcCommon.storeSys("/ui/index.js", js, readWholeFile(comDir + "/ui/vanilla/index.js")),
-
        // CommonSys Other
-       rpcCommon.storeSys("/ui/common.index.html", html,
-                          readWholeFile(comDir + "/ui/vanilla/common.index.html")),
-
        rpcCommon.storeSys("/common/rpc.mjs", js, readWholeFile(comDir + "/common/rpc.mjs")),
        rpcCommon.storeSys("/common/useGraphQLQuery.mjs", js,
                           readWholeFile(comDir + "/common/useGraphQLQuery.mjs")),
@@ -389,14 +382,11 @@ void DefaultTestChain::registerSysRpc()
        rpcCommon.storeSys("/common/use-local-storage-state.mjs", js,
                           readWholeFile(thirdPty + "/useLocalStorageState.js")),
 
-       // AccountSys Basic UI
-       //    rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/vanilla/index.html")),
-       //    rpcAccount.storeSys("/ui/index.js", js, readWholeFile(accDir + "/ui/vanilla/index.js")),
-
        // AccountSys Fancy UI
        rpcAccount.storeSys("/app-account.svg", svg,
                            readWholeFile(accDir + "/ui/dist/app-account.svg")),
        rpcAccount.storeSys("/index.html", html, readWholeFile(accDir + "/ui/dist/index.html")),
+
        rpcAccount.storeSys("/index.js", js, readWholeFile(accDir + "/ui/dist/index.js")),
        rpcAccount.storeSys("/lock-closed.svg", svg,
                            readWholeFile(accDir + "/ui/dist/lock-closed.svg")),
