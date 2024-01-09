@@ -4,11 +4,13 @@
 # - deployment will be just a line in CommonSys package
 
 # build Loader code (that will be shared with AccountSys and TokenSys)
+rm -rf dist
+rm -rf node_modules
 yarn --mutex network && yarn build
 
 # Services that will receive Loader code
 system_services=("AccountSys")
-user_services=("TokenSys")
+user_services=("TokenSys" "DemoApp1" "DemoApp2")
 
 # Function to check for and execute build.sh
 check_and_execute_build() {
@@ -23,6 +25,7 @@ check_and_execute_build() {
 
 # Loop through the system directories and execute the command for each
 for system_dir in "${system_services[@]}"; do
+    # echo "Starting system loop..."
     root_dir="../../system/$system_dir"
     target_dir="/ui/public/loader"
     full_path="$root_dir$target_dir"
@@ -36,6 +39,7 @@ done
 
 # Loop through the user directories and execute the command for each
 for user_dir in "${user_services[@]}"; do
+    # echo "Starting user loop..."
     root_dir="../../user/$user_dir"
     target_dir="/ui/public/loader"
     full_path="$root_dir$target_dir"

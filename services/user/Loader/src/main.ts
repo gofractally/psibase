@@ -30,6 +30,7 @@ const runWasm = async (
   method: string,
   params: any[]
 ) => {
+  console.info("runWasm().top 2");
   const { load } = await import("rollup-plugin-wit-component");
 
   console.time("Load");
@@ -40,7 +41,6 @@ const runWasm = async (
   );
   console.timeEnd("Load");
 
-  console.log(mod, "is the module I have");
   return mod[method](...params);
 };
 

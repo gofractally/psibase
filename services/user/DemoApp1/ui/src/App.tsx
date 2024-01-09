@@ -4,19 +4,20 @@ import { connect } from "@psibase/plugin";
 function App() {
   const run = async () => {
     const res = await connect();
+    console.info("DemoApp1 connected to Supervisor");
 
-    console.log(res, "about to call functionCall");
+    console.log("calling demoapp2.callintoplugin");
     const back = await res.functionCall({
-      service: "account-sys",
-      method: "call",
+      service: "demoapp2",
+      method: "callintoplugin",
       params: [],
     });
-    console.log(back, "came back on app2?");
+    console.log("demosapp2.callintoplugin() returned:", back);
   };
 
   return (
     <>
-      <h1>Psibase App Demo</h1>
+      <h1>Psibase Demo App 1</h1>
       <div className="card">
         <button onClick={() => run()}>Say Hello</button>
       </div>

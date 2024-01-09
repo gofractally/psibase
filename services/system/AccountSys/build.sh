@@ -9,5 +9,7 @@ cargo component build --release && cp target/wasm32-wasi/release/$rust_name.wasm
 
 # Account-Sys
 cd ../ui
+rm -rf dist
+rm -rf node_modules
 yarn --mutex network && yarn build
 psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload -r $account_name ./dist / -S $account_name
