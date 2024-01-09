@@ -1,5 +1,6 @@
 cargo_component_bindings::generate!();
 
+use bindings::component::account_sys::types::Funccallparams;
 use bindings::component::account_sys::types::User;
 
 use bindings::Guest;
@@ -18,7 +19,13 @@ impl Guest for Component {
     }
 
     fn strings(word: String) -> String {
-        bindings::component::account_sys::imports::prnt("Calling prnt from Rust");
+        let test_params = Funccallparams {
+            service: "test_service".to_string(),
+            method: "test_method".to_string(),
+            params: "test_params".to_string(),
+        };
+        let x = bindings::component::account_sys::imports::funccall(&test_params);
+        println!("The x, 'is a thing.. {:?}", x);
         format!("The word you gave me was {}", word)
     }
 

@@ -43,8 +43,7 @@ export interface AccountWithKey extends AccountWithAuth {
     privateKey: KeyPairWithAccounts["privateKey"];
 }
 
-
-//  psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree r-account-sys / ./dist/ -S r-account-sys
+// npm run build && psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree r-account-sys / ./dist/ -S r-account-sys
 
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
@@ -69,8 +68,6 @@ function App() {
     };
 
     const ran = useRef(false);
-
-    // npm run build && psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree psispace-sys / ./dist/ -S account-sys
 
     const init = async () => {
         if (ran.current) return;

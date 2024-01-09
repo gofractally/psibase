@@ -23,21 +23,6 @@ const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
 
 // const wasmUrl = (service: string) => `./${service}.wasm`;
 
-// passing a string
-// passing anumber
-// passing an object with Rust <-> TS.
-
-// account-sys.psibase.io/loader
-// supervisor-sys.psibase.io/loader...?
-
-// We might have to lock down the security of penpal and the origins of messages, in case each loader might need to be hard coded to a path / specific domain
-//
-//
-
-// John - Can go ahead and try get a demonstration and set an example of how to pass all sorts of params.
-// After that, push to the branch for Sparky to review when he works next
-//
-
 const functionCall = async (param: FunctionCallParam) => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
@@ -68,6 +53,7 @@ const connection = connectToParent({
 });
 
 connection.promise.then((parent) => {
+  console.log("Loader got parent", parent);
   // @ts-ignore
   parent.add(3, 1).then((total) => console.log(total));
 });
