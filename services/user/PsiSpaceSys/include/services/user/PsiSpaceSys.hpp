@@ -52,8 +52,7 @@ namespace SystemService
    /// You don't need the `-a` and `-s` options if your running a local test chain at
    /// `http://psibase.127.0.0.1.sslip.io:8080/` and don't protect the accounts with keypairs.
    ///
-   /// After files are uploaded, the site is available at either `http://$ACCOUNT.$DOMAIN` or
-   /// `http://$DOMAIN/applet/$ACCOUNT`
+   /// After files are uploaded, the site is available at `http://$ACCOUNT.$DOMAIN`
    struct PsiSpaceSys : psibase::Service<PsiSpaceSys>
    {
       static constexpr auto service = psibase::AccountNumber("psispace-sys");
