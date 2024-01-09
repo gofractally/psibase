@@ -43,6 +43,16 @@ const getLoaderDomain = (subDomain = "supervisor-sys"): string => {
   return url.origin + "/loader";
 };
 
+const getConnection = async (service: string): Promise<PenpalObj> => {
+  // const existingService = loadedServices.find((s) => s.service === service);
+  // if (existingService) return existingService.obj;
+  const obj = await createIFrameService(service);
+  console.log(obj, "is my iframe service");
+  loadedServices.push({ service, obj });
+
+  return obj;
+};
+
 const createIFrameService = async (service: string): Promise<PenpalObj> => {
   const iframe = document.createElement("iframe");
   iframe.src = getLoaderDomain(service);
@@ -62,20 +72,18 @@ const createIFrameService = async (service: string): Promise<PenpalObj> => {
   const connection = connectToChild({
     iframe,
     methods: {
+      importedCall: async (param: FunctionCallParam) => {
+        console.log(
+          `Supervisor: Received request from ${service} of function call`,
+          param
+        );
+        return functionCall(param);
+      },
       add: (a: number, b: number) => a + b,
     },
   });
 
   return connection.promise as unknown as Promise<PenpalObj>;
-};
-
-const getConnection = async (service: string): Promise<PenpalObj> => {
-  const existingService = loadedServices.find((s) => s.service === service);
-  if (existingService) return existingService.obj;
-  const obj = await createIFrameService(service);
-  loadedServices.push({ service, obj });
-
-  return obj;
 };
 
 const functionCall = async (param: FunctionCallParam) => {
