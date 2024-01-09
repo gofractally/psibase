@@ -1,3 +1,4 @@
+import importableCode from "./importables.js?raw";
 import { connectToParent } from "penpal";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -47,9 +48,9 @@ const functionCall = async (param: FunctionCallParam) => {
 
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
 
-  const importableCode = `export function prnt(string) {
-    console.log('from imported code: ', string);
-  };`;
+  // const importableCode = `export function prnt(string) {
+  //   console.log('from imported code: ', string);
+  // };`;
 
   let importables = [{ "component:account-sys/imports": importableCode }];
 
