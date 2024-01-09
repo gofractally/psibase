@@ -1,16 +1,29 @@
 package component:account-sys;
 
-
-interface imports {
-   prnt: func(msg: string);
-}
-
 interface types {
     record user {
         name: string,
         age: u8
     }
+
+    record funccallparams {
+        service: string,
+        method: string,
+        params: string
+    }
+
 }
+
+
+interface imports {
+
+    use types.{funccallparams};
+
+
+   prnt: func(msg: string);
+   funccall: func(msg: funccallparams);
+}
+
 
 world example {
 
