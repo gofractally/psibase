@@ -1,5 +1,6 @@
 #include <psibase/Watchdog.hpp>
 
+#include <unistd.h>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -33,14 +34,14 @@ TEST_CASE("CpuClock should be associated with the current thread")
    std::atomic<bool>        done{false};
    std::chrono::nanoseconds t0_elapsed;
    auto                     start = CpuClock::now();
-   std::thread             t0{[&]
-                   {
-                      auto start = CpuClock::now();
-                      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                      auto end   = CpuClock::now();
-                      t0_elapsed = end - start;
-                      done       = true;
-                   }};
+   std::thread              t0{[&]
+                  {
+                     auto start = CpuClock::now();
+                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                     auto end   = CpuClock::now();
+                     t0_elapsed = end - start;
+                     done       = true;
+                  }};
    while (!done)
    {
    }
@@ -95,8 +96,8 @@ TEST_CASE("Watchdog threaded")
 {
    WatchdogManager manager;
 
-   static constexpr int      num_threads = 2;
-   std::chrono::nanoseconds  durations[num_threads];
+   static constexpr int     num_threads = 2;
+   std::chrono::nanoseconds durations[num_threads];
    std::vector<std::thread> threads;
 
    for (int i = 0; i < num_threads; ++i)
@@ -104,6 +105,7 @@ TEST_CASE("Watchdog threaded")
       threads.emplace_back(
           [&, i]
           {
+             ::nice(10);
              std::atomic<bool> interrupted{false};
              auto              start = CpuClock::now();
              Watchdog          watchdog(manager, [&] { interrupted = true; });
@@ -116,7 +118,8 @@ TEST_CASE("Watchdog threaded")
           });
    }
 
-   for( auto& t : threads ) t.join();
+   for (auto& t : threads)
+      t.join();
    threads.clear();
    for (int i = 0; i < num_threads; ++i)
    {
