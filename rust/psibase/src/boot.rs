@@ -1,8 +1,8 @@
 use crate::services::{account_sys, auth_ec_sys, auth_sys, producer_sys, transaction_sys};
 use crate::{
-    method_raw, AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData,
-    MethodNumber, PackagedService, ProducerConfigRow, PublicKey, SignedTransaction, Tapos,
-    TimePointSec, Transaction,
+    method_raw, validate_dependencies, AccountNumber, Action, AnyPublicKey, Claim,
+    ExactAccountNumber, GenesisActionData, MethodNumber, PackagedService, ProducerConfigRow,
+    PublicKey, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::{Pack, Unpack};
 use psibase_macros::account_raw;
@@ -173,6 +173,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
 ) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
+    validate_dependencies(service_packages).unwrap();
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)];
     let mut actions =
         get_initial_actions(initial_key, initial_producer, install_ui, service_packages);
