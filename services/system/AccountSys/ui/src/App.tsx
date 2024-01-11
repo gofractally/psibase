@@ -90,10 +90,11 @@ function App() {
                 name: "john",
                 age: 29,
             };
+
             const strings = await supervisor.functionCall({
                 service: "account-sys",
                 method: "strings",
-                params: ["user"],
+                params: ["user", 2],
             });
             console.log(strings, "strings *");
             const peoples = await supervisor.functionCall({

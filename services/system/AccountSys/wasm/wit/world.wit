@@ -15,19 +15,18 @@ interface types {
 }
 
 
-interface imports {
 
-    use types.{funccallparams};
-
-
-   prnt: func(msg: string);
-   funccall: func(msg: funccallparams);
-}
 
 
 world example {
 
-    import imports;
+    
+    import in-the-line: interface {
+        use types.{funccallparams};
+        prnt: func(msg: string);
+        funccall: func(msg: funccallparams);
+
+    }
 
     use types.{user};
     export hire: func(user: user) -> string;
