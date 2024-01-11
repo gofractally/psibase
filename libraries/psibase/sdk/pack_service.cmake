@@ -63,6 +63,7 @@ endfunction()
 # DEPENDS <targets>...      - Targets that this target depends on
 # PACKAGE_DEPENDS <name>... - Other psibase packages that the package depends on
 # SERVICE <name>            - The account name of a service
+#   TARGET <target>         - The wasm file that will be deployed
 #   WASM <filename>         - The wasm file that will be deployed
 #   FLAGS <flags>...        - Flags to set on the service account (requires chain admin powers to install)
 #   SERVER <name>           - The service that handles HTTP requests
@@ -71,7 +72,7 @@ endfunction()
 #   INIT                    - The service has an init action that should be run with no arguments
 #   POSTINSTALL <filename>  - Additional actions that should be run at the end of installation
 function(psibase_package)
-    set(keywords NAME DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA WASM FLAGS SERVER INIT POSTINSTALL)
+    set(keywords NAME DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA TARGET WASM FLAGS SERVER INIT POSTINSTALL)
     foreach(keyword IN LISTS keywords)
         set(_${keyword})
     endforeach()
@@ -116,6 +117,8 @@ function(psibase_package)
                 set(_INIT_${_SERVICE})
             elseif(current_keyword STREQUAL "DATA")
                 list(APPEND _DATA_${_SERVICE} ${arg})
+            elseif(current_keyword STREQUAL "TARGET")
+                set(_TARGET_${_SERVICE} ${arg})
             elseif(current_keyword STREQUAL "WASM")
                 set(_WASM_${_SERVICE} ${arg})
             elseif(current_keyword STREQUAL "FLAGS")
@@ -138,12 +141,12 @@ function(psibase_package)
     if(NOT _OUTPUT)
         set(_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${_NAME}.psi)
     endif()
-    set(outdir ${CMAKE_CURRENT_BINARY_DIR}/${_NAME})
+    set(outdir ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_NAME}.psi.tmp)
     set(contents meta.json)
     set(zip-deps)
     set(init-services)
     foreach(service IN LISTS _SERVICES)
-        if(_WASM_${service})
+        if(_WASM_${service} OR _TARGET_${service})
             write_service_info(
                 OUTPUT ${outdir}/service/${service}.json
                 FLAGS ${_FLAGS_${service}}
@@ -152,10 +155,12 @@ function(psibase_package)
             if(_INIT_${service})
                 list(APPEND init-services ${service})
             endif()
-            set(wasm ${_WASM_${service}})
-            set(deps ${wasm})
-            if (TARGET ${wasm})
-                set(wasm $<TARGET_FILE:${_WASM}>)
+            if (_TARGET_${service})
+                set(wasm $<TARGET_FILE:${_TARGET_${service}}>)
+                set(deps ${_TARGET_${service}})
+            else()
+                set(wasm ${_WASM_${service}})
+                set(deps ${wasm})
             endif()
             add_custom_command(
                 OUTPUT ${outdir}/service/${service}.wasm
@@ -262,5 +267,5 @@ function(psibase_package)
         COMMAND cd ${tempdir} && ${CMAKE_COMMAND} -E tar cf ${_OUTPUT} --format=zip ${contents}
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${tempdir}
     )
-    add_custom_target(${_NAME}.psi ALL DEPENDS ${_OUTPUT})
+    add_custom_target(${_NAME} ALL DEPENDS ${_OUTPUT})
 endfunction()

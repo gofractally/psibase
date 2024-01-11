@@ -124,3 +124,5 @@ endfunction()
 
 add_libs("")
 add_libs("-debug")
+
+include(${CMAKE_CURRENT_LIST_DIR}/pack_service.cmake)

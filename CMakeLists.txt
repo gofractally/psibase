@@ -292,7 +292,7 @@ if(BUILD_JS)
 endif()
 
 # Build services
-include(pack_service.cmake)
+include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
@@ -566,7 +566,7 @@ psibase_package(
 function(write_package_index out)
     set(deps ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh)
     foreach(service IN LISTS ARGN)
-        list(APPEND deps ${service}.psi ${SERVICE_DIR}/${service}.psi)
+        list(APPEND deps ${service} ${SERVICE_DIR}/${service}.psi)
     endforeach()
     add_custom_command(
         OUTPUT ${SERVICE_DIR}/index.json
