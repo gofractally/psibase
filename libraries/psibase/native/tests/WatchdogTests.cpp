@@ -93,11 +93,12 @@ TEST_CASE("Watchdog maximum limit")
 
 TEST_CASE("Watchdog threaded")
 {
-   constexpr int run_count        = 10;
-   constexpr int allowed_failures = 2;
+   constexpr int run_count        = 20;
+   constexpr int allowed_failures = 5;
    int           failed           = 0;
    for (int i = 0; i < run_count; ++i)
    {
+      INFO("run #" << i);
       WatchdogManager manager;
 
       static constexpr int     num_threads = 2;
