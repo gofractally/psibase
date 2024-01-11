@@ -1,8 +1,8 @@
 use crate::services::{account_sys, auth_ec_sys, auth_sys, producer_sys, transaction_sys};
 use crate::{
-    method_raw, AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData,
-    MethodNumber, PackagedService, ProducerConfigRow, PublicKey, SignedTransaction, Tapos,
-    TimePointSec, Transaction,
+    method_raw, validate_dependencies, AccountNumber, Action, AnyPublicKey, Claim,
+    ExactAccountNumber, GenesisActionData, MethodNumber, PackagedService, ProducerConfigRow,
+    PublicKey, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::{Pack, Unpack};
 use psibase_macros::account_raw;
@@ -73,10 +73,10 @@ fn without_tapos(actions: Vec<Action>, expiration: TimePointSec) -> Transaction 
 fn genesis_transaction<R: Read + Seek>(
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
-) -> SignedTransaction {
+) -> Result<SignedTransaction, anyhow::Error> {
     let mut services = vec![];
     for s in service_packages {
-        s.get_genesis(&mut services).unwrap()
+        s.get_genesis(&mut services)?
     }
 
     let genesis_action_data = GenesisActionData {
@@ -92,10 +92,10 @@ fn genesis_transaction<R: Read + Seek>(
         rawData: genesis_action_data.packed().into(),
     }];
 
-    SignedTransaction {
+    Ok(SignedTransaction {
         transaction: without_tapos(actions, expiration).packed().into(),
         proofs: vec![],
-    }
+    })
 }
 
 /// Get initial actions
@@ -107,7 +107,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     initial_producer: AccountNumber,
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
-) -> Vec<Action> {
+) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
     for s in &mut service_packages[..] {
         for account in s.get_accounts() {
@@ -117,11 +117,11 @@ pub fn get_initial_actions<R: Read + Seek>(
         }
 
         if install_ui {
-            s.reg_server(&mut actions).unwrap();
-            s.store_data(&mut actions).unwrap();
+            s.reg_server(&mut actions)?;
+            s.store_data(&mut actions)?;
         }
 
-        s.postinstall(&mut actions).unwrap();
+        s.postinstall(&mut actions)?;
     }
 
     actions.push(set_producers_action(
@@ -146,7 +146,7 @@ pub fn get_initial_actions<R: Read + Seek>(
 
     actions.push(transaction_sys::Wrapper::pack().finishBoot());
 
-    actions
+    Ok(actions)
 }
 
 /// Create boot transactions
@@ -172,10 +172,11 @@ pub fn create_boot_transactions<R: Read + Seek>(
     install_ui: bool,
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
-) -> (Vec<SignedTransaction>, Vec<SignedTransaction>) {
-    let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)];
+) -> Result<(Vec<SignedTransaction>, Vec<SignedTransaction>), anyhow::Error> {
+    validate_dependencies(service_packages)?;
+    let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
     let mut actions =
-        get_initial_actions(initial_key, initial_producer, install_ui, service_packages);
+        get_initial_actions(initial_key, initial_producer, install_ui, service_packages)?;
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -207,7 +208,11 @@ pub fn create_boot_transactions<R: Read + Seek>(
         .into(),
         proofs: vec![],
     });
-    (boot_transactions, transactions)
+    Ok((boot_transactions, transactions))
+}
+
+fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
+    result.map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Creates boot transactions.
@@ -220,23 +225,23 @@ pub fn js_create_boot_transactions(
     js_services: JsValue,
 ) -> Result<JsValue, JsValue> {
     let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
-    let deserialized_services: Vec<ByteBuf> = serde_wasm_bindgen::from_value(js_services)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let deserialized_services: Vec<ByteBuf> = js_err(serde_wasm_bindgen::from_value(js_services))?;
     for s in &deserialized_services[..] {
-        services.push(
-            PackagedService::new(Cursor::new(&s[..]))
-                .map_err(|e| JsValue::from_str(&e.to_string()))?,
-        );
+        services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
     }
     let now_plus_30secs = chrono::Utc::now() + chrono::Duration::seconds(30);
     let expiration = TimePointSec {
         seconds: now_plus_30secs.timestamp() as u32,
     };
-    let prod =
-        ExactAccountNumber::from_str(&producer).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let prod = js_err(ExactAccountNumber::from_str(&producer))?;
 
-    let (boot_transactions, transactions) =
-        create_boot_transactions(&None, prod.into(), true, expiration, &mut services[..]);
+    let (boot_transactions, transactions) = js_err(create_boot_transactions(
+        &None,
+        prod.into(),
+        true,
+        expiration,
+        &mut services[..],
+    ))?;
 
     let boot_transactions = boot_transactions.packed();
     let transactions: Vec<ByteBuf> = transactions

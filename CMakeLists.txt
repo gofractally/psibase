@@ -416,7 +416,7 @@ if(BUILD_DOC)
         DESCRIPTION "Psibase documentation"
         SERVICE doc-sys
         DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
-        PACKAGE_DEPENDS PsiSpaceSys
+        PACKAGE_DEPENDS PsiSpaceSys AccountSys
         DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
     )
 endif()
@@ -445,6 +445,7 @@ psibase_package(
     SERVICE r-prod-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm
     DEPENDS wasm
+    PACKAGE_DEPENDS ProxySys
 )
 
 psibase_package(
@@ -550,7 +551,7 @@ psibase_package(
     NAME TokenUsers
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
-    PACKAGE_DEPENDS TokenSys SymbolSys
+    PACKAGE_DEPENDS TokenSys SymbolSys AccountSys
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/src/TokenUsers.json
 )
 

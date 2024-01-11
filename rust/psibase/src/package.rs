@@ -1,9 +1,9 @@
-use crate::services::{proxy_sys, psispace_sys};
+use crate::services::{account_sys, proxy_sys, psispace_sys};
 use crate::{AccountNumber, Action, GenesisService};
 use custom_error::custom_error;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 use std::io::{Read, Seek};
 use std::str::FromStr;
 use zip::ZipArchive;
@@ -17,7 +17,11 @@ custom_error! {
         MissingMeta          = "Service does not contain meta.json",
     InvalidFlags = "Invalid service flags",
     DependencyCycle = "Cycle in service dependencies",
-    UnknownFileType{path:String} = "Cannot determine Mime-Type for {path}"
+    UnknownFileType{path:String} = "Cannot determine Mime-Type for {path}",
+    UnknownAccount{name:AccountNumber} = "Account {name} not defined in meta.json",
+    AccountConflict{name: AccountNumber, old: String, new: String} = "The account {name} is defined by more than one package: {old}, {new}",
+    MissingDepAccount{name: AccountNumber, package: String} = "The account {name} required by {package} is not defined by any package",
+    MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -95,8 +99,14 @@ impl<R: Read + Seek> PackagedService<R> {
                 }
             }
         }
+        let meta_contents =
+            std::io::read_to_string(archive.by_index(meta_index.ok_or(Error::MissingMeta)?)?)?;
+        let meta: Meta = serde_json::de::from_str(&meta_contents)?;
         let mut services = vec![];
         for (account, file) in service_files {
+            if !meta.accounts.contains(&account) {
+                Err(Error::UnknownAccount { name: account })?
+            }
             let info = match info_files.get(&account) {
                 Some(info_idx) => serde_json::de::from_reader(archive.by_index(*info_idx)?)?,
                 None => ServiceInfo {
@@ -106,9 +116,11 @@ impl<R: Read + Seek> PackagedService<R> {
             };
             services.push((account, file, info));
         }
-        let meta_contents =
-            std::io::read_to_string(archive.by_index(meta_index.ok_or(Error::MissingMeta)?)?)?;
-        let meta: Meta = serde_json::de::from_str(&meta_contents)?;
+        for (account, _file) in &data[..] {
+            if !meta.accounts.contains(&account) {
+                Err(Error::UnknownAccount { name: *account })?
+            }
+        }
         Ok(PackagedService {
             archive: archive,
             meta: meta,
@@ -186,6 +198,76 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         Ok(())
     }
+
+    // Returns accounts that must be defined by either this package or its
+    // immediate dependencies
+    pub fn get_required_accounts(&mut self) -> Result<Vec<AccountNumber>, anyhow::Error> {
+        let mut result = vec![];
+
+        for account in self.get_accounts() {
+            if !self.has_service(*account) {
+                result.push(account_sys::SERVICE)
+            }
+        }
+
+        for (_, _, info) in &self.services {
+            if let Some(_) = &info.server {
+                result.push(proxy_sys::SERVICE)
+            }
+        }
+
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            let actions: Vec<Action> = serde_json::de::from_str(&std::io::read_to_string(file)?)?;
+            for act in actions {
+                result.push(act.sender);
+                result.push(act.service);
+            }
+        }
+
+        result.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+        result.dedup();
+
+        Ok(result)
+    }
+}
+
+// Two packages shall not create the same account
+// Accounts used in any way during installation must be part of the package or
+// its direct dependencies
+pub fn validate_dependencies<T: Read + Seek>(
+    packages: &mut [PackagedService<T>],
+) -> Result<(), anyhow::Error> {
+    let mut accounts: HashMap<AccountNumber, String> = HashMap::new();
+    for p in &packages[..] {
+        for account in p.get_accounts() {
+            match accounts.entry(*account) {
+                hash_map::Entry::Occupied(entry) => Err(Error::AccountConflict {
+                    name: *account,
+                    old: entry.get().to_string(),
+                    new: p.meta.name.clone(),
+                })?,
+                hash_map::Entry::Vacant(entry) => entry.insert(p.meta.name.clone()),
+            };
+        }
+    }
+    for p in &mut packages[..] {
+        for account in p.get_required_accounts()? {
+            if let Some(package) = accounts.get(&account) {
+                if &p.meta.name != package && !p.meta.depends.contains(package) {
+                    Err(Error::MissingDepPackage {
+                        name: p.meta.name.clone(),
+                        dep: package.clone(),
+                    })?;
+                }
+            } else {
+                Err(Error::MissingDepAccount {
+                    name: account,
+                    package: p.meta.name.clone(),
+                })?
+            }
+        }
+    }
+    Ok(())
 }
 
 fn dfs<T: PackageRegistry + ?Sized>(
