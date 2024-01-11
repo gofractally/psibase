@@ -5,6 +5,8 @@ use bindings::component::account_sys::types::User;
 
 use bindings::Guest;
 
+use crate::bindings::in_the_line;
+
 struct Component;
 
 impl Guest for Component {
@@ -24,7 +26,7 @@ impl Guest for Component {
             method: "test_method".to_string(),
             params: "test_params".to_string(),
         };
-        let x = bindings::component::account_sys::imports::funccall(&test_params);
+        let x = in_the_line::funccall(&test_params);
         println!("The x, 'is a thing.. {:?}", x);
         format!("The word you gave me was {}", word)
     }
