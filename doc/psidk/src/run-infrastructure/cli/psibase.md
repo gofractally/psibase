@@ -10,7 +10,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
 `psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
-`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* *dest*  
+`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
 
 ## DESCRIPTION
@@ -123,7 +123,7 @@ Modify an account
 
 ### upload
 
-`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* *dest*  
+`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
 
 Upload a file to a service. The service must provide a `storeSys` action.
 
@@ -145,7 +145,7 @@ Upload a file to a service. The service must provide a `storeSys` action.
 
 - *dest*
 
-  Destination path within *service*
+  Destination path within *service*. If not specified, defaults to the file name of *source* or `/` for recursive uploads.
 
 - `-S`, `--sender` *sender*
 

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
 use std::fs::{metadata, read_dir};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
@@ -152,7 +152,7 @@ enum Command {
         source: String,
 
         /// Destination path within service
-        dest: String,
+        dest: Option<String>,
 
         /// MIME content type of file
         #[clap(short = 't', long, value_name = "MIME-TYPE")]
@@ -407,7 +407,7 @@ async fn upload(
     client: reqwest::Client,
     service: AccountNumber,
     sender: Option<ExactAccountNumber>,
-    dest: &str,
+    dest: &Option<String>,
     content_type: &Option<String>,
     source: &str,
 ) -> Result<(), anyhow::Error> {
@@ -428,10 +428,20 @@ async fn upload(
         }
     };
 
+    let normalized_dest = if let Some(d) = dest {
+        if d.starts_with('/') {
+            d.to_string()
+        } else {
+            "/".to_string() + d
+        }
+    } else {
+        "/".to_string() + Path::new(source).file_name().unwrap().to_str().unwrap()
+    };
+
     let actions = vec![store_sys(
         service,
         sender,
-        dest,
+        &normalized_dest,
         &deduced_content_type,
         &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
     )];
@@ -618,12 +628,26 @@ async fn push_boot(
     Ok(())
 }
 
+fn normalize_upload_path(path: &Option<String>) -> String {
+    let mut result = String::new();
+    if let Some(s) = path {
+        if !s.starts_with('/') {
+            result.push('/');
+        }
+        result.push_str(s);
+        while result.ends_with('/') {
+            result.pop();
+        }
+    }
+    result
+}
+
 async fn upload_tree(
     args: &Args,
     client: reqwest::Client,
     service: AccountNumber,
     sender: Option<ExactAccountNumber>,
-    mut dest: &str,
+    dest: &Option<String>,
     source: &str,
 ) -> Result<(), anyhow::Error> {
     let sender = if let Some(s) = sender {
@@ -632,12 +656,17 @@ async fn upload_tree(
         service
     };
 
-    while !dest.is_empty() && dest.ends_with('/') {
-        dest = &dest[0..dest.len() - 1];
-    }
+    let normalized_dest = normalize_upload_path(dest);
 
     let mut actions = Vec::new();
-    fill_tree(service, sender, &mut actions, dest, source, true)?;
+    fill_tree(
+        service,
+        sender,
+        &mut actions,
+        &normalized_dest,
+        source,
+        true,
+    )?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
     let mut running = Vec::new();
