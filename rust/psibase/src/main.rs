@@ -148,30 +148,19 @@ enum Command {
         /// Service to upload to
         service: ExactAccountNumber,
 
-        /// Destination file within service
-        dest: String,
-
-        /// MIME content type of file
-        content_type: String,
-
         /// Source filename to upload
         source: String,
 
-        /// Sender to use; defaults to <SERVICE>
-        #[clap(short = 'S', long, value_name = "SENDER")]
-        sender: Option<ExactAccountNumber>,
-    },
-
-    /// Upload a directory tree to a service
-    UploadTree {
-        /// Service to upload to
-        service: ExactAccountNumber,
-
-        /// Destination directory within service
+        /// Destination path within service
         dest: String,
 
-        /// Source directory to upload
-        source: String,
+        /// MIME content type of file
+        #[clap(short = 't', long, value_name = "MIME-TYPE")]
+        content_type: Option<String>,
+
+        /// Upload a directory recursively
+        #[clap(short = 'r', long)]
+        recursive: bool,
 
         /// Sender to use; defaults to <SERVICE>
         #[clap(short = 'S', long, value_name = "SENDER")]
@@ -419,7 +408,7 @@ async fn upload(
     service: AccountNumber,
     sender: Option<ExactAccountNumber>,
     dest: &str,
-    content_type: &str,
+    content_type: &Option<String>,
     source: &str,
 ) -> Result<(), anyhow::Error> {
     let sender = if let Some(s) = sender {
@@ -428,11 +417,22 @@ async fn upload(
         service
     };
 
+    let deduced_content_type = match content_type {
+        Some(t) => t.clone(),
+        None => {
+            let guess = mime_guess::from_path(source);
+            let Some(t) = guess.first() else {
+                return Err(anyhow!(format!("Unknown mime type: {}", source)));
+            };
+            t.essence_str().to_string()
+        }
+    };
+
     let actions = vec![store_sys(
         service,
         sender,
         dest,
-        content_type,
+        &deduced_content_type,
         &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
     )];
     let trx = with_tapos(
@@ -458,6 +458,7 @@ fn fill_tree(
     actions: &mut Vec<(String, Action)>,
     dest: &str,
     source: &str,
+    top: bool,
 ) -> Result<(), anyhow::Error> {
     let md = metadata(source)?;
     if md.is_file() {
@@ -475,13 +476,30 @@ fn fill_tree(
                 ),
             ));
         } else {
-            println!("Skip unknown mime type: {}", source);
+            if top {
+                return Err(anyhow!("Unknown mime type: {}", source));
+            } else {
+                println!("Skip unknown mime type: {}", source);
+            }
         }
     } else if md.is_dir() {
         for path in read_dir(source)? {
             let path = path?;
             let d = dest.to_owned() + "/" + path.file_name().to_str().unwrap();
-            fill_tree(service, sender, actions, &d, path.path().to_str().unwrap())?;
+            fill_tree(
+                service,
+                sender,
+                actions,
+                &d,
+                path.path().to_str().unwrap(),
+                false,
+            )?;
+        }
+    } else {
+        if top {
+            return Err(anyhow!("{} is not a file or directory", source));
+        } else {
+            println!("Skip {}", source);
         }
     }
     Ok(())
@@ -619,7 +637,7 @@ async fn upload_tree(
     }
 
     let mut actions = Vec::new();
-    fill_tree(service, sender, &mut actions, dest, source)?;
+    fill_tree(service, sender, &mut actions, dest, source, true)?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
     let mut running = Vec::new();
@@ -740,28 +758,30 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Command::Upload {
             service,
+            source,
             dest,
             content_type,
-            source,
+            recursive,
             sender,
         } => {
-            upload(
-                &args,
-                client,
-                (*service).into(),
-                *sender,
-                dest,
-                content_type,
-                source,
-            )
-            .await?
+            if *recursive {
+                if content_type.is_some() {
+                    return Err(anyhow!("--recursive is incompatible with --content-type"));
+                }
+                upload_tree(&args, client, (*service).into(), *sender, dest, source).await?
+            } else {
+                upload(
+                    &args,
+                    client,
+                    (*service).into(),
+                    *sender,
+                    dest,
+                    content_type,
+                    source,
+                )
+                .await?
+            }
         }
-        Command::UploadTree {
-            service,
-            dest,
-            source,
-            sender,
-        } => upload_tree(&args, client, (*service).into(), *sender, dest, source).await?,
         Command::CreateToken {
             expires_after,
             mode,

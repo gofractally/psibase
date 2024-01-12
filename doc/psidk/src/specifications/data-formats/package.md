@@ -26,7 +26,7 @@ Properties associated with a service.
 
 ## data/&lt;service&gt;/*
 
-Files that will be uploaded using the `uploadSys` action.
+Files that will be uploaded using the `storeSys` action.
 
 ## script/postinstall.json
 
