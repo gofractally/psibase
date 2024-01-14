@@ -224,7 +224,7 @@ namespace arbtrie
             */
 
             auto obj_size   = foo->size();
-            auto [loc, ptr] = ses.alloc_data(obj_size, foo->id(), foo->get_type());
+            auto [loc, ptr] = ses.alloc_data(obj_size, foo->id());
             auto try_move   = [&]()
             {
                int count = 0;
@@ -255,14 +255,15 @@ namespace arbtrie
 
             if (not try_move())
             {
-               TRIEDENT_WARN("try move failed, unalloc...", foo->id());
+             //  TRIEDENT_WARN("try move failed, unalloc...", foo->id());
                _header->seg_meta[start_seg_num].free_object(foo->size());
+               // TODO: retry
               // ses.unalloc(ptr->_nsize);
             }
-            if (not foo->validate_checksum())
+            //if (not foo->validate_checksum())
             {
-               TRIEDENT_WARN("moved object with invalid checksum: expected: ",
-                             foo->calculate_checksum(), " != ", foo->checksum);
+           //    TRIEDENT_WARN("moved object with invalid checksum: expected: ",
+            //                 foo->calculate_checksum(), " != ", foo->checksum);
             }
          }
 

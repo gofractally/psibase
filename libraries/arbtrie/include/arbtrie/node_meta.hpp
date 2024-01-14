@@ -1,7 +1,8 @@
 #pragma once
 #include <cassert>
-#include <string_view>
 #include <iostream>
+#include <optional>
+#include <string_view>
 
 namespace arbtrie
 {
@@ -13,12 +14,21 @@ namespace arbtrie
    // each thread will have a segment this size, so larger values
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
-   static const uint64_t segment_size = 1024 * 1024 * 16;  // 256mb
+   static const uint64_t segment_size = 1024 * 1024 * 64;  // 256mb
 
    /// object pointers can only address 48 bits
    /// 128 TB limit on database size with 47 bits, this saves us
    /// 8MB of memory relative to 48 bits in cases with less than 128 TB
    static const uint64_t max_segment_count = (1ull << 47) / segment_size;
+
+   static const uint64_t binary_refactor_threshold = 4096;
+   static const uint64_t binary_node_max_size  = 4096;
+
+   // the number of branches at which an inner node is automatically
+   // upgraded to a full node
+   static const int full_node_threshold = 128;
+
+   static const int max_branch_count = 257;
 
    struct node_header;
    struct binary_node;
@@ -33,25 +43,70 @@ namespace arbtrie
    {
       freelist  = 0,  // not initialized/invalid, must be first enum
       binary    = 1,  // binary search
-      setlist   = 2,  // list of branches
-      value     = 3,  // just the data, no key
+      value     = 2,  // just the data, no key
+      setlist   = 3,  // list of branches
       roots     = 4,  // contains pointers to other root nodes
-      merge     = 5,  // delta applied to existing node
+      full      = 5,  // 256 full id_type
       undefined = 6,  // no type has been defined yet
 
       // future, requires taking a bit
       index    = 7,  // 256 index buffer to id_type
       bitfield = 8,
-      full     = 9,  // 256 full id_type
+      merge    = 9,  // delta applied to existing node
    };
    static const char* node_type_names[] = {
-      "freelist", // must be first
-      "binary",
-      "setlist",
-      "value",
-      "roots",
-      "merge",
-      "undefined",
+       "freelist",  // must be first
+       "binary",   "setlist", "value", "roots", "merge", "undefined",
+   };
+
+   struct clone_config
+   {
+      int spare_branches = 0;  // inner nodes other than full
+      int spare_space    = 0;  // value nodes, binary nodes
+      int spare_prefix   = 0;  //
+      std::optional<key_view> update_prefix;
+      friend auto             operator<=>(const clone_config&, const clone_config&) = default;
+
+      int_fast16_t prefix_capacity() const
+      {
+         if (update_prefix)
+            return update_prefix->size() + spare_prefix;
+         return spare_prefix;
+      }
+   };
+
+   struct upsert_mode
+   {
+      enum type : int
+      {
+         shared        = 0,
+         unique        = 1,  // ref count of all parent nodes and this is 1
+         insert        = 2,  // fail if key does exist
+         update        = 4,  // fail if key doesn't exist
+         upsert        = insert | update,
+         unique_upsert = unique | upsert,
+         unique_insert = unique | insert,
+         unique_update = unique | update,
+         shared_upsert = shared | upsert,
+         shared_insert = shared | insert,
+         shared_update = shared | update
+      };
+
+      constexpr upsert_mode(upsert_mode::type t) : flags(t){};
+
+      constexpr bool        is_unique() const { return flags & unique; }
+      constexpr bool        is_shared() const { return not is_unique(); }
+      constexpr upsert_mode make_shared() const { return {flags & ~unique}; }
+      constexpr upsert_mode make_unique() const { return {flags | unique}; }
+      constexpr bool        may_insert() const { return flags & insert; }
+      constexpr bool        may_update() const { return flags & insert; }
+      constexpr bool        must_insert() const { return not may_update(); }
+      constexpr bool        must_update() const { return not may_insert(); }
+
+     // private: structural types cannot have private members,
+     // but the flags field is not meant to be used directly
+      constexpr upsert_mode( int f ):flags(f){}
+      int flags;
    };
 
    /**
@@ -63,10 +118,11 @@ namespace arbtrie
     */
    struct object_id
    {
-      uint64_t    id : 40 = 0;  // obj id
-      explicit    operator bool() const { return id != 0; }
-      friend bool operator==(object_id a, object_id b) = default;
-      friend std::ostream& operator << ( std::ostream& out, const object_id& oid ) {
+      uint64_t             id : 40 = 0;  // obj id
+      explicit             operator bool() const { return id != 0; }
+      friend bool          operator==(object_id a, object_id b) = default;
+      friend std::ostream& operator<<(std::ostream& out, const object_id& oid)
+      {
          return out << uint64_t(oid.id);
       }
    } __attribute__((packed)) __attribute__((aligned(1)));
@@ -96,7 +152,6 @@ namespace arbtrie
     * the same instant before any core can realize the overshoot and subtract out.
     */
    static const uint32_t max_threads = 32;
-
 
    /**
     *  Tracks high-level information for each object in an atomic manner
@@ -167,9 +222,9 @@ namespace arbtrie
       {
          uint64_t ref : ARBTRIE_REF_BITS;
          uint64_t type : ARBTRIE_TYPE_BITS;
-         uint64_t copy_flag: 1; // set this bit on start of copy, clear it on start of modify
-         uint64_t modify_flag: 1; // 0 when modifying, 1 when not
-         uint64_t location : 46;  // the location divided by 16, 1024 TB addressable
+         uint64_t copy_flag : 1;    // set this bit on start of copy, clear it on start of modify
+         uint64_t modify_flag : 1;  // 0 when modifying, 1 when not
+         uint64_t location : 46;    // the location divided by 16, 1024 TB addressable
       };
 
       // temporary impl that relies on the UB that writing to one and reading
@@ -185,19 +240,20 @@ namespace arbtrie
       static_assert(sizeof(_value) == sizeof(uint64_t));
 
      public:
-      static const uint64_t ref_mask      = (1ull << ARBTRIE_REF_BITS) - 1;
-      static const uint64_t max_ref_count = ref_mask - max_threads;  // allow some overflow bits for retain
-      static const uint64_t type_mask       = 7 << ARBTRIE_REF_BITS;
-      static const uint64_t copy_flag_bit   = ARBTRIE_REF_BITS + ARBTRIE_TYPE_BITS;
-      static const uint64_t modify_flag_bit = copy_flag_bit + 1;
-      static const uint64_t copy_flag_mask   = (uint64_t(1)<<copy_flag_bit);
-      static const uint64_t modify_flag_mask = (uint64_t(1)<<modify_flag_bit);
-      static const uint64_t location_mask   = ~(type_mask | ref_mask | copy_flag_mask | modify_flag_mask);
+      static const uint64_t ref_mask = (1ull << ARBTRIE_REF_BITS) - 1;
+      static const uint64_t max_ref_count =
+          ref_mask - max_threads;  // allow some overflow bits for retain
+      static const uint64_t type_mask        = 7 << ARBTRIE_REF_BITS;
+      static const uint64_t copy_flag_bit    = ARBTRIE_REF_BITS + ARBTRIE_TYPE_BITS;
+      static const uint64_t modify_flag_bit  = copy_flag_bit + 1;
+      static const uint64_t copy_flag_mask   = (uint64_t(1) << copy_flag_bit);
+      static const uint64_t modify_flag_mask = (uint64_t(1) << modify_flag_bit);
+      static const uint64_t location_mask =
+          ~(type_mask | ref_mask | copy_flag_mask | modify_flag_mask);
 
-      object_meta( const object_meta& c) {
-         _value.iv = c._value.iv;
-      }
-      object_meta& operator=(const object_meta& in) {
+      object_meta(const object_meta& c) { _value.iv = c._value.iv; }
+      object_meta& operator=(const object_meta& in)
+      {
          _value.iv = in._value.iv;
          return *this;
       }
@@ -205,47 +261,47 @@ namespace arbtrie
       explicit object_meta(uint64_t v = 0) { _value.iv = v; };
       explicit object_meta(node_type t)
       {
-         _value.bf.type     = int(t);
-         _value.bf.location = 0;
-         _value.bf.ref      = 0;
+         _value.bf.type        = int(t);
+         _value.bf.location    = 0;
+         _value.bf.ref         = 0;
          _value.bf.modify_flag = 1;
       }
 
       // does not divide loc by 16
       explicit object_meta(node_type t, uint64_t loc)
       {
-         _value.bf.type     = int(t);
-         _value.bf.location = loc;
-         _value.bf.ref      = 0;
+         _value.bf.type        = int(t);
+         _value.bf.location    = loc;
+         _value.bf.ref         = 0;
          _value.bf.modify_flag = 1;
       }
       explicit object_meta(node_type t, object_location loc)
       {
-         assert(not (loc._offset & 15));
-         _value.bf.type     = int(t);
-         _value.bf.location = loc._offset >> 4;
-         _value.bf.ref      = 0;
+         assert(not(loc._offset & 15));
+         _value.bf.type        = int(t);
+         _value.bf.location    = loc._offset >> 4;
+         _value.bf.ref         = 0;
          _value.bf.modify_flag = 1;
       }
       explicit object_meta(node_type t, object_location loc, int r)
       {
-         assert(not (loc._offset & 15));
-         _value.bf.type     = int(t);
-         _value.bf.location = loc._offset >> 4;
-         _value.bf.ref      = r;
+         assert(not(loc._offset & 15));
+         _value.bf.type        = int(t);
+         _value.bf.location    = loc._offset >> 4;
+         _value.bf.ref         = r;
          _value.bf.modify_flag = 1;
       }
 
       object_meta& set_ref(uint16_t ref)
       {
-         static_assert( max_ref_count < (1 << ARBTRIE_REF_BITS) );
+         static_assert(max_ref_count < (1 << ARBTRIE_REF_BITS));
          assert(int64_t(ref) < max_ref_count);
          _value.bf.ref = ref;
          return *this;
       }
       object_meta& set_location(object_location loc)
       {
-         assert(not (loc._offset & 15));
+         assert(not(loc._offset & 15));
          assert((loc._offset >> 4) == (loc._offset / 16));
          _value.bf.location = loc._offset >> 4;
          /*
@@ -261,20 +317,24 @@ namespace arbtrie
          return *this;
          //   value = (value & ~type_mask ) | (uint64_t(type) << type_lshift);
       }
-      uint64_t  ref() const { return _value.bf.ref; }  //_value & ref_mask; }
-      node_type type() const { return node_type(_value.bf.type); }
-      bool      modify_flag()const { return _value.bf.modify_flag; }
-      bool      copy_flag()const { return _value.bf.copy_flag; }
-      object_meta& clear_copy_flag() { _value.bf.copy_flag = 0; return *this;}
+      uint64_t     ref() const { return _value.bf.ref; }  //_value & ref_mask; }
+      node_type    type() const { return node_type(_value.bf.type); }
+      bool         modify_flag() const { return _value.bf.modify_flag; }
+      bool         copy_flag() const { return _value.bf.copy_flag; }
+      object_meta& clear_copy_flag()
+      {
+         _value.bf.copy_flag = 0;
+         return *this;
+      }
 
-      bool      is_changing()const { return not modify_flag(); }
-      bool      is_copying()const  { return _value.bf.copy_flag; }
+      bool is_changing() const { return not modify_flag(); }
+      bool is_copying() const { return _value.bf.copy_flag; }
 
       object_location loc() const { return {uint64_t(_value.bf.location) << 4}; }
 
       // return the loc without mult by 16
       uint64_t raw_loc() const { return _value.bf.location; }
-      void     set_raw_loc( uint64_t l ) { _value.bf.location = l; }
+      void     set_raw_loc(uint64_t l) { _value.bf.location = l; }
 
       uint64_t&       data() { return _value.iv; }
       const uint64_t& data() const { return _value.iv; }

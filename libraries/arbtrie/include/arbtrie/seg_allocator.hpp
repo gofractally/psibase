@@ -212,12 +212,12 @@ namespace arbtrie
                  // _mut.unlock();
                   _read_on_lock = _meta.fetch_and(start_mod_mask, std::memory_order_acquire);
 
-                  auto prior_o= object_meta(
+                  //auto prior_o= object_meta(
                       //_meta.fetch_and(start_mod_mask, std::memory_order_acquire) & start_mod_mask);
-                       _read_on_lock);
+                  //     _read_on_lock);
 
                   // assert no one else is atempting to modify at the same time
-                  assert( not prior_o.is_changing() );
+                  //assert( not prior_o.is_changing() );
 
                   _locked_val = object_meta( _read_on_lock& start_mod_mask);
                   assert(_locked_val.is_changing());
@@ -254,7 +254,7 @@ namespace arbtrie
                   {
                      // TODO: check to see if checksum actually changed?
                      // to let us know if we are making empty changes
-                     _observed_ptr->update_checksum();
+                     _observed_ptr->checksum = 0;//update_checksum();
                   }
                   else
                   {
@@ -342,6 +342,7 @@ namespace arbtrie
                template <typename Type>
                const Type* as() const
                {
+                  assert( Type::type == obj()->get_type() );
                   return reinterpret_cast<const Type*>(obj());
                };
 
@@ -536,8 +537,7 @@ namespace arbtrie
           *
           */
          std::pair<object_location, node_header*> alloc_data(uint32_t  size,
-                                                             object_id id,
-                                                             node_type t)
+                                                             object_id id)
          {
             assert(size < segment_size - 16);
             // A - if no segment get a new segment
@@ -574,13 +574,12 @@ namespace arbtrie
                _alloc_seg_ptr = nullptr;
                _alloc_seg_num = -1ull;
 
-               return alloc_data(size, id, t);  // recurse
+               return alloc_data(size, id);  // recurse
             }
 
             auto obj       = ((char*)sh) + sh->_alloc_pos.load(std::memory_order_relaxed);
             auto head      = (node_header*)obj;
-            head           = new (head) node_header(size, t, 0, 0);
-            head->_node_id = id.id;
+            head           = new (head) node_header(size, id);
 
             auto new_alloc_pos =
                 rounded_size + sh->_alloc_pos.fetch_add(rounded_size, std::memory_order_relaxed);
@@ -694,6 +693,13 @@ namespace arbtrie
       std::atomic<uint64_t> _min_read_ptr = -1ull;  // min(R*)
       uint64_t              get_min_read_ptr();
 
+      struct read_ptr_view {
+         uint32_t locked_end = 0; // the locked sequence number, or max u32 if unlocked
+         uint32_t view_of_end = 0; // the last view of end seen by session;
+      };
+
+      //std::atomic<read_ptr_view> _session_lock_ptrs[64];
+
       /**
       * At the start of each access to the DB, 
       * a read thread must copy the end_ptr and store
@@ -747,34 +753,6 @@ namespace arbtrie
    template <typename T>
    using deref = seg_allocator::session::read_lock::object_ref<T>;
 
-   /**
-    * Holds a unique_lock that toggles a bit and prevents the
-    * underlying object from being moved or released while the lock
-    * is held.
-    */
-   template <typename T>
-   struct mutable_deref : public deref<T>
-   {
-      mutable_deref(const deref<T>& src) : deref<T>(src), lock(src.get_mutex()) {}
-
-      /*
-      mutable_deref(std::unique_lock<std::mutex>& m, const deref<T>& src) 
-         : deref<T>(src), lock(m)
-      {
-      }
-      */
-
-      //inline auto& as_value_node() const { return *this->template as<value_node>(); }
-      //inline auto& as_inner_node() const { return *this->template as<inner_node>(); }
-
-      inline T* operator->() const { return const_cast<T*>(this->template as<T>()); }
-      inline T& operator*() const { return const_cast<T&>(*this->template as<T>()); }
-
-      ~mutable_deref() { this->obj()->update_checksum(); }
-
-     private:
-      std::unique_lock<std::mutex> lock;
-   };  // mutable_deref
 
    /**
     * @param expect - the current location the caller things the object is at
@@ -854,7 +832,7 @@ namespace arbtrie
       assert(prior.ref() > 0);
       assert(prior.type() != node_type::freelist);
 
-      //TRIEDENT_DEBUG( id(), " ref++ => ", (prior.to_int()&object_meta::ref_mask)+1 );
+  //    TRIEDENT_DEBUG( id(), " ref++ => ", (prior.to_int()&object_meta::ref_mask)+1 );
       if (prior.ref() > object_meta::max_ref_count) [[unlikely]]
       {
          _atom_loc.fetch_sub(1, std::memory_order_relaxed);
@@ -869,7 +847,7 @@ namespace arbtrie
       assert(type() != node_type::undefined);
       assert(type() != node_type::freelist);
       auto prior = _atom_loc.fetch_sub(1, std::memory_order_relaxed);
-     // TRIEDENT_DEBUG( id(), " ref-- => ", (prior&object_meta::ref_mask)-1 );
+  //    TRIEDENT_DEBUG( id(), " ref-- => ", (prior&object_meta::ref_mask)-1 );
       if ((prior & object_meta::ref_mask) > 1)
          return false;
 
@@ -888,7 +866,8 @@ namespace arbtrie
 
       auto obj_ptr =
           (node_header*)((char*)_rlock._session._sega._block_alloc.get(seg) + loc.index());
-      obj_ptr->set_type(node_type::undefined);
+
+      //obj_ptr->set_type(node_type::undefined);
 
       // signal to compactor that this data is no longer valid before
       // we allow the ID to be reused.
@@ -941,15 +920,20 @@ namespace arbtrie
       assert(type != node_type::undefined);
 
       auto& atom           = _session._sega._id_alloc.get(id);
-      auto [loc, node_ptr] = _session.alloc_data(size, id, type);
+      auto [loc, node_ptr] = _session.alloc_data(size, id);
 
       init(node_ptr);
-      node_ptr->update_checksum();
 
       /*
       TRIEDENT_WARN( "realloc id: ", id, " old type: " , node_type_names[get(id).type()], " old loc: ", l._offset,
                      " new type:", node_type_names[type], "  new loc: ", loc._offset, " nsize: ", size );
                      */
+
+
+      assert(node_ptr->_nsize == size );
+      assert(node_ptr->_ntype == type );
+      assert(node_ptr->_unused_pad == 0);
+      assert(node_ptr->_node_id == id.id);
 
       // we can stomp on the data because it is impossible for the ref count to
       // increase while realloc and even if compactor moves the data from the
@@ -968,14 +952,17 @@ namespace arbtrie
       assert(type != node_type::undefined);
 
       auto [atom, id]      = _session._sega._id_alloc.get_new_id();
-      auto [loc, node_ptr] = _session.alloc_data(size, id, type);
+      auto [loc, node_ptr] = _session.alloc_data(size, id);
       //TRIEDENT_WARN( "alloc id: ", id, " type: " , node_type_names[type], " loc: ", loc._offset, " size: ", size);
 
       init(node_ptr);
-      node_ptr->update_checksum();
 
       atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
 
+      assert(node_ptr->_nsize == size );
+      assert(node_ptr->_ntype == type );
+      assert(node_ptr->_unused_pad == 0);
+      assert(node_ptr->_node_id == id.id);
       assert(object_ref(*this, id, atom).type() != node_type::undefined);
       return object_ref(*this, id, atom);
    }

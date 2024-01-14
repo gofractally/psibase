@@ -60,7 +60,7 @@ namespace arbtrie
 
       std::atomic<uint64_t>& get(object_id id)
       {
-         auto abs_pos        = id.id * sizeof(uint64_t);
+         auto abs_pos        = int_fast64_t(id.id) * sizeof(uint64_t);
          auto block_num      = abs_pos / id_block_size; // TODO: use a shift
          auto index_in_block = uint64_t(abs_pos) & uint64_t(id_block_size - 1);
          auto ptr            = ((char*)_block_alloc.get(block_num)) + index_in_block;

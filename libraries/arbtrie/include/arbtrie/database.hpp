@@ -3,6 +3,7 @@
 #include <arbtrie/id_allocator.hpp>
 #include <arbtrie/root.hpp>
 #include <arbtrie/seg_allocator.hpp>
+#include <arbtrie/arbtrie.hpp>
 #include <memory>
 #include <optional>
 
@@ -57,7 +58,7 @@ namespace arbtrie
       friend class root_data;
       friend class root;
       read_session(database& db);
-      database&              _db;
+      database& _db;
 
      public:
       // TODO make private
@@ -67,8 +68,8 @@ namespace arbtrie
       /**
        * @return -1 if not found, otherwise the size of the value
        */
-      int get(root& r, key_view key, std::vector<char>* result = nullptr);
-      bool validate( const root& r );
+      int  get(root& r, key_view key, std::vector<char>* result = nullptr);
+      bool validate(const root& r);
    };
 
    class write_session : public read_session
@@ -76,11 +77,8 @@ namespace arbtrie
       friend class database;
       write_session(database& db) : read_session(db) {}
 
-      object_id upsert(session_rlock& state,
-                       object_id   root,
-                       key_view    key,
-                       value_view  val,
-                       int&        old_size);
+      object_id upsert(session_rlock& state, object_id root, key_view key, value_view val);
+      object_id insert(session_rlock& state, object_id root, key_view key, value_view val);
 
      public:
       ~write_session();
@@ -95,10 +93,37 @@ namespace arbtrie
              * @return -1 on insert, otherwise the size of the old value
              */
       int upsert(node_handle& r, key_view key, value_view val);
+      int insert(node_handle& r, key_view key, value_view val);
 
       // r must not be a reference to subtree, but it can be
       // a reference to a copy of subtree
       int upsert(root& r, key_view key, root_ptr subtree);
+
+     private:
+      template <upsert_mode mode, typename NodeType>
+      object_id upsert(object_ref<NodeType>& root, key_view key, value_view val);
+      template <upsert_mode mode, typename NodeType>
+      object_id upsert(object_ref<NodeType>&& root, key_view key, value_view val);
+
+      template <upsert_mode mode, typename NodeType>
+      object_id upsert_inner(object_ref<node_header>& r, key_view key, value_view val);
+
+      template <upsert_mode mode, typename NodeType>
+      object_id upsert_inner(object_ref<node_header>&& r, key_view key, value_view val) {
+         return upsert_inner<mode>( r, key, val );
+      }
+      
+
+      template <upsert_mode mode>
+      object_id upsert_value(object_ref<node_header>& root, value_view val);
+
+      //=======================
+      // binary_node operations
+      // ======================
+      object_id make_binary( session_rlock& state, key_view key, is_value_type auto val );
+
+      template <upsert_mode mode>
+      object_id upsert_binary(object_ref<node_header>& root, key_view key, is_value_type auto val);
    };
 
    class database
@@ -146,7 +171,37 @@ namespace arbtrie
       config           _config;
    };
 
-   inline read_session::read_session(database& db) : _db(db), _segas(db._sega.start_session()) {}
 
-   inline write_session::~write_session() { _db._have_write_session = false; }
+   template <typename NodeType>
+   void retain_children(session_rlock& state, const NodeType* in);
+
+   inline read_session::read_session(database& db) : _db(db), _segas(db._sega.start_session()) {}
+   inline write_session::~write_session()
+   {
+      _db._have_write_session = false;
+   }
+
+   template <typename T>
+   void release_node(object_ref<T>& r)
+   {
+      auto& state = r.rlock();
+
+      auto release_id = [&](object_id b) { release_node(state.get(b)); };
+
+      auto n = r.obj();
+      if (r.release())
+      {
+         // if we don't know the type, dynamic dispatch
+         if constexpr (std::is_same_v<T, node_header>)
+            cast_and_call(n, [&](const auto* ptr) { ptr->visit_branches(release_id); });
+         else  // we already know the type, yay!
+            n->visit_branches(release_id);
+      }
+   }
+   template <typename T>
+   void release_node(object_ref<T>&& r)
+   {
+      release_node(r);
+   }
+
 }  // namespace arbtrie
