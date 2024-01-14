@@ -486,6 +486,23 @@ namespace arbtrie
             ++_nested_read_lock;
             if (_nested_read_lock == 1)
             {
+               uint64_t cur = _sega._session_lock_ptrs[_session_num].load( std::memory_order_acquire);
+               //cur.locked_end = cur.view_of_end;
+               uint32_t view_of_end = cur >> 32;
+               uint32_t cur_end = uint32_t(cur);
+               // it should be unlocked which signaled by max
+               assert( cur_end == uint32_t(-1) );
+               auto diff = cur_end - view_of_end;
+
+               // an atomic sub should leave the higher-order bits in place where the view
+               // from the compactor is being updated.
+               _sega._session_lock_ptrs[_session_num].fetch_sub( diff, std::memory_order_release );
+
+
+
+
+               
+               /*
                auto pt = _sega._session_ptrs[_session_num].load(std::memory_order_acquire);
                if (pt == -1ull)
                   _sega._session_ptrs[_session_num].store(
@@ -493,6 +510,7 @@ namespace arbtrie
                       std::memory_order_relaxed);
                else  // TODO: this may be ok, but if so then
                   throw std::runtime_error("attempt to double-lock");
+                  */
             }
          }
 
@@ -503,8 +521,12 @@ namespace arbtrie
             assert(_nested_read_lock >= 0);
             if (not _nested_read_lock)
             {
-               assert(_sega._session_ptrs[_session_num] != -1ull);
-               _sega._session_ptrs[_session_num] = -1ull;
+             //  assert(_sega._session_ptrs[_session_num] != -1ull);
+               //_sega._session_ptrs[_session_num] = -1ull;
+             //  _sega._session_lock_ptrs[_session_num].fetch_or( , std::memory_order_release );
+
+               // set it to max uint32_t
+               _sega._session_lock_ptrs[_session_num].fetch_or( uint32_t(-1) );
             }
          }
 
@@ -692,13 +714,15 @@ namespace arbtrie
        */
       std::atomic<uint64_t> _min_read_ptr = -1ull;  // min(R*)
       uint64_t              get_min_read_ptr();
+      void                  set_session_end_ptrs( uint32_t e );
 
-      struct read_ptr_view {
-         uint32_t locked_end = 0; // the locked sequence number, or max u32 if unlocked
-         uint32_t view_of_end = 0; // the last view of end seen by session;
-      };
-
-      //std::atomic<read_ptr_view> _session_lock_ptrs[64];
+      /**
+       *  Lower 32 bits represent R* above
+       *  Upper 32 bits represent what compactor has pushed to the session
+       *
+       *  Allocator takes the min of the lower 32 bits to determine the lock position.
+       */
+      std::atomic<uint64_t> _session_lock_ptrs[64];
 
       /**
       * At the start of each access to the DB, 
@@ -713,7 +737,7 @@ namespace arbtrie
       * we can store other session-local data on that cache line
       * for free.
       */
-      std::atomic<uint64_t> _session_ptrs[64];  // R* above
+      //std::atomic<uint64_t> _session_ptrs[64];  // R* above
 
       // to allocate a new session in thread-safe way you
       // load, find first non-zero bit, and attempt to set it via C&S,
