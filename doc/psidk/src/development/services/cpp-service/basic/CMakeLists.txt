@@ -11,3 +11,10 @@ find_package(psibase REQUIRED)
 # Build example.wasm service
 add_executable(example example.cpp)
 target_link_libraries(example Psibase::service)
+
+psibase_package(
+    NAME Example
+    DESCRIPTION "An example service"
+    SERVICE example
+    TARGET example
+)
