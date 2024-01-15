@@ -125,27 +125,58 @@ namespace arbtrie
       uint16_t _branch_cap;  // space reserved for branchs, must be <= num_branches()
       uint8_t  _key_hashes[];
 
+      struct clone_update
+      {
+         uint16_t   idx;  // the index to update
+         value_type val;
+      };
+
+      struct clone_insert
+      {
+         uint16_t   lb_idx;  // the lower bound to insert before
+         key_view   key;
+         value_type val;
+      };
+
       /**
        * Always a multiple of 64, aka the typical cache line size
        */
-      inline static int alloc_size(clone_config cfg);
-      inline static int alloc_size(const binary_node* src, clone_config cfg);
-      inline static int alloc_size(const binary_node* src,
-                                   clone_config       cfg,
-                                   key_view           key,
-                                   is_value_type auto val);
+      inline static int alloc_size(const clone_config& cfg);
+      inline static int alloc_size(const binary_node* src, const clone_config& cfg);
+      inline static int alloc_size(const binary_node*  src,
+                                   const clone_config& cfg,
+                                   const clone_insert& ins);
+      inline static int alloc_size(const binary_node*  src,
+                                   const clone_config& cfg,
+                                   const clone_update& upv);
+
+      //                     int lb_idx,
+      //                    key_view           key,
+      //                   is_value_type auto val);
 
       // make empty
-      binary_node(int_fast16_t asize, object_id nid, clone_config cfg);
+      binary_node(int_fast16_t asize, object_id nid, const clone_config& cfg);
       // clone
-      binary_node(int_fast16_t asize, object_id nid, const binary_node* src, clone_config cfg);
+      binary_node(int_fast16_t        asize,
+                  object_id           nid,
+                  const binary_node*  src,
+                  const clone_config& cfg);
       // clone + insert
-      binary_node(int_fast16_t       asize,
-                  object_id          nid,
-                  const binary_node* src,
-                  clone_config       cfg,
-                  key_view           key,
-                  is_value_type auto val);
+      binary_node(int_fast16_t        asize,
+                  object_id           nid,
+                  const binary_node*  src,
+                  const clone_config& cfg,
+                  const clone_insert& ins);
+
+      binary_node(int_fast16_t        asize,
+                  object_id           nid,
+                  const binary_node*  src,
+                  const clone_config& cfg,
+                  const clone_update& upv);
+
+      //            int lb_idx,
+      //            key_view           key,
+      //            is_value_type auto val);
 
       static inline uint64_t key_hash(key_view k) { return XXH3_64bits(k.data(), k.size()); }
       static inline uint64_t value_hash(value_view k) { return XXH3_64bits(k.data(), k.size()); }
@@ -161,10 +192,10 @@ namespace arbtrie
             inline_data = 0,
             obj_id      = 1
          };
-         uint16_t pos : 12 = 0;
-         uint16_t type : 4 = inline_data;
-         value_type val_type()const{ return (value_type)type; }
-         key_index& operator = ( const key_index& ) = default;
+         uint16_t   pos : 12 = 0;
+         uint16_t   type : 4 = inline_data;
+         value_type val_type() const { return (value_type)type; }
+         key_index& operator=(const key_index&) = default;
       } __attribute((packed, aligned(1)));
       static_assert(sizeof(key_index) == sizeof(uint16_t));
 
@@ -205,6 +236,35 @@ namespace arbtrie
             assert(_val_size == sizeof(object_id));
             return *((object_id*)(_key + _key_size));
          }
+         void set_key(key_view v)
+         {
+            _key_size = v.size();
+            memcpy(key_ptr(), v.data(), v.size());
+         }
+         void set_value(value_view v)
+         {
+            assert(v.size() <= _val_size);
+            _val_size = v.size();
+            memcpy(val_ptr(), v.data(), v.size());
+         }
+         void set_value(const value_type& v)
+         {
+            assert(v.size() <= _val_size);
+            if (v.is_object_id())
+            {
+               assert( _val_size >= sizeof(object_id) );
+               _val_size   = sizeof(object_id);
+               object_id() = v.id();
+            }
+            else
+            {
+               auto vv = v.view();
+               assert( _val_size >= vv.size() );
+               assert(vv.size() <= max_inline_value_size);
+               _val_size = vv.size();
+               memcpy(val_ptr(), vv.data(), vv.size());
+            }
+         }
 
          /*
          key_val_pair*       next() { return (key_val_pair*)(((char*)this) + padded_size()); }
@@ -217,7 +277,7 @@ namespace arbtrie
 
       static_assert(sizeof(key_val_pair) == 2);
 
-      void raise_branch_cap( short newcap );
+      void raise_branch_cap(short newcap);
 
       uint8_t*       key_hashes() { return _key_hashes; }
       const uint8_t* key_hashes() const { return _key_hashes; }
@@ -255,26 +315,38 @@ namespace arbtrie
          return (tail() - key_val_section_size()) - (const uint8_t*)end_index_data();
       }
 
-      bool insert_requires_refactor(key_view k, value_view v) const
+      bool insert_requires_refactor(key_view k, const value_type& v) const
       {
-         auto space_req = 4+calc_key_val_pair_size(k, v)+16*4;
+         auto space_req = 4 + calc_key_val_pair_size(k, v) + 32 * 4;
+         return (size() - spare_capacity() + space_req) > binary_refactor_threshold;
+      }
+      bool update_requires_refactor(const key_val_pair* existing, const value_type& new_val) const
+      {
+         auto space_req = calc_key_val_pair_size(existing->key(), new_val) - existing->key_size() -
+                          existing->value_size();
          return (size() - spare_capacity() + space_req) > binary_refactor_threshold;
       }
 
-      bool can_insert(key_view k, is_value_type auto val) const
+      bool can_insert(key_view k, const value_type& val) const
       {
-         int s = calc_key_val_pair_size(k, val);
+         int  s  = calc_key_val_pair_size(k, val);
          auto sc = spare_capacity();
-         if( s < sc and num_branches() < _branch_cap )
+         if (s < sc and num_branches() < _branch_cap)
             return true;
-         s += 32; // room to grow the branch cap
-         return  s < sc;
+         s += 32;  // room to grow the branch cap
+         return s < sc;
          // if numb == branch_cap then size += 4 else size += 0
          //s += (num_branches() == _branch_cap) << 2;
          //return s <= spare_capacity();
       }
+      void set_value(int lb_idx, const value_type& val)
+      {
+         auto& idx = key_offsets()[lb_idx];
+         idx.type = val.is_object_id();
+         get_key_val_ptr(lb_idx)->set_value(val);
+      }
 
-      inline static constexpr bool can_inline(value_view val)
+      inline static constexpr bool can_inline(const value_type& val)
       {
          return val.size() <= max_inline_value_size;
       }
@@ -292,6 +364,12 @@ namespace arbtrie
       {
          // 4 = pos, keyhash, valhash
          return sizeof(key_val_pair) + key.size() + sizeof(val);
+      }
+      inline static int calc_key_val_pair_size(key_view key, const value_type& val)
+      {
+         if (val.is_object_id())
+            return calc_key_val_pair_size(key, val.id());
+         return calc_key_val_pair_size(key, val.view());
       }
 
       /**
@@ -343,15 +421,21 @@ namespace arbtrie
       int find_key_idx(std::string_view key, uint64_t khash) const
       {
          key_view hashes((char*)key_hashes(), num_branches());
+         auto     khh = key_header_hash(khash);
+         //  TRIEDENT_WARN( "find key: '", key, "' with h: ", int(khh), "  nb: ", num_branches() );
+
+         int base = 0;
          while (true)
          {
-            auto idx = hashes.find(key_header_hash(khash));
+            auto idx = hashes.find(khh);
             if (idx == key_view::npos)
                return -1;
-            auto kvp = get_key_val_ptr(idx);
+            auto bidx = base + idx;
+            auto kvp  = get_key_val_ptr(bidx);
             if (kvp->key() == key)
-               return idx;
+               return bidx;
             hashes = hashes.substr(idx + 1);
+            base   = bidx + 1;
          }
       }
       int find_key_idx(std::string_view key) const
@@ -393,6 +477,7 @@ namespace arbtrie
          return true;
       }
 
+      /*
       // returns the space required to add a key/val, counts:
       //   2 byte offset
       //   1 byte key hash
@@ -403,6 +488,7 @@ namespace arbtrie
       {
          return 6 + key.size() + (can_inline(val) ? val.size() : sizeof(object_id));
       }
+      */
 
       /**
        *  Visits all values that contain a value_id, usually
@@ -413,7 +499,7 @@ namespace arbtrie
        *
        *  callss visitor() with an object_id 
        */
-      inline void visit_branches(auto visitor) const
+      inline void visit_branches(auto&& visitor) const
       {
          auto       start = key_offsets();
          auto       pos   = start;
@@ -429,7 +515,7 @@ namespace arbtrie
          }
       }
 
-      void insert(key_view key, is_value_type auto val);
+      void insert(int kidx, key_view key, const value_type& val);
 
    } __attribute((packed));
    static_assert(sizeof(binary_node) == sizeof(node_header) + 4);

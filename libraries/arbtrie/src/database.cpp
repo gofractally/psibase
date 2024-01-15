@@ -9,22 +9,21 @@ namespace arbtrie
 {
 
    template <typename NodeType>
-   object_ref<NodeType> make(session_rlock& state, clone_config cfg, auto uinit)
+   object_ref<NodeType> make(session_rlock& state, const clone_config& cfg, auto uinit)
    {
       auto asize     = NodeType::alloc_size(cfg);
       auto make_init = [&](node_header* cl)
       {
          assert(cl->_nsize == asize);
-         // assert( cl->_nsize <= 4096 );
          uinit(new (cl) NodeType(cl->_nsize, cl->id(), cfg));
       };
       return state.alloc(asize, NodeType::type, make_init);
    }
    template <typename NodeType>
-   object_ref<NodeType> remake(session_rlock& state,
-                               object_id      reuseid,
-                               clone_config   cfg,
-                               auto           uinit)
+   object_ref<NodeType> remake(session_rlock&      state,
+                               object_id           reuseid,
+                               const clone_config& cfg,
+                               auto                uinit)
    {
       auto asize     = NodeType::alloc_size(cfg);
       auto make_init = [&](node_header* cl) { uinit(new (cl) NodeType(asize, cl->id(), cfg)); };
@@ -106,7 +105,6 @@ namespace arbtrie
           r, src, cfg, [](auto) {}, std::forward<CArgs>(cargs)...);
    }
 
-
    uint32_t node_header::calculate_checksum() const
    {
       return cast_and_call(this, [&](const auto* t) { return t->calculate_checksum(); });
@@ -185,14 +183,17 @@ namespace arbtrie
       in->visit_branches([&](auto bid) { state.get(bid).retain(); });
    }
 
-   object_id make_value(session_rlock& state, value_view val)
+   object_id make_value(session_rlock& state, const value_type& val)
    {
+      if( val.is_object_id() ) 
+         return val.id();
+      auto v = val.view();
       return state
-          .alloc(sizeof(node_header) + val.size(), node_type::value,
+          .alloc(sizeof(node_header) + v.size(), node_type::value,
                  [&](node_header* node)
                  {
                     node->set_type(node_type::value);
-                    memcpy(node->body(), val.data(), val.size());
+                    memcpy(node->body(), v.data(), v.size());
                  })
           .id();
    }
@@ -206,7 +207,7 @@ namespace arbtrie
       // reallocate the value and update where the oref points
    }
 
-   int write_session::upsert(node_handle& r, key_view key, value_view val)
+   int write_session::upsert(node_handle& r, key_view key, const value_type& val)
    {
       auto state = _segas.lock();
 
@@ -214,7 +215,7 @@ namespace arbtrie
 
       return 0;
    }
-   int write_session::insert(node_handle& r, key_view key, value_view val)
+   int write_session::insert(node_handle& r, key_view key, const value_type& val)
    {
       auto state = _segas.lock();
 
@@ -226,7 +227,7 @@ namespace arbtrie
    object_id write_session::upsert(session_rlock& state,
                                    object_id      root,
                                    key_view       key,
-                                   value_view     val)
+                                   const value_type& val)
    {
       if (not root) [[unlikely]]
          return make_binary(state, key, val);
@@ -235,7 +236,7 @@ namespace arbtrie
    object_id write_session::insert(session_rlock& state,
                                    object_id      root,
                                    key_view       key,
-                                   value_view     val)
+                                   const value_type& val)
    {
       if (not root) [[unlikely]]
          return make_binary(state, key, val);
@@ -243,7 +244,7 @@ namespace arbtrie
    }
 
    template <upsert_mode mode, typename NodeType>
-   object_id write_session::upsert(object_ref<NodeType>&& root, key_view key, value_view val)
+   object_id write_session::upsert(object_ref<NodeType>&& root, key_view key, const value_type& val)
    {
       return upsert<mode>(root, key, val);
    }
@@ -251,7 +252,7 @@ namespace arbtrie
     *  Inserts key under root, if necessary 
     */
    template <upsert_mode mode, typename NodeType>
-   object_id write_session::upsert(object_ref<NodeType>& root, key_view key, value_view val)
+   object_id write_session::upsert(object_ref<NodeType>& root, key_view key, const value_type& val)
    {
       if constexpr (mode.is_unique())
       {
@@ -285,7 +286,7 @@ namespace arbtrie
    }
 
    template <upsert_mode mode, typename NodeType>
-   object_id upsert(object_ref<NodeType>&& root, key_view key, value_view val)
+   object_id upsert(object_ref<NodeType>&& root, key_view key, const value_type& val)
    {
       return upsert<mode>(root, key, val);
    }
@@ -294,25 +295,27 @@ namespace arbtrie
    //  upsert_value
    //================================
    template <upsert_mode mode>
-   object_id write_session::upsert_value(object_ref<node_header>& root, value_view val)
+   object_id write_session::upsert_value(object_ref<node_header>& root, const value_type& val)
    {
+      if ( val.is_object_id() ) 
+         return val.id();
       if constexpr (mode.is_shared())
-         return make_value(root.rlock(), val);
+         return make_value(root.rlock(), val.view());
       else if constexpr (mode.is_unique())
       {
          if (root.ref() != 1)
-         {
-            return upsert_value<mode.make_shared()>(root, val);
-         }
+            return make_value(root.rlock(), val.view());
+
          auto vn = root.as<value_node>();
          if (vn->value_size() == val.size())
          {
             auto mod_lock = root.modify();
             auto mvn      = mod_lock.as<value_node>();
-            memcpy(mvn->body(), val.data(), val.size());
+            auto vv = val.view();
+            memcpy(mvn->body(), vv.data(), vv.size());
             return root.id();
          }
-         return remake_value(root, vn, val);
+         return remake_value(root, vn, val.view());
       }
    }
 
@@ -337,8 +340,12 @@ namespace arbtrie
       {
          for (int i = from; i < to; ++i)
          {
-            bn->append(src->get_key_val_ptr(i), minus_prefix.size(), src->key_hashes()[i],
-                       src->value_hashes()[i], src->key_offsets()[i].val_type());
+            auto kvp  = src->get_key_val_ptr(i);
+            auto nkey = kvp->key().substr(minus_prefix.size());
+            auto nkh  = binary_node::key_header_hash(binary_node::key_hash(nkey));
+
+            bn->append(kvp, minus_prefix.size(), nkh, src->value_hashes()[i],
+                       src->key_offsets()[i].val_type());
          }
       };
       return make<binary_node>(r.rlock(),
@@ -356,7 +363,7 @@ namespace arbtrie
    template <upsert_mode mode>
    object_ref<node_header> refactor(object_ref<node_header>& r, const binary_node* root)
    {
-      //  TRIEDENT_WARN( "REFACTOR!" );
+      //     TRIEDENT_WARN( "REFACTOR!" );
       assert(root->num_branches() > 1);
       auto first_key     = root->get_key(0);
       auto last_key      = root->get_key(root->num_branches() - 1);
@@ -475,7 +482,7 @@ namespace arbtrie
                    r.rlock().get(oid).retain();
              });
          init(fn);
-         assert( fn->num_branches() >= full_node_threshold );
+         assert(fn->num_branches() >= full_node_threshold);
       };
       if constexpr (mode.is_unique())
       {
@@ -510,7 +517,9 @@ namespace arbtrie
    //
    //========================================
    template <upsert_mode mode, typename NodeType>
-   object_id write_session::upsert_inner(object_ref<node_header>& r, key_view key, value_view val)
+   object_id write_session::upsert_inner(object_ref<node_header>& r,
+                                         key_view                 key,
+                                         const value_type&        val)
    {
       auto& state = r.rlock();
       auto  fn    = r.as<NodeType>();
@@ -610,7 +619,8 @@ namespace arbtrie
             else  // there is no value stored here
             {
                //     TRIEDENT_WARN( "making value branch!" );
-               auto new_id = make_value(state, val);
+               object_id   new_id = make_value(state, val);
+
                if constexpr (mode.is_unique())
                {
                   if (fn->can_add_branch())
@@ -693,65 +703,50 @@ namespace arbtrie
       }
    }  // end upsert<T>
 
-   // there are several possible cases:
-   //    1. the existing value is not inlined and the new value will not be inlined
-   //    2. the existing value is not inlined and the new value could be inlined
-   //         - we could just update the non-inlined value (likely faster)
-   //         - or we could keep things canonical and reallocate binary node
-   //    3. the existing value is inlined and the new value is not inlined
-   //    4. the existing value is inlined and the new value is inined
-   //         - they could be the same size
-   //         - they could be different sizes
-   //
-   //  two cases allow update in place
-   //    - old and new are both the same size and inlined
-   //    - old and new are both not inlined
-   object_id update_binary(object_ref<node_header>& root,
-                           binary_node*             bn,
-                           bool                     unique,
-                           int                      key_index,
-                           value_view               val)
-   {
-      TRIEDENT_WARN("value: ", val);
-      assert(!"update not implemented yet");
-      // TODO: update not working yet
-      return root.id();
-      // if same size, clone then recall with unique
-   }
-
    template <upsert_mode mode>
    object_id write_session::upsert_binary(object_ref<node_header>& root,
                                           key_view                 key,
-                                          is_value_type auto       val)
+                                          const value_type&        val)
    {
       auto bn = root.as<binary_node>();
 
-      int_fast16_t key_idx;
-      uint64_t     key_hash;
+      int_fast16_t lb_idx;
+      uint64_t     key_hash  = binary_node::key_hash(key);
+      bool         key_found = false;
       if constexpr (mode.must_insert())
       {
          // no need to test/search for existing node in hash list,
          // the caller already expects this to be an insert
-         key_idx = bn->find_key_idx(key);
+         lb_idx = bn->lower_bound_idx(key);
+         if (lb_idx < bn->num_branches())
+            key_found = key == bn->get_key(lb_idx);
 
          // this is unlikey because the caller explictly told us
          // to perform an insert and not an update and we assume the
          // caller would call "upsert" if they didn't know if the key
          // existed or not.
-         if (binary_node::key_not_found != key_idx)
+         if (key_found)  //binary_node::key_not_found != key_idx)
             throw std::runtime_error("insert failed because key exists");
-
-         // we still need the key_hash so we can insert it below!
-         key_hash = binary_node::key_hash(key);
       }
-      else
+      else if constexpr (mode.must_update())
+      {
+         // there must be a key key to update
+         lb_idx    = bn->find_key_idx(key, key_hash);
+         key_found = lb_idx != binary_node::key_not_found;
+      }
+      else  // we may insert or update
       {
          // optimistically search for key to update
-         key_hash = binary_node::key_hash(key);
-         key_idx  = bn->find_key_idx(key, key_hash);
+         lb_idx    = bn->find_key_idx(key, key_hash);
+         key_found = lb_idx != binary_node::key_not_found;
+
+         // but fall back to the lower bound to insert
+         if (not key_found)
+            lb_idx = bn->lower_bound_idx(key);
       }
 
-      if (binary_node::key_not_found == key_idx)  // then insert a new value
+      //if (binary_node::key_not_found == key_idx)  // then insert a new value
+      if (not key_found)  // then insert a new value
       {
          if constexpr (mode.must_update())
             throw std::runtime_error("update failed because key doesn't exist");
@@ -764,9 +759,10 @@ namespace arbtrie
             if (bn->can_insert(key, val)) [[likely]]
             {
                if (bn->can_inline(val))
-                  root.modify().as<binary_node>()->insert(key, val);
+                  root.modify().as<binary_node>()->insert(lb_idx, key, val);
                else
-                  root.modify().as<binary_node>()->insert(key, make_value(root.rlock(), val));
+                  root.modify().as<binary_node>()->insert(lb_idx, key,
+                                                          make_value(root.rlock(), val));
                return root.id();
             }
          }
@@ -787,32 +783,122 @@ namespace arbtrie
          }
 
          if (binary_node::can_inline(val))
-            return clone<mode>(root, bn, {.spare_branches = 1, .spare_space = 1024}, key, val).id();
+            return clone<mode>(root, bn, {.spare_branches = 1, .spare_space = 1024},
+                               binary_node::clone_insert(lb_idx, key, val))
+                .id();
          else
-            return clone<mode>(root, bn, {.spare_branches = 1, .spare_space = 1024}, key,
-                               make_value(root.rlock(), val))
+            return clone<mode>(
+                       root, bn, {.spare_branches = 1, .spare_space = 1024},
+                       binary_node::clone_insert(lb_idx, key, make_value(root.rlock(), val)))
                 .id();
       }
-
-      assert(bn->get_key(bn->find_key_idx(key)) == key);
-      assert(!"not impl update yet");
-      throw std::runtime_error("update not implimented yet");
+      return update_binary_key<mode>(root, bn, lb_idx, key, val);
    }  // upsert_binary
 
-   object_id write_session::make_binary(session_rlock& state, key_view key, is_value_type auto val)
+   /**
+    *  update_binary_key
+    *
+    *  simple case:
+    *     unique, same size -> update in place and return
+    *  
+    *
+    *
+    */
+   template <upsert_mode mode>
+   object_id write_session::update_binary_key(object_ref<node_header>& root,
+                                              const binary_node*       bn,
+                                              uint16_t                 lb_idx,
+                                              key_view                 key,
+                                              const value_type&        val)
+   {
+      auto kvp = bn->get_key_val_ptr(lb_idx);
+      assert(kvp->key() == key);
+
+      if (bn->update_requires_refactor(kvp, val))
+      {
+         auto rid = refactor<mode>(root, bn);
+
+         assert((mode.is_unique() and (rid.id() == root.id())) or
+                ((mode.is_shared()) and (rid.id() != root.id())));
+
+         // if it wasn't unique before and the id changed then
+         // it has become unique. If it was unique before, then
+         // it remains unique now.
+         return upsert<mode.make_unique()>(rid, key, val);
+      }
+
+      if constexpr (mode.is_unique())
+      {
+         if (bn->is_obj_id(lb_idx))
+         {
+            // if val.size() can inline then
+            auto oldr = root.rlock().get(kvp->value_id());
+            auto nid  = upsert_value<mode>(oldr, val);
+            if (nid != oldr.id())
+            {
+               root.modify().as<binary_node>()->get_key_val_ptr(lb_idx)->value_id() = nid;
+               release_node(oldr);
+            }
+            return root.id();
+         }
+         else if (kvp->value_size() >= val.size())
+         {
+            root.modify().as<binary_node>()->set_value( lb_idx, val );
+            return root.id();
+         }
+      }  // else mode is shared or needs a clone anyway
+
+      object_id old_val_oid;
+      if (bn->is_obj_id(lb_idx))
+         old_val_oid = kvp->value_id();
+
+      if (binary_node::can_inline(val))
+      {
+         // if val is an object id, the we must release_node
+         // on the current object id, assuming it is different,
+         // before we set the new object id, but we cannot release it
+         // until *after* clone has retained everything it needs to,
+         // so we should save the objid here... release it on the
+         // other side of clone
+
+         auto new_bin_node =
+             clone<mode>(root, bn, {.spare_space = 1024}, binary_node::clone_update(lb_idx, val));
+         auto nkvp = new_bin_node->get_key_val_ptr(lb_idx);
+         if (old_val_oid and (not bn->is_obj_id(lb_idx) or nkvp->value_id() != old_val_oid))
+            release_node(root.rlock().get(old_val_oid));
+         return new_bin_node.id();
+      }
+      else
+      {
+         auto vid = make_value(root.rlock(), val);
+         auto new_bin_node =
+             clone<mode>(root, bn, {.spare_space = 1024}, binary_node::clone_update(lb_idx, vid));
+
+         auto nkvp = new_bin_node->get_key_val_ptr(lb_idx);
+         if (old_val_oid and (not bn->is_obj_id(lb_idx) or nkvp->value_id() != old_val_oid))
+            release_node(root.rlock().get(old_val_oid));
+
+         return new_bin_node.id();
+      }
+   }
+
+   object_id write_session::make_binary(session_rlock& state, key_view key, const value_type& val)
    {
       auto ss = binary_node::calc_key_val_pair_size(key, val) + 1024;
       return make<binary_node>(state, {.spare_branches = 1, .spare_space = ss},
                                [&](binary_node* bn)
                                {
-                                  if (binary_node::can_inline(val))
-                                     bn->insert(key, val);
+                                  if (val.is_object_id())
+                                  {
+                                     bn->insert(0, key, val.id());
+                                  }
                                   else
                                   {
-                                     if constexpr (std::same_as<value_view, decltype(val)>)
-                                        bn->insert(key, make_value(state, val));
+                                     auto vv = val.view();
+                                     if (binary_node::can_inline(vv))
+                                        bn->insert(0, key, vv);
                                      else
-                                        static_assert(!"unhandled value type?");
+                                        bn->insert(0, key, make_value(state, vv));
                                   }
                                })
           .id();

@@ -107,8 +107,8 @@ namespace arbtrie
          // set to uint64_t max when this segment is ready
          // to be marked read only to the seg_allocator
          std::atomic<uint32_t> _alloc_pos = 16;  // sizeof(segment_header)
-         uint32_t
-             _age;  // every time a segment is allocated it is assigned an age which aids in reconstruction
+         uint32_t _age;  // every time a segment is allocated it is assigned an age 
+                         // which aids in reconstruction
          // used to calculate object density of segment header,
          // to establish madvise
          uint32_t _num_objects = 0;  // inc on alloc

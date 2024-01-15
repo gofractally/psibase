@@ -31,8 +31,9 @@ void indent(int depth)
    for (int i = 0; i < depth; ++i)
       std::cerr << "    ";
 }
-namespace arbtrie {
-   void print_hex( std::string_view v );
+namespace arbtrie
+{
+   void print_hex(std::string_view v);
 }
 
 std::string add_comma(uint64_t s)
@@ -75,14 +76,15 @@ void print(session_rlock& state, const arbtrie::index_node* in, int depth )
 
 void print(session_rlock& state, const binary_node* bn, int depth = 0)
 {
-   assert( depth < 6 );
-   assert( bn->get_type() == node_type::binary );
+   assert(depth < 6);
+   assert(bn->get_type() == node_type::binary);
    //indent(depth);
-   std::cerr << "BN   r" << state.get(bn->id()).ref()<<"    binary node " << bn->id() << " with " << std::dec << bn->num_branches()
-             << " branches and ref : " << state.get(bn->id()).ref() 
-             << " size: " << bn->size() <<"  spare: " << bn->spare_capacity() <<"  "
-             << " free_slots: " << int(bn->_branch_cap - bn->_num_branches) 
-             << " kvsize: " << bn->key_val_section_size() <<"\n";
+   std::cerr << "BN   r" << state.get(bn->id()).ref() << "    binary node " << bn->id() << " with "
+             << std::dec << bn->num_branches()
+             << " branches and ref : " << state.get(bn->id()).ref() << " size: " << bn->size()
+             << "  spare: " << bn->spare_capacity() << "  "
+             << " free_slots: " << int(bn->_branch_cap - bn->_num_branches)
+             << " kvsize: " << bn->key_val_section_size() << "\n";
 
    return;
    for (int i = 0; i < bn->num_branches(); ++i)
@@ -91,9 +93,9 @@ void print(session_rlock& state, const binary_node* bn, int depth = 0)
       auto kvp = bn->get_key_val_ptr(i);
       indent(depth);
       auto v = kvp->value();
-      if ( bn->is_obj_id(i) ) //kvp->is_value_node())
+      if (bn->is_obj_id(i))  //kvp->is_value_node())
       {
-         std::cerr <<" id: " << kvp->value_id() <<"  ";
+         std::cerr << " id: " << kvp->value_id() << "  ";
          auto vr = state.get(kvp->value_id());
          v       = vr.as<value_node>()->value();
          std::cerr << "ref: " << vr.ref() << " ";
@@ -101,14 +103,15 @@ void print(session_rlock& state, const binary_node* bn, int depth = 0)
       //   std::cerr << "koff: " << bn->key_offset(i) << " ksize: ";
       //   std::cerr << k.size() <<" ";
       std::cerr << "'";
-  //    print_hex(kvp->key());
+      //    print_hex(kvp->key());
       std::cerr << kvp->key() << "' = '" << v << "'\n";
    }
 }
 
 void print(session_rlock& state, const setlist_node* sl, int depth = 0)
 {
-   std::cerr << "SLN r" << state.get(sl->id()).ref() <<"   cpre\"" << sl->get_prefix() << "\"  id: " << sl->id()<<" ";
+   std::cerr << "SLN r" << state.get(sl->id()).ref() << "   cpre\"" << sl->get_prefix()
+             << "\"  id: " << sl->id() << " ";
    if (sl->has_eof_value())
    {
       std::cerr << " = '" << state.get(sl->get_branch(0)).as<value_node>()->value()
@@ -119,20 +122,22 @@ void print(session_rlock& state, const setlist_node* sl, int depth = 0)
       std::cerr << " branches: " << std::dec << sl->num_branches()
                 << " ref: " << state.get(sl->id()).ref() << " id: " << sl->id() << "\n";
    }
-   
- //  auto gsl = sl->get_setlist();
-//   for( auto b : gsl ) {
- //     std::cerr << int(b) <<"\n";
-  // }
-   sl->visit_branches_with_br( [&]( int br, object_id bid ) {
-        if( not br )
-           return;
-        indent(depth);
-        //std::cerr << "'"<<char(br-1)<<"' -> ";
-        std::cerr << "'"<<br<<"' -> ";
-        print(state, bid, depth + 1);
-   });
-   assert( sl->validate() );
+
+   //  auto gsl = sl->get_setlist();
+   //   for( auto b : gsl ) {
+   //     std::cerr << int(b) <<"\n";
+   // }
+   sl->visit_branches_with_br(
+       [&](int br, object_id bid)
+       {
+          if (not br)
+             return;
+          indent(depth);
+          //std::cerr << "'"<<char(br-1)<<"' -> ";
+          std::cerr << "'" << br << "' -> ";
+          print(state, bid, depth + 1);
+       });
+   assert(sl->validate());
    /*
    const auto count = sl->num_branches() - sl->has_eof_value();
    for (int i = 0; i < count; ++i)
@@ -186,10 +191,10 @@ void print(session_rlock& state, object_id i, int depth)
       case node_type::setlist:
          return print(state, obj.as<setlist_node>(), depth);
       case node_type::value:
-         std::cerr << "VALUE: id: "<<i <<"\n";
+         std::cerr << "VALUE: id: " << i << "\n";
          return;
       default:
-         std::cerr << "UNKNOWN!: id: "<<i <<"\n";
+         std::cerr << "UNKNOWN!: id: " << i << "\n";
          return;
    }
 }
@@ -199,11 +204,11 @@ void test_refactor();
 int  main(int argc, char** argv)
 {
    arbtrie::thread_name("main");
-//   test_binary_node();
-//   test_refactor();
- //   return 0;
+   //   test_binary_node();
+   //   test_refactor();
+   //   return 0;
    //
-   bool sync_compact = false;// false = use threads
+   bool sync_compact = false;  // false = use threads
 
    std::cerr << "resetting database\n";
    std::filesystem::remove_all("arbtriedb");
@@ -235,103 +240,115 @@ int  main(int argc, char** argv)
 
       {
          std::optional<node_handle> last_root;
-         auto                r = ws.create_root();
+         auto                       r      = ws.create_root();
+         const int                  rounds = 5;
+         const int                  count  = 10'000'000;
 
-         for (int ro = 0; ro < 100; ++ro)
+         std::cerr << "insert dense rand \n";
+         for (int ro = 0; ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
-            int  count = 10000000;  //v.size();
             for (int i = 0; i < count; ++i)
             {
-               //         key_view str = v[i];
-               uint64_t val  = rand64(); seq++;
-               //++seq;
-               //uint64_t val = ++seq;  //rand64();
-               // uint64_t val = bswap(seq++);  //rand64();
-               //uint64_t val = bswap(seq+=67);  //rand64();
-               //uint64_t val = seq+=67;  //rand64();
-               auto str = std::to_string(val);//rand64());//++seq);
-               //str += str;
+               uint64_t val = rand64();
+               ++seq;
                key_view kstr((char*)&val, sizeof(val));
-
-        //       std::cerr <<"----------------  "<< std::dec << i <<"  seq: " << std::hex << seq <<"   -----------------\n";
-               //print_hex( kstr );
-               //std::cerr<<"\n";
-
-// std::cerr<<"i] " << i <<"  root before: " << r.id() <<"  ref: " << r.ref() <<" -------------------------------\n";
-               auto l = ws._segas.lock();
-                  //ws.upsert(r, kstr, kstr);
-                  ws.insert(r, kstr, kstr);
-               
-               if( i > 253) {
-                  /*
-                  std::cerr <<"break ppoint\n";
-                  */
-                 // TRIEDENT_WARN( "===========  ",  i);
-                 // print(l, r.id());
-                  
-
-             //     TRIEDENT_WARN( "ROOT BEFORE UPSERT" );
-            //      print(l, r.id());
-               }
-               
-
-               //auto str = std::string_view(v[rand64() % v.size()]).substr(0,62);
-               //auto str = std::string_view(v[i]).substr(0,62);
-         //      std::cerr <<i<<"]    root after upsert: " << r.id() <<" ref: " << r.ref() <<" ---------\n";
-
-
-          //     if( i == 205 )
-           //       print(l, r.id());
-
-               if (i % 1000000 == 0) {
-            //      if( last_root ) 
-             //        std::cerr <<"    init last_root = " << last_root->id() <<"  ref: " << last_root->ref()<<"\n";
-              //    else
-               //      std::cerr <<"    init last_root = null\n";
-               //   print(l, last_root->id());
-               //   }
+               ws.insert(r, kstr, kstr);
+               if( (i % 1000) == 0 )
                   last_root = r;
-                //  std::cerr <<"    last_root = " << last_root->id() <<"   ref: " << last_root->ref()<<"\n";
-               }
-               //if( seq > 60000 )
-               //find_refs(l,r.id(),1);
+            }
 
-               //    if( i % 10000 == 0 )
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
 
-               /*if ((seq % 10) == 0) 
-                  if (not ws.validate(r))
-                  {
-                     TRIEDENT_WARN("validation fail");
-                  }
-                  */
-               //          ws.validate(r);
-               if (false and seq == 3596)
-               {
-                  TRIEDENT_WARN("before release");
-                  db.print_stats(std::cout);
-                  auto l = ws._segas.lock();
-                  print(l, r.id());
-               }
-               //
 
-               //     if( i % 10000 == 0 )
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << " dense rand insert/sec  total items: " << add_comma(seq) << "\n";
+         }
+         uint64_t seq3 =0 ;
+         std::cerr << "insert little endian seq\n";
+         for (int ro = 0; ro < rounds; ++ro)
+         {
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               uint64_t val = ++seq3; seq++;
+               key_view kstr((char*)&val, sizeof(val));
+               ws.insert(r, kstr, kstr);
+            }
+            last_root = r;
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
 
-               /*
-              if ( seq == 3596)
-              {
-              TRIEDENT_WARN ("AFTER release" );
-                 auto l = ws._segas.lock();
-                 print(l, r.id());
-              }
-              */
 
-               while (sync_compact and db.compact_next_segment())
-               {
-                  //      std::cerr <<"compacting at seq: "<< seq <<"\n";
-                  //      ws.validate(r);
-               }
-               //   ws.validate(r);
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << " insert/sec  total items: " << add_comma(seq) << "\n";
+         }
+         std::cerr << "insert big endian seq\n";
+         for (int ro = 0; ro < rounds; ++ro)
+         {
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               uint64_t val = bswap(++seq3); ++seq;
+               key_view kstr((char*)&val, sizeof(val));
+               ws.insert(r, kstr, kstr);
+            }
+            last_root = r;
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
+
+
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << " insert/sec  total items: " << add_comma(seq) << "\n";
+         }
+         std::cerr << "insert to_string(rand) \n";
+         for (int ro = 0; ro < rounds; ++ro)
+         {
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               auto kstr = std::to_string(rand64());
+               ws.insert(r, kstr, kstr);
+            }
+            last_root = r;
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
+
+
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << " rand str insert/sec  total items: " << add_comma(seq) << "\n";
+         }
+         std::cerr << "get known key little endian seq\n";
+         uint64_t seq2 = 0;
+         for (int ro = 0; ro < rounds; ++ro)
+         {
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               uint64_t val = ++seq2;
+               key_view kstr((char*)&val, sizeof(val));
+               ws.get(r, kstr,
+                      [&](bool found, const value_type& r)
+                      {
+                         if (not found)
+                         {
+                            TRIEDENT_WARN("unable to find key: ", seq2, " ro: ", ro, " i:", i);
+                         }
+                         assert(found and r.view() == kstr);
+                      });
             }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
@@ -340,61 +357,101 @@ int  main(int argc, char** argv)
                       << add_comma(int64_t(
                              (count) /
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << " insert/sec  total items: " << add_comma(seq) << "\n";
-
-            //   db.print_stats(std::cout);
-
-            if (false)
-            {
-               auto l = ws._segas.lock();
-               print(l, r.id());
-            }
-            //    db.print_stats( std::cout );
-            //   std::cout << "references: " << r.references() <<"\n";
-            //r = ws.create_root();
-            //ws.set_root( r );
-            //ws.release( r );
-            //ws.release( r );
-            //   TRIEDENT_WARN("check before release");
-            //        ws.validate(r);
-            //         std::cerr << "Saving root: " << r.id() << "\n";
-            //        last_root = r;
-            //        std::cerr << " r.refs: " << r.references() << "  id: " << r.id() << " \n";
-            /*
-            std::cerr << " lr.refs: " << last_root->references() << "  lr id: " << last_root->id()
-                      << "\n";
-            static char hello[] = "hello";
-            hello[ro] -= 'a' - 'A';
-            std::cerr << "insert " << hello << " world\n";
-            ws.upsert(r, hello, "world");
-            std::cerr << " r.refs: " << r.references() << "  id: " << r.id() << " \n";
-            std::cerr << " lr.refs: " << last_root->references() << "  lr id: " << last_root->id()
-                      << "\n";
-            std::cerr << "freeing last root\n";
-            last_root.reset();
-            std::cerr << " r.refs: " << r.references() << "\n";
-            std::cerr << "done freeing last root\n";
-            //   TRIEDENT_WARN("check after release");
-            ws.validate(r);
-            */
+                      << "  seq get/sec  total items: " << add_comma(seq) << "\n";
          }
+
+         std::cerr << "get known key little endian rand\n";
+         for (int ro = 0; ro < rounds; ++ro)
+         {
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               uint64_t val = rand64()%seq2;
+               uint64_t val2 = val;
+            //   TRIEDENT_DEBUG( "val: ", val, " val2: ", val2 );
+               key_view kstr((char*)&val, sizeof(val));
+               ws.get(r, kstr,
+                      [&](bool found, const value_type& r)
+                      {
+                         if (not found)
+                         {
+                            TRIEDENT_WARN("unable to find key: ", val, " ", val2, "  ro: ", ro, " i:", i);
+                         } else {
+           //              TRIEDENT_DEBUG( "found key!!!!!" );
+                         }
+                         assert(found and r.view() == kstr);
+                      });
+          //     TRIEDENT_DEBUG( "post val: ", val, " val2: ", val2 );
+            }
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
+
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << "  seq get/sec  total items: " << add_comma(seq) << "\n";
+         }
+         std::cerr << "get known key big endian seq\n";
+         for (int ro = 0; ro < rounds; ++ro)
+         {
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               uint64_t val = bswap(++seq2);
+               key_view kstr((char*)&val, sizeof(val));
+               ws.get(r, kstr,
+                      [&](bool found, const value_type& r)
+                      {
+                         if (not found)
+                         {
+                            TRIEDENT_WARN("unable to find key: ", seq2, " ro: ", ro, " i:", i);
+                         }
+                         assert(found and r.view() == kstr);
+                      });
+            }
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
+
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << "  seq get/sec  total items: " << add_comma(seq) << "\n";
+         }
+
+         while (sync_compact and db.compact_next_segment())
+         {
+         }
+         //   ws.validate(r);
          TRIEDENT_WARN("ROOT GOING OUT OF SCOPE r.id: ", r.id());
-         //      auto l = ws._segas.lock();
-         //      print(l, r.id());
       }
+      /*
+      if (false)
+      {
+         auto l = ws._segas.lock();
+         print(l, r.id());
+      }
+      */
+
+      //      auto l = ws._segas.lock();
+      //      print(l, r.id());
+      //
       std::cerr << "wait for cleanup...\n";
       while (sync_compact and db.compact_next_segment())
       {
       }
       db.stop_compact_thread();
 
-      while (db.compact_next_segment()) { }
-    
+      while (db.compact_next_segment())
+      {
+      }
+
       db.print_stats(std::cout);
    }
-   catch (std::exception& e)
+   catch (const std::exception& e)
    {
-      TRIEDENT_WARN("caught exception: ", e.what());
+      TRIEDENT_WARN("Caught Exception: ", e.what());
    }
    return 0;
 }
@@ -414,12 +471,12 @@ struct environ
 
 void test_binary_node()
 {
-   environ             env;
+   environ env;
    {
-      auto                ws = env.db->start_write_session();
+      auto                       ws = env.db->start_write_session();
       std::optional<node_handle> last_root;
-      auto                cur_root = ws.create_root();
-      auto state = ws._segas.lock();
+      auto                       cur_root = ws.create_root();
+      auto                       state    = ws._segas.lock();
 
       ws.upsert(cur_root, "hello", "world");
       print(state, cur_root.id(), 1);
@@ -435,7 +492,8 @@ void test_binary_node()
       print(state, last_root->id(), 1);
 
       std::cerr << "\n ========== inserting 'update' = 'world' ==========\n";
-      ws.upsert(cur_root, "update", "long                                                      world");
+      ws.upsert(cur_root, "update",
+                "long                                                      world");
 
       std::cerr << "root.........\n";
       print(state, cur_root.id(), 1);
@@ -454,15 +512,14 @@ void test_binary_node()
    }
    usleep(1000000);
    env.db->print_stats(std::cout);
-   
 }
 
 void test_refactor()
 {
    environ env;
    env.db->start_compact_thread();
-   auto    ws    = env.db->start_write_session();
-   auto    state = ws._segas.lock();
+   auto ws    = env.db->start_write_session();
+   auto state = ws._segas.lock();
 
    {
       std::optional<node_handle> last_root;
@@ -471,18 +528,18 @@ void test_refactor()
 
          for (int i = 0; i < 1000000; ++i)
          {
-       //     std::cerr << "==================   start upsert  " << i << "=====================\n";
-            std::string v = std::to_string(rand64());
-            std::string value_buffer =
-                v + "==============123456790=======" + v;
+            //     std::cerr << "==================   start upsert  " << i << "=====================\n";
+            std::string v            = std::to_string(rand64());
+            std::string value_buffer = v + "==============123456790=======" + v;
             ws.upsert(cur_root, v, value_buffer);
-           // std::cerr << " after upsert and set backup\n";
+            // std::cerr << " after upsert and set backup\n";
             last_root = cur_root;
-            if( i >=  179) {
-             //  print(state, cur_root.id(), 1);
+            if (i >= 179)
+            {
+               //  print(state, cur_root.id(), 1);
             }
-         //   std::cerr << " free last root and save cur root\n";
-         //   print(state, cur_root.id(), 1);
+            //   std::cerr << " free last root and save cur root\n";
+            //   print(state, cur_root.id(), 1);
             /*
          std::cerr << "======= set last root = cur_root  =================\n";
          std::cerr << "before  cr.refs: " << cur_root.references() << "  id: " << cur_root.id()
@@ -500,13 +557,14 @@ void test_refactor()
          */
          }
          std::cerr << "before release cur_root\n";
-   //      print(state, cur_root.id(), 1);
-   //      env.db->print_stats(std::cout);
+         //      print(state, cur_root.id(), 1);
+         //      env.db->print_stats(std::cout);
       }
       std::cerr << "before last root\n";
-      if( last_root ) {
-   //      print(state, last_root->id(), 1);
-   //      env.db->print_stats(std::cout);
+      if (last_root)
+      {
+         //      print(state, last_root->id(), 1);
+         //      env.db->print_stats(std::cout);
       }
    }
    std::cerr << "before exit after release all roots\n";

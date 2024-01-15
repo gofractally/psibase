@@ -1,9 +1,9 @@
 #pragma once
 #include <algorithm>
+#include <arbtrie/arbtrie.hpp>
 #include <arbtrie/id_allocator.hpp>
 #include <arbtrie/root.hpp>
 #include <arbtrie/seg_allocator.hpp>
-#include <arbtrie/arbtrie.hpp>
 #include <memory>
 #include <optional>
 
@@ -60,9 +60,18 @@ namespace arbtrie
       read_session(database& db);
       database& _db;
 
+      int get(object_ref<node_header>& root, key_view key, auto callback);
+      int get(object_ref<node_header>& root, const auto* inner, key_view key, auto callback);
+      int get(object_ref<node_header>& root, const binary_node*, key_view key, auto callback);
+      int get(object_ref<node_header>& root, const value_node*, key_view key, auto callback);
+
      public:
+      inline int get(const node_handle& r, key_view key, auto callback);
+
       // TODO make private
       seg_allocator::session _segas;
+
+      int get(root& r, key_view key, auto callback);
 
       root get_root();
       /**
@@ -77,8 +86,8 @@ namespace arbtrie
       friend class database;
       write_session(database& db) : read_session(db) {}
 
-      object_id upsert(session_rlock& state, object_id root, key_view key, value_view val);
-      object_id insert(session_rlock& state, object_id root, key_view key, value_view val);
+      object_id upsert(session_rlock& state, object_id root, key_view key, const value_type& val);
+      object_id insert(session_rlock& state, object_id root, key_view key, const value_type& val);
 
      public:
       ~write_session();
@@ -92,38 +101,41 @@ namespace arbtrie
       /**
              * @return -1 on insert, otherwise the size of the old value
              */
-      int upsert(node_handle& r, key_view key, value_view val);
-      int insert(node_handle& r, key_view key, value_view val);
-
-      // r must not be a reference to subtree, but it can be
-      // a reference to a copy of subtree
-      int upsert(root& r, key_view key, root_ptr subtree);
+      int upsert(node_handle& r, key_view key, const value_type& val);
+      int insert(node_handle& r, key_view key, const value_type& val);
 
      private:
       template <upsert_mode mode, typename NodeType>
-      object_id upsert(object_ref<NodeType>& root, key_view key, value_view val);
+      object_id upsert(object_ref<NodeType>& root, key_view key, const value_type& val);
       template <upsert_mode mode, typename NodeType>
-      object_id upsert(object_ref<NodeType>&& root, key_view key, value_view val);
+      object_id upsert(object_ref<NodeType>&& root, key_view key, const value_type& val);
 
       template <upsert_mode mode, typename NodeType>
-      object_id upsert_inner(object_ref<node_header>& r, key_view key, value_view val);
+      object_id upsert_inner(object_ref<node_header>& r, key_view key, const value_type& val);
 
       template <upsert_mode mode, typename NodeType>
-      object_id upsert_inner(object_ref<node_header>&& r, key_view key, value_view val) {
-         return upsert_inner<mode>( r, key, val );
+      object_id upsert_inner(object_ref<node_header>&& r, key_view key, const value_type& val)
+      {
+         return upsert_inner<mode>(r, key, val);
       }
-      
 
       template <upsert_mode mode>
-      object_id upsert_value(object_ref<node_header>& root, value_view val);
+      object_id upsert_value(object_ref<node_header>& root, const value_type& val);
 
       //=======================
       // binary_node operations
       // ======================
-      object_id make_binary( session_rlock& state, key_view key, is_value_type auto val );
+      object_id make_binary(session_rlock& state, key_view key, const value_type&  val);
 
       template <upsert_mode mode>
-      object_id upsert_binary(object_ref<node_header>& root, key_view key, is_value_type auto val);
+      object_id upsert_binary(object_ref<node_header>& root, key_view key, const value_type& val);
+
+      template<upsert_mode mode>
+      object_id update_binary_key(  object_ref<node_header>& root,
+                                    const binary_node*       bn,
+                                    uint16_t                 lb_idx,
+                                    key_view                 key,
+                                    const value_type&        val);
    };
 
    class database
@@ -171,7 +183,6 @@ namespace arbtrie
       config           _config;
    };
 
-
    template <typename NodeType>
    void retain_children(session_rlock& state, const NodeType* in);
 
@@ -202,6 +213,83 @@ namespace arbtrie
    void release_node(object_ref<T>&& r)
    {
       release_node(r);
+   }
+
+   inline int read_session::get(const node_handle& r, key_view key, auto callback)
+   {
+      auto state = _segas.lock();
+      if (not r.id()) [[unlikely]]
+      {
+         callback(false, value_view());
+         return false;
+      }
+      auto ref = state.get(r.id());
+      return get(ref, key, std::forward<decltype(callback)>(callback));
+   }
+
+   int read_session::get(object_ref<node_header>& root, key_view key, auto callback)
+   {
+      auto r = root.obj();
+      return cast_and_call(root.obj(), [&](const auto* n) { return get(root, n, key, callback); });
+   }
+   int read_session::get(object_ref<node_header>& root,
+                         const auto*              inner,
+                         key_view                 key,
+                         auto                     callback)
+   {
+      if (key.size() == 0)
+      {
+         if (auto val_node_id = inner->get_branch(0))
+         {
+            auto vr = root.rlock().get(val_node_id);
+            if( vr.type() == node_type::value ) {
+               callback(true, value_type(vr.template as<value_node>()->value()) );
+            } else {
+               callback(true, value_type(val_node_id) );
+            }
+            return 1;
+         }
+      }
+      else
+      {
+         if (auto branch_id = inner->get_branch(uint_fast16_t(uint8_t(key[0])) + 1))
+         {
+            auto bref = root.rlock().get(branch_id);
+            return get(bref, key.substr(1), callback);
+         }
+      }
+      callback( false, value_type() );
+      return 0;
+   }
+
+   int read_session::get(object_ref<node_header>& root,
+                         const binary_node*       bn,
+                         key_view                 key,
+                         auto                     callback)
+   {
+      if (int idx = bn->find_key_idx(key, binary_node::key_hash(key)); idx >= 0)
+      {
+         // if( int idx = bn->find_key_idx( key ); idx >= 0 ) {
+         auto kvp = bn->get_key_val_ptr(idx);
+         if (bn->is_obj_id(idx))
+         {
+            callback(true, root.rlock().get(kvp->value_id()).template as<value_node>()->value());
+         }
+         else
+         {
+            callback(true, kvp->value());
+         }
+         return true;
+      }
+      callback(false, value_view());
+      return 0;
+   }
+   int read_session::get(object_ref<node_header>& root,
+                         const value_node*,
+                         key_view key,
+                         auto     callback)
+   {
+      return 0;
    }
 
 }  // namespace arbtrie

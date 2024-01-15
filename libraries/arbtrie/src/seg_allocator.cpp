@@ -15,8 +15,8 @@ namespace arbtrie
       }
       _header = reinterpret_cast<mapped_memory::allocator_header*>(_header_file.data());
 
-      for (auto& sptr : _session_ptrs)
-         sptr.store(-1ull);
+      for (auto& sptr : _session_lock_ptrs)
+         sptr.store(uint32_t(-1ull));
       _done.store(false);
    }
 
@@ -65,7 +65,6 @@ namespace arbtrie
     *  After all writes are complete, and there is not enough space
     *  to allocate the next object the alloc_ptr gets set to MAX and
     *  the page gets 
-    */
    void seg_allocator::finalize_segment(segment_number)
    {
       /// add maxsegsize - (seg_end-alloc_ptr) to free space
@@ -76,14 +75,15 @@ namespace arbtrie
       /// mark seg as seq access if average object size is greater than 1mb
       /// else mark seg as normal access
    }
+    */
 
    /**
     *  After all data has been removed from a segment
     * - madvise free/don't need 
     * - add the segment number to the free segments at allocator_header::end_ptr
     * - increment allocator_header::end_ptr
-    */
    void seg_allocator::release_segment(segment_number) {}
+    */
 
    void seg_allocator::compact_loop()
    {
@@ -158,6 +158,7 @@ namespace arbtrie
       char*        foc   = (char*)s + sizeof(mapped_memory::segment_header);
       node_header* foo   = (node_header*)(foc);
 
+      
       /*
       std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num << " "
       << "seg free: " << _header->seg_meta[seg_num].get_free_space_and_objs().first << " "
@@ -166,6 +167,7 @@ namespace arbtrie
          std::cerr << "calloc: " << ses._alloc_seg_ptr->_alloc_pos <<" cfree: " << _header->seg_meta[ses._alloc_seg_num].get_free_space_and_objs().first <<"\n";
       } else std::cerr<<"\n";
       */
+      
 
       assert(s->_alloc_pos == segment_offset(-1));
       //   std::cerr << "seg " << seg_num <<" alloc pos: " << s->_alloc_pos <<"\n";
@@ -256,7 +258,8 @@ namespace arbtrie
             if (not try_move())
             {
              //  TRIEDENT_WARN("try move failed, unalloc...", foo->id());
-               _header->seg_meta[start_seg_num].free_object(foo->size());
+                //auto start_seg_num = ses._alloc_seg_num;
+               _header->seg_meta[ses._alloc_seg_num].free_object(foo->size());
                // TODO: retry
               // ses.unalloc(ptr->_nsize);
             }
@@ -349,7 +352,10 @@ namespace arbtrie
       assert( seg_num != segment_number(-1) );
       _header->free_seg_buffer[_header->end_ptr.load(std::memory_order_relaxed) &
                                (max_segment_count - 1)] = seg_num;
-      _header->end_ptr.fetch_add(1, std::memory_order_release);
+      auto prev = _header->end_ptr.fetch_add(1, std::memory_order_release);
+
+      //set_session_end_ptrs(prev);
+      
       //
    }
 
@@ -381,10 +387,8 @@ namespace arbtrie
          {
             if (fs & (1ull << i))
             {
-               if (auto p = _session_ptrs[i].load(std::memory_order_relaxed); p < min)
-               {
+               if( uint32_t p = _session_lock_ptrs[i].load( std::memory_order_relaxed ); p < min )
                   min = p;
-               }
 
                // we can't find anything lower than this
                if (min == ap)
@@ -399,6 +403,23 @@ namespace arbtrie
          min = ep;
       _min_read_ptr.store(min, std::memory_order_release);
       return min;
+   }
+
+   void seg_allocator::set_session_end_ptrs( uint32_t e ) {
+      TRIEDENT_DEBUG( " session end ptr: ", e );
+      auto fs      = ~_free_sessions.load();
+      auto num_ses = std::popcount(fs);
+      for (uint32_t i = 0; fs and i < max_session_count; ++i)
+      {
+         if (fs & (1ull << i))
+         {
+            uint64_t p = _session_lock_ptrs[i].load( std::memory_order_relaxed );
+            p &= ~uint64_t(uint32_t(-1)); // clear the lower bits, to get accurate diff
+            auto delta = (uint64_t(e)<<32) - p;
+            assert( (delta << 32) == 0 );
+            _session_lock_ptrs[i].fetch_add(delta, std::memory_order_release );
+         }
+      }
    }
 
    /**
@@ -417,12 +438,15 @@ namespace arbtrie
       auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
       auto min = get_min_read_ptr();
 
+     // TRIEDENT_DEBUG( " get new seg session min ptr: ", min );
+     // TRIEDENT_WARN( "end ptr: ", _header->end_ptr.load(), " _header: ", _header );
       auto prepare_segment = [&](segment_number sn)
       {
          auto sp = _block_alloc.get(sn);
-         madvise(sp, segment_size, MADV_FREE);  // zero's pages if they happen to be accessed
+     //    madvise(sp, segment_size, MADV_FREE);  // zero's pages if they happen to be accessed
          madvise(sp, segment_size, MADV_RANDOM);
 
+         // TODO: only do this if not already mlock
          auto r = mlock(sp, segment_size);
 
          if (r)
@@ -432,15 +456,18 @@ namespace arbtrie
 
          auto shp  = new (sp) mapped_memory::segment_header();
          shp->_age = _header->next_alloc_age.fetch_add(1, std::memory_order_relaxed);
-
+      //   TRIEDENT_WARN( "returning segment: ", sn, " ap: ", ap, " min: ", min, "  _header->end_ptr: ", _header->end_ptr.load() );
          return std::pair<segment_number, mapped_memory::segment_header*>(sn, shp);
       };
-      //  std::cout <<"get new seg ap: " << ap << "  min: " << min <<"  min-ap:" << min - ap << "\n";
+     //  std::cout <<"get new seg ap: " << ap << "  min: " << min <<"  min-ap:" << min - ap << "\n";
 
       while (min - ap >= 1)
       {
          if (_header->alloc_ptr.compare_exchange_weak(ap, ap + 1))
          {
+      //      TRIEDENT_DEBUG( "ap += 1: ", ap + 1 );
+      //   TRIEDENT_DEBUG( "     end_ptr: ", _header->end_ptr.load() );
+
             auto apidx                          = ap & (max_segment_count - 1);
             uint64_t free_seg                   = _header->free_seg_buffer[apidx];
             if( free_seg == segment_number(-1) )[[unlikely]] {
@@ -454,6 +481,7 @@ namespace arbtrie
                TRIEDENT_WARN( "something bad happend!" );
                abort();
             }
+       //  TRIEDENT_DEBUG( "prepare segment: ", free_seg, "     end_ptr: ", _header->end_ptr.load() );
             //       std::cerr << "reusing segment..." << free_seg <<"\n";
             return prepare_segment(free_seg);
          }
@@ -544,8 +572,8 @@ namespace arbtrie
       std::cerr << "A - alloc idx: " << _header->alloc_ptr.load() << "\n";
       for (uint32_t i = 0; i < max_session_count; ++i)
       {
-         if (auto p = _session_ptrs[i].load(); p != -1ull)
-            std::cerr << "R" << i << ": " << p << "\n";
+         if (auto p = _session_lock_ptrs[i].load(); uint32_t(p) != uint32_t(-1))
+            std::cerr << "R" << i << ": " << uint32_t(p) << "\n";
       }
 
       std::cerr << "E - end idx: " << _header->end_ptr.load() << "\n";
@@ -557,7 +585,7 @@ namespace arbtrie
       {
          if (fs & (1ull << i))
          {
-            if (auto p = _session_ptrs[i].load(); p == -1ull)
+            if (auto p = _session_lock_ptrs[i].load(); uint32_t(p) == uint32_t(-1))
                std::cerr << "R" << i << ": UNLOCKED \n";
          }
       }
