@@ -51,9 +51,77 @@ namespace arbtrie
       sync_type sync_mode = sync_type::none;
    };
 
+   /**
+    *   An iterator grabs a read-only snapshot of the database
+    *   and provides a consistent view.
+    */
+   class iterator
+   {
+      friend class read_session;
+      iterator(read_session& s, node_handle r) : _rs(s),_root(std::move(r)) {}
+
+     public:
+      // return the root this iterator is based on
+      node_handle get_root()const { return _root; }
+
+      bool next();  // moves to next key, return valid()
+      bool prev();  // moves to the prv key, return valid()
+                    
+      // moves to the first key >= search, return valid()
+      bool lower_bound(key_view search);
+
+      // moves to the first key > search, return valid()
+      bool upper_bound(key_view search);
+
+      // moves to the first key with prefix, return valid()
+      bool first(key_view prefix = {});
+
+      // moves to the last key with prefix, return valid()
+      bool last(key_view prefix = {});
+
+      // moves to the key(), return valid()
+      bool get(key_view key);
+
+      // true if the iterator points to a key/value pair
+      bool valid() const { return _path.size() > 0; }
+
+      // the key the iterator is currently pointing to
+      key_view key() const { return key_view((char*)_branches.data(), _branches.size()); }
+
+      // if the value is a subtree, return an iterator into that subtree
+      iterator    sub_iterator() const;
+      bool        is_node() const;
+      bool        is_data() const;
+
+      // return -1 if no
+      int32_t value_size() const { return _size; }
+
+      // resizes v to the and copies the value into it
+      int32_t read_value(std::vector<char>&);
+
+      // copies the value into [s,s+s_len) and returns the
+      // number of bytes copied
+      int32_t read_value(char* s, uint32_t s_len);
+
+     private:
+      // path[0] = root
+      // branch[0] eq the branch taken from root,
+      //    branch.size() then the value is on the node path[branches.size()]
+      // if branches.size() >= path.size() surplus bytes in branches represent
+      //    the key into the binary node and path.back() should be a binary node.
+      std::vector<uint8_t>   _branches;
+      std::vector<object_id> _path;  // path[0]
+      int                    _binary_index;
+      int                    _size; // -1 if unknown
+      object_id              _oid;
+      read_session&          _rs;
+      node_handle            _root;
+   };
+
    class read_session
    {
      protected:
+      friend class iterator;
       friend class database;
       friend class root_data;
       friend class root;
@@ -66,14 +134,18 @@ namespace arbtrie
       int get(object_ref<node_header>& root, const value_node*, key_view key, auto callback);
 
      public:
+      iterator create_iterator() { return iterator(*this, get_root()); }
+
       inline int get(const node_handle& r, key_view key, auto callback);
+      // callback( key_view key, value_type )
+      inline void lower_bound(const node_handle& r, key_view key, auto callback);
 
       // TODO make private
       seg_allocator::session _segas;
 
-      int get(root& r, key_view key, auto callback);
+      // reads the last value called by 
+      node_handle get_root();
 
-      root get_root();
       /**
        * @return -1 if not found, otherwise the size of the value
        */
@@ -88,21 +160,46 @@ namespace arbtrie
 
       object_id upsert(session_rlock& state, object_id root, key_view key, const value_type& val);
       object_id insert(session_rlock& state, object_id root, key_view key, const value_type& val);
+      object_id update(session_rlock& state, object_id root, key_view key, const value_type& val);
 
      public:
       ~write_session();
 
+      /**
+       *  Creates a new independent tree with no values on it,
+       *  the tree will be deleted when the last node handle that
+       *  references it goes out of scope. If node handle isn't
+       *  saved via a call to set_root(), or storing it as a value
+       *  associated with a key under the tree saved as set_root()
+       *  it will not survivie the current process.
+       *
+       *  Each node handle is an immutable reference to the
+       *  state of the tree so it is important to keep only
+       *  one copy of it if you are wanting to update effeciently
+       *  in place.
+       */
       node_handle create_root() { return node_handle(*this); }
 
-      void set_root(const root&);
+      // makes the passed node handle the official state of the
+      // database and returns the old state so the caller can
+      // choose when it gets released
+      node_handle set_root(node_handle);
 
-      bool remove(root& r, key_view key);
-      bool remove(root& r, key_view from, key_view to);
       /**
-             * @return -1 on insert, otherwise the size of the old value
-             */
-      int upsert(node_handle& r, key_view key, const value_type& val);
-      int insert(node_handle& r, key_view key, const value_type& val);
+       * @return -1 on insert, otherwise the size of the old value
+       */
+      int upsert(node_handle& r, key_view key, value_view val);
+      int insert(node_handle& r, key_view key, value_view val);
+      int update(node_handle& r, key_view key, value_view val);
+
+      int                        insert(node_handle& r, key_view key, node_handle subtree);
+      std::optional<node_handle> upsert(node_handle& r, key_view key, node_handle subtree);
+      node_handle                update(node_handle& r, key_view key, node_handle subtree);
+
+      // return the number of keys removed
+      int remove(node_handle& r, key_view key );
+      // return the number of keys removed
+      int remove(node_handle& r, key_view from, key_view to);
 
      private:
       template <upsert_mode mode, typename NodeType>
@@ -125,18 +222,19 @@ namespace arbtrie
       //=======================
       // binary_node operations
       // ======================
-      object_id make_binary(session_rlock& state, key_view key, const value_type&  val);
+      object_id make_binary(session_rlock& state, key_view key, const value_type& val);
 
       template <upsert_mode mode>
       object_id upsert_binary(object_ref<node_header>& root, key_view key, const value_type& val);
 
-      template<upsert_mode mode>
-      object_id update_binary_key(  object_ref<node_header>& root,
-                                    const binary_node*       bn,
-                                    uint16_t                 lb_idx,
-                                    key_view                 key,
-                                    const value_type&        val);
+      template <upsert_mode mode>
+      object_id update_binary_key(object_ref<node_header>& root,
+                                  const binary_node*       bn,
+                                  uint16_t                 lb_idx,
+                                  key_view                 key,
+                                  const value_type&        val);
    };
+
 
    class database
    {
@@ -242,10 +340,13 @@ namespace arbtrie
          if (auto val_node_id = inner->get_branch(0))
          {
             auto vr = root.rlock().get(val_node_id);
-            if( vr.type() == node_type::value ) {
-               callback(true, value_type(vr.template as<value_node>()->value()) );
-            } else {
-               callback(true, value_type(val_node_id) );
+            if (vr.type() == node_type::value)
+            {
+               callback(true, value_type(vr.template as<value_node>()->value()));
+            }
+            else
+            {
+               callback(true, value_type(val_node_id));
             }
             return 1;
          }
@@ -258,7 +359,7 @@ namespace arbtrie
             return get(bref, key.substr(1), callback);
          }
       }
-      callback( false, value_type() );
+      callback(false, value_type());
       return 0;
    }
 

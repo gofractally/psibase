@@ -497,20 +497,6 @@ namespace arbtrie
                // an atomic sub should leave the higher-order bits in place where the view
                // from the compactor is being updated.
                _sega._session_lock_ptrs[_session_num].fetch_sub( diff, std::memory_order_release );
-
-
-
-
-               
-               /*
-               auto pt = _sega._session_ptrs[_session_num].load(std::memory_order_acquire);
-               if (pt == -1ull)
-                  _sega._session_ptrs[_session_num].store(
-                      _sega._header->end_ptr.load(std::memory_order_acquire),
-                      std::memory_order_relaxed);
-               else  // TODO: this may be ok, but if so then
-                  throw std::runtime_error("attempt to double-lock");
-                  */
             }
          }
 

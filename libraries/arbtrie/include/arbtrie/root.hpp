@@ -7,6 +7,7 @@ namespace arbtrie
    class database;
    class root;
    class read_session;
+   class write_session;
    using root_ptr = std::shared_ptr<root>;
 
 
@@ -16,8 +17,15 @@ namespace arbtrie
    * releasing it.
    */
   class node_handle {
-     public:
+     private:
+        friend class read_session;
+        friend class write_session;
         node_handle( read_session& s ):_session(&s){}
+        node_handle( read_session& s, object_id retains ):_session(&s),_id(retains){
+           retain();
+        }
+
+     public:
         ~node_handle() {
            release();
         }
