@@ -66,6 +66,14 @@ namespace arbtrie
 
       bool can_add_branch() const { return _num_branches < branch_count; }
 
+      std::pair<int_fast16_t,object_id> lower_bound( int_fast16_t br )const {
+         while( br < max_branch_count and not _branches[br] )
+            ++br;
+         if( br == max_branch_count )
+            return {br, {}};
+         return {br, _branches[br]};
+      }
+
       void add_branch(int_fast16_t br, object_id b)
       {
          assert(br < max_branch_count);

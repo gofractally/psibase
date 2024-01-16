@@ -110,11 +110,20 @@ namespace arbtrie
       return cast_and_call(this, [&](const auto* t) { return t->calculate_checksum(); });
    }
 
-   void write_session::set_root(const root& r)
+   node_handle write_session::set_root(node_handle r)
    {
-      assert(!"not implemented yet");
-      std::cerr << " set root segas lock\n";
-      _segas.lock().get(r.id()).retain();
+      uint64_t old_r;
+      uint64_t new_r = r.id().id;
+      { // lock scope
+         std::unique_lock lock(_db._root_change_mutex);
+         old_r = _db._dbm->top_root.exchange(new_r, std::memory_order_relaxed);
+      }
+      return r.give(object_id(old_r));
+   }
+   node_handle read_session::get_root()
+   {
+      std::unique_lock lock(_db._root_change_mutex);
+      return node_handle(*this, object_id(_db._dbm->top_root.load(std::memory_order_relaxed)));
    }
 
    database::database(std::filesystem::path dir, config cfg, access_mode mode)
@@ -185,7 +194,7 @@ namespace arbtrie
 
    object_id make_value(session_rlock& state, const value_type& val)
    {
-      if( val.is_object_id() ) 
+      if (val.is_object_id())
          return val.id();
       auto v = val.view();
       return state
@@ -207,7 +216,7 @@ namespace arbtrie
       // reallocate the value and update where the oref points
    }
 
-   int write_session::upsert(node_handle& r, key_view key, const value_type& val)
+   int write_session::upsert(node_handle& r, key_view key, value_view val)
    {
       auto state = _segas.lock();
 
@@ -215,7 +224,7 @@ namespace arbtrie
 
       return 0;
    }
-   int write_session::insert(node_handle& r, key_view key, const value_type& val)
+   int write_session::insert(node_handle& r, key_view key, value_view val)
    {
       auto state = _segas.lock();
 
@@ -223,24 +232,41 @@ namespace arbtrie
 
       return 0;
    }
+   int write_session::update(node_handle& r, key_view key, value_view val)
+   {
+      auto state = _segas.lock();
 
-   object_id write_session::upsert(session_rlock& state,
-                                   object_id      root,
-                                   key_view       key,
+      r.give(update(state, r.take(), key, val));
+
+      return 0;
+   }
+
+   object_id write_session::upsert(session_rlock&    state,
+                                   object_id         root,
+                                   key_view          key,
                                    const value_type& val)
    {
       if (not root) [[unlikely]]
          return make_binary(state, key, val);
       return upsert<upsert_mode::unique_upsert>(state.get(root), key, val);
    }
-   object_id write_session::insert(session_rlock& state,
-                                   object_id      root,
-                                   key_view       key,
+   object_id write_session::insert(session_rlock&    state,
+                                   object_id         root,
+                                   key_view          key,
                                    const value_type& val)
    {
       if (not root) [[unlikely]]
          return make_binary(state, key, val);
       return upsert<upsert_mode::unique_insert>(state.get(root), key, val);
+   }
+   object_id write_session::update(session_rlock&    state,
+                                   object_id         root,
+                                   key_view          key,
+                                   const value_type& val)
+   {
+      if (not root) [[unlikely]]
+         return make_binary(state, key, val);
+      return upsert<upsert_mode::unique_update>(state.get(root), key, val);
    }
 
    template <upsert_mode mode, typename NodeType>
@@ -297,7 +323,7 @@ namespace arbtrie
    template <upsert_mode mode>
    object_id write_session::upsert_value(object_ref<node_header>& root, const value_type& val)
    {
-      if ( val.is_object_id() ) 
+      if (val.is_object_id())
          return val.id();
       if constexpr (mode.is_shared())
          return make_value(root.rlock(), val.view());
@@ -311,7 +337,7 @@ namespace arbtrie
          {
             auto mod_lock = root.modify();
             auto mvn      = mod_lock.as<value_node>();
-            auto vv = val.view();
+            auto vv       = val.view();
             memcpy(mvn->body(), vv.data(), vv.size());
             return root.id();
          }
@@ -619,7 +645,7 @@ namespace arbtrie
             else  // there is no value stored here
             {
                //     TRIEDENT_WARN( "making value branch!" );
-               object_id   new_id = make_value(state, val);
+               object_id new_id = make_value(state, val);
 
                if constexpr (mode.is_unique())
                {
@@ -843,7 +869,7 @@ namespace arbtrie
          }
          else if (kvp->value_size() >= val.size())
          {
-            root.modify().as<binary_node>()->set_value( lb_idx, val );
+            root.modify().as<binary_node>()->set_value(lb_idx, val);
             return root.id();
          }
       }  // else mode is shared or needs a clone anyway
@@ -904,5 +930,7 @@ namespace arbtrie
           .id();
    }
 
+
 }  // namespace arbtrie
 
+#include "iterator.cpp"

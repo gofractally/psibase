@@ -353,8 +353,8 @@ namespace arbtrie
       _header->free_seg_buffer[_header->end_ptr.load(std::memory_order_relaxed) &
                                (max_segment_count - 1)] = seg_num;
       auto prev = _header->end_ptr.fetch_add(1, std::memory_order_release);
+      set_session_end_ptrs(prev);
 
-      //set_session_end_ptrs(prev);
       
       //
    }
@@ -368,14 +368,19 @@ namespace arbtrie
     * updating _min_read_ptr; however, if A >= _min_read_ptr then 
     * we want to check all active R* to find the min. If all sessions
     * are idle, the the min becomes E.
+    *
+    * Min automatically advances every time compactor pushes a new segment
+    * to the end, but sometimes the compactor did its work while a read
+    * lock was in place and once the read lock was released the min could
+    * be updated.
     */
    uint64_t seg_allocator::get_min_read_ptr()
    {
       auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
       auto ep  = _header->end_ptr.load(std::memory_order_acquire);
-      auto min = _min_read_ptr.load(std::memory_order_acquire);
+      auto min = _min_read_ptr.load(std::memory_order_relaxed);
 
-      if (ap >= min)  // then check to see if there is more
+      if (ap >= min and ep > min)  // then check to see if there is more
       {
          min = ep;
          // find new last min
@@ -406,20 +411,31 @@ namespace arbtrie
    }
 
    void seg_allocator::set_session_end_ptrs( uint32_t e ) {
-      TRIEDENT_DEBUG( " session end ptr: ", e );
       auto fs      = ~_free_sessions.load();
       auto num_ses = std::popcount(fs);
+      uint32_t min = -1;
       for (uint32_t i = 0; fs and i < max_session_count; ++i)
       {
          if (fs & (1ull << i))
          {
             uint64_t p = _session_lock_ptrs[i].load( std::memory_order_relaxed );
+
+            if( uint32_t(p) < min ) 
+               min = uint32_t(p);
+
             p &= ~uint64_t(uint32_t(-1)); // clear the lower bits, to get accurate diff
             auto delta = (uint64_t(e)<<32) - p;
             assert( (delta << 32) == 0 );
-            _session_lock_ptrs[i].fetch_add(delta, std::memory_order_release );
+            auto ep = _session_lock_ptrs[i].fetch_add(delta, std::memory_order_release );
          }
       }
+      if( e > (1<<16) ) {
+         TRIEDENT_WARN( "TODO: looks like ALLOC P and END P need to be renormalized, they have wrapped the buffer too many times." );
+      }
+      
+      if (min > e) // only possible 
+         min = e;
+      _min_read_ptr.store(min, std::memory_order_relaxed);
    }
 
    /**
@@ -463,6 +479,7 @@ namespace arbtrie
 
       while (min - ap >= 1)
       {
+      //   TRIEDENT_WARN( "REUSE SEGMENTS" );
          if (_header->alloc_ptr.compare_exchange_weak(ap, ap + 1))
          {
       //      TRIEDENT_DEBUG( "ap += 1: ", ap + 1 );

@@ -96,6 +96,7 @@ namespace arbtrie
             assert( uint8_t(get_setlist_ptr()[idx-1]) < byte );
       }
 
+
       bool validate()const {
          auto sl = get_setlist();
          if( sl.size() ) {
@@ -130,6 +131,27 @@ namespace arbtrie
   //       std::cerr << "lsp- sl: " << slp-sl <<"\n";
          return slp - sl;
       }
+
+      std::pair<int_fast16_t,object_id> lower_bound( int_fast16_t br )const {
+         if( br == 0 )
+            if( _eof_branch ) 
+               return std::pair<int_fast16_t,object_id>(0,get_branch_ptr()[0]);
+            else ++br;
+
+         uint8_t b = br-1;
+         const uint8_t* s = get_setlist_ptr();
+         const auto* e = s + get_setlist_size();
+
+         const uint8_t* p = s;
+         while( p < e and b > *p ) 
+            ++p;
+         if( p == e )
+            return std::pair<int_fast16_t,object_id>(max_branch_count,{});
+         return std::pair<int_fast16_t,object_id>( uint16_t(*p)+1, 
+                                                   get_branch_ptr()[(p-s)+_eof_branch] );
+      }
+
+
 
       void set_branch(uint_fast16_t br, object_id b)
       {

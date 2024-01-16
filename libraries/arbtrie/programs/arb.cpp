@@ -198,12 +198,15 @@ void print(session_rlock& state, object_id i, int depth)
          return;
    }
 }
+void test_iterator();
 
 void test_binary_node();
 void test_refactor();
 int  main(int argc, char** argv)
 {
    arbtrie::thread_name("main");
+   test_iterator();
+   return 0;
    //   test_binary_node();
    //   test_refactor();
    //   return 0;
@@ -238,6 +241,7 @@ int  main(int argc, char** argv)
       database db("arbtriedb", {.run_compact_thread = not sync_compact});
       auto     ws = db.start_write_session();
 
+      do
       {
          std::optional<node_handle> last_root;
          auto                       r      = ws.create_root();
@@ -254,13 +258,11 @@ int  main(int argc, char** argv)
                ++seq;
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
-               if( (i % 1000) == 0 )
-                  last_root = r;
             }
+            last_root = r;
 
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
-
 
             std::cout << ro << "] " << std::setw(12)
                       << add_comma(int64_t(
@@ -268,21 +270,21 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << " dense rand insert/sec  total items: " << add_comma(seq) << "\n";
          }
-         uint64_t seq3 =0 ;
+         uint64_t seq3 = 0;
          std::cerr << "insert little endian seq\n";
          for (int ro = 0; ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t val = ++seq3; seq++;
+               uint64_t val = ++seq3;
+               seq++;
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
             }
-            last_root = r;
+            last_root  = r;
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
-
 
             std::cout << ro << "] " << std::setw(12)
                       << add_comma(int64_t(
@@ -296,14 +298,14 @@ int  main(int argc, char** argv)
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t val = bswap(++seq3); ++seq;
+               uint64_t val = bswap(++seq3);
+               ++seq;
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
             }
-            last_root = r;
+            last_root  = r;
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
-
 
             std::cout << ro << "] " << std::setw(12)
                       << add_comma(int64_t(
@@ -320,10 +322,9 @@ int  main(int argc, char** argv)
                auto kstr = std::to_string(rand64());
                ws.insert(r, kstr, kstr);
             }
-            last_root = r;
+            last_root  = r;
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
-
 
             std::cout << ro << "] " << std::setw(12)
                       << add_comma(int64_t(
@@ -366,22 +367,25 @@ int  main(int argc, char** argv)
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t val = rand64()%seq2;
+               uint64_t val  = rand64() % seq2;
                uint64_t val2 = val;
-            //   TRIEDENT_DEBUG( "val: ", val, " val2: ", val2 );
+               //   TRIEDENT_DEBUG( "val: ", val, " val2: ", val2 );
                key_view kstr((char*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
                          if (not found)
                          {
-                            TRIEDENT_WARN("unable to find key: ", val, " ", val2, "  ro: ", ro, " i:", i);
-                         } else {
-           //              TRIEDENT_DEBUG( "found key!!!!!" );
+                            TRIEDENT_WARN("unable to find key: ", val, " ", val2, "  ro: ", ro,
+                                          " i:", i);
+                         }
+                         else
+                         {
+                            //              TRIEDENT_DEBUG( "found key!!!!!" );
                          }
                          assert(found and r.view() == kstr);
                       });
-          //     TRIEDENT_DEBUG( "post val: ", val, " val2: ", val2 );
+               //     TRIEDENT_DEBUG( "post val: ", val, " val2: ", val2 );
             }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
@@ -425,7 +429,7 @@ int  main(int argc, char** argv)
          }
          //   ws.validate(r);
          TRIEDENT_WARN("ROOT GOING OUT OF SCOPE r.id: ", r.id());
-      }
+      } while (false);
       /*
       if (false)
       {
@@ -469,6 +473,104 @@ struct environ
    arbtrie::database* db;
 };
 
+void load_words(write_session& ws, node_handle& root)
+{
+   auto          filename = "/usr/share/dict/words";
+
+   {
+   auto          start    = std::chrono::steady_clock::now();
+   std::ifstream file(filename);
+
+   std::string key;
+   std::string val;
+
+   int count = 0;
+   // Read the next line from File until it reaches the
+   // end.
+   while (file >> key)
+   {
+      val = key;
+      for (auto& c : val)
+         c = toupper(c);
+      ws.upsert(root, key, val);
+      ++count;
+   }
+
+   auto end   = std::chrono::steady_clock::now();
+   auto delta = end - start;
+
+   std::cout << "db loaded " << std::setw(12)
+             << add_comma(int64_t(
+                    (count) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+             << " words/sec  total items: " << add_comma(count) << " from " << filename << "\n";
+   }
+
+   {
+   auto          start    = std::chrono::steady_clock::now();
+   std::ifstream file(filename);
+
+   std::vector<std::string> v;
+   std::string              str;
+
+   // Read the next line from File until it reaches the
+   // end.
+   while (file >> str)
+   {
+      std::string val = str;
+      for (auto& c : val)
+         c = toupper(c);
+      // Now keep reading next line
+      // and push it in vector function until end of file
+      v.push_back(str);
+   }
+   auto end   = std::chrono::steady_clock::now();
+   auto delta = end - start;
+
+   std::cout << "vector loaded " << std::setw(12)
+             << add_comma(int64_t(
+                    (v.size()) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+             << " words/sec  total items: " << add_comma(v.size()) << " from " << filename << "\n";
+   }
+}
+
+void test_iterator()
+{
+   environ env;
+   {
+      auto ws   = env.db->start_write_session();
+      auto root = ws.create_root();
+      load_words(ws, root);
+
+      ws.upsert(root, "hello", "world");
+      ws.upsert(root, "daniel", "larimer");
+      ws.upsert(root, "anna", "taylor");
+
+      auto itr = ws.create_iterator(root);
+      assert(not itr.valid());
+
+      std::vector<char> data;
+      {
+         assert(itr.first());
+         itr.read_value(data);
+         std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
+                   << "' \n";
+      }
+      {
+         assert(itr.first("da"));
+         itr.read_value(data);
+         std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
+                   << "' \n";
+      }
+      {
+         assert(itr.first("baby"));
+         itr.read_value(data);
+         std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
+                   << "' \n";
+      }
+   }
+   usleep(100000);
+   env.db->print_stats(std::cout);
+}
 void test_binary_node()
 {
    environ env;
