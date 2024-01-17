@@ -6,9 +6,11 @@ psibase - The psibase blockchain command line client
 
 ## SYNOPSIS
 
-`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*]  
+`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
 `psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
+`psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
+`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
@@ -38,9 +40,13 @@ psibase - The psibase blockchain command line client
 
 ### boot
 
-`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*]  
+`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 
 The boot command deploys a set of system services and web interfaces suitable for development. The chain will have a single block producer. The chain can only be booted once.
+
+- *packages*
+
+  Packages to install to the chain. If not specifed, a default set will be installed.
 
 - `-k`, `--key` *public-key*
 
@@ -103,6 +109,41 @@ Deploy a service
 - `-S`, `--sender` *sender*
 
   Sender to use when creating the account [default: account-sys]
+
+### install
+
+`psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
+
+Install apps to the chain along with all dependencies. Packages that are already installed will not be modified.
+
+- *packages*
+
+  Packages to install
+
+- `-k` *public-key*
+
+  Set all accounts created by the new packages to authenticate using this key. If no key is provided, the accounts will not require authentication. The public key can be any of the following:
+  - A file containing a PEM or DER encoded public key
+  - A PKCS #11 URI
+  - An EOS style base58-encoded public key beginning `PUB_K1_`
+
+### list
+
+`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
+
+Prints a list of apps from the chain and/or package repositories
+
+- `--all`
+
+  Prints all known packages (default)
+  
+- `--available`
+
+  Prints packages that are available in the repository, but not installed on chain
+  
+- `--installed`
+
+  Prints packages that are currently installed
 
 ### modify
 
