@@ -14,6 +14,7 @@ use psibase::{
     DirectoryRegistry, ExactAccountNumber, PackageList, PackageRegistry, SignedTransaction, Tapos,
     TaposRefBlock, TimePointSec, Transaction,
 };
+use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -189,6 +190,12 @@ enum Command {
         /// List installed apps
         #[clap(long)]
         installed: bool,
+    },
+
+    /// Find packages
+    Search {
+        /// Regular expressions to search for in package names and descriptions
+        patterns: Vec<String>,
     },
 
     /// Create a bearer token that can be used to access a node
@@ -853,6 +860,48 @@ async fn list(
     Ok(())
 }
 
+async fn search(
+    _args: &Args,
+    _client: reqwest::Client,
+    patterns: &Vec<String>,
+) -> Result<(), anyhow::Error> {
+    let mut compiled = vec![];
+    for pattern in patterns {
+        compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
+    }
+    // TODO: search installed packages as well
+    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+    let mut primary_matches = vec![];
+    let mut secondary_matches = vec![];
+    for info in package_registry.index()? {
+        let mut name_matched = 0;
+        let mut description_matched = 0;
+        for re in &compiled[..] {
+            if re.is_match(&info.name) {
+                name_matched += 1;
+            } else if re.is_match(&info.description) {
+                description_matched += 1;
+            } else {
+                break;
+            }
+        }
+        if name_matched == compiled.len() {
+            primary_matches.push(info);
+        } else if name_matched + description_matched == compiled.len() {
+            secondary_matches.push(info);
+        }
+    }
+    primary_matches.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    secondary_matches.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    for result in primary_matches {
+        println!("{}", result.name);
+    }
+    for result in secondary_matches {
+        println!("{}", result.name);
+    }
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize)]
 struct TokenData<'a> {
     exp: i64,
@@ -959,6 +1008,7 @@ async fn main() -> Result<(), anyhow::Error> {
             available,
             installed,
         } => list(&args, client, *all, *available, *installed).await?,
+        Command::Search { patterns } => search(&args, client, patterns).await?,
         Command::CreateToken {
             expires_after,
             mode,

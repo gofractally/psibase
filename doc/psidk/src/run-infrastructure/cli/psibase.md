@@ -12,6 +12,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
+`psibase` [`-a` *url*] `search` *regex*\.\.\.  
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
 
@@ -161,6 +162,16 @@ Modify an account
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
   - An EOS style base58-encoded public key beginning `PUB_K1_`
+
+### search
+
+`psibase` [`-a` *url*] `search` *regex*\.\.\.  
+
+Search for packages
+
+- *regex*
+
+  Regular expressions to match agaist the package names and descriptions. If there are multiple patterns, they must all match for a package to be listed. The search is case-insensitive.
 
 ### upload
 

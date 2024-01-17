@@ -38,12 +38,12 @@ struct Meta {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PackageInfo {
-    name: String,
-    description: String,
-    depends: Vec<String>,
-    accounts: Vec<AccountNumber>,
-    sha256: Checksum256,
-    file: String,
+    pub name: String,
+    pub description: String,
+    pub depends: Vec<String>,
+    pub accounts: Vec<AccountNumber>,
+    pub sha256: Checksum256,
+    pub file: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
