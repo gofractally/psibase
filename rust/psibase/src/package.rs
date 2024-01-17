@@ -417,7 +417,6 @@ impl PackageRegistry for DirectoryRegistry {
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
 pub fn additional_packages<T: PackageRegistry + ?Sized>(
     installed: &PackageList,
     reg: &T,
@@ -481,8 +480,8 @@ struct InstalledRoot {
     data: InstalledQuery,
 }
 
-#[cfg(not(target_family = "wasm"))]
 impl PackageList {
+    #[cfg(not(target_family = "wasm"))]
     pub async fn installed(
         base_url: &reqwest::Url,
         client: &mut reqwest::Client,
