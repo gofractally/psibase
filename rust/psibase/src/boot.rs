@@ -1,22 +1,16 @@
-use crate::services::{account_sys, auth_ec_sys, auth_sys, producer_sys, transaction_sys};
+use crate::services::{account_sys, producer_sys, transaction_sys};
 use crate::{
-    method_raw, validate_dependencies, AccountNumber, Action, AnyPublicKey, Claim,
-    ExactAccountNumber, GenesisActionData, MethodNumber, PackagedService, ProducerConfigRow,
-    PublicKey, SignedTransaction, Tapos, TimePointSec, Transaction,
+    method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
+    AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData,
+    MethodNumber, PackagedService, ProducerConfigRow, SignedTransaction, Tapos, TimePointSec,
+    Transaction,
 };
-use fracpack::{Pack, Unpack};
-use psibase_macros::account_raw;
+use fracpack::Pack;
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::io::{Cursor, Read, Seek};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
-
-macro_rules! account {
-    ($name:expr) => {
-        AccountNumber::new(account_raw!($name))
-    };
-}
 
 macro_rules! method {
     ($name:expr) => {
@@ -36,25 +30,6 @@ fn to_claim(key: &AnyPublicKey) -> Claim {
         service: key.key.service,
         rawData: key.key.rawData.clone(),
     }
-}
-
-fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
-    account_sys::Wrapper::pack_from(sender).newAccount(account, account!("auth-any-sys"), false)
-}
-
-fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
-    if key.key.service == account!("verifyec-sys") {
-        auth_ec_sys::Wrapper::pack_from(account)
-            .setKey(PublicKey::unpacked(&key.key.rawData).unwrap())
-    } else if key.key.service == account!("verify-sys") {
-        auth_sys::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec())
-    } else {
-        panic!("unknown account service");
-    }
-}
-
-fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
-    account_sys::Wrapper::pack_from(account).setAuthServ(auth_service)
 }
 
 fn without_tapos(actions: Vec<Action>, expiration: TimePointSec) -> Transaction {
@@ -109,6 +84,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     service_packages: &mut [PackagedService<R>],
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
+    let has_package_sys = true;
     for s in &mut service_packages[..] {
         for account in s.get_accounts() {
             if !s.has_service(*account) {
@@ -141,6 +117,12 @@ pub fn get_initial_actions<R: Read + Seek>(
                 actions.push(set_key_action(*account, k));
                 actions.push(set_auth_service_action(*account, k.auth_service()));
             }
+        }
+    }
+
+    if has_package_sys {
+        for s in &mut service_packages[..] {
+            s.commit_install(&mut actions)?;
         }
     }
 

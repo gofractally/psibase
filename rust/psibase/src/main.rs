@@ -1,16 +1,17 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
-use fracpack::{Pack, Unpack};
+use fracpack::Pack;
 use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{account_sys, auth_ec_sys, auth_sys, proxy_sys, psispace_sys, setcode_sys};
+use psibase::services::psispace_sys;
 use psibase::{
-    account, apply_proxy, create_boot_transactions, get_tapos_for_head, push_transaction,
+    account, apply_proxy, create_boot_transactions, get_tapos_for_head, new_account_action,
+    push_transaction, reg_server, set_auth_service_action, set_code_action, set_key_action,
     sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
-    DirectoryRegistry, ExactAccountNumber, PackageRegistry, PublicKey, SignedTransaction, Tapos,
+    DirectoryRegistry, ExactAccountNumber, PackageList, PackageRegistry, SignedTransaction, Tapos,
     TaposRefBlock, TimePointSec, Transaction,
 };
 use reqwest::Url;
@@ -167,6 +168,29 @@ enum Command {
         sender: Option<ExactAccountNumber>,
     },
 
+    /// Install apps to the chain
+    Install {
+        /// Packages to install
+        packages: Vec<String>,
+
+        /// Set all accounts to authenticate using this key
+        #[clap(short = 'k', long, value_name = "KEY")]
+        key: Option<AnyPublicKey>,
+    },
+
+    /// Prints a list of apps
+    List {
+        /// List all apps
+        #[clap(long)]
+        all: bool,
+        /// List apps that are available in the repository, but not currently installed
+        #[clap(long)]
+        available: bool,
+        /// List installed apps
+        #[clap(long)]
+        installed: bool,
+    },
+
     /// Create a bearer token that can be used to access a node
     CreateToken {
         /// The lifetime of the new token
@@ -188,48 +212,6 @@ fn to_hex(bytes: &[u8]) -> String {
         result.push(DIGITS[(byte & 0x0f) as usize]);
     }
     String::from_utf8(result).unwrap()
-}
-
-#[derive(Serialize, Deserialize, Pack, Unpack)]
-struct NewAccountAction {
-    account: AccountNumber,
-    auth_service: AccountNumber,
-    require_new: bool,
-}
-
-fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
-    account_sys::Wrapper::pack_from(sender).newAccount(account, account!("auth-any-sys"), false)
-}
-
-fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
-    if key.key.service == account!("verifyec-sys") {
-        auth_ec_sys::Wrapper::pack_from(account)
-            .setKey(PublicKey::unpacked(&key.key.rawData).unwrap())
-    } else if key.key.service == account!("verify-sys") {
-        auth_sys::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec())
-    } else {
-        panic!("unknown account service");
-    }
-}
-
-fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {
-    account_sys::Wrapper::pack_from(account).setAuthServ(auth_service)
-}
-
-#[derive(Serialize, Deserialize, Pack, Unpack)]
-struct SetCodeAction {
-    service: AccountNumber,
-    vm_type: i8,
-    vm_version: i8,
-    code: Vec<u8>,
-}
-
-fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
-    setcode_sys::Wrapper::pack_from(account).setCode(account, 0, 0, wasm.into())
-}
-
-fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
-    proxy_sys::Wrapper::pack_from(service).registerServer(server_service)
 }
 
 fn store_sys(
@@ -711,6 +693,166 @@ async fn upload_tree(
     Ok(())
 }
 
+async fn monitor_install_trx(
+    args: &Args,
+    client: &reqwest::Client,
+    tapos: &TaposRefBlock,
+    actions: Vec<Action>,
+    progress: ProgressBar,
+    n: u64,
+) -> Result<(), anyhow::Error> {
+    let trx = with_tapos(tapos, actions);
+
+    let result = push_transaction(
+        &args.api,
+        client.clone(),
+        sign_transaction(trx, &args.sign)?.packed(),
+    )
+    .await;
+
+    if let Err(err) = result {
+        progress.abandon_with_message(format!("{}: {:?}", progress.message(), err));
+        return Err(err);
+    }
+    progress.inc(n);
+    Ok(())
+}
+
+async fn install(
+    args: &Args,
+    mut client: reqwest::Client,
+    packages: &[String],
+    key: &Option<AnyPublicKey>,
+) -> Result<(), anyhow::Error> {
+    let installed = PackageList::installed(&args.api, &mut client).await?;
+    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+    let to_install = installed.resolve_new(&package_registry, packages)?;
+
+    let mut all_account_actions = vec![];
+    let mut all_init_actions = vec![];
+    for mut package in to_install {
+        let mut account_actions = vec![];
+        package.install_accounts(&mut account_actions, key)?;
+        all_account_actions.push((account_actions, package.name().to_string()));
+        let mut actions = vec![];
+        package.install(&mut actions, true)?;
+        all_init_actions.push((actions, package.name().to_string()));
+    }
+
+    let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
+    let progress = ProgressBar::new(all_account_actions.len() as u64).with_style(
+        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
+    );
+
+    let action_limit: usize = 64 * 1024;
+
+    // create all accounts
+    {
+        let mut n: u64 = 0;
+        let mut size: usize = 0;
+        let mut trx_actions = vec![];
+        for (actions, name) in all_account_actions {
+            progress.set_message("Deploying ".to_string() + &name);
+            for group in actions {
+                if size >= action_limit {
+                    monitor_install_trx(
+                        args,
+                        &client,
+                        &tapos,
+                        trx_actions.drain(..).collect(),
+                        progress.clone(),
+                        n,
+                    )
+                    .await?;
+                    n = 0;
+                    size = 0;
+                }
+                for act in group {
+                    size += act.rawData.len();
+                    trx_actions.push(act);
+                }
+            }
+            n += 1;
+        }
+        if !trx_actions.is_empty() {
+            monitor_install_trx(args, &client, &tapos, trx_actions, progress.clone(), n).await?;
+        }
+    }
+
+    // Wait for a new block after the accounts are created, so the
+    // first auth check doesn't fail
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    progress.set_position(0);
+
+    {
+        let mut n: u64 = 0;
+        let mut size: usize = 0;
+        let mut trx_actions = vec![];
+        for (actions, name) in all_init_actions {
+            progress.set_message("Initializing ".to_string() + &name);
+            for act in actions {
+                if size >= action_limit {
+                    monitor_install_trx(
+                        args,
+                        &client,
+                        &tapos,
+                        trx_actions.drain(..).collect(),
+                        progress.clone(),
+                        n,
+                    )
+                    .await?;
+                    n = 0;
+                    size = 0;
+                }
+
+                size += act.rawData.len();
+                trx_actions.push(act);
+            }
+            n += 1;
+        }
+        if !trx_actions.is_empty() {
+            monitor_install_trx(args, &client, &tapos, trx_actions, progress.clone(), n).await?;
+        }
+    }
+    if !args.suppress_ok {
+        progress.finish_with_message("Ok");
+    } else {
+        progress.finish_and_clear();
+    }
+
+    Ok(())
+}
+
+async fn list(
+    args: &Args,
+    mut client: reqwest::Client,
+    all: bool,
+    available: bool,
+    installed: bool,
+) -> Result<(), anyhow::Error> {
+    if all || (installed && available) || (!all & !installed && !available) {
+        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+        let reglist = PackageList::from_registry(&package_registry)?;
+        for name in installed.union(reglist).into_vec() {
+            println!("{}", name);
+        }
+    } else if installed {
+        let installed = PackageList::installed(&args.api, &mut client).await?;
+        for name in installed.into_vec() {
+            println!("{}", name);
+        }
+    } else if available {
+        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+        let reglist = PackageList::from_registry(&package_registry)?;
+        for name in reglist.difference(installed).into_vec() {
+            println!("{}", name);
+        }
+    }
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize)]
 struct TokenData<'a> {
     exp: i64,
@@ -811,6 +953,12 @@ async fn main() -> Result<(), anyhow::Error> {
                 .await?
             }
         }
+        Command::Install { packages, key } => install(&args, client, packages, key).await?,
+        Command::List {
+            all,
+            available,
+            installed,
+        } => list(&args, client, *all, *available, *installed).await?,
         Command::CreateToken {
             expires_after,
             mode,

@@ -1,9 +1,12 @@
-use crate::services::{account_sys, proxy_sys, psispace_sys};
-use crate::{AccountNumber, Action, GenesisService};
+use crate::services::{account_sys, package_sys, proxy_sys, psispace_sys, setcode_sys};
+use crate::{
+    new_account_action, set_auth_service_action, set_code_action, set_key_action, AccountNumber,
+    Action, AnyPublicKey, Checksum256, GenesisService,
+};
 use custom_error::custom_error;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map, HashMap};
+use std::collections::{hash_map, HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::str::FromStr;
 use zip::ZipArchive;
@@ -22,6 +25,7 @@ custom_error! {
     AccountConflict{name: AccountNumber, old: String, new: String} = "The account {name} is defined by more than one package: {old}, {new}",
     MissingDepAccount{name: AccountNumber, package: String} = "The account {name} required by {package} is not defined by any package",
     MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
+    NoDomain = "Virtual hosting requires a URL with a domain name",
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -30,6 +34,16 @@ struct Meta {
     description: String,
     depends: Vec<String>,
     accounts: Vec<AccountNumber>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PackageInfo {
+    name: String,
+    description: String,
+    depends: Vec<String>,
+    accounts: Vec<AccountNumber>,
+    sha256: Checksum256,
+    file: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -128,6 +142,9 @@ impl<R: Read + Seek> PackagedService<R> {
             data: data,
         })
     }
+    pub fn name(&self) -> &str {
+        &self.meta.name
+    }
     pub fn get_genesis(&mut self, services: &mut Vec<GenesisService>) -> Result<(), anyhow::Error> {
         for (account, index, info) in &self.services {
             services.push(GenesisService {
@@ -196,6 +213,77 @@ impl<R: Read + Seek> PackagedService<R> {
                 file,
             )?)?);
         }
+        Ok(())
+    }
+
+    pub fn commit_install(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+        actions.push(
+            package_sys::Wrapper::pack().postinstall(package_sys::InstalledPackage {
+                name: self.meta.name.clone(),
+                depends: self.meta.depends.clone(),
+                accounts: self.meta.accounts.clone(),
+            }),
+        );
+        Ok(())
+    }
+
+    pub fn create_account(
+        &self,
+        account: AccountNumber,
+        key: &Option<AnyPublicKey>,
+        actions: &mut Vec<Action>,
+    ) -> Result<(), anyhow::Error> {
+        actions.push(new_account_action(account_sys::SERVICE, account));
+        if let Some(key) = key {
+            actions.push(set_key_action(account, key));
+            actions.push(set_auth_service_action(account, key.auth_service()));
+        }
+        Ok(())
+    }
+
+    pub fn install_accounts(
+        &mut self,
+        actions: &mut Vec<Vec<Action>>,
+        key: &Option<AnyPublicKey>,
+    ) -> Result<(), anyhow::Error> {
+        // service accounts
+        for (account, index, info) in &self.services {
+            let mut group = vec![];
+            self.create_account(*account, key, &mut group)?;
+            group.push(set_code_action(
+                *account,
+                read(&mut self.archive.by_index(*index)?)?.into(),
+            ));
+            let flags = translate_flags(&info.flags)?;
+            if flags != 0 {
+                group.push(setcode_sys::Wrapper::pack().setFlags(*account, flags));
+            }
+            actions.push(group);
+        }
+        // extra accounts
+        for account in self.get_accounts() {
+            if !self.has_service(*account) {
+                let mut group = vec![];
+                self.create_account(*account, key, &mut group)?;
+                actions.push(group);
+            }
+        }
+        Ok(())
+    }
+
+    // TODO: handle recovery from partial install
+    pub fn install(
+        &mut self,
+        actions: &mut Vec<Action>,
+        install_ui: bool,
+    ) -> Result<(), anyhow::Error> {
+        if install_ui {
+            self.reg_server(actions)?;
+            self.store_data(actions)?;
+        }
+
+        self.postinstall(actions)?;
+        self.commit_install(actions)?;
         Ok(())
     }
 
@@ -294,6 +382,7 @@ fn dfs<T: PackageRegistry + ?Sized>(
 
 pub trait PackageRegistry {
     type R: Read + Seek;
+    fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error>;
     fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error>;
     // Returns a set of packages and all dependencies
     // The result is ordered by dependency so that if A depends on B, then B appears before A.
@@ -316,8 +405,150 @@ impl DirectoryRegistry {
 
 impl PackageRegistry for DirectoryRegistry {
     type R = BufReader<File>;
+    fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
+        let f = File::open(self.dir.join("index.json"))?;
+        let contents = std::io::read_to_string(f)?;
+        let result: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
+        Ok(result)
+    }
     fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error> {
         let f = File::open(self.dir.join(name.to_string() + ".psi"))?;
         PackagedService::new(BufReader::new(f))
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn additional_packages<T: PackageRegistry + ?Sized>(
+    installed: &PackageList,
+    reg: &T,
+    names: &[String],
+    found: &mut HashMap<String, bool>,
+    result: &mut Vec<PackagedService<<T as PackageRegistry>::R>>,
+) -> Result<(), anyhow::Error> {
+    for name in names {
+        if let Some(completed) = found.get(name) {
+            if !completed {
+                Err(Error::DependencyCycle)?
+            }
+        } else {
+            found.insert(name.clone(), false);
+            if !installed.contains(name.as_str()) {
+                let package = reg.get(name.as_str())?;
+                additional_packages(installed, reg, &package.meta.depends, found, result)?;
+                result.push(package);
+            }
+            *found.get_mut(name).unwrap() = true;
+        }
+    }
+    Ok(())
+}
+
+pub struct PackageList {
+    packages: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct InstalledNode {
+    name: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct InstalledEdge {
+    node: InstalledNode,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct NextPageInfo {
+    hasNextPage: bool,
+    endCursor: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct InstalledConnection {
+    pageInfo: NextPageInfo,
+    edges: Vec<InstalledEdge>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct InstalledQuery {
+    installed: InstalledConnection,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct InstalledRoot {
+    data: InstalledQuery,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl PackageList {
+    pub async fn installed(
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+    ) -> Result<Self, anyhow::Error> {
+        let Some(url::Host::Domain(host)) = base_url.host() else {
+            Err(Error::NoDomain)?
+        };
+        let mut url = base_url.join("graphql")?;
+        url.set_host(Some(&("package-sys.".to_string() + host)))?;
+        //
+        let mut end_cursor: Option<String> = None;
+        let mut result = PackageList {
+            packages: HashSet::new(),
+        };
+        loop {
+            let page: InstalledRoot = crate::as_json(client
+                                                     .post(url.clone())
+                                                     .header("Content-Type", "application/graphql")
+                                                    .body(format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name }} }} }} }}", serde_json::to_string(&end_cursor)?)))
+                .await?;
+            for edge in page.data.installed.edges {
+                result.packages.insert(edge.node.name);
+            }
+            if !page.data.installed.pageInfo.hasNextPage {
+                break;
+            }
+            end_cursor = Some(page.data.installed.pageInfo.endCursor);
+        }
+        Ok(result)
+    }
+    pub fn from_registry<T: PackageRegistry + ?Sized>(reg: &T) -> Result<Self, anyhow::Error> {
+        let mut result = PackageList {
+            packages: HashSet::new(),
+        };
+        for package in reg.index()? {
+            result.packages.insert(package.name);
+        }
+        Ok(result)
+    }
+    fn contains(&self, name: &str) -> bool {
+        self.packages.contains(name)
+    }
+    pub fn resolve_new<T: PackageRegistry + ?Sized>(
+        &self,
+        reg: &T,
+        packages: &[String],
+    ) -> Result<Vec<PackagedService<<T as PackageRegistry>::R>>, anyhow::Error> {
+        let mut result = vec![];
+        additional_packages(self, reg, packages, &mut HashMap::new(), &mut result)?;
+        Ok(result)
+    }
+    pub fn into_vec(mut self) -> Vec<String> {
+        let mut result: Vec<String> = self.packages.drain().collect();
+        result.sort_unstable();
+        result
+    }
+    pub fn union(mut self, mut other: Self) -> Self {
+        for package in other.packages.drain() {
+            self.packages.insert(package);
+        }
+        self
+    }
+    pub fn difference(mut self, other: Self) -> Self {
+        for package in other.packages {
+            self.packages.remove(&package);
+        }
+        self
     }
 }
