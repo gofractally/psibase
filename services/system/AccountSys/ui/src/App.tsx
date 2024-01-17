@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import {
     useAccountsWithKeys,
@@ -45,6 +45,20 @@ export interface AccountWithKey extends AccountWithAuth {
 
 // npm run build && psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree r-account-sys / ./dist/ -S r-account-sys
 
+const useConnect = () => {
+    const [supervisor, setSupervisor] = useState();
+    const ran = useRef(false);
+
+    useEffect(() => {
+        if (ran.current) return;
+        ran.current = true;
+        // @ts-ignore
+        connect().then((x) => setSupervisor(x));
+    }, []);
+
+    return supervisor;
+};
+
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
     const [allAccounts, refreshAccounts] = useAccounts();
@@ -69,48 +83,68 @@ function App() {
 
     const ran = useRef(false);
 
-    const init = async () => {
-        if (ran.current) return;
-        ran.current = true;
-        console.count("init");
+    const supervisor = useConnect();
 
-        const supervisor = await connect();
-        console.log(supervisor, "came back casey");
-        try {
-            // todo
-            // make it work with several params?
-            const res = await supervisor.functionCall({
-                service: "account-sys",
-                method: "numbers",
-                params: [200, 14, true],
-            });
-            console.log({ supervisor, res, x: 111 });
-            console.log(res, "numbers *");
-            const user = {
-                name: "john",
-                age: 29,
-            };
-
-            const strings = await supervisor.functionCall({
-                service: "account-sys",
-                method: "strings",
-                params: ["user", 2],
-            });
-            console.log(strings, "strings *");
-            const peoples = await supervisor.functionCall({
-                service: "account-sys",
-                method: "peoples",
-                params: [[user, user]],
-            });
-            console.log(peoples, "peoples *");
-        } catch (e) {
-            console.error(e);
-        }
+    const [waitTime, setWaitTime] = useState(0);
+    const onClick = async () => {
+        // @ts-ignore
+        const msThen = new Date() / 1;
+        console.log("clicked");
+        console.log(supervisor, "xx");
+        // @ts-ignore
+        const res = await supervisor.functionCall({
+            service: "account-sys",
+            method: "numbers",
+            params: [200, 14, true],
+        });
+        // @ts-ignore
+        const msNow = new Date() / 1;
+        setWaitTime(msNow - msThen);
+        console.log(res, "res");
     };
 
-    useEffect(() => {
-        init();
-    }, []);
+    // const init = async () => {
+    //     if (ran.current) return;
+    //     ran.current = true;
+    //     console.count("init");
+
+    //     const supervisor = await connect();
+    //     console.log(supervisor, "came back casey");
+    //     try {
+    //         // todo
+    //         // make it work with several params?
+    //         const res = await supervisor.functionCall({
+    //             service: "account-sys",
+    //             method: "numbers",
+    //             params: [200, 14, true],
+    //         });
+    //         console.log({ supervisor, res, x: 111 });
+    //         console.log(res, "numbers *");
+    //         const user = {
+    //             name: "john",
+    //             age: 29,
+    //         };
+
+    //         const strings = await supervisor.functionCall({
+    //             service: "account-sys",
+    //             method: "strings",
+    //             params: ["user", 2],
+    //         });
+    //         console.log(strings, "strings *");
+    //         const peoples = await supervisor.functionCall({
+    //             service: "account-sys",
+    //             method: "peoples",
+    //             params: [[user, user]],
+    //         });
+    //         console.log(peoples, "peoples *");
+    //     } catch (e) {
+    //         console.error(e);
+    //     }
+    // };
+
+    // useEffect(() => {
+    //     init();
+    // }, []);
 
     useInitialized(async () => {
         try {
@@ -127,6 +161,11 @@ function App() {
 
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
+            <div>
+                <h1>Wait time</h1>
+                <h2>{waitTime}</h2>
+                <button onClick={() => onClick()}>Do something</button>
+            </div>
             <div className="flex items-center gap-2">
                 <AccountIcon />
                 <Heading tag="h1" className="select-none text-gray-600">

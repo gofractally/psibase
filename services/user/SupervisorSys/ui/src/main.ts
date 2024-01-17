@@ -72,18 +72,18 @@ const createIFrameService = async (service: string): Promise<PenpalObj> => {
   const connection = connectToChild({
     iframe,
     methods: {
-      importedCall: async (param: FunctionCallParam) => {
-        console.log(
-          `Supervisor: Received request from ${service} of function call`,
-          param
-        );
-        return functionCall(param);
-      },
+      functionCall,
+      addToTx,
       add: (a: number, b: number) => a + b,
     },
   });
 
   return connection.promise as unknown as Promise<PenpalObj>;
+};
+
+const addToTx = async (param: FunctionCallParam) => {
+  console.log("supervisor addToTx", param);
+  return param;
 };
 
 const functionCall = async (param: FunctionCallParam) => {
@@ -111,6 +111,7 @@ const functionCall = async (param: FunctionCallParam) => {
 const connection = connectToParent({
   methods: {
     functionCall,
+    addToTx,
   },
 });
 

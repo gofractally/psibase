@@ -24,7 +24,14 @@ export async function prnt(string) {
     method: "stilldontknow",
     params: "yesbuddeh",
   };
-  const res = await xx.importedCall(toCall);
+  const res = await xx.functionCall(toCall);
 
   console.log(res, "came back from the imported call...");
+}
+
+export async function addToTx(params) {
+  console.log("addedToTx", params);
+
+  const connection = await connectToParent().promise;
+  await connection.addToTx(params);
 }
