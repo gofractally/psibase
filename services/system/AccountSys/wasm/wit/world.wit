@@ -15,18 +15,24 @@ interface types {
 }
 
 
+interface imports {
+   use types.{funccallparams};
+
+   prnt: func(msg: string);
+   funccall: func(msg: funccallparams);
+   add-to-tx: func(msg: funccallparams);
 
 
+}
+
+interface token-sys {
+    transfer: func(msg: string);
+}
 
 world example {
 
-    
-    import in-the-line: interface {
-        use types.{funccallparams};
-        prnt: func(msg: string);
-        funccall: func(msg: funccallparams);
-
-    }
+    import imports;
+    import token-sys;
 
     use types.{user};
     export hire: func(user: user) -> string;

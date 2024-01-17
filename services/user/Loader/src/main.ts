@@ -27,11 +27,13 @@ const functionCall = async (param: FunctionCallParam) => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
+  console.log("loading js...");
   const { load } = await import("rollup-plugin-wit-component");
 
   // account.sys.psibase.io/loader
   const url = "/loader/functions.wasm";
 
+  console.log("fetching wasm...");
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
 
   // const importableCode = `export function prnt(string) {
@@ -40,11 +42,18 @@ const functionCall = async (param: FunctionCallParam) => {
 
   let importables = [{ "component:account-sys/imports": importableCode }];
 
-  // @ts-expect-error fff
-  const module = await load(/* @vite-ignore */ wasmBytes, importables);
+  console.log("loading wasm...");
 
-  console.log(module, "is the module I have");
-  return module[param.method](...param.params);
+  console.time("Load");
+  const { mod, imports, exports, files } = await load(
+    // @ts-expect-error fff
+    /* @vite-ignore */ wasmBytes,
+    importables
+  );
+  console.timeEnd("Load");
+
+  console.log(mod, "is the module I have", { imports, exports, files });
+  return mod[param.method](...param.params);
 };
 
 const connection = connectToParent({
