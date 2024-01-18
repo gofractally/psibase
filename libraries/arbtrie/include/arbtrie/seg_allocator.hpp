@@ -261,6 +261,8 @@ namespace arbtrie
                      TRIEDENT_WARN("got modify lock but never read data");
                   }
 
+                  // this must be memory_order release so that any threads
+                  // that are about to deref the pointer see the latest modifications,
                   auto prior = _meta.fetch_or(
                       object_meta::modify_flag_mask, std::memory_order_release);
                                                        
@@ -987,7 +989,15 @@ namespace arbtrie
       // with memory_order_acquire, when updating an object_info we need to write with
       // memory_order_release otherwise the data written may not be visible yet to the reader coming
       // along behind
-      assert(segment->_alloc_pos == 0 or segment->_alloc_pos > loc.index());
+
+      // only check this in release if this flag is set
+      if constexpr ( debug_memory ) {
+         if( not (segment->_alloc_pos == 0 or segment->_alloc_pos > loc.index()) ) {
+            abort();
+         }
+      } else { // always check in debug builds
+         assert(segment->_alloc_pos == 0 or segment->_alloc_pos > loc.index());
+      }
       return (node_header*)((char*)_session._sega._block_alloc.get(loc.segment()) + loc.index());
    }
 

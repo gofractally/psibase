@@ -34,7 +34,8 @@ namespace arbtrie
    struct setlist_node : node_header
    {
       static const node_type type = node_type::setlist;
-      uint64_t               _descendants : 45;
+      uint64_t               _descendants : 44;
+      uint64_t               _eof_branch  : 1;
       uint64_t               _prefix_trunc : 10;
       uint64_t               _spare_capacity : 9;
       uint8_t                _prefix[];
@@ -77,7 +78,7 @@ namespace arbtrie
       const object_id* get_branch_end_ptr() const { return ((object_id*)tail()) - _spare_capacity; }
 
       bool can_add_branch() const { return _spare_capacity > 0; }
-      void add_branch(uint_fast16_t br, object_id b);
+      void add_branch(branch_index_type br, object_id b);
 
       void set_eof(object_id e)
       {
@@ -260,7 +261,7 @@ namespace arbtrie
       }
 
       setlist_node(int_fast16_t asize, object_id nid, clone_config cfg)
-          : node_header(asize, nid, node_type::setlist), _descendants(0)
+          : node_header(asize, nid, node_type::setlist), _descendants(0),_eof_branch(0)
       {
          _prefix_trunc    = cfg.spare_prefix;
          _prefix_capacity = cfg.spare_prefix;
@@ -276,7 +277,7 @@ namespace arbtrie
       }
 
       setlist_node(int_fast16_t asize, object_id nid, const setlist_node* src, clone_config cfg)
-          : node_header(asize, nid, node_type::setlist), _descendants(src->_descendants)
+          : node_header(asize, nid, node_type::setlist), _descendants(src->_descendants),_eof_branch(src->_eof_branch)
       {
          _prefix_trunc    = cfg.spare_prefix;
          _prefix_capacity = cfg.spare_prefix;
@@ -292,8 +293,6 @@ namespace arbtrie
          }
 
          _num_branches = src->_num_branches;
-         _eof_branch   = src->_eof_branch;
-
          _spare_capacity = std::min<int_fast16_t>(257, src->num_branches() + cfg.spare_branches) -
                            src->_num_branches;
 
@@ -306,7 +305,7 @@ namespace arbtrie
 
    static_assert(sizeof(setlist_node) == sizeof(node_header) + sizeof(uint64_t));
 
-   inline void setlist_node::add_branch(uint_fast16_t br, object_id b)
+   inline void setlist_node::add_branch(branch_index_type br, object_id b)
    {
       assert(validate());
       assert(br < max_branch_count);

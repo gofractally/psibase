@@ -206,7 +206,6 @@ int  main(int argc, char** argv)
 {
    arbtrie::thread_name("main");
    test_iterator();
-   return 0;
    //   return 0;
    //   test_binary_node();
    //   test_refactor();
@@ -247,11 +246,11 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 10;
+         const int                  rounds = 1;
          const int                  count  = 10'000'000;
 
          std::cerr << "insert dense rand \n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -275,7 +274,7 @@ int  main(int argc, char** argv)
          }
          uint64_t seq3 = 0;
          std::cerr << "insert little endian seq\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -296,7 +295,7 @@ int  main(int argc, char** argv)
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
          std::cerr << "insert big endian seq\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -317,7 +316,7 @@ int  main(int argc, char** argv)
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
          std::cerr << "insert to_string(rand) \n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -337,12 +336,12 @@ int  main(int argc, char** argv)
          }
          std::cerr << "get known key little endian seq\n";
          uint64_t seq2 = 0;
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t val = ++seq2;
+               uint64_t val = seq2++;
                key_view kstr((char*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
@@ -365,12 +364,13 @@ int  main(int argc, char** argv)
          }
 
          std::cerr << "get known key little endian rand\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t val  = rand64() % seq2;
+               uint64_t rnd = rand64();
+               uint64_t val  = rnd  % seq2;
                uint64_t val2 = val;
                //   TRIEDENT_DEBUG( "val: ", val, " val2: ", val2 );
                key_view kstr((char*)&val, sizeof(val));
@@ -380,13 +380,13 @@ int  main(int argc, char** argv)
                          if (not found)
                          {
                             TRIEDENT_WARN("unable to find key: ", val, " ", val2, "  ro: ", ro,
-                                          " i:", i);
+                                          " i:", i, " rnd: ", rnd, " seq2: ", seq2);
                          }
                          else
                          {
+                            assert(found and r.view() == kstr);
                             //              TRIEDENT_DEBUG( "found key!!!!!" );
                          }
-                         assert(found and r.view() == kstr);
                       });
                //     TRIEDENT_DEBUG( "post val: ", val, " val2: ", val2 );
             }
@@ -399,8 +399,9 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << "  seq get/sec  total items: " << add_comma(seq) << "\n";
          }
+         /*
          std::cerr << "get known key big endian seq\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -426,9 +427,10 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << "  seq get/sec  total items: " << add_comma(seq) << "\n";
          }
+         */
 
          std::cerr << "lower bound random i64\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto itr   = ws.create_iterator(r);
             auto start = std::chrono::steady_clock::now();
@@ -499,7 +501,7 @@ int  main(int argc, char** argv)
          }
 
          std::cerr << "insert dense rand while reading " << rthreads.size() << " threads\n";
-         for (int ro = 0; ro < rounds * 20; ++ro)
+         for (int ro = 0; ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)

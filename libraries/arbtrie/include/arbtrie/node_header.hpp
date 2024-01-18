@@ -29,8 +29,8 @@ namespace arbtrie
       uint32_t _ntype : 4;             // bytes allocated for this node
       uint32_t _nsize : 28;            // bytes allocated for this node
       uint64_t _num_branches : 9;      // number of branches that are set
-      uint64_t _eof_branch : 1;        // does the node have a value on it
-      uint64_t _unused_pad : 4;        // does the node have a value on it
+//      uint64_t _eof_branch : 1;        // does the node have a value on it
+      uint64_t _unused_pad : 5;        // does the node have a value on it
       uint64_t _prefix_capacity : 10;  // number of bytes in up to 1024
       uint64_t _node_id : 40;
 
@@ -43,7 +43,6 @@ namespace arbtrie
             _ntype(type),
             _nsize(size),
             _num_branches(num_branch),
-            _eof_branch(0),
             _unused_pad(0),
             _prefix_capacity(prefix_cap),
             _node_id(nid.id)

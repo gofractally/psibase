@@ -702,7 +702,8 @@ namespace arbtrie
                                       [&](setlist_node* sln)
                                       {
                                          sln->add_branch(0, v);
-                                         sln->add_branch(int_fast16_t(rootpre[cpre.size()]) + 1,
+                                         //sln->add_branch(int_fast16_t(rootpre[cpre.size()]) + 1,
+                                         sln->add_branch(char_to_branch(rootpre[cpre.size()]),
                                                          child_id);
                                       })
                 .id();
@@ -716,11 +717,13 @@ namespace arbtrie
                        {
                           // adding in sorted order is more effecient,
                           // and this is a branchless way of doing this
-                          std::pair<int_fast16_t, object_id> brs[2];
+                          std::pair<branch_index_type, object_id> brs[2];
 
                           auto order  = key[cpre.size()] < rootpre[cpre.size()];
-                          brs[order]  = {int_fast16_t(key[cpre.size()]) + 1, abx};
-                          brs[!order] = {int_fast16_t(rootpre[cpre.size()]) + 1, child_id};
+                          //brs[order]  = {int_fast16_t(key[cpre.size()]) + 1, abx};
+                          brs[order]  = {char_to_branch(key[cpre.size()]), abx};
+                          brs[!order] = {char_to_branch(rootpre[cpre.size()]), child_id};
+                          //brs[!order] = {int_fast16_t(rootpre[cpre.size()]) + 1, child_id};
                           sln->add_branch(brs[0].first, brs[0].second);
                           sln->add_branch(brs[1].first, brs[1].second);
                        })
