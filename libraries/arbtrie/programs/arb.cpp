@@ -16,7 +16,7 @@ void test_binary_node_layout() {}
 int64_t rand64()
 {
    thread_local static std::mt19937 gen(rand());
-   return uint64_t(gen()) << 32 | gen();
+   return (uint64_t(gen()) << 32) | gen();
 }
 uint64_t bswap(uint64_t x)
 {
@@ -207,6 +207,7 @@ int  main(int argc, char** argv)
    arbtrie::thread_name("main");
    test_iterator();
    return 0;
+   //   return 0;
    //   test_binary_node();
    //   test_refactor();
    //   return 0;
@@ -244,12 +245,13 @@ int  main(int argc, char** argv)
       do
       {
          std::optional<node_handle> last_root;
+         std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 5;
+         const int                  rounds = 10;
          const int                  count  = 10'000'000;
 
          std::cerr << "insert dense rand \n";
-         for (int ro = 0; ro < rounds; ++ro)
+         for (int ro = 0; false and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -259,7 +261,8 @@ int  main(int argc, char** argv)
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
             }
-            last_root = r;
+            last_root2 = last_root;
+            last_root  = r;
 
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
@@ -272,7 +275,7 @@ int  main(int argc, char** argv)
          }
          uint64_t seq3 = 0;
          std::cerr << "insert little endian seq\n";
-         for (int ro = 0; ro < rounds; ++ro)
+         for (int ro = 0; false and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -293,7 +296,7 @@ int  main(int argc, char** argv)
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
          std::cerr << "insert big endian seq\n";
-         for (int ro = 0; ro < rounds; ++ro)
+         for (int ro = 0; false and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -314,7 +317,7 @@ int  main(int argc, char** argv)
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
          std::cerr << "insert to_string(rand) \n";
-         for (int ro = 0; ro < rounds; ++ro)
+         for (int ro = 0; false and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -334,7 +337,7 @@ int  main(int argc, char** argv)
          }
          std::cerr << "get known key little endian seq\n";
          uint64_t seq2 = 0;
-         for (int ro = 0; ro < rounds; ++ro)
+         for (int ro = 0; false and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -362,7 +365,7 @@ int  main(int argc, char** argv)
          }
 
          std::cerr << "get known key little endian rand\n";
-         for (int ro = 0; ro < rounds; ++ro)
+         for (int ro = 0; false and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -397,7 +400,7 @@ int  main(int argc, char** argv)
                       << "  seq get/sec  total items: " << add_comma(seq) << "\n";
          }
          std::cerr << "get known key big endian seq\n";
-         for (int ro = 0; ro < rounds; ++ro)
+         for (int ro = 0; false and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -423,6 +426,113 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << "  seq get/sec  total items: " << add_comma(seq) << "\n";
          }
+
+         std::cerr << "lower bound random i64\n";
+         for (int ro = 0; false and ro < rounds; ++ro)
+         {
+            auto itr   = ws.create_iterator(r);
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               uint64_t val = rand64();  //bswap(++seq2);
+               key_view kstr((char*)&val, sizeof(val));
+               itr.lower_bound(kstr);
+            }
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
+
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << "  rand lowerbound/sec  total items: " << add_comma(seq) << "\n";
+         }
+
+         auto read_thread = [&]() {};
+
+         std::vector<std::unique_ptr<std::thread>> rthreads;
+         rthreads.reserve(6);
+         std::atomic<bool>    done = false;
+         std::atomic<int64_t> read_count;
+         std::mutex           _lr_mutex;
+
+         for (uint32_t i = 0; i < rthreads.capacity(); ++i)
+         {
+            auto read_loop = [&]()
+            {
+               auto                       rs = db.start_write_session();
+               int64_t                    tc = 0;
+               int                        cn = 0;
+               std::optional<node_handle> lr;
+               while (not done.load(std::memory_order_relaxed))
+               {
+                  {
+                     std::unique_lock lock(_lr_mutex);
+                     if (not last_root)
+                     {
+                        usleep(10);
+                        continue;
+                     }
+                     lr = rs.adopt(*last_root);
+                  }
+                  auto itr    = rs.create_iterator(*lr);
+                  int  roundc = 100000;
+                  for (int i = 0; i < roundc; ++i)
+                  {
+                     uint64_t val = rand64();  //bswap(++seq2);
+                     //auto str = std::to_string(val);
+                     key_view kstr((char*)&val, sizeof(val));
+                     //key_view kstr(str);
+                     if (not itr.lower_bound(kstr))
+                     {
+                        //   std::cerr << "what's the problem? "<<val <<"\n";
+                     }
+                     else
+                     {
+                        //  std::cerr << "everything ok "<<val <<"\n";
+                     }
+                  }
+                  read_count.fetch_add(roundc, std::memory_order_relaxed);
+               }
+            };
+            rthreads.emplace_back(new std::thread(read_loop));
+         }
+
+         std::cerr << "insert dense rand while reading " << rthreads.size() << " threads\n";
+         for (int ro = 0; ro < rounds * 20; ++ro)
+         {
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               uint64_t val = rand64();
+               auto     str = std::to_string(val);
+               ++seq;
+               key_view kstr((char*)&val, sizeof(val));
+               ws.insert(r, kstr, kstr);
+               if (not last_root)
+                  last_root = r;
+            }
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
+
+            {
+               std::unique_lock lock(_lr_mutex);
+               last_root = r;
+            }
+
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << " dense rand insert/sec  total items: " << add_comma(seq) << "    "
+                      << add_comma(int64_t(
+                             (read_count.exchange(0, std::memory_order_relaxed)) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << "  lowerbound/sec \n";
+         }
+         done = true;
+         for (auto& r : rthreads)
+            r->join();
 
          while (sync_compact and db.compact_next_segment())
          {
@@ -475,61 +585,63 @@ struct environ
 
 void load_words(write_session& ws, node_handle& root)
 {
-   auto          filename = "/usr/share/dict/words";
+   auto filename = "/usr/share/dict/words";
 
    {
-   auto          start    = std::chrono::steady_clock::now();
-   std::ifstream file(filename);
+      auto          start = std::chrono::steady_clock::now();
+      std::ifstream file(filename);
 
-   std::string key;
-   std::string val;
+      std::string key;
+      std::string val;
 
-   int count = 0;
-   // Read the next line from File until it reaches the
-   // end.
-   while (file >> key)
-   {
-      val = key;
-      for (auto& c : val)
-         c = toupper(c);
-      ws.upsert(root, key, val);
-      ++count;
+      int count = 0;
+      // Read the next line from File until it reaches the
+      // end.
+      while (file >> key)
+      {
+         val = key;
+         for (auto& c : val)
+            c = toupper(c);
+         ws.upsert(root, key, val);
+         ++count;
+      }
+
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+
+      std::cout << "db loaded " << std::setw(12)
+                << add_comma(int64_t(
+                       (count) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                << " words/sec  total items: " << add_comma(count) << " from " << filename << "\n";
    }
 
-   auto end   = std::chrono::steady_clock::now();
-   auto delta = end - start;
-
-   std::cout << "db loaded " << std::setw(12)
-             << add_comma(int64_t(
-                    (count) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-             << " words/sec  total items: " << add_comma(count) << " from " << filename << "\n";
-   }
-
    {
-   auto          start    = std::chrono::steady_clock::now();
-   std::ifstream file(filename);
+      auto          start = std::chrono::steady_clock::now();
+      std::ifstream file(filename);
 
-   std::vector<std::string> v;
-   std::string              str;
+      std::vector<std::string> v;
+      std::string              str;
 
-   // Read the next line from File until it reaches the
-   // end.
-   while (file >> str)
-   {
-      std::string val = str;
-      for (auto& c : val)
-         c = toupper(c);
-      // Now keep reading next line
-      // and push it in vector function until end of file
-      v.push_back(str);
-   }
-   auto end   = std::chrono::steady_clock::now();
-   auto delta = end - start;
+      // Read the next line from File until it reaches the
+      // end.
+      while (file >> str)
+      {
+         std::string val = str;
+         for (auto& c : val)
+            c = toupper(c);
+         // Now keep reading next line
+         // and push it in vector function until end of file
+         v.push_back(str);
+      }
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
 
-   std::cout << "vector loaded " << std::setw(12)
-             << add_comma(int64_t(
-                    (v.size()) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-             << " words/sec  total items: " << add_comma(v.size()) << " from " << filename << "\n";
+      std::cout << "vector loaded " << std::setw(12)
+                << add_comma(
+                       int64_t((v.size()) /
+                               (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                << " words/sec  total items: " << add_comma(v.size()) << " from " << filename
+                << "\n";
    }
 }
 
@@ -541,32 +653,62 @@ void test_iterator()
       auto root = ws.create_root();
       load_words(ws, root);
 
-      ws.upsert(root, "hello", "world");
-      ws.upsert(root, "daniel", "larimer");
-      ws.upsert(root, "anna", "taylor");
+      //   ws.upsert(root, "hello", "world");
+      //   ws.upsert(root, "daniel", "larimer");
+      //  ws.upsert(root, "anna", "taylor");
 
       auto itr = ws.create_iterator(root);
       assert(not itr.valid());
 
       std::vector<char> data;
+      /*
       {
-         assert(itr.first());
+         assert(itr.lower_bound());
          itr.read_value(data);
          std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
                    << "' \n";
       }
       {
-         assert(itr.first("da"));
+         assert(itr.lower_bound("da"));
          itr.read_value(data);
          std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
                    << "' \n";
       }
       {
-         assert(itr.first("baby"));
+         assert(itr.lower_bound("baby"));
          itr.read_value(data);
          std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
                    << "' \n";
+         std::cerr << "next: " << itr.next() <<"\n";
+         itr.read_value(data);
+         std::cerr << "next: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
+                   << "' \n";
+                   */
+      auto start = std::chrono::steady_clock::now();
+      int  count = 0;
+      if (itr.lower_bound())
+      {
+         itr.read_value(data);
+         ++count;
+         //   std::cerr << "next: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
+         //             << "' \n";
       }
+      while (itr.next())
+      {
+         itr.read_value(data);
+         ++count;
+         //      std::cerr << "next: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
+         //               << "' \n";
+      }
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+      std::cout << "iterated " << std::setw(12)
+                << add_comma(
+                       int64_t(count) /
+                               (std::chrono::duration<double, std::milli>(delta).count() / 1000))
+                << " keyval/sec \n"; 
+
+      //}
    }
    usleep(100000);
    env.db->print_stats(std::cout);

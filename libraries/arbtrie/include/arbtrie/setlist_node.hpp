@@ -52,7 +52,7 @@ namespace arbtrie
       inline key_view get_prefix() const { return key_view((char*)_prefix, prefix_size()); }
       inline void     set_prefix(key_view pre)
       {
-        // assert(_spare_capacity == 0);
+         // assert(_spare_capacity == 0);
          assert(pre.size() <= prefix_capacity());
          _prefix_trunc = prefix_capacity() - pre.size();
          memcpy(_prefix, pre.data(), pre.size());
@@ -90,21 +90,24 @@ namespace arbtrie
          assert(idx < _num_branches);
          get_branch_ptr()[int(idx) + _eof_branch] = c;
          get_setlist_ptr()[idx]                   = byte;
-        // if( idx+1 < _num_branches )
-        //    assert( uint8_t(get_setlist_ptr()[idx+1]) > byte );
-         if( idx > 0 ) 
-            assert( uint8_t(get_setlist_ptr()[idx-1]) < byte );
+         // if( idx+1 < _num_branches )
+         //    assert( uint8_t(get_setlist_ptr()[idx+1]) > byte );
+         if (idx > 0)
+            assert(uint8_t(get_setlist_ptr()[idx - 1]) < byte);
       }
 
-
-      bool validate()const {
+      bool validate() const
+      {
          auto sl = get_setlist();
-         if( sl.size() ) {
+         if (sl.size())
+         {
             uint8_t last = sl.front();
-            for( int i = 1; i < sl.size(); ++i ) {
-               if( uint8_t(sl[i]) <= last ) {
-                  assert( !"order invalid" );
-                  throw std::runtime_error( "order invalid" );
+            for (int i = 1; i < sl.size(); ++i)
+            {
+               if (uint8_t(sl[i]) <= last)
+               {
+                  assert(!"order invalid");
+                  throw std::runtime_error("order invalid");
                }
                last = sl[i];
             }
@@ -116,42 +119,46 @@ namespace arbtrie
       int_fast16_t lower_bound_idx(uint_fast16_t br) const
       {
          assert(br > 0 and br <= 256);
-         uint8_t br2 = br-1;
+         uint8_t br2 = br - 1;
          auto    sl  = get_setlist_ptr();
          auto    slp = sl;
          auto    sle = slp + num_branches() - _eof_branch;
- //        std::cerr << "sle - slp: " << sle-slp <<"\n";
+         //        std::cerr << "sle - slp: " << sle-slp <<"\n";
          while (slp != sle)
          {
-            if (uint8_t(*slp) >= uint8_t(br2) ) {
+            if (uint8_t(*slp) >= uint8_t(br2))
+            {
                return slp - sl;
             }
             ++slp;
          }
-  //       std::cerr << "lsp- sl: " << slp-sl <<"\n";
+         //       std::cerr << "lsp- sl: " << slp-sl <<"\n";
          return slp - sl;
       }
 
-      std::pair<int_fast16_t,object_id> lower_bound( int_fast16_t br )const {
-         if( br == 0 )
-            if( _eof_branch ) 
-               return std::pair<int_fast16_t,object_id>(0,get_branch_ptr()[0]);
-            else ++br;
+      std::pair<int_fast16_t, object_id> lower_bound(int_fast16_t br) const
+      {
+         if( br >= max_branch_count )
+            return std::pair<int_fast16_t, object_id>(max_branch_count, {});
+         if (br == 0)
+         {
+            if (_eof_branch)
+               return std::pair<int_fast16_t, object_id>(0, get_branch_ptr()[0]);
+            ++br;
+         }
 
-         uint8_t b = br-1;
+         uint8_t        b = br - 1;
          const uint8_t* s = get_setlist_ptr();
-         const auto* e = s + get_setlist_size();
+         const auto*    e = s + get_setlist_size();
 
          const uint8_t* p = s;
-         while( p < e and b > *p ) 
+         while (p < e and b > *p)
             ++p;
-         if( p == e )
-            return std::pair<int_fast16_t,object_id>(max_branch_count,{});
-         return std::pair<int_fast16_t,object_id>( uint16_t(*p)+1, 
-                                                   get_branch_ptr()[(p-s)+_eof_branch] );
+         if (p == e)
+            return std::pair<int_fast16_t, object_id>(max_branch_count, {});
+         return std::pair<int_fast16_t, object_id>( char_to_branch(*p),
+                                                   get_branch_ptr()[(p - s) + _eof_branch]);
       }
-
-
 
       void set_branch(uint_fast16_t br, object_id b)
       {
@@ -182,9 +189,9 @@ namespace arbtrie
          }
 
          auto pos = get_setlist().find(br - 1);
-         if( pos == key_view::npos ) 
+         if (pos == key_view::npos)
             return object_id();
-      //   assert(pos != key_view::npos);
+         //   assert(pos != key_view::npos);
          return get_branch_ptr()[pos + _eof_branch];
       }
 
@@ -203,7 +210,7 @@ namespace arbtrie
          auto              slp   = get_setlist_ptr();
          auto*             start = get_branch_ptr();
          const auto* const end   = start + num_branches();
-         auto* ptr = start;
+         auto*             ptr   = start;
 
          if (_eof_branch)
          {
@@ -214,7 +221,7 @@ namespace arbtrie
 
          while (ptr != end)
          {
-            visitor(int(slp[ptr - start])+1, *ptr);
+            visitor(int(slp[ptr - start]) + 1, *ptr);
             ++ptr;
          }
       }
@@ -255,9 +262,10 @@ namespace arbtrie
       setlist_node(int_fast16_t asize, object_id nid, clone_config cfg)
           : node_header(asize, nid, node_type::setlist), _descendants(0)
       {
-         _prefix_trunc = cfg.spare_prefix;
+         _prefix_trunc    = cfg.spare_prefix;
          _prefix_capacity = cfg.spare_prefix;
-         if (cfg.update_prefix) {
+         if (cfg.update_prefix)
+         {
             _prefix_capacity = std::max<int>(cfg.spare_prefix, cfg.update_prefix->size());
             set_prefix(*cfg.update_prefix);
          }
@@ -270,26 +278,28 @@ namespace arbtrie
       setlist_node(int_fast16_t asize, object_id nid, const setlist_node* src, clone_config cfg)
           : node_header(asize, nid, node_type::setlist), _descendants(src->_descendants)
       {
-         _prefix_trunc = cfg.spare_prefix;
+         _prefix_trunc    = cfg.spare_prefix;
          _prefix_capacity = cfg.spare_prefix;
-         if (cfg.update_prefix) {
+         if (cfg.update_prefix)
+         {
             _prefix_capacity = cfg.update_prefix->size();
             set_prefix(*cfg.update_prefix);
          }
-         else {
+         else
+         {
             _prefix_capacity = src->prefix_size();
             set_prefix(src->get_prefix());
          }
 
          _num_branches = src->_num_branches;
-         _eof_branch = src->_eof_branch;
+         _eof_branch   = src->_eof_branch;
 
          _spare_capacity = std::min<int_fast16_t>(257, src->num_branches() + cfg.spare_branches) -
                            src->_num_branches;
 
          memcpy(get_setlist_ptr(), src->get_setlist_ptr(), src->get_setlist_size());
          memcpy(get_branch_ptr(), src->get_branch_ptr(), src->num_branches() * sizeof(object_id));
-         assert( validate() );
+         assert(validate());
       }
 
    } __attribute((packed));
@@ -298,7 +308,7 @@ namespace arbtrie
 
    inline void setlist_node::add_branch(uint_fast16_t br, object_id b)
    {
-      assert( validate() );
+      assert(validate());
       assert(br < max_branch_count);
       assert(br >= 0);
       assert(not(br == 0 and _eof_branch));
@@ -334,7 +344,7 @@ namespace arbtrie
       ++_num_branches;
       --_spare_capacity;
 
-      assert( validate() );
+      assert(validate());
    }
 
 }  // namespace arbtrie

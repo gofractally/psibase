@@ -181,7 +181,7 @@ namespace arbtrie
 
    write_session database::start_write_session()
    {
-      assert(not _have_write_session);
+    //  assert(not _have_write_session);
       _have_write_session = true;
       return write_session(*this);
    }

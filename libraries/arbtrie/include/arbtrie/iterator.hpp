@@ -19,15 +19,12 @@ namespace arbtrie {
 
       bool next();  // moves to next key, return valid()
       bool prev();  // moves to the prv key, return valid()
-                    
-      // moves to the first key >= search, return valid()
-      bool lower_bound(key_view search);
 
-      // moves to the first key > search, return valid()
+      // moves to the lower_bound key > search, return valid()
       bool upper_bound(key_view search);
 
-      // moves to the first key with prefix, return valid()
-      bool first(key_view prefix = {});
+      // moves to the lower_bound key with prefix, return valid()
+      bool lower_bound(key_view prefix = {});
 
       // moves to the last key with prefix, return valid()
       bool last(key_view prefix = {});
@@ -65,17 +62,17 @@ namespace arbtrie {
       //    the key into the binary node and path.back() should be a binary node.
       std::vector<uint8_t>   _branches;
       std::vector<object_id> _path;  // path[0]
-      int                    _binary_index;
+      branch_index_type      _cur_branch; // branch on path.back() (don't rely on branches.back())
       int                    _size; // -1 if unknown
       object_id              _oid;
       read_session&          _rs;
       node_handle            _root;
 
 
-      bool first_impl( object_ref<node_header>& r, const auto* in, key_view prefix );
-      bool first_impl( object_ref<node_header>& r, const binary_node* bn, key_view prefix );
-      bool first_impl( object_ref<node_header>& r, const value_node* bn, key_view prefix );
-      bool first_impl( object_ref<node_header>& r, key_view prefix );
+      bool lower_bound_impl( object_ref<node_header>& r, const auto* in, key_view prefix );
+      bool lower_bound_impl( object_ref<node_header>& r, const binary_node* bn, key_view prefix );
+      bool lower_bound_impl( object_ref<node_header>& r, const value_node* bn, key_view prefix );
+      bool lower_bound_impl( object_ref<node_header>& r, key_view prefix );
    };
    
 } // namespace arbtrie

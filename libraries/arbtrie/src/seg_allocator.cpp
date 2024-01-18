@@ -429,7 +429,7 @@ namespace arbtrie
             auto ep = _session_lock_ptrs[i].fetch_add(delta, std::memory_order_release );
          }
       }
-      if( e > (1<<16) ) {
+      if( e > (1<<20) ) {
          TRIEDENT_WARN( "TODO: looks like ALLOC P and END P need to be renormalized, they have wrapped the buffer too many times." );
       }
       

@@ -70,6 +70,7 @@ namespace arbtrie
 
      public:
       iterator create_iterator( node_handle h ) { return iterator(*this, h); }
+      node_handle adopt( const node_handle& h ) { return node_handle(*this,h.id()); }
 
       inline int get(const node_handle& r, key_view key, auto callback);
       // callback( key_view key, value_type )

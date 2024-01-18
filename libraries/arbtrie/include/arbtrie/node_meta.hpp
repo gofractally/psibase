@@ -131,6 +131,8 @@ namespace arbtrie
    static_assert(sizeof(object_id) == 5, "unexpected padding");
    static_assert(alignof(object_id) == 1, "unexpected alignment");
 
+
+
    /**
     * Used to identify where an object can be found
     */
@@ -383,5 +385,10 @@ namespace arbtrie
       private:
          std::variant<value_view,object_id> data;
    };
+
+   using branch_index_type = int_fast16_t;
+   inline constexpr branch_index_type char_to_branch( char c ) { return branch_index_type(uint8_t(c))+1; }
+   inline constexpr branch_index_type char_to_branch( uint8_t c ) { return branch_index_type(uint8_t(c))+1; }
+   inline constexpr char branch_to_char( branch_index_type b ) { return char( b-1); }
 
 }  // namespace arbtrie

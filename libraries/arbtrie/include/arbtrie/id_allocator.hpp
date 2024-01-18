@@ -75,7 +75,7 @@ namespace arbtrie
           */
       std::pair<std::atomic<uint64_t>&, object_id> get_new_id()
       {
-         ++free_release_count;
+         free_release_count.fetch_add(1,std::memory_order_relaxed);
          auto brand_new = [&]()
          {
             object_id id{_idheader->_next_alloc.fetch_add(1, std::memory_order_relaxed)};
@@ -127,7 +127,7 @@ namespace arbtrie
 
       void free_id(object_id id)
       {
-         --free_release_count;
+         free_release_count.fetch_sub(1,std::memory_order_relaxed);;
          assert( id );
          //TRIEDENT_WARN( "free id: ", id );
          //std::cerr << "flist before free id: ";
@@ -155,7 +155,7 @@ namespace arbtrie
       }
 
       
-      int64_t free_release_count = 0;
+      std::atomic<int64_t> free_release_count = 0;
 
      private:
       friend class alloc_session;
