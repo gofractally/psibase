@@ -60,7 +60,7 @@ namespace arbtrie
 
       std::atomic<uint64_t>& get(object_id id)
       {
-         auto abs_pos        = int_fast64_t(id.id) * sizeof(uint64_t);
+         auto abs_pos        = id.to_int() * sizeof(uint64_t);
          auto block_num      = abs_pos / id_block_size; // TODO: use a shift
          auto index_in_block = uint64_t(abs_pos) & uint64_t(id_block_size - 1);
          auto ptr            = ((char*)_block_alloc.get(block_num)) + index_in_block;
@@ -99,17 +99,17 @@ namespace arbtrie
                return brand_new();
             }
          } while (not _idheader->_first_free.compare_exchange_strong(
-             ff, get({object_meta(ff).raw_loc()}).load(std::memory_order_relaxed)));
+             ff, get(object_id(object_meta(ff).raw_loc())).load(std::memory_order_relaxed)));
 
          ff = object_meta(ff).raw_loc();
          //      std::cerr << "  reused id: " << ff << "\n";
-         auto& ffa = get({ff});
+         auto& ffa = get(object_id(ff));
          // store 1 = ref count 1 prevents object as being interpreted as unalloc
          ffa.store( object_meta(node_type::undefined).set_ref(1).to_int(), std::memory_order_relaxed);
 
          //     std::cerr << "   post alloc free list: ";
          //    print_free_list();
-         return {ffa, {ff}};
+         return {ffa, object_id(ff)};
       }
 
       void print_free_list()
@@ -118,7 +118,7 @@ namespace arbtrie
          std::cerr << "'"<<id<<"'";
          while (id)
          {
-            id = object_meta(get({id})).raw_loc();
+            id = object_meta(get(object_id(id))).raw_loc();
             if( id )
                std::cerr << ", " << id;
          }
@@ -135,7 +135,7 @@ namespace arbtrie
 
          auto& head_free_list = _idheader->_first_free;
          auto& next_free      = get(id);
-         auto  new_head       = object_meta(node_type::freelist, id.id).to_int();
+         auto  new_head       = object_meta(node_type::freelist, id.to_int()).to_int();
 
          uint64_t cur_head = _idheader->_first_free.load(std::memory_order_acquire);
          do
@@ -163,14 +163,14 @@ namespace arbtrie
       void grow(object_id id)
       {
          // optimistic...
-         if ( id.id <
+         if ( id.to_int()<
              _idheader->_end_id.load(std::memory_order_relaxed))
             return;
 
          void* ptr;
          {
             std::lock_guard l{_grow_mutex};
-            if (id.id < _idheader->_end_id.load())
+            if (id.to_int()< _idheader->_end_id.load())
                return;  // no need to grow, another thread grew first
 
             //      std::cerr << "growing obj id db\n";

@@ -27,25 +27,21 @@ namespace arbtrie
    {
       uint32_t checksum;
       uint32_t _ntype : 4;             // bytes allocated for this node
-      uint32_t _nsize : 28;            // bytes allocated for this node
+      uint32_t _nsize : 27;            // bytes allocated for this node
       uint64_t _num_branches : 9;      // number of branches that are set
-//      uint64_t _eof_branch : 1;        // does the node have a value on it
-      uint64_t _unused_pad : 5;        // does the node have a value on it
-      uint64_t _prefix_capacity : 10;  // number of bytes in up to 1024
-      uint64_t _node_id : 40;
+      uint64_t _branch_id_region: 16;   // the ID region branches from this node are allocated to
+      uint64_t _node_id : 40;          // the ID of this node
 
       inline node_header(uint32_t  size,
                          object_id nid,
                          node_type type       = node_type::freelist,
-                         uint16_t  num_branch = 0,
-                         uint8_t   prefix_cap = 0)
+                         uint16_t  num_branch = 0 )
           : checksum(0),
             _ntype(type),
             _nsize(size),
             _num_branches(num_branch),
-            _unused_pad(0),
-            _prefix_capacity(prefix_cap),
-            _node_id(nid.id)
+            _branch_id_region(0),
+            _node_id(nid.to_int())
       {
       }
 
@@ -68,13 +64,12 @@ namespace arbtrie
       //inline static T* make(uint32_t size, uint16_t num_branch, uint8_t prefix_len = 0);
 
       void set_type(node_type t) { _ntype = (int)t; }
-      void set_id(object_id i) { _node_id = i.id; }
+      void set_id(object_id i) { _node_id = i.to_int(); }
 
       uint32_t       size() const { return _nsize; }
       object_id      id() const { return object_id(_node_id); }
       node_type      get_type() const { return (node_type)_ntype; }
       uint16_t       num_branches() const { return _num_branches; }
-      uint16_t       prefix_capacity() const { return _prefix_capacity; }
       char*          body() { return (char*)(this + 1); }
       const char*    body() const { return (const char*)(this + 1); }
       char*          tail() { return ((char*)this) + _nsize; }

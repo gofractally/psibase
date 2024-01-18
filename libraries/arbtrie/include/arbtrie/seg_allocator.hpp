@@ -353,7 +353,7 @@ namespace arbtrie
                //  T*       operator->() { return as<T>(); }
                const T* operator->() const { return as<T>(); }
 
-               int64_t as_id() const { return _id.id; }
+               //int64_t as_id() const { return _id.id; }
 
                auto& get_mutex() const { return _rlock._session._sega._id_alloc.get_mutex(_id); }
 
@@ -944,8 +944,7 @@ namespace arbtrie
 
       assert(node_ptr->_nsize == size );
       assert(node_ptr->_ntype == type );
-      assert(node_ptr->_unused_pad == 0);
-      assert(node_ptr->_node_id == id.id);
+      assert(node_ptr->_node_id == id.to_int());
 
       // we can stomp on the data because it is impossible for the ref count to
       // increase while realloc and even if compactor moves the data from the
@@ -973,8 +972,7 @@ namespace arbtrie
 
       assert(node_ptr->_nsize == size );
       assert(node_ptr->_ntype == type );
-      assert(node_ptr->_unused_pad == 0);
-      assert(node_ptr->_node_id == id.id);
+      assert(node_ptr->_node_id == id.to_int());
       assert(object_ref(*this, id, atom).type() != node_type::undefined);
       return object_ref(*this, id, atom);
    }

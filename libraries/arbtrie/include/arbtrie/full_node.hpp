@@ -133,12 +133,14 @@ namespace arbtrie
                visitor(x);
       }
 
-      uint64_t _descendants : 54  = 0;
+      uint64_t _descendants : 44  = 0;
       uint64_t _prefix_trunc : 10 = 0;
+      uint64_t _prefix_capacity: 10 = 0;
 
       object_id _branches[max_branch_count];
       char      _prefix[];
 
+      uint16_t        prefix_capacity() const { return _prefix_capacity; }
       uint32_t calculate_checksum()const {
          return XXH3_64bits( ((const char*)this)+sizeof(checksum), 
                       _nsize - sizeof(checksum) );

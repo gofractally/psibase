@@ -113,7 +113,7 @@ namespace arbtrie
    node_handle write_session::set_root(node_handle r)
    {
       uint64_t old_r;
-      uint64_t new_r = r.id().id;
+      uint64_t new_r = r.id().to_int();
       { // lock scope
          std::unique_lock lock(_db._root_change_mutex);
          old_r = _db._dbm->top_root.exchange(new_r, std::memory_order_relaxed);
@@ -453,9 +453,9 @@ namespace arbtrie
       auto init_setlist = [&](setlist_node* sl)
       {
          assert(sl->_num_branches == 0);
-         assert(sl->_spare_capacity >= nbranch);
+         assert(sl->_spare_branch_capacity >= nbranch);
          sl->_num_branches = nbranch;
-         sl->_spare_capacity -= nbranch;
+         sl->_spare_branch_capacity -= nbranch;
 
          if (has_eof_value) [[unlikely]]
          {

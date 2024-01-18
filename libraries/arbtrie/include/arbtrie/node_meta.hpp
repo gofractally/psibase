@@ -120,13 +120,19 @@ namespace arbtrie
     */
    struct object_id
    {
-      uint64_t             id : 40 = 0;  // obj id
       explicit             operator bool() const { return id != 0; }
       friend bool          operator==(object_id a, object_id b) = default;
       friend std::ostream& operator<<(std::ostream& out, const object_id& oid)
       {
          return out << uint64_t(oid.id);
       }
+      constexpr object_id():id(0){}
+      explicit constexpr object_id( uint64_t i ):id(i){}
+      uint64_t to_int()const { return id; }
+      
+      void reset(){id=0;}
+      private:
+      uint64_t             id : 40 = 0;  // obj id
    } __attribute__((packed)) __attribute__((aligned(1)));
    static_assert(sizeof(object_id) == 5, "unexpected padding");
    static_assert(alignof(object_id) == 1, "unexpected alignment");
