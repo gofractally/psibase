@@ -783,13 +783,10 @@ namespace arbtrie
          // TODO: every call to ex.loc() does a mult by 16, could be replaced
          // by ex.raw_loc() compared to loc.offset >> 4
          if (not ex.is_copying())
-         {
-       //     std::cerr << "obj_ref::move atempting to move, but the copy bit was cleared\n";
-       //     std::cerr << "     is changing? " << ex.is_changing() <<"  ex.loc == expect? " << (ex.loc() == expect_loc) << " ref: " << ex.ref() <<"\n";
             return move_result::dirty;
-         }
-         if (ex.is_changing())
-            return move_result::dirty;
+         assert( not ex.is_changing() );
+         //if (ex.is_changing())
+         //   return move_result::dirty;
          if (ex.loc() != expect_loc)
             return move_result::moved;
          if (ex.ref() == 0)

@@ -7,11 +7,9 @@ add_library(arbtrie
     src/database.cpp
     src/mapping.cpp
     src/seg_allocator.cpp
-#    src/gc_queue.cpp
-#    src/ring_allocator.cpp
-#    src/region_allocator.cpp
-#    src/cache_allocator.cpp
+    src/id_alloc.cpp
             )
+
 target_include_directories(arbtrie PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
 target_link_libraries(arbtrie PUBLIC Threads::Threads)
 #target_compile_options(arbtrie PUBLIC -fsanitize=thread -g)

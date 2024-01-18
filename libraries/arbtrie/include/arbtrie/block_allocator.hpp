@@ -130,6 +130,51 @@ namespace arbtrie
          return _block_mapping[i]; 
       }
 
+      // ensures that at least the desired number of blocks are present
+      uint32_t reserve( uint32_t desired_num_blocks, bool memlock = false) {
+         if( desired_num_blocks > _max_blocks )
+            throw std::runtime_error( "unable to reserve, maximum block would be reached" );
+
+         std::lock_guard l{_resize_mutex};
+         if( num_blocks() >= desired_num_blocks ) 
+            return desired_num_blocks;
+
+         auto cur_num = num_blocks();
+         auto add_count = desired_num_blocks-cur_num;
+
+         auto new_size = _file_size + _block_size*add_count;
+         if (::ftruncate(_fd, new_size) < 0)
+         {
+            throw std::system_error(errno, std::generic_category());
+         }
+
+         auto prot = PROT_READ | PROT_WRITE;  
+         if (auto addr = ::mmap(nullptr, _block_size, prot, MAP_SHARED, _fd, _file_size);
+             addr != MAP_FAILED)
+         {
+            if( memlock ) {
+               if (::mlock(addr, new_size - _file_size)) {
+                  std::cerr << "WARNING: unable to mlock ID lookups\n";
+                  ::madvise(addr, new_size-_file_size, MADV_RANDOM);
+               }
+            }
+            char* ac = (char*)addr;
+            while( cur_num < desired_num_blocks ) {
+               _block_mapping[cur_num] = ac;
+               ++cur_num;
+               ac += _block_size;
+            }
+            _file_size = new_size;
+            return _num_blocks.fetch_add(add_count, std::memory_order_release)+add_count;
+         }
+         if (::ftruncate(_fd, _file_size) < 0)
+         {
+            throw std::system_error(errno, std::generic_category());
+         }
+         throw std::runtime_error("unable to mmap new block");
+      }
+
+
       id alloc()
       {
          std::lock_guard l{_resize_mutex};

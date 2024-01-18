@@ -5,30 +5,16 @@
 #include <string_view>
 #include <variant>
 #include <arbtrie/object_id.hpp>
+#include <arbtrie/config.hpp>
 
 namespace arbtrie
 {
 
-   // must be a power of 2
-   // size of the data segments data is allocated in
-   // the smaller this value, the more overhead there is in
-   // searching for segments to manage and the free list
-   // each thread will have a segment this size, so larger values
-   // may use more memory than necessary for idle threads
-   // max value: 4 GB due to type of segment_offset
-   static const uint64_t segment_size = 1024 * 1024 * 128;  // 256mb
 
    /// object pointers can only address 48 bits
    /// 128 TB limit on database size with 47 bits, this saves us
    /// 8MB of memory relative to 48 bits in cases with less than 128 TB
    static const uint64_t max_segment_count = (1ull << 47) / segment_size;
-
-   static const uint64_t binary_refactor_threshold = 4096;
-   static const uint64_t binary_node_max_size  = 4096;
-
-   // the number of branches at which an inner node is automatically
-   // upgraded to a full node
-   static const int full_node_threshold = 128;
 
    static const int max_branch_count = 257;
 

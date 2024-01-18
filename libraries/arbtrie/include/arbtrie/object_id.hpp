@@ -1,7 +1,8 @@
 #pragma once
+#include <cstdint>
+#include <iostream>
 
 namespace arbtrie {
-
 
    struct object_id;
 
@@ -18,12 +19,18 @@ namespace arbtrie {
    static_assert( sizeof(id_index) == 3 );
 
    struct id_address {
-      id_address( id_region r, id_index i ):region(r),index(i){}
+      id_address( id_region r, id_index i ):_region(r),_index(i){}
 
       id_address( object_id oid ); 
-      uint64_t to_int()const { return (uint64_t(region.region)<<24) | index.index; }
-      id_region region;
-      id_index  index;
+      uint64_t to_int()const { return (uint64_t(_region.region)<<24) | _index.index; }
+      uint16_t region()const { return _region.region; }
+      uint32_t index()const  { return _index.index; }
+      id_region _region;
+      id_index  _index;
+
+      friend std::ostream& operator  << ( std::ostream& out, id_address a) {
+         return out << a.region() <<"."<<a.index();
+      }
    }__attribute__((packed)) __attribute__((aligned(1)));
 
    inline id_address operator + ( id_region r, id_index i ) {
@@ -43,7 +50,7 @@ namespace arbtrie {
       friend bool          operator==(object_id a, object_id b) = default;
       friend std::ostream& operator<<(std::ostream& out, const object_id& oid)
       {
-         return out << uint64_t(oid.id);
+         return out << id_address(oid);
       }
       constexpr object_id():id(0){}
       explicit constexpr object_id( uint64_t i ):id(i){}
@@ -62,8 +69,8 @@ namespace arbtrie {
 
    inline id_address::id_address( object_id oid ) {
       auto i = oid.to_int();
-      index.index   = i & 0xffffff;
-      region.region = i >> 24;
+      _index.index   = i & 0xffffff;
+      _region.region = i >> 24;
    }
 
 } // namespace arbtrie
