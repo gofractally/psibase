@@ -4,6 +4,7 @@
 #include <optional>
 #include <string_view>
 #include <variant>
+#include <arbtrie/object_id.hpp>
 
 namespace arbtrie
 {
@@ -111,31 +112,6 @@ namespace arbtrie
       int flags;
    };
 
-   /**
-    *  An offset/8 from object_db_header::alloc_segments encoded
-    *  as 5 bytes. This allows addressing of 8TB worth of object IDs which
-    *  is way beyond what will fit in RAM of most computers, 32 bits would
-    *  have only supported 32GB of object IDs which clearly fits within the
-    *  RAM of many laptops. 
-    */
-   struct object_id
-   {
-      explicit             operator bool() const { return id != 0; }
-      friend bool          operator==(object_id a, object_id b) = default;
-      friend std::ostream& operator<<(std::ostream& out, const object_id& oid)
-      {
-         return out << uint64_t(oid.id);
-      }
-      constexpr object_id():id(0){}
-      explicit constexpr object_id( uint64_t i ):id(i){}
-      uint64_t to_int()const { return id; }
-      
-      void reset(){id=0;}
-      private:
-      uint64_t             id : 40 = 0;  // obj id
-   } __attribute__((packed)) __attribute__((aligned(1)));
-   static_assert(sizeof(object_id) == 5, "unexpected padding");
-   static_assert(alignof(object_id) == 1, "unexpected alignment");
 
 
 
