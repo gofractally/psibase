@@ -14,12 +14,12 @@ binaryen = "0.12"
 cargo_metadata = "0.15.0"
 clap = {version = "3.1", features = ["derive"]}
 console = "0.15.2"
-parity-wasm = {version = "0.45", features = ["bulk", "sign_ext", "simd"]}
 psibase = { version = "0.2.0", path = "../psibase" }
 regex = "1"
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 url = "2.3"
+walrus = "0.20.3"
 
 [build-dependencies]
 binaryen = "0.12"

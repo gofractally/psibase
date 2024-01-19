@@ -19,6 +19,7 @@ use tokio::io::AsyncBufReadExt;
 use url::Url;
 
 const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
+const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"];
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
@@ -215,6 +216,7 @@ async fn build(
         .arg("--target=wasm32-wasi")
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .arg("--color=always")
+        .args(SERVICE_ARGS_RUSTC)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;

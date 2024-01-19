@@ -1,234 +1,28 @@
 use anyhow::anyhow;
-use parity_wasm::deserialize_buffer;
-use parity_wasm::elements::{
-    External, Func, FuncBody, ImportEntry, Instruction, Internal, Section, TableElementType, Type,
-};
-use std::collections::HashMap;
-use std::path::Path;
+use walrus::{FunctionId, ir::Instr, Module, TypeId, FunctionBuilder};
 
-#[derive(Clone, Hash, PartialEq, Eq, Debug)]
-struct ImportFunction {
-    module: String,
-    field: String,
-    ty: Type,
-}
-
-#[derive(Clone, Debug)]
-enum OldToNewFn {
-    Fn {
-        ty: Type,
-        body: FuncBody,
-        new_index: usize,
-    },
-    Import(ImportFunction),
-    ResolvedImport(usize),
-}
-
-fn get_imported_functions(
-    module: &parity_wasm::elements::Module,
-    types: &[Type],
-) -> Vec<ImportFunction> {
-    module
-        .import_section()
-        .unwrap()
-        .entries()
-        .iter()
-        .filter_map(|entry| {
-            if let External::Function(ty) = entry.external() {
-                Some(ImportFunction {
-                    module: entry.module().to_owned(),
-                    field: entry.field().to_owned(),
-                    ty: types[*ty as usize].clone(),
-                })
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-fn mark_type(new_types: &mut Vec<Type>, type_map: &mut HashMap<Type, usize>, ty: &Type) {
-    if !type_map.contains_key(ty) {
-        type_map.insert(ty.clone(), new_types.len());
-        new_types.push(ty.clone());
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn mark_function(
-    module: &parity_wasm::elements::Module,
-    imported_fns: &[ImportFunction],
-    num_new_functions: &mut usize,
-    old_to_new_fn: &mut Vec<Option<OldToNewFn>>,
-    old_types: &Vec<Type>,
-    new_types: &mut Vec<Type>,
-    type_map: &mut HashMap<Type, usize>,
-    index: usize,
-) -> Result<(), anyhow::Error> {
-    if old_to_new_fn[index].is_some() {
-        return Ok(());
-    }
-    if index < imported_fns.len() {
-        old_to_new_fn[index] = Some(OldToNewFn::Import(imported_fns[index].clone()));
-        mark_type(new_types, type_map, &imported_fns[index].ty);
-    } else {
-        let adj_index = index - imported_fns.len();
-        let functions = module.function_section().unwrap().entries();
-        let code = module.code_section().unwrap().bodies();
-        if adj_index >= functions.len() || adj_index >= code.len() {
-            return Err(anyhow!("Function index out of bounds"));
-        }
-        let ty = &old_types[functions[adj_index].type_ref() as usize];
-        let body = &code[adj_index];
-
-        old_to_new_fn[index] = Some(OldToNewFn::Fn {
-            ty: ty.clone(),
-            body: body.clone(),
-            new_index: *num_new_functions,
-        });
-        *num_new_functions += 1;
-
-        mark_type(new_types, type_map, ty);
-        for instruction in body.code().elements() {
-            if let Instruction::Call(index) = instruction {
-                mark_function(
-                    module,
-                    imported_fns,
-                    num_new_functions,
-                    old_to_new_fn,
-                    old_types,
-                    new_types,
-                    type_map,
-                    *index as usize,
-                )?
-            }
-        }
-    }
-    Ok(())
-}
-
-fn mark_functions(
-    module: &parity_wasm::elements::Module,
-    imported_fns: &[ImportFunction],
-    num_new_functions: &mut usize,
-    old_to_new_fn: &mut Vec<Option<OldToNewFn>>,
-    old_types: &Vec<Type>,
-    new_types: &mut Vec<Type>,
-    type_map: &mut HashMap<Type, usize>,
-) -> Result<(), anyhow::Error> {
-    for entry in module.export_section().unwrap().entries() {
-        if let Internal::Function(index) = entry.internal() {
-            mark_function(
-                module,
-                imported_fns,
-                num_new_functions,
-                old_to_new_fn,
-                old_types,
-                new_types,
-                type_map,
-                *index as usize,
-            )?;
-        }
-    }
-
-    if let Some(element) = module.elements_section() {
-        if let Some(table) = module.table_section() {
-            for entry in element.entries() {
-                if entry.index() as usize >= table.entries().len() {
-                    return Err(anyhow!("Element references missing table"));
-                }
-                if table.entries()[entry.index() as usize].elem_type() != TableElementType::AnyFunc
-                {
-                    return Err(anyhow!("Unsupported table type"));
-                }
-                for member in entry.members() {
-                    mark_function(
-                        module,
-                        imported_fns,
-                        num_new_functions,
-                        old_to_new_fn,
-                        old_types,
-                        new_types,
-                        type_map,
-                        *member as usize,
-                    )?;
-                }
-            }
-        } else {
-            return Err(anyhow!("Element references missing table"));
-        }
-    }
-    Ok(())
-}
-
-fn fill_functions(
-    is_poly: bool,
-    old_types: &[Type],
-    type_map: &HashMap<Type, usize>,
-    old_to_new_fn: &[Option<OldToNewFn>],
-    new_imports: &[ImportEntry],
-    new_functions: &mut [Option<Func>],
-    new_bodies: &mut [Option<FuncBody>],
-) -> Result<(), anyhow::Error> {
-    for item in old_to_new_fn.iter().flatten() {
-        if let OldToNewFn::Fn {
-            ty,
-            body,
-            new_index,
-        } = item
-        {
-            new_functions[*new_index] = Some(Func::new(*type_map.get(ty).unwrap() as u32));
-            let mut body = body.clone();
-            for instr in body.code_mut().elements_mut() {
-                match instr {
-                    Instruction::Call(f) => match old_to_new_fn[*f as usize].as_ref().unwrap() {
-                        OldToNewFn::Fn {
-                            ty: _,
-                            body: _,
-                            new_index,
-                        } => *f = (new_imports.len() + new_index) as u32,
-                        OldToNewFn::Import(_) => panic!("unresolved import"),
-                        OldToNewFn::ResolvedImport(i) => *f = *i as u32,
-                    },
-                    Instruction::CallIndirect(ty, _) => {
-                        if is_poly {
-                            return Err(anyhow!("polyfill has an indirect call"));
-                        }
-                        *ty = *type_map.get(&old_types[*ty as usize]).unwrap() as u32;
-                    }
-                    Instruction::GetGlobal(_) => {
-                        if is_poly {
-                            return Err(anyhow!("polyfill uses a global"));
-                        }
-                    }
-                    Instruction::SetGlobal(_) => {
-                        if is_poly {
-                            return Err(anyhow!("polyfill uses a global"));
-                        }
-                    }
-                    _ => (),
-                }
-            }
-            new_bodies[*new_index] = Some(body);
-        }
-    }
-    Ok(())
-}
-
-// Link polyfill to code and strip out unused functions
-pub fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    let poly: parity_wasm::elements::Module = deserialize_buffer(polyfill)
-        .map_err(|e| anyhow!("Parity-wasm failed to parse polyfill: {}", e))?;
-    
-    if poly.table_section().is_some()
-        || poly.start_section().is_some()
-        || poly.elements_section().is_some()
-        || poly.data_section().is_some()
+/// The polyfill module must not have the following sections, since they require 
+/// relocatable wasms to merge:
+/// * Tables
+/// * Start
+/// * Elements
+/// * Data
+/// 
+/// The polyfill must include the following sections:
+/// * Types
+/// * Imports
+/// * Functions
+/// * Exports
+/// 
+/// Any local functions in the polyfill must have >0 instructions
+fn validate_polyfill(polyfill: &walrus::Module) -> Result<(), anyhow::Error> {
+    if polyfill.tables.iter().next().is_some()
+        || polyfill.start.is_some()
+        || polyfill.elements.iter().next().is_some()
+        || polyfill.data.iter().next().is_some()
     {
-        // These sections are unsupported in the polyfill since they
-        // would require relocatable wasms to merge. Rust uses lld,
-        // which currently errors out when attempting to produce
-        // relocatable wasms. If it could produce relocatable wasms,
+        // Rust uses lld, which currently errors out when attempting to 
+        // produce relocatable wasms. If it could produce relocatable wasms,
         // there is an alternative solution to writing this custom
         // linker: feed lld's output, along with the polyfill, back
         // into lld, after repairing names which unfortunately vary
@@ -244,221 +38,280 @@ pub fn link(filename: &Path, code: &[u8], polyfill: &[u8]) -> Result<Vec<u8>, an
         // wasm-gc does it, but its repo is archived.
         return Err(anyhow!("Polyfill has unexpected section"));
     }
-    if poly.type_section().is_none()
-        || poly.import_section().is_none()
-        || poly.function_section().is_none()
-        || poly.code_section().is_none()
-        || poly.export_section().is_none()
+    if polyfill.types.iter().next().is_none()
+        || polyfill.imports.iter().next().is_none()
+        || polyfill.funcs.iter().next().is_none()
+        || polyfill.funcs.iter_local().any(|(_, local_function)| local_function.size() == 0) 
+        || polyfill.exports.iter().next().is_none()
     {
         return Err(anyhow!("Polyfill has missing section"));
     }
 
-    let poly_old_types = poly.type_section().unwrap().types().to_owned();
-    let poly_imported_fns = get_imported_functions(&poly, &poly_old_types);
-    let poly_functions = poly.function_section().unwrap().entries();
-    let poly_exports = poly.export_section().unwrap().entries();
-    let poly_num_functions = poly_imported_fns.len() + poly_functions.len();
+    Ok(())
+}
 
-    let mut module: parity_wasm::elements::Module = deserialize_buffer(code)
-        .map_err(|_| anyhow!("Parity-wasm failed to parse {}", filename.to_string_lossy()))?;
-    if module.start_section().is_some() {
-        return Err(anyhow!(
-            "{} has unsupported start section",
-            filename.to_string_lossy()
-        ))?;
+/// The module is not a supported target for polyfilling if it has the following:
+/// * A start module
+fn validate_fill_target(module: &walrus::Module) -> Result<(), anyhow::Error> {
+    if module.start.is_some() {
+        return Err(anyhow!("Target module has unsupported section: start"))?;
     }
-    if module.type_section().is_none()
-        || module.import_section().is_none()
-        || module.function_section().is_none()
-        || module.code_section().is_none()
-        || module.export_section().is_none()
-        || !module
-            .export_section()
-            .unwrap()
-            .entries()
-            .iter()
-            .any(|e| matches!(e.internal(), Internal::Function(_)))
-    {
-        return Ok(code.to_owned());
+    Ok(())
+}
+
+/// A module is not a candidate for polyfilling if it has any of the following:
+/// * No types
+/// * No imports
+/// * No functions
+/// * No function bodies
+/// * No exports
+/// * No function exports
+fn should_polyfill(module : &walrus::Module) -> bool {
+    if module.types.iter().next().is_none()
+        || module.imports.iter().next().is_none()
+        || module.funcs.iter().next().is_none()
+        || module.funcs.iter_local().all(|f| f.1.size() == 0) 
+        || module.exports.iter().next().is_none()
+        || !module.funcs.iter().any(|f| module.exports.get_exported_func(f.id()).is_some()) {
+        return false;
     }
+    true
+}
 
-    let old_types = module.type_section().unwrap().types().to_owned();
-    let imported_fns = get_imported_functions(&module, &old_types);
-    let num_functions = imported_fns.len() + module.function_section().unwrap().entries().len();
+/// Matches imported functions in a destination module to exported functions in a source module
+struct PolyfillTarget {
+    source_fid : FunctionId,
+    dest_fid : FunctionId,
+}
 
-    let mut num_new_functions = 0;
-    let mut new_types = Vec::new();
-    let mut old_to_new_fn = vec![None; num_functions];
-    let mut type_map = HashMap::new();
-    mark_functions(
-        &module,
-        &imported_fns,
-        &mut num_new_functions,
-        &mut old_to_new_fn,
-        &old_types,
-        &mut new_types,
-        &mut type_map,
-    )?;
+/// Confirms that the parameters and results are the same given two type IDs and their 
+/// corresponding modules.
+fn same_signature(tid1 : &TypeId, m1 : &Module, tid2 : &TypeId, m2 : &Module) -> bool {
+    let t1 = m1.types.get(*tid1);
+    let t2 = m2.types.get(*tid2);
+    
+    return t1.params() == t2.params() 
+        && t1.results() == t2.results();
+}
 
-    let mut poly_old_to_new_fn = vec![None; poly_num_functions];
-    for item in old_to_new_fn.iter_mut().flatten() {
-        if let OldToNewFn::Import(import) = item {
-            if import.module == "wasi_snapshot_preview1" {
-                for export in poly_exports.iter() {
-                    if export.field() == import.field {
-                        if let Internal::Function(export_fn) = export.internal() {
-                            mark_function(
-                                &poly,
-                                &poly_imported_fns,
-                                &mut num_new_functions,
-                                &mut poly_old_to_new_fn,
-                                &poly_old_types,
-                                &mut new_types,
-                                &mut type_map,
-                                *export_fn as usize,
-                            )?;
-                            let new_item = poly_old_to_new_fn[*export_fn as usize].clone().unwrap();
-                            let new_ty = match &new_item {
-                                OldToNewFn::Fn {
-                                    ty,
-                                    body: _,
-                                    new_index: _,
-                                } => ty,
-                                OldToNewFn::Import(f) => &f.ty,
-                                OldToNewFn::ResolvedImport(_) => unimplemented!(),
-                            };
-                            if new_ty != &import.ty {
-                                return Err(anyhow!(
-                                    "mismatched polyfill type; {} {:?} {:?}",
-                                    import.field,
-                                    import.ty,
-                                    new_ty
-                                ));
-                            }
-                            *item = new_item;
-                            break;
+/// Returns a list of function IDs exported from the `source` module mapped to the 
+/// corresponding function IDs imported in the `dest` module.
+/// 
+/// Only functions that are actually imported in the `dest` module will be considered for polyfilling. 
+/// This function also checks that the signature of the replacement function matches the signature of 
+/// the imported function.
+fn get_polyfill_targets(source: &walrus::Module, dest: &walrus::Module) -> Result<Option<Vec<PolyfillTarget>>, anyhow::Error> {
+    
+    let targets : Vec<PolyfillTarget> = dest.imports.iter().filter_map(|import| {
+        let name = &import.name;
+        
+        // If the import is a function, get it
+        let dest_func = match import.kind {
+            walrus::ImportKind::Function(import_fid) => dest.funcs.get(import_fid),
+            _ => return None,
+        };
+
+        // Get the corresponding export function
+        let source_func = match source.exports.get_func(name) {
+            // Match guard ensures the export function has a local definition
+            Ok(exp_fid) if matches!(source.funcs.get(exp_fid).kind, walrus::FunctionKind::Local(_)) => source.funcs.get(exp_fid),
+            _ => return None,
+        };
+
+        // Check that the signatures match
+        assert!(same_signature(&dest_func.ty(), dest, &source_func.ty(), source), 
+            "Destination import {} matches source export by name but not by type.", name);
+        // Todo - this should more gracefully handle the error, rather than panic
+
+        Some(PolyfillTarget{
+            source_fid: source_func.id(),
+            dest_fid: dest_func.id(),
+        })
+    }).collect();
+
+    return Ok(Some(targets));
+}
+
+/// Gets the instructions of the local `fid` function from the specified module.
+fn get_instructions(fid : FunctionId, module: & mut walrus::Module) -> Result<Vec<Instr>, anyhow::Error> {
+    let func = module.funcs.get_mut(fid);
+    
+    if let walrus::FunctionKind::Local(local_func) = &mut func.kind {
+        let instructions = local_func.builder_mut().func_body().instrs().iter().map(|(i, _)| i.clone()).collect();
+        return Ok(instructions);
+    }
+    return Err(anyhow!("No instructions found for requested local function"));
+}
+
+/// Validates an instruction.
+/// An instruction is valid if it is not of type: `CallIndirect`, `GlobalGet`, or `GlobalSet`.
+fn validate_instruction(instr : &Instr) -> Result<(), anyhow::Error> {
+    match &instr {
+        Instr::CallIndirect(_) => {
+            return Err(anyhow!("Error: Polyfill module is not allowed to use an indirect call."));
+        }
+        Instr::GlobalGet(_) => {
+            return Err(anyhow!("Error: Polyfill module is not allowed to get a global."));    
+        }
+        Instr::GlobalSet(_) => {
+            return Err(anyhow!("Error: Polyfill module is not allowed to set a global."));
+        }
+        _ => {
+            return Ok(());
+        }
+    }
+}
+
+/// Calls `validate_instruction` on each instruction in `instrs`.
+fn validate_instructions(instrs : &Vec<Instr>) -> Result<(), anyhow::Error> {
+    for instr in instrs {
+        validate_instruction(&instr)?;
+    }
+    Ok(())
+}
+
+/// Gets the FunctionID if it exists for a function in a `wasm_module` based on a function `name`
+/// and `function_module`.
+/// If the function does not exist, an empty optional will be returned.
+fn get_import_fid(name : &String, function_module : &String, wasm_module : &Module) -> Result<Option<FunctionId>, anyhow::Error> {
+    
+    if let Some(imp_func) = wasm_module.imports.iter().find(|&i|{
+        return &i.name == name && &i.module == function_module;
+    }) {
+        match imp_func.kind {
+            walrus::ImportKind::Function(dest_fid) => {
+                return Ok(Some(dest_fid)); 
+            },
+            _ => {
+                return Err(anyhow!("Import kind mismatch"));
+            }
+
+        }
+        
+    } else {
+        Ok(None)
+    }
+}
+
+/// This is a recursive function that ensures that all call instructions refer 
+/// to valid functions in the `dest` module.
+/// 
+/// If a call instruction refers to an import in the `source` module, the `dest`
+/// module will contain the same import. If a call instruction refers to a local
+/// function in the `source` module, the `dest` module will contain the same 
+/// local function.
+fn add_missing_calls(instrs : &mut Vec<Instr>, source : &mut Module, dest : &mut Module ) -> Result<(), anyhow::Error> {
+    
+    validate_instructions(instrs)?;
+
+    // Check for calls within these instructions
+    // If there are call instructions, they must reference either imported or local functions.
+    for i in instrs {
+        match i {
+            Instr::Call(call) => {           
+                let called_fid = call.func;
+                
+                if let Some(import) = source.imports.get_imported_func(called_fid) {
+                    // Call is to an imported function
+                    
+                    let import_ty = &source.funcs.get(called_fid).ty();
+                    if let Some(import_fid) = get_import_fid(&import.name, &import.module, &dest)? {
+                        // The same import already exists in dest. Update the called fid.
+                        if !same_signature(&dest.funcs.get(import_fid).ty(), dest, import_ty, source) {
+                            return Err(anyhow!("Type mismatch between imports"));
                         }
+                        call.func = import_fid;
+                        
+                    } else {
+                        // The import needs to be added to the dest. Update the called fid.
+                        call.func = dest.add_import_func(&import.module, &import.name, import_ty.clone()).0;
+                    }                    
+                    
+                } else {
+                    // Call is to a local function
+
+                    // Build the new local function declaration
+                    let local_function = source.funcs.get(called_fid);
+                    let local_func_type = source.types.get(local_function.ty());
+                    let mut builder = FunctionBuilder::new(&mut dest.types, local_func_type.params(), local_func_type.results());
+
+                    // Get the instructions from the `source` module, and update the instructions to 
+                    // ensure they are valid
+                    let mut called_instrs = get_instructions(called_fid, source)?;
+                    add_missing_calls(&mut called_instrs, source, dest)?;
+                    
+                    // Copy the (valid) instructions into the new function
+                    for called_instr in called_instrs {
+                        builder.func_body().instr(called_instr);
                     }
+
+                    // Save the function into `funcs` section of the `dest` module.
+                    dest.funcs.add_local(builder.local_func(Vec::new()));
                 }
             }
+            _ =>
+             { /* No-op when the instruction is anything other than a call */ }
         }
-    }
+    }    
 
-    let mut new_imports = Vec::new();
-    let mut import_map = HashMap::new();
-    for item in old_to_new_fn
-        .iter_mut()
-        .chain(poly_old_to_new_fn.iter_mut())
-        .flatten()
-    {
-        if let OldToNewFn::Import(import) = item {
-            if let Some(index) = import_map.get(import) {
-                *item = OldToNewFn::ResolvedImport(*index);
-            } else {
-                import_map.insert(import.clone(), new_imports.len());
-                new_imports.push(ImportEntry::new(
-                    import.module.clone(),
-                    import.field.clone(),
-                    External::Function(*type_map.get(&import.ty).unwrap() as u32),
-                ));
-                *item = OldToNewFn::ResolvedImport(new_imports.len() - 1);
+    Ok(())
+}
+
+
+/// Replaces the imported function `dest_fid` in the `dest` module with a new (and valid) 
+/// local function.
+/// 
+/// The instructions in the new local function are copied from the `source_fid` function 
+/// in the `source` module. 
+fn fill(source_fid : FunctionId, source : &mut Module, dest_fid : FunctionId, dest : &mut Module) -> Result<(), anyhow::Error>
+{
+    let mut instrs = get_instructions(source_fid, source)?;
+
+    add_missing_calls(&mut instrs, source, dest)?;
+
+    dest.replace_imported_func(dest_fid, |(body, _)| {
+        for instr in instrs {
+            body.instr(instr);
+        }
+    })?;
+    
+    Ok(())
+}
+
+/// Link polyfill module (source) to code module (dest) and strip out unused functions
+pub fn link(dest: &[u8], source: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+    
+    let mut source_module = Module::from_buffer(source)?;
+    let mut dest_module = Module::from_buffer(dest)?;
+        
+    validate_polyfill(&source_module)?;
+    validate_fill_target(&dest_module)?;
+    
+    if should_polyfill(&dest_module) {
+        if let Some(targets) = get_polyfill_targets(&source_module, &dest_module)? 
+        {
+            for target in targets {
+                fill(target.source_fid, &mut source_module, target.dest_fid, &mut dest_module)?;
             }
         }
     }
 
-    let mut new_functions = vec![None; num_new_functions];
-    let mut new_bodies = vec![None; num_new_functions];
-    fill_functions(
-        false,
-        &old_types,
-        &type_map,
-        &old_to_new_fn,
-        &new_imports,
-        &mut new_functions,
-        &mut new_bodies,
-    )?;
-    fill_functions(
-        true,
-        &poly_old_types,
-        &type_map,
-        &poly_old_to_new_fn,
-        &new_imports,
-        &mut new_functions,
-        &mut new_bodies,
-    )?;
+    walrus::passes::gc::run(&mut dest_module);
 
-    // for (i, item) in old_to_new_fn.iter().enumerate() {
-    //     if let Some(item) = item {
-    //         match item {
-    //             OldToNewFn::Fn {
-    //                 ty: _,
-    //                 body: _,
-    //                 new_index,
-    //             } => println!("func {} -> {}", i, new_imports.len() + new_index),
-    //             OldToNewFn::Import(_) => todo!(),
-    //             OldToNewFn::ResolvedImport(f) => println!("imp  {} -> {}", i, f),
-    //         }
-    //     }
-    // }
+    Ok(dest_module.emit_wasm())
 
-    // Remove all custom sections; psibase doesn't need them
-    // and this is easier than translating them.
-    //
-    // TODO: need an option to to support debugging.
-    //       * Don't trim out or reorder functions, since
-    //         editing DWARF is a PITA
-    //       * Leave custom sections as-is
-    //       * Might also need to skip binaryen
-    let sections = module.sections_mut();
-    *sections = sections
-        .drain(..)
-        .filter(|s| !matches!(s, Section::Custom(_)))
-        .collect();
 
-    for entry in module.export_section_mut().unwrap().entries_mut() {
-        if let Internal::Function(f) = entry.internal_mut() {
-            *f = match old_to_new_fn[*f as usize].as_ref().unwrap() {
-                OldToNewFn::Fn {
-                    ty: _,
-                    body: _,
-                    new_index,
-                } => (new_imports.len() + new_index) as u32,
-                OldToNewFn::Import(_) => panic!("unresolved import"),
-                OldToNewFn::ResolvedImport(i) => *i as u32,
-            };
-        }
-    }
-
-    for entry in module.elements_section_mut().unwrap().entries_mut() {
-        for member in entry.members_mut() {
-            *member = match old_to_new_fn[*member as usize].as_ref().unwrap() {
-                OldToNewFn::Fn {
-                    ty: _,
-                    body: _,
-                    new_index,
-                } => (new_imports.len() + new_index) as u32,
-                OldToNewFn::Import(_) => panic!("unresolved import"),
-                OldToNewFn::ResolvedImport(i) => *i as u32,
-            };
-        }
-    }
-
-    new_imports.extend(
-        module
-            .import_section()
-            .unwrap()
-            .entries()
-            .iter()
-            .filter(|e| !matches!(e.external(), External::Function(_)))
-            .cloned(),
-    );
-
-    *module.type_section_mut().unwrap().types_mut() = new_types;
-    *module.import_section_mut().unwrap().entries_mut() = new_imports;
-    *module.function_section_mut().unwrap().entries_mut() =
-        new_functions.into_iter().map(|f| f.unwrap()).collect();
-    *module.code_section_mut().unwrap().bodies_mut() =
-        new_bodies.into_iter().map(|f| f.unwrap()).collect();
-
-    Ok(module.into_bytes()?)
+    // // Remove all custom sections; psibase doesn't need them
+    // // and this is easier than translating them.
+    // //
+    // // TODO: need an option to to support debugging.
+    // //       * Don't trim out or reorder functions, since
+    // //         editing DWARF is a PITA
+    // //       * Leave custom sections as-is
+    // //       * Might also need to skip binaryen
+    // let sections = module.sections_mut();
+    // *sections = sections
+    //     .drain(..)
+    //     .filter(|s| !matches!(s, Section::Custom(_)))
+    //     .collect();
 }

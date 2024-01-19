@@ -33,12 +33,13 @@ fn main() {
 
         let target_dir = out_dir.clone() + "/" + name + "-target";
         if !Command::new(&cargo)
-            .args(["build"])
+            .args(["rustc"])
             .args(["--color", "always"])
             .args(["--target", "wasm32-wasi"])
             .args(["--target-dir", &target_dir])
             .args(["--manifest-path", &(package_dir + "/Cargo.toml")])
             .args(["--release"])
+            .args(["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"])
             .status()
             .unwrap()
             .success()
