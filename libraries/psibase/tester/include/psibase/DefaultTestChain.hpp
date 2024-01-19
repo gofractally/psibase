@@ -10,6 +10,7 @@ namespace psibase
    class DefaultTestChain : public TestChain
    {
      public:
+      DefaultTestChain(std::span<const std::string> packageNames);
       DefaultTestChain(
           const std::vector<std::pair<AccountNumber, const char*>>& additionalServices = {},
           uint64_t                                                  hot_bytes          = 1ull << 27,

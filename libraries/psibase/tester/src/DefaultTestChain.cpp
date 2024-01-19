@@ -1,5 +1,6 @@
 #include <psibase/DefaultTestChain.hpp>
 
+#include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <services/system/AccountSys.hpp>
 #include <services/system/AuthAnySys.hpp>
@@ -31,6 +32,124 @@
 using namespace psibase;
 using namespace SystemService;
 using namespace UserService;
+
+namespace
+{
+
+   void pushGenesisTransaction(DefaultTestChain& chain, std::span<PackagedService> service_packages)
+   {
+      std::vector<GenesisService> services;
+      for (auto& s : service_packages)
+      {
+         s.genesis(services);
+      }
+
+      auto trace = chain.pushTransaction(  //
+          chain.makeTransaction(           //
+              {                            //
+               // TODO: set sender,service,method in a way that's helpful to block explorers
+               Action{.sender  = AccountNumber{"foo"},  // ignored
+                      .service = AccountNumber{"bar"},  // ignored
+                      .method  = {},
+                      .rawData = psio::convert_to_frac(
+                          GenesisActionData{.services = std::move(services)})}}),
+          {});
+
+      check(psibase::show(false, trace) == "", "Failed to deploy genesis services");
+   }
+
+   std::vector<Action> getInitialActions(std::span<PackagedService> service_packages,
+                                         bool                       installUI)
+   {
+      transactor<AccountSys>     asys{AccountSys::service, AccountSys::service};
+      transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
+      std::vector<Action>        actions;
+      bool                       has_package_sys = true;
+      for (auto& s : service_packages)
+      {
+         for (auto account : s.accounts())
+         {
+            if (!s.hasService(account))
+            {
+               actions.push_back(asys.newAccount(account, AuthAnySys::service, true));
+            }
+         }
+
+         if (installUI)
+         {
+            s.regServer(actions);
+            s.storeData(actions);
+         }
+
+         s.postinstall(actions);
+      }
+
+      transactor<ProducerSys> psys{ProducerSys::service, ProducerSys::service};
+      std::vector<Producer>   producerConfig = {{"firstproducer"_a, {}}};
+      actions.push_back(psys.setProducers(producerConfig));
+
+      if (has_package_sys)
+      {
+         for (auto& s : service_packages)
+         {
+            s.commitInstall(actions);
+         }
+      }
+
+      actions.push_back(tsys.finishBoot());
+
+      return actions;
+   }
+
+   std::vector<SignedTransaction> makeTransactions(TestChain& chain, std::vector<Action>&& actions)
+   {
+      std::vector<SignedTransaction> result;
+      std::vector<Action>            group;
+      std::size_t                    size = 0;
+      for (auto& act : actions)
+      {
+         size += act.rawData.size();
+         group.push_back(std::move(act));
+         if (size >= 1024 * 1024)
+         {
+            result.push_back(SignedTransaction{chain.makeTransaction(std::move(group))});
+            size = 0;
+         }
+      }
+      if (!group.empty())
+      {
+         result.push_back(SignedTransaction{chain.makeTransaction(std::move(group))});
+      }
+      return result;
+   }
+}  // namespace
+
+DefaultTestChain::DefaultTestChain(std::span<const std::string> names)
+{
+   auto packages = DirectoryRegistry("share/psibase/packages").resolve(names);
+   setAutoBlockStart(false);
+   startBlock();
+   pushGenesisTransaction(*this, packages);
+   auto transactions = makeTransactions(*this, getInitialActions(packages, true));
+   std::vector<Checksum256> transactionIds;
+   for (const auto& trx : transactions)
+   {
+      transactionIds.push_back(sha256(trx.transaction.data(), trx.transaction.size()));
+   }
+   auto trace = pushTransaction(
+       makeTransaction(
+           {transactor<TransactionSys>{TransactionSys::service, TransactionSys::service}.startBoot(
+               transactionIds)}),
+       {});
+   check(psibase::show(false, trace) == "", "Failed to boot");
+   startBlock();
+   setAutoBlockStart(true);
+   for (const auto& trx : transactions)
+   {
+      auto trace = pushTransaction(trx);
+      check(psibase::show(false, trace) == "", "Failed to boot");
+   }
+}
 
 DefaultTestChain::DefaultTestChain(
     const std::vector<std::pair<AccountNumber, const char*>>& additionalServices,
