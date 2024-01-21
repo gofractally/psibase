@@ -739,8 +739,8 @@ namespace arbtrie
       }
       else  // key does not share the same prefix!
       {
-         TRIEDENT_DEBUG("KEY DOESN'T SHARE PREFIX  node prelen: ", rootpre.size(),
-                        "  cprelen: ", cpre.size());
+ //        TRIEDENT_DEBUG("KEY DOESN'T SHARE PREFIX  node prelen: ", rootpre.size(),
+  //                      "  cprelen: ", cpre.size());
        //  TRIEDENT_WARN( "root prefix: ", to_hex( rootpre ) );
        //  TRIEDENT_WARN( "insert: ", to_hex(key) );
          // Example Transformation:
@@ -779,20 +779,22 @@ namespace arbtrie
       //      TRIEDENT_DEBUG("r prefix: '", to_hex(rootpre), "' becomes: '",
        //                    to_hex(rootpre.substr(cpre.size() + 1)), "'  cpre: '", to_hex(cpre),
        //                    "'");
-            r.modify().as<NodeType>()->set_prefix(rootpre.substr(cpre.size() + 1));
+            //r.modify().as<NodeType>()->set_prefix(rootpre.substr(cpre.size() + 1));
+            //child_id = r.address();
         //    TRIEDENT_WARN( "after setpre: '", to_hex(r.as<NodeType>()->get_prefix()),"'" );
-            child_id = r.address();
             //     TRIEDENT_DEBUG( " moving root to child inplace: addr: ", child_id );
+            
             /*
+            */
             auto [meta, new_addr] = state.get_new_meta_node( new_reg );
-            r.modify().as<setlist_node>( [&]( setlist_node* n ) {
-                meta.set_location( r.loc() );
+            r.modify().as<NodeType>( [&]( auto* n ) {
+                meta.store( r.meta_data(), std::memory_order_relaxed );
                 n->set_prefix(rootpre.substr(cpre.size() + 1));
                 n->set_address( new_addr );
             });
             state.free_meta_node(r.address()); 
             child_id = new_addr;
-            */
+            
          }
          else  // shared state
          {
@@ -830,7 +832,7 @@ namespace arbtrie
                        [&](setlist_node* sln)
                        {
                           //TRIEDENT_WARN( "THE CHILD ID REGION INSTEAD OF NEW?");
-                          sln->set_branch_region(state.get_new_region());
+                          sln->set_branch_region(new_reg);
                           // TODO:
                           //      abx needs to be in this new region
                           //sln->set_branch_region( child_id.region() );

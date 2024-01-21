@@ -369,8 +369,8 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 2;
-         const int                  count  = 100000;
+         const int                  rounds = 3;
+         const int                  count  = 1'000'000;
 
          auto iterate_all = [&]()
          {
@@ -454,6 +454,7 @@ int  main(int argc, char** argv)
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
          iterate_all();
+         validate_invariant( l, r.id() );
          auto start_big_end = seq3;
          std::cerr << "insert big endian seq\n";
          for (int ro = 0; true and ro < rounds; ++ro)
@@ -493,6 +494,7 @@ int  main(int argc, char** argv)
          }
          //print_pre(l, r.id(), "");
          iterate_all();
+         validate_invariant( l, r.id() );
 
          uint64_t seq4 = -1;
          std::cerr << "insert big endian rev seq\n";
@@ -534,6 +536,7 @@ int  main(int argc, char** argv)
          //auto l = ws._segas.lock();
          //print_pre(l, r.id(), "");
          iterate_all();
+         validate_invariant( l, r.id() );
 
          std::cerr << "insert to_string(rand) \n";
          for (int ro = 0; true and ro < rounds; ++ro)
@@ -556,6 +559,7 @@ int  main(int argc, char** argv)
                       << " rand str insert/sec  total items: " << add_comma(seq) << "\n";
          }
          iterate_all();
+         validate_invariant( l, r.id() );
          std::cerr << "get known key little endian seq\n";
          uint64_t seq2 = 0;
          for (int ro = 0; true and ro < rounds; ++ro)

@@ -306,6 +306,8 @@ namespace arbtrie
 
                //object_ref clone(const T* v) const { return rlock().clone(v); }
 
+               temp_meta_type meta_data() { return _cached; }
+
               protected:
                friend class seg_allocator;
                friend class seg_allocator::session;
