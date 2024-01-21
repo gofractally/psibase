@@ -8,20 +8,31 @@ namespace arbtrie {
 
    struct id_region {
       id_region( uint16_t r = 0 ):region(r){}
+      uint16_t to_int()const{ return region; }
       uint16_t region;
+      friend bool operator == ( id_region a, id_region b ) = default;
+
+      friend std::ostream& operator  << ( std::ostream& out, id_region r) {
+         return out << r.region;
+      }
    } __attribute__((aligned(1)));
    static_assert( sizeof(id_region) == 2 );
 
    struct id_index {
-      id_index( uint32_t r = 0 ):index(0){}
+      id_index( uint32_t r = 0 ):index(r){}
       uint32_t index:24;
+      friend bool operator == ( id_index a, id_index b ) = default;
    } __attribute__((packed)) __attribute__((aligned(1)));
    static_assert( sizeof(id_index) == 3 );
 
    struct id_address {
+      id_address() = default;
+      id_address( const id_address& ) = default;
       id_address( id_region r, id_index i ):_region(r),_index(i){}
-
       id_address( object_id oid ); 
+
+      operator object_id()const;
+
       uint64_t to_int()const { return (uint64_t(_region.region)<<24) | _index.index; }
       uint16_t region()const { return _region.region; }
       uint32_t index()const  { return _index.index; }
@@ -31,10 +42,13 @@ namespace arbtrie {
       friend std::ostream& operator  << ( std::ostream& out, id_address a) {
          return out << a.region() <<"."<<a.index();
       }
+      friend bool operator == ( id_address a, id_address b ) = default;
+      operator bool()const { return to_int() != 0; }
+      void reset() { _region.region = 0; _index.index = 0; }
    }__attribute__((packed)) __attribute__((aligned(1)));
 
    inline id_address operator + ( id_region r, id_index i ) {
-      return id_address{ r, i };
+      return id_address( r, i );
    }
 
    /**
@@ -71,6 +85,10 @@ namespace arbtrie {
       auto i = oid.to_int();
       _index.index   = i & 0xffffff;
       _region.region = i >> 24;
+   }
+
+   inline id_address::operator object_id()const {
+      return object_id( to_int() );
    }
 
 } // namespace arbtrie

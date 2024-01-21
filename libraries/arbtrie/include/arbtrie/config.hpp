@@ -1,11 +1,27 @@
 #pragma once
+#include <string_view>
 
 namespace arbtrie {
 
-   static const uint64_t MB = 1024ull*1024ull;
-   static const uint64_t GB = 1024ull * MB;
-   static const uint64_t TB = 1024ull * GB;
-   static const uint64_t max_database_size = 64 * TB; 
+   static constexpr const uint64_t MB = 1024ull*1024ull;
+   static constexpr const uint64_t GB = 1024ull * MB;
+   static constexpr const uint64_t TB = 1024ull * GB;
+
+   /**
+    *  Certain 
+    */
+   static constexpr const uint64_t max_database_size = 64 * TB; 
+
+   /**
+    * This impacts the number of reference count bits that are reserved in case
+    * all threads attempt to increment one atomic variable at the same time and
+    * overshoot.  This would mean 32 cores all increment the same atomic at
+    * the same instant before any core can realize the overshoot and subtract out.
+    *
+    * The session allocation algo uses a 64 bit atomic to alloc session numbers,
+    * so going beyond 64 would require a refactor of thatcode.
+    */
+   static constexpr const uint32_t max_threads = 64;
 
    /**
     * Each ID region can store 512 IDs before the ID
@@ -24,7 +40,7 @@ namespace arbtrie {
     * spread across all regions to prevent premature growth to
     * 512MB or more just because one region is too dense.
     */
-   static const uint32_t id_page_size = 4096;
+   static constexpr const uint32_t id_page_size = 4096;
 
    // must be a power of 2
    // size of the data segments file grows
@@ -45,20 +61,25 @@ namespace arbtrie {
    // each thread will have a segment this size, so larger values
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
-   static const uint64_t segment_size = 64*MB;
+   static constexpr const uint64_t segment_size = 64*MB;
                                                             
    // the maximum value a node may have
-   static const uint64_t max_value_size = segment_size / 2;
+   static constexpr const uint64_t max_value_size = segment_size / 2;
 
    // more than 1024 and the bit fields in nodes need adjustment
-   static const uint16_t max_key_length = 1024; 
+   static constexpr const uint16_t max_key_length = 1024; 
    static_assert( max_key_length <= 1024 );
                                                             
    // the number of branches at which an inner node is automatically
    // upgraded to a full node
-   static const int full_node_threshold = 128;
+   static constexpr const int full_node_threshold = 128;
 
-   static const uint64_t binary_refactor_threshold = 4096;
-   static const uint64_t binary_node_max_size  = 4096;
-   static const uint64_t binary_node_max_keys  = 400;
+   static constexpr const uint64_t binary_refactor_threshold = 4096;
+   static constexpr const uint64_t binary_node_max_size  = 4096;
+   static constexpr const uint64_t binary_node_max_keys  = 400;
+
+   using key_view       = std::string_view;
+   using value_view     = std::string_view;
+   using segment_offset = uint32_t;
+   using segment_number = uint64_t;
 }

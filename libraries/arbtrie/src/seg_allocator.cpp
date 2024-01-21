@@ -181,14 +181,6 @@ namespace arbtrie
       madvise(s, segment_size, MADV_SEQUENTIAL);
       while (foo < send and foo->id())
       {
-         // if the object has been deleted, skip it
-         /*if (foo->checksum == uint32_t(-1))
-         {
-            foo = foo->next();
-            continue;
-         }
-         */
-
          // skip anything that has been freed
          // note the ref can go to 0 before foo->check is set to -1
          auto obj_ref = state.get(foo->id());
@@ -205,46 +197,33 @@ namespace arbtrie
          // because obj_ref could be pointing to an ID in the free list
          auto foo_idx     = (char*)foo - (char*)s;
          auto current_loc = obj_ref.loc();
-         if (current_loc._offset != seg_num * segment_size + foo_idx)
+         if (current_loc.to_abs() != seg_num * segment_size + foo_idx)
          {
             foo = foo->next();
             continue;
          }
-         //      std::cerr << "current_loc._offset: " <<current_loc._offset << "  raw: " << obj_ref.raw_loc()
-         //                << "expected: " << (seg_num*segment_size + foo_idx) <<"\n";
 
          {
-          //  auto lock_scope = obj_ref.modify();
-            //std::unique_lock lock_scope( obj_ref.get_mutex() );
-            /*
-            if (foo != lock_scope.as<node_header>())
-            {
-               TRIEDENT_DEBUG("object moved");
-               foo = foo->next();
-               continue;
-            }
-            */
-
             auto obj_size   = foo->size();
             auto [loc, ptr] = ses.alloc_data(obj_size, foo->id());
             auto try_move   = [&]()
             {
                int count = 0;
-               while (obj_ref.try_start_move(obj_ref.raw_loc()))
+               while (obj_ref.try_start_move(obj_ref.loc()))
                {
                   memcpy(ptr, foo, obj_size);
                 //  if( ptr->validate_checksum()) 
-                  switch (obj_ref.move(obj_ref.loc(), loc))
+                  switch (obj_ref.try_move(obj_ref.loc(), loc))
                   {
-                     case move_result::freed:
-                     case move_result::moved:
+                     case node_meta_type::freed:
+                     case node_meta_type::moved:
                         // TRIEDENT_DEBUG("object moved or freed while copying");
                         return false;
-                     case move_result::dirty:
+                     case node_meta_type::dirty:
                         //TRIEDENT_WARN("compactor moving dirty obj, try again");
                         ++count;
                         continue;
-                     case move_result::success:
+                     case node_meta_type::success:
                         if( count ) {
                            TRIEDENT_WARN( "success on attempt: ", count );
                         }
@@ -613,6 +592,6 @@ namespace arbtrie
          std::cerr << x << "] " << _header->free_seg_buffer[x & (max_segment_count - 1)] << "\n";
       }
       std::cerr << "--------------------------\n";
-      std::cerr << "free release +/- = " << _id_alloc.free_release_count <<" \n";
+      std::cerr << "free release +/- = " << _id_alloc.free_release_count() <<" \n";
    }
 };  // namespace arbtrie

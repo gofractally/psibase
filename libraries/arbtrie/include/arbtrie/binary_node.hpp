@@ -1,5 +1,7 @@
 #pragma once
 #include <arbtrie/node_header.hpp>
+#include <arbtrie/value_type.hpp>
+
 
 namespace arbtrie
 {
@@ -360,7 +362,7 @@ namespace arbtrie
          return sizeof(key_val_pair) + key.size() +
                 (can_inline(val) ? val.size() : sizeof(object_id));
       }
-      inline static int calc_key_val_pair_size(key_view key, object_id val)
+      inline static int calc_key_val_pair_size(key_view key, id_address val)
       {
          // 4 = pos, keyhash, valhash
          return sizeof(key_val_pair) + key.size() + sizeof(val);

@@ -10,13 +10,13 @@ namespace arbtrie
       }
 
       auto state = _rs._segas.lock();
-      auto rr    = state.get(_path.back());
+      auto rr    = state.get(_path.back().first);
 
       switch (rr.type())
       {
          case node_type::binary:
          {
-            auto kvp = rr.as<binary_node>()->get_key_val_ptr(_cur_branch);
+            auto kvp = rr.as<binary_node>()->get_key_val_ptr(_path.back().second);
             auto s   = kvp->value_size();
             buffer.resize(s);
             memcpy(buffer.data(), kvp->val_ptr(), s);

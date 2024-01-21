@@ -2,6 +2,7 @@
 #include <arbtrie/debug.hpp>
 #include <arbtrie/node_meta.hpp>
 #include <arbtrie/util.hpp>
+#include <arbtrie/object_id.hpp>
 #include <string_view>
 
 #define XXH_INLINE_ALL
@@ -9,7 +10,14 @@
 
 namespace arbtrie
 {
+   struct node_header;
    uint32_t calculate_checksum(const node_header* h);
+   static constexpr const int max_branch_count = 257;
+
+   using branch_index_type = int_fast16_t;
+   inline constexpr branch_index_type char_to_branch( char c ) { return branch_index_type(uint8_t(c))+1; }
+   inline constexpr branch_index_type char_to_branch( uint8_t c ) { return branch_index_type(uint8_t(c))+1; }
+   inline constexpr char branch_to_char( branch_index_type b ) { return char( b-1); }
 
    /**
     *  keysize limit of 1024 requires 10 bits, longer keys would 
@@ -26,14 +34,14 @@ namespace arbtrie
    struct node_header
    {
       uint32_t checksum;
-      uint32_t _ntype : 4;             // bytes allocated for this node
+      uint32_t _ntype : 4;             // node_type 
       uint32_t _nsize : 27;            // bytes allocated for this node
       uint64_t _num_branches : 9;      // number of branches that are set
-      uint64_t _branch_id_region: 16;   // the ID region branches from this node are allocated to
+      uint64_t _branch_id_region: 16;  // the ID region branches from this node are allocated to
       uint64_t _node_id : 40;          // the ID of this node
 
       inline node_header(uint32_t  size,
-                         object_id nid,
+                         id_address nid,
                          node_type type       = node_type::freelist,
                          uint16_t  num_branch = 0 )
           : checksum(0),
@@ -45,7 +53,8 @@ namespace arbtrie
       {
       }
 
-      //inline node_header* clone();
+      void set_address( id_address a ) { _node_id = a.to_int(); }
+      id_region branch_region()const{ return id_region( _branch_id_region ); }
 
       template <typename T>
       T* as()
@@ -65,6 +74,7 @@ namespace arbtrie
 
       void set_type(node_type t) { _ntype = (int)t; }
       void set_id(object_id i) { _node_id = i.to_int(); }
+      void set_branch_region(id_region r) { _branch_id_region = r.to_int(); }
 
       uint32_t       size() const { return _nsize; }
       object_id      id() const { return object_id(_node_id); }
@@ -92,6 +102,7 @@ namespace arbtrie
    } __attribute((packed));
    static_assert(sizeof(node_header) == 16);
 
+
    struct full_node;
    struct setlist_node;
    struct binary_node;
@@ -104,6 +115,22 @@ namespace arbtrie
    template <typename T>
    concept is_value_type = std::is_same_v<std::remove_cv_t<T>, value_view> or
                            std::is_same_v<std::remove_cv_t<T>, object_id>;
+
+   struct clone_config
+   {
+      int spare_branches = 0;  // inner nodes other than full
+      int spare_space    = 0;  // value nodes, binary nodes
+      int spare_prefix   = 0;  //
+      std::optional<key_view> update_prefix;
+      friend auto             operator<=>(const clone_config&, const clone_config&) = default;
+
+      int_fast16_t prefix_capacity() const
+      {
+         if (update_prefix)
+            return update_prefix->size() + spare_prefix;
+         return spare_prefix;
+      }
+   };
 
 }  // namespace arbtrie
 

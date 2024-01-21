@@ -35,6 +35,7 @@ namespace arbtrie
       {
          assert(src != nullptr);
          assert(asize == alloc_size(src, cfg));
+         _branch_id_region = src->_branch_id_region;
          _prefix_trunc = cfg.spare_prefix;
          _prefix_capacity = cfg.spare_prefix;
          if (cfg.update_prefix) {
@@ -74,11 +75,12 @@ namespace arbtrie
          return {br, _branches[br]};
       }
 
-      void add_branch(int_fast16_t br, object_id b)
+      void add_branch(int_fast16_t br, id_address b)
       {
          assert(br < max_branch_count);
          assert(br >= 0);
          assert(not _branches[br]);
+         assert( b._region == branch_region() );
          ++_num_branches;
          assert(_num_branches <= max_branch_count);
          _branches[br] = b;
@@ -100,11 +102,12 @@ namespace arbtrie
          // for full node by reading this, so don't bother updating it
          //_eof_branch &= br != 0;
       }
-      void set_branch(int_fast16_t br, object_id b)
+      void set_branch(int_fast16_t br, id_address b)
       {
          assert(br < max_branch_count);
          assert(br >= 0);
          assert(_branches[br]);
+         assert( b._region == branch_region() );
          _branches[br] = b;
       }
 
@@ -118,12 +121,13 @@ namespace arbtrie
       }
 
       inline int_fast32_t prefix_size() const { return prefix_capacity() - _prefix_trunc; }
-      inline key_view     get_prefix() const { return key_view(_prefix, prefix_capacity()); }
+      inline key_view     get_prefix() const { return key_view(_prefix, prefix_size()); }
       inline void         set_prefix(key_view pre)
       {
          assert(pre.size() <= prefix_capacity());
          _prefix_trunc = prefix_capacity() - pre.size();
          memcpy(_prefix, pre.data(), pre.size());
+         assert( get_prefix() == pre );
       }
 
       inline void visit_branches(auto visitor) const
@@ -132,12 +136,19 @@ namespace arbtrie
             if (x)
                visitor(x);
       }
+      inline void visit_branches_with_br(auto visitor) const
+      {
+         for( int i = 0; i < 257; ++i ) {
+            if( _branches[i] ) 
+               visitor( i, _branches[i] );
+         }
+      }
 
       uint64_t _descendants : 44  = 0;
       uint64_t _prefix_trunc : 10 = 0;
       uint64_t _prefix_capacity: 10 = 0;
 
-      object_id _branches[max_branch_count];
+      id_address _branches[max_branch_count];
       char      _prefix[];
 
       uint16_t        prefix_capacity() const { return _prefix_capacity; }

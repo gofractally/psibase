@@ -77,7 +77,7 @@ namespace arbtrie
         void release();
         void retain();
 
-        object_id     _id;
+        id_address    _id;
         read_session* _session;
 
   };

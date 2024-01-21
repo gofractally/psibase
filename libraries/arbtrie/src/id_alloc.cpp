@@ -11,11 +11,12 @@ namespace arbtrie {
          _ids_state_file.resize(round_to_page(sizeof(id_alloc_state)));
          auto idh = new (_ids_state_file.data()) id_alloc_state();
          for( auto& r : idh->regions ) {
-            r.first_free.store(end_of_freelist.loc_div16);
-            r.use_count.store(0);
-            r.next_alloc.store(0);
+            r.first_free.store( temp_meta_type().set_location(end_of_freelist).to_int());
+            r.use_count.store(8);
+            r.next_alloc.store(8);
          }
-         idh->regions[0].next_alloc.store(1);
+         TRIEDENT_DEBUG( "eofl: " , end_of_freelist.to_aligned() );
+      //   idh->regions[0].next_alloc.store(1);
          idh->clean_shutdown = true;
      }
      _state = reinterpret_cast<id_alloc_state*>( _ids_state_file.data() );

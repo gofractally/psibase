@@ -84,7 +84,7 @@ namespace arbtrie
       const object_id* get_branch_end_ptr() const { return ((object_id*)tail()) - _spare_branch_capacity; }
 
       bool can_add_branch() const { return _spare_branch_capacity > 0; }
-      void add_branch(branch_index_type br, object_id b);
+      void add_branch(branch_index_type br, id_address b);
 
       void set_eof(object_id e)
       {
@@ -167,11 +167,12 @@ namespace arbtrie
                                                    get_branch_ptr()[(p - s) + _eof_branch]);
       }
 
-      void set_branch(uint_fast16_t br, object_id b)
+      void set_branch(uint_fast16_t br, id_address b)
       {
          assert(br < 257);
          assert(not(br == 0 and not _eof_branch));
          assert(b);
+         assert( b._region == branch_region() );
 
          auto bp = get_branch_ptr();
          if (br == 0) [[unlikely]]
@@ -285,6 +286,7 @@ namespace arbtrie
       setlist_node(int_fast16_t asize, object_id nid, const setlist_node* src, clone_config cfg)
           : node_header(asize, nid, node_type::setlist), _descendants(src->_descendants),_eof_branch(src->_eof_branch)
       {
+         _branch_id_region = src->_branch_id_region;
          _prefix_trunc    = cfg.spare_prefix;
          _prefix_capacity = cfg.spare_prefix;
          if (cfg.update_prefix)
@@ -311,12 +313,13 @@ namespace arbtrie
 
    static_assert(sizeof(setlist_node) == sizeof(node_header) + sizeof(uint64_t) + sizeof(uint32_t));
 
-   inline void setlist_node::add_branch(branch_index_type br, object_id b)
+   inline void setlist_node::add_branch(branch_index_type br, id_address b)
    {
       assert(validate());
       assert(br < max_branch_count);
       assert(br >= 0);
       assert(not(br == 0 and _eof_branch));
+      assert( b._region == branch_region() );
 
       object_id* branches = get_branch_ptr();
       if (br == 0) [[unlikely]]

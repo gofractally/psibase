@@ -1,3 +1,4 @@
+#include <format>
 #include <stdlib.h>
 #include <fstream>
 #include <iostream>
@@ -33,8 +34,25 @@ void indent(int depth)
 }
 namespace arbtrie
 {
-   void print_hex(std::string_view v);
-}
+   void toupper(std::string& s)
+   {
+      for (auto& c : s)
+         c = std::toupper(c);
+   }
+   std::string to_upper(std::string_view sv)
+   {
+      std::string str(sv);
+      toupper(str);
+      return str;
+   }
+
+   void print_hex(std::string_view v)
+   {
+      std::cerr << std::setfill('0');
+      for (auto c : v)
+         std::cerr << std::hex << std::setw(2) << uint16_t(uint8_t(c));
+   }
+}  // namespace arbtrie
 
 std::string add_comma(uint64_t s)
 {
@@ -53,7 +71,22 @@ std::string add_comma(uint64_t s)
    return std::to_string(s);
 };
 
+void validate_invariant( session_rlock& state, object_id i );
+void validate_invariant( session_rlock& state, object_id i, auto* in) {
+   in->visit_branches_with_br( [&](int br, id_address adr ) {
+      assert( in->branch_region() == adr._region );
+      validate_invariant( state, adr );
+   });
+}
+void validate_invariant( session_rlock& state, object_id i, const binary_node* inner ){}
+void validate_invariant( session_rlock& state, object_id i, const value_node* inner ){}
+void validate_invariant( session_rlock& state, object_id i ) {
+   auto ref = state.get(i);
+   cast_and_call( ref.header(), [&]( const auto* ptr ){ validate_invariant( state, i, ptr ); } );
+}
+
 void print(session_rlock& state, object_id i, int depth = 1);
+void print_pre(session_rlock& state, object_id i, std::string prefix, std::vector<std::string> path={}, int depth = 1);
 /*
 void print(session_rlock& state, const arbtrie::index_node* in, int depth )
 {
@@ -73,6 +106,97 @@ void print(session_rlock& state, const arbtrie::index_node* in, int depth )
    }
 }
 */
+
+void print_pre(session_rlock& state, auto* in, std::string prefix, std::vector<std::string> path, int depth = 1)
+{
+   prefix += in->get_prefix();
+   path .push_back( to_hex(in->get_prefix()));
+
+   in->visit_branches_with_br(
+       [&](int br, object_id bid)
+       {
+          if (0 == br)
+          {
+             std::cerr << depth << " |" << node_type_names[in->get_type()][0] << "  ";
+             //std::cerr << prefix;
+             print_hex(prefix);
+             std::cerr << "   " << id_address(bid) << "  ";
+             auto va = state.get(bid);
+             std::cerr << node_type_names[va.type()] << "    ";
+            // std::cerr << va->value();
+            // assert(to_upper(prefix) == va->value());
+             print_hex(va->value());
+             std::cerr << "\n";
+             return;
+          }
+          auto c = branch_to_char(br);
+          path.push_back(  "-"+to_hex( std::string_view(&c,1) ));
+          print_pre(state, bid, prefix + branch_to_char(br), path, depth + 1);
+          path.pop_back();
+       });
+   path.pop_back();
+}
+void print_pre(session_rlock& state, const binary_node* bn, std::string prefix, 
+               std::vector<std::string> path, int depth = 1)
+{
+   for (int i = 0; i < bn->num_branches(); ++i)
+   {
+      //auto k = bn->get_key(i);
+      std::cerr << depth << " |B  ";
+      auto kvp = bn->get_key_val_ptr(i);
+      print_hex(prefix);
+      std::cerr<<"-";
+      print_hex( std::string(kvp->key()));
+
+
+      std::cerr<<"     ";
+      for( auto s : path ) std::cerr << s <<" ";
+      std::cerr << to_hex( kvp->key() );
+      //std::cerr << (prefix + std::string(kvp->key()));
+      std::cerr << "\n";
+      /*
+      if (prefix.size() + kvp->key().size() > 8)
+      {
+         TRIEDENT_WARN("    ERROR   ");
+      }
+      */
+      /*
+      indent(depth);
+      auto v = kvp->value();
+      if (bn->is_obj_id(i))  //kvp->is_value_node())
+      {
+         std::cerr << " id: " << kvp->value_id() << "  ";
+         auto vr = state.get(kvp->value_id());
+         v       = vr.as<value_node>()->value();
+         std::cerr << "ref: " << vr.ref() << " ";
+      }
+      //   std::cerr << "koff: " << bn->key_offset(i) << " ksize: ";
+      //   std::cerr << k.size() <<" ";
+      std::cerr << "'";
+      std::cerr << kvp->key() << "' = '" << v << "'\n";
+      */
+   }
+}
+
+void print_pre(session_rlock& state, object_id i, std::string prefix, std::vector<std::string> path, int depth)
+{
+   auto obj = state.get(i);
+   switch (obj.type())
+   {
+      case node_type::binary:
+         return print_pre(state, obj.as<binary_node>(), prefix, path, depth);
+      case node_type::setlist:
+         return print_pre(state, obj.as<setlist_node>(), prefix, path, depth);
+      case node_type::full:
+         return print_pre(state, obj.as<full_node>(), prefix, path, depth);
+      case node_type::value:
+         std::cerr << "VALUE: id: " << i << "\n";
+         return;
+      default:
+         std::cerr << "UNKNOWN!: id: " << i << "\n";
+         return;
+   }
+}
 
 void print(session_rlock& state, const binary_node* bn, int depth = 0)
 {
@@ -205,9 +329,8 @@ void test_refactor();
 int  main(int argc, char** argv)
 {
    arbtrie::thread_name("main");
-   test_iterator();
-   //   return 0;
-   //   test_binary_node();
+   //test_binary_node();
+   //test_iterator();
    //   test_refactor();
    //   return 0;
    //
@@ -246,11 +369,44 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 1;
-         const int                  count  = 10'000'000;
+         const int                  rounds = 2;
+         const int                  count  = 100000;
+
+         auto iterate_all = [&]()
+         {
+            std::cerr << "iterate entire database\n";
+            {
+               uint64_t item_count = 0;
+               auto     itr        = ws.create_iterator(r);
+               assert(not itr.valid());
+
+               std::vector<char> data;
+               auto              start = std::chrono::steady_clock::now();
+               if (itr.lower_bound())
+               {
+                  itr.read_value(data);
+                  ++item_count;
+               }
+               while (itr.next())
+               {
+                  itr.key();
+                  itr.read_value(data);
+                  ++item_count;
+               }
+               auto end   = std::chrono::steady_clock::now();
+               auto delta = end - start;
+               std::cout << "iterated " << std::setw(12)
+                         << add_comma(
+                                int64_t(item_count) /
+                                (std::chrono::duration<double, std::milli>(delta).count() / 1000))
+                         << " items/sec  total items: " << add_comma(item_count) << "\n";
+            }
+         };
+
+         uint64_t seq3 = 0;
 
          std::cerr << "insert dense rand \n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -272,9 +428,12 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << " dense rand insert/sec  total items: " << add_comma(seq) << "\n";
          }
-         uint64_t seq3 = 0;
+         iterate_all();
+         auto l = ws._segas.lock();
+         validate_invariant( l, r.id() );
+
          std::cerr << "insert little endian seq\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -294,16 +453,33 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
+         iterate_all();
+         auto start_big_end = seq3;
          std::cerr << "insert big endian seq\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t val = bswap(++seq3);
+               uint64_t val = bswap(seq3++);
                ++seq;
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
+               /*
+               ws.get(r, kstr,
+                      [&](bool found, const value_type& r)
+                      {
+                         if (not found)
+                         {
+                            TRIEDENT_WARN("unable to find key: ", seq3, " ro: ", ro, " i:", i);
+                            assert(!"should have found key!");
+                         }
+                         else
+                         {
+                            assert(r.view() == kstr);
+                         }
+                      });
+                      */
             }
             last_root  = r;
             auto end   = std::chrono::steady_clock::now();
@@ -315,12 +491,57 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
-         std::cerr << "insert to_string(rand) \n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         //print_pre(l, r.id(), "");
+         iterate_all();
+
+         uint64_t seq4 = -1;
+         std::cerr << "insert big endian rev seq\n";
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
+               uint64_t val = bswap(seq4--);
+               ++seq;
+               key_view kstr((char*)&val, sizeof(val));
+               ws.insert(r, kstr, kstr);
+               /*
+               ws.get(r, kstr,
+                      [&](bool found, const value_type& r)
+                      {
+                         if (not found)
+                         {
+                            TRIEDENT_WARN("unable to find key: ", seq3, " ro: ", ro, " i:", i);
+                            assert(!"should have found key!");
+                         }
+                         else
+                         {
+                            assert(r.view() == kstr);
+                         }
+                      });
+                      */
+            }
+            last_root  = r;
+            auto end   = std::chrono::steady_clock::now();
+            auto delta = end - start;
+
+            std::cout << ro << "] " << std::setw(12)
+                      << add_comma(int64_t(
+                             (count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                      << " insert/sec  total items: " << add_comma(seq) << "\n";
+         }
+         //auto l = ws._segas.lock();
+         //print_pre(l, r.id(), "");
+         iterate_all();
+
+         std::cerr << "insert to_string(rand) \n";
+         for (int ro = 0; true and ro < rounds; ++ro)
+         {
+            auto start = std::chrono::steady_clock::now();
+            for (int i = 0; i < count; ++i)
+            {
+               ++seq;
                auto kstr = std::to_string(rand64());
                ws.insert(r, kstr, kstr);
             }
@@ -334,9 +555,10 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << " rand str insert/sec  total items: " << add_comma(seq) << "\n";
          }
+         iterate_all();
          std::cerr << "get known key little endian seq\n";
          uint64_t seq2 = 0;
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -349,7 +571,9 @@ int  main(int argc, char** argv)
                          if (not found)
                          {
                             TRIEDENT_WARN("unable to find key: ", val, " ro: ", ro, " i:", i);
-                         } else {
+                         }
+                         else
+                         {
                             assert(r.view() == kstr);
                          }
                       });
@@ -365,13 +589,13 @@ int  main(int argc, char** argv)
          }
 
          std::cerr << "get known key little endian rand\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t rnd = rand64();
-               uint64_t val  = rnd  % seq2;
+               uint64_t rnd  = rand64();
+               uint64_t val  = rnd % (seq2-1);
                uint64_t val2 = val;
                //   TRIEDENT_DEBUG( "val: ", val, " val2: ", val2 );
                key_view kstr((char*)&val, sizeof(val));
@@ -398,25 +622,29 @@ int  main(int argc, char** argv)
                       << add_comma(int64_t(
                              (count) /
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << "  seq get/sec  total items: " << add_comma(seq) << "\n";
+                      << "  rand get/sec  total items: " << add_comma(seq) << "\n";
          }
-         /*
          std::cerr << "get known key big endian seq\n";
          for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t val = bswap(++seq2);
+               uint64_t val = bswap(start_big_end++);
+               //TRIEDENT_WARN( "find ", start_big_end );
                key_view kstr((char*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
                          if (not found)
                          {
-                            TRIEDENT_WARN("unable to find key: ", seq2, " ro: ", ro, " i:", i);
+                            TRIEDENT_WARN("unable to find key: ", start_big_end, " ro: ", ro, " i:", i);
+                            assert(!"should have found key!");
                          }
-                         assert(found and r.view() == kstr);
+                         else
+                         {
+                            assert(r.view() == kstr);
+                         }
                       });
             }
             auto end   = std::chrono::steady_clock::now();
@@ -428,10 +656,10 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << "  seq get/sec  total items: " << add_comma(seq) << "\n";
          }
-         */
+         break;
 
          std::cerr << "lower bound random i64\n";
-         for (int ro = 0; false and ro < rounds; ++ro)
+         for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto itr   = ws.create_iterator(r);
             auto start = std::chrono::steady_clock::now();
@@ -450,6 +678,8 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << "  rand lowerbound/sec  total items: " << add_comma(seq) << "\n";
          }
+
+         db.print_region_stats();
 
          auto read_thread = [&]() {};
 
@@ -555,14 +785,11 @@ int  main(int argc, char** argv)
       //      print(l, r.id());
       //
       std::cerr << "wait for cleanup...\n";
+      usleep(1000000*2);
       while (sync_compact and db.compact_next_segment())
       {
       }
       db.stop_compact_thread();
-
-      while (db.compact_next_segment())
-      {
-      }
 
       db.print_stats(std::cout);
    }
@@ -586,7 +813,7 @@ struct environ
    arbtrie::database* db;
 };
 
-void load_words(write_session& ws, node_handle& root)
+void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
 {
    auto filename = "/usr/share/dict/words";
 
@@ -597,16 +824,30 @@ void load_words(write_session& ws, node_handle& root)
       std::string key;
       std::string val;
 
-      int count = 0;
+      int  count    = 0;
+      bool inserted = false;
       // Read the next line from File until it reaches the
       // end.
       while (file >> key)
       {
          val = key;
-         for (auto& c : val)
-            c = toupper(c);
+         toupper(val);
          ws.upsert(root, key, val);
+         ws.get(root, key,
+                [&](bool found, const value_type& r)
+                {
+                   if (key == "psych")
+                   {
+                      TRIEDENT_WARN("get ", key, " =  ", r.view());
+                      inserted = true;
+                   }
+                   assert(found);
+                   assert(r.view() == val);
+                });
+
          ++count;
+         if (count > limit)
+            break;
       }
 
       auto end   = std::chrono::steady_clock::now();
@@ -616,8 +857,10 @@ void load_words(write_session& ws, node_handle& root)
                 << add_comma(int64_t(
                        (count) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                 << " words/sec  total items: " << add_comma(count) << " from " << filename << "\n";
+      usleep(1000000*3);
    }
 
+   /*
    {
       auto          start = std::chrono::steady_clock::now();
       std::ifstream file(filename);
@@ -646,6 +889,7 @@ void load_words(write_session& ws, node_handle& root)
                 << " words/sec  total items: " << add_comma(v.size()) << " from " << filename
                 << "\n";
    }
+   */
 }
 
 void test_iterator()
@@ -662,54 +906,45 @@ void test_iterator()
 
       auto itr = ws.create_iterator(root);
       assert(not itr.valid());
+      //auto l = ws._segas.lock();
+      //print_pre(l, root.id(), "", 1);
 
       std::vector<char> data;
-      /*
-      {
-         assert(itr.lower_bound());
-         itr.read_value(data);
-         std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
-                   << "' \n";
-      }
-      {
-         assert(itr.lower_bound("da"));
-         itr.read_value(data);
-         std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
-                   << "' \n";
-      }
-      {
-         assert(itr.lower_bound("baby"));
-         itr.read_value(data);
-         std::cerr << "first: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
-                   << "' \n";
-         std::cerr << "next: " << itr.next() <<"\n";
-         itr.read_value(data);
-         std::cerr << "next: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
-                   << "' \n";
-                   */
-      auto start = std::chrono::steady_clock::now();
-      int  count = 0;
+      auto              start = std::chrono::steady_clock::now();
+      int               count = 0;
+      std::string       last;
+      std::string       cur;
       if (itr.lower_bound())
       {
          itr.read_value(data);
+         cur = std::string_view(data.data(), data.size());
+     //    std::cerr << itr.key() << " = " << std::string_view(data.data(), data.size()) << "\n";
+         assert(cur > last);
+         last = cur;
          ++count;
-         //   std::cerr << "next: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
-         //             << "' \n";
+      }
+      else
+      {
+         assert(!"this should be found!");
       }
       while (itr.next())
       {
          itr.read_value(data);
+         cur           = std::string_view(data.data(), data.size());
+         std::string k = std::string(itr.key());
+         toupper(k);
+         // assert( cur > last );
+     //    std::cerr << itr.key() << " = " << std::string_view(data.data(), data.size()) << "\n";
+         assert(k == cur);
+         last = cur;
          ++count;
-         //      std::cerr << "next: '" << itr.key() << "' = '" << value_view(data.data(), data.size())
-         //               << "' \n";
       }
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
       std::cout << "iterated " << std::setw(12)
-                << add_comma(
-                       int64_t(count) /
-                               (std::chrono::duration<double, std::milli>(delta).count() / 1000))
-                << " keyval/sec \n"; 
+                << add_comma(int64_t(count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000))
+                << " keyval/sec  items: "<< add_comma(count) <<" \n";
 
       //}
    }
@@ -724,6 +959,7 @@ void test_binary_node()
       std::optional<node_handle> last_root;
       auto                       cur_root = ws.create_root();
       auto                       state    = ws._segas.lock();
+      TRIEDENT_DEBUG("upsert hello = world");
 
       ws.upsert(cur_root, "hello", "world");
       print(state, cur_root.id(), 1);
@@ -731,6 +967,7 @@ void test_binary_node()
                 "message                                                          ends");
 
       print(state, cur_root.id(), 1);
+
       last_root = cur_root;
 
       std::cerr << "root.........\n";

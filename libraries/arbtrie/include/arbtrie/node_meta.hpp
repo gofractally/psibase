@@ -6,134 +6,51 @@
 #include <variant>
 #include <arbtrie/object_id.hpp>
 #include <arbtrie/config.hpp>
+#include <arbtrie/util.hpp>
+#include <arbtrie/node_location.hpp>
 
 namespace arbtrie
 {
-
-
-   /// object pointers can only address 48 bits
-   /// 128 TB limit on database size with 47 bits, this saves us
-   /// 8MB of memory relative to 48 bits in cases with less than 128 TB
-   static const uint64_t max_segment_count = (1ull << 47) / segment_size;
-
-   static const int max_branch_count = 257;
-
-   struct node_header;
-   struct binary_node;
-   struct setlist_node;
-
-   using key_view       = std::string_view;
-   using value_view     = std::string_view;
-   using segment_offset = uint32_t;
-   using segment_number = uint64_t;
-
    enum node_type : uint8_t
    {
       freelist  = 0,  // not initialized/invalid, must be first enum
       binary    = 1,  // binary search
       value     = 2,  // just the data, no key
       setlist   = 3,  // list of branches
-      roots     = 4,  // contains pointers to other root nodes
-      full      = 5,  // 256 full id_type
-      undefined = 6,  // no type has been defined yet
+      full      = 4,  // 256 full id_type
+      undefined = 5,  // no type has been defined yet
 
-      // future, requires taking a bit
-      index    = 7,  // 256 index buffer to id_type
-      bitfield = 8,
-      merge    = 9,  // delta applied to existing node
+      // future, requires taking a bit, or removing undefined/freelist
+      //index    = 7,  // 256 index buffer to id_type
+      //bitfield = 8,
+      //merge    = 9,  // delta applied to existing node
    };
-   static const char* node_type_names[] = {
-       "freelist",  // must be first
-       "binary",   "setlist", "value", "roots", "merge", "undefined",
-   };
+   static const char* node_type_names[] = {"freelist", "binary", "value",
+                                           "setlist",  "full",  "undefined"};
 
-   struct clone_config
+   inline std::ostream& operator<<(std::ostream& out, node_type t)
    {
-      int spare_branches = 0;  // inner nodes other than full
-      int spare_space    = 0;  // value nodes, binary nodes
-      int spare_prefix   = 0;  //
-      std::optional<key_view> update_prefix;
-      friend auto             operator<=>(const clone_config&, const clone_config&) = default;
-
-      int_fast16_t prefix_capacity() const
-      {
-         if (update_prefix)
-            return update_prefix->size() + spare_prefix;
-         return spare_prefix;
-      }
-   };
-
-   struct upsert_mode
-   {
-      enum type : int
-      {
-         shared        = 0,
-         unique        = 1,  // ref count of all parent nodes and this is 1
-         insert        = 2,  // fail if key does exist
-         update        = 4,  // fail if key doesn't exist
-         upsert        = insert | update,
-         unique_upsert = unique | upsert,
-         unique_insert = unique | insert,
-         unique_update = unique | update,
-         shared_upsert = shared | upsert,
-         shared_insert = shared | insert,
-         shared_update = shared | update
-      };
-
-      constexpr upsert_mode(upsert_mode::type t) : flags(t){};
-
-      constexpr bool        is_unique() const { return flags & unique; }
-      constexpr bool        is_shared() const { return not is_unique(); }
-      constexpr upsert_mode make_shared() const { return {flags & ~unique}; }
-      constexpr upsert_mode make_unique() const { return {flags | unique}; }
-      constexpr bool        may_insert() const { return flags & insert; }
-      constexpr bool        may_update() const { return flags & insert; }
-      constexpr bool        must_insert() const { return not (flags & update); }
-      constexpr bool        must_update() const { return not (flags & insert); } 
-      constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); } 
-
-     // private: structural types cannot have private members,
-     // but the flags field is not meant to be used directly
-      constexpr upsert_mode( int f ):flags(f){}
-      int flags;
-   };
-
-
-
+      if (t < node_type::undefined) [[likely]]
+         return out << node_type_names[t];
+      return out << "undefined(" << int(t) << ")";
+   }
 
    /**
-    * Used to identify where an object can be found
-    */
-   struct object_location
-   {
-      uint32_t segment() const { return _offset / segment_size; }
-      uint32_t index() const { return _offset & (segment_size - 1); }
-
-      friend bool operator==(const object_location&, const object_location&) = default;
-
-      uint64_t _offset;  // : 48; only 48 bits can be used/stored in object_meta
-   };
-
-#define ARBTRIE_REF_BITS 12
-#define ARBTRIE_TYPE_BITS 3
-
-   /**
-    * This impacts the number of reference count bits that are reserved in case
-    * all threads attempt to increment one atomic variable at the same time and
-    * overshoot.  This would mean 32 cores all increment the same atomic at
-    * the same instant before any core can realize the overshoot and subtract out.
-    */
-   static const uint32_t max_threads = 32;
-
-   /**
-    *  Tracks high-level information for each object in an atomic manner
-    *  that can be pinned in RAM. This prevents unnecessary page loads when
-    *  all you want to know is the type or to increment/decrment a reference count. 
+    * @class node_meta
+    * 
+    * This class is the core of the arbtrie memory managment algorithm
+    * and is responsible for a majority of the lock-free properties. It
+    * manages 8 bytes of "meta" information on every node in the trie
+    * including its current location, reference count, copy locks,
+    * and type. 
     *
-    *  Additionally, the real location of the object can be moved at any time to
-    *  provide better cache locality without interfering with readers.
+    * Because node_meta is an atomic type and we desire to minimize 
+    * the number of atomic accesses, @ref node_meta is templated on
+    * the storage type so the majority of the API can be used on the
+    * temporary read from the atomic. See node_meta<>::temp_type
     *
-    *  ## Locking Protocol
+    *  ## Modify / Copy Locking Protocol
+    *
     *  For any given object it can be modified by exactly one writer thread or
     *  moved by exactly one compactor thread. The compactor thread needs to prove
     *  that the data was not modified while being copied and the modify thread 
@@ -177,186 +94,287 @@ namespace arbtrie
     *  The copy thread waits with memory_order_acquire and the modify thread ends
     *  with memory_order_release.
     *
-    *  This synchronization process is an alternative to a pool of mutex indexed by
-    *  object id which must be locked during copy/modify operations. The mutex approach causes
-    *  write threads to conflict with eachother and allows the compactor (backround)
-    *  to block the modifer (forground). While the mutex pool is transient and automatically
-    *  reset on crash, the lock state of these bits is stored on the memory mapped file
-    *  and will need to be cleared if the program crashes leaving the bits set. A side 
-    *  effect of these bits is that it is possible to detect if a crash occurred in the
-    *  middle of a modify operation! Since reference counts must be reset on a crash,
-    *  resetting these locks shouldn't be an issue and only takes a second or two.
     */
-   struct object_meta
+   template <typename Storage = std::atomic<uint64_t>>
+   class node_meta
    {
-     private:
+      /**
+       *  Use the bitfield to layout the data,
+       *  compute the masks. 
+       */
       struct bitfield
       {
-         uint64_t ref : ARBTRIE_REF_BITS;
-         uint64_t type : ARBTRIE_TYPE_BITS;
-         uint64_t copy_flag : 1;    // set this bit on start of copy, clear it on start of modify
-         uint64_t modify_flag : 1;  // 0 when modifying, 1 when not
-         uint64_t location : 46;    // the location divided by 16, 1024 TB addressable
-      };
+         uint64_t ref : 12       = 0;
+         uint64_t type : 4       = 0;
+         uint64_t copy_flag : 1  = 0;  // set this bit on start of copy, clear it on start of modify
+         uint64_t const_flag : 1 = 1;  // 0 when modifying, 1 when not
+         // the location divided by 16, 1024 TB addressable,
+         // upgrade to cacheline gives 4096 TB addressable
+         uint64_t location : 46 = 0;
 
-      // temporary impl that relies on the UB that writing to one and reading
-      // from another is safe and assumptions about the bitpacking order. To be
-      // replaced with functions that do explicit bit operations. This representation
-      // is convienent for lldb/gdb understanding.
-      union
-      {
-         uint64_t              iv = 0;
-         bitfield              bf;
-         std::atomic<uint64_t> av;
-      } _value;
-      static_assert(sizeof(_value) == sizeof(uint64_t));
+
+         constexpr bitfield& from_int(uint64_t i)
+         {
+            memcpy(this, &i, sizeof(i));
+            return *this;
+         }
+         explicit bitfield( uint64_t bf ) { from_int(bf); }
+
+         // doesn't work as a constexpr on all compilers
+         constexpr uint64_t to_int() const { return std::bit_cast<uint64_t>(*this); }
+         constexpr auto&    set_type(node_type t)
+         {
+            type = t;
+            return *this;
+         }
+         constexpr auto& set_location(node_location l)
+         {
+            location = l.to_aligned();
+            return *this;
+         }
+         constexpr auto& set_ref(uint16_t r)
+         {
+            assert(r <= max_ref_count);
+            ref = r;
+            return *this;
+         }
+      } __attribute((packed));
+      static_assert(sizeof(bitfield) == sizeof(uint64_t));
 
      public:
-      static const uint64_t ref_mask = (1ull << ARBTRIE_REF_BITS) - 1;
-      static const uint64_t max_ref_count =
-          ref_mask - max_threads;  // allow some overflow bits for retain
-      static const uint64_t type_mask        = 7 << ARBTRIE_REF_BITS;
-      static const uint64_t copy_flag_bit    = ARBTRIE_REF_BITS + ARBTRIE_TYPE_BITS;
-      static const uint64_t modify_flag_bit  = copy_flag_bit + 1;
-      static const uint64_t copy_flag_mask   = (uint64_t(1) << copy_flag_bit);
-      static const uint64_t modify_flag_mask = (uint64_t(1) << modify_flag_bit);
-      static const uint64_t location_mask =
-          ~(type_mask | ref_mask | copy_flag_mask | modify_flag_mask);
+      using temp_type = node_meta<uint64_t>;
 
-      object_meta(const object_meta& c) { _value.iv = c._value.iv; }
-      object_meta& operator=(const object_meta& in)
+      static constexpr const uint64_t ref_mask      = make_mask<0, 12>();
+      static constexpr const uint64_t type_mask     = make_mask<12, 4>();
+      static constexpr const uint64_t copy_mask     = make_mask<16, 1>();
+      static constexpr const uint64_t const_mask    = make_mask<17, 1>();
+      static constexpr const uint64_t location_mask = make_mask<18, 46>();
+
+      /**
+       *  Because retain() uses fetch_add() there is a possability of
+       *  overflow. For this reason retain will fail and undo once it
+       *  reaches past max_ref_count. A value of 64 means 64 threads would
+       *  have to fetch_add() before any thread fetch_sub() after reading
+       *  the value. That is an unreasonable number of cores attempting
+       *  to retain at the same time; therefore, this should be safe and
+       *  still allows ref counts up to 4032. 
+       */
+      static constexpr const uint64_t max_ref_count = ref_mask - max_threads;
+
+      /**
+       * @defgroup Accessors
+       *  These methods work on by the atomic and temp_type 
+       */
+      ///@{
+
+      uint64_t to_int() const { 
+         if constexpr (std::is_same_v<Storage, uint64_t>)
+            return _meta; 
+         else
+            return _meta.load( std::memory_order_relaxed );
+      }
+
+      bool          is_changing() const { return not is_const(); }
+      bool          is_const() const { return to_int() & const_mask; }
+      bool          is_copying() const { return to_int() & copy_mask; }
+      uint16_t      ref() const { return bitfield(to_int()).ref; }
+      node_location loc() const { return node_location::from_aligned(bitfield(to_int()).location); }
+      node_type     type() const { return node_type(bitfield(to_int()).type); }
+
+      auto& set_ref(uint16_t ref)
       {
-         _value.iv = in._value.iv;
+         assert(ref < max_ref_count);
+         _meta = bitfield(to_int()).set_ref(ref).to_int();
          return *this;
       }
 
-      explicit object_meta(uint64_t v = 0) { _value.iv = v; };
-      explicit object_meta(node_type t)
+      auto& set_type(node_type t)
       {
-         _value.bf.type        = int(t);
-         _value.bf.location    = 0;
-         _value.bf.ref         = 0;
-         _value.bf.modify_flag = 1;
-      }
-
-      // does not divide loc by 16
-      explicit object_meta(node_type t, uint64_t loc)
-      {
-         _value.bf.type        = int(t);
-         _value.bf.location    = loc;
-         _value.bf.ref         = 0;
-         _value.bf.modify_flag = 1;
-      }
-      explicit object_meta(node_type t, object_location loc)
-      {
-         assert(not(loc._offset & 15));
-         _value.bf.type        = int(t);
-         _value.bf.location    = loc._offset >> 4;
-         _value.bf.ref         = 0;
-         _value.bf.modify_flag = 1;
-      }
-      explicit object_meta(node_type t, object_location loc, int r)
-      {
-         assert(not(loc._offset & 15));
-         _value.bf.type        = int(t);
-         _value.bf.location    = loc._offset >> 4;
-         _value.bf.ref         = r;
-         _value.bf.modify_flag = 1;
-      }
-
-      object_meta& set_ref(uint16_t ref)
-      {
-         static_assert(max_ref_count < (1 << ARBTRIE_REF_BITS));
-         assert(int64_t(ref) < max_ref_count);
-         _value.bf.ref = ref;
-         return *this;
-      }
-      object_meta& set_location(object_location loc)
-      {
-         assert(not(loc._offset & 15));
-         assert((loc._offset >> 4) == (loc._offset / 16));
-         _value.bf.location = loc._offset >> 4;
-         /*
-            _value.bf.location = loc >> 4;
-            loc << (location_rshift-3);
-            value = (value & ~location_mask) | loc;
-            */
-         return *this;
-      }
-      object_meta& set_type(node_type type)
-      {
-         _value.bf.type = int(type);
-         return *this;
-         //   value = (value & ~type_mask ) | (uint64_t(type) << type_lshift);
-      }
-      uint64_t     ref() const { return _value.bf.ref; }  //_value & ref_mask; }
-      node_type    type() const { return node_type(_value.bf.type); }
-      bool         modify_flag() const { return _value.bf.modify_flag; }
-      bool         copy_flag() const { return _value.bf.copy_flag; }
-      object_meta& clear_copy_flag()
-      {
-         _value.bf.copy_flag = 0;
+         _meta = bitfield(to_int()).set_type(t).to_int();
          return *this;
       }
 
-      bool is_changing() const { return not modify_flag(); }
-      bool is_copying() const { return _value.bf.copy_flag; }
+      auto& set_location(node_location nl)
+      {
+         _meta = bitfield(to_int()).set_location(nl).to_int();
+         return *this;
+      }
+      auto& clear_copy_flag()
+      {
+         _meta &= ~copy_mask;
+         return *this;
+      }
 
-      object_location loc() const { return {uint64_t(_value.bf.location) << 4}; }
+      void store(uint64_t v, auto memory_order) { _meta.store(v, memory_order); }
+      void store( temp_type v, auto memory_order) { _meta.store(v.to_int(), memory_order); }
+      auto load(auto memory_order = std::memory_order_relaxed) const
+      {
+         if constexpr (std::is_same_v<Storage, uint64_t>)
+            return temp_type(_meta);
+         else
+            return temp_type(_meta.load(memory_order));
+      }
+      ///@}
 
-      // return the loc without mult by 16
-      uint64_t raw_loc() const { return _value.bf.location; }
-      void     set_raw_loc(uint64_t l) { _value.bf.location = l; }
+      /**
+       * @defgroup Atomic Synchronization 
+       *  These methods only work on the default Storage=std::atomic
+       */
+      ///@{
+      // returns the state prior to start modify
+      temp_type start_modify()
+      {
+         // this mask sets copy to 0 and const to 0
+         const uint64_t start_mod_mask = ~(copy_mask | const_mask);
+         //if constexpr (std::is_same_v<Storage, fake_atomic<uint64_t>>)
+         return temp_type(_meta.fetch_and(start_mod_mask, std::memory_order_acquire));
+         //else
+         //   static_assert(!"cannot modify a temporary view of an atomic object");
+      }
 
-      uint64_t&       data() { return _value.iv; }
-      const uint64_t& data() const { return _value.iv; }
-      uint64_t        to_int() const { return _value.iv; }
-   };
-   static_assert(sizeof(object_meta) == sizeof(uint64_t));
+      temp_type end_modify()
+      {
+         // set the const flag to 1 to signal that modification is complete
+         // mem order release synchronizies with readers of the modification
+         temp_type prior(_meta.fetch_or(const_mask, std::memory_order_release));
 
-   struct value_type {
-      value_type( const char* str ):data(std::string_view(str)){}
-      value_type( const std::string& vv ):data(std::string_view(vv)){}
-      value_type( value_view vv ):data(vv){}
-      value_type( object_id i ):data(i){}
-      value_type(){}
-
-      uint16_t size()const {
-         if( const value_view* vv = std::get_if<value_view>(&data) ){
-            return vv->size();
+         // if a copy was started between start_modify() and end_modify() then
+         // the copy bit would be set and the other thread will be waiting
+         if (prior.is_copying()){
+            _meta.notify_all();
          }
-         return sizeof(object_id);
+         return prior;
       }
-      const value_view& view()const { return std::get<value_view>(data); }
-      object_id         id()const   { return std::get<object_id>(data);  }
-      bool is_object_id()const      { return data.index() == 1;          }
-      bool is_view()const           { return data.index() == 0;          }
 
-      auto visit( auto&& l )const { return std::visit( std::forward<decltype(l)>(l), data ); }
-
-      // copy the value into the provided buffer
-      void place_into( uint8_t* buffer, uint16_t size )const 
+      /**
+       *  Sets the copy flag to true, 
+       */
+      bool try_start_move(node_location expected)
       {
-         if( const value_view* vv = std::get_if<value_view>(&data) ){
-            memcpy( buffer, vv->data(), vv->size() );
-         } else {
-            assert( size == sizeof(object_id) );
-            auto id = std::get<object_id>(data);
-            memcpy( buffer, &id, sizeof(id) );
-         }
-      }
-      friend std::ostream& operator << ( std::ostream& out, const value_type& v ) {
-         if( v.is_object_id() )
-            return out << v.id();
-         return out << v.view();
-      }
-      private:
-         std::variant<value_view,object_id> data;
-   };
+         do
+         {
+            // set the copy bit to 1
+            // acquire because if successful, we need the latest writes to the object
+            // we are trying to move
+            temp_type old(_meta.fetch_or(copy_mask, std::memory_order_acquire));
 
-   using branch_index_type = int_fast16_t;
-   inline constexpr branch_index_type char_to_branch( char c ) { return branch_index_type(uint8_t(c))+1; }
-   inline constexpr branch_index_type char_to_branch( uint8_t c ) { return branch_index_type(uint8_t(c))+1; }
-   inline constexpr char branch_to_char( branch_index_type b ) { return char( b-1); }
+            if (not old.ref() or old.loc() != expected) [[unlikely]]
+            {  // object we are trying to copy has moved or been freed, return false
+               _meta.fetch_and(~copy_mask, std::memory_order_relaxed);
+               return false;
+            }
+
+            if (not old.is_changing()) [[likely]]
+               return true;
+
+            // exepcted current value is old|copy because the last fetch_or,
+            // this will wait until the value has changed
+            _meta.wait(old.to_int() | copy_mask, std::memory_order_acquire);
+         } while (true);
+      }
+
+      enum move_result : int_fast8_t
+      {
+         moved   = -1,
+         freed   = -2,
+         success = 0,
+         dirty   = 1,
+      };
+
+      /**
+       *  Move is only successful if the expected location hasn't changed 
+       *  from when try_start_move() was called. If everything is in order
+       *  then new_loc is stored.  move_result > 1 is dirty, move_result < 0
+       *  means the object is no longer there.  Success is 0.
+       */
+      move_result try_move(node_location expect_loc, node_location new_loc)
+      {
+         uint64_t  expected = _meta.load(std::memory_order_acquire);
+         temp_type ex;
+         do
+         {
+            ex = temp_type(expected);
+            if (not ex.is_copying()) [[unlikely]]
+               return move_result::dirty;
+
+            // start_move set the copy bit, start_modify cleared it
+            // therefore the prior if already returned.
+            assert(not ex.is_changing());
+            /*if (ex.is_changing()) [[unlikely]] 
+               return move_result::dirty; */
+
+            if (ex.loc() != expect_loc) [[unlikely]]
+               return move_result::moved;
+            if (ex.ref() == 0) [[unlikely]]
+               return move_result::freed;
+            ex.set_location(new_loc).clear_copy_flag();
+         } while (
+             not _meta.compare_exchange_weak(expected, ex.to_int(), std::memory_order_release));
+         return move_result::success;
+      }
+
+      /**
+       *  A thread that doesn't own this object and wants to own it must
+       *  ensure that nothing changes if it cannot increment the reference count; therefore,
+       *  it cannot use fetch_add() like retain() does and must use compare/exchange loop
+       */
+      bool try_retain()
+      {
+         // load, inc, compare and exchange
+         throw std::runtime_error("try_retain not impl yet");
+         abort();
+      }
+
+      /**
+       * This method is only safe to call if the caller already "owns" one
+       * existing reference count. To retain from a non-owning thread requires
+       * calling try_retain
+       */
+      bool retain()
+      {
+         temp_type prior(_meta.fetch_add(1, std::memory_order_relaxed));
+         if (prior.ref() > node_meta::max_ref_count) [[unlikely]]
+         {
+            _meta.fetch_sub(1, std::memory_order_relaxed);
+            return false;
+         }
+         return true;
+      }
+      temp_type release()
+      {
+         temp_type prior(_meta.fetch_sub(1, std::memory_order_relaxed));
+         assert(prior.ref() != 0);
+         if constexpr (debug_memory)
+         {
+            if (prior.ref() == 0)
+               throw std::runtime_error("double release detected");
+         }
+         return prior;
+      }
+      ///@} k
+
+      node_meta( const node_meta<uint64_t>& cpy ):_meta(cpy._meta){}
+
+      constexpr node_meta(uint64_t v = const_mask) : _meta(v) {}
+
+      /*
+      node_meta& operator=(auto&& m)
+      {
+         _meta = std::forward<decltype(m)>(m);
+         return *this;
+      }
+      */
+
+     private:
+      Storage _meta;
+   };
+   static_assert(sizeof(node_meta<>) == 8);
+
+   using node_meta_type = node_meta<>;
+   using temp_meta_type = node_meta<uint64_t>;
+   static_assert(sizeof(node_meta_type) == sizeof(temp_meta_type));
+
+
+
 
 }  // namespace arbtrie

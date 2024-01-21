@@ -1,6 +1,7 @@
 #pragma once
+#include <arbtrie/config.hpp>
 #include <arbtrie/debug.hpp>
-#include <arbtrie/id_allocator.hpp>
+#include <arbtrie/id_alloc.hpp>
 #include <arbtrie/mapping.hpp>
 #include <arbtrie/node_header.hpp>
 #include <thread>
@@ -55,6 +56,11 @@ namespace arbtrie
    /// index into meta[free_segment_index]._free_segment_number
    using free_segment_index = uint64_t;
 
+   /// object pointers can only address 48 bits
+   /// 128 TB limit on database size with 47 bits, this saves us
+   /// 8MB of memory relative to 48 bits in cases with less than 128 TB
+   static constexpr const uint64_t max_segment_count = max_database_size / segment_size;
+
    // types that are memory mapped
    namespace mapped_memory
    {
@@ -107,8 +113,8 @@ namespace arbtrie
          // set to uint64_t max when this segment is ready
          // to be marked read only to the seg_allocator
          std::atomic<uint32_t> _alloc_pos = 16;  // sizeof(segment_header)
-         uint32_t _age;  // every time a segment is allocated it is assigned an age 
-                         // which aids in reconstruction
+         uint32_t              _age;  // every time a segment is allocated it is assigned an age
+                                      // which aids in reconstruction
          // used to calculate object density of segment header,
          // to establish madvise
          uint32_t _num_objects = 0;  // inc on alloc
@@ -158,14 +164,6 @@ namespace arbtrie
 
    }  // namespace mapped_memory
 
-   enum move_result
-   {
-      success,
-      dirty,
-      moved,
-      freed
-   };
-
    class seg_allocator
    {
      public:
@@ -177,6 +175,7 @@ namespace arbtrie
       ~seg_allocator();
 
       void dump();
+      void print_region_stats(){ _id_alloc.print_region_stats(); }
       void sync(sync_type st = sync_type::sync);
       void start_compact_thread();
       void stop_compact_thread();
@@ -197,40 +196,15 @@ namespace arbtrie
             class modify_lock
             {
               public:
-               modify_lock(std::atomic<uint64_t>& m, read_lock& rl, std::mutex& mut)
-                   : _meta(m), _rlock(rl), _mut(mut)
+               modify_lock(node_meta_type& m, read_lock& rl) : _meta(m), _rlock(rl)
                {
-                  //  _locked_val = object_meta( _meta.load(std::memory_order_acquire));
-
-                  assert(not object_meta(_meta.load()).is_changing());
-
-                  // clear copy and modify bit at once
-                  const uint64_t start_mod_mask =
-                      ~(object_meta::copy_flag_mask | object_meta::modify_flag_mask);
-
-                 // _mut.lock();
-                 // _mut.unlock();
-                  _read_on_lock = _meta.fetch_and(start_mod_mask, std::memory_order_acquire);
-
-                  //auto prior_o= object_meta(
-                      //_meta.fetch_and(start_mod_mask, std::memory_order_acquire) & start_mod_mask);
-                  //     _read_on_lock);
-
-                  // assert no one else is atempting to modify at the same time
-                  //assert( not prior_o.is_changing() );
-
-                  _locked_val = object_meta( _read_on_lock& start_mod_mask);
-                  assert(_locked_val.is_changing());
-                  assert(not _locked_val.is_copying() );
+                  _locked_val = _meta.start_modify();
                }
 
                ~modify_lock()
                {
                   if (not _released)
-                  {
                      unlock();
-                  }
-                  assert(not object_meta(_meta.load()).is_changing());
                }
 
                // returned mutable T is only valid while modify lock is in scope
@@ -238,7 +212,13 @@ namespace arbtrie
                T* as()
                {
                   assert(_locked_val.ref());
-                  return (T*)(_observed_ptr = _rlock.get_object_pointer(_locked_val.loc()));
+                  return (T*)(_observed_ptr = _rlock.get_node_pointer(_locked_val.loc()));
+               }
+               template <typename T>
+               void as(auto&& call_with_tptr)
+               {
+                  assert(_locked_val.ref());
+                  call_with_tptr((T*)(_observed_ptr = _rlock.get_node_pointer(_locked_val.loc())));
                }
 
                void release()
@@ -250,60 +230,20 @@ namespace arbtrie
               private:
                void unlock()
                {
+                  // TODO: check to see if checksum actually changed?
+                  // to let us know if we are making empty changes
                   if (_observed_ptr) [[likely]]
-                  {
-                     // TODO: check to see if checksum actually changed?
-                     // to let us know if we are making empty changes
-                     _observed_ptr->checksum = 0;//update_checksum();
-                  }
+                     _observed_ptr->checksum = 0;  //update_checksum();
                   else
-                  {
                      TRIEDENT_WARN("got modify lock but never read data");
-                  }
 
-                  // this must be memory_order release so that any threads
-                  // that are about to deref the pointer see the latest modifications,
-                  auto prior = _meta.fetch_or(
-                      object_meta::modify_flag_mask, std::memory_order_release);
-                                                       
-                  const uint64_t start_mod_mask =
-                      ~(object_meta::copy_flag_mask | object_meta::modify_flag_mask);
-
-                     /*
-                  if( prior != (_read_on_lock & start_mod_mask) ) {
-                     TRIEDENT_WARN( "object changed during lock: after.ref:",
-                                    object_meta(prior).ref(),  " onlock.ref: ",
-                                    object_meta(_read_on_lock).ref(),
-                                    "  after.loc: ", object_meta(prior).raw_loc(),
-                                    "  onlock.loc: ", object_meta(_read_on_lock).raw_loc(),
-                                    "  after.is_copying: ", object_meta(prior).is_copying(),
-                                    "  onlock.is_copying: ", object_meta(_read_on_lock).is_copying() );
-                  }
-                                    */
-                                                       //
-                  assert( object_meta(prior).is_changing() );
-                  if( object_meta(prior).is_copying() ) {
-                  //   TRIEDENT_WARN("notifying on unlock");
-                     _meta.notify_all();
-                  }
-
-                  /*
-                  if (prior & object_meta::copy_flag_mask)
-                  {
-                     TRIEDENT_WARN("notifying on unlock");
-                     _meta.notify_all();
-                  }
-                  */
-                  assert(not object_meta(prior | object_meta::modify_flag_mask).is_changing());
-
+                  _meta.end_modify();
                }
-               bool                   _released = false;
-               object_meta            _locked_val;
-               std::atomic<uint64_t>& _meta;
-               read_lock&             _rlock;
-               node_header*           _observed_ptr = nullptr;
-               std::mutex&            _mut;
-               uint64_t               _read_on_lock;
+               bool            _released = false;
+               temp_meta_type  _locked_val;
+               node_meta_type& _meta;
+               read_lock&      _rlock;
+               node_header*    _observed_ptr = nullptr;
             };
 
             template <typename T = node_header>
@@ -315,115 +255,111 @@ namespace arbtrie
 
                template <typename Other>
                object_ref(object_ref<Other> p)
-                   : _rlock(p._rlock), _id(p._id), _atom_loc(p._atom_loc), _cached(p._cached)
+                   : _rlock(p._rlock), _address(p._address), _meta(p._meta), _cached(p._cached)
                {
                }
 
-               inline object_id       id() const { return _id; }
-               inline uint32_t        ref() const { return _cached.ref(); }
-               inline node_type       type() const { return _cached.type(); }
-               inline object_location loc() const { return _cached.loc(); }
-               inline uint64_t        raw_loc() const { return _cached.raw_loc(); }
+               inline id_address    address() const { return _address; }
+               inline uint32_t      ref() const { return _cached.ref(); }
+               inline node_type     type() const { return _cached.type(); }
+               inline node_location loc() const { return _cached.loc(); }
 
                // return false if ref count overflow
-               bool retain();
+               bool retain() { 
+                  return _meta.retain(); 
+               }
                // return true if object is deleted
-               bool     release();
-               const T* obj() const;  // TODO: rename header()
+               bool release();
 
-               modify_lock modify() { return modify_lock(_atom_loc, _rlock, get_mutex()); }
-               //  T*       obj();        // TODO: rename header()
+               modify_lock modify() { return modify_lock(_meta, _rlock); }
+               bool        try_start_move(node_location loc) { return _meta.try_start_move(loc); }
+               auto        try_move(node_location expected_prior_loc, node_location move_to_loc)
+               {
+                  return _meta.try_move(expected_prior_loc, move_to_loc);
+               }
 
-               bool try_start_move(uint64_t expect_raw_loc);
-
-               //  template <typename Type>
-               //  Type* as()
-               //  {
-               //     return reinterpret_cast<Type*>(obj());
-               //  };
+               const T* header() const;
+               const T* operator->() const { return header(); }
                template <typename Type>
                const Type* as() const
                {
-                  assert( Type::type == obj()->get_type() );
-                  return reinterpret_cast<const Type*>(obj());
+                  assert(Type::type == header()->get_type());
+                  return reinterpret_cast<const Type*>(header());
                };
+               void store(temp_meta_type tmt, auto memory_order)
+               {
+                  _meta.store(_cached = tmt, memory_order);
+               }
 
-               explicit inline operator bool() const { return bool(id()); }
+               //explicit inline operator bool() const { return bool(id()); }
 
-               //  T*       operator->() { return as<T>(); }
-               const T* operator->() const { return as<T>(); }
-
-               //int64_t as_id() const { return _id.id; }
-
-               auto& get_mutex() const { return _rlock._session._sega._id_alloc.get_mutex(_id); }
+               //auto& get_mutex() const { return _rlock._session._sega._id_alloc.get_mutex(_id); }
 
                // return false if object is released or moved while atempting to move
-               move_result move(object_location expected_prior_loc, object_location move_to_loc);
 
-               bool cache_object();
+               //bool cache_object();
 
-               void refresh() { _cached = object_meta(_atom_loc.load(std::memory_order_acquire)); }
+               //void refresh() { _cached = _meta.load( std::memory_order_acquire ); }
 
                auto& rlock() { return _rlock; }
                auto& rlock() const { return _rlock; }
 
-               object_ref clone(const T* v) const { return rlock().clone(v); }
+               //object_ref clone(const T* v) const { return rlock().clone(v); }
 
               protected:
                friend class seg_allocator;
                friend class seg_allocator::session;
 
                object_ref(seg_allocator::session::read_lock& rlock,
-                          object_id                          id,
-                          std::atomic<uint64_t>&             atom_loc)
+                          id_address                         adr,
+                          node_meta_type&                    met)
                    : _rlock(rlock),
-                     _atom_loc(atom_loc),
-                     _cached(atom_loc.load(std::memory_order_acquire)),
-                     _id(id)
+                     _meta(met),
+                     _cached(_meta.load(std::memory_order_acquire)),
+                     _address(adr)
                {
                   //    assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
                }
 
                seg_allocator::session::read_lock& _rlock;
-               std::atomic<uint64_t>&             _atom_loc;
-               object_meta                        _cached;  // cached read of atomic _atom_loc
-               object_id                          _id;
+               node_meta_type&                    _meta;
+               temp_meta_type                     _cached;  // cached read of atomic _atom_loc
+               id_address                         _address;
             };  // object_ref
 
-            template <typename T>
-            inline object_ref<T>    clone(const T* n);
-            object_ref<node_header> alloc(uint32_t size, node_type type, auto initfunc);
+            //template <typename T>
+            //inline object_ref<T>    clone(const T* n);
+            //template <typename T>
+            //object_ref<T> clone(T* n);
 
-            object_ref<node_header> realloc(object_id reuse,
-                                            uint32_t  size,
-                                            node_type type,
-                                            auto      initfunc);
+            object_ref<node_header> alloc(id_region reg,
+                                          uint32_t  size,
+                                          node_type type,
+                                          auto      initfunc);
+            object_ref<node_header> realloc(id_address reuse,
+                                            uint32_t   size,
+                                            node_type  type,
+                                            auto       initfunc);
 
-            template <typename T>
-            object_ref<T> clone(T* n);
+            /**
+             * @defgroup Region Alloc Helpers
+             */
+            /// @{
+            id_region get_new_region() { return _session._sega._id_alloc.get_new_region(); }
+            void      free_meta_node(id_address);
+            std::pair<node_meta_type&, id_address> get_new_meta_node(id_region);
+            /// @}
 
             template <typename T = node_header>
-            inline object_ref<T> get(object_id id)
+            inline object_ref<T> get(id_address adr)
             {
-               return object_ref<T>(*this, id, _session._sega._id_alloc.get(id));
+               return object_ref<T>(*this, adr, _session._sega._id_alloc.get(adr));
             }
 
             // this is for help in lldb
-            object_ref<node_header> get_by_id(object_id id) { return get(id); }
+            //object_ref<node_header> get_by_id(object_id id) { return get(id); }
 
             inline object_ref<node_header> get(node_header*);
-
-            // checks known invariants:
-            //   id < max_id of id_allocator
-            //   id points to obj that points back to it
-            //   ref_count > 0
-            //   node_type is known and defined
-            //   ptr is in a valid range
-            //   others?
-            object_ref<node_header> validate(object_id id) const
-            {
-               throw std::runtime_error("read_lock::validate not impl");
-            }
 
             ~read_lock() { _session.release_read_lock(); }
 
@@ -432,7 +368,7 @@ namespace arbtrie
             template <typename T>
             friend class object_ref;
 
-            node_header* get_object_pointer(object_location);
+            node_header* get_node_pointer(node_location);
 
             read_lock(session& s) : _session(s) { _session.retain_read_lock(); }
             read_lock(const session&) = delete;
@@ -447,7 +383,7 @@ namespace arbtrie
          // before any objects can be read, the session must note the
          // current state of the free segment queue so that no segments that
          // could be read while the return value of this method is in scope can
-         // be reused.
+         // be reused (overwritten)
          read_lock lock() { return read_lock(*this); }
 
          ~session()
@@ -488,17 +424,18 @@ namespace arbtrie
             ++_nested_read_lock;
             if (_nested_read_lock == 1)
             {
-               uint64_t cur = _sega._session_lock_ptrs[_session_num].load( std::memory_order_acquire);
+               uint64_t cur =
+                   _sega._session_lock_ptrs[_session_num].load(std::memory_order_acquire);
                //cur.locked_end = cur.view_of_end;
                uint32_t view_of_end = cur >> 32;
-               uint32_t cur_end = uint32_t(cur);
+               uint32_t cur_end     = uint32_t(cur);
                // it should be unlocked which signaled by max
-               assert( cur_end == uint32_t(-1) );
+               assert(cur_end == uint32_t(-1));
                auto diff = cur_end - view_of_end;
 
                // an atomic sub should leave the higher-order bits in place where the view
                // from the compactor is being updated.
-               _sega._session_lock_ptrs[_session_num].fetch_sub( diff, std::memory_order_release );
+               _sega._session_lock_ptrs[_session_num].fetch_sub(diff, std::memory_order_release);
             }
          }
 
@@ -509,12 +446,12 @@ namespace arbtrie
             assert(_nested_read_lock >= 0);
             if (not _nested_read_lock)
             {
-             //  assert(_sega._session_ptrs[_session_num] != -1ull);
+               //  assert(_sega._session_ptrs[_session_num] != -1ull);
                //_sega._session_ptrs[_session_num] = -1ull;
-             //  _sega._session_lock_ptrs[_session_num].fetch_or( , std::memory_order_release );
+               //  _sega._session_lock_ptrs[_session_num].fetch_or( , std::memory_order_release );
 
                // set it to max uint32_t
-               _sega._session_lock_ptrs[_session_num].fetch_or( uint32_t(-1) );
+               _sega._session_lock_ptrs[_session_num].fetch_or(uint32_t(-1));
             }
          }
 
@@ -545,14 +482,18 @@ namespace arbtrie
          /**
           *   alloc_data
           *
+          *   TODO: all objects should be aligned to a cache line of 64 bytes
+          *   because it reduces the total number of cache lines that must be fetched. 
+          *   Every time a node crosses a cacheline it doubles the required memory
+          *   bandwidth.  A side effect is that it increases the total addressable space
+          *   of the database by 4x (and/or) gives us more bits in node_meta.
           */
-         std::pair<object_location, node_header*> alloc_data(uint32_t  size,
-                                                             object_id id)
+         std::pair<node_location, node_header*> alloc_data(uint32_t size, id_address adr)
          {
             assert(size < segment_size - 16);
             // A - if no segment get a new segment
-            if (not _alloc_seg_ptr or
-                _alloc_seg_ptr->_alloc_pos.load(std::memory_order_relaxed) > segment_size)
+            if (not _alloc_seg_ptr or _alloc_seg_ptr->_alloc_pos.load(std::memory_order_relaxed) >
+                                          segment_size) [[unlikely]]
             {
                auto [num, ptr] = _sega.get_new_segment();
                _alloc_seg_num  = num;
@@ -566,13 +507,11 @@ namespace arbtrie
 
             auto cur_apos = sh->_alloc_pos.load(std::memory_order_relaxed);
 
-            assert(not(cur_apos & 15));
-
             auto spec_pos   = uint64_t(cur_apos) + rounded_size;
             auto free_space = segment_size - cur_apos;
 
             // B - if there isn't enough space, notify compactor go to A
-            if (spec_pos > (segment_size - sizeof(node_header)))
+            if (spec_pos > (segment_size - sizeof(node_header))) [[unlikely]]
             {
                if (free_space >= sizeof(node_header))
                {
@@ -584,12 +523,12 @@ namespace arbtrie
                _alloc_seg_ptr = nullptr;
                _alloc_seg_num = -1ull;
 
-               return alloc_data(size, id);  // recurse
+               return alloc_data(size, adr);  // recurse
             }
 
-            auto obj       = ((char*)sh) + sh->_alloc_pos.load(std::memory_order_relaxed);
-            auto head      = (node_header*)obj;
-            head           = new (head) node_header(size, id);
+            auto obj  = ((char*)sh) + sh->_alloc_pos.load(std::memory_order_relaxed);
+            auto head = (node_header*)obj;
+            head      = new (head) node_header(size, adr);
 
             auto new_alloc_pos =
                 rounded_size + sh->_alloc_pos.fetch_add(rounded_size, std::memory_order_relaxed);
@@ -597,7 +536,7 @@ namespace arbtrie
 
             auto loc = _alloc_seg_num * segment_size + cur_apos;
 
-            return {object_location{loc}, head};
+            return {node_location::from_absolute(loc), head};
          }
 
          uint32_t _session_num;  // index into _sega's active sessions list
@@ -658,8 +597,8 @@ namespace arbtrie
        * All objects are const because they cannot be modified after being
        * written.
        */
-      const node_header* get_object(object_location loc) const;
-      const node_header* get_object(object_id oid) const;
+      const node_header* get_object(node_location loc) const;
+      //const node_header* get_object(object_id oid) const;
 
       /**
        *  After all writes are complete, and there is not enough space
@@ -689,7 +628,7 @@ namespace arbtrie
       std::thread _compact_thread;
 
       // maps ids to locations
-      id_allocator _id_alloc;
+      id_alloc _id_alloc;
 
       // allocates new segments
       block_allocator _block_alloc;
@@ -702,7 +641,7 @@ namespace arbtrie
        */
       std::atomic<uint64_t> _min_read_ptr = -1ull;  // min(R*)
       uint64_t              get_min_read_ptr();
-      void                  set_session_end_ptrs( uint32_t e );
+      void                  set_session_end_ptrs(uint32_t e);
 
       /**
        *  Lower 32 bits represent R* above
@@ -754,172 +693,24 @@ namespace arbtrie
    */
 
    template <typename T>
-   inline const T* seg_allocator::session::read_lock::object_ref<T>::obj() const
+   inline const T* seg_allocator::session::read_lock::object_ref<T>::header() const
    {
-      object_meta val(_atom_loc.load(std::memory_order_acquire));
-
-      assert(val.ref());
-      return (const T*)_rlock.get_object_pointer(val.loc());
-   }
-
-   template <typename T>
-   using deref = seg_allocator::session::read_lock::object_ref<T>;
-
-
-   /**
-    * @param expect - the current location the caller things the object is at
-    * @param loc    - the new location the caller wants it to point at if and only
-    *                 if the expected location hasn't changed.
-    * @return true if the swap was made and the object still has a positive ref count
-    */
-   template <typename T>
-   move_result seg_allocator::session::read_lock::object_ref<T>::move(object_location expect_loc,
-                                                                      object_location loc)
-   {
-      uint64_t expected = _atom_loc.load(std::memory_order_acquire);
-      do
-      {
-         object_meta ex(expected);
-         // TODO: every call to ex.loc() does a mult by 16, could be replaced
-         // by ex.raw_loc() compared to loc.offset >> 4
-         if (not ex.is_copying())
-            return move_result::dirty;
-         assert( not ex.is_changing() );
-         //if (ex.is_changing())
-         //   return move_result::dirty;
-         if (ex.loc() != expect_loc)
-            return move_result::moved;
-         if (ex.ref() == 0)
-            return move_result::freed;
-         _cached = ex.set_location(loc).clear_copy_flag();
-      } while (not _atom_loc.compare_exchange_weak(expected, _cached.to_int(),
-                                                   std::memory_order_release));
-      return move_result::success;
-   }
-
-   /**
-                *  while the object is valid and at the expected location
-                *  wait for any modifications to be completed
-                *
-                *  @return false if moving no longer makes sense because
-                *  the object has been freed or moved elsewhare. 
-                *  @return true if the object is not changing and is 
-                *    still in the expected location
-                */
-   template <typename T>
-   bool seg_allocator::session::read_lock::object_ref<T>::try_start_move(uint64_t expect_raw_loc)
-   {
-      assert(not _cached.is_copying());
-      do
-      {
-         auto r = _atom_loc.fetch_or(object_meta::copy_flag_mask, std::memory_order_acquire);
-         object_meta old(r);
-         assert(object_meta(r | object_meta::copy_flag_mask).is_copying());
-
-         if (not old.ref() or old.raw_loc() != expect_raw_loc)
-         {
-          //  TRIEDENT_DEBUG("object already moved or ref: ", old.ref(), " id: ", id(),
-          //                 "  orl: ", old.raw_loc(), " exp: ", expect_raw_loc);
-            _atom_loc.fetch_and(~object_meta::copy_flag_mask);  //, std::memory_order_relaxed);
-            return false;  // object we are trying to copy has moved or been freed
-         }
-         if (not old.is_changing())
-         {
-            return true;
-         }
-
-       //  TRIEDENT_WARN("waiting for modify to complete: ", id());
-         _atom_loc.wait(old.to_int()|object_meta::copy_flag_mask, std::memory_order_acquire);
-       //  TRIEDENT_WARN("done waiting for modify to complete: ", id());
-      } while (true);
-   }
-
-   template <typename T>
-   bool seg_allocator::session::read_lock::object_ref<T>::retain()
-   {
-      object_meta prior(_atom_loc.fetch_add(1, std::memory_order_relaxed));
-      assert(prior.ref() > 0);
-      assert(prior.type() != node_type::freelist);
-
-  //    TRIEDENT_DEBUG( id(), " ref++ => ", (prior.to_int()&object_meta::ref_mask)+1 );
-      if (prior.ref() > object_meta::max_ref_count) [[unlikely]]
-      {
-         _atom_loc.fetch_sub(1, std::memory_order_relaxed);
-         return false;
-      }
-      return true;
-   }
-
-   template <typename T>
-   bool seg_allocator::session::read_lock::object_ref<T>::release()
-   {
-      assert(type() != node_type::undefined);
-      assert(type() != node_type::freelist);
-      auto prior = _atom_loc.fetch_sub(1, std::memory_order_relaxed);
-  //    TRIEDENT_DEBUG( id(), " ref-- => ", (prior&object_meta::ref_mask)-1 );
-      if ((prior & object_meta::ref_mask) > 1)
-         return false;
-
-      // in theory this isn't needed because
-      // a. ref count 0 already invalidated any new attempt to start a copy
-      // b. ref count 0 will invalidate any attempt to complete the move
-      // c. if ID is reallocated the new location will invalidate any move
-
-      // b. the location is about to change which will also invalidate
-      // in theory this will
-      // {modify()};  // invalidate any copies being made
-
-      _cached  = object_meta(prior - 1);
-      auto loc = _cached.loc();
-      auto seg = loc.segment();
-
-      auto obj_ptr =
-          (node_header*)((char*)_rlock._session._sega._block_alloc.get(seg) + loc.index());
-
-      //obj_ptr->set_type(node_type::undefined);
-
-      // signal to compactor that this data is no longer valid before
-      // we allow the ID to be reused.
-
-      // by touching this we are forcing pages to be written that were previously constant,
-      // but with recent changes to move() this check is almost redundant
-      //    obj_ptr->checksum = -1;  //TODO: does this prevent false invalid checksum in validate
-      
-
-    //  TRIEDENT_WARN( "free id: ", _id, " type: " , node_type_names[_cached.type()], " loc: ", loc._offset);
-
-      // This ID can be reused almost immediately after calling this method
-      // which means this objref object is worthless to the caller
-      _rlock._session._sega._id_alloc.free_id(_id);
-      _rlock._session._sega._header->seg_meta[seg].free_object(obj_ptr->object_capacity());
-
-      return true;
+      return (const T*)_rlock.get_node_pointer(_meta.load(std::memory_order_acquire).loc());
    }
 
    template <typename T>
    using object_ref = seg_allocator::session::read_lock::object_ref<T>;
 
-   template <typename T>
-   inline object_ref<T> seg_allocator::session::read_lock::clone(const T* n)
-   {
-      auto [atom, id]      = _session._sega._id_alloc.get_new_id();
-      auto [loc, node_ptr] = _session.alloc_data(n->size(), id, n->get_type());
-      memcpy(node_ptr, n, n->size());
-      node_ptr->set_id(n->id());
-
-      atom.store(object_meta(n->get_type(), loc, 1).to_int(), std::memory_order_relaxed);
-      return object_ref(*this, id, atom);
-   }
-
    /// @pre refcount of id is 1
-   inline object_ref<node_header> seg_allocator::session::read_lock::realloc(object_id id,
-                                                                             uint32_t  size,
-                                                                             node_type type,
-                                                                             auto      init)
+   inline object_ref<node_header> seg_allocator::session::read_lock::realloc(id_address adr,
+                                                                             uint32_t   size,
+                                                                             node_type  type,
+                                                                             auto       init)
    {
-      auto l       = get(id).loc();
+      auto oref    = get(adr);
+      auto l       = oref.loc();
       auto seg     = l.segment();
-      auto obj_ptr = (node_header*)((char*)_session._sega._block_alloc.get(seg) + l.index());
+      auto obj_ptr = (node_header*)((char*)_session._sega._block_alloc.get(seg) + l.abs_index());
 
       _session._sega._header->seg_meta[seg].free_object(obj_ptr->object_capacity());
 
@@ -928,53 +719,65 @@ namespace arbtrie
       assert(size >= sizeof(node_header));
       assert(type != node_type::undefined);
 
-      auto& atom           = _session._sega._id_alloc.get(id);
-      auto [loc, node_ptr] = _session.alloc_data(size, id);
+      //auto& atom           = _session._sega._id_alloc.get(id);
+      auto [loc, node_ptr] = _session.alloc_data(size, adr);
 
       init(node_ptr);
 
-      /*
-      TRIEDENT_WARN( "realloc id: ", id, " old type: " , node_type_names[get(id).type()], " old loc: ", l._offset,
-                     " new type:", node_type_names[type], "  new loc: ", loc._offset, " nsize: ", size );
-                     */
-
-
-      assert(node_ptr->_nsize == size );
-      assert(node_ptr->_ntype == type );
-      assert(node_ptr->_node_id == id.to_int());
+      assert(node_ptr->_nsize == size);
+      assert(node_ptr->_ntype == type);
+      assert(node_ptr->_node_id == adr.to_int());
 
       // we can stomp on the data because it is impossible for the ref count to
       // increase while realloc and even if compactor moves the data from the
-      // old location, the new data should take priority
-      atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
+      // old location, the new data should take priority and this thread shouldn't
+      // be holding the modify lock while realloc and
 
-      assert(object_ref(*this, id, atom).type() != node_type::undefined);
-      return object_ref(*this, id, atom);
+      //  atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
+
+
+      oref.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
+                 std::memory_order_release);
+      return oref;
+
+      //assert(object_ref(*this, id, atom).type() != node_type::undefined);
+      //return object_ref(*this, id, atom);
    }
 
-   inline object_ref<node_header> seg_allocator::session::read_lock::alloc(uint32_t  size,
+   inline std::pair<node_meta_type&, id_address>
+   seg_allocator::session::read_lock::get_new_meta_node(id_region reg)
+   {
+      return _session._sega._id_alloc.get_new_id(reg);
+      //auto [atom, id]      = _session._sega._id_alloc.get_new_id(reg);
+   }
+
+   inline object_ref<node_header> seg_allocator::session::read_lock::alloc(id_region reg,
+                                                                           uint32_t  size,
                                                                            node_type type,
                                                                            auto      init)
    {
       assert(size >= sizeof(node_header));
       assert(type != node_type::undefined);
 
-      auto [atom, id]      = _session._sega._id_alloc.get_new_id();
+      auto [atom, id]      = _session._sega._id_alloc.get_new_id(reg);
       auto [loc, node_ptr] = _session.alloc_data(size, id);
       //TRIEDENT_WARN( "alloc id: ", id, " type: " , node_type_names[type], " loc: ", loc._offset, " size: ", size);
 
       init(node_ptr);
 
-      atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
+      auto tmp = temp_meta_type().set_type(type).set_location(loc).set_ref(1);
+      //atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
+      atom.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
+                 std::memory_order_release);
 
-      assert(node_ptr->_nsize == size );
-      assert(node_ptr->_ntype == type );
+      assert(node_ptr->_nsize == size);
+      assert(node_ptr->_ntype == type);
       assert(node_ptr->_node_id == id.to_int());
       assert(object_ref(*this, id, atom).type() != node_type::undefined);
       return object_ref(*this, id, atom);
    }
 
-   inline node_header* seg_allocator::session::read_lock::get_object_pointer(object_location loc)
+   inline node_header* seg_allocator::session::read_lock::get_node_pointer(node_location loc)
    {
       auto segment = (mapped_memory::segment_header*)_session._sega._block_alloc.get(loc.segment());
       // 0 means we are accessing a swapped object on a segment that hasn't started new allocs
@@ -986,62 +789,42 @@ namespace arbtrie
       // along behind
 
       // only check this in release if this flag is set
-      if constexpr ( debug_memory ) {
-         if( not (segment->_alloc_pos == 0 or segment->_alloc_pos > loc.index()) ) {
-            abort();
-         }
-      } else { // always check in debug builds
-         assert(segment->_alloc_pos == 0 or segment->_alloc_pos > loc.index());
-      }
-      return (node_header*)((char*)_session._sega._block_alloc.get(loc.segment()) + loc.index());
-   }
-
-   /**
-    *  Given obj, if it isn't already located in the allocation segment of
-    *  this thread or in the allocation segment of another thread then
-    *  move it to the allocation segment of the current thread.
-    *
-    *  - do not wait for a write lock, if we can't get the write lock
-    *  then we will just let another thread move it
-    *
-    *  @return true if the object was moved
-   template <typename T>
-   bool seg_allocator::session::read_lock::object_ref<T>::cache_object()
-   {
-      std::unique_lock ul(get_mutex(), std::try_to_lock);
-
-      if (ul.owns_lock())
+      if constexpr (debug_memory)
       {
-         auto cur_loc = loc();
-
-         assert(ref());
-         assert(cur_loc._offset);
-         assert(cur_loc._offset & (segment_size - 1));
-
-         auto         cur_seg_ptr = _rlock._session._sega.get_segment(cur_loc.segment());
-         node_header* cur_obj_ptr = (node_header*)(((char*)cur_seg_ptr) + cur_loc.index());
-
-         assert(0 != cur_seg_ptr->_alloc_pos);  // this would be on a freed segment
-
-         // this would mean its currently located in an active alloc thread, while
-         // we could re-alloc it is probably already hot because a writer, reader,
-         // or compactor has just recently copied it.
-         if (cur_seg_ptr->_alloc_pos.load(std::memory_order_relaxed) != uint32_t(-1))
-            return false;
-
-         auto obj_size    = cur_obj_ptr->object_capacity();
-         auto [nloc, ptr] = _rlock._session.alloc_data(obj_size, _id, cur_obj_ptr->get_type());
-         memcpy(ptr, cur_obj_ptr, obj_size);
-         if (move(loc(), nloc))
-         {
-            // note that this item has been freed from the segment so the space
-            // can be recovered by the compactor
-            _rlock._session._sega._header->seg_meta[cur_loc.segment()].free_object(obj_size);
-            return true;
-         }
+         auto ap = segment->_alloc_pos.load(std::memory_order_relaxed);
+         if (not(ap == 0 or ap > loc.abs_index()))
+            abort();
       }
-      return false;
+      else  // always check in debug builds
+         assert(segment->_alloc_pos == 0 or segment->_alloc_pos > loc.abs_index());
+
+      return (node_header*)((char*)_session._sega._block_alloc.get(loc.segment()) +
+                            loc.abs_index());
    }
-    */
+
+   inline void seg_allocator::session::read_lock::free_meta_node(id_address a)
+   {
+      _session._sega._id_alloc.free_id(a);
+   }
+
+   template <typename T>
+   bool seg_allocator::session::read_lock::object_ref<T>::release()
+   {
+//      TRIEDENT_DEBUG( "  ", address(), "  ref: ", ref(), " type: ", node_type_names[type()] );
+      auto prior = _meta.release();
+      if (prior.ref() > 1)
+         return false;
+
+ //     TRIEDENT_DEBUG( "  free ", address() );
+
+      auto ploc    = prior.loc();
+      auto obj_ptr = _rlock.get_node_pointer(ploc);
+      //    (node_header*)((char*)_rlock._session._sega._block_alloc.get(seg) + loc.abs_index());
+
+      _rlock.free_meta_node(_address);  //_session._sega._id_alloc.free_id(_address);
+      _rlock._session._sega._header->seg_meta[ploc.segment()].free_object(
+          obj_ptr->object_capacity());
+      return true;
+   }
 
 }  // namespace arbtrie

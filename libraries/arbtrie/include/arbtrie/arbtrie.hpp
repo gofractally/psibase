@@ -2,7 +2,6 @@
 #include <arbtrie/node_header.hpp>
 #include <cassert>
 
-
 namespace arbtrie
 {
 
@@ -17,6 +16,7 @@ namespace arbtrie
       void visit_branches( auto )const{};
    };
 
+   /*
    struct bitfield_node : node_header
    {
       static const node_type type = node_type::bitfield;
@@ -25,14 +25,8 @@ namespace arbtrie
       //id_type                branches[N];
       //char                   prefix[];
    } __attribute((packed));
+   */
 
-   // This always returns a view into the first argument
-   inline std::string_view common_prefix(std::string_view a, std::string_view b)
-   {
-      return {a.begin(), std::mismatch(a.begin(), a.end(), b.begin(), b.end()).first};
-   }
-
-   using node_ptr = std::shared_ptr<node_header>;
 };  // namespace arbtrie
 
 #include <arbtrie/setlist_node.hpp>
@@ -62,8 +56,8 @@ namespace arbtrie {
             return func(static_cast<transcribe_const_t<T, binary_node>*>(h));
          [[unlikely]] case node_type::value:
             return func(static_cast<transcribe_const_t<T, value_node>*>(h));
-         [[unlikely]] case node_type::index:
-            throw std::runtime_error("index node not implimented");
+         //[[unlikely]] case node_type::index:
+         //   throw std::runtime_error("index node not implimented");
          [[unlikely]] case node_type::freelist:
             assert( !"cast and call on freelist" );
             throw std::runtime_error("cast and call on node type freelist");

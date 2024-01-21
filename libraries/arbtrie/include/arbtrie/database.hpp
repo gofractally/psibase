@@ -1,16 +1,55 @@
 #pragma once
 #include <algorithm>
 #include <arbtrie/arbtrie.hpp>
-#include <arbtrie/id_allocator.hpp>
 #include <arbtrie/root.hpp>
 #include <arbtrie/seg_allocator.hpp>
 #include <arbtrie/iterator.hpp>
+#include <arbtrie/value_type.hpp>
 #include <memory>
 #include <optional>
 
 namespace arbtrie
 {
    using session_rlock = seg_allocator::session::read_lock;
+
+   struct upsert_mode
+   {
+      enum type : int
+      {
+         shared        = 0,
+         unique        = 1,  // ref count of all parent nodes and this is 1
+         insert        = 2,  // fail if key does exist
+         update        = 4,  // fail if key doesn't exist
+         same_region   = 8,
+         upsert        = insert | update,
+         unique_upsert = unique | upsert,
+         unique_insert = unique | insert,
+         unique_update = unique | update,
+         shared_upsert = shared | upsert,
+         shared_insert = shared | insert,
+         shared_update = shared | update
+      };
+
+      constexpr upsert_mode(upsert_mode::type t) : flags(t){};
+
+      constexpr bool        is_unique() const { return flags & unique; }
+      constexpr bool        is_shared() const { return not is_unique(); }
+      constexpr bool        is_same_region() const { return flags & same_region; }
+      constexpr upsert_mode make_shared() const { return {flags & ~unique}; }
+      constexpr upsert_mode make_unique() const { return {flags | unique}; }
+      constexpr upsert_mode make_same_region() const { return {flags | same_region}; }
+      constexpr bool        may_insert() const { return flags & insert; }
+      constexpr bool        may_update() const { return flags & insert; }
+      constexpr bool        must_insert() const { return not (flags & update); }
+      constexpr bool        must_update() const { return not (flags & insert); } 
+      constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); } 
+
+     // private: structural types cannot have private members,
+     // but the flags field is not meant to be used directly
+      constexpr upsert_mode( int f ):flags(f){}
+      int flags;
+   };
+
    struct config
    {
       /**
@@ -153,12 +192,12 @@ namespace arbtrie
       }
 
       template <upsert_mode mode>
-      object_id upsert_value(object_ref<node_header>& root, const value_type& val);
+      id_address upsert_value(object_ref<node_header>& root, const value_type& val);
 
       //=======================
       // binary_node operations
       // ======================
-      object_id make_binary(session_rlock& state, key_view key, const value_type& val);
+      object_id make_binary(id_region reg, session_rlock& state, key_view key, const value_type& val);
 
       template <upsert_mode mode>
       object_id upsert_binary(object_ref<node_header>& root, key_view key, const value_type& val);
@@ -191,6 +230,7 @@ namespace arbtrie
       bool compact_next_segment();
 
       void print_stats(std::ostream& os, bool detail = false);
+      void print_region_stats();
 
      private:
       friend class write_session;
@@ -233,7 +273,7 @@ namespace arbtrie
 
       auto release_id = [&](object_id b) { release_node(state.get(b)); };
 
-      auto n = r.obj();
+      auto n = r.header();
       if (r.release())
       {
          // if we don't know the type, dynamic dispatch
@@ -263,8 +303,7 @@ namespace arbtrie
 
    int read_session::get(object_ref<node_header>& root, key_view key, auto callback)
    {
-      //auto r = root.obj();
-      return cast_and_call(root.obj(), [&](const auto* n) { return get(root, n, key, callback); });
+      return cast_and_call(root.header(), [&](const auto* n) { return get(root, n, key, callback); });
    }
    int read_session::get(object_ref<node_header>& root,
                          const auto*              inner,
@@ -289,10 +328,23 @@ namespace arbtrie
       }
       else
       {
-         if (auto branch_id = inner->get_branch(uint_fast16_t(uint8_t(key[0])) + 1))
-         {
-            auto bref = root.rlock().get(branch_id);
-            return get(bref, key.substr(1), callback);
+         auto cpre = common_prefix( inner->get_prefix(), key );
+         if( cpre == inner->get_prefix() ) {
+            if( key.size() > cpre.size() ) {
+               if (auto branch_id = inner->get_branch(char_to_branch(key[cpre.size()])) ) 
+               {
+                  auto bref = root.rlock().get(branch_id);
+                  return get(bref, key.substr(cpre.size()+1), callback);
+               }
+            } else {
+               if (auto branch_id = inner->get_branch(0) )
+               {
+                  auto bref = root.rlock().get(branch_id);
+                  callback( true, bref.template as<value_node>()->value() );
+                  return 1;
+               }
+
+            }
          }
       }
       callback(false, value_type());
