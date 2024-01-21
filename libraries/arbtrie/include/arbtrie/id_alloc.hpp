@@ -150,6 +150,7 @@ namespace arbtrie
 
          if (nid < num_pages * id_page_size) [[likely]]
          {
+            assert( nid != 0 );
             auto nadr = r + id_index(nid);
        //     TRIEDENT_WARN( "alloc: ", nadr );
             return {get(nadr), nadr};

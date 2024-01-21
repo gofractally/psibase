@@ -67,12 +67,12 @@ namespace arbtrie
 
       bool can_add_branch() const { return _num_branches < branch_count; }
 
-      std::pair<int_fast16_t,object_id> lower_bound( int_fast16_t br )const {
+      std::pair<int_fast16_t,id_address> lower_bound( int_fast16_t br )const {
          while( br < max_branch_count and not _branches[br] )
             ++br;
          if( br == max_branch_count )
             return {br, {}};
-         return {br, _branches[br]};
+         return {br, get_branch(br) };
       }
 
       void add_branch(int_fast16_t br, id_address b)
@@ -83,7 +83,7 @@ namespace arbtrie
          assert( b._region == branch_region() );
          ++_num_branches;
          assert(_num_branches <= max_branch_count);
-         _branches[br] = b;
+         _branches[br] = b._index;
 
          // this info is redundant and no one should determine eof_branch
          // for full node by reading this, so don't bother updating it
@@ -108,16 +108,19 @@ namespace arbtrie
          assert(br >= 0);
          assert(_branches[br]);
          assert( b._region == branch_region() );
-         _branches[br] = b;
+         _branches[br] = b._index;
       }
 
       bool has_eof_value()const { return bool(_branches[0]); }
 
-      object_id get_branch(int_fast16_t br)const
+      id_address get_branch(int_fast16_t br)const
       {
          assert(br < max_branch_count);
          assert(br >= 0);
-         return _branches[br];
+         // TODO: remove this once everyone handles null properly
+         //if( _branches[br] )
+            return id_address{ branch_region(), _branches[br] };
+         //return {};
       }
 
       inline int_fast32_t prefix_size() const { return prefix_capacity() - _prefix_trunc; }
@@ -134,13 +137,13 @@ namespace arbtrie
       {
          for (auto& x : _branches)
             if (x)
-               visitor(x);
+               visitor( id_address{branch_region(),x} );
       }
       inline void visit_branches_with_br(auto visitor) const
       {
          for( int i = 0; i < 257; ++i ) {
             if( _branches[i] ) 
-               visitor( i, _branches[i] );
+               visitor( i, get_branch(i) );//id_address{branch_region(),_branches[i]} );
          }
       }
 
@@ -148,7 +151,7 @@ namespace arbtrie
       uint64_t _prefix_trunc : 10 = 0;
       uint64_t _prefix_capacity: 10 = 0;
 
-      id_address _branches[max_branch_count];
+      id_index  _branches[max_branch_count];
       char      _prefix[];
 
       uint16_t        prefix_capacity() const { return _prefix_capacity; }

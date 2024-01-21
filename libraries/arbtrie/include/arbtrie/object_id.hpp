@@ -21,6 +21,7 @@ namespace arbtrie {
    struct id_index {
       id_index( uint32_t r = 0 ):index(r){}
       uint32_t index:24;
+      operator bool()const { return index; }
       friend bool operator == ( id_index a, id_index b ) = default;
    } __attribute__((packed)) __attribute__((aligned(1)));
    static_assert( sizeof(id_index) == 3 );
@@ -43,7 +44,9 @@ namespace arbtrie {
          return out << a.region() <<"."<<a.index();
       }
       friend bool operator == ( id_address a, id_address b ) = default;
-      operator bool()const { return to_int() != 0; }
+      friend bool operator != ( id_address a, object_id b );
+
+      operator bool()const { return _index; }
       void reset() { _region.region = 0; _index.index = 0; }
    }__attribute__((packed)) __attribute__((aligned(1)));
 
@@ -60,7 +63,7 @@ namespace arbtrie {
     */
    struct object_id
    {
-      explicit             operator bool() const { return id != 0; }
+      explicit             operator bool() const { return (id & 0xffffff) != 0; }
       friend bool          operator==(object_id a, object_id b) = default;
       friend std::ostream& operator<<(std::ostream& out, const object_id& oid)
       {
@@ -89,6 +92,9 @@ namespace arbtrie {
 
    inline id_address::operator object_id()const {
       return object_id( to_int() );
+   }
+   inline bool operator != ( id_address a, object_id b ) {
+      return a.to_int() != b.to_int();
    }
 
 } // namespace arbtrie

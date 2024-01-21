@@ -74,7 +74,8 @@ std::string add_comma(uint64_t s)
 void validate_invariant( session_rlock& state, object_id i );
 void validate_invariant( session_rlock& state, object_id i, auto* in) {
    in->visit_branches_with_br( [&](int br, id_address adr ) {
-      assert( in->branch_region() == adr._region );
+      if( in->branch_region() != adr._region )
+          throw std::runtime_error( "region invariant violated" );
       validate_invariant( state, adr );
    });
 }
@@ -347,6 +348,8 @@ int  main(int argc, char** argv)
    std::vector<std::string> v;
    std::string              str;
 
+   int64_t batch_size = 100'000'000;
+
    // Read the next line from File until it reaches the
    // end.
    while (file >> str)
@@ -369,8 +372,8 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 3;
-         const int                  count  = 1'000'000;
+         const int                  rounds = 2;
+         const int                  count  = 10'000'000;
 
          auto iterate_all = [&]()
          {
@@ -415,8 +418,10 @@ int  main(int argc, char** argv)
                ++seq;
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
+               if( (i % batch_size)  == 0 ) {
+                  last_root = r;
+               }
             }
-            last_root2 = last_root;
             last_root  = r;
 
             auto end   = std::chrono::steady_clock::now();
@@ -429,8 +434,10 @@ int  main(int argc, char** argv)
                       << " dense rand insert/sec  total items: " << add_comma(seq) << "\n";
          }
          iterate_all();
+         {
          auto l = ws._segas.lock();
          validate_invariant( l, r.id() );
+         }
 
          std::cerr << "insert little endian seq\n";
          for (int ro = 0; true and ro < rounds; ++ro)
@@ -442,6 +449,9 @@ int  main(int argc, char** argv)
                seq++;
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
+               if( (i % batch_size)  == 0 ) {
+                  last_root = r;
+               }
             }
             last_root  = r;
             auto end   = std::chrono::steady_clock::now();
@@ -454,7 +464,10 @@ int  main(int argc, char** argv)
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
          iterate_all();
+         {
+         auto l = ws._segas.lock();
          validate_invariant( l, r.id() );
+         }
          auto start_big_end = seq3;
          std::cerr << "insert big endian seq\n";
          for (int ro = 0; true and ro < rounds; ++ro)
@@ -466,6 +479,9 @@ int  main(int argc, char** argv)
                ++seq;
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
+               if( (i % batch_size)  == 0 ) {
+                  last_root = r;
+               }
                /*
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
@@ -494,7 +510,10 @@ int  main(int argc, char** argv)
          }
          //print_pre(l, r.id(), "");
          iterate_all();
+         {
+         auto l = ws._segas.lock();
          validate_invariant( l, r.id() );
+         }
 
          uint64_t seq4 = -1;
          std::cerr << "insert big endian rev seq\n";
@@ -507,6 +526,9 @@ int  main(int argc, char** argv)
                ++seq;
                key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
+               if( (i % batch_size)  == 0 ) {
+                  last_root = r;
+               }
                /*
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
@@ -536,7 +558,10 @@ int  main(int argc, char** argv)
          //auto l = ws._segas.lock();
          //print_pre(l, r.id(), "");
          iterate_all();
+         {
+         auto l = ws._segas.lock();
          validate_invariant( l, r.id() );
+         }
 
          std::cerr << "insert to_string(rand) \n";
          for (int ro = 0; true and ro < rounds; ++ro)
@@ -547,6 +572,9 @@ int  main(int argc, char** argv)
                ++seq;
                auto kstr = std::to_string(rand64());
                ws.insert(r, kstr, kstr);
+               if( (i % batch_size)  == 0 ) {
+                  last_root = r;
+               }
             }
             last_root  = r;
             auto end   = std::chrono::steady_clock::now();
@@ -559,7 +587,7 @@ int  main(int argc, char** argv)
                       << " rand str insert/sec  total items: " << add_comma(seq) << "\n";
          }
          iterate_all();
-         validate_invariant( l, r.id() );
+         //validate_invariant( l, r.id() );
          std::cerr << "get known key little endian seq\n";
          uint64_t seq2 = 0;
          for (int ro = 0; true and ro < rounds; ++ro)
@@ -660,7 +688,6 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << "  seq get/sec  total items: " << add_comma(seq) << "\n";
          }
-         break;
 
          std::cerr << "lower bound random i64\n";
          for (int ro = 0; true and ro < rounds; ++ro)
