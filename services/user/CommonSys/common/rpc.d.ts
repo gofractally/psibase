@@ -118,6 +118,11 @@ declare module "common/rpc.mjs" {
         transaction: any,
         privateKeys?: string[] // TODO: remove optional once we're done with fake-auth
     ): Promise<any>;
+    function signAndPushTransaction(
+        baseUrl: string,
+        transaction: any,
+        privateKeys?: string[] 
+    ): Promise<any>
     function packAndDigestTransaction(
         baseUrl: string,
         transaction: any

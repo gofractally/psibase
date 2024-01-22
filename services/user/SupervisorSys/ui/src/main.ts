@@ -108,10 +108,13 @@ const functionCall = async (param: FunctionCallParam) => {
   };
 };
 
+const getLoggedInUser = async () => "alice";
+
 const connection = connectToParent({
   methods: {
     functionCall,
     addToTx,
+    getLoggedInUser,
   },
 });
 

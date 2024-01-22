@@ -9,3 +9,4 @@ storybook-static
 .env.local
 .idea
 .DS_Store
+target
