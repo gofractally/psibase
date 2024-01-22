@@ -259,7 +259,7 @@ namespace arbtrie
                {
                }
 
-               inline id_address    address() const { return _address; }
+               inline fast_meta_address address() const { return _address; }
                inline uint32_t      ref() const { return _cached.ref(); }
                inline node_type     type() const { return _cached.type(); }
                inline node_location loc() const { return _cached.loc(); }
@@ -313,7 +313,7 @@ namespace arbtrie
                friend class seg_allocator::session;
 
                object_ref(seg_allocator::session::read_lock& rlock,
-                          id_address                         adr,
+                          fast_meta_address                  adr,
                           node_meta_type&                    met)
                    : _rlock(rlock),
                      _meta(met),
@@ -326,7 +326,7 @@ namespace arbtrie
                seg_allocator::session::read_lock& _rlock;
                node_meta_type&                    _meta;
                temp_meta_type                     _cached;  // cached read of atomic _atom_loc
-               id_address                         _address;
+               fast_meta_address _address;
             };  // object_ref
 
             //template <typename T>
@@ -338,7 +338,7 @@ namespace arbtrie
                                           uint32_t  size,
                                           node_type type,
                                           auto      initfunc);
-            object_ref<node_header> realloc(id_address reuse,
+            object_ref<node_header> realloc(fast_meta_address reuse,
                                             uint32_t   size,
                                             node_type  type,
                                             auto       initfunc);
@@ -348,12 +348,12 @@ namespace arbtrie
              */
             /// @{
             id_region get_new_region() { return _session._sega._id_alloc.get_new_region(); }
-            void      free_meta_node(id_address);
-            std::pair<node_meta_type&, id_address> get_new_meta_node(id_region);
+            void      free_meta_node(fast_meta_address);
+            std::pair<node_meta_type&, fast_meta_address> get_new_meta_node(id_region);
             /// @}
 
             template <typename T = node_header>
-            inline object_ref<T> get(id_address adr)
+            inline object_ref<T> get(fast_meta_address adr)
             {
                return object_ref<T>(*this, adr, _session._sega._id_alloc.get(adr));
             }
@@ -490,7 +490,7 @@ namespace arbtrie
           *   bandwidth.  A side effect is that it increases the total addressable space
           *   of the database by 4x (and/or) gives us more bits in node_meta.
           */
-         std::pair<node_location, node_header*> alloc_data(uint32_t size, id_address adr)
+         std::pair<node_location, node_header*> alloc_data(uint32_t size, fast_meta_address adr)
          {
             assert(size < segment_size - 16);
             // A - if no segment get a new segment
@@ -704,7 +704,7 @@ namespace arbtrie
    using object_ref = seg_allocator::session::read_lock::object_ref<T>;
 
    /// @pre refcount of id is 1
-   inline object_ref<node_header> seg_allocator::session::read_lock::realloc(id_address adr,
+   inline object_ref<node_header> seg_allocator::session::read_lock::realloc(fast_meta_address adr,
                                                                              uint32_t   size,
                                                                              node_type  type,
                                                                              auto       init)
@@ -746,7 +746,7 @@ namespace arbtrie
       //return object_ref(*this, id, atom);
    }
 
-   inline std::pair<node_meta_type&, id_address>
+   inline std::pair<node_meta_type&, fast_meta_address>
    seg_allocator::session::read_lock::get_new_meta_node(id_region reg)
    {
       return _session._sega._id_alloc.get_new_id(reg);
@@ -804,7 +804,7 @@ namespace arbtrie
                             loc.abs_index());
    }
 
-   inline void seg_allocator::session::read_lock::free_meta_node(id_address a)
+   inline void seg_allocator::session::read_lock::free_meta_node(fast_meta_address a)
    {
       _session._sega._id_alloc.free_id(a);
    }

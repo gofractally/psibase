@@ -29,11 +29,11 @@ namespace arbtrie
       id_alloc(std::filesystem::path id_file);
       ~id_alloc();
 
-      node_meta_type& get(id_address nid);
+      node_meta_type& get(fast_meta_address nid);
 
       id_region                              get_new_region();
-      std::pair<node_meta_type&, id_address> get_new_id(id_region r);
-      void                                   free_id(id_address id);
+      std::pair<node_meta_type&, fast_meta_address> get_new_id(id_region r);
+      void                                   free_id(fast_meta_address id);
       int64_t                                free_release_count() const
       {
          return _state->free_release_count.load(std::memory_order_relaxed);
@@ -78,20 +78,21 @@ namespace arbtrie
                counts[31]++;
             }
       }
+      std::cerr << "Region Stats (grouped by ranges of 32 ids) per region\n";
       for( uint32_t i = 0; i <  32; ++i ){
          std::cout << std::setw(4) << (i*32) << ", "<< counts[i] <<"\n";
       }
    }
 
-   inline node_meta_type& id_alloc::get(id_address nid)
+   inline node_meta_type& id_alloc::get(fast_meta_address nid)
    {
       // TODO verify compiler converted all multiply and divide operations to shifts
-      uint64_t abs_pos        = nid.index() * sizeof(node_meta_type);
+      uint64_t abs_pos        = nid.index * sizeof(node_meta_type);
       uint64_t block_num      = abs_pos / id_page_size;
       uint64_t index_in_block = abs_pos & uint64_t(id_page_size - 1);
 
       auto ptr =
-          ((char*)_block_alloc.get(block_num)) + nid.region() * id_page_size + index_in_block;
+          ((char*)_block_alloc.get(block_num)) + nid.region * id_page_size + index_in_block;
 
       return reinterpret_cast<node_meta_type&>(*ptr);
    }
@@ -112,7 +113,7 @@ namespace arbtrie
     *  if it must grab from the free list, but will use atomic inc allocate
     *  until the free list must be consulted
     */
-   inline std::pair<node_meta_type&, id_address> id_alloc::get_new_id(id_region r)
+   inline std::pair<node_meta_type&, fast_meta_address> id_alloc::get_new_id(id_region r)
    {
       if constexpr (debug_memory)
          _state->free_release_count.fetch_add(1, std::memory_order_relaxed);
@@ -168,7 +169,7 @@ namespace arbtrie
       // TODO: ff_index must init to node_meta::location_mask == end of list
       uint64_t ff_index = 0;
 
-      id_address alloced_id;
+      fast_meta_address alloced_id;
       node_meta_type* ffa;
 
       // TODO: make this compile time constant
@@ -205,17 +206,17 @@ namespace arbtrie
       return {*ffa, alloced_id};
    }
 
-   inline void id_alloc::free_id(id_address adr)
+   inline void id_alloc::free_id(fast_meta_address adr)
    {
       if constexpr (debug_memory)
          _state->free_release_count.fetch_sub(1, std::memory_order_relaxed);
  //     TRIEDENT_DEBUG("Free           ", adr);
 
-      auto& rhead          = _state->regions[adr.region()];
+      auto& rhead          = _state->regions[adr.region];
       auto& head_free_list = rhead.first_free;
       auto& next_free      = get(adr);
       auto  new_head =
-          temp_meta_type().set_location(node_location::from_aligned(adr.index())).to_int();
+          temp_meta_type().set_location(node_location::from_aligned(adr.index)).to_int();
 
       uint64_t cur_head = rhead.first_free.load(std::memory_order_acquire);
       do

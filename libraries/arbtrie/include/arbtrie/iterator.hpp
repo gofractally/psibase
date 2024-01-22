@@ -1,5 +1,7 @@
 #pragma once
 #include <arbtrie/arbtrie.hpp>
+#include <arbtrie/root.hpp>
+#include <arbtrie/seg_allocator.hpp>
 #include <vector>
 
 namespace arbtrie
@@ -67,48 +69,28 @@ namespace arbtrie
          _branches.clear();
          _path.clear();
       }
-      auto brs() { return std::string_view((char*)_branches.data(),_branches.size() ); }
+
+      //auto brs() { return std::string_view((char*)_branches.data(),_branches.size() ); }
       void pushkey(std::string_view k)
       {
-      //   std::cerr << "push: " << std::setw(20) << to_hex(k) <<"   | ";
          _branches.resize(_branches.size() + k.size());
          memcpy(_branches.data() + _branches.size() - k.size(), k.data(), k.size());
-       //  std::cerr << to_hex(brs()) <<"\n";
       }
       void pushkey(char c) { 
-       //  std::cerr << "push: " << std::setw(20) << to_hex(c) <<"   | ";;
          _branches.push_back(c); 
-       //  std::cerr << to_hex(brs()) <<"\n";
       }
       void popkey(int s) { 
          assert( s >= 0 );
-       //  std::cerr << "pop:  " << std::setw(20) <<
-       //     to_hex( std::string_view((char*)_branches.data()+_branches.size()-s, s) ) <<"   | ";
          _branches.resize(_branches.size() - s); 
-       //  std::cerr << to_hex(brs()) <<"\n";
       }
 
-      // path[0] = root
-      // branch[0] eq the branch taken from root,
-      //    branch.size() then the value is on the node path[branches.size()]
-      // if branches.size() >= path.size() surplus bytes in branches represent
-      //    the key into the binary node and path.back() should be a binary node.
-      std::vector<uint8_t>                                   _branches;
-      std::vector<std::pair<id_address, branch_index_type> > _path;
+      std::vector<uint8_t>                                          _branches;
+      std::vector<std::pair<fast_meta_address, branch_index_type> > _path;
 
       int           _size;  // -1 if unknown
       object_id     _oid;
       read_session& _rs;
       node_handle   _root;
-
-      /*
-      struct frame {
-         id_address  node;
-         std::string prefix;
-         uint16_t    branch;
-      };
-      std::vector<frame> _stack;
-      */
 
       bool lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view prefix);
       bool lower_bound_impl(object_ref<node_header>& r, const binary_node* bn, key_view prefix);

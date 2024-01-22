@@ -14,7 +14,7 @@ namespace arbtrie
       if (query <= node_prefix)
       {
          // go to first branch
-         std::pair<branch_index_type, object_id> idx = in->lower_bound(0);
+         std::pair<branch_index_type, fast_meta_address> idx = in->lower_bound(0);
          if (idx.first == 0)
          {
          //   _path.back().second = 0;
@@ -43,7 +43,7 @@ namespace arbtrie
       auto remaining_query = query.substr(cpre.size());
       assert(remaining_query.size() > 0);
 
-      std::pair<branch_index_type, object_id> idx =
+      std::pair<branch_index_type, fast_meta_address> idx =
           in->lower_bound(char_to_branch(remaining_query.front()));
 
       if (idx.second)
@@ -91,7 +91,7 @@ namespace arbtrie
 
    bool iterator::lower_bound(key_view prefix)
    {
-      if (not _root.id())
+      if (not _root.address())
          return end();
 
       auto& db    = _rs._db;
@@ -100,7 +100,7 @@ namespace arbtrie
       _branches.reserve(prefix.size());
       _path.clear();
 
-      auto rr = state.get(_root.id());
+      auto rr = state.get(_root.address());
       if (not lower_bound_impl(rr, prefix))
          return end();
       return true;
@@ -131,13 +131,8 @@ namespace arbtrie
             _path.pop_back();
             return next();
          }
-         if (current) {
+         if (current) 
             _branches.back() = branch_to_char(lbx.first);
-            /*
-            popkey(1);
-            pushkey( branch_to_char(lbx.first) );
-            */
-         }
          else
             pushkey(branch_to_char(lbx.first));
 
@@ -153,12 +148,12 @@ namespace arbtrie
          case node_type::binary:
          {
             auto bn = oref.as<binary_node>();
-            popkey(bn->get_key_val_ptr(current)->key().size());
-            if (_path.back().second >= bn->num_branches())
+            if( int(bn->num_branches()) - _path.back().second <= 0 )
             {
                _path.pop_back();
                return next();
             }
+            popkey(bn->get_key_val_ptr(current)->key_size());
             pushkey(bn->get_key_val_ptr(current + 1)->key());
             return true;
          }

@@ -59,7 +59,7 @@ namespace arbtrie
       return limit;
    }
 
-   inline binary_node::binary_node(int_fast16_t asize, object_id nid, const clone_config& cfg)
+   inline binary_node::binary_node(int_fast16_t asize, fast_meta_address nid, const clone_config& cfg)
        : node_header(asize, nid, node_type::binary), _alloc_pos(0)
    {
       _branch_cap = round_up_multiple<32>(cfg.spare_branches);
@@ -69,7 +69,7 @@ namespace arbtrie
    }
 
    inline binary_node::binary_node(int_fast16_t        asize,
-                                   object_id           nid,
+                                   fast_meta_address nid,
                                    const binary_node*  src,
                                    const clone_config& cfg)
        : node_header(asize, nid, node_type::binary, src->num_branches()),
@@ -100,7 +100,7 @@ namespace arbtrie
     *  a new compact node that has the updated value in the right spot.
     */
    inline binary_node::binary_node(int_fast16_t        asize,
-                                   object_id           nid,
+                                   fast_meta_address nid,
                                    const binary_node*  src,
                                    const clone_config& cfg,
                                    const clone_update& up)
@@ -152,7 +152,7 @@ namespace arbtrie
     *  an new key/value pair
     */
    inline binary_node::binary_node(int_fast16_t        asize,
-                                   object_id           nid,
+                                   fast_meta_address   nid,
                                    const binary_node*  src,
                                    const clone_config& cfg,
                                    const clone_insert& ins)
@@ -187,7 +187,7 @@ namespace arbtrie
       {
          kidx.type       = key_index::obj_id;
          kvp->_val_size  = sizeof(object_id);
-         kvp->value_id() = ins.val.id();
+         kvp->value_id() = ins.val.id().to_address();
       }
       else
       {
@@ -299,7 +299,7 @@ namespace arbtrie
       if ( val.is_object_id() )
       {
          kvp->_val_size  = sizeof(object_id);
-         kvp->value_id() = val.id();
+         kvp->value_id() = val.id().to_address();
          kidx.type       = key_index::obj_id;
       }
       else 

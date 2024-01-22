@@ -1,9 +1,9 @@
 #pragma once
 #include <algorithm>
 #include <arbtrie/arbtrie.hpp>
+#include <arbtrie/iterator.hpp>
 #include <arbtrie/root.hpp>
 #include <arbtrie/seg_allocator.hpp>
-#include <arbtrie/iterator.hpp>
 #include <arbtrie/value_type.hpp>
 #include <memory>
 #include <optional>
@@ -40,13 +40,13 @@ namespace arbtrie
       constexpr upsert_mode make_same_region() const { return {flags | same_region}; }
       constexpr bool        may_insert() const { return flags & insert; }
       constexpr bool        may_update() const { return flags & insert; }
-      constexpr bool        must_insert() const { return not (flags & update); }
-      constexpr bool        must_update() const { return not (flags & insert); } 
-      constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); } 
+      constexpr bool        must_insert() const { return not(flags & update); }
+      constexpr bool        must_update() const { return not(flags & insert); }
+      constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); }
 
-     // private: structural types cannot have private members,
-     // but the flags field is not meant to be used directly
-      constexpr upsert_mode( int f ):flags(f){}
+      // private: structural types cannot have private members,
+      // but the flags field is not meant to be used directly
+      constexpr upsert_mode(int f) : flags(f) {}
       int flags;
    };
 
@@ -91,7 +91,6 @@ namespace arbtrie
       sync_type sync_mode = sync_type::none;
    };
 
-
    class read_session
    {
      protected:
@@ -108,8 +107,8 @@ namespace arbtrie
       int get(object_ref<node_header>& root, const value_node*, key_view key, auto callback);
 
      public:
-      iterator create_iterator( node_handle h ) { return iterator(*this, h); }
-      node_handle adopt( const node_handle& h ) { return node_handle(*this,h.id()); }
+      iterator    create_iterator(node_handle h) { return iterator(*this, h); }
+      node_handle adopt(const node_handle& h) { return node_handle(*this, h.address()); }
 
       inline int get(const node_handle& r, key_view key, auto callback);
       // callback( key_view key, value_type )
@@ -118,7 +117,7 @@ namespace arbtrie
       // TODO make private
       seg_allocator::session _segas;
 
-      // reads the last value called by 
+      // reads the last value called by
       node_handle get_root();
 
       /**
@@ -133,9 +132,18 @@ namespace arbtrie
       friend class database;
       write_session(database& db) : read_session(db) {}
 
-      object_id upsert(session_rlock& state, object_id root, key_view key, const value_type& val);
-      object_id insert(session_rlock& state, object_id root, key_view key, const value_type& val);
-      object_id update(session_rlock& state, object_id root, key_view key, const value_type& val);
+      fast_meta_address upsert(session_rlock&    state,
+                               fast_meta_address root,
+                               key_view          key,
+                               const value_type& val);
+      fast_meta_address insert(session_rlock&    state,
+                               fast_meta_address root,
+                               key_view          key,
+                               const value_type& val);
+      fast_meta_address update(session_rlock&    state,
+                               fast_meta_address root,
+                               key_view          key,
+                               const value_type& val);
 
      public:
       ~write_session();
@@ -172,44 +180,52 @@ namespace arbtrie
       node_handle                update(node_handle& r, key_view key, node_handle subtree);
 
       // return the number of keys removed
-      int remove(node_handle& r, key_view key );
+      int remove(node_handle& r, key_view key);
       // return the number of keys removed
       int remove(node_handle& r, key_view from, key_view to);
 
      private:
       template <upsert_mode mode, typename NodeType>
-      object_id upsert(object_ref<NodeType>& root, key_view key, const value_type& val);
+      fast_meta_address upsert(object_ref<NodeType>& root, key_view key, const value_type& val);
       template <upsert_mode mode, typename NodeType>
-      object_id upsert(object_ref<NodeType>&& root, key_view key, const value_type& val);
+      fast_meta_address upsert(object_ref<NodeType>&& root, key_view key, const value_type& val);
 
       template <upsert_mode mode, typename NodeType>
-      object_id upsert_inner(object_ref<node_header>& r, key_view key, const value_type& val);
+      fast_meta_address upsert_inner(object_ref<node_header>& r,
+                                     key_view                 key,
+                                     const value_type&        val);
 
       template <upsert_mode mode, typename NodeType>
-      object_id upsert_inner(object_ref<node_header>&& r, key_view key, const value_type& val)
+      fast_meta_address upsert_inner(object_ref<node_header>&& r,
+                                     key_view                  key,
+                                     const value_type&         val)
       {
          return upsert_inner<mode>(r, key, val);
       }
 
       template <upsert_mode mode>
-      id_address upsert_value(object_ref<node_header>& root, const value_type& val);
+      fast_meta_address upsert_value(object_ref<node_header>& root, const value_type& val);
 
       //=======================
       // binary_node operations
       // ======================
-      object_id make_binary(id_region reg, session_rlock& state, key_view key, const value_type& val);
+      fast_meta_address make_binary(id_region         reg,
+                                    session_rlock&    state,
+                                    key_view          key,
+                                    const value_type& val);
 
       template <upsert_mode mode>
-      object_id upsert_binary(object_ref<node_header>& root, key_view key, const value_type& val);
+      fast_meta_address upsert_binary(object_ref<node_header>& root,
+                                      key_view                 key,
+                                      const value_type&        val);
 
       template <upsert_mode mode>
-      object_id update_binary_key(object_ref<node_header>& root,
-                                  const binary_node*       bn,
-                                  uint16_t                 lb_idx,
-                                  key_view                 key,
-                                  const value_type&        val);
+      fast_meta_address update_binary_key(object_ref<node_header>& root,
+                                          const binary_node*       bn,
+                                          uint16_t                 lb_idx,
+                                          key_view                 key,
+                                          const value_type&        val);
    };
-
 
    class database
    {
@@ -271,7 +287,7 @@ namespace arbtrie
    {
       auto& state = r.rlock();
 
-      auto release_id = [&](object_id b) { release_node(state.get(b)); };
+      auto release_id = [&](fast_meta_address b) { release_node(state.get(b)); };
 
       auto n = r.header();
       if (r.release())
@@ -283,6 +299,62 @@ namespace arbtrie
             n->visit_branches(release_id);
       }
    }
+
+   template <typename T>
+   void release_node2(object_ref<T>& r)
+   {
+      auto& state = r.rlock();
+
+      //  auto release_id = [&](fast_meta_address b) { release_node(state.get(b)); };
+
+      auto n = r.header();
+      if (r.release())
+      {
+         switch (r.type())
+         {
+            case node_type::setlist:
+            {
+               auto*             sl  = (const setlist_node*)n;
+               auto*             ptr = sl->get_branch_ptr();
+               const auto* const end = ptr + sl->num_branches();
+               while (ptr != end)
+               {
+                  release_node(state.get(fast_meta_address(sl->branch_region(), *ptr)));
+                  ++ptr;
+               }
+               return;
+            }
+            case node_type::full:
+            {
+               auto* sl = (const full_node*)n;
+               for (auto& x : sl->_branches)
+                  if (x)
+                     release_node(state.get(fast_meta_address(sl->branch_region(), x)));
+               return;
+            }
+            case node_type::binary:
+            {
+               auto*      sl    = (const binary_node*)n;
+               auto       start = sl->key_offsets();
+               auto       pos   = start;
+               const auto end   = start + sl->num_branches();
+               while (pos != end)
+               {
+                  if (pos->type == binary_node::key_index::obj_id)
+                  {
+                     assert(sl->get_key_val_ptr_offset(pos->pos)->value_size() ==
+                            sizeof(object_id));
+                     release_node(state.get(
+                         fast_meta_address(sl->get_key_val_ptr_offset(pos->pos)->value_id())));
+                  }
+                  ++pos;
+               }
+               return;
+            }
+         }
+      }
+   }
+
    template <typename T>
    void release_node(object_ref<T>&& r)
    {
@@ -292,18 +364,19 @@ namespace arbtrie
    inline int read_session::get(const node_handle& r, key_view key, auto callback)
    {
       auto state = _segas.lock();
-      if (not r.id()) [[unlikely]]
+      if (not r.address()) [[unlikely]]
       {
          callback(false, value_view());
          return false;
       }
-      auto ref = state.get(r.id());
+      auto ref = state.get(r.address());
       return get(ref, key, std::forward<decltype(callback)>(callback));
    }
 
    int read_session::get(object_ref<node_header>& root, key_view key, auto callback)
    {
-      return cast_and_call(root.header(), [&](const auto* n) { return get(root, n, key, callback); });
+      return cast_and_call(root.header(),
+                           [&](const auto* n) { return get(root, n, key, callback); });
    }
    int read_session::get(object_ref<node_header>& root,
                          const auto*              inner,
@@ -328,22 +401,25 @@ namespace arbtrie
       }
       else
       {
-         auto cpre = common_prefix( inner->get_prefix(), key );
-         if( cpre == inner->get_prefix() ) {
-            if( key.size() > cpre.size() ) {
-               if (auto branch_id = inner->get_branch(char_to_branch(key[cpre.size()])) ) 
+         auto cpre = common_prefix(inner->get_prefix(), key);
+         if (cpre == inner->get_prefix())
+         {
+            if (key.size() > cpre.size())
+            {
+               if (auto branch_id = inner->get_branch(char_to_branch(key[cpre.size()])))
                {
                   auto bref = root.rlock().get(branch_id);
-                  return get(bref, key.substr(cpre.size()+1), callback);
+                  return get(bref, key.substr(cpre.size() + 1), callback);
                }
-            } else {
-               if (auto branch_id = inner->get_branch(0) )
+            }
+            else
+            {
+               if (auto branch_id = inner->get_branch(0))
                {
                   auto bref = root.rlock().get(branch_id);
-                  callback( true, bref.template as<value_node>()->value() );
+                  callback(true, bref.template as<value_node>()->value());
                   return 1;
                }
-
             }
          }
       }
@@ -362,7 +438,10 @@ namespace arbtrie
          auto kvp = bn->get_key_val_ptr(idx);
          if (bn->is_obj_id(idx))
          {
-            callback(true, root.rlock().get(kvp->value_id()).template as<value_node>()->value());
+            callback(true, root.rlock()
+                               .get(fast_meta_address(kvp->value_id()))
+                               .template as<value_node>()
+                               ->value());
          }
          else
          {

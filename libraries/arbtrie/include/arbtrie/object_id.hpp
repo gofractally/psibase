@@ -7,8 +7,8 @@ namespace arbtrie {
    struct object_id;
 
    struct id_region {
-      id_region( uint16_t r = 0 ):region(r){}
-      uint16_t to_int()const{ return region; }
+      constexpr id_region( uint16_t r = 0 ):region(r){}
+      constexpr uint16_t to_int()const{ return region; }
       uint16_t region;
       friend bool operator == ( id_region a, id_region b ) = default;
 
@@ -19,7 +19,7 @@ namespace arbtrie {
    static_assert( sizeof(id_region) == 2 );
 
    struct id_index {
-      id_index( uint32_t r = 0 ):index(r){}
+      constexpr id_index( uint32_t r = 0 ):index(r){}
       uint32_t index:24;
       operator bool()const { return index; }
       friend bool operator == ( id_index a, id_index b ) = default;
@@ -27,10 +27,10 @@ namespace arbtrie {
    static_assert( sizeof(id_index) == 3 );
 
    struct id_address {
-      id_address() = default;
-      id_address( const id_address& ) = default;
-      id_address( id_region r, id_index i ):_region(r),_index(i){}
-      id_address( object_id oid ); 
+      constexpr id_address() = default;
+      constexpr id_address( const id_address& ) = default;
+      constexpr id_address( id_region r, id_index i ):_region(r),_index(i){}
+      constexpr id_address( object_id oid ); 
 
       operator object_id()const;
 
@@ -50,8 +50,39 @@ namespace arbtrie {
       void reset() { _region.region = 0; _index.index = 0; }
    }__attribute__((packed)) __attribute__((aligned(1)));
 
-   inline id_address operator + ( id_region r, id_index i ) {
-      return id_address( r, i );
+   /**
+    *  This type isn't for storage, but for computation 
+    */
+   struct fast_meta_address {
+      constexpr fast_meta_address()=default;
+      constexpr fast_meta_address( id_region r, id_index i )
+      :region( r.region), index(i.index){}
+
+      constexpr fast_meta_address( id_address a )
+         :region(a.region()),index(a.index()){}
+
+      constexpr static inline fast_meta_address from_int( uint64_t i ) {
+         return { i>>24, i & 0xffffff };
+      }
+      constexpr uint64_t to_int()const { return (uint64_t(region)<<24) | uint64_t(index); }
+
+      constexpr void reset(){region=0;index=0;}
+
+      uint16_t region=0;
+      uint32_t index=0;
+      operator bool()const { return index; }
+      explicit operator id_address()const { return {region,index}; }
+      constexpr id_address to_address()const { return {region,index}; }
+
+      friend std::ostream& operator  << ( std::ostream& out, fast_meta_address a) {
+         return out << a.region <<"."<<a.index;
+      }
+      friend bool operator != ( fast_meta_address a, fast_meta_address b ) = default;
+      friend bool operator == ( fast_meta_address a, fast_meta_address b ) = default;
+   };
+
+   inline fast_meta_address operator + ( id_region r, id_index i ) {
+      return fast_meta_address( r, i );
    }
 
    /**
@@ -84,7 +115,7 @@ namespace arbtrie {
    static_assert(alignof(object_id) == 1, "unexpected alignment");
    static_assert( sizeof(id_address) == sizeof(object_id) );
 
-   inline id_address::id_address( object_id oid ) {
+   constexpr inline id_address::id_address( object_id oid ) {
       auto i = oid.to_int();
       _index.index   = i & 0xffffff;
       _region.region = i >> 24;

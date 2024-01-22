@@ -87,20 +87,20 @@ namespace arbtrie
       }
 
       bool can_add_branch() const { return _spare_branch_capacity > 0; }
-      void add_branch(branch_index_type br, id_address b);
+      void add_branch(branch_index_type br, fast_meta_address b);
 
-      void set_eof(id_address e)
+      void set_eof(fast_meta_address e)
       {
-         assert(e._region == branch_region());
+         assert(e.region == branch_region());
          _eof_branch         = true;
-         get_branch_ptr()[0] = e._index;
+         get_branch_ptr()[0] = e.index;
       }
       bool has_eof_value() const { return _eof_branch; }
-      void set_index(int idx, uint8_t byte, id_address adr)
+      void set_index(int idx, uint8_t byte, fast_meta_address adr)
       {
          assert(idx < _num_branches);
-         assert(adr._region == branch_region());
-         get_branch_ptr()[int(idx) + _eof_branch] = adr._index;
+         assert(adr.region == branch_region());
+         get_branch_ptr()[int(idx) + _eof_branch] = adr.index;
          get_setlist_ptr()[idx]                   = byte;
          // if( idx+1 < _num_branches )
          //    assert( uint8_t(get_setlist_ptr()[idx+1]) > byte );
@@ -148,14 +148,14 @@ namespace arbtrie
          return slp - sl;
       }
 
-      std::pair<int_fast16_t, id_address> lower_bound(int_fast16_t br) const
+      std::pair<int_fast16_t, fast_meta_address> lower_bound(int_fast16_t br) const
       {
          if (br >= max_branch_count)
-            return std::pair<int_fast16_t, id_address>(max_branch_count, {});
+            return std::pair<int_fast16_t, fast_meta_address>(max_branch_count, {});
          if (br == 0)
          {
             if (_eof_branch)
-               return std::pair<int_fast16_t, id_address>(0,
+               return std::pair<int_fast16_t, fast_meta_address>(0,
                                                           {branch_region(), get_branch_ptr()[0]});
             ++br;
          }
@@ -168,31 +168,31 @@ namespace arbtrie
          while (p < e and b > *p)
             ++p;
          if (p == e)
-            return std::pair<int_fast16_t, id_address>(max_branch_count, {});
-         return std::pair<int_fast16_t, id_address>(
+            return std::pair<int_fast16_t, fast_meta_address>(max_branch_count, {});
+         return std::pair<int_fast16_t, fast_meta_address>(
              char_to_branch(*p), {branch_region(), get_branch_ptr()[(p - s) + _eof_branch]});
       }
 
-      void set_branch(uint_fast16_t br, id_address b)
+      void set_branch(uint_fast16_t br, fast_meta_address b)
       {
          assert(br < 257);
          assert(not(br == 0 and not _eof_branch));
          assert(b);
-         assert(b._region == branch_region());
+         assert(b.region == branch_region());
 
          auto bp = get_branch_ptr();
          if (br == 0) [[unlikely]]
          {
-            bp[0] = b._index;
+            bp[0].index = b.index;
             return;
          }
          auto pos = get_setlist().find(br - 1);
          assert(pos != key_view::npos);
 
-         bp[pos + _eof_branch] = b._index;
+         bp[pos + _eof_branch].index = b.index;
       }
 
-      id_address get_branch(uint_fast16_t br) const
+      fast_meta_address get_branch(uint_fast16_t br) const
       {
          assert(br < 257);
 
@@ -204,7 +204,7 @@ namespace arbtrie
 
          auto pos = get_setlist().find(br - 1);
          if (pos == key_view::npos)
-            return id_address();
+            return fast_meta_address();
          //   assert(pos != key_view::npos);
          return {branch_region(),get_branch_ptr()[pos + _eof_branch]};
       }
@@ -215,7 +215,7 @@ namespace arbtrie
          const auto* const end = ptr + num_branches();
          while (ptr != end)
          {
-            visitor( id_address{branch_region(),*ptr} );
+            visitor( fast_meta_address{branch_region(),*ptr} );
             ++ptr;
          }
       }
@@ -228,19 +228,19 @@ namespace arbtrie
 
          if (_eof_branch)
          {
-            visitor(0, id_address{ branch_region(),*start} );
+            visitor(0, fast_meta_address( branch_region(),*start) );
             ++ptr;
             ++start;
          }
 
          while (ptr != end)
          {
-            visitor(int(slp[ptr - start]) + 1, id_address{branch_region(),*ptr});
+            visitor(int(slp[ptr - start]) + 1, fast_meta_address(branch_region(),*ptr));
             ++ptr;
          }
       }
 
-      void remove_branch(int_fast16_t br, id_address b)
+      void remove_branch(int_fast16_t br, fast_meta_address b)
       {
          assert(num_branches() > 1);  // cannot remove the last branch
          assert(br < max_branch_count);
@@ -277,7 +277,7 @@ namespace arbtrie
                 cfg.spare_branches * (1 + sizeof(id_index));
       }
 
-      setlist_node(int_fast16_t asize, object_id nid, clone_config cfg)
+      setlist_node(int_fast16_t asize, fast_meta_address nid, clone_config cfg)
           : node_header(asize, nid, node_type::setlist), _descendants(0), _eof_branch(0)
       {
          _prefix_trunc    = cfg.spare_prefix;
@@ -293,7 +293,7 @@ namespace arbtrie
          _eof_branch            = 0;
       }
 
-      setlist_node(int_fast16_t asize, object_id nid, const setlist_node* src, clone_config cfg)
+      setlist_node(int_fast16_t asize, fast_meta_address nid, const setlist_node* src, clone_config cfg)
           : node_header(asize, nid, node_type::setlist),
             _descendants(src->_descendants),
             _eof_branch(src->_eof_branch)
@@ -326,19 +326,19 @@ namespace arbtrie
 
    static_assert(sizeof(setlist_node) == sizeof(node_header) + sizeof(uint64_t) + sizeof(uint32_t));
 
-   inline void setlist_node::add_branch(branch_index_type br, id_address b)
+   inline void setlist_node::add_branch(branch_index_type br, fast_meta_address b)
    {
       assert(validate());
       assert(br < max_branch_count);
       assert(br >= 0);
       assert(not(br == 0 and _eof_branch));
-      assert(b._region == branch_region());
+      assert(b.region == branch_region());
 
       id_index* branches = get_branch_ptr();
       if (br == 0) [[unlikely]]
       {
          memmove(branches + 1, branches, sizeof(id_index) * num_branches());
-         *branches = b._index;
+         branches->index = b.index;
          ++_num_branches;
          --_spare_branch_capacity;
          _eof_branch = true;
@@ -360,7 +360,7 @@ namespace arbtrie
       auto b_found = blp + pos + _eof_branch;
       auto b_end   = blp + num_branches();
       memmove(b_found + 1, b_found, (char*)b_end - (char*)b_found);
-      *b_found = b._index;
+      b_found->index = b.index;
 
       ++_num_branches;
       --_spare_branch_capacity;

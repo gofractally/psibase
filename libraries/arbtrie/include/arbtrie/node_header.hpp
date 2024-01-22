@@ -41,7 +41,7 @@ namespace arbtrie
       uint64_t _node_id : 40;          // the ID of this node
 
       inline node_header(uint32_t  size,
-                         id_address nid,
+                         fast_meta_address nid,
                          node_type type       = node_type::freelist,
                          uint16_t  num_branch = 0 )
           : checksum(0),
@@ -51,9 +51,10 @@ namespace arbtrie
             _branch_id_region(0),
             _node_id(nid.to_int())
       {
+         assert( fast_meta_address::from_int(_node_id) == nid );
       }
 
-      void set_address( id_address a ) { _node_id = a.to_int(); }
+      void set_address( fast_meta_address a ) { _node_id = a.to_int(); }
       id_region branch_region()const{ return id_region( _branch_id_region ); }
 
       template <typename T>
@@ -73,11 +74,12 @@ namespace arbtrie
       //inline static T* make(uint32_t size, uint16_t num_branch, uint8_t prefix_len = 0);
 
       void set_type(node_type t) { _ntype = (int)t; }
-      void set_id(object_id i) { _node_id = i.to_int(); }
+      void set_id(fast_meta_address i) { _node_id = i.to_int(); }
       void set_branch_region(id_region r) { _branch_id_region = r.to_int(); }
 
       uint32_t       size() const { return _nsize; }
-      object_id      id() const { return object_id(_node_id); }
+      fast_meta_address address()const { return fast_meta_address::from_int(_node_id); }
+ //     object_id      id() const { return object_id(_node_id); }
       node_type      get_type() const { return (node_type)_ntype; }
       uint16_t       num_branches() const { return _num_branches; }
       char*          body() { return (char*)(this + 1); }

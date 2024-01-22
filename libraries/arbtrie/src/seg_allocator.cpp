@@ -179,11 +179,12 @@ namespace arbtrie
       auto start_seg_num = ses._alloc_seg_num;
 
       madvise(s, segment_size, MADV_SEQUENTIAL);
-      while (foo < send and foo->id())
+      while (foo < send and foo->address())
       {
+         auto foo_address = foo->address();
          // skip anything that has been freed
          // note the ref can go to 0 before foo->check is set to -1
-         auto obj_ref = state.get(foo->id());
+         auto obj_ref = state.get(foo_address);
          if (obj_ref.ref() == 0)
          {
             foo = foo->next();
@@ -205,7 +206,7 @@ namespace arbtrie
 
          {
             auto obj_size   = foo->size();
-            auto [loc, ptr] = ses.alloc_data(obj_size, foo->id());
+            auto [loc, ptr] = ses.alloc_data(obj_size, foo_address);
             auto try_move   = [&]()
             {
                int count = 0;

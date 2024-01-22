@@ -4,11 +4,8 @@
 namespace arbtrie
 {
    /**
-    *  Full Node - has one branch for all possible branches and eof,
-    *  lower_bound does a linear search of the branches that can only
-    *  be optimized slightly if object_id is a multiple 8 bytes.
-    *
-    *  - constant time "get" / "set"
+    *  Full Node - has one branch for all possible branches and eof stored
+    *  as a 3 byte index under a common region
     */
    struct full_node : node_header
    {
@@ -30,7 +27,7 @@ namespace arbtrie
                 std::max<int_fast16_t>(src->get_prefix().size(), cfg.prefix_capacity());
       }
 
-      full_node(int_fast16_t asize, object_id nid, const full_node* src, clone_config cfg)
+      full_node(int_fast16_t asize, fast_meta_address nid, const full_node* src, clone_config cfg)
           : node_header(asize, nid, node_type::full)
       {
          assert(src != nullptr);
@@ -50,7 +47,7 @@ namespace arbtrie
          memcpy(_branches, src->_branches, sizeof(_branches));
       }
 
-      full_node(int_fast16_t asize, object_id nid, clone_config cfg)
+      full_node(int_fast16_t asize, fast_meta_address nid, clone_config cfg)
           : node_header(asize, nid, node_type::full), _prefix_trunc(cfg.spare_prefix)
       {
          assert(asize == alloc_size(cfg));
@@ -67,7 +64,7 @@ namespace arbtrie
 
       bool can_add_branch() const { return _num_branches < branch_count; }
 
-      std::pair<int_fast16_t,id_address> lower_bound( int_fast16_t br )const {
+      std::pair<int_fast16_t,fast_meta_address> lower_bound( int_fast16_t br )const {
          while( br < max_branch_count and not _branches[br] )
             ++br;
          if( br == max_branch_count )
@@ -75,15 +72,15 @@ namespace arbtrie
          return {br, get_branch(br) };
       }
 
-      void add_branch(int_fast16_t br, id_address b)
+      void add_branch(int_fast16_t br, fast_meta_address b)
       {
          assert(br < max_branch_count);
          assert(br >= 0);
          assert(not _branches[br]);
-         assert( b._region == branch_region() );
+         assert( b.region == branch_region() );
          ++_num_branches;
          assert(_num_branches <= max_branch_count);
-         _branches[br] = b._index;
+         _branches[br].index = b.index;
 
          // this info is redundant and no one should determine eof_branch
          // for full node by reading this, so don't bother updating it
@@ -102,25 +99,22 @@ namespace arbtrie
          // for full node by reading this, so don't bother updating it
          //_eof_branch &= br != 0;
       }
-      void set_branch(int_fast16_t br, id_address b)
+      void set_branch(int_fast16_t br, fast_meta_address b)
       {
          assert(br < max_branch_count);
          assert(br >= 0);
          assert(_branches[br]);
-         assert( b._region == branch_region() );
-         _branches[br] = b._index;
+         assert( b.region == branch_region() );
+         _branches[br].index = b.index;
       }
 
       bool has_eof_value()const { return bool(_branches[0]); }
 
-      id_address get_branch(int_fast16_t br)const
+      fast_meta_address get_branch(int_fast16_t br)const
       {
          assert(br < max_branch_count);
          assert(br >= 0);
-         // TODO: remove this once everyone handles null properly
-         //if( _branches[br] )
-            return id_address{ branch_region(), _branches[br] };
-         //return {};
+         return fast_meta_address( branch_region(), _branches[br] );
       }
 
       inline int_fast32_t prefix_size() const { return prefix_capacity() - _prefix_trunc; }
@@ -137,20 +131,20 @@ namespace arbtrie
       {
          for (auto& x : _branches)
             if (x)
-               visitor( id_address{branch_region(),x} );
+               visitor( fast_meta_address(branch_region(),x) );
       }
       inline void visit_branches_with_br(auto visitor) const
       {
          for( int i = 0; i < 257; ++i ) {
             if( _branches[i] ) 
-               visitor( i, get_branch(i) );//id_address{branch_region(),_branches[i]} );
+               visitor( i, get_branch(i) );
          }
       }
 
       uint64_t _descendants : 44  = 0;
       uint64_t _prefix_trunc : 10 = 0;
       uint64_t _prefix_capacity: 10 = 0;
-
+      //id_region eof_region; // TODO: value nodes don't alway share the region
       id_index  _branches[max_branch_count];
       char      _prefix[];
 
