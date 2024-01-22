@@ -10,13 +10,14 @@ namespace psibase
    class DefaultTestChain : public TestChain
    {
      public:
-      DefaultTestChain(std::span<const std::string> packageNames);
-      DefaultTestChain(
-          const std::vector<std::pair<AccountNumber, const char*>>& additionalServices = {},
-          uint64_t                                                  hot_bytes          = 1ull << 27,
-          uint64_t                                                  warm_bytes         = 1ull << 27,
-          uint64_t                                                  cool_bytes         = 1ull << 27,
-          uint64_t                                                  cold_bytes = 1ull << 27);
+      // default excludes DocSys and TokenUsers
+      DefaultTestChain(const std::vector<std::string>& packageNames =
+                           {"AccountSys", "AuthAnySys", "AuthSys", "AuthEcSys", "CommonSys",
+                            "CpuSys", "ExploreSys", "FractalSys", "InviteSys", "NftSys",
+                            "PackageSys", "ProducerSys", "ProxySys", "PsiSpaceSys", "SetCodeSys",
+                            "SymbolSys", "TokenSys", "TransactionSys"},
+                       bool                  installUI = false,
+                       const DatabaseConfig& dbconfig  = {});
 
       AccountNumber addService(const char* acc, const char* filename, bool show = false);
       AccountNumber addService(AccountNumber acc, const char* filename, bool show = false);
@@ -49,11 +50,5 @@ namespace psibase
       AccountNumber addAccount(AccountNumber acc,
                                AccountNumber authService = AccountNumber("auth-any-sys"),
                                bool          show        = false);
-
-     private:
-      void registerSysRpc();
-      void deploySystemServices(bool show = false);
-      void setBlockProducers(bool show = false);
-      void createSysServiceAccounts(bool show = false);
    };
 }  // namespace psibase
