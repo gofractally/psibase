@@ -9,6 +9,7 @@
 #include <psibase/log.hpp>
 #include <psibase/node.hpp>
 #include <psibase/peer_manager.hpp>
+#include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/shortest_path_routing.hpp>
 #include <psibase/version.hpp>
@@ -32,10 +33,6 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
-
-#ifdef __APPLE__
-#include <libproc.h>
-#endif
 
 using namespace psibase;
 using namespace psibase::net;
@@ -215,32 +212,6 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
    v = result;
 };
 
-std::filesystem::path get_prefix()
-{
-#ifdef __APPLE__
-   int   ret;
-   pid_t pid;
-   char  pathbuf[2048];
-
-   pid = getpid();
-   ret = proc_pidpath(pid, pathbuf, sizeof(pathbuf));
-
-   if (ret <= 0)
-      throw std::runtime_error("unable to get process path");
-
-   std::filesystem::path prefix(std::string(pathbuf, ret));
-   prefix = prefix.parent_path();
-#else
-   auto prefix = std::filesystem::read_symlink("/proc/self/exe").parent_path();
-#endif
-
-   if (prefix.filename() == "bin")
-   {
-      prefix = prefix.parent_path();
-   }
-   return prefix;
-}
-
 std::filesystem::path option_path;
 ConfigFileOptions     config_options{.expandValue = [](std::string_view key)
                                  {
@@ -307,7 +278,7 @@ void validate(boost::any& v, const std::vector<std::string>& values, native_serv
 
 std::filesystem::path config_template_path()
 {
-   return get_prefix() / "share" / "psibase" / "config.in";
+   return installPrefix() / "share" / "psibase" / "config.in";
 }
 
 void load_service(const native_service& config,
@@ -2423,7 +2394,7 @@ int main(int argc, char* argv[])
 {
    // Must run before any additional threads are started
    {
-      auto prefix = get_prefix();
+      auto prefix = installPrefix();
       ::setenv("PREFIX", prefix.c_str(), 1);
       ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
    }

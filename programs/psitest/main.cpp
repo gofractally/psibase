@@ -1,11 +1,12 @@
 #include <boost/filesystem/operations.hpp>
 #include <debug_eos_vm/debug_eos_vm.hpp>
 #include <psibase/ActionContext.hpp>
-#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/log.hpp>
+#include <psibase/prefix.hpp>
 #include <psibase/version.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
@@ -70,15 +71,19 @@ inline constexpr uint32_t billed_cpu_time_use = 2000;
 
 inline constexpr int32_t polyfill_root_dir_fd = 3;
 
-inline constexpr uint16_t wasi_errno_badf  = 8;
-inline constexpr uint16_t wasi_errno_fault = 21;
-inline constexpr uint16_t wasi_errno_inval = 28;
-inline constexpr uint16_t wasi_errno_io    = 29;
-inline constexpr uint16_t wasi_errno_noent = 44;
+inline constexpr uint16_t wasi_errno_badf     = 8;
+inline constexpr uint16_t wasi_errno_fault    = 21;
+inline constexpr uint16_t wasi_errno_inval    = 28;
+inline constexpr uint16_t wasi_errno_io       = 29;
+inline constexpr uint16_t wasi_errno_noent    = 44;
+inline constexpr uint16_t wasi_errno_overflow = 61;
 
+inline constexpr uint8_t wasi_filetype_unknown          = 0;
+inline constexpr uint8_t wasi_filetype_block_device     = 1;
 inline constexpr uint8_t wasi_filetype_character_device = 2;
 inline constexpr uint8_t wasi_filetype_directory        = 3;
 inline constexpr uint8_t wasi_filetype_regular_file     = 4;
+inline constexpr uint8_t wasi_filetype_symbolic_link    = 7;
 
 inline constexpr uint64_t wasi_rights_fd_read  = 2;
 inline constexpr uint64_t wasi_rights_fd_write = 64;
@@ -93,6 +98,8 @@ inline constexpr uint16_t wasi_fdflags_dsync    = 2;
 inline constexpr uint16_t wasi_fdflags_nonblock = 4;
 inline constexpr uint16_t wasi_fdflags_rsync    = 8;
 inline constexpr uint16_t wasi_fdflags_sync     = 1;
+
+inline constexpr std::uint32_t wasi_lookupflags_symlink_follow = 1;
 
 struct assert_exception : std::exception
 {
@@ -371,6 +378,43 @@ struct file
    }
 };
 
+struct wasi_stat
+{
+   static wasi_stat from_stat(struct stat& stat)
+   {
+      wasi_stat result;
+      auto      to_nsec = [](const timespec& t) { return t.tv_sec * 1000000000ull + t.tv_nsec; };
+      result.dev        = stat.st_dev;
+      result.ino        = stat.st_ino;
+      if (S_ISREG(stat.st_mode))
+         result.filetype = wasi_filetype_regular_file;
+      else if (S_ISDIR(stat.st_mode))
+         result.filetype = wasi_filetype_directory;
+      else if (S_ISCHR(stat.st_mode))
+         result.filetype = wasi_filetype_character_device;
+      else if (S_ISBLK(stat.st_mode))
+         result.filetype = wasi_filetype_block_device;
+      else if (S_ISLNK(stat.st_mode))
+         result.filetype = wasi_filetype_symbolic_link;
+      else
+         result.filetype = wasi_filetype_unknown;
+      result.nlink = stat.st_nlink;
+      result.size  = stat.st_size;
+#ifdef __APPLE__
+      result.atim = to_nsec(stat.st_atimespec);
+      result.mtim = to_nsec(stat.st_mtimespec);
+      result.ctim = to_nsec(stat.st_ctimespec);
+#else   // not __APPLE__
+      result.atim = to_nsec(stat.st_atim);
+      result.mtim = to_nsec(stat.st_mtim);
+      result.ctim = to_nsec(stat.st_ctim);
+#endif  // apple
+      return result;
+   }
+   uint64_t dev, ino, filetype, nlink, size, atim, mtim, ctim;
+};
+static_assert(sizeof(wasi_stat) == 64);
+
 struct callbacks
 {
    ::state&          state;
@@ -462,6 +506,47 @@ struct callbacks
       }
    };
 
+   int32_t testerGetEnvironCounts(wasm_ptr<uint32_t> environc, wasm_ptr<uint32_t> bufsize)
+   {
+      std::size_t totalSize = 0;
+      char**      p         = environ;
+      for (; *p; ++p)
+      {
+         auto size = std::strlen(*p) + 1;
+         if (std::numeric_limits<std::size_t>::max() - size < totalSize)
+            return wasi_errno_overflow;
+         totalSize += size;
+      }
+      if (totalSize > 0xffffffffu || p - environ > 0xffffffffu)
+         return wasi_errno_overflow;
+      *environc = p - environ;
+      *bufsize  = totalSize;
+      return 0;
+   }
+
+   int32_t testerGetEnviron(uint32_t env, uint32_t buf)
+   {
+      auto pages = state.backend.get_context().current_linear_memory();
+      if (pages < 0)
+         return wasi_errno_fault;
+      std::size_t end = static_cast<std::size_t>(pages) * eosio::vm::page_size;
+      if (env > end || buf > end)
+         return wasi_errno_fault;
+      char* memory = state.backend.get_context().linear_memory();
+
+      for (char** p = ::environ; *p; ++p)
+      {
+         auto size = std::strlen(*p) + 1;
+         if (end - buf < size || end - env < 4)
+            return wasi_errno_fault;
+         std::memcpy(memory + buf, *p, size);
+         std::memcpy(memory + env, &buf, 4);
+         buf += size;
+         env += 4;
+      }
+      return 0;
+   }
+
    int32_t testerClockTimeGet(uint32_t id, uint64_t precision, wasm_ptr<uint64_t> time)
    {
       std::chrono::nanoseconds result;
@@ -532,11 +617,7 @@ struct callbacks
 
    uint32_t testerFilestatGet(int32_t fd, span<char> statbuf)
    {
-      struct wasi_stat
-      {
-         uint64_t dev, ino, filetype, nlink, size, atim, mtim, ctim;
-      } result = {};
-      static_assert(sizeof(wasi_stat) == 64);
+      wasi_stat result = {};
       if (statbuf.size() < sizeof(result))
          return wasi_errno_fault;
       if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO)
@@ -554,26 +635,38 @@ struct callbacks
          if (::fstat(fd, &stat) < 0)
             return wasi_errno_badf;
 
-         auto to_nsec    = [](const timespec& t) { return t.tv_sec * 1000000000ull + t.tv_nsec; };
-         result.dev      = stat.st_dev;
-         result.ino      = stat.st_ino;
-         result.filetype = wasi_filetype_regular_file;
-         result.nlink    = stat.st_nlink;
-         result.size     = stat.st_size;
-#ifdef __APPLE__
-         result.atim     = to_nsec(stat.st_atimespec);
-         result.mtim     = to_nsec(stat.st_mtimespec);
-         result.ctim     = to_nsec(stat.st_ctimespec);
-#else // not __APPLE__
-         result.atim     = to_nsec(stat.st_atim);
-         result.mtim     = to_nsec(stat.st_mtim);
-         result.ctim     = to_nsec(stat.st_ctim);
-#endif  // apple
+         result = wasi_stat::from_stat(stat);
       }
       else
       {
          return wasi_errno_badf;
       }
+      std::memcpy(statbuf.data(), &result, sizeof(result));
+      return 0;
+   }
+
+   uint32_t testerPathFilestatGet(int32_t          fd,
+                                  uint32_t         flags,
+                                  span<const char> path,
+                                  span<char>       statbuf)
+   {
+      if (fd != polyfill_root_dir_fd)
+         return wasi_errno_badf;
+      struct stat stat;
+      std::string cPath = "/" + span_str(path);
+      if (flags & wasi_lookupflags_symlink_follow)
+      {
+         if (::lstat(cPath.c_str(), &stat) < 0)
+            return wasi_errno_noent;
+      }
+      else
+      {
+         if (::stat(cPath.c_str(), &stat) < 0)
+            return wasi_errno_noent;
+      }
+      auto result = wasi_stat::from_stat(stat);
+      if (statbuf.size() < sizeof(result))
+         return wasi_errno_fault;
       std::memcpy(statbuf.data(), &result, sizeof(result));
       return 0;
    }
@@ -643,7 +736,7 @@ struct callbacks
       if (!mode)
          return wasi_errno_inval;
 
-      file f = fopen(span_str(path).c_str(), mode);
+      file f = fopen(("/" + span_str(path)).c_str(), mode);
       if (!f.f)
          return wasi_errno_noent;
       state.files.push_back(std::move(f));
@@ -901,9 +994,12 @@ void register_callbacks()
    rhf_t::add<&callbacks::writeConsole>("env", "writeConsole");
    rhf_t::add<&callbacks::testerGetArgCounts>("env", "testerGetArgCounts");
    rhf_t::add<&callbacks::testerGetArgs>("env", "testerGetArgs");
+   rhf_t::add<&callbacks::testerGetEnviron>("env", "testerGetEnviron");
+   rhf_t::add<&callbacks::testerGetEnvironCounts>("env", "testerGetEnvironCounts");
    rhf_t::add<&callbacks::testerClockTimeGet>("env", "testerClockTimeGet");
    rhf_t::add<&callbacks::testerFdstatGet>("env", "testerFdstatGet");
    rhf_t::add<&callbacks::testerFilestatGet>("env", "testerFdFilestatGet");
+   rhf_t::add<&callbacks::testerPathFilestatGet>("env", "testerPathFilestatGet");
    rhf_t::add<&callbacks::testerOpenFile>("env", "testerOpenFile");
    rhf_t::add<&callbacks::testerCloseFile>("env", "testerCloseFile");
    rhf_t::add<&callbacks::testerWriteFile>("env", "testerWriteFile");
@@ -1037,6 +1133,11 @@ OPTIONS:
 
 int main(int argc, char* argv[])
 {
+   // Must run before any additional threads are started
+   {
+      auto prefix = psibase::installPrefix();
+      ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
+   }
    bool                               show_usage   = false;
    bool                               error        = false;
    bool                               show_version = false;

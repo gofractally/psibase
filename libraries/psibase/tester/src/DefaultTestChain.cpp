@@ -36,6 +36,19 @@ using namespace UserService;
 
 namespace
 {
+#ifdef __wasm32__
+   struct InitCwd
+   {
+      InitCwd()
+      {
+         if (char* pwd = std::getenv("PWD"))
+         {
+            ::chdir(pwd);
+         }
+      }
+   };
+   InitCwd initCwd;
+#endif
 
    void pushGenesisTransaction(DefaultTestChain& chain, std::span<PackagedService> service_packages)
    {
@@ -134,7 +147,9 @@ DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
                                    const DatabaseConfig&           dbconfig)
     : TestChain(dbconfig)
 {
-   auto packages = DirectoryRegistry("share/psibase/packages").resolve(names);
+   auto packageRoot = std::getenv("PSIBASE_DATADIR");
+   check(!!packageRoot, "Cannot find package directory: PSIBASE_DATADIR not defined");
+   auto packages = DirectoryRegistry(std::string(packageRoot) + "/packages").resolve(names);
    setAutoBlockStart(false);
    startBlock();
    pushGenesisTransaction(*this, packages);
