@@ -117,12 +117,14 @@ if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
                          ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
@@ -466,6 +468,7 @@ psibase_package(
     DESCRIPTION "All compiled code is uploaded to the chain through this service"
     SERVICE setcode-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm
+    FLAGS allowWriteNative
     DEPENDS wasm
 )
 
@@ -556,12 +559,33 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/PackageSys.psi
+    NAME PackageSys
+    DESCRIPTION "Package manager for psibase apps"
+    SERVICE package-sys
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
+        SERVER r-package-sys
+    SERVICE r-package-sys
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
+    DEPENDS wasm
+    PACKAGE_DEPENDS ProxySys
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Default.psi
     NAME Default
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys DocSys
-                    ExploreSys FractalSys InviteSys NftSys ProducerSys ProxySys
+                    ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
                     PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Minimal.psi
+    NAME Minimal
+    DESCRIPTION "Minimum services for a functional chain"
+    PACKAGE_DEPENDS AccountSys AuthAnySys CpuSys CommonSys PackageSys ProducerSys ProxySys
+                    SetCodeSys TransactionSys
 )
 
 function(write_package_index out)
@@ -579,7 +603,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
-    DocSys ExploreSys FractalSys InviteSys NftSys ProducerSys ProxySys
+    DocSys ExploreSys FractalSys InviteSys NftSys Minimal PackageSys ProducerSys ProxySys
     PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
@@ -595,7 +619,9 @@ install(
           ${SERVICE_DIR}/ExploreSys.psi
           ${SERVICE_DIR}/FractalSys.psi
           ${SERVICE_DIR}/InviteSys.psi
+          ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/NftSys.psi
+          ${SERVICE_DIR}/PackageSys.psi
           ${SERVICE_DIR}/ProducerSys.psi
           ${SERVICE_DIR}/ProxySys.psi
           ${SERVICE_DIR}/PsiSpaceSys.psi

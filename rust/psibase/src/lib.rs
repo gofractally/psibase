@@ -1,5 +1,6 @@
 mod account_number;
 mod action_template;
+mod actions;
 mod block;
 mod boot;
 mod crypto;
@@ -34,6 +35,7 @@ mod web_services;
 
 pub use account_number::*;
 pub use action_template::*;
+pub use actions::*;
 pub use block::*;
 pub use boot::*;
 pub use crypto::*;
