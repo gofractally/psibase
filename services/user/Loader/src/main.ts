@@ -27,7 +27,7 @@ const functionCall = async (param: FunctionCallParam) => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
-  console.log("loading js...");
+  console.log("loading js... new hcange!");
   const { load } = await import("rollup-plugin-wit-component");
 
   // account.sys.psibase.io/loader
@@ -40,7 +40,9 @@ const functionCall = async (param: FunctionCallParam) => {
   //   console.log('from imported code: ', string);
   // };`;
 
-  let importables = [{ "component:account-sys/imports": importableCode }];
+  let importables = [
+    { [`component:${param.service}/imports`]: importableCode },
+  ];
 
   console.log("loading wasm...");
 

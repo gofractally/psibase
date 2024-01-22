@@ -51,7 +51,7 @@ export const Dashboard = ({ currentUser }: { currentUser: string }) => {
                     <AppletIcon
                         applet={a}
                         href={hrefs[a.service]}
-                        disabled={a.requiresUser && !currentUser}
+                        disabled={false}
                         key={a.service}
                     />
                 ))}

@@ -9,6 +9,11 @@ export async function funccall(params) {
   return "yesbuddeh funcCall";
 }
 
+export function getLoggedInUser() {
+  console.log("I WAS ASKED FOR ALICE");
+  return "alice";
+}
+
 export async function prnt(string) {
   console.log(window, window.postMessage, "was the window post message");
   console.log(`from imported code: ${derp(2)}`, string);

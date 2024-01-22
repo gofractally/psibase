@@ -18,6 +18,8 @@ import { getLoggedInUser, updateAccountInCommonNav } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
 import { connect } from "@psibase/plugin";
 
+import { getTaposForHeadBlock, signAndPushTransaction } from "common/rpc.mjs";
+
 // deploy the wasm
 // install the plugin
 
@@ -42,6 +44,8 @@ export interface AccountWithAuth extends Account {
 export interface AccountWithKey extends AccountWithAuth {
     privateKey: KeyPairWithAccounts["privateKey"];
 }
+
+const baseUrl = "https://account-sys.psibase.127.0.0.1.sslip.io:8080";
 
 // npm run build && psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree r-account-sys / ./dist/ -S r-account-sys
 
@@ -91,6 +95,11 @@ function App() {
         const msThen = new Date() / 1;
         console.log("clicked");
         console.log(supervisor, "xx");
+
+        // @ts-ignore
+        const loggedInUser = await supervisor!.getLoggedInUser();
+        console.log("i am", loggedInUser);
+
         // @ts-ignore
         const res = await supervisor.functionCall({
             service: "account-sys",
@@ -101,6 +110,34 @@ function App() {
         const msNow = new Date() / 1;
         setWaitTime(msNow - msThen);
         console.log(res, "res");
+
+        const transaction = {
+            tapos: {
+                ...(await getTaposForHeadBlock(baseUrl)),
+                expiration: new Date(Date.now() + 10000),
+            },
+            actions: [
+                {
+                    sender: "alice", // account requesting action
+                    service: "account-sys", // service executing action
+                    method: "newAccount", // method to execute
+                    data: {
+                        name: "betty",
+                        authService: "auth-any-sys",
+                    },
+                },
+            ],
+        };
+        // const privateKeys = [
+        // "PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V",
+        // ];
+
+        const trace = await signAndPushTransaction(
+            baseUrl,
+            transaction
+            // privateKeys
+        );
+        console.log("trace is", trace);
     };
 
     // const init = async () => {
