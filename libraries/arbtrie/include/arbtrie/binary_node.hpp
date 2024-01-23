@@ -348,6 +348,7 @@ namespace arbtrie
       {
          auto& idx = key_offsets()[lb_idx];
          idx.type = val.is_object_id();
+         assert( (char*)get_key_val_ptr(lb_idx) < tail() );
          get_key_val_ptr(lb_idx)->set_value(val);
       }
 
@@ -395,16 +396,19 @@ namespace arbtrie
       inline key_val_pair* get_key_val_ptr(int n)
       {
          assert(n < num_branches());
+         assert( key_offset_from_tail(n) < _nsize - sizeof(binary_node) );
          return (key_val_pair*)(tail() - key_offset_from_tail(n));
       }
       inline const key_val_pair* get_key_val_ptr(int n) const
       {
          assert(n < num_branches());
+         assert( key_offset_from_tail(n) < _nsize - sizeof(binary_node) );
          return (const key_val_pair*)(tail() - key_offset_from_tail(n));
       }
 
       inline const key_val_pair* get_key_val_ptr_offset(int n) const
       {
+         assert( (tail() - n) > ((uint8_t*)this) + sizeof(binary_node) );
          return (const key_val_pair*)(tail() - n);
       }
       inline key_val_pair* get_key_val_ptr_offset(int n) { return (key_val_pair*)(tail() - n); }

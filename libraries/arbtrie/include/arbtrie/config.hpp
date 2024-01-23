@@ -8,6 +8,25 @@ namespace arbtrie {
    static constexpr const uint64_t TB = 1024ull * GB;
 
    /**
+    *  If true then compactor will detect when a modify occurred 
+    *  while copying and try again. The modify thread will never block,
+    *  but will notify the copy thread if it is waiting.
+    *
+    *  If false then the modify thread will wait for the pending copy
+    *  to complete and the compactor thread will wake it up once
+    *  the copy is complete. 
+    *
+    *  Note: there is some kind of funky behavior going on with
+    *  wait_free_modify which causes teh compactor to occasionally
+    *  see things as dirty and try again; yet, when disabling
+    *  wait_free_modify the same tests show that the modify thread
+    *  is never forced to wait... but it crashes in both modes,
+    *  so who knows.  False avoids UB, true tests and checks
+    *  for UB.
+    */
+   static constexpr const bool     use_wait_free_modify = false;
+
+   /**
     *  Certain 
     */
    static constexpr const uint64_t max_database_size = 64 * TB; 
@@ -61,7 +80,7 @@ namespace arbtrie {
    // each thread will have a segment this size, so larger values
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
-   static constexpr const uint64_t segment_size = 64*MB;
+   static constexpr const uint64_t segment_size = 1*MB;
                                                             
    // the maximum value a node may have
    static constexpr const uint64_t max_value_size = segment_size / 2;

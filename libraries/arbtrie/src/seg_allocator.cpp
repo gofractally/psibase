@@ -1,6 +1,9 @@
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/seg_allocator.hpp>
 
+#undef NDEBUG
+#include <assert.h>
+
 namespace arbtrie
 {
    seg_allocator::seg_allocator(std::filesystem::path dir)
@@ -159,14 +162,16 @@ namespace arbtrie
       node_header* foo   = (node_header*)(foc);
 
       
+      
       /*
       std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num << " "
       << "seg free: " << _header->seg_meta[seg_num].get_free_space_and_objs().first << " "
       << "seg alloc_pos: " << s->_alloc_pos <<" ";
       if( ses._alloc_seg_ptr ) {
-         std::cerr << "calloc: " << ses._alloc_seg_ptr->_alloc_pos <<" cfree: " << _header->seg_meta[ses._alloc_seg_num].get_free_space_and_objs().first <<"\n";
-      } else std::cerr<<"\n";
+         std::cerr << "calloc: " << ses._alloc_seg_ptr->_alloc_pos <<" cfree: " << _header->seg_meta[ses._alloc_seg_num].get_free_space_and_objs().first <<"\r";
+      } else std::cerr<<"\r";
       */
+      
       
 
       assert(s->_alloc_pos == segment_offset(-1));
@@ -181,6 +186,7 @@ namespace arbtrie
       madvise(s, segment_size, MADV_SEQUENTIAL);
       while (foo < send and foo->address())
       {
+         assert( foo->validate_checksum() );
          auto foo_address = foo->address();
          // skip anything that has been freed
          // note the ref can go to 0 before foo->check is set to -1
@@ -207,21 +213,40 @@ namespace arbtrie
          {
             auto obj_size   = foo->size();
             auto [loc, ptr] = ses.alloc_data(obj_size, foo_address);
+
+            // TODO:
+            //    This code probably doesn't work in the case that
+            //    foo is modified by changing its address, it will
+            //    probably detect that the old obj_ref has been
+            //    freed not realizing that foo is no longer pointing
+            //    at the old object ref after the move This happens
+            //    in a currently disabled case on upsert.
+            //
             auto try_move   = [&]()
             {
                int count = 0;
                while (obj_ref.try_start_move(obj_ref.loc()))
                {
+                  assert( foo->validate_checksum() );
                   memcpy(ptr, foo, obj_size);
                 //  if( ptr->validate_checksum()) 
                   switch (obj_ref.try_move(obj_ref.loc(), loc))
                   {
                      case node_meta_type::freed:
+                         TRIEDENT_WARN("object freed while copying");
+                        return false;
                      case node_meta_type::moved:
-                        // TRIEDENT_DEBUG("object moved or freed while copying");
+                        // realloc or
+                         TRIEDENT_WARN("object moved while copying");
                         return false;
                      case node_meta_type::dirty:
-                        //TRIEDENT_WARN("compactor moving dirty obj, try again");
+                        // TODO: verify whether foo->address() == foo_address
+                        if( foo->address() != foo_address ) {
+                           TRIEDENT_WARN( "The Address of Foo Changed! HELP ME" );
+                           abort();
+                        }
+                        TRIEDENT_WARN("compactor moving dirty obj, try again");
+                        obj_ref.refresh();
                         ++count;
                         continue;
                      case node_meta_type::success:
@@ -431,8 +456,6 @@ namespace arbtrie
     */
    std::pair<segment_number, mapped_memory::segment_header*> seg_allocator::get_new_segment()
    {
-      auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
-      auto min = get_min_read_ptr();
 
      // TRIEDENT_DEBUG( " get new seg session min ptr: ", min );
      // TRIEDENT_WARN( "end ptr: ", _header->end_ptr.load(), " _header: ", _header );
@@ -448,16 +471,18 @@ namespace arbtrie
          if (r)
             std::cerr << "MLOCK RETURNED: " << r << "  EINVAL:" << EINVAL << "  EAGAIN:" << EAGAIN << "\n";
 
-         //memset(sp, 0, segment_size);  // TODO: is this necessary?
+         // for debug we clear the memory
+         assert( memset(sp, 0xff, segment_size) );  // TODO: is this necessary?
 
          auto shp  = new (sp) mapped_memory::segment_header();
          shp->_age = _header->next_alloc_age.fetch_add(1, std::memory_order_relaxed);
-      //   TRIEDENT_WARN( "returning segment: ", sn, " ap: ", ap, " min: ", min, "  _header->end_ptr: ", _header->end_ptr.load() );
          return std::pair<segment_number, mapped_memory::segment_header*>(sn, shp);
       };
      //  std::cout <<"get new seg ap: " << ap << "  min: " << min <<"  min-ap:" << min - ap << "\n";
 
-      while (min - ap >= 1)
+      auto min = get_min_read_ptr();
+      auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
+      while (min - ap > 1)
       {
       //   TRIEDENT_WARN( "REUSE SEGMENTS" );
          if (_header->alloc_ptr.compare_exchange_weak(ap, ap + 1))

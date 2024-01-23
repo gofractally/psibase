@@ -5,6 +5,9 @@
 
 #include <utility>
 
+#undef NDEBUG
+#include <assert.h>
+
 namespace arbtrie
 {
 
@@ -680,13 +683,14 @@ namespace arbtrie
          }
          else  // the key ends on this node, store value here
          {
-            //   TRIEDENT_WARN( "upsert value node on inner node" );
+            TRIEDENT_WARN( "upsert value node on inner node" );
             if (fn->has_eof_value())  //val_nid)
             {
                fast_meta_address val_nid = fn->get_branch(0);
                auto       old_val = state.get(val_nid);
                if constexpr (mode.is_unique())
                {
+                  TRIEDENT_DEBUG( "... upsert_value<mode>\n" );
                   fast_meta_address new_id = upsert_value<mode>(old_val, val);
                   if (new_id != val_nid)
                   {
@@ -739,8 +743,7 @@ namespace arbtrie
       }
       else  // key does not share the same prefix!
       {
- //        TRIEDENT_DEBUG("KEY DOESN'T SHARE PREFIX  node prelen: ", rootpre.size(),
-  //                      "  cprelen: ", cpre.size());
+      //   TRIEDENT_DEBUG("KEY DOESN'T SHARE PREFIX  node prelen: ", rootpre.size(), "  cprelen: ", cpre.size());
        //  TRIEDENT_WARN( "root prefix: ", to_hex( rootpre ) );
        //  TRIEDENT_WARN( "insert: ", to_hex(key) );
 
@@ -775,7 +778,7 @@ namespace arbtrie
          char root_prebranch = rootpre[cpre.size()];
 
          fast_meta_address child_id;
-         if constexpr (mode.is_unique())
+         if constexpr ( mode.is_unique())
          {
             // because the new setlist root must have a different branch region,
             // we need to reassign the meta_address for the current root, this is
@@ -791,7 +794,7 @@ namespace arbtrie
          }
          else  // shared state
          {
-         //   TRIEDENT_DEBUG(" moving root to child shared ");
+       //     TRIEDENT_DEBUG(" moving root to child shared ");
             auto new_prefix = rootpre.substr(cpre.size() + 1);
             auto cl         = clone<mode.make_shared()>(new_reg, r, fn,
                                                 {.spare_branches = 1, .update_prefix = new_prefix});

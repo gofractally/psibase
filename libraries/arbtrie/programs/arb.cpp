@@ -354,7 +354,7 @@ int  main(int argc, char** argv)
    //   test_refactor();
    //   return 0;
    //
-   bool sync_compact = false;  // false = use threads
+   bool sync_compact = argc > 1;//true;//false;  // false = use threads
 
    std::cerr << "resetting database\n";
    std::filesystem::remove_all("arbtriedb");
@@ -367,7 +367,7 @@ int  main(int argc, char** argv)
    std::vector<std::string> v;
    std::string              str;
 
-   int64_t batch_size = 100;
+   int64_t batch_size = 7;
 
    // Read the next line from File until it reaches the
    // end.
@@ -391,12 +391,12 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 10;
-         const int                  count  = 4'000'000;
+         const int                  rounds = 20;
+         const int                  count  = 1'000'000;
 
          auto iterate_all = [&]()
          {
-            std::cerr << "iterate entire database\n";
+        //    std::cerr << "iterate entire database\n";
             {
                uint64_t item_count = 0;
                auto     itr        = ws.create_iterator(r);
@@ -417,11 +417,13 @@ int  main(int argc, char** argv)
                }
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
+               /*
                std::cout << "iterated " << std::setw(12)
                          << add_comma(
                                 int64_t(item_count) /
                                 (std::chrono::duration<double, std::milli>(delta).count() / 1000))
                          << " items/sec  total items: " << add_comma(item_count) << "\n";
+                         */
             }
          };
 
@@ -431,9 +433,9 @@ int  main(int argc, char** argv)
          for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count*27; i+=27)
+            for (int i = 0; i < count*3; i+=3)
             {
-               auto l = ws._segas.lock();
+             //  auto l = ws._segas.lock();
                uint64_t val = rand64();
                ++seq;
                key_view kstr((char*)&val, sizeof(val));
@@ -447,6 +449,7 @@ int  main(int argc, char** argv)
 
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
+         while (sync_compact and db.compact_next_segment());
 
             std::cout << ro << "] " << std::setw(12)
                       << add_comma(int64_t(
@@ -472,10 +475,14 @@ int  main(int argc, char** argv)
                ws.insert(r, kstr, kstr);
                if ((i % batch_size) == 0)
                {
+                  auto l = ws._segas.lock();
                   last_root = r;
                }
             }
+            {
+            auto l = ws._segas.lock();
             last_root  = r;
+            }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
 

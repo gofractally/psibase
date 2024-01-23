@@ -1,5 +1,7 @@
 #pragma once
 #include <arbtrie/node_header.hpp>
+#undef NDEBUG
+#include <assert.h>
 
 namespace arbtrie
 {

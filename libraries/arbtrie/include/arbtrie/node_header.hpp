@@ -8,6 +8,9 @@
 #define XXH_INLINE_ALL
 #include <arbtrie/xxhash.h>
 
+#undef NDEBUG
+#include <assert.h>
+
 namespace arbtrie
 {
    struct node_header;
@@ -44,7 +47,7 @@ namespace arbtrie
                          fast_meta_address nid,
                          node_type type       = node_type::freelist,
                          uint16_t  num_branch = 0 )
-          : checksum(0),
+          : checksum(0xbaadbaad),
             _ntype(type),
             _nsize(size),
             _num_branches(num_branch),
@@ -99,8 +102,8 @@ namespace arbtrie
 
       uint32_t calculate_checksum() const;
 
-      void update_checksum() { checksum = calculate_checksum(); }
-      bool validate_checksum() { return checksum == calculate_checksum(); }
+      void update_checksum() { checksum = 0xbaadbaad; }//calculate_checksum(); }
+      bool validate_checksum()const { return checksum == 0xbaadbaad; } //calculate_checksum(); }
    } __attribute((packed));
    static_assert(sizeof(node_header) == 16);
 

@@ -225,11 +225,17 @@ namespace arbtrie
       temp_type start_modify()
       {
          // this mask sets copy to 0 and const to 0
-         const uint64_t start_mod_mask = ~(copy_mask | const_mask);
-         //if constexpr (std::is_same_v<Storage, fake_atomic<uint64_t>>)
-         return temp_type(_meta.fetch_and(start_mod_mask, std::memory_order_acquire));
-         //else
-         //   static_assert(!"cannot modify a temporary view of an atomic object");
+         if constexpr ( use_wait_free_modify ) {
+            constexpr const uint64_t start_mod_mask = ~(copy_mask | const_mask);
+            return temp_type(_meta.fetch_and(start_mod_mask));
+         } else {
+            temp_type prior(_meta.fetch_and(~const_mask) );
+            if( prior.is_copying() ) {
+               TRIEDENT_WARN( "waiting on copy before modifying" );
+               _meta.wait( prior.to_int() & ~const_mask );
+            }
+            return prior;
+         }
       }
 
       temp_type end_modify()
@@ -256,7 +262,7 @@ namespace arbtrie
             // set the copy bit to 1
             // acquire because if successful, we need the latest writes to the object
             // we are trying to move
-            temp_type old(_meta.fetch_or(copy_mask, std::memory_order_acquire));
+            temp_type old(_meta.fetch_or(copy_mask));//, std::memory_order_acquire));
 
             if (not old.ref() or old.loc() != expected) [[unlikely]]
             {  // object we are trying to copy has moved or been freed, return false
@@ -269,7 +275,8 @@ namespace arbtrie
 
             // exepcted current value is old|copy because the last fetch_or,
             // this will wait until the value has changed
-            _meta.wait(old.to_int() | copy_mask, std::memory_order_acquire);
+            //_meta.wait(old.to_int() | copy_mask, std::memory_order_acquire);
+            _meta.wait(old.to_int() | copy_mask);//, std::memory_order_acquire);
          } while (true);
       }
 
@@ -289,19 +296,37 @@ namespace arbtrie
        */
       move_result try_move(node_location expect_loc, node_location new_loc)
       {
-         uint64_t  expected = _meta.load(std::memory_order_acquire);
+         uint64_t  expected;
+         if constexpr ( not use_wait_free_modify ) {
+            expected = _meta.fetch_and( ~copy_mask, std::memory_order_relaxed );
+            if( not (expected & const_mask) ) {
+               TRIEDENT_WARN( "notify modify thread after copy" );
+               _meta.notify_all();
+            }
+         } else {
+            expected = _meta.load(std::memory_order_relaxed);
+         }
+
          temp_type ex;
          do
          {
             ex = temp_type(expected);
-            if (not ex.is_copying()) [[unlikely]]
-               return move_result::dirty;
+            if constexpr( use_wait_free_modify ) {
+               if (not ex.is_copying()) [[unlikely]]
+                  return move_result::dirty;
 
-            // start_move set the copy bit, start_modify cleared it
-            // therefore the prior if already returned.
-            assert(not ex.is_changing());
-            /*if (ex.is_changing()) [[unlikely]] 
-               return move_result::dirty; */
+               // start_move set the copy bit, start_modify cleared it
+               // therefore the prior if already returned.
+               assert(not ex.is_changing());
+            }
+
+            if constexpr ( debug_memory ) {
+               if (ex.is_changing()) [[unlikely]] 
+               {
+                  TRIEDENT_WARN( " SHOULD NEVER HAPPEN DIRTY?" );
+                  return move_result::dirty; 
+               }
+            }
 
             if (ex.loc() != expect_loc) [[unlikely]]
                return move_result::moved;
@@ -309,7 +334,8 @@ namespace arbtrie
                return move_result::freed;
             ex.set_location(new_loc).clear_copy_flag();
          } while (
-             not _meta.compare_exchange_weak(expected, ex.to_int(), std::memory_order_release));
+             //not _meta.compare_exchange_weak(expected, ex.to_int(), std::memory_order_release));
+             not _meta.compare_exchange_weak(expected, ex.to_int()) );
          return move_result::success;
       }
 
@@ -342,6 +368,22 @@ namespace arbtrie
       }
       temp_type release()
       {
+         /**
+          *  Normally reference counting requires this to be memory_order_acquire
+          *  or, technically, memory_order_release followed by an acquire fence
+          *  if and only if prior was 1.  This is to make sure all writes to the
+          *  memory are complete before the object is theoretically handed over
+          *  to someone else; however, we have a unique situation:
+          *
+          *  1. all data with a reference count > 1 is constant and protected by
+          *     the segment sequence lock.
+          *  2. The caller of release() holds the segment lock that prevents it
+          *  from being reused for anyone else until after that is released.
+          *
+          *  In other words the "life time" of the object extends to the read
+          *  lock and this decrement is not in danger given all threads
+          *  synchronize their memory on the sequence numbers.
+          */
          temp_type prior(_meta.fetch_sub(1, std::memory_order_relaxed));
          assert(prior.ref() != 0);
          if constexpr (debug_memory)

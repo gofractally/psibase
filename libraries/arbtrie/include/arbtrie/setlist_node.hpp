@@ -2,6 +2,8 @@
 #include <arbtrie/debug.hpp>
 #include <arbtrie/node_header.hpp>
 
+#undef NDEBUG
+#include <assert.h>
 namespace arbtrie
 {
 
@@ -318,7 +320,9 @@ namespace arbtrie
              src->_num_branches;
 
          memcpy(get_setlist_ptr(), src->get_setlist_ptr(), src->get_setlist_size());
-         memcpy(get_branch_ptr(), src->get_branch_ptr(), src->num_branches() * sizeof(object_id));
+         memcpy(get_branch_ptr(), src->get_branch_ptr(), src->num_branches() * sizeof(id_index));
+
+         assert( (char*)get_branch_ptr() + src->num_branches()*sizeof(id_index) <= tail() );
          assert(validate());
       }
 

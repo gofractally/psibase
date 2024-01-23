@@ -210,9 +210,10 @@ namespace arbtrie
                // returned mutable T is only valid while modify lock is in scope
                template <typename T>
                T* as()
-               {
+               {  _observed_ptr = _rlock.get_node_pointer(_locked_val.loc());
                   assert(_locked_val.ref());
-                  return (T*)(_observed_ptr = _rlock.get_node_pointer(_locked_val.loc()));
+                  assert( _observed_ptr->validate_checksum() );
+                  return (T*)_observed_ptr;
                }
                template <typename T>
                void as(auto&& call_with_tptr)
@@ -232,8 +233,10 @@ namespace arbtrie
                {
                   // TODO: check to see if checksum actually changed?
                   // to let us know if we are making empty changes
-                  if (_observed_ptr) [[likely]]
-                     _observed_ptr->checksum = 0;  //update_checksum();
+                  if (_observed_ptr) [[likely]] {
+                     assert( _observed_ptr->validate_checksum() );
+                     //_observed_ptr->checksum = update_checksum();
+                  }
                   else
                      TRIEDENT_WARN("got modify lock but never read data");
 
@@ -272,7 +275,9 @@ namespace arbtrie
                bool release();
 
                modify_lock modify() { return modify_lock(_meta, _rlock); }
-               bool        try_start_move(node_location loc) { return _meta.try_start_move(loc); }
+               bool        try_start_move(node_location loc) { 
+                  return _meta.try_start_move(loc); 
+               }
                auto        try_move(node_location expected_prior_loc, node_location move_to_loc)
                {
                   return _meta.try_move(expected_prior_loc, move_to_loc);
@@ -283,6 +288,7 @@ namespace arbtrie
                template <typename Type>
                const Type* as() const
                {
+                  assert( header()->validate_checksum() );
                   assert(Type::type == header()->get_type());
                   return reinterpret_cast<const Type*>(header());
                };
@@ -299,7 +305,7 @@ namespace arbtrie
 
                //bool cache_object();
 
-               //void refresh() { _cached = _meta.load( std::memory_order_acquire ); }
+               void refresh() { _cached = _meta.load( std::memory_order_acquire ); }
 
                auto& rlock() { return _rlock; }
                auto& rlock() const { return _rlock; }
@@ -697,7 +703,15 @@ namespace arbtrie
    template <typename T>
    inline const T* seg_allocator::session::read_lock::object_ref<T>::header() const
    {
-      return (const T*)_rlock.get_node_pointer(_meta.load(std::memory_order_acquire).loc());
+      //assert( _meta.load(std::memory_order_relaxed).ref() );
+      auto r = (const T*)_rlock.get_node_pointer(_meta.load(std::memory_order_acquire).loc());
+      if constexpr ( debug_memory ) {
+         if( not r->validate_checksum() ) {
+            TRIEDENT_WARN( "checksum: ", r->checksum );
+         }
+         assert( r->validate_checksum() );
+      }
+      return r;
    }
 
    template <typename T>
@@ -726,6 +740,7 @@ namespace arbtrie
 
       init(node_ptr);
 
+      assert( node_ptr->validate_checksum() );
       assert(node_ptr->_nsize == size);
       assert(node_ptr->_ntype == type);
       assert(node_ptr->_node_id == adr.to_int());
@@ -766,6 +781,7 @@ namespace arbtrie
       //TRIEDENT_WARN( "alloc id: ", id, " type: " , node_type_names[type], " loc: ", loc._offset, " size: ", size);
 
       init(node_ptr);
+      assert( node_ptr->validate_checksum() );
 
       auto tmp = temp_meta_type().set_type(type).set_location(loc).set_ref(1);
       //atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
@@ -794,8 +810,11 @@ namespace arbtrie
       if constexpr (debug_memory)
       {
          auto ap = segment->_alloc_pos.load(std::memory_order_relaxed);
-         if (not(ap == 0 or ap > loc.abs_index()))
+         if (not(ap == 0 or ap > loc.abs_index())) {
+            TRIEDENT_WARN( "ap: ", ap, "  loc: ", loc.aligned_index(), " abs: ", loc.abs_index(), 
+                           "loc.segment: ", loc.segment() );
             abort();
+         }
       }
       else  // always check in debug builds
          assert(segment->_alloc_pos == 0 or segment->_alloc_pos > loc.abs_index());
