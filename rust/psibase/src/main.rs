@@ -11,8 +11,8 @@ use psibase::{
     account, apply_proxy, create_boot_transactions, get_tapos_for_head, new_account_action,
     push_transaction, reg_server, set_auth_service_action, set_code_action, set_key_action,
     sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
-    DirectoryRegistry, ExactAccountNumber, PackageList, PackageRegistry, SignedTransaction, Tapos,
-    TaposRefBlock, TimePointSec, Transaction,
+    DirectoryRegistry, ExactAccountNumber, HTTPRegistry, PackageList, PackageRegistry,
+    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -63,6 +63,10 @@ enum Command {
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
         producer: ExactAccountNumber,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
 
         services: Vec<String>,
     },
@@ -548,6 +552,7 @@ async fn boot(
     client: reqwest::Client,
     key: &Option<AnyPublicKey>,
     producer: ExactAccountNumber,
+    _package_source: &Vec<String>,
     services: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let now_plus_30secs = Utc::now() + Duration::seconds(30);
@@ -555,12 +560,20 @@ async fn boot(
         seconds: now_plus_30secs.timestamp() as u32,
     };
     let default_services = vec!["Default".to_string()];
-    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
-    let mut packages = package_registry.resolve(if services.is_empty() {
-        &default_services[..]
-    } else {
-        &services[..]
-    })?;
+    // let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+    let package_registry = HTTPRegistry::new(
+        Path::new("/tmp/psibase"),
+        Url::parse("http://localhost:8080/packages/")?,
+        client.clone(),
+    )
+    .await?;
+    let mut packages = package_registry
+        .resolve(if services.is_empty() {
+            &default_services[..]
+        } else {
+            &services[..]
+        })
+        .await?;
     let (boot_transactions, transactions) =
         create_boot_transactions(key, producer.into(), true, expiration, &mut packages)?;
 
@@ -733,7 +746,7 @@ async fn install(
 ) -> Result<(), anyhow::Error> {
     let installed = PackageList::installed(&args.api, &mut client).await?;
     let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
-    let to_install = installed.resolve_new(&package_registry, packages)?;
+    let to_install = installed.resolve_new(&package_registry, packages).await?;
 
     let mut all_account_actions = vec![];
     let mut all_init_actions = vec![];
@@ -933,8 +946,9 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::Boot {
             key,
             producer,
+            package_source,
             services,
-        } => boot(&args, client, key, *producer, services).await?,
+        } => boot(&args, client, key, *producer, package_source, services).await?,
         Command::Create {
             account,
             key,

@@ -11,9 +11,14 @@ use std::io::{Read, Seek};
 use std::str::FromStr;
 use zip::ZipArchive;
 
+use async_recursion::async_recursion;
+use async_trait::async_trait;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+
+#[cfg(not(target_family = "wasm"))]
+use std::{io::Write, path::Path};
 
 custom_error! {
     pub Error
@@ -358,7 +363,8 @@ pub fn validate_dependencies<T: Read + Seek>(
     Ok(())
 }
 
-fn dfs<T: PackageRegistry + ?Sized>(
+#[async_recursion(?Send)]
+async fn dfs<T: PackageRegistry + ?Sized>(
     reg: &T,
     names: &[String],
     found: &mut HashMap<String, bool>,
@@ -371,8 +377,8 @@ fn dfs<T: PackageRegistry + ?Sized>(
             }
         } else {
             found.insert(name.clone(), false);
-            let package = reg.get(name.as_str())?;
-            dfs(reg, &package.meta.depends, found, result)?;
+            let package = reg.get(name.as_str()).await?;
+            dfs(reg, &package.meta.depends, found, result).await?;
             result.push(package);
             *found.get_mut(name).unwrap() = true;
         }
@@ -380,15 +386,19 @@ fn dfs<T: PackageRegistry + ?Sized>(
     Ok(())
 }
 
+#[async_trait(?Send)]
 pub trait PackageRegistry {
     type R: Read + Seek;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error>;
-    fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error>;
+    async fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error>;
     // Returns a set of packages and all dependencies
     // The result is ordered by dependency so that if A depends on B, then B appears before A.
-    fn resolve(&self, packages: &[String]) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
+    async fn resolve(
+        &self,
+        packages: &[String],
+    ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let mut result = vec![];
-        dfs(self, packages, &mut HashMap::new(), &mut result)?;
+        dfs(self, packages, &mut HashMap::new(), &mut result).await?;
         Ok(result)
     }
 }
@@ -403,6 +413,7 @@ impl DirectoryRegistry {
     }
 }
 
+#[async_trait(?Send)]
 impl PackageRegistry for DirectoryRegistry {
     type R = BufReader<File>;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
@@ -411,13 +422,100 @@ impl PackageRegistry for DirectoryRegistry {
         let result: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
         Ok(result)
     }
-    fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error> {
+    async fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error> {
         let f = File::open(self.dir.join(name.to_string() + ".psi"))?;
         PackagedService::new(BufReader::new(f))
     }
 }
 
-pub fn additional_packages<T: PackageRegistry + ?Sized>(
+#[cfg(not(target_family = "wasm"))]
+struct FileRemover<'a> {
+    path: Option<&'a Path>,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl Drop for FileRemover<'_> {
+    fn drop(&mut self) {
+        if let Some(path) = self.path {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub struct HTTPRegistry {
+    cache_dir: PathBuf,
+    url: reqwest::Url,
+    client: reqwest::Client,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl HTTPRegistry {
+    pub async fn new(
+        cache_dir: &Path,
+        url: reqwest::Url,
+        client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        std::fs::create_dir_all(cache_dir)?;
+        let result = HTTPRegistry {
+            cache_dir: cache_dir.into(),
+            url: url,
+            client: client,
+        };
+        result.download("index.json").await?;
+        Ok(result)
+    }
+    async fn download(&self, filename: &str) -> Result<(), anyhow::Error> {
+        let mut response = self
+            .client
+            .get(self.url.join(&filename)?)
+            .send()
+            .await?
+            .error_for_status()?;
+        let tmp_path = self.cache_dir.join(filename.to_string() + ".tmp");
+        let mut f = File::options()
+            .write(true)
+            .create_new(true)
+            .open(&tmp_path)?;
+        let mut cleanup = FileRemover {
+            path: Some(&tmp_path),
+        };
+        while let Some(chunk) = response.chunk().await? {
+            f.write_all(&chunk)?
+        }
+        let local_path = self.cache_dir.join(filename);
+        std::fs::rename(&tmp_path, &local_path)?;
+        cleanup.path = None;
+        Ok(())
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[async_trait(?Send)]
+impl PackageRegistry for HTTPRegistry {
+    type R = BufReader<File>;
+    fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
+        let f = File::open(self.cache_dir.join("index.json"))?;
+        let contents = std::io::read_to_string(f)?;
+        let result: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
+        Ok(result)
+    }
+    async fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error> {
+        let filename = name.to_string() + ".psi";
+        let local_path = self.cache_dir.join(&filename);
+        let f = match File::open(&local_path) {
+            Ok(f) => f,
+            Err(_) => {
+                self.download(&filename).await?;
+                File::open(&local_path)?
+            }
+        };
+        PackagedService::new(BufReader::new(f))
+    }
+}
+
+#[async_recursion(?Send)]
+pub async fn additional_packages<T: PackageRegistry + ?Sized>(
     installed: &PackageList,
     reg: &T,
     names: &[String],
@@ -432,8 +530,8 @@ pub fn additional_packages<T: PackageRegistry + ?Sized>(
         } else {
             found.insert(name.clone(), false);
             if !installed.contains(name.as_str()) {
-                let package = reg.get(name.as_str())?;
-                additional_packages(installed, reg, &package.meta.depends, found, result)?;
+                let package = reg.get(name.as_str()).await?;
+                additional_packages(installed, reg, &package.meta.depends, found, result).await?;
                 result.push(package);
             }
             *found.get_mut(name).unwrap() = true;
@@ -524,13 +622,13 @@ impl PackageList {
     fn contains(&self, name: &str) -> bool {
         self.packages.contains(name)
     }
-    pub fn resolve_new<T: PackageRegistry + ?Sized>(
+    pub async fn resolve_new<T: PackageRegistry + ?Sized>(
         &self,
         reg: &T,
         packages: &[String],
     ) -> Result<Vec<PackagedService<<T as PackageRegistry>::R>>, anyhow::Error> {
         let mut result = vec![];
-        additional_packages(self, reg, packages, &mut HashMap::new(), &mut result)?;
+        additional_packages(self, reg, packages, &mut HashMap::new(), &mut result).await?;
         Ok(result)
     }
     pub fn into_vec(mut self) -> Vec<String> {
