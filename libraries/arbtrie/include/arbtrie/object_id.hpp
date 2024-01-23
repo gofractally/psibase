@@ -20,16 +20,17 @@ namespace arbtrie {
 
    struct id_index {
       constexpr id_index( uint32_t r = 0 ):index(r){}
-      uint32_t index:24;
+      uint32_t index:23;
+      uint32_t dirty:1;
       operator bool()const { return index; }
-      friend bool operator == ( id_index a, id_index b ) = default;
+      friend bool operator == ( id_index a, id_index b ) { return a.index == b.index; };
    } __attribute__((packed)) __attribute__((aligned(1)));
    static_assert( sizeof(id_index) == 3 );
 
    struct id_address {
       constexpr id_address() = default;
       constexpr id_address( const id_address& ) = default;
-      constexpr id_address( id_region r, id_index i ):_region(r),_index(i){}
+      constexpr id_address( id_region r, id_index i ):_region(r),_index(i.index){}
       constexpr id_address( object_id oid ); 
 
       operator object_id()const;

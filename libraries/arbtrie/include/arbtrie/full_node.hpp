@@ -74,7 +74,7 @@ namespace arbtrie
          return {br, get_branch(br) };
       }
 
-      void add_branch(int_fast16_t br, fast_meta_address b)
+      void add_branch(int_fast16_t br, fast_meta_address b, bool dirty = false)
       {
          assert(br < max_branch_count);
          assert(br >= 0);
@@ -83,6 +83,7 @@ namespace arbtrie
          ++_num_branches;
          assert(_num_branches <= max_branch_count);
          _branches[br].index = b.index;
+         _branches[br].dirty |= dirty;
 
          // this info is redundant and no one should determine eof_branch
          // for full node by reading this, so don't bother updating it
@@ -101,13 +102,17 @@ namespace arbtrie
          // for full node by reading this, so don't bother updating it
          //_eof_branch &= br != 0;
       }
-      void set_branch(int_fast16_t br, fast_meta_address b)
+      void clear_dirty( branch_index_type br ) {
+         _branches[br].dirty = 0;
+      }
+      void set_branch(int_fast16_t br, fast_meta_address b, bool dirty = false)
       {
          assert(br < max_branch_count);
          assert(br >= 0);
          assert(_branches[br]);
          assert( b.region == branch_region() );
          _branches[br].index = b.index;
+         _branches[br].dirty |= dirty;
       }
 
       bool has_eof_value()const { return bool(_branches[0]); }

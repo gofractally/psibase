@@ -472,7 +472,7 @@ namespace arbtrie
                   fn->add_branch(0, root->get_key_val_ptr(0)->value_id());
                else
                   fn->add_branch(0,
-                                 make_value(bregion, r.rlock(), root->get_key_val_ptr(0)->value()));
+                                 make_value(bregion, r.rlock(), root->get_key_val_ptr(0)->value()), true);
             }
 
             for (int from = has_eof_value; from < numb;)
@@ -484,7 +484,7 @@ namespace arbtrie
                auto new_child = clone_binary_range(fn->branch_region(), r, root,
                                                    k.substr(0, cpre.size() + 1), from, to);
                from           = to;
-               fn->add_branch(uint16_t(byte) + 1, new_child);
+               fn->add_branch(uint16_t(byte) + 1, new_child, true);
             }
          };
          if constexpr (mode.is_unique())
@@ -636,7 +636,7 @@ namespace arbtrie
                {
                   auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1), val);
                   if (br != new_br)
-                     r.modify().as<NodeType>()->set_branch(bidx, new_br);
+                     r.modify().as<NodeType>()->set_branch(bidx, new_br, true);
                   return r.address();
                }
                else  // shared_node
@@ -644,7 +644,7 @@ namespace arbtrie
                   auto cl     = clone<mode>(r, fn, {});
                   auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1), val);
                   assert(br != new_br);
-                  cl.modify().template as<NodeType>()->set_branch(bidx, new_br);
+                  cl.modify().template as<NodeType>()->set_branch(bidx, new_br, true);
                   return cl.address();
                }
             }
@@ -661,7 +661,7 @@ namespace arbtrie
                   {
                      if (fn->can_add_branch())
                      {
-                        r.modify().template as<NodeType>()->add_branch(bidx, new_bin);
+                        r.modify().template as<NodeType>()->add_branch(bidx, new_bin, true);
                         return r.address();
                      }
                   }
@@ -670,13 +670,13 @@ namespace arbtrie
                      if (fn->num_branches() + 1 >= full_node_threshold)
                      {
                         return refactor_to_full<mode>(
-                                   r, fn, [&](auto fptr) { fptr->add_branch(bidx, new_bin); })
+                                   r, fn, [&](auto fptr) { fptr->add_branch(bidx, new_bin, true); })
                             .address();
                      }
                   }
 
                   return clone<mode>(r, fn, {.spare_branches = 16},
-                                     [&](auto cptr) { cptr->add_branch(bidx, new_bin); })
+                                     [&](auto cptr) { cptr->add_branch(bidx, new_bin, true); })
                       .address();
                }
             }
@@ -694,7 +694,7 @@ namespace arbtrie
                   fast_meta_address new_id = upsert_value<mode>(old_val, val);
                   if (new_id != val_nid)
                   {
-                     r.modify().as<NodeType>()->set_branch(0, new_id);
+                     r.modify().as<NodeType>()->set_branch(0, new_id, true);
                      release_node(old_val);
                   }
                   return r.address();
@@ -705,7 +705,7 @@ namespace arbtrie
                   assert(new_id != val_nid);  // because shared state
                   release_node(old_val);
                   auto cl = clone<mode>(r, fn, {.spare_branches = 16},
-                                        [&](auto cl) { cl->set_branch(0, new_id); });
+                                        [&](auto cl) { cl->set_branch(0, new_id, true); });
                   return cl.address();
                }
             }
@@ -718,7 +718,7 @@ namespace arbtrie
                   if (fn->can_add_branch())
                   {
                      //         TRIEDENT_DEBUG( " can add" );
-                     r.modify().template as<NodeType>()->add_branch(0, new_id);
+                     r.modify().template as<NodeType>()->add_branch(0, new_id, true);
                      return r.address();
                   }
                   else
@@ -727,7 +727,7 @@ namespace arbtrie
                      // cloning unique reuses ID and bypasses need to
                      // retain/release all children
                      return clone<mode>(r, fn, {.spare_branches = 1},
-                                        [&](auto cl) { cl->add_branch(0, new_id); })
+                                        [&](auto cl) { cl->add_branch(0, new_id, true); })
                          .address();
                   }
                }
@@ -735,7 +735,7 @@ namespace arbtrie
                {
                   TRIEDENT_DEBUG(" clone add new value to branch 0, val =", val);
                   return clone<mode>(r, fn, {.spare_branches = 16},
-                                     [&](auto cl) { cl->add_branch(0, new_id); })
+                                     [&](auto cl) { cl->add_branch(0, new_id, true); })
                       .address();
                }
             }
@@ -813,8 +813,8 @@ namespace arbtrie
                                       {
                                          //                            TRIEDENT_WARN( "CHILD ID REGION INSTEAD OF NEW?");
                                          sln->set_branch_region(child_id.region);
-                                         sln->add_branch(0, v);
-                                         sln->add_branch(char_to_branch(root_prebranch), child_id);
+                                         sln->add_branch(0, v, true);
+                                         sln->add_branch(char_to_branch(root_prebranch), child_id, true);
                                       })
                 .address();
          }
@@ -836,8 +836,8 @@ namespace arbtrie
                           brs[!order] = {char_to_branch(root_prebranch), child_id};
                           //                TRIEDENT_DEBUG( "abx: ", abx);
                           //               TRIEDENT_DEBUG( "child_id: ", child_id, " on branch: ", root_prebranch);
-                          sln->add_branch(brs[0].first, brs[0].second);
-                          sln->add_branch(brs[1].first, brs[1].second);
+                          sln->add_branch(brs[0].first, brs[0].second, true);
+                          sln->add_branch(brs[1].first, brs[1].second, true);
                        })
                 .address();
          }
