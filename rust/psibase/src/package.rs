@@ -18,6 +18,8 @@ use std::io::BufReader;
 use std::path::PathBuf;
 
 #[cfg(not(target_family = "wasm"))]
+use sha2::{Digest, Sha256};
+#[cfg(not(target_family = "wasm"))]
 use std::io::Write;
 #[cfg(not(target_family = "wasm"))]
 use tempfile::tempfile;
@@ -35,9 +37,11 @@ custom_error! {
     NoDomain = "Virtual hosting requires a URL with a domain name",
     PackageNotFound{package: String} = "The package {package} was not found",
     DuplicatePackage{package: String} = "The package {package} was declared multiple times in the package index",
+    PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
+    PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 struct Meta {
     name: String,
     description: String,
@@ -53,6 +57,18 @@ pub struct PackageInfo {
     pub accounts: Vec<AccountNumber>,
     pub sha256: Checksum256,
     pub file: String,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl PackageInfo {
+    fn meta(&self) -> Meta {
+        Meta {
+            name: self.name.clone(),
+            description: self.description.clone(),
+            depends: self.depends.clone(),
+            accounts: self.accounts.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -450,7 +466,7 @@ impl HTTPRegistry {
             client: client,
             index: HashMap::new(),
         };
-        let index_file = result.download("index.json").await?;
+        let (index_file, _) = result.download("index.json").await?;
         let contents = std::io::read_to_string(index_file)?;
         let index: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
         for package in index {
@@ -460,19 +476,22 @@ impl HTTPRegistry {
         }
         Ok(result)
     }
-    async fn download(&self, filename: &str) -> Result<File, anyhow::Error> {
+    async fn download(&self, filename: &str) -> Result<(File, Checksum256), anyhow::Error> {
         let mut url = self.url.clone();
         url.path_segments_mut()
             .unwrap()
             .pop_if_empty()
             .push(filename);
         let mut response = self.client.get(url).send().await?.error_for_status()?;
+        let mut hasher = Sha256::new();
         let mut f = tempfile()?;
         while let Some(chunk) = response.chunk().await? {
-            f.write_all(&chunk)?
+            f.write_all(&chunk)?;
+            hasher.update(&chunk);
         }
+        let hash: [u8; 32] = hasher.finalize().into();
         f.rewind()?;
-        Ok(f)
+        Ok((f, Checksum256::from(hash)))
     }
 }
 
@@ -493,8 +512,19 @@ impl PackageRegistry for HTTPRegistry {
                 package: name.to_string(),
             })?
         };
-        let f = self.download(&info.file).await?;
-        PackagedService::new(BufReader::new(f))
+        let (f, hash) = self.download(&info.file).await?;
+        if hash != info.sha256 {
+            Err(Error::PackageDigestFailure {
+                package: info.name.clone(),
+            })?
+        }
+        let result = PackagedService::new(BufReader::new(f))?;
+        if result.meta != info.meta() {
+            Err(Error::PackageMetaMismatch {
+                package: info.name.clone(),
+            })?
+        }
+        Ok(result)
     }
 }
 
