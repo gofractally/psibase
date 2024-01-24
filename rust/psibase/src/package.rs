@@ -467,12 +467,12 @@ impl HTTPRegistry {
         Ok(result)
     }
     async fn download(&self, filename: &str) -> Result<(), anyhow::Error> {
-        let mut response = self
-            .client
-            .get(self.url.join(&filename)?)
-            .send()
-            .await?
-            .error_for_status()?;
+        let mut url = self.url.clone();
+        url.path_segments_mut()
+            .unwrap()
+            .pop_if_empty()
+            .push(filename);
+        let mut response = self.client.get(url).send().await?.error_for_status()?;
         let tmp_path = self.cache_dir.path().join(filename.to_string() + ".tmp");
         let mut f = File::options()
             .write(true)
