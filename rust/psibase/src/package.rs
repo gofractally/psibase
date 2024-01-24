@@ -31,6 +31,7 @@ custom_error! {
     MissingDepAccount{name: AccountNumber, package: String} = "The account {name} required by {package} is not defined by any package",
     MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
     NoDomain = "Virtual hosting requires a URL with a domain name",
+    PackageNotFound{package: String} = "The package {package} was not found",
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -511,6 +512,52 @@ impl PackageRegistry for HTTPRegistry {
             }
         };
         PackagedService::new(BufReader::new(f))
+    }
+}
+
+pub struct JointRegistry<T: Read + Seek> {
+    sources: Vec<(PackageList, Box<dyn PackageRegistry<R = T>>)>,
+}
+
+impl<T: Read + Seek> JointRegistry<T> {
+    pub fn new() -> Self {
+        Self { sources: vec![] }
+    }
+    pub fn push<U: PackageRegistry<R = T> + 'static>(
+        &mut self,
+        source: U,
+    ) -> Result<(), anyhow::Error> {
+        let list = PackageList::from_registry(&source)?;
+        self.sources.push((list, Box::new(source)));
+        Ok(())
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
+    type R = T;
+    fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
+        let mut result = Vec::new();
+        let mut found = HashSet::new();
+        for (_, reg) in &self.sources {
+            for entry in reg.index()? {
+                if !found.contains(&entry.name) {
+                    found.insert(entry.name.clone());
+                    result.push(entry);
+                }
+            }
+        }
+        Ok(result)
+    }
+    async fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error> {
+        for (list, reg) in &self.sources {
+            if list.contains(name) {
+                return reg.get(name).await;
+            }
+        }
+        Err(Error::PackageNotFound {
+            package: name.to_string(),
+        })?
     }
 }
 

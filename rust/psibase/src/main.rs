@@ -11,15 +11,16 @@ use psibase::{
     account, apply_proxy, create_boot_transactions, get_tapos_for_head, new_account_action,
     push_transaction, reg_server, set_auth_service_action, set_code_action, set_key_action,
     sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
-    DirectoryRegistry, ExactAccountNumber, HTTPRegistry, PackageList, PackageRegistry,
-    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
+    DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
+    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
-use std::fs::{metadata, read_dir};
+use std::fs::{metadata, read_dir, File};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 /// Interact with a running psinode
@@ -547,12 +548,34 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
     Ok(base.join("share/psibase"))
 }
 
+async fn get_package_registry(
+    sources: &Vec<String>,
+    client: reqwest::Client,
+) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
+    let cache_dir = Path::new("/tmp/psibase");
+    let mut result = JointRegistry::new();
+    if sources.is_empty() {
+        result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
+    } else {
+        for source in sources {
+            if source.starts_with("http:") || source.starts_with("https:") {
+                result.push(
+                    HTTPRegistry::new(cache_dir, Url::parse(source)?, client.clone()).await?,
+                )?;
+            } else {
+                result.push(DirectoryRegistry::new(source.into()))?;
+            }
+        }
+    }
+    Ok(result)
+}
+
 async fn boot(
     args: &Args,
     client: reqwest::Client,
     key: &Option<AnyPublicKey>,
     producer: ExactAccountNumber,
-    _package_source: &Vec<String>,
+    package_source: &Vec<String>,
     services: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let now_plus_30secs = Utc::now() + Duration::seconds(30);
@@ -560,13 +583,7 @@ async fn boot(
         seconds: now_plus_30secs.timestamp() as u32,
     };
     let default_services = vec!["Default".to_string()];
-    // let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
-    let package_registry = HTTPRegistry::new(
-        Path::new("/tmp/psibase"),
-        Url::parse("http://localhost:8080/packages/")?,
-        client.clone(),
-    )
-    .await?;
+    let package_registry = get_package_registry(package_source, client.clone()).await?;
     let mut packages = package_registry
         .resolve(if services.is_empty() {
             &default_services[..]
