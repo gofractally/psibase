@@ -39,6 +39,7 @@ custom_error! {
     DuplicatePackage{package: String} = "The package {package} was declared multiple times in the package index",
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
+    CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -450,7 +451,7 @@ impl PackageRegistry for DirectoryRegistry {
 
 #[cfg(not(target_family = "wasm"))]
 pub struct HTTPRegistry {
-    url: reqwest::Url,
+    index_url: reqwest::Url,
     client: reqwest::Client,
     index: HashMap<String, PackageInfo>,
 }
@@ -461,27 +462,31 @@ impl HTTPRegistry {
         url: reqwest::Url,
         client: reqwest::Client,
     ) -> Result<HTTPRegistry, anyhow::Error> {
-        let mut result = HTTPRegistry {
-            url: url,
-            client: client,
-            index: HashMap::new(),
-        };
-        let (index_file, _) = result.download("index.json").await?;
-        let contents = std::io::read_to_string(index_file)?;
-        let index: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
-        for package in index {
-            if let Some(prev) = result.index.insert(package.name.clone(), package) {
+        let mut index_url = url.clone();
+        index_url
+            .path_segments_mut()
+            .unwrap()
+            .pop_if_empty()
+            .push("index.json");
+        let mut index = HashMap::new();
+        for package in crate::as_json::<Vec<PackageInfo>>(client.get(index_url.clone())).await? {
+            if let Some(prev) = index.insert(package.name.clone(), package) {
                 Err(Error::DuplicatePackage { package: prev.name })?
             }
         }
-        Ok(result)
+        Ok(HTTPRegistry {
+            index_url,
+            client,
+            index,
+        })
     }
     async fn download(&self, filename: &str) -> Result<(File, Checksum256), anyhow::Error> {
-        let mut url = self.url.clone();
-        url.path_segments_mut()
-            .unwrap()
-            .pop_if_empty()
-            .push(filename);
+        let url = self.index_url.join(filename)?;
+        if url.origin() != self.index_url.origin() {
+            Err(Error::CrossOriginFile {
+                file: filename.to_string(),
+            })?;
+        }
         let mut response = self.client.get(url).send().await?.error_for_status()?;
         let mut hasher = Sha256::new();
         let mut f = tempfile()?;
