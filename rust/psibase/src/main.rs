@@ -182,6 +182,10 @@ enum Command {
         /// Set all accounts to authenticate using this key
         #[clap(short = 'k', long, value_name = "KEY")]
         key: Option<AnyPublicKey>,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
     },
 
     /// Prints a list of apps
@@ -195,12 +199,20 @@ enum Command {
         /// List installed apps
         #[clap(long)]
         installed: bool,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
     },
 
     /// Find packages
     Search {
         /// Regular expressions to search for in package names and descriptions
         patterns: Vec<String>,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
     },
 
     /// Create a bearer token that can be used to access a node
@@ -757,9 +769,10 @@ async fn install(
     mut client: reqwest::Client,
     packages: &[String],
     key: &Option<AnyPublicKey>,
+    sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let installed = PackageList::installed(&args.api, &mut client).await?;
-    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+    let package_registry = get_package_registry(sources, client.clone()).await?;
     let to_install = installed.resolve_new(&package_registry, packages).await?;
 
     let mut all_account_actions = vec![];
@@ -863,10 +876,11 @@ async fn list(
     all: bool,
     available: bool,
     installed: bool,
+    sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     if all || (installed && available) || (!all & !installed && !available) {
         let installed = PackageList::installed(&args.api, &mut client).await?;
-        let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+        let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
@@ -878,7 +892,7 @@ async fn list(
         }
     } else if available {
         let installed = PackageList::installed(&args.api, &mut client).await?;
-        let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+        let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
             println!("{}", name);
@@ -889,15 +903,16 @@ async fn list(
 
 async fn search(
     _args: &Args,
-    _client: reqwest::Client,
+    client: reqwest::Client,
     patterns: &Vec<String>,
+    sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let mut compiled = vec![];
     for pattern in patterns {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
     // TODO: search installed packages as well
-    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+    let package_registry = get_package_registry(sources, client.clone()).await?;
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
     for info in package_registry.index()? {
@@ -1030,13 +1045,21 @@ async fn main() -> Result<(), anyhow::Error> {
                 .await?
             }
         }
-        Command::Install { packages, key } => install(&args, client, packages, key).await?,
+        Command::Install {
+            packages,
+            key,
+            package_source,
+        } => install(&args, client, packages, key, package_source).await?,
         Command::List {
             all,
             available,
             installed,
-        } => list(&args, client, *all, *available, *installed).await?,
-        Command::Search { patterns } => search(&args, client, patterns).await?,
+            package_source,
+        } => list(&args, client, *all, *available, *installed, package_source).await?,
+        Command::Search {
+            patterns,
+            package_source,
+        } => search(&args, client, patterns, package_source).await?,
         Command::CreateToken {
             expires_after,
             mode,
