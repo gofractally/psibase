@@ -18,9 +18,9 @@ use std::io::BufReader;
 use std::path::PathBuf;
 
 #[cfg(not(target_family = "wasm"))]
-use std::{io::Write, path::Path};
+use std::io::Write;
 #[cfg(not(target_family = "wasm"))]
-use tempfile::TempDir;
+use tempfile::tempfile;
 
 custom_error! {
     pub Error
@@ -34,6 +34,7 @@ custom_error! {
     MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
     NoDomain = "Virtual hosting requires a URL with a domain name",
     PackageNotFound{package: String} = "The package {package} was not found",
+    DuplicatePackage{package: String} = "The package {package} was declared multiple times in the package index",
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -432,24 +433,10 @@ impl PackageRegistry for DirectoryRegistry {
 }
 
 #[cfg(not(target_family = "wasm"))]
-struct FileRemover<'a> {
-    path: Option<&'a Path>,
-}
-
-#[cfg(not(target_family = "wasm"))]
-impl Drop for FileRemover<'_> {
-    fn drop(&mut self) {
-        if let Some(path) = self.path {
-            let _ = std::fs::remove_file(path);
-        }
-    }
-}
-
-#[cfg(not(target_family = "wasm"))]
 pub struct HTTPRegistry {
-    cache_dir: TempDir,
     url: reqwest::Url,
     client: reqwest::Client,
+    index: HashMap<String, PackageInfo>,
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -458,36 +445,34 @@ impl HTTPRegistry {
         url: reqwest::Url,
         client: reqwest::Client,
     ) -> Result<HTTPRegistry, anyhow::Error> {
-        let result = HTTPRegistry {
-            cache_dir: TempDir::new()?,
+        let mut result = HTTPRegistry {
             url: url,
             client: client,
+            index: HashMap::new(),
         };
-        result.download("index.json").await?;
+        let index_file = result.download("index.json").await?;
+        let contents = std::io::read_to_string(index_file)?;
+        let index: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
+        for package in index {
+            if let Some(prev) = result.index.insert(package.name.clone(), package) {
+                Err(Error::DuplicatePackage { package: prev.name })?
+            }
+        }
         Ok(result)
     }
-    async fn download(&self, filename: &str) -> Result<(), anyhow::Error> {
+    async fn download(&self, filename: &str) -> Result<File, anyhow::Error> {
         let mut url = self.url.clone();
         url.path_segments_mut()
             .unwrap()
             .pop_if_empty()
             .push(filename);
         let mut response = self.client.get(url).send().await?.error_for_status()?;
-        let tmp_path = self.cache_dir.path().join(filename.to_string() + ".tmp");
-        let mut f = File::options()
-            .write(true)
-            .create_new(true)
-            .open(&tmp_path)?;
-        let mut cleanup = FileRemover {
-            path: Some(&tmp_path),
-        };
+        let mut f = tempfile()?;
         while let Some(chunk) = response.chunk().await? {
             f.write_all(&chunk)?
         }
-        let local_path = self.cache_dir.path().join(filename);
-        std::fs::rename(&tmp_path, &local_path)?;
-        cleanup.path = None;
-        Ok(())
+        f.rewind()?;
+        Ok(f)
     }
 }
 
@@ -496,21 +481,19 @@ impl HTTPRegistry {
 impl PackageRegistry for HTTPRegistry {
     type R = BufReader<File>;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
-        let f = File::open(self.cache_dir.path().join("index.json"))?;
-        let contents = std::io::read_to_string(f)?;
-        let result: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
+        let mut result = Vec::new();
+        for (_k, v) in &self.index {
+            result.push(v.clone());
+        }
         Ok(result)
     }
     async fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error> {
-        let filename = name.to_string() + ".psi";
-        let local_path = self.cache_dir.path().join(&filename);
-        let f = match File::open(&local_path) {
-            Ok(f) => f,
-            Err(_) => {
-                self.download(&filename).await?;
-                File::open(&local_path)?
-            }
+        let Some(info) = self.index.get(name) else {
+            Err(Error::PackageNotFound {
+                package: name.to_string(),
+            })?
         };
+        let f = self.download(&info.file).await?;
         PackagedService::new(BufReader::new(f))
     }
 }
