@@ -552,16 +552,13 @@ async fn get_package_registry(
     sources: &Vec<String>,
     client: reqwest::Client,
 ) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
-    let cache_dir = Path::new("/tmp/psibase");
     let mut result = JointRegistry::new();
     if sources.is_empty() {
         result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
     } else {
         for source in sources {
             if source.starts_with("http:") || source.starts_with("https:") {
-                result.push(
-                    HTTPRegistry::new(cache_dir, Url::parse(source)?, client.clone()).await?,
-                )?;
+                result.push(HTTPRegistry::new(Url::parse(source)?, client.clone()).await?)?;
             } else {
                 result.push(DirectoryRegistry::new(source.into()))?;
             }

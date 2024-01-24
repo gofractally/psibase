@@ -19,6 +19,8 @@ use std::path::PathBuf;
 
 #[cfg(not(target_family = "wasm"))]
 use std::{io::Write, path::Path};
+#[cfg(not(target_family = "wasm"))]
+use tempfile::TempDir;
 
 custom_error! {
     pub Error
@@ -445,7 +447,7 @@ impl Drop for FileRemover<'_> {
 
 #[cfg(not(target_family = "wasm"))]
 pub struct HTTPRegistry {
-    cache_dir: PathBuf,
+    cache_dir: TempDir,
     url: reqwest::Url,
     client: reqwest::Client,
 }
@@ -453,13 +455,11 @@ pub struct HTTPRegistry {
 #[cfg(not(target_family = "wasm"))]
 impl HTTPRegistry {
     pub async fn new(
-        cache_dir: &Path,
         url: reqwest::Url,
         client: reqwest::Client,
     ) -> Result<HTTPRegistry, anyhow::Error> {
-        std::fs::create_dir_all(cache_dir)?;
         let result = HTTPRegistry {
-            cache_dir: cache_dir.into(),
+            cache_dir: TempDir::new()?,
             url: url,
             client: client,
         };
@@ -473,7 +473,7 @@ impl HTTPRegistry {
             .send()
             .await?
             .error_for_status()?;
-        let tmp_path = self.cache_dir.join(filename.to_string() + ".tmp");
+        let tmp_path = self.cache_dir.path().join(filename.to_string() + ".tmp");
         let mut f = File::options()
             .write(true)
             .create_new(true)
@@ -484,7 +484,7 @@ impl HTTPRegistry {
         while let Some(chunk) = response.chunk().await? {
             f.write_all(&chunk)?
         }
-        let local_path = self.cache_dir.join(filename);
+        let local_path = self.cache_dir.path().join(filename);
         std::fs::rename(&tmp_path, &local_path)?;
         cleanup.path = None;
         Ok(())
@@ -496,14 +496,14 @@ impl HTTPRegistry {
 impl PackageRegistry for HTTPRegistry {
     type R = BufReader<File>;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
-        let f = File::open(self.cache_dir.join("index.json"))?;
+        let f = File::open(self.cache_dir.path().join("index.json"))?;
         let contents = std::io::read_to_string(f)?;
         let result: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
         Ok(result)
     }
     async fn get(&self, name: &str) -> Result<PackagedService<Self::R>, anyhow::Error> {
         let filename = name.to_string() + ".psi";
-        let local_path = self.cache_dir.join(&filename);
+        let local_path = self.cache_dir.path().join(&filename);
         let f = match File::open(&local_path) {
             Ok(f) => f,
             Err(_) => {

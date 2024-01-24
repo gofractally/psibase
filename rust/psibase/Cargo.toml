@@ -49,6 +49,7 @@ reqwest = { version = "0.11", default-features = false, features = ["json","rust
 rpassword = "7.2"
 secp256k1 = { version="0.27", features = ["global-context", "bitcoin_hashes"] }
 sha2 = "0.10"
+tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 pkcs8 = { version = "0.10", features = ["pem"] }
 subprocess = "0.2"

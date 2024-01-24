@@ -2332,6 +2332,7 @@ dependencies = [
  "sha2",
  "spki",
  "subprocess",
+ "tempfile",
  "tokio",
  "url",
  "wasm-bindgen",
