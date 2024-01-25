@@ -114,6 +114,8 @@ function(add suffix)
         target_sources(psitestlib${suffix} PRIVATE
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
+            tester/src/package.cpp
+            tester/src/zip.cpp
             tester/src/testUtils.cpp
             service/src/intrinsic.cpp
             service/src/ossl.c
@@ -144,6 +146,7 @@ function(add suffix)
             psibase${suffix}
             catch2
             boost
+            -lz
             -lsecp256k1
             -lc++
             -lc++abi
@@ -169,6 +172,7 @@ function(add suffix)
             ../../services/user/FractalSys/include
             ../../services/user/InviteSys/include
             ../../services/user/NftSys/include
+            ../../services/user/PackageSys/include
             ../../services/user/PsiSpaceSys/include
             ../../services/user/SymbolSys/include
             ../../services/user/TokenSys/include
@@ -199,6 +203,7 @@ function(add suffix)
             native/src/OpenSSLProver.cpp
             native/src/pkcs11.cpp
             native/src/PKCS11Prover.cpp
+            native/src/prefix.cpp
             native/src/Prover.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp

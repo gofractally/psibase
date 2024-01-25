@@ -125,6 +125,14 @@ const psibase::PublicKey psibase::TestChain::defaultPubKey =
 const psibase::PrivateKey psibase::TestChain::defaultPrivKey =
     psibase::privateKeyFromString("PVT_K1_27Hseiioosmff4ue31Jv37pC1NWfhbjuKuSBxEkqCTzbJtxQD2");
 
+psibase::TestChain::TestChain(const DatabaseConfig& dbconfig)
+    : id{::testerCreateChain(dbconfig.hotBytes,
+                             dbconfig.warmBytes,
+                             dbconfig.coolBytes,
+                             dbconfig.coldBytes)}
+{
+}
+
 psibase::TestChain::TestChain(uint64_t hot_bytes,
                               uint64_t warm_bytes,
                               uint64_t cool_bytes,
