@@ -1,5 +1,18 @@
 use anyhow::anyhow;
-use walrus::{FunctionId, ir::Instr, Module, TypeId, FunctionBuilder};
+use walrus::{FunctionId, Module, InstrSeqBuilder, LocalFunction, FunctionKind};
+use walrus::FunctionKind::{Import, Local, Uninitialized};
+use walrus::ir::{Instr, InstrSeqId};
+
+// Helper traits
+trait TypeFromFid {
+    fn func_type(&self, id: FunctionId) -> &walrus::Type;
+}
+
+impl TypeFromFid for walrus::Module {
+    fn func_type(&self, id : FunctionId) -> &walrus::Type {
+        &self.types.get(self.funcs.get(id).ty())
+    }
+}
 
 /// The polyfill module must not have the following sections, since they require 
 /// relocatable wasms to merge:
@@ -78,50 +91,40 @@ fn should_polyfill(module : &walrus::Module) -> bool {
     true
 }
 
-/// Matches imported functions in a destination module to exported functions in a source module
+/// Maps imported function IDs in a destination module to their corresponding exported 
+/// function IDs from a source module
 struct PolyfillTarget {
     source_fid : FunctionId,
     dest_fid : FunctionId,
 }
 
-/// Confirms that the parameters and results are the same given two type IDs and their 
-/// corresponding modules.
-fn same_signature(tid1 : &TypeId, m1 : &Module, tid2 : &TypeId, m2 : &Module) -> bool {
-    let t1 = m1.types.get(*tid1);
-    let t2 = m2.types.get(*tid2);
-    
-    return t1.params() == t2.params() 
-        && t1.results() == t2.results();
-}
-
-/// Returns a list of function IDs exported from the `source` module mapped to the 
-/// corresponding function IDs imported in the `dest` module.
+/// Returns a list of `PolyfillTarget` objects.
 /// 
-/// Only functions that are actually imported in the `dest` module will be considered for polyfilling. 
-/// This function also checks that the signature of the replacement function matches the signature of 
-/// the imported function.
+/// Only functions that are actually imported in the `dest` module will be considered
+/// for polyfilling.
 fn get_polyfill_targets(source: &walrus::Module, dest: &walrus::Module) -> Result<Option<Vec<PolyfillTarget>>, anyhow::Error> {
-    
+
+    let mut error : Option<anyhow::Error> = None;
     let targets : Vec<PolyfillTarget> = dest.imports.iter().filter_map(|import| {
         let name = &import.name;
-        
-        // If the import is a function, get it
+
+        // Only consider imported functions
         let dest_func = match import.kind {
             walrus::ImportKind::Function(import_fid) => dest.funcs.get(import_fid),
             _ => return None,
         };
 
-        // Get the corresponding export function
+        // Check if there's a corresponding export in the `source` module
         let source_func = match source.exports.get_func(name) {
-            // Match guard ensures the export function has a local definition
+            // This match guard ensures the export function has a local definition
             Ok(exp_fid) if matches!(source.funcs.get(exp_fid).kind, walrus::FunctionKind::Local(_)) => source.funcs.get(exp_fid),
             _ => return None,
         };
 
-        // Check that the signatures match
-        assert!(same_signature(&dest_func.ty(), dest, &source_func.ty(), source), 
-            "Destination import {} matches source export by name but not by type.", name);
-        // Todo - this should more gracefully handle the error, rather than panic
+        // Check function types match
+        if source.func_type(source_func.id()) != dest.func_type(dest_func.id()) {
+            error = Some(anyhow!("Destination import {} matches source export by name but not by type.", name));
+        }
 
         Some(PolyfillTarget{
             source_fid: source_func.id(),
@@ -129,169 +132,225 @@ fn get_polyfill_targets(source: &walrus::Module, dest: &walrus::Module) -> Resul
         })
     }).collect();
 
+    if error.is_some() {
+        return Err(error.unwrap());
+    }
+
     return Ok(Some(targets));
 }
 
-/// Gets the instructions of the local `fid` function from the specified module.
-fn get_instructions(fid : FunctionId, module: & mut walrus::Module) -> Result<Vec<Instr>, anyhow::Error> {
-    let func = module.funcs.get_mut(fid);
-    
-    if let walrus::FunctionKind::Local(local_func) = &mut func.kind {
-        let instructions = local_func.builder_mut().func_body().instrs().iter().map(|(i, _)| i.clone()).collect();
-        return Ok(instructions);
-    }
-    return Err(anyhow!("No instructions found for requested local function"));
+/// Gets the FunctionID if it exists for a function in a `wasm_module` based on a 
+/// `function_module` and `name`.
+fn get_import_fid(function_module : &String, name : &String, wasm_module : &Module) -> Result<Option<FunctionId>, anyhow::Error> {
+    wasm_module
+        .imports
+        .iter()
+        .find(|&i| &i.name == name && &i.module == function_module)
+        .map_or(Ok(None), |i| match i.kind {
+            walrus::ImportKind::Function(fid) => Ok(Some(fid)),
+            _ => Err(anyhow!("Import kind mismatch")),
+        })
 }
 
-/// Validates an instruction.
-/// An instruction is valid if it is not of type: `CallIndirect`, `GlobalGet`, or `GlobalSet`.
-fn validate_instruction(instr : &Instr) -> Result<(), anyhow::Error> {
-    match &instr {
-        Instr::CallIndirect(_) => {
-            return Err(anyhow!("Error: Polyfill module is not allowed to use an indirect call."));
-        }
-        Instr::GlobalGet(_) => {
-            return Err(anyhow!("Error: Polyfill module is not allowed to get a global."));    
-        }
-        Instr::GlobalSet(_) => {
-            return Err(anyhow!("Error: Polyfill module is not allowed to set a global."));
-        }
-        _ => {
-            return Ok(());
-        }
-    }
-}
+/// Get the corresponding FunctionID in the `dest` module for a given FunctionID from the `source`
+/// module. If the function does not exist in the `dest` module, it will be added.
+fn get_dest_fid(source_fid : FunctionId, source : &Module, dest : &mut Module ) -> Result<FunctionId, anyhow::Error> {
 
-/// Calls `validate_instruction` on each instruction in `instrs`.
-fn validate_instructions(instrs : &Vec<Instr>) -> Result<(), anyhow::Error> {
-    for instr in instrs {
-        validate_instruction(&instr)?;
-    }
-    Ok(())
-}
+    let f = source.funcs.get(source_fid);
+    let (source_func_kind, source_func_ty) = (&f.kind, f.ty());
 
-/// Gets the FunctionID if it exists for a function in a `wasm_module` based on a function `name`
-/// and `function_module`.
-/// If the function does not exist, an empty optional will be returned.
-fn get_import_fid(name : &String, function_module : &String, wasm_module : &Module) -> Result<Option<FunctionId>, anyhow::Error> {
-    
-    if let Some(imp_func) = wasm_module.imports.iter().find(|&i|{
-        return &i.name == name && &i.module == function_module;
-    }) {
-        match imp_func.kind {
-            walrus::ImportKind::Function(dest_fid) => {
-                return Ok(Some(dest_fid)); 
-            },
-            _ => {
-                return Err(anyhow!("Import kind mismatch"));
-            }
+    let new_fid = match &source_func_kind {
+        Import(_) => {
+            let s = source.imports.get_imported_func(source_fid).unwrap();
+            let (module, name) = (&s.module, &s.name);
 
-        }
-        
-    } else {
-        Ok(None)
-    }
-}
+            let dest_fid_opt = get_import_fid(module, name, &dest)?;
 
-/// This is a recursive function that ensures that all call instructions refer 
-/// to valid functions in the `dest` module.
-/// 
-/// If a call instruction refers to an import in the `source` module, the `dest`
-/// module will contain the same import. If a call instruction refers to a local
-/// function in the `source` module, the `dest` module will contain the same 
-/// local function.
-fn add_missing_calls(instrs : &mut Vec<Instr>, source : &mut Module, dest : &mut Module ) -> Result<(), anyhow::Error> {
-    
-    validate_instructions(instrs)?;
-
-    // Check for calls within these instructions
-    // If there are call instructions, they must reference either imported or local functions.
-    for i in instrs {
-        match i {
-            Instr::Call(call) => {           
-                let called_fid = call.func;
-                
-                if let Some(import) = source.imports.get_imported_func(called_fid) {
-                    // Call is to an imported function
-                    
-                    let import_ty = &source.funcs.get(called_fid).ty();
-                    if let Some(import_fid) = get_import_fid(&import.name, &import.module, &dest)? {
-                        // The same import already exists in dest. Update the called fid.
-                        if !same_signature(&dest.funcs.get(import_fid).ty(), dest, import_ty, source) {
-                            return Err(anyhow!("Type mismatch between imports"));
-                        }
-                        call.func = import_fid;
-                        
-                    } else {
-                        // The import needs to be added to the dest. Update the called fid.
-                        call.func = dest.add_import_func(&import.module, &import.name, import_ty.clone()).0;
-                    }                    
-                    
-                } else {
-                    // Call is to a local function
-
-                    // Build the new local function declaration
-                    let local_function = source.funcs.get(called_fid);
-                    let local_func_type = source.types.get(local_function.ty());
-                    let mut builder = FunctionBuilder::new(&mut dest.types, local_func_type.params(), local_func_type.results());
-
-                    // Get the instructions from the `source` module, and update the instructions to 
-                    // ensure they are valid
-                    let mut called_instrs = get_instructions(called_fid, source)?;
-                    add_missing_calls(&mut called_instrs, source, dest)?;
-                    
-                    // Copy the (valid) instructions into the new function
-                    for called_instr in called_instrs {
-                        builder.func_body().instr(called_instr);
-                    }
-
-                    // Save the function into `funcs` section of the `dest` module.
-                    dest.funcs.add_local(builder.local_func(Vec::new()));
+            if let Some(dest_fid) = dest_fid_opt {
+                if dest.func_type(dest_fid) != source.func_type(source_fid) {
+                    return Err(anyhow!("Type mismatch between imports"));
                 }
+                dest_fid
+            } else {
+                // The import needs to be added to the dest. Update the called fid.
+                dest.add_import_func(module, name, source_func_ty.clone()).0
             }
-            _ =>
-             { /* No-op when the instruction is anything other than a call */ }
+        },
+        Local(_) => {
+            let new_local_func = copy_func(source_fid, source, dest)?;
+            dest.funcs.add_local(new_local_func)
+        },
+        Uninitialized(_) => {
+            return Err(anyhow!("Error: Source function uninitialized."));
+        },
+    };
+    Ok(new_fid)
+}
+
+/// Copies one instruction sequence from a function in a `source` module to a sequence 
+/// in a `dest` module.
+fn copy_instr_block(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<(), anyhow::Error> {
+
+    // Get the instructions from the specified source block
+    let instrs : Vec<Instr> = source_function.block(source_block_id).instrs.iter().map(|(instr, _)|{instr.clone()}).collect();
+
+    // Map each source instruction to an instruction injected into the new target sequence
+    for mut instr in instrs {
+
+        match &mut instr {
+            Instr::RefFunc(ref_func_ins ) => {
+                ref_func_ins.func = get_dest_fid(ref_func_ins.func, source, dest)?;
+                dest_seq.instr(Instr::RefFunc(ref_func_ins.clone()));
+
+            }
+            Instr::Call(call_ins) => {
+                call_ins.func = get_dest_fid(call_ins.func, source, dest)?;
+                dest_seq.instr(Instr::Call(call_ins.clone()));
+            }
+            
+            Instr::Block(block_ins) => {
+                let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
+                copy_instr_block(block_ins.seq, source_function, source, &mut new_dest_sequence, dest)?;
+                block_ins.seq = new_dest_sequence.id();
+
+                dest_seq.instr(Instr::Block(block_ins.clone()));
+            }
+            Instr::Loop(loop_ins) => {
+                let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
+                copy_instr_block( loop_ins.seq, source_function, source, &mut new_dest_sequence, dest)?;
+                loop_ins.seq = new_dest_sequence.id();
+                
+                dest_seq.instr(Instr::Loop(loop_ins.clone()));
+            }
+            Instr::IfElse(if_else_ins) => {
+                let mut new_dest_seq_1 = dest_seq.dangling_instr_seq(None);
+                copy_instr_block(if_else_ins.consequent, source_function, source, &mut new_dest_seq_1, dest)?;
+                if_else_ins.consequent = new_dest_seq_1.id();
+
+                let mut new_dest_seq_2 = dest_seq.dangling_instr_seq(None);
+                copy_instr_block( if_else_ins.alternative, source_function, source, &mut new_dest_seq_2, dest)?;
+                if_else_ins.alternative = new_dest_seq_2.id();
+                
+                dest_seq.instr(Instr::IfElse(if_else_ins.clone()));
+            }
+
+            // Invalid instructions
+            Instr::CallIndirect(_) => {
+                return Err(anyhow!("Error: Polyfill module has invalid instruction: Indirect call"));
+            }
+            Instr::GlobalGet(_) => {
+                return Err(anyhow!("Error: Polyfill module has invalid instruction: Get global"));    
+            }
+            Instr::GlobalSet(_) => {
+                return Err(anyhow!("Error: Polyfill module has invalid instruction: Set global"));
+            }
+
+            // List every other option, to enforce that new instructions are properly handled
+            Instr::LocalGet(_)
+             | Instr::LocalSet(_)
+             | Instr::LocalTee(_)
+             | Instr::Const(_)
+             | Instr::Binop(_)
+             | Instr::Unop(_)
+             | Instr::Select(_)
+             | Instr::Unreachable(_)
+             | Instr::Br(_)
+             | Instr::BrIf(_)
+             | Instr::BrTable(_)
+             | Instr::Drop(_)
+             | Instr::Return(_)
+             | Instr::MemorySize(_)
+             | Instr::MemoryGrow(_)
+             | Instr::MemoryInit(_)
+             | Instr::DataDrop(_)
+             | Instr::MemoryCopy(_)
+             | Instr::MemoryFill(_)
+             | Instr::Load(_)
+             | Instr::Store(_)
+             | Instr::AtomicRmw(_)
+             | Instr::Cmpxchg(_)
+             | Instr::AtomicNotify(_)
+             | Instr::AtomicWait(_)
+             | Instr::AtomicFence(_)
+             | Instr::TableGet(_)
+             | Instr::TableSet(_)
+             | Instr::TableGrow(_)
+             | Instr::TableSize(_)
+             | Instr::TableFill(_)
+             | Instr::RefNull(_)
+             | Instr::RefIsNull(_)
+             | Instr::V128Bitselect(_)
+             | Instr::I8x16Swizzle(_)
+             | Instr::I8x16Shuffle(_)
+             | Instr::LoadSimd(_)
+             | Instr::TableInit(_)
+             | Instr::ElemDrop(_)
+             | Instr::TableCopy(_) => {/* No-op */}
         }
-    }    
+    }
 
     Ok(())
 }
 
 
-/// Replaces the imported function `dest_fid` in the `dest` module with a new (and valid) 
-/// local function.
-/// 
-/// The instructions in the new local function are copied from the `source_fid` function 
-/// in the `source` module. 
-fn fill(source_fid : FunctionId, source : &mut Module, dest_fid : FunctionId, dest : &mut Module) -> Result<(), anyhow::Error>
+/// Copy all instructions from a function in a `source` module to a new function 
+/// in a `dest` module.
+fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> Result<LocalFunction, anyhow::Error>
 {
-    let mut instrs = get_instructions(source_fid, source)?;
+    // Get source local function
+    let source_func = source.funcs.get(source_fid);
+    let source_local_func = match &source_func.kind {
+        walrus::FunctionKind::Local(loc) => loc,
+        _ => return Err(anyhow!("Requested local function not found"))
+    };
 
-    add_missing_calls(&mut instrs, source, dest)?;
+    // Build the new local function with the correct signature
+    let tid = source_local_func.ty();
+    let ty = source.types.get(tid);
+    let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
+    let mut builder = walrus::FunctionBuilder::new(&mut dest.types, &params, &results);
 
-    dest.replace_imported_func(dest_fid, |(body, _)| {
-        for instr in instrs {
-            body.instr(instr);
-        }
-    })?;
+    // Copy the first sequence of instructions in a function from a `source` module into the 
+    let instr_seq_id = source_local_func.entry_block();
+    let dest_instr_builder = &mut builder.func_body();
+    copy_instr_block(instr_seq_id, &source_local_func, source, dest_instr_builder, dest)?;
+
+    // Make the new local function
+    let args = params
+        .iter()
+        .map(|val_type| dest.locals.add(*val_type))
+        .collect::<Vec<_>>();
     
-    Ok(())
+    Ok(builder.local_func(args))
 }
 
-/// Link polyfill module (source) to code module (dest) and strip out unused functions
-pub fn link(dest: &[u8], source: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    
-    let mut source_module = Module::from_buffer(source)?;
+/// Produce a module that links exported functions in the `source` module to 
+/// their corresponding imported functions in a `dest` module.
+/// 
+/// This also strips out unused functions from the final module.
+pub fn link(source: &[u8], dest: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+    let source_module = Module::from_buffer(source)?;
     let mut dest_module = Module::from_buffer(dest)?;
-        
+
     validate_polyfill(&source_module)?;
     validate_fill_target(&dest_module)?;
-    
+
     if should_polyfill(&dest_module) {
         if let Some(targets) = get_polyfill_targets(&source_module, &dest_module)? 
         {
             for target in targets {
-                fill(target.source_fid, &mut source_module, target.dest_fid, &mut dest_module)?;
+                let PolyfillTarget {source_fid, dest_fid} = target;
+
+                // Get import ID
+                let import_id = dest_module.imports.get_imported_func(dest_fid).map(|i| i.id()).unwrap();
+                
+                // Copy the function into a new local function in the `dest_module`
+                let new_func = copy_func(source_fid, &source_module, &mut dest_module)?;
+
+                // Replace the old imported function with the new local function and delete the old import.
+                let dest_func = dest_module.funcs.get_mut(dest_fid);
+                dest_func.kind = FunctionKind::Local(new_func);
+                dest_module.imports.delete(import_id);
             }
         }
     }
