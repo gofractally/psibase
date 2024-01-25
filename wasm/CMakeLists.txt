@@ -211,3 +211,5 @@ add_subdirectory(boost)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../services services)
 add_subdirectory(../programs programs)
+
+install(FILES ${DEP_PREFIX}/lib/libcrypto.a ${DEP_PREFIX}/lib/libz.a ${DEP_PREFIX}/lib/libsecp256k1.a TYPE LIB COMPONENT libpsibase)
