@@ -64,7 +64,7 @@ fn validate_polyfill(polyfill: &walrus::Module) -> Result<(), anyhow::Error> {
 }
 
 /// The module is not a supported target for polyfilling if it has the following:
-/// * A start module
+/// * A start function
 fn validate_fill_target(module: &walrus::Module) -> Result<(), anyhow::Error> {
     if module.start.is_some() {
         return Err(anyhow!("Target module has unsupported section: start"))?;
@@ -141,7 +141,7 @@ fn get_polyfill_targets(source: &walrus::Module, dest: &walrus::Module) -> Resul
 
 /// Gets the FunctionID if it exists for a function in a `wasm_module` based on a 
 /// `function_module` and `name`.
-fn get_import_fid(function_module : &String, name : &String, wasm_module : &Module) -> Result<Option<FunctionId>, anyhow::Error> {
+fn get_import_fid(function_module : &str, name : &str, wasm_module : &Module) -> Result<Option<FunctionId>, anyhow::Error> {
     wasm_module
         .imports
         .iter()
@@ -187,51 +187,55 @@ fn get_dest_fid(source_fid : FunctionId, source : &Module, dest : &mut Module ) 
     Ok(new_fid)
 }
 
+
+
 /// Copies one instruction sequence from a function in a `source` module to a sequence 
 /// in a `dest` module.
 fn copy_instr_block(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<(), anyhow::Error> {
 
     // Get the instructions from the specified source block
-    let instrs : Vec<Instr> = source_function.block(source_block_id).instrs.iter().map(|(instr, _)|{instr.clone()}).collect();
+    let instrs = source_function.block(source_block_id).instrs.iter().map(|(instr, _)|{instr});
 
     // Map each source instruction to an instruction injected into the new target sequence
-    for mut instr in instrs {
+    for instr in instrs {
 
-        match &mut instr {
+        match instr {
             Instr::RefFunc(ref_func_ins ) => {
-                ref_func_ins.func = get_dest_fid(ref_func_ins.func, source, dest)?;
-                dest_seq.instr(Instr::RefFunc(ref_func_ins.clone()));
-
+                let mut i = ref_func_ins.clone();
+                i.func = get_dest_fid(i.func, source, dest)?;
+                dest_seq.instr(i);
             }
             Instr::Call(call_ins) => {
-                call_ins.func = get_dest_fid(call_ins.func, source, dest)?;
-                dest_seq.instr(Instr::Call(call_ins.clone()));
+                let mut i = call_ins.clone();
+                i.func = get_dest_fid(i.func, source, dest)?;
+                dest_seq.instr(i);
             }
             
             Instr::Block(block_ins) => {
+                let mut i = block_ins.clone();
                 let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
-                copy_instr_block(block_ins.seq, source_function, source, &mut new_dest_sequence, dest)?;
-                block_ins.seq = new_dest_sequence.id();
-
-                dest_seq.instr(Instr::Block(block_ins.clone()));
+                copy_instr_block(i.seq, source_function, source, &mut new_dest_sequence, dest)?;
+                i.seq = new_dest_sequence.id();
+                dest_seq.instr(i);
             }
             Instr::Loop(loop_ins) => {
+                let mut i = loop_ins.clone();
                 let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
-                copy_instr_block( loop_ins.seq, source_function, source, &mut new_dest_sequence, dest)?;
-                loop_ins.seq = new_dest_sequence.id();
-                
-                dest_seq.instr(Instr::Loop(loop_ins.clone()));
+                copy_instr_block( i.seq, source_function, source, &mut new_dest_sequence, dest)?;
+                i.seq = new_dest_sequence.id();
+                dest_seq.instr(i);
             }
             Instr::IfElse(if_else_ins) => {
+                let mut i = if_else_ins.clone();
                 let mut new_dest_seq_1 = dest_seq.dangling_instr_seq(None);
-                copy_instr_block(if_else_ins.consequent, source_function, source, &mut new_dest_seq_1, dest)?;
-                if_else_ins.consequent = new_dest_seq_1.id();
+                copy_instr_block(i.consequent, source_function, source, &mut new_dest_seq_1, dest)?;
+                i.consequent = new_dest_seq_1.id();
 
                 let mut new_dest_seq_2 = dest_seq.dangling_instr_seq(None);
-                copy_instr_block( if_else_ins.alternative, source_function, source, &mut new_dest_seq_2, dest)?;
-                if_else_ins.alternative = new_dest_seq_2.id();
+                copy_instr_block(i.alternative, source_function, source, &mut new_dest_seq_2, dest)?;
+                i.alternative = new_dest_seq_2.id();
                 
-                dest_seq.instr(Instr::IfElse(if_else_ins.clone()));
+                dest_seq.instr(i);
             }
 
             // Invalid instructions
@@ -239,53 +243,53 @@ fn copy_instr_block(source_block_id : InstrSeqId, source_function : &LocalFuncti
                 return Err(anyhow!("Error: Polyfill module has invalid instruction: Indirect call"));
             }
             Instr::GlobalGet(_) => {
-                return Err(anyhow!("Error: Polyfill module has invalid instruction: Get global"));    
+                return Err(anyhow!("Error: Polyfill module has invalid instruction: Get global"));
             }
             Instr::GlobalSet(_) => {
                 return Err(anyhow!("Error: Polyfill module has invalid instruction: Set global"));
             }
 
             // List every other option, to enforce that new instructions are properly handled
-            Instr::LocalGet(_)
-             | Instr::LocalSet(_)
-             | Instr::LocalTee(_)
-             | Instr::Const(_)
-             | Instr::Binop(_)
-             | Instr::Unop(_)
-             | Instr::Select(_)
-             | Instr::Unreachable(_)
-             | Instr::Br(_)
-             | Instr::BrIf(_)
-             | Instr::BrTable(_)
-             | Instr::Drop(_)
-             | Instr::Return(_)
-             | Instr::MemorySize(_)
-             | Instr::MemoryGrow(_)
-             | Instr::MemoryInit(_)
-             | Instr::DataDrop(_)
-             | Instr::MemoryCopy(_)
-             | Instr::MemoryFill(_)
-             | Instr::Load(_)
-             | Instr::Store(_)
-             | Instr::AtomicRmw(_)
-             | Instr::Cmpxchg(_)
-             | Instr::AtomicNotify(_)
-             | Instr::AtomicWait(_)
-             | Instr::AtomicFence(_)
-             | Instr::TableGet(_)
-             | Instr::TableSet(_)
-             | Instr::TableGrow(_)
-             | Instr::TableSize(_)
-             | Instr::TableFill(_)
-             | Instr::RefNull(_)
-             | Instr::RefIsNull(_)
-             | Instr::V128Bitselect(_)
-             | Instr::I8x16Swizzle(_)
-             | Instr::I8x16Shuffle(_)
-             | Instr::LoadSimd(_)
-             | Instr::TableInit(_)
-             | Instr::ElemDrop(_)
-             | Instr::TableCopy(_) => {/* No-op */}
+            Instr::LocalGet(i)           => {dest_seq.instr(i.clone());}
+            Instr::LocalSet(i)           => {dest_seq.instr(i.clone());}
+            Instr::LocalTee(i)           => {dest_seq.instr(i.clone());}
+            Instr::Const(i)                 => {dest_seq.instr(i.clone());}
+            Instr::Binop(i)                 => {dest_seq.instr(i.clone());}
+            Instr::Unop(i)                   => {dest_seq.instr(i.clone());}
+            Instr::Select(i)               => {dest_seq.instr(i.clone());}
+            Instr::Unreachable(i)     => {dest_seq.instr(i.clone());}
+            Instr::Br(i)                       => {dest_seq.instr(i.clone());}
+            Instr::BrIf(i)                   => {dest_seq.instr(i.clone());}
+            Instr::BrTable(i)             => {dest_seq.instr(i.clone());}
+            Instr::Drop(i)                   => {dest_seq.instr(i.clone());}
+            Instr::Return(i)               => {dest_seq.instr(i.clone());}
+            Instr::MemorySize(i)       => {dest_seq.instr(i.clone());}
+            Instr::MemoryGrow(i)       => {dest_seq.instr(i.clone());}
+            Instr::MemoryInit(i)       => {dest_seq.instr(i.clone());}
+            Instr::DataDrop(i)           => {dest_seq.instr(i.clone());}
+            Instr::MemoryCopy(i)       => {dest_seq.instr(i.clone());}
+            Instr::MemoryFill(i)       => {dest_seq.instr(i.clone());}
+            Instr::Load(i)                   => {dest_seq.instr(i.clone());}
+            Instr::Store(i)                 => {dest_seq.instr(i.clone());}
+            Instr::AtomicRmw(i)         => {dest_seq.instr(i.clone());}
+            Instr::Cmpxchg(i)             => {dest_seq.instr(i.clone());}
+            Instr::AtomicNotify(i)   => {dest_seq.instr(i.clone());}
+            Instr::AtomicWait(i)       => {dest_seq.instr(i.clone());}
+            Instr::AtomicFence(i)     => {dest_seq.instr(i.clone());}
+            Instr::TableGet(i)           => {dest_seq.instr(i.clone());}
+            Instr::TableSet(i)           => {dest_seq.instr(i.clone());}
+            Instr::TableGrow(i)         => {dest_seq.instr(i.clone());}
+            Instr::TableSize(i)         => {dest_seq.instr(i.clone());}
+            Instr::TableFill(i)         => {dest_seq.instr(i.clone());}
+            Instr::RefNull(i)             => {dest_seq.instr(i.clone());}
+            Instr::RefIsNull(i)         => {dest_seq.instr(i.clone());}
+            Instr::V128Bitselect(i) => {dest_seq.instr(i.clone());}
+            Instr::I8x16Swizzle(i)   => {dest_seq.instr(i.clone());}
+            Instr::I8x16Shuffle(i)   => {dest_seq.instr(i.clone());}
+            Instr::LoadSimd(i)           => {dest_seq.instr(i.clone());}
+            Instr::TableInit(i)         => {dest_seq.instr(i.clone());}
+            Instr::ElemDrop(i)           => {dest_seq.instr(i.clone());}
+            Instr::TableCopy(i)         => {dest_seq.instr(i.clone());}
         }
     }
 
