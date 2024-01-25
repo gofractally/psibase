@@ -237,7 +237,7 @@ if(IS_WASM)
     install(FILES sdk/WASI.cmake DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/share/cmake/Modules/Platform COMPONENT libpsibase)
     install(PROGRAMS sdk/psibase-wasm-opt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/cmake COMPONENT libpsibase)
     install(PROGRAMS sdk/nop-wasm-opt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/cmake COMPONENT libpsibase)
-    install(FILES sdk/pack_service.cmake DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/cmake COMPONENT libpsibase)
+    install(FILES sdk/pack_service.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/psibase COMPONENT libpsibase)
 
     configure_file(sdk/psibase-config.cmake.build ${ROOT_BINARY_DIR}/psibase-config.cmake @ONLY)
     configure_file(sdk/psidk-cmake-args.build ${ROOT_BINARY_DIR}/psidk-cmake-args @ONLY)
