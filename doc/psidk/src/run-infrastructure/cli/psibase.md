@@ -60,6 +60,10 @@ The boot command deploys a set of system services and web interfaces suitable fo
 
   Set the name of the block producer. `psinode` should be configured to use the same name.
 
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
+
 ### create
 
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
@@ -128,6 +132,10 @@ Install apps to the chain along with all dependencies. Packages that are already
   - A PKCS #11 URI
   - An EOS style base58-encoded public key beginning `PUB_K1_`
 
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
+
 ### list
 
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
@@ -145,6 +153,10 @@ Prints a list of apps from the chain and/or package repositories
 - `--installed`
 
   Prints packages that are currently installed
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
 ### modify
 
@@ -172,6 +184,10 @@ Search for packages
 - *regex*
 
   Regular expressions to match agaist the package names and descriptions. If there are multiple patterns, they must all match for a package to be listed. The search is case-insensitive.
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
 ### upload
 

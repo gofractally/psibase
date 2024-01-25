@@ -11,15 +11,16 @@ use psibase::{
     account, apply_proxy, create_boot_transactions, get_tapos_for_head, new_account_action,
     push_transaction, reg_server, set_auth_service_action, set_code_action, set_key_action,
     sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
-    DirectoryRegistry, ExactAccountNumber, PackageList, PackageRegistry, SignedTransaction, Tapos,
-    TaposRefBlock, TimePointSec, Transaction,
+    DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
+    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
-use std::fs::{metadata, read_dir};
+use std::fs::{metadata, read_dir, File};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 /// Interact with a running psinode
@@ -63,6 +64,10 @@ enum Command {
         /// Sets the name of the block producer
         #[clap(short = 'p', long, value_name = "PRODUCER")]
         producer: ExactAccountNumber,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
 
         services: Vec<String>,
     },
@@ -177,6 +182,10 @@ enum Command {
         /// Set all accounts to authenticate using this key
         #[clap(short = 'k', long, value_name = "KEY")]
         key: Option<AnyPublicKey>,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
     },
 
     /// Prints a list of apps
@@ -190,12 +199,20 @@ enum Command {
         /// List installed apps
         #[clap(long)]
         installed: bool,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
     },
 
     /// Find packages
     Search {
         /// Regular expressions to search for in package names and descriptions
         patterns: Vec<String>,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
     },
 
     /// Create a bearer token that can be used to access a node
@@ -543,11 +560,31 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
     Ok(base.join("share/psibase"))
 }
 
+async fn get_package_registry(
+    sources: &Vec<String>,
+    client: reqwest::Client,
+) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
+    let mut result = JointRegistry::new();
+    if sources.is_empty() {
+        result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
+    } else {
+        for source in sources {
+            if source.starts_with("http:") || source.starts_with("https:") {
+                result.push(HTTPRegistry::new(Url::parse(source)?, client.clone()).await?)?;
+            } else {
+                result.push(DirectoryRegistry::new(source.into()))?;
+            }
+        }
+    }
+    Ok(result)
+}
+
 async fn boot(
     args: &Args,
     client: reqwest::Client,
     key: &Option<AnyPublicKey>,
     producer: ExactAccountNumber,
+    package_source: &Vec<String>,
     services: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let now_plus_30secs = Utc::now() + Duration::seconds(30);
@@ -555,12 +592,14 @@ async fn boot(
         seconds: now_plus_30secs.timestamp() as u32,
     };
     let default_services = vec!["Default".to_string()];
-    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
-    let mut packages = package_registry.resolve(if services.is_empty() {
-        &default_services[..]
-    } else {
-        &services[..]
-    })?;
+    let package_registry = get_package_registry(package_source, client.clone()).await?;
+    let mut packages = package_registry
+        .resolve(if services.is_empty() {
+            &default_services[..]
+        } else {
+            &services[..]
+        })
+        .await?;
     let (boot_transactions, transactions) =
         create_boot_transactions(key, producer.into(), true, expiration, &mut packages)?;
 
@@ -730,10 +769,11 @@ async fn install(
     mut client: reqwest::Client,
     packages: &[String],
     key: &Option<AnyPublicKey>,
+    sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let installed = PackageList::installed(&args.api, &mut client).await?;
-    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
-    let to_install = installed.resolve_new(&package_registry, packages)?;
+    let package_registry = get_package_registry(sources, client.clone()).await?;
+    let to_install = installed.resolve_new(&package_registry, packages).await?;
 
     let mut all_account_actions = vec![];
     let mut all_init_actions = vec![];
@@ -836,10 +876,11 @@ async fn list(
     all: bool,
     available: bool,
     installed: bool,
+    sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     if all || (installed && available) || (!all & !installed && !available) {
         let installed = PackageList::installed(&args.api, &mut client).await?;
-        let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+        let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
@@ -851,7 +892,7 @@ async fn list(
         }
     } else if available {
         let installed = PackageList::installed(&args.api, &mut client).await?;
-        let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+        let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
             println!("{}", name);
@@ -862,15 +903,16 @@ async fn list(
 
 async fn search(
     _args: &Args,
-    _client: reqwest::Client,
+    client: reqwest::Client,
     patterns: &Vec<String>,
+    sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let mut compiled = vec![];
     for pattern in patterns {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
     // TODO: search installed packages as well
-    let package_registry = DirectoryRegistry::new(data_directory()?.join("packages"));
+    let package_registry = get_package_registry(sources, client.clone()).await?;
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
     for info in package_registry.index()? {
@@ -933,8 +975,9 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::Boot {
             key,
             producer,
+            package_source,
             services,
-        } => boot(&args, client, key, *producer, services).await?,
+        } => boot(&args, client, key, *producer, package_source, services).await?,
         Command::Create {
             account,
             key,
@@ -1002,13 +1045,21 @@ async fn main() -> Result<(), anyhow::Error> {
                 .await?
             }
         }
-        Command::Install { packages, key } => install(&args, client, packages, key).await?,
+        Command::Install {
+            packages,
+            key,
+            package_source,
+        } => install(&args, client, packages, key, package_source).await?,
         Command::List {
             all,
             available,
             installed,
-        } => list(&args, client, *all, *available, *installed).await?,
-        Command::Search { patterns } => search(&args, client, patterns).await?,
+            package_source,
+        } => list(&args, client, *all, *available, *installed, package_source).await?,
+        Command::Search {
+            patterns,
+            package_source,
+        } => search(&args, client, patterns, package_source).await?,
         Command::CreateToken {
             expires_after,
             mode,
