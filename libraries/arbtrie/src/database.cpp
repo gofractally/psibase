@@ -1030,7 +1030,7 @@ namespace arbtrie
       //TODO: configure how much spare capacity goes into nodes as they are being 
       //created.  Currently adding 128 (2 cachelines) + what ever ounding out to nearest
       // 64 bytes is already going on.
-      auto ss = binary_node::calc_key_val_pair_size(key, val) + 2048;
+      auto ss = binary_node::calc_key_val_pair_size(key, val) + 128;
       return make<binary_node>(reg, state, {.branch_cap = 1, .data_cap = ss},
                                [&](binary_node* bn)
                                {

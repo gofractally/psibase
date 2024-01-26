@@ -98,7 +98,6 @@ namespace arbtrie
    template <typename Storage = std::atomic<uint64_t>>
    class node_meta
    {
-     public:
       /**
        *  Use the bitfield to layout the data,
        *  compute the masks. 
@@ -141,8 +140,8 @@ namespace arbtrie
       } __attribute((packed));
       static_assert(sizeof(bitfield) == sizeof(uint64_t));
 
+     public:
       using temp_type = node_meta<uint64_t>;
-      bitfield to_bitfield()const { return bitfield(to_int()); }
 
       static constexpr const uint64_t ref_mask      = make_mask<0, 12>();
       static constexpr const uint64_t type_mask     = make_mask<12, 4>();
@@ -167,7 +166,11 @@ namespace arbtrie
        */
       ///@{
 
-      uint64_t to_int( std::memory_order order = std::memory_order_relaxed ) const
+      bitfield to_bitfield(std::memory_order order = std::memory_order_relaxed) const
+      {
+         return bitfield(to_int(order));
+      }
+      uint64_t to_int(std::memory_order order = std::memory_order_relaxed) const
       {
          if constexpr (std::is_same_v<Storage, uint64_t>)
             return _meta;
@@ -206,8 +209,14 @@ namespace arbtrie
          return *this;
       }
 
-      void store(uint64_t v, auto memory_order) { _meta.store(v, memory_order); }
-      void store(temp_type v, auto memory_order) { _meta.store(v.to_int(), memory_order); }
+      void store(uint64_t v, std::memory_order memory_order = std::memory_order_relaxed)
+      {
+         _meta.store(v, memory_order);
+      }
+      void store(temp_type v, std::memory_order memory_order = std::memory_order_relaxed)
+      {
+         _meta.store(v.to_int(), memory_order);
+      }
       auto load(auto memory_order = std::memory_order_relaxed) const
       {
          if constexpr (std::is_same_v<Storage, uint64_t>)
@@ -217,10 +226,12 @@ namespace arbtrie
       }
       ///@}
 
-      static std::mutex& mut() {
+      std::mutex& mut()
+      {
          static std::mutex m;
          return m;
       }
+
       /**
        * @defgroup Atomic Synchronization 
        *  These methods only work on the default Storage=std::atomic
@@ -229,35 +240,21 @@ namespace arbtrie
       // returns the state prior to start modify
       temp_type start_modify()
       {
-       //  mut().lock();
-         //TRIEDENT_DEBUG( "start modify" );
-         // this mask sets copy to 0 and const to 0
-         if constexpr (use_wait_free_modify)
+         do
          {
-            constexpr const uint64_t start_mod_mask = ~(copy_mask | const_mask);
-            return temp_type(_meta.fetch_and(start_mod_mask));
-         }
-         else
-         {
-            do {
-               temp_type prior(_meta.fetch_and(~const_mask));
-               assert( prior.is_const() );
-               if ( not prior.is_copying())
-                  return prior;
-               TRIEDENT_WARN("waiting on copy before modifying");
-               _meta.wait(prior.to_int() & ~const_mask);
-            } while( true );
-         }
+            temp_type prior(_meta.fetch_and(~const_mask, std::memory_order_acquire));
+            if (not prior.is_copying())
+               return prior;
+            _meta.wait(prior.to_int() & ~const_mask);
+         } while (true);
       }
 
       temp_type end_modify()
       {
          // set the const flag to 1 to signal that modification is complete
          // mem order release synchronizies with readers of the modification
-         temp_type prior(_meta.fetch_or(const_mask));//, std::memory_order_release));
+         temp_type prior(_meta.fetch_or(const_mask, std::memory_order_release));
 
-        // TRIEDENT_DEBUG( "end modify" );
-      //   mut().unlock();
          // if a copy was started between start_modify() and end_modify() then
          // the copy bit would be set and the other thread will be waiting
          if (prior.is_copying())
@@ -272,32 +269,35 @@ namespace arbtrie
        */
       bool try_start_move(node_location expected)
       {
-        // mut().lock();
          do
          {
+            temp_type cur = _meta.load(std::memory_order_relaxed);
+            if (not cur.ref() or cur.loc() != expected) [[unlikely]]
+               return false;
+
             // set the copy bit to 1
             // acquire because if successful, we need the latest writes to the object
             // we are trying to move
-            temp_type old(_meta.fetch_or(copy_mask));  //, std::memory_order_acquire));
+            temp_type old(_meta.fetch_or(copy_mask, std::memory_order_acquire));
 
             if (not old.ref() or old.loc() != expected) [[unlikely]]
-            {  // object we are trying to copy has moved or been freed, return false
-               _meta.fetch_and(~copy_mask, std::memory_order_relaxed);
-               TRIEDENT_WARN( "unlock because start move failed"  );
-               //mut().unlock();
+            {  // object we are trying to copy has moved or been freed, return false after releasing
+               // lock and notify the other thread if it was waiting on us
+               auto prior = _meta.fetch_and(~copy_mask, std::memory_order_relaxed);
+               if (not(prior & const_mask)) [[unlikely]]
+               {
+                  TRIEDENT_WARN("notify modify thread after copy failed");
+                  _meta.notify_all();
+               }
                return false;
             }
 
-            if (not old.is_changing()) [[likely]] {
+            if (not old.is_changing()) [[likely]]
                return true;
-            }
-
-            TRIEDENT_WARN("waiting on modify before copying");
 
             // exepcted current value is old|copy because the last fetch_or,
             // this will wait until the value has changed
-            //_meta.wait(old.to_int() | copy_mask, std::memory_order_acquire);
-            _meta.wait(old.to_int() | copy_mask);  //, std::memory_order_acquire);
+            _meta.wait(old.to_int() | copy_mask, std::memory_order_acquire);
          } while (true);
       }
 
@@ -317,61 +317,34 @@ namespace arbtrie
        */
       move_result try_move(node_location expect_loc, node_location new_loc)
       {
-        // TRIEDENT_WARN( "end move" );
-         uint64_t expected;
-         if constexpr (not use_wait_free_modify)
+         uint64_t expected = _meta.fetch_and(~copy_mask, std::memory_order_relaxed);
+         assert(expected & copy_mask);
+
+         auto notify = [&]()
          {
-            expected = _meta.fetch_and(~copy_mask); //, std::memory_order_relaxed);
             if (not(expected & const_mask)) [[unlikely]]
-            {
-               //TRIEDENT_WARN("notify modify thread after copy");
                _meta.notify_all();
-            }
-         }
-         else
-         {
-            expected = _meta.load(std::memory_order_relaxed);
-         }
+         };
 
          temp_type ex;
          do
          {
             ex = temp_type(expected);
-            if constexpr (use_wait_free_modify)
+            if (ex.loc() != expect_loc) [[unlikely]]
             {
-               if (not ex.is_copying()) [[unlikely]]
-               {
-                  TRIEDENT_WARN( "return without unlock because dirty!" );
-                  return move_result::dirty;
-               }
-
-               // start_move set the copy bit, start_modify cleared it
-               // therefore the prior if already returned.
-               assert(not ex.is_changing());
-
-               if constexpr (debug_memory)
-               {
-                  if (ex.is_changing()) [[unlikely]] {
-                     TRIEDENT_WARN( "return without unlock because dirty!" );
-                     return move_result::dirty;
-                  }
-               }
-            }
-            if (ex.loc() != expect_loc) [[unlikely]] {
-             //  mut().unlock();
+               notify();
                return move_result::moved;
             }
-            if (ex.ref() == 0) [[unlikely]] {
-              // mut().unlock();
+            if (ex.ref() == 0) [[unlikely]]
+            {
+               notify();
                return move_result::freed;
             }
             ex.set_location(new_loc).clear_copy_flag();
          } while (
-             //not _meta.compare_exchange_weak(expected, ex.to_int(), std::memory_order_release));
-             not _meta.compare_exchange_weak(expected, ex.to_int()));
+             not _meta.compare_exchange_weak(expected, ex.to_int(), std::memory_order_release));
 
-         //TRIEDENT_WARN( "return after unlock because success" );
-        // mut().unlock();
+         notify();
          return move_result::success;
       }
 
@@ -394,15 +367,12 @@ namespace arbtrie
        */
       bool retain()
       {
-         assert( type() != node_type::freelist );
          temp_type prior(_meta.fetch_add(1, std::memory_order_relaxed));
          if (prior.ref() > node_meta::max_ref_count) [[unlikely]]
          {
-            assert( !"ref over flow!" );
             _meta.fetch_sub(1, std::memory_order_relaxed);
             return false;
          }
-         assert( prior.ref() != 0 );
          return true;
       }
       temp_type release()
@@ -427,11 +397,11 @@ namespace arbtrie
          assert(prior.ref() != 0);
          if constexpr (debug_memory)
          {
+            // no one should use meta.  Setting it to 0
+            if (prior.ref() == 1)
+               _meta.store(0, std::memory_order_relaxed);
             if (prior.ref() == 0)
                throw std::runtime_error("double release detected");
-         }
-         if( prior.ref() == 1 ) {
-            _meta.store(0, std::memory_order_release);
          }
          return prior;
       }

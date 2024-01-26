@@ -186,12 +186,12 @@ namespace arbtrie
          // reading last free and storing, conviently there are
          // 65k different regions so should be little contention
          std::unique_lock<std::mutex> l{rhead.alloc_mutex};
-         ff_index = rhead.first_free.load(std::memory_order_acquire);
+         ff_index = rhead.first_free.load(std::memory_order_seq_cst);
 
          //     TRIEDENT_DEBUG("reg: ", r.region, " alloc from ff_index: ", ff_index, " idx: ", (ff_index >> 18),
          //                   "  tmd: ", temp_meta_type(ff_index).loc().to_aligned(), "  eofl: ", eofl);
          uint64_t next_free = get(r + id_index(temp_meta_type(ff_index).loc().to_aligned()))
-                                  .to_int(std::memory_order_acquire);
+                                  .to_int(std::memory_order_seq_cst);
 
          assert(temp_meta_type(next_free).ref() == 0);
          assert(temp_meta_type(next_free).type() == node_type::freelist);
@@ -201,7 +201,9 @@ namespace arbtrie
                throw std::runtime_error("reached end of free list, that shouldn't happen!");
             alloced_id = r + id_index(ff_index >> 18);
             ffa        = &get(alloced_id);
-            next_free  = ffa->to_int(std::memory_order_acquire);
+
+            next_free = ffa->to_int(std::memory_order_seq_cst);
+
             assert(temp_meta_type(next_free).ref() == 0);
             assert(temp_meta_type(next_free).type() == node_type::freelist);
          } while (rhead.first_free.compare_exchange_weak(ff_index, next_free));
@@ -233,13 +235,15 @@ namespace arbtrie
           temp_meta_type().set_location(node_location::from_aligned(adr.index)).to_int();
 
       {
-     //    std::unique_lock<std::mutex> l{rhead.alloc_mutex};
-         uint64_t                     cur_head = rhead.first_free.load(std::memory_order_acquire);
-         do
          {
-            next_free.store(cur_head, std::memory_order_release);
-         } while (not rhead.first_free.compare_exchange_weak(cur_head, new_head,
-                                                             std::memory_order_release));
+            std::unique_lock<std::mutex> l{rhead.alloc_mutex};
+            uint64_t cur_head = rhead.first_free.load();  //std::memory_order_relaxed);
+            //      uint64_t  cur_head = rhead.first_free.load(std::memory_order_relaxed);
+            do
+            {
+               next_free.store(cur_head);  //, std::memory_order_release);
+            } while (not rhead.first_free.compare_exchange_weak(cur_head, new_head));
+         }
       }
       rhead.use_count.fetch_sub(1, std::memory_order_release);
    }

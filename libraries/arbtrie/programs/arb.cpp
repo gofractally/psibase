@@ -789,7 +789,7 @@ int  main(int argc, char** argv)
          auto read_thread = [&]() {};
 
          std::vector<std::unique_ptr<std::thread>> rthreads;
-         rthreads.reserve(6);
+         rthreads.reserve(8);
          std::atomic<bool>    done = false;
          std::atomic<int64_t> read_count;
          std::mutex           _lr_mutex;
@@ -838,7 +838,7 @@ int  main(int argc, char** argv)
          }
 
          std::cerr << "insert dense rand while reading " << rthreads.size() << " threads\n";
-         for (int ro = 0; ro < rounds*2; ++ro)
+         for (int ro = 0; ro < rounds*8; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
