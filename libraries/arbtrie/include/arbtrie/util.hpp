@@ -9,7 +9,7 @@ namespace arbtrie {
    using transcribe_cv_t = transcribe_const_t<Src, transcribe_volatile_t<Src, Dst> >;
 
    template<unsigned int N, typename T>
-   T round_up_multiple( T v ) {
+   constexpr T round_up_multiple( T v ) {
       static_assert( std::popcount(N) == 1, "N must be power of 2" );
       return (v + (T(N)-1)) & -T(N);
    }

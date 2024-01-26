@@ -5,8 +5,8 @@
 
 #include <utility>
 
-#undef NDEBUG
-#include <assert.h>
+//#undef NDEBUG
+//#include <assert.h>
 
 namespace arbtrie
 {
@@ -423,7 +423,7 @@ namespace arbtrie
          }
       };
       return make<binary_node>(reg, r.rlock(),
-                               {.spare_branches = to - from, .spare_space = total_kv_size},
+                               {.branch_cap = to - from, .data_cap = total_kv_size},
                                init_binary)
           .address();
    }
@@ -489,12 +489,12 @@ namespace arbtrie
          };
          if constexpr (mode.is_unique())
          {
-            return remake<full_node>(r.rlock(), root->address(), {.update_prefix = cpre}, init_full);
+            return remake<full_node>(r.rlock(), root->address(), {.set_prefix = cpre}, init_full);
          }
          else
          {
             retain_children(r.rlock(), root);
-            return make<full_node>(r.address().region, r.rlock(), {.update_prefix = cpre},
+            return make<full_node>(r.address().region, r.rlock(), {.set_prefix = cpre},
                                    init_full);
          }
       }
@@ -512,16 +512,13 @@ namespace arbtrie
    //      TRIEDENT_WARN("REFACTOR TO SETLIST");
          sl->set_branch_region(r.rlock().get_new_region());
          assert(sl->_num_branches == 0);
-         assert(sl->_spare_branch_capacity >= nbranch);
+         assert(sl->branch_capacity() >= nbranch);
          sl->_num_branches = nbranch;
-         sl->_spare_branch_capacity -= nbranch;
 
          if (has_eof_value) [[unlikely]]
          {
             if (root->is_obj_id(0))
-               sl->set_eof(
-                   root->get_key_val_ptr(0)
-                       ->value_id());  // TODO: may have to move value_id to region of branch and also similar rule for full_node
+               sl->set_eof( root->get_key_val_ptr(0) ->value_id());  
             else
                sl->set_eof(
                    make_value(sl->branch_region(), r.rlock(), root->get_key_val_ptr(0)->value()));
@@ -546,14 +543,14 @@ namespace arbtrie
       if constexpr (mode.is_unique())
       {
          return remake<setlist_node>(r.rlock(), root->address(),
-                                     {.spare_branches = nbranch, .update_prefix = cpre},
+                                     {.branch_cap = nbranch, .set_prefix = cpre},
                                      init_setlist);
       }
       else
       {
          retain_children(r.rlock(), root);
          return make<setlist_node>(r.address().region, r.rlock(),
-                                   {.spare_branches = nbranch, .update_prefix = cpre},
+                                   {.branch_cap= nbranch, .set_prefix = cpre},
                                    init_setlist);
       }
    }
@@ -577,11 +574,11 @@ namespace arbtrie
          assert(fn->num_branches() >= full_node_threshold);
       };
       if constexpr (mode.is_unique())
-         return remake<full_node>(r.rlock(), r.address(), {.update_prefix = src->get_prefix()},
+         return remake<full_node>(r.rlock(), r.address(), {.set_prefix = src->get_prefix()},
                                   init_fn);
       else
          return make<full_node>(r.address().region, r.rlock(),
-                                {.update_prefix = src->get_prefix()}, init_fn);
+                                {.set_prefix = src->get_prefix()}, init_fn);
    }
 
    //=======================================
@@ -624,8 +621,7 @@ namespace arbtrie
          // on any given path this will be true for all parent nodes
          if (cpre.size() < key.size()) [[likely]]
          {
-            const auto bidx =
-                char_to_branch(key[cpre.size()]);  //uint_fast16_t(uint8_t(key[cpre.size()])) + 1;
+            const auto bidx = char_to_branch(key[cpre.size()]); 
             auto br = fn->get_branch(bidx);
             if (br)
             {  // existing branch
@@ -650,7 +646,6 @@ namespace arbtrie
             }
             else  // new branch
             {
-               //      TRIEDENT_WARN( "NEW BRANCH" );
                if constexpr (mode.must_update())
                   throw std::runtime_error("unable to find key to update value");
                else
@@ -675,7 +670,7 @@ namespace arbtrie
                      }
                   }
 
-                  return clone<mode>(r, fn, {.spare_branches = 16},
+                  return clone<mode>(r, fn, {.branch_cap = fn->num_branches()+1},
                                      [&](auto cptr) { cptr->add_branch(bidx, new_bin, true); })
                       .address();
                }
@@ -704,7 +699,7 @@ namespace arbtrie
                   auto new_id = upsert_value<mode>(old_val, val);
                   assert(new_id != val_nid);  // because shared state
                   release_node(old_val);
-                  auto cl = clone<mode>(r, fn, {.spare_branches = 16},
+                  auto cl = clone<mode>(r, fn, {.branch_cap= 16},
                                         [&](auto cl) { cl->set_branch(0, new_id, true); });
                   return cl.address();
                }
@@ -726,7 +721,7 @@ namespace arbtrie
                      //          TRIEDENT_DEBUG( " clone add" );
                      // cloning unique reuses ID and bypasses need to
                      // retain/release all children
-                     return clone<mode>(r, fn, {.spare_branches = 1},
+                     return clone<mode>(r, fn, {.branch_cap= 1},
                                         [&](auto cl) { cl->add_branch(0, new_id, true); })
                          .address();
                   }
@@ -734,7 +729,7 @@ namespace arbtrie
                else
                {
                   TRIEDENT_DEBUG(" clone add new value to branch 0, val =", val);
-                  return clone<mode>(r, fn, {.spare_branches = 16},
+                  return clone<mode>(r, fn, {.branch_cap= 16},
                                      [&](auto cl) { cl->add_branch(0, new_id, true); })
                       .address();
                }
@@ -778,7 +773,11 @@ namespace arbtrie
          char root_prebranch = rootpre[cpre.size()];
 
          fast_meta_address child_id;
-         if constexpr ( mode.is_unique())
+
+         // the compactor needs to be smart enough to detect
+         // when the node's address has changed before we can take
+         // this path
+         if constexpr ( false and mode.is_unique())
          {
             // because the new setlist root must have a different branch region,
             // we need to reassign the meta_address for the current root, this is
@@ -797,7 +796,7 @@ namespace arbtrie
        //     TRIEDENT_DEBUG(" moving root to child shared ");
             auto new_prefix = rootpre.substr(cpre.size() + 1);
             auto cl         = clone<mode.make_shared()>(new_reg, r, fn,
-                                                {.spare_branches = 1, .update_prefix = new_prefix});
+                                                { .set_prefix = new_prefix});
             child_id        = cl.address();
          }
 
@@ -808,7 +807,7 @@ namespace arbtrie
             // must be same region as r because we can't cange the region our parent
             // put this node in.
             return make<setlist_node>(r.address().region, state,
-                                      {.spare_branches = 2, .update_prefix = cpre},
+                                      {.branch_cap = 2, .set_prefix = cpre},
                                       [&](setlist_node* sln)
                                       {
                                          //                            TRIEDENT_WARN( "CHILD ID REGION INSTEAD OF NEW?");
@@ -824,7 +823,7 @@ namespace arbtrie
       //                     " rpre: ", to_hex(rootpre));
             auto abx = make_binary(child_id.region, state, key.substr(cpre.size() + 1), val);
             return make<setlist_node>(
-                       r.address().region, state, {.spare_branches = 2, .update_prefix = cpre},
+                       r.address().region, state, {.branch_cap = 2, .set_prefix = cpre},
                        [&](setlist_node* sln)
                        {
                           sln->set_branch_region(new_reg);
@@ -924,11 +923,11 @@ namespace arbtrie
          }
 
          if (binary_node::can_inline(val))
-            return clone<mode>(root, bn, {.spare_branches = 1, .spare_space = 1024},
+            return clone<mode>(root, bn, {},
                                binary_node::clone_insert(lb_idx, key, val))
                 .address();
          else
-            return clone<mode>(root, bn, {.spare_branches = 1, .spare_space = 1024},
+            return clone<mode>(root, bn, {},
                                binary_node::clone_insert(
                                    lb_idx, key, make_value(bn->branch_region(), root.rlock(), val)))
                 .address();
@@ -1003,7 +1002,7 @@ namespace arbtrie
          // other side of clone
 
          auto new_bin_node =
-             clone<mode>(root, bn, {.spare_space = 1024}, binary_node::clone_update(lb_idx, val));
+             clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, val));
          auto nkvp = new_bin_node->get_key_val_ptr(lb_idx);
          if (old_val_oid and (not bn->is_obj_id(lb_idx) or nkvp->value_id() != old_val_oid))
             release_node(root.rlock().get(old_val_oid));
@@ -1013,7 +1012,7 @@ namespace arbtrie
       {
          auto vid = make_value(bn->branch_region(), root.rlock(), val);
          auto new_bin_node =
-             clone<mode>(root, bn, {.spare_space = 1024}, binary_node::clone_update(lb_idx, vid));
+             clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, vid));
 
          auto nkvp = new_bin_node->get_key_val_ptr(lb_idx);
          if (old_val_oid and (not bn->is_obj_id(lb_idx) or nkvp->value_id() != old_val_oid))
@@ -1028,8 +1027,11 @@ namespace arbtrie
                                         key_view          key,
                                         const value_type& val)
    {
-      auto ss = binary_node::calc_key_val_pair_size(key, val) + 1024;
-      return make<binary_node>(reg, state, {.spare_branches = 1, .spare_space = ss},
+      //TODO: configure how much spare capacity goes into nodes as they are being 
+      //created.  Currently adding 128 (2 cachelines) + what ever ounding out to nearest
+      // 64 bytes is already going on.
+      auto ss = binary_node::calc_key_val_pair_size(key, val) + 2048;
+      return make<binary_node>(reg, state, {.branch_cap = 1, .data_cap = ss},
                                [&](binary_node* bn)
                                {
                                   if (val.is_object_id())

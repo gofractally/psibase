@@ -39,25 +39,9 @@ namespace arbtrie
     *  and store this hash in another parallel/linear array. Updating
     *  the 32 bit hash over the entire binary node only requires
     *  calculating the key hash, the value hash, and a hash of the
-    *  hashes. One bit of the value hash can signal whether the value
+    *  hashes. One bit of the index field can signal whether the value
     *  is bytes or an object_id and therefore make scanning for
     *  object_id's to retain/release much faster.
-    *
-    *  Because the hash algorithm produces a full 8 byte hash and 
-    *  we are only using 1 byte, we can use any padding that rounds
-    *  the key/value pair to 16 byte alignment to store additional
-    *  checksum bytes for the key and value for no extra storage
-    *  cost and minimal CPU cost. Assuming a random distribution
-    *  of key/value sizes the there is an average of 7 additional
-    *  hash bytes per key/value pair while 1 in 16 keys would have
-    *  only the 8 bit hash giving just 99.6% error diection rate.
-    *
-    *  Because the key offsets are 8 bits and the key_val alignment
-    *  is 16 bytes (so that the full 4096 bytes is addressable), there
-    *  is a maximum of 214 key/value per binary node. The hash of hashes 
-    *  would require hashing 450 bytes or about 15% of the data in the
-    *  page, an 85% savings. Nodes that are not full and/or have
-    *  larger keys and inline values would be even more effecient.
     *
     *  ## Inline Storage of Values
     *  Values less than 63 bytes are stored inline with the binary node

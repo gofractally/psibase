@@ -300,6 +300,7 @@ namespace arbtrie
       }
    }
 
+   /*
    template <typename T>
    void release_node2(object_ref<T>& r)
    {
@@ -354,6 +355,7 @@ namespace arbtrie
          }
       }
    }
+   */
 
    template <typename T>
    void release_node(object_ref<T>&& r)

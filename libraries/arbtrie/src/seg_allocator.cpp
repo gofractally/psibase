@@ -1,8 +1,8 @@
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/seg_allocator.hpp>
 
-#undef NDEBUG
-#include <assert.h>
+//#undef NDEBUG
+//#include <assert.h>
 
 namespace arbtrie
 {
@@ -42,7 +42,8 @@ namespace arbtrie
              });
       }
    }
-   void seg_allocator::stop_compact_thread() {
+   void seg_allocator::stop_compact_thread()
+   {
       _done.store(true);
       if (_compact_thread.joinable())
          _compact_thread.join();
@@ -161,8 +162,6 @@ namespace arbtrie
       char*        foc   = (char*)s + sizeof(mapped_memory::segment_header);
       node_header* foo   = (node_header*)(foc);
 
-      
-      
       /*
       std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num << " "
       << "seg free: " << _header->seg_meta[seg_num].get_free_space_and_objs().first << " "
@@ -171,8 +170,6 @@ namespace arbtrie
          std::cerr << "calloc: " << ses._alloc_seg_ptr->_alloc_pos <<" cfree: " << _header->seg_meta[ses._alloc_seg_num].get_free_space_and_objs().first <<"\r";
       } else std::cerr<<"\r";
       */
-      
-      
 
       assert(s->_alloc_pos == segment_offset(-1));
       //   std::cerr << "seg " << seg_num <<" alloc pos: " << s->_alloc_pos <<"\n";
@@ -186,7 +183,7 @@ namespace arbtrie
       madvise(s, segment_size, MADV_SEQUENTIAL);
       while (foo < send and foo->address())
       {
-         assert( foo->validate_checksum() );
+         assert(foo->validate_checksum());
          auto foo_address = foo->address();
          // skip anything that has been freed
          // note the ref can go to 0 before foo->check is set to -1
@@ -222,56 +219,66 @@ namespace arbtrie
             //    at the old object ref after the move This happens
             //    in a currently disabled case on upsert.
             //
-            auto try_move   = [&]()
+            auto try_move = [&]()
             {
                int count = 0;
-               while (obj_ref.try_start_move(obj_ref.loc()))
+               while (obj_ref.try_start_move(obj_ref.loc())) [[likely]]
                {
-                  assert( foo->validate_checksum() );
+                  assert(foo->validate_checksum());
                   memcpy(ptr, foo, obj_size);
-                //  if( ptr->validate_checksum()) 
+                  //  if( ptr->validate_checksum())
                   switch (obj_ref.try_move(obj_ref.loc(), loc))
                   {
                      case node_meta_type::freed:
-                         TRIEDENT_WARN("object freed while copying");
+                        // TRIEDENT_WARN("object freed while copying");
                         return false;
                      case node_meta_type::moved:
                         // realloc or
-                         TRIEDENT_WARN("object moved while copying");
+                        // TRIEDENT_WARN("object moved while copying");
                         return false;
                      case node_meta_type::dirty:
-                        // TODO: verify whether foo->address() == foo_address
-                        if( foo->address() != foo_address ) {
-                           TRIEDENT_WARN( "The Address of Foo Changed! HELP ME" );
-                           abort();
+                        if constexpr (use_wait_free_modify)
+                        {
+                           // TODO: verify whether foo->address() == foo_address
+                           if (foo->address() != foo_address)
+                           {
+                              TRIEDENT_WARN("The Address of Foo Changed! HELP ME");
+                              abort();
+                           }
+                         //  TRIEDENT_WARN("compactor moving dirty obj, try again");
+                           obj_ref.refresh();
+                           ++count;
+                           continue;
                         }
-                        TRIEDENT_WARN("compactor moving dirty obj, try again");
-                        obj_ref.refresh();
-                        ++count;
-                        continue;
+                        throw std::runtime_error("unexpected return dirty from try_move");
                      case node_meta_type::success:
-                        if( count ) {
-                           TRIEDENT_WARN( "success on attempt: ", count );
+                        if constexpr (use_wait_free_modify)
+                        {
+                           if (count)
+                           {
+                              TRIEDENT_WARN("success on attempt: ", count);
+                           }
                         }
                         return true;
                   }
-               }
-           //    TRIEDENT_WARN( "try_move failed in try_start_move" );
+               } // while try_start_move
+
+               //    TRIEDENT_WARN( "try_move failed in try_start_move" );
                return false;
             };
 
             if (not try_move())
             {
-             //  TRIEDENT_WARN("try move failed, unalloc...", foo->id());
-                //auto start_seg_num = ses._alloc_seg_num;
+               //  TRIEDENT_WARN("try move failed, unalloc...", foo->id());
+               //auto start_seg_num = ses._alloc_seg_num;
                _header->seg_meta[ses._alloc_seg_num].free_object(foo->size());
                // TODO: retry
-              // ses.unalloc(ptr->_nsize);
+               // ses.unalloc(ptr->_nsize);
             }
             //if (not foo->validate_checksum())
             {
-           //    TRIEDENT_WARN("moved object with invalid checksum: expected: ",
-            //                 foo->calculate_checksum(), " != ", foo->checksum);
+               //    TRIEDENT_WARN("moved object with invalid checksum: expected: ",
+               //                 foo->calculate_checksum(), " != ", foo->checksum);
             }
          }
 
@@ -353,14 +360,13 @@ namespace arbtrie
 
       // only one thread can move the end_ptr or this will break
       // std::cerr<<"done freeing end_ptr: " << _header->end_ptr.load() <<" <== " << seg_num <<"\n";
-   
-      assert( seg_num != segment_number(-1) );
+
+      assert(seg_num != segment_number(-1));
       _header->free_seg_buffer[_header->end_ptr.load(std::memory_order_relaxed) &
                                (max_segment_count - 1)] = seg_num;
       auto prev = _header->end_ptr.fetch_add(1, std::memory_order_release);
       set_session_end_ptrs(prev);
 
-      
       //
    }
 
@@ -397,7 +403,7 @@ namespace arbtrie
          {
             if (fs & (1ull << i))
             {
-               if( uint32_t p = _session_lock_ptrs[i].load( std::memory_order_relaxed ); p < min )
+               if (uint32_t p = _session_lock_ptrs[i].load(std::memory_order_relaxed); p < min)
                   min = p;
 
                // we can't find anything lower than this
@@ -415,30 +421,34 @@ namespace arbtrie
       return min;
    }
 
-   void seg_allocator::set_session_end_ptrs( uint32_t e ) {
-      auto fs      = ~_free_sessions.load();
-      auto num_ses = std::popcount(fs);
-      uint32_t min = -1;
+   void seg_allocator::set_session_end_ptrs(uint32_t e)
+   {
+      auto     fs      = ~_free_sessions.load();
+      auto     num_ses = std::popcount(fs);
+      uint32_t min     = -1;
       for (uint32_t i = 0; fs and i < max_session_count; ++i)
       {
          if (fs & (1ull << i))
          {
-            uint64_t p = _session_lock_ptrs[i].load( std::memory_order_relaxed );
+            uint64_t p = _session_lock_ptrs[i].load(std::memory_order_relaxed);
 
-            if( uint32_t(p) < min ) 
+            if (uint32_t(p) < min)
                min = uint32_t(p);
 
-            p &= ~uint64_t(uint32_t(-1)); // clear the lower bits, to get accurate diff
-            auto delta = (uint64_t(e)<<32) - p;
-            assert( (delta << 32) == 0 );
-            auto ep = _session_lock_ptrs[i].fetch_add(delta, std::memory_order_release );
+            p &= ~uint64_t(uint32_t(-1));  // clear the lower bits, to get accurate diff
+            auto delta = (uint64_t(e) << 32) - p;
+            assert((delta << 32) == 0);
+            auto ep = _session_lock_ptrs[i].fetch_add(delta, std::memory_order_release);
          }
       }
-      if( e > (1<<20) ) {
-         TRIEDENT_WARN( "TODO: looks like ALLOC P and END P need to be renormalized, they have wrapped the buffer too many times." );
+      if (e > (1 << 20))
+      {
+         TRIEDENT_WARN(
+             "TODO: looks like ALLOC P and END P need to be renormalized, they have wrapped the "
+             "buffer too many times.");
       }
-      
-      if (min > e) // only possible 
+
+      if (min > e)  // only possible
          min = e;
       _min_read_ptr.store(min, std::memory_order_relaxed);
    }
@@ -456,54 +466,56 @@ namespace arbtrie
     */
    std::pair<segment_number, mapped_memory::segment_header*> seg_allocator::get_new_segment()
    {
-
-     // TRIEDENT_DEBUG( " get new seg session min ptr: ", min );
-     // TRIEDENT_WARN( "end ptr: ", _header->end_ptr.load(), " _header: ", _header );
+      // TRIEDENT_DEBUG( " get new seg session min ptr: ", min );
+      // TRIEDENT_WARN( "end ptr: ", _header->end_ptr.load(), " _header: ", _header );
       auto prepare_segment = [&](segment_number sn)
       {
          auto sp = _block_alloc.get(sn);
-     //    madvise(sp, segment_size, MADV_FREE);  // zero's pages if they happen to be accessed
+         //    madvise(sp, segment_size, MADV_FREE);  // zero's pages if they happen to be accessed
          madvise(sp, segment_size, MADV_RANDOM);
 
          // TODO: only do this if not already mlock
          auto r = mlock(sp, segment_size);
 
          if (r)
-            std::cerr << "MLOCK RETURNED: " << r << "  EINVAL:" << EINVAL << "  EAGAIN:" << EAGAIN << "\n";
+            std::cerr << "MLOCK RETURNED: " << r << "  EINVAL:" << EINVAL << "  EAGAIN:" << EAGAIN
+                      << "\n";
 
          // for debug we clear the memory
-         assert( memset(sp, 0xff, segment_size) );  // TODO: is this necessary?
+         assert(memset(sp, 0xff, segment_size));  // TODO: is this necessary?
 
          auto shp  = new (sp) mapped_memory::segment_header();
          shp->_age = _header->next_alloc_age.fetch_add(1, std::memory_order_relaxed);
          return std::pair<segment_number, mapped_memory::segment_header*>(sn, shp);
       };
-     //  std::cout <<"get new seg ap: " << ap << "  min: " << min <<"  min-ap:" << min - ap << "\n";
+      //  std::cout <<"get new seg ap: " << ap << "  min: " << min <<"  min-ap:" << min - ap << "\n";
 
       auto min = get_min_read_ptr();
       auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
       while (min - ap > 1)
       {
-      //   TRIEDENT_WARN( "REUSE SEGMENTS" );
+         //   TRIEDENT_WARN( "REUSE SEGMENTS" );
          if (_header->alloc_ptr.compare_exchange_weak(ap, ap + 1))
          {
-      //      TRIEDENT_DEBUG( "ap += 1: ", ap + 1 );
-      //   TRIEDENT_DEBUG( "     end_ptr: ", _header->end_ptr.load() );
+            //      TRIEDENT_DEBUG( "ap += 1: ", ap + 1 );
+            //   TRIEDENT_DEBUG( "     end_ptr: ", _header->end_ptr.load() );
 
-            auto apidx                          = ap & (max_segment_count - 1);
-            uint64_t free_seg                   = _header->free_seg_buffer[apidx];
-            if( free_seg == segment_number(-1) )[[unlikely]] {
-               TRIEDENT_WARN( "something bad happend!" );
+            auto     apidx    = ap & (max_segment_count - 1);
+            uint64_t free_seg = _header->free_seg_buffer[apidx];
+            if (free_seg == segment_number(-1)) [[unlikely]]
+            {
+               TRIEDENT_WARN("something bad happend!");
                abort();
             }
 
             _header->free_seg_buffer[apidx] = segment_number(-1);
 
-            if( free_seg == segment_number(-1) )[[unlikely]] {
-               TRIEDENT_WARN( "something bad happend!" );
+            if (free_seg == segment_number(-1)) [[unlikely]]
+            {
+               TRIEDENT_WARN("something bad happend!");
                abort();
             }
-       //  TRIEDENT_DEBUG( "prepare segment: ", free_seg, "     end_ptr: ", _header->end_ptr.load() );
+            //  TRIEDENT_DEBUG( "prepare segment: ", free_seg, "     end_ptr: ", _header->end_ptr.load() );
             //       std::cerr << "reusing segment..." << free_seg <<"\n";
             return prepare_segment(free_seg);
          }
@@ -618,6 +630,6 @@ namespace arbtrie
          std::cerr << x << "] " << _header->free_seg_buffer[x & (max_segment_count - 1)] << "\n";
       }
       std::cerr << "--------------------------\n";
-      std::cerr << "free release +/- = " << _id_alloc.free_release_count() <<" \n";
+      std::cerr << "free release +/- = " << _id_alloc.free_release_count() << " \n";
    }
 };  // namespace arbtrie

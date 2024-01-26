@@ -1,7 +1,5 @@
 #pragma once
 #include <arbtrie/node_header.hpp>
-#undef NDEBUG
-#include <assert.h>
 
 namespace arbtrie
 {
@@ -9,157 +7,154 @@ namespace arbtrie
     *  Full Node - has one branch for all possible branches and eof stored
     *  as a 3 byte index under a common region
     */
-   struct full_node : node_header
+   struct full_node : inner_node<full_node>
    {
-      static const int_fast16_t branch_count = 257;
+      static constexpr const int_fast16_t branch_count = 256;
       static const node_type    type         = node_type::full;
 
       static int_fast16_t alloc_size(clone_config cfg)
       {
-         return sizeof(full_node) + cfg.prefix_capacity();
+         return round_up_multiple<64>(sizeof(full_node) + cfg.prefix_capacity() + (branch_count*sizeof(id_index)));
       }
       static int_fast16_t alloc_size(const full_node* src, clone_config cfg)
       {
-         assert(src != nullptr);
-         if (cfg.update_prefix)
-         {
-            return sizeof(full_node) + cfg.prefix_capacity();
-         }
-         return sizeof(full_node) +
-                std::max<int_fast16_t>(src->get_prefix().size(), cfg.prefix_capacity());
+         auto min_pre  = cfg.set_prefix ? cfg.set_prefix->size() : src->prefix_size();
+         min_pre       = std::max<int>(min_pre, cfg.prefix_cap);
+         auto min_size = sizeof(setlist_node) + min_pre + (branch_count* sizeof(id_index));
+         return round_up_multiple<64>(min_size);
       }
 
       full_node(int_fast16_t asize, fast_meta_address nid, const full_node* src, clone_config cfg)
-          : node_header(asize, nid, node_type::full)
+          : inner_node<full_node>(asize, nid, src, cfg)
       {
-         assert(src != nullptr);
-         assert(asize == alloc_size(src, cfg));
-         _branch_id_region = src->_branch_id_region;
-         _prefix_trunc = cfg.spare_prefix;
-         _prefix_capacity = cfg.spare_prefix;
-         if (cfg.update_prefix) {
-            _prefix_capacity = cfg.update_prefix->size();
-            set_prefix(*cfg.update_prefix);
-         } else {
-            _prefix_capacity = src->prefix_size();
-            set_prefix(src->get_prefix());
-         }
-
-         _descendants = src->_descendants;
-         memcpy(_branches, src->_branches, sizeof(_branches));
+         _prefix_capacity = asize - sizeof(inner_node<full_node>) - branch_count* sizeof(id_index);
+         memcpy(branches(), src->branches(), branch_count* sizeof(id_index));
       }
 
       full_node(int_fast16_t asize, fast_meta_address nid, clone_config cfg)
-          : node_header(asize, nid, node_type::full), _prefix_trunc(cfg.spare_prefix)
+          : inner_node<full_node>(asize, nid, cfg, 0)
       {
-         assert(asize == alloc_size(cfg));
-
-         _prefix_trunc = cfg.spare_prefix;
-         _prefix_capacity = cfg.spare_prefix;
-         if (cfg.update_prefix) {
-            _prefix_capacity = cfg.update_prefix->size();
-            set_prefix(*cfg.update_prefix);
-         }
-         _descendants = 0;
-         memset(_branches, 0, sizeof(_branches));
+         _prefix_capacity = asize - sizeof(inner_node<full_node>) - branch_count* sizeof(id_index);
+         memset(branches(), 0, branch_count* sizeof(id_index));
       }
 
-      bool can_add_branch() const { return _num_branches < branch_count; }
+      bool can_add_branch() const { return num_branches() < max_branch_count; }
 
-      std::pair<int_fast16_t,fast_meta_address> lower_bound( int_fast16_t br )const {
-         while( br < max_branch_count and not _branches[br] )
+      std::pair<branch_index_type, fast_meta_address> lower_bound(branch_index_type br) const
+      {
+         if (br == 0)
+         {
+            if (has_eof_value())
+               return {0, _eof_value};
             ++br;
-         if( br == max_branch_count )
-            return {br, {}};
-         return {br, get_branch(br) };
+         }
+
+         auto       beg = branches();
+         auto       ptr = beg + br - 1;
+         const auto end = beg + branch_count;
+         assert( (const uint8_t*)end == tail() );
+
+         while (ptr < end)
+         {
+            if (*ptr) {
+               return {1 + (ptr - beg), fast_meta_address(branch_region(), *ptr)};
+            }
+            ++ptr;
+         }
+         return {max_branch_count, {}};
       }
 
-      void add_branch(int_fast16_t br, fast_meta_address b, bool dirty = false)
+      void add_branch(branch_index_type br, fast_meta_address b, bool dirty = false)
       {
          assert(br < max_branch_count);
-         assert(br >= 0);
-         assert(not _branches[br]);
-         assert( b.region == branch_region() );
+         assert(br > 0);
+         assert(not branches()[br-1]);
+         assert(b.region == branch_region());
+         assert(_num_branches < max_branch_count);
+
          ++_num_branches;
-         assert(_num_branches <= max_branch_count);
-         _branches[br].index = b.index;
-         _branches[br].dirty |= dirty;
-
-         // this info is redundant and no one should determine eof_branch
-         // for full node by reading this, so don't bother updating it
-         //_eof_branch |= br == 0;
+         auto& idx = branches()[br - 1];
+         idx.index = b.index;
+         idx.dirty |= dirty;
       }
-      void remove_branch(int_fast16_t br)
+
+      void remove_branch(branch_index_type br)
       {
          assert(br < max_branch_count);
-         assert(br >= 0);
-         assert(_branches[br]);
+         assert(br > 0);
+         assert(get_branch(br));
          assert(_num_branches > 0);
+
          --_num_branches;
-         _branches[br] = {};
+         branches()[br - 1] = {};
+      }
 
-         // this info is redundant and no one should determine eof_branch
-         // for full node by reading this, so don't bother updating it
-         //_eof_branch &= br != 0;
+      void clear_dirty(branch_index_type br)
+      {
+         if (br)
+            branches()[br - 1].dirty = 0;
+         else
+            _eof_value._index.dirty = 0;
       }
-      void clear_dirty( branch_index_type br ) {
-         _branches[br].dirty = 0;
+
+      void set_branch(branch_index_type br, fast_meta_address b, bool dirty = false)
+      {
+         assert(br < max_branch_count);
+         assert(br > 0);
+         assert(get_branch(br));
+         assert(b.region == branch_region());
+
+         auto& idx = branches()[br - 1];
+         idx.index = b.index;
+         idx.dirty |= dirty;
       }
-      void set_branch(int_fast16_t br, fast_meta_address b, bool dirty = false)
+
+      fast_meta_address get_branch(branch_index_type br) const
       {
          assert(br < max_branch_count);
          assert(br >= 0);
-         assert(_branches[br]);
-         assert( b.region == branch_region() );
-         _branches[br].index = b.index;
-         _branches[br].dirty |= dirty;
+
+         if (br == 0) return _eof_value;
+         return fast_meta_address(branch_region(), branch(br - 1));
       }
 
-      bool has_eof_value()const { return bool(_branches[0]); }
+      inline void visit_branches( std::invocable<fast_meta_address> auto&& visitor) const
+      {
+         if (has_eof_value())
+            visitor(_eof_value);
 
-      fast_meta_address get_branch(int_fast16_t br)const
-      {
-         assert(br < max_branch_count);
-         assert(br >= 0);
-         return fast_meta_address( branch_region(), _branches[br] );
-      }
-
-      inline int_fast32_t prefix_size() const { return prefix_capacity() - _prefix_trunc; }
-      inline key_view     get_prefix() const { return key_view(_prefix, prefix_size()); }
-      inline void         set_prefix(key_view pre)
-      {
-         assert(pre.size() <= prefix_capacity());
-         _prefix_trunc = prefix_capacity() - pre.size();
-         memcpy(_prefix, pre.data(), pre.size());
-         assert( get_prefix() == pre );
-      }
-
-      inline void visit_branches(auto visitor) const
-      {
-         for (auto& x : _branches)
-            if (x)
-               visitor( fast_meta_address(branch_region(),x) );
-      }
-      inline void visit_branches_with_br(auto visitor) const
-      {
-         for( int i = 0; i < 257; ++i ) {
-            if( _branches[i] ) 
-               visitor( i, get_branch(i) );
+         const auto region = branch_region();
+         for (int i = 0; i < branch_count; ++i)
+         {
+            if (auto b = branch(i))
+               visitor(fast_meta_address(region, b));
          }
       }
 
-      uint64_t _descendants : 44  = 0;
-      uint64_t _prefix_trunc : 10 = 0;
-      uint64_t _prefix_capacity: 10 = 0;
-      //id_region eof_region; // TODO: value nodes don't alway share the region
-      id_index  _branches[max_branch_count];
-      char      _prefix[];
+      inline void visit_branches_with_br(
+          std::invocable<branch_index_type, fast_meta_address> auto&& visitor) const
+      {
+         if (has_eof_value())
+            visitor(0, _eof_value);
 
-      uint16_t        prefix_capacity() const { return _prefix_capacity; }
-      uint32_t calculate_checksum()const {
-         return XXH3_64bits( ((const char*)this)+sizeof(checksum), 
-                      _nsize - sizeof(checksum) );
+         const auto region = branch_region();
+         for (branch_index_type i = 0; i < branch_count;)
+         {
+            if (auto b = branch(i))
+               visitor(++i, fast_meta_address(region, b));
+            else ++i;
+         }
       }
+
+      uint32_t calculate_checksum() const
+      {
+         return XXH3_64bits(((const char*)this) + sizeof(checksum), _nsize - sizeof(checksum));
+      }
+
+     private:
+      id_index*       branches() { return ((id_index*)tail()) - branch_count; }
+      const id_index* branches()const { return ((const id_index*)tail()) - branch_count; }
+      id_index        branch(int i) const { return branches()[i]; }
 
    } __attribute((packed));
 

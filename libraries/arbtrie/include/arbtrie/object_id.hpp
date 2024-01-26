@@ -19,7 +19,7 @@ namespace arbtrie {
    static_assert( sizeof(id_region) == 2 );
 
    struct id_index {
-      constexpr id_index( uint32_t r = 0 ):index(r){}
+      constexpr id_index( uint32_t r = 0 ):index(r),dirty(0){}
       uint32_t index:23;
       uint32_t dirty:1;
       operator bool()const { return index; }
@@ -55,6 +55,9 @@ namespace arbtrie {
     *  This type isn't for storage, but for computation 
     */
    struct fast_meta_address {
+      uint16_t region=0;
+      uint32_t index=0;
+
       constexpr fast_meta_address()=default;
       constexpr fast_meta_address( id_region r, id_index i )
       :region( r.region), index(i.index){}
@@ -69,8 +72,6 @@ namespace arbtrie {
 
       constexpr void reset(){region=0;index=0;}
 
-      uint16_t region=0;
-      uint32_t index=0;
       operator bool()const { return index; }
       explicit operator id_address()const { return {region,index}; }
       constexpr id_address to_address()const { return {region,index}; }

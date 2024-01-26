@@ -12,8 +12,8 @@ add_library(arbtrie
 
 target_include_directories(arbtrie PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
 target_link_libraries(arbtrie PUBLIC Threads::Threads)
-#target_compile_options(arbtrie PUBLIC -fsanitize=thread -g)
-#target_link_options(arbtrie PUBLIC -fsanitize=thread -g)
+target_compile_options(arbtrie PUBLIC -fsanitize=thread -g)
+target_link_options(arbtrie PUBLIC -fsanitize=thread -g)
 
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(X86_64)|(amd64)|(AMD64)")
    if( NOT APPLE )
