@@ -17,6 +17,7 @@ namespace arbtrie
          std::pair<branch_index_type, fast_meta_address> idx = in->lower_bound(0);
          if (idx.first == 0)
          {
+            assert( _path.back().second == 0 );
          //   _path.back().second = 0;
             return true;
          }

@@ -369,7 +369,7 @@ int  main(int argc, char** argv)
    std::vector<std::string> v;
    std::string              str;
 
-   int64_t batch_size = 1'000'000;
+   int64_t batch_size = 1000000;
 
    // Read the next line from File until it reaches the
    // end.
@@ -398,7 +398,6 @@ int  main(int argc, char** argv)
 
          auto iterate_all = [&]()
          {
-            std::cerr << "iterate entire database\n";
             {
                uint64_t item_count = 0;
                auto     itr        = ws.create_iterator(r);

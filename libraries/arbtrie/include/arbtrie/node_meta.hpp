@@ -18,7 +18,8 @@ namespace arbtrie
       value     = 2,  // just the data, no key
       setlist   = 3,  // list of branches
       full      = 4,  // 256 full id_type
-      undefined = 5,  // no type has been defined yet
+      bitset    = 5,
+      undefined = 6,  // no type has been defined yet
 
       // future, requires taking a bit, or removing undefined/freelist
       //index    = 7,  // 256 index buffer to id_type
@@ -318,7 +319,7 @@ namespace arbtrie
       move_result try_move(node_location expect_loc, node_location new_loc)
       {
          uint64_t expected = _meta.fetch_and(~copy_mask, std::memory_order_relaxed);
-         assert(expected & copy_mask);
+         //assert(expected & copy_mask);
 
          auto notify = [&]()
          {
@@ -398,8 +399,8 @@ namespace arbtrie
          if constexpr (debug_memory)
          {
             // no one should use meta.  Setting it to 0
-            if (prior.ref() == 1)
-               _meta.store(0, std::memory_order_relaxed);
+          //  if (prior.ref() == 1)
+          //     _meta.store(0, std::memory_order_relaxed);
             if (prior.ref() == 0)
                throw std::runtime_error("double release detected");
          }

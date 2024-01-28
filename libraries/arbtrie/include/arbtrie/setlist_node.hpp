@@ -76,14 +76,7 @@ namespace arbtrie
       }
 
       bool can_add_branch() const { return (num_branches() - has_eof_value()) < branch_capacity(); }
-      void add_branch(branch_index_type br, fast_meta_address b, bool dirty = false);
-
-      // idx = index of setlist, not branch, 0 is the first non eof branch
-      void clear_dirty_idx(int idx)
-      {
-         assert(idx < num_branches() - has_eof_value());
-         get_branch_ptr()[idx].dirty = 0;
-      }
+      void add_branch(branch_index_type br, fast_meta_address b);
 
       void set_index(int idx, uint8_t byte, fast_meta_address adr)
       {
@@ -133,11 +126,11 @@ namespace arbtrie
          return slp - sl;
       }
 
-      std::pair<int_fast16_t, fast_meta_address> lower_bound(int_fast16_t br) const
+      std::pair<branch_index_type, fast_meta_address> lower_bound(branch_index_type br) const
       {
-         if (br >= max_branch_count)
+         if (br >= max_branch_count) [[unlikely]]
             return std::pair<int_fast16_t, fast_meta_address>(max_branch_count, {});
-         if (br == 0)
+         if (br == 0) 
          {
             if (_eof_value)
                return std::pair<int_fast16_t, fast_meta_address>(0, _eof_value);
@@ -152,32 +145,24 @@ namespace arbtrie
          while (p < e and b > *p)
             ++p;
          if (p == e)
-            return std::pair<int_fast16_t, fast_meta_address>(max_branch_count, {});
-         return std::pair<int_fast16_t, fast_meta_address>(
+            return std::pair<branch_index_type, fast_meta_address>(max_branch_count, {});
+         return std::pair<branch_index_type, fast_meta_address>(
              char_to_branch(*p), {branch_region(), get_branch_ptr()[(p - s) + bool(_eof_value)]});
       }
 
-      void set_branch(uint_fast16_t br, fast_meta_address b, bool dirty = false)
+      void set_branch(branch_index_type br, fast_meta_address b)
       {
          assert(br < 257);
          assert(not(br == 0 and not bool(_eof_value)));
          assert(b);
          assert(b.region == branch_region());
 
-         auto bp = get_branch_ptr();
          if (br == 0) [[unlikely]]
-         {
-            set_eof(b);
-            _eof_value._index.dirty |= dirty;
-            return;
-         }
+            return set_eof(b);
 
          auto pos = get_setlist().find(br - 1);
          assert(pos != key_view::npos);
-
-         auto idx      = pos;
-         bp[idx].index = b.index;
-         bp[idx].dirty = dirty;
+         get_branch_ptr()[pos].index = b.index;
       }
 
       fast_meta_address get_branch(uint_fast16_t br) const
@@ -194,7 +179,7 @@ namespace arbtrie
          return {branch_region(), get_branch_ptr()[pos]};
       }
 
-      inline void visit_branches(auto visitor) const
+      inline void visit_branches( std::invocable<fast_meta_address> auto&& visitor) const
       {
          const bool has_eof = has_eof_value();
 
@@ -210,7 +195,8 @@ namespace arbtrie
          }
       }
 
-      inline void visit_branches_with_br(auto visitor) const
+      inline void visit_branches_with_br(
+          std::invocable<branch_index_type, fast_meta_address> auto&& visitor) const
       {
          const bool        has_eof = has_eof_value();
          const auto*       slp     = get_setlist_ptr();
@@ -260,7 +246,7 @@ namespace arbtrie
          --_num_branches;
       }
 
-      inline static int_fast16_t alloc_size(clone_config cfg)
+      inline static int_fast16_t alloc_size(const clone_config& cfg)
       {
          auto min_size =
              sizeof(setlist_node) + cfg.prefix_cap + (cfg.branch_cap) * (sizeof(id_index) + 1);
@@ -273,8 +259,8 @@ namespace arbtrie
          assert(src != nullptr);
          assert(cfg.branch_cap < 192);
 
-         auto pcap = cfg.set_prefix ? cfg.set_prefix->size()
-                                    : std::max<int>(cfg.prefix_cap, src->prefix_size());
+         auto pcap     = cfg.set_prefix ? cfg.set_prefix->size()
+                                        : std::max<int>(cfg.prefix_cap, src->prefix_size());
          auto bcap     = std::max<int>(cfg.branch_cap, src->num_branches());
          auto min_size = sizeof(setlist_node) + pcap + (bcap) * (sizeof(id_index) + 1);
 
@@ -286,7 +272,7 @@ namespace arbtrie
          return asize;
       }
 
-      setlist_node(int_fast16_t asize, fast_meta_address nid, clone_config cfg)
+      setlist_node(int_fast16_t asize, fast_meta_address nid, const clone_config& cfg)
           : inner_node(asize, nid, cfg, 0)
       {
       }
@@ -294,7 +280,7 @@ namespace arbtrie
       setlist_node(int_fast16_t        asize,
                    fast_meta_address   nid,
                    const setlist_node* src,
-                   clone_config        cfg)
+                   const clone_config&        cfg)
           : inner_node(asize, nid, src, cfg)
       {
          assert(src->num_branches() <= branch_capacity());
@@ -308,7 +294,7 @@ namespace arbtrie
    static_assert(sizeof(setlist_node) ==
                  sizeof(node_header) + sizeof(uint64_t) + sizeof(id_address));
 
-   inline void setlist_node::add_branch(branch_index_type br, fast_meta_address b, bool dirty)
+   inline void setlist_node::add_branch(branch_index_type br, fast_meta_address b)
    {
       assert(br < max_branch_count);
       assert(br >= 0);
@@ -318,9 +304,7 @@ namespace arbtrie
       id_index* branches = get_branch_ptr();
       if (br == 0) [[unlikely]]
       {
-         TRIEDENT_WARN("set eof dirty");
          set_eof(b);
-         _eof_value._index.dirty = dirty;
          return;
       }
       assert(_num_branches < branch_capacity());
@@ -340,7 +324,6 @@ namespace arbtrie
       auto b_end   = blp + nbranch;
       memmove(b_found + 1, b_found, (char*)b_end - (char*)b_found);
       b_found->index = b.index;
-      b_found->dirty |= dirty;
 
       ++_num_branches;
    }

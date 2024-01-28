@@ -271,8 +271,10 @@ namespace arbtrie
                bool retain() { 
                   return _meta.retain(); 
                }
-               // return true if object is deleted
-               bool release();
+
+               // return last value of pointer if object is deleted, so children can
+               // be released... otherwise null
+               const node_header* release();
 
                modify_lock modify() { return modify_lock(_meta, _rlock); }
                bool        try_start_move(node_location loc) { 
@@ -313,6 +315,11 @@ namespace arbtrie
                //object_ref clone(const T* v) const { return rlock().clone(v); }
 
                temp_meta_type meta_data() { return _cached; }
+
+               void prefetch() {
+                  __builtin_prefetch( &_meta, 1, 1 );
+               }
+               node_meta_type& meta() { return _meta; }
 
               protected:
                friend class seg_allocator;
@@ -371,12 +378,12 @@ namespace arbtrie
 
             ~read_lock() { _session.release_read_lock(); }
 
+            node_header* get_node_pointer(node_location);
            private:
             friend class session;
             template <typename T>
             friend class object_ref;
 
-            node_header* get_node_pointer(node_location);
 
             read_lock(session& s) : _session(s) { _session.retain_read_lock(); }
             read_lock(const session&) = delete;
@@ -828,13 +835,19 @@ namespace arbtrie
       _session._sega._id_alloc.free_id(a);
    }
 
+   /**
+    *  Returns the last value of the node pointer prior to release so that
+    *  its children may be released, or null if the children shouldn't be released.
+    */
    template <typename T>
-   bool seg_allocator::session::read_lock::object_ref<T>::release()
+   const node_header* seg_allocator::session::read_lock::object_ref<T>::release()
    {
 //      TRIEDENT_DEBUG( "  ", address(), "  ref: ", ref(), " type: ", node_type_names[type()] );
       auto prior = _meta.release();
       if (prior.ref() > 1)
-         return false;
+         return nullptr;
+
+      auto result = _rlock.get_node_pointer(prior.loc());
 
  //     TRIEDENT_DEBUG( "  free ", address() );
 
@@ -842,10 +855,10 @@ namespace arbtrie
       auto obj_ptr = _rlock.get_node_pointer(ploc);
       //    (node_header*)((char*)_rlock._session._sega._block_alloc.get(seg) + loc.abs_index());
 
-      _rlock.free_meta_node(_address);  //_session._sega._id_alloc.free_id(_address);
+      _rlock.free_meta_node(_address);  
       _rlock._session._sega._header->seg_meta[ploc.segment()].free_object(
           obj_ptr->object_capacity());
-      return true;
+      return result;
    }
 
 }  // namespace arbtrie

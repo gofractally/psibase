@@ -19,13 +19,13 @@ namespace arbtrie {
    static_assert( sizeof(id_region) == 2 );
 
    struct id_index {
-      constexpr id_index( uint32_t r = 0 ):index(r),dirty(0){}
-      uint32_t index:23;
-      uint32_t dirty:1;
+      constexpr id_index( uint32_t r = 0 ):index(r){}
+      //uint32_t index:24;
+      uint16_t index;
       operator bool()const { return index; }
       friend bool operator == ( id_index a, id_index b ) { return a.index == b.index; };
    } __attribute__((packed)) __attribute__((aligned(1)));
-   static_assert( sizeof(id_index) == 3 );
+   static_assert( sizeof(id_index) == 2 );
 
    struct id_address {
       constexpr id_address() = default;
@@ -115,7 +115,7 @@ namespace arbtrie {
    } __attribute__((packed)) __attribute__((aligned(1)));
    static_assert(sizeof(object_id) == 5, "unexpected padding");
    static_assert(alignof(object_id) == 1, "unexpected alignment");
-   static_assert( sizeof(id_address) == sizeof(object_id) );
+   //static_assert( sizeof(id_address) == sizeof(object_id) );
 
    constexpr inline id_address::id_address( object_id oid ) {
       auto i = oid.to_int();

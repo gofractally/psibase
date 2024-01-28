@@ -109,6 +109,6 @@ namespace arbtrie
          return key_view((const char*)start_prefix(), prefix_size());
       }
    } __attribute__((packed));
-   static_assert(sizeof(inner_node<void>) == 29);
+   static_assert(sizeof(inner_node<void>) == 28);
 
 }  // namespace arbtrie

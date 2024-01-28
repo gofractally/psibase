@@ -2,6 +2,7 @@ enable_testing()
 
 if(DEFINED IS_NATIVE)
   add_subdirectory(triedent)
+  add_subdirectory(arbtrie)
 endif()
 
 add_subdirectory(psio)

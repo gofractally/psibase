@@ -282,6 +282,7 @@ namespace arbtrie
       _db._have_write_session = false;
    }
 
+   
    template <typename T>
    void release_node(object_ref<T>& r)
    {
@@ -289,8 +290,7 @@ namespace arbtrie
 
       auto release_id = [&](fast_meta_address b) { release_node(state.get(b)); };
 
-      auto n = r.header();
-      if (r.release())
+      if (auto n = r.release())
       {
          // if we don't know the type, dynamic dispatch
          if constexpr (std::is_same_v<T, node_header>)
@@ -299,63 +299,8 @@ namespace arbtrie
             n->visit_branches(release_id);
       }
    }
-
-   /*
-   template <typename T>
-   void release_node2(object_ref<T>& r)
-   {
-      auto& state = r.rlock();
-
-      //  auto release_id = [&](fast_meta_address b) { release_node(state.get(b)); };
-
-      auto n = r.header();
-      if (r.release())
-      {
-         switch (r.type())
-         {
-            case node_type::setlist:
-            {
-               auto*             sl  = (const setlist_node*)n;
-               auto*             ptr = sl->get_branch_ptr();
-               const auto* const end = ptr + sl->num_branches();
-               while (ptr != end)
-               {
-                  release_node(state.get(fast_meta_address(sl->branch_region(), *ptr)));
-                  ++ptr;
-               }
-               return;
-            }
-            case node_type::full:
-            {
-               auto* sl = (const full_node*)n;
-               for (auto& x : sl->_branches)
-                  if (x)
-                     release_node(state.get(fast_meta_address(sl->branch_region(), x)));
-               return;
-            }
-            case node_type::binary:
-            {
-               auto*      sl    = (const binary_node*)n;
-               auto       start = sl->key_offsets();
-               auto       pos   = start;
-               const auto end   = start + sl->num_branches();
-               while (pos != end)
-               {
-                  if (pos->type == binary_node::key_index::obj_id)
-                  {
-                     assert(sl->get_key_val_ptr_offset(pos->pos)->value_size() ==
-                            sizeof(object_id));
-                     release_node(state.get(
-                         fast_meta_address(sl->get_key_val_ptr_offset(pos->pos)->value_id())));
-                  }
-                  ++pos;
-               }
-               return;
-            }
-         }
-      }
-   }
-   */
+   
+   
 
    template <typename T>
    void release_node(object_ref<T>&& r)
