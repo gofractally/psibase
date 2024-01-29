@@ -196,8 +196,6 @@ fn to_dest_func(source_fid : FunctionId, source : &Module, dest : &mut Module ) 
 /// 
 /// Returns the id of the new sequence
 fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<InstrSeqId, anyhow::Error> {
-/// Returns the id of the new sequence
-fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<InstrSeqId, anyhow::Error> {
 
     // Get the instructions from the specified source block
     let instrs = source_function.block(source_block_id).instrs.iter().map(|(instr, _)|{instr});
