@@ -174,7 +174,10 @@ fn to_dest_func(source_fid : FunctionId, source : &Module, dest : &mut Module ) 
                 dest_fid
             } else {
                 // The import needs to be added to the dest. Update the called fid.
-                dest.add_import_func(module, name, source_func_ty.clone()).0
+                let ty = source.types.get(source_func_ty);
+                let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
+                let dest_type = dest.types.add(&params, &results);
+                dest.add_import_func(module, name, dest_type).0
             }
         },
         Local(_) => {
