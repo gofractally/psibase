@@ -294,7 +294,7 @@ namespace arbtrie
       {
          // if we don't know the type, dynamic dispatch
          if constexpr (std::is_same_v<T, node_header>)
-            cast_and_call(n, [&](const auto* ptr) { ptr->visit_branches(release_id); });
+            cast_and_call(r.type(), n, [&](const auto* ptr) { ptr->visit_branches(release_id); });
          else  // we already know the type, yay!
             n->visit_branches(release_id);
       }

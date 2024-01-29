@@ -28,9 +28,9 @@ namespace arbtrie {
 
    template <typename T>
       requires is_node_header<T>
-   inline auto cast_and_call(T* h, auto func)
+   inline auto cast_and_call(node_type t, T* h, auto&& func)
    {
-      switch (h->get_type())
+      switch (t)
       {
          // sparse internal nodes are assumed most likely, because only one
          // binary node is at the end of each traversal, the likely/unlikely
@@ -54,6 +54,13 @@ namespace arbtrie {
             assert( !"cast and call on unknown node type" );
             throw std::runtime_error("cast and call on unknown node type");
       }
+   }
+
+   template <typename T>
+      requires is_node_header<T>
+   inline auto cast_and_call(T* h, auto&& func)
+   {
+      return cast_and_call( h->get_type(), h, std::forward<decltype(func)>(func) );
    }
 
 

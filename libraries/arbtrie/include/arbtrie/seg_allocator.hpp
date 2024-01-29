@@ -175,7 +175,7 @@ namespace arbtrie
       ~seg_allocator();
 
       void dump();
-      void print_region_stats(){ _id_alloc.print_region_stats(); }
+      void print_region_stats() { _id_alloc.print_region_stats(); }
       void sync(sync_type st = sync_type::sync);
       void start_compact_thread();
       void stop_compact_thread();
@@ -210,9 +210,10 @@ namespace arbtrie
                // returned mutable T is only valid while modify lock is in scope
                template <typename T>
                T* as()
-               {  _observed_ptr = _rlock.get_node_pointer(_locked_val.loc());
+               {
+                  _observed_ptr = _rlock.get_node_pointer(_locked_val.loc());
                   assert(_locked_val.ref());
-                  assert( _observed_ptr->validate_checksum() );
+                  assert(_observed_ptr->validate_checksum());
                   return (T*)_observed_ptr;
                }
                template <typename T>
@@ -233,8 +234,9 @@ namespace arbtrie
                {
                   // TODO: check to see if checksum actually changed?
                   // to let us know if we are making empty changes
-                  if (_observed_ptr) [[likely]] {
-                     assert( _observed_ptr->validate_checksum() );
+                  if (_observed_ptr) [[likely]]
+                  {
+                     assert(_observed_ptr->validate_checksum());
                      //_observed_ptr->checksum = update_checksum();
                   }
                   else
@@ -263,23 +265,19 @@ namespace arbtrie
                }
 
                inline fast_meta_address address() const { return _address; }
-               inline uint32_t      ref() const { return _cached.ref(); }
-               inline node_type     type() const { return _cached.type(); }
-               inline node_location loc() const { return _cached.loc(); }
+               inline uint32_t          ref() const { return _cached.ref(); }
+               inline node_type         type() const { return _cached.type(); }
+               inline node_location     loc() const { return _cached.loc(); }
 
                // return false if ref count overflow
-               bool retain() { 
-                  return _meta.retain(); 
-               }
+               bool retain() { return _meta.retain(); }
 
                // return last value of pointer if object is deleted, so children can
                // be released... otherwise null
                const node_header* release();
 
                modify_lock modify() { return modify_lock(_meta, _rlock); }
-               bool        try_start_move(node_location loc) { 
-                  return _meta.try_start_move(loc); 
-               }
+               bool        try_start_move(node_location loc) { return _meta.try_start_move(loc); }
                auto        try_move(node_location expected_prior_loc, node_location move_to_loc)
                {
                   return _meta.try_move(expected_prior_loc, move_to_loc);
@@ -290,7 +288,7 @@ namespace arbtrie
                template <typename Type>
                const Type* as() const
                {
-                  assert( header()->validate_checksum() );
+                  assert(header()->validate_checksum());
                   assert(Type::type == header()->get_type());
                   return reinterpret_cast<const Type*>(header());
                };
@@ -307,7 +305,7 @@ namespace arbtrie
 
                //bool cache_object();
 
-               void refresh() { _cached = _meta.load( std::memory_order_acquire ); }
+               void refresh() { _cached = _meta.load(std::memory_order_acquire); }
 
                auto& rlock() { return _rlock; }
                auto& rlock() const { return _rlock; }
@@ -316,9 +314,7 @@ namespace arbtrie
 
                temp_meta_type meta_data() { return _cached; }
 
-               void prefetch() {
-                  __builtin_prefetch( &_meta, 1, 1 );
-               }
+               void            prefetch() { __builtin_prefetch(&_meta, 1, 1); }
                node_meta_type& meta() { return _meta; }
 
               protected:
@@ -339,7 +335,7 @@ namespace arbtrie
                seg_allocator::session::read_lock& _rlock;
                node_meta_type&                    _meta;
                temp_meta_type                     _cached;  // cached read of atomic _atom_loc
-               fast_meta_address _address;
+               fast_meta_address                  _address;
             };  // object_ref
 
             //template <typename T>
@@ -352,9 +348,9 @@ namespace arbtrie
                                           node_type type,
                                           auto      initfunc);
             object_ref<node_header> realloc(fast_meta_address reuse,
-                                            uint32_t   size,
-                                            node_type  type,
-                                            auto       initfunc);
+                                            uint32_t          size,
+                                            node_type         type,
+                                            auto              initfunc);
 
             /**
              * @defgroup Region Alloc Helpers
@@ -379,11 +375,11 @@ namespace arbtrie
             ~read_lock() { _session.release_read_lock(); }
 
             node_header* get_node_pointer(node_location);
+
            private:
             friend class session;
             template <typename T>
             friend class object_ref;
-
 
             read_lock(session& s) : _session(s) { _session.retain_read_lock(); }
             read_lock(const session&) = delete;
@@ -712,11 +708,13 @@ namespace arbtrie
    {
       //assert( _meta.load(std::memory_order_relaxed).ref() );
       auto r = (const T*)_rlock.get_node_pointer(_meta.load(std::memory_order_acquire).loc());
-      if constexpr ( debug_memory ) {
-         if( not r->validate_checksum() ) {
-            TRIEDENT_WARN( "checksum: ", r->checksum );
+      if constexpr (debug_memory)
+      {
+         if (not r->validate_checksum())
+         {
+            TRIEDENT_WARN("checksum: ", r->checksum);
          }
-         assert( r->validate_checksum() );
+         assert(r->validate_checksum());
       }
       return r;
    }
@@ -726,9 +724,9 @@ namespace arbtrie
 
    /// @pre refcount of id is 1
    inline object_ref<node_header> seg_allocator::session::read_lock::realloc(fast_meta_address adr,
-                                                                             uint32_t   size,
-                                                                             node_type  type,
-                                                                             auto       init)
+                                                                             uint32_t          size,
+                                                                             node_type         type,
+                                                                             auto              init)
    {
       auto oref    = get(adr);
       auto l       = oref.loc();
@@ -745,9 +743,27 @@ namespace arbtrie
       //auto& atom           = _session._sega._id_alloc.get(id);
       auto [loc, node_ptr] = _session.alloc_data(size, adr);
 
-      init(node_ptr);
+      if constexpr (debug_memory)
+      {
+         auto      seg_end = (char*)_session._sega._block_alloc.get(seg) + segment_size;
+         uint32_t* check   = (uint32_t*)(((char*)node_ptr) + size);
+         if ( loc.abs_index() + size < segment_size )
+         {
+            auto old = *check;
+            init(node_ptr);
+            assert(*check == 0 or
+                   *check == old or
+                   *check == 0xbaadbaad);
+         }
+         else
+            init(node_ptr);
+      }
+      else
+      {
+         init(node_ptr);
+      }
 
-      assert( node_ptr->validate_checksum() );
+      assert(node_ptr->validate_checksum());
       assert(node_ptr->_nsize == size);
       assert(node_ptr->_ntype == type);
       assert(node_ptr->_node_id == adr.to_int());
@@ -756,16 +772,9 @@ namespace arbtrie
       // increase while realloc and even if compactor moves the data from the
       // old location, the new data should take priority and this thread shouldn't
       // be holding the modify lock while realloc and
-
-      //  atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
-
-
       oref.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
                  std::memory_order_release);
       return oref;
-
-      //assert(object_ref(*this, id, atom).type() != node_type::undefined);
-      //return object_ref(*this, id, atom);
    }
 
    inline std::pair<node_meta_type&, fast_meta_address>
@@ -787,8 +796,28 @@ namespace arbtrie
       auto [loc, node_ptr] = _session.alloc_data(size, id);
       //TRIEDENT_WARN( "alloc id: ", id, " type: " , node_type_names[type], " loc: ", loc._offset, " size: ", size);
 
-      init(node_ptr);
-      assert( node_ptr->validate_checksum() );
+      //init(node_ptr);
+      if constexpr (debug_memory)
+      {
+         uint32_t* check   = (uint32_t*)(((char*)node_ptr) + size);
+         if ( loc.abs_index() + size  < segment_size )
+         {
+            auto old = *check;
+            init(node_ptr);
+            assert(*check == 0 or
+                   *check == old or
+                   *check == 0xbaadbaad);
+         }
+         else
+            init(node_ptr);
+      }
+      else
+      {
+         init(node_ptr);
+      }
+
+
+      assert(node_ptr->validate_checksum());
 
       auto tmp = temp_meta_type().set_type(type).set_location(loc).set_ref(1);
       //atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
@@ -817,9 +846,10 @@ namespace arbtrie
       if constexpr (debug_memory)
       {
          auto ap = segment->_alloc_pos.load(std::memory_order_relaxed);
-         if (not(ap == 0 or ap > loc.abs_index())) {
-            TRIEDENT_WARN( "ap: ", ap, "  loc: ", loc.aligned_index(), " abs: ", loc.abs_index(), 
-                           "loc.segment: ", loc.segment() );
+         if (not(ap == 0 or ap > loc.abs_index()))
+         {
+            TRIEDENT_WARN("ap: ", ap, "  loc: ", loc.aligned_index(), " abs: ", loc.abs_index(),
+                          "loc.segment: ", loc.segment());
             abort();
          }
       }
@@ -842,20 +872,20 @@ namespace arbtrie
    template <typename T>
    const node_header* seg_allocator::session::read_lock::object_ref<T>::release()
    {
-//      TRIEDENT_DEBUG( "  ", address(), "  ref: ", ref(), " type: ", node_type_names[type()] );
+      //      TRIEDENT_DEBUG( "  ", address(), "  ref: ", ref(), " type: ", node_type_names[type()] );
       auto prior = _meta.release();
       if (prior.ref() > 1)
          return nullptr;
 
       auto result = _rlock.get_node_pointer(prior.loc());
 
- //     TRIEDENT_DEBUG( "  free ", address() );
+      //     TRIEDENT_DEBUG( "  free ", address() );
 
       auto ploc    = prior.loc();
       auto obj_ptr = _rlock.get_node_pointer(ploc);
       //    (node_header*)((char*)_rlock._session._sega._block_alloc.get(seg) + loc.abs_index());
 
-      _rlock.free_meta_node(_address);  
+      _rlock.free_meta_node(_address);
       _rlock._session._sega._header->seg_meta[ploc.segment()].free_object(
           obj_ptr->object_capacity());
       return result;

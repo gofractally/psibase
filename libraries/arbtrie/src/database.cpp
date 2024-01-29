@@ -517,6 +517,7 @@ namespace arbtrie
 
          if (has_eof_value) [[unlikely]]
          {
+            TRIEDENT_DEBUG( "set value of setlist" );
             if (root->is_obj_id(0))
                sl->set_eof( root->get_key_val_ptr(0) ->value_id());  
             else
@@ -535,6 +536,7 @@ namespace arbtrie
             auto new_child = clone_binary_range(sl->branch_region(), r, root,
                                                 k.substr(0, cpre.size() + 1), from, to);
             from           = to;
+            assert( slidx < nbranch );
             sl->set_index(slidx++, byte, new_child);
          }
          assert(sl->validate());

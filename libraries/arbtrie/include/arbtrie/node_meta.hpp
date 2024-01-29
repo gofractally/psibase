@@ -241,13 +241,13 @@ namespace arbtrie
       // returns the state prior to start modify
       temp_type start_modify()
       {
-         do
-         {
-            temp_type prior(_meta.fetch_and(~const_mask, std::memory_order_acquire));
-            if (not prior.is_copying())
-               return prior;
-            _meta.wait(prior.to_int() & ~const_mask);
-         } while (true);
+         do {
+            uint64_t prior = _meta.fetch_and( ~const_mask, std::memory_order_acquire );
+            if (not (prior & copy_mask) )
+               return temp_type(prior);
+
+            _meta.wait(prior & ~const_mask);
+         } while( true );
       }
 
       temp_type end_modify()
@@ -259,10 +259,16 @@ namespace arbtrie
          // if a copy was started between start_modify() and end_modify() then
          // the copy bit would be set and the other thread will be waiting
          if (prior.is_copying())
-         {
             _meta.notify_all();
-         }
+
          return prior;
+      }
+
+      bool end_move() {
+         auto prior = _meta.fetch_and(~copy_mask, std::memory_order_release);
+         if( not (prior & const_mask) )
+            _meta.notify_all();
+         return false;
       }
 
       /**
@@ -270,36 +276,22 @@ namespace arbtrie
        */
       bool try_start_move(node_location expected)
       {
-         do
-         {
-            temp_type cur = _meta.load(std::memory_order_relaxed);
-            if (not cur.ref() or cur.loc() != expected) [[unlikely]]
-               return false;
+         do {
+            uint64_t prior = _meta.load( std::memory_order_relaxed );
+            do {
+               temp_type meta(prior);
 
-            // set the copy bit to 1
-            // acquire because if successful, we need the latest writes to the object
-            // we are trying to move
-            temp_type old(_meta.fetch_or(copy_mask, std::memory_order_acquire));
+               if( not meta.ref() or meta.loc() != expected ) [[unlikely]] 
+                  return end_move();
 
-            if (not old.ref() or old.loc() != expected) [[unlikely]]
-            {  // object we are trying to copy has moved or been freed, return false after releasing
-               // lock and notify the other thread if it was waiting on us
-               auto prior = _meta.fetch_and(~copy_mask, std::memory_order_relaxed);
-               if (not(prior & const_mask)) [[unlikely]]
-               {
-                  TRIEDENT_WARN("notify modify thread after copy failed");
-                  _meta.notify_all();
-               }
-               return false;
-            }
+            } while( not _meta.compare_exchange_weak( prior, prior | copy_mask, 
+                                                  std::memory_order_acquire ) );
 
-            if (not old.is_changing()) [[likely]]
+            if( not temp_type(prior).is_changing() ) 
                return true;
 
-            // exepcted current value is old|copy because the last fetch_or,
-            // this will wait until the value has changed
-            _meta.wait(old.to_int() | copy_mask, std::memory_order_acquire);
-         } while (true);
+            _meta.wait( prior, std::memory_order_relaxed );
+         } while ( true );
       }
 
       enum move_result : int_fast8_t
@@ -318,34 +310,28 @@ namespace arbtrie
        */
       move_result try_move(node_location expect_loc, node_location new_loc)
       {
-         uint64_t expected = _meta.fetch_and(~copy_mask, std::memory_order_relaxed);
-         //assert(expected & copy_mask);
-
-         auto notify = [&]()
-         {
-            if (not(expected & const_mask)) [[unlikely]]
-               _meta.notify_all();
-         };
-
+         uint64_t expected = _meta.load( std::memory_order_relaxed );
          temp_type ex;
          do
          {
             ex = temp_type(expected);
             if (ex.loc() != expect_loc) [[unlikely]]
             {
-               notify();
+               end_move();
                return move_result::moved;
             }
             if (ex.ref() == 0) [[unlikely]]
             {
-               notify();
+               end_move();
                return move_result::freed;
             }
             ex.set_location(new_loc).clear_copy_flag();
          } while (
              not _meta.compare_exchange_weak(expected, ex.to_int(), std::memory_order_release));
 
-         notify();
+         if( not (expected & const_mask ) ) [[unlikely]]
+            _meta.notify_all();
+
          return move_result::success;
       }
 

@@ -82,6 +82,7 @@ namespace arbtrie
       {
          assert(idx < _num_branches);
          assert(adr.region == branch_region());
+         assert( (char*)(get_branch_ptr()+idx) < tail() );
          get_branch_ptr()[idx]  = adr.index;
          get_setlist_ptr()[idx] = byte;
       }
