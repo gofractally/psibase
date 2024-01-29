@@ -297,6 +297,26 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
                 dest_seq.instr(i);
             }
 
+            // Local reference updates
+            Instr::LocalGet(local_ref) => {
+                let mut i = local_ref.clone();
+                let ty = source.locals.get(local_ref.local).ty();
+                i.local = dest.locals.add(ty);
+                dest_seq.instr(i);
+            }
+            Instr::LocalSet(local_ref) => {
+                let mut i = local_ref.clone();
+                let ty = source.locals.get(local_ref.local).ty();
+                i.local = dest.locals.add(ty);
+                dest_seq.instr(i);
+            }
+            Instr::LocalTee(local_ref) => {
+                let mut i = local_ref.clone();
+                let ty = source.locals.get(local_ref.local).ty();
+                i.local = dest.locals.add(ty);
+                dest_seq.instr(i);
+            }
+
             // Invalid instructions
             Instr::CallIndirect(_) => {
                 // Polyfill shouldn't be using indirect calls
@@ -356,9 +376,6 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
             Instr::BrTable(i) => {dest_seq.instr(i.clone());}
 
             // List every other instruction type, to enforce that new types are properly handled
-            Instr::LocalGet(i) => {dest_seq.instr(i.clone());}
-            Instr::LocalSet(i) => {dest_seq.instr(i.clone());}
-            Instr::LocalTee(i) => {dest_seq.instr(i.clone());}
             Instr::Const(i) => {dest_seq.instr(i.clone());}
             Instr::Binop(i) => {dest_seq.instr(i.clone());}
             Instr::Unop(i) => {dest_seq.instr(i.clone());}
