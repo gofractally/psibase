@@ -154,7 +154,7 @@ fn get_import_fid(function_module : &str, name : &str, wasm_module : &Module) ->
 
 /// Get the corresponding FunctionID in the `dest` module for a given FunctionID from the `source`
 /// module. If the function does not exist in the `dest` module, it will be added.
-fn provide_dest_fid(source_fid : FunctionId, source : &Module, dest : &mut Module ) -> Result<FunctionId, anyhow::Error> {
+fn to_dest_func(source_fid : FunctionId, source : &Module, dest : &mut Module ) -> Result<FunctionId, anyhow::Error> {
 
     let f = source.funcs.get(source_fid);
     let (source_func_kind, source_func_ty) = (&f.kind, f.ty());
@@ -167,6 +167,7 @@ fn provide_dest_fid(source_fid : FunctionId, source : &Module, dest : &mut Modul
             let dest_fid_opt = get_import_fid(module, name, &dest)?;
 
             if let Some(dest_fid) = dest_fid_opt {
+                // The import already exists in the dest
                 if dest.func_type(dest_fid) != source.func_type(source_fid) {
                     return Err(anyhow!("Type mismatch between imports"));
                 }
@@ -189,7 +190,11 @@ fn provide_dest_fid(source_fid : FunctionId, source : &Module, dest : &mut Modul
 
 /// Copies one instruction sequence from a function in a `source` module to a sequence 
 /// in a `dest` module.
-fn provide_dest_seq_id(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<InstrSeqId, anyhow::Error> {
+/// 
+/// Returns the id of the new sequence
+fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<InstrSeqId, anyhow::Error> {
+/// Returns the id of the new sequence
+fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<InstrSeqId, anyhow::Error> {
 
     // Get the instructions from the specified source block
     let instrs = source_function.block(source_block_id).instrs.iter().map(|(instr, _)|{instr});
@@ -202,34 +207,34 @@ fn provide_dest_seq_id(source_block_id : InstrSeqId, source_function : &LocalFun
         match instr {
             Instr::RefFunc(ref_func_ins ) => {
                 let mut i = ref_func_ins.clone();
-                i.func = provide_dest_fid(i.func, source, dest)?;
+                i.func = to_dest_func(i.func, source, dest)?;
                 dest_seq.instr(i);
             }
             Instr::Call(call_ins) => {
                 let mut i = call_ins.clone();
-                i.func = provide_dest_fid(i.func, source, dest)?;
+                i.func = to_dest_func(i.func, source, dest)?;
                 dest_seq.instr(i);
             }
             
             Instr::Block(block_ins) => {
                 let mut i = block_ins.clone();
                 let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
-                i.seq = provide_dest_seq_id(i.seq, source_function, source, &mut new_dest_sequence, dest)?;
+                i.seq = to_dest_seq(i.seq, source_function, source, &mut new_dest_sequence, dest)?;
                 dest_seq.instr(i);
             }
             Instr::Loop(loop_ins) => {
                 let mut i = loop_ins.clone();
                 let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
-                i.seq = provide_dest_seq_id( i.seq, source_function, source, &mut new_dest_sequence, dest)?;
+                i.seq = to_dest_seq( i.seq, source_function, source, &mut new_dest_sequence, dest)?;
                 dest_seq.instr(i);
             }
             Instr::IfElse(if_else_ins) => {
                 let mut i = if_else_ins.clone();
                 let mut new_dest_seq_1 = dest_seq.dangling_instr_seq(None);
-                i.consequent = provide_dest_seq_id(i.consequent, source_function, source, &mut new_dest_seq_1, dest)?;
+                i.consequent = to_dest_seq(i.consequent, source_function, source, &mut new_dest_seq_1, dest)?;
 
                 let mut new_dest_seq_2 = dest_seq.dangling_instr_seq(None);
-                i.alternative = provide_dest_seq_id(i.alternative, source_function, source, &mut new_dest_seq_2, dest)?;
+                i.alternative = to_dest_seq(i.alternative, source_function, source, &mut new_dest_seq_2, dest)?;
 
                 dest_seq.instr(i);
             }
@@ -341,7 +346,7 @@ fn provide_dest_seq_id(source_block_id : InstrSeqId, source_function : &LocalFun
                 return Err(anyhow!("Error: Polyfill module has unsupported instruction: ElemDrop"));
             }
 
-            // Branch sequences shouldn't need any updates:
+            // Branch sequences shouldn't need updates since they use relative indices:
             // "Labels are targets for branch instructions that reference them with label indices. 
             // Unlike with other index spaces, indexing of labels is relative by nesting depth..."
             // https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions
@@ -385,7 +390,7 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
         _ => return Err(anyhow!("Requested local function not found"))
     };
 
-    // Build the new local function with the correct signature
+    // Build the new local function in `dest` with the correct signature
     let tid = source_local_func.ty();
     let ty = source.types.get(tid);
     let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
@@ -395,7 +400,7 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
     // the new `dest` instruction sequence. 
     let instr_seq_id = source_local_func.entry_block();
     let dest_instr_builder = &mut builder.func_body();
-    provide_dest_seq_id(instr_seq_id, &source_local_func, source, dest_instr_builder, dest)?;
+    to_dest_seq(instr_seq_id, &source_local_func, source, dest_instr_builder, dest)?;
 
     // Make the new local function
     let args = params
