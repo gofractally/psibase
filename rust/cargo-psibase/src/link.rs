@@ -154,7 +154,7 @@ fn get_import_fid(function_module : &str, name : &str, wasm_module : &Module) ->
 
 /// Get the corresponding FunctionID in the `dest` module for a given FunctionID from the `source`
 /// module. If the function does not exist in the `dest` module, it will be added.
-fn get_dest_fid(source_fid : FunctionId, source : &Module, dest : &mut Module ) -> Result<FunctionId, anyhow::Error> {
+fn provide_dest_fid(source_fid : FunctionId, source : &Module, dest : &mut Module ) -> Result<FunctionId, anyhow::Error> {
 
     let f = source.funcs.get(source_fid);
     let (source_func_kind, source_func_ty) = (&f.kind, f.ty());
@@ -187,14 +187,14 @@ fn get_dest_fid(source_fid : FunctionId, source : &Module, dest : &mut Module ) 
     Ok(new_fid)
 }
 
-
-
 /// Copies one instruction sequence from a function in a `source` module to a sequence 
 /// in a `dest` module.
-fn copy_instr_block(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<(), anyhow::Error> {
+fn provide_dest_seq_id(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<InstrSeqId, anyhow::Error> {
 
     // Get the instructions from the specified source block
     let instrs = source_function.block(source_block_id).instrs.iter().map(|(instr, _)|{instr});
+
+    let dest_mem_id = dest.get_memory_id()?;
 
     // Map each source instruction to an instruction injected into the new target sequence
     for instr in instrs {
@@ -202,98 +202,175 @@ fn copy_instr_block(source_block_id : InstrSeqId, source_function : &LocalFuncti
         match instr {
             Instr::RefFunc(ref_func_ins ) => {
                 let mut i = ref_func_ins.clone();
-                i.func = get_dest_fid(i.func, source, dest)?;
+                i.func = provide_dest_fid(i.func, source, dest)?;
                 dest_seq.instr(i);
             }
             Instr::Call(call_ins) => {
                 let mut i = call_ins.clone();
-                i.func = get_dest_fid(i.func, source, dest)?;
+                i.func = provide_dest_fid(i.func, source, dest)?;
                 dest_seq.instr(i);
             }
             
             Instr::Block(block_ins) => {
                 let mut i = block_ins.clone();
                 let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
-                copy_instr_block(i.seq, source_function, source, &mut new_dest_sequence, dest)?;
-                i.seq = new_dest_sequence.id();
+                i.seq = provide_dest_seq_id(i.seq, source_function, source, &mut new_dest_sequence, dest)?;
                 dest_seq.instr(i);
             }
             Instr::Loop(loop_ins) => {
                 let mut i = loop_ins.clone();
                 let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
-                copy_instr_block( i.seq, source_function, source, &mut new_dest_sequence, dest)?;
-                i.seq = new_dest_sequence.id();
+                i.seq = provide_dest_seq_id( i.seq, source_function, source, &mut new_dest_sequence, dest)?;
                 dest_seq.instr(i);
             }
             Instr::IfElse(if_else_ins) => {
                 let mut i = if_else_ins.clone();
                 let mut new_dest_seq_1 = dest_seq.dangling_instr_seq(None);
-                copy_instr_block(i.consequent, source_function, source, &mut new_dest_seq_1, dest)?;
-                i.consequent = new_dest_seq_1.id();
+                i.consequent = provide_dest_seq_id(i.consequent, source_function, source, &mut new_dest_seq_1, dest)?;
 
                 let mut new_dest_seq_2 = dest_seq.dangling_instr_seq(None);
-                copy_instr_block(i.alternative, source_function, source, &mut new_dest_seq_2, dest)?;
-                i.alternative = new_dest_seq_2.id();
-                
+                i.alternative = provide_dest_seq_id(i.alternative, source_function, source, &mut new_dest_seq_2, dest)?;
+
+                dest_seq.instr(i);
+            }
+
+            // Memory reference updates
+            Instr::MemorySize(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::MemoryGrow(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::MemoryInit(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::MemoryFill(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::Load(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::Store(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::AtomicRmw(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::Cmpxchg(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::AtomicNotify(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::AtomicWait(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
+                dest_seq.instr(i);
+            }
+            Instr::LoadSimd(mem_ref) => {
+                let mut i = mem_ref.clone();
+                i.memory = dest_mem_id;
                 dest_seq.instr(i);
             }
 
             // Invalid instructions
             Instr::CallIndirect(_) => {
-                return Err(anyhow!("Error: Polyfill module has invalid instruction: Indirect call"));
+                // Polyfill shouldn't be using indirect calls
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: Indirect call"));
             }
             Instr::GlobalGet(_) => {
-                return Err(anyhow!("Error: Polyfill module has invalid instruction: Get global"));
+                // Polyfill shouldn't be referencing globals
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: Get global"));
             }
             Instr::GlobalSet(_) => {
-                return Err(anyhow!("Error: Polyfill module has invalid instruction: Set global"));
+                // Polyfill shouldn't be referencing globals
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: Set global"));
+            }
+            Instr::MemoryCopy(_) => {
+                // Unsure how to handle copying memory
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: Memory copy"));
+            }
+            Instr::TableGet(_) => {
+                // Polyfill not allowed to have a tables section
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableGet"));
+            }
+            Instr::TableSet(_) => {
+                // Polyfill not allowed to have a tables section
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableSet"));
+            }
+            Instr::TableGrow(_) => {
+                // Polyfill not allowed to have a tables section
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableGrow"));
+            }
+            Instr::TableSize(_) => {
+                // Polyfill not allowed to have a tables section
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableSize"));
+            }
+            Instr::TableFill(_) => {
+                // Polyfill not allowed to have a tables section
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableFill"));
+            }
+            Instr::TableInit(_) => {
+                // Polyfill not allowed to have a tables section
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableInit"));
+            }
+            Instr::TableCopy(_) => {
+                // Polyfill not allowed to have a tables section
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableCopy"));
+            }
+            Instr::ElemDrop(_) => {
+                // Polyfill not allowed to have an elements section
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: ElemDrop"));
             }
 
-            // List every other option, to enforce that new instructions are properly handled
-            Instr::LocalGet(i)           => {dest_seq.instr(i.clone());}
-            Instr::LocalSet(i)           => {dest_seq.instr(i.clone());}
-            Instr::LocalTee(i)           => {dest_seq.instr(i.clone());}
-            Instr::Const(i)                 => {dest_seq.instr(i.clone());}
-            Instr::Binop(i)                 => {dest_seq.instr(i.clone());}
-            Instr::Unop(i)                   => {dest_seq.instr(i.clone());}
-            Instr::Select(i)               => {dest_seq.instr(i.clone());}
-            Instr::Unreachable(i)     => {dest_seq.instr(i.clone());}
-            Instr::Br(i)                       => {dest_seq.instr(i.clone());}
-            Instr::BrIf(i)                   => {dest_seq.instr(i.clone());}
-            Instr::BrTable(i)             => {dest_seq.instr(i.clone());}
-            Instr::Drop(i)                   => {dest_seq.instr(i.clone());}
-            Instr::Return(i)               => {dest_seq.instr(i.clone());}
-            Instr::MemorySize(i)       => {dest_seq.instr(i.clone());}
-            Instr::MemoryGrow(i)       => {dest_seq.instr(i.clone());}
-            Instr::MemoryInit(i)       => {dest_seq.instr(i.clone());}
-            Instr::DataDrop(i)           => {dest_seq.instr(i.clone());}
-            Instr::MemoryCopy(i)       => {dest_seq.instr(i.clone());}
-            Instr::MemoryFill(i)       => {dest_seq.instr(i.clone());}
-            Instr::Load(i)                   => {dest_seq.instr(i.clone());}
-            Instr::Store(i)                 => {dest_seq.instr(i.clone());}
-            Instr::AtomicRmw(i)         => {dest_seq.instr(i.clone());}
-            Instr::Cmpxchg(i)             => {dest_seq.instr(i.clone());}
-            Instr::AtomicNotify(i)   => {dest_seq.instr(i.clone());}
-            Instr::AtomicWait(i)       => {dest_seq.instr(i.clone());}
-            Instr::AtomicFence(i)     => {dest_seq.instr(i.clone());}
-            Instr::TableGet(i)           => {dest_seq.instr(i.clone());}
-            Instr::TableSet(i)           => {dest_seq.instr(i.clone());}
-            Instr::TableGrow(i)         => {dest_seq.instr(i.clone());}
-            Instr::TableSize(i)         => {dest_seq.instr(i.clone());}
-            Instr::TableFill(i)         => {dest_seq.instr(i.clone());}
-            Instr::RefNull(i)             => {dest_seq.instr(i.clone());}
-            Instr::RefIsNull(i)         => {dest_seq.instr(i.clone());}
+            // Branch sequences shouldn't need any updates:
+            // "Labels are targets for branch instructions that reference them with label indices. 
+            // Unlike with other index spaces, indexing of labels is relative by nesting depth..."
+            // https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions
+            Instr::Br(i) => {dest_seq.instr(i.clone());}
+            Instr::BrIf(i) => {dest_seq.instr(i.clone());}
+            Instr::BrTable(i) => {dest_seq.instr(i.clone());}
+
+            // List every other instruction type, to enforce that new types are properly handled
+            Instr::LocalGet(i) => {dest_seq.instr(i.clone());}
+            Instr::LocalSet(i) => {dest_seq.instr(i.clone());}
+            Instr::LocalTee(i) => {dest_seq.instr(i.clone());}
+            Instr::Const(i) => {dest_seq.instr(i.clone());}
+            Instr::Binop(i) => {dest_seq.instr(i.clone());}
+            Instr::Unop(i) => {dest_seq.instr(i.clone());}
+            Instr::Select(i) => {dest_seq.instr(i.clone());}
+            Instr::Unreachable(i) => {dest_seq.instr(i.clone());}
+            Instr::Drop(i) => {dest_seq.instr(i.clone());}
+            Instr::Return(i) => {dest_seq.instr(i.clone());}
+            Instr::DataDrop(i) => {dest_seq.instr(i.clone());}
+            Instr::AtomicFence(i) => {dest_seq.instr(i.clone());}
+            Instr::RefNull(i) => {dest_seq.instr(i.clone());}
+            Instr::RefIsNull(i) => {dest_seq.instr(i.clone());}
             Instr::V128Bitselect(i) => {dest_seq.instr(i.clone());}
-            Instr::I8x16Swizzle(i)   => {dest_seq.instr(i.clone());}
-            Instr::I8x16Shuffle(i)   => {dest_seq.instr(i.clone());}
-            Instr::LoadSimd(i)           => {dest_seq.instr(i.clone());}
-            Instr::TableInit(i)         => {dest_seq.instr(i.clone());}
-            Instr::ElemDrop(i)           => {dest_seq.instr(i.clone());}
-            Instr::TableCopy(i)         => {dest_seq.instr(i.clone());}
+            Instr::I8x16Swizzle(i) => {dest_seq.instr(i.clone());}
+            Instr::I8x16Shuffle(i) => {dest_seq.instr(i.clone());}
         }
     }
 
-    Ok(())
+    Ok(dest_seq.id())
 }
 
 
@@ -314,10 +391,11 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
     let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
     let mut builder = walrus::FunctionBuilder::new(&mut dest.types, &params, &results);
 
-    // Copy the first sequence of instructions in a function from a `source` module into the 
+    // Copy the sequence of instructions in a function from a `source` module into 
+    // the new `dest` instruction sequence. 
     let instr_seq_id = source_local_func.entry_block();
     let dest_instr_builder = &mut builder.func_body();
-    copy_instr_block(instr_seq_id, &source_local_func, source, dest_instr_builder, dest)?;
+    provide_dest_seq_id(instr_seq_id, &source_local_func, source, dest_instr_builder, dest)?;
 
     // Make the new local function
     let args = params
@@ -335,6 +413,8 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
 pub fn link(source: &[u8], dest: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
     let source_module = Module::from_buffer(source)?;
     let mut dest_module = Module::from_buffer(dest)?;
+    
+    walrus::passes::gc::run(&mut dest_module);
 
     validate_polyfill(&source_module)?;
     validate_fill_target(&dest_module)?;
