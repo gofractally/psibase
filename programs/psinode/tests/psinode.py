@@ -431,15 +431,13 @@ class Node(API):
         else:
             return self.disconnect(other.socketpath) or other.disconnect(self.socketpath)
 
-    def boot(self, producer=None):
+    def boot(self, producer=None, packages=[]):
         '''boots the chain. If a producer is not specified, uses the name of this node'''
-        self._find_psibase()
         if producer is None:
             producer = self.producer
         if producer is None:
             raise RuntimeError("Producer required for boot")
-        args = ['-p', producer]
-        subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath, 'boot'] + args)
+        self.run_psibase(['boot', '-p', producer] + packages)
         now = time.time_ns() // 1000000000
         def isbooted(node):
             try:
@@ -450,6 +448,9 @@ class Node(API):
                 return False
             return node.get_producers() == ([producer],[])
         self.wait(isbooted)
+    def run_psibase(self, args):
+        self._find_psibase()
+        subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath] + args)
     def log(self):
         return open(self.logpath, 'r')
     def print_log(self):
