@@ -5,8 +5,8 @@
 
 #include <utility>
 
-//#undef NDEBUG
-//#include <assert.h>
+#undef NDEBUG
+#include <assert.h>
 
 namespace arbtrie
 {
@@ -287,6 +287,11 @@ namespace arbtrie
 
       return 0;
    }
+   int write_session::remove(node_handle& r, key_view key ) {
+      auto state = _segas.lock();
+      r.give(update(state, r.take(), key, value_type::remove()));
+      return 0;
+   }
 
    fast_meta_address write_session::upsert(session_rlock&    state,
                                    fast_meta_address root,
@@ -315,6 +320,14 @@ namespace arbtrie
          throw std::runtime_error("cannot update key that doesn't exist");
       return upsert<upsert_mode::unique_update>(state.get(root), key, val);
    }
+   fast_meta_address write_session::remove( session_rlock& state,
+                                            fast_meta_address root,
+                                            key_view key ) {
+      if (not root) [[unlikely]]
+         throw std::runtime_error("cannot remove key that doesn't exist");
+      return upsert<upsert_mode::unique_remove>( state.get(root), key, value_type::remove() );
+   }
+
 
    template <upsert_mode mode, typename NodeType>
    fast_meta_address write_session::upsert(object_ref<NodeType>&& root, key_view key, const value_type& val)
@@ -458,34 +471,39 @@ namespace arbtrie
          freq_table[f]++;
       }
 
+      auto bregion = r.rlock().get_new_region();
+      fast_meta_address eof_val;
+      if( has_eof_value ) [[unlikely]]
+         eof_val  = root->is_obj_id(0)? root->get_key_val_ptr(0)->value_id() 
+                                             : make_value( bregion, r.rlock(), root->get_key_val_ptr(0)->value());
+
+      std::pair<uint8_t,int> branches[nbranch-has_eof_value];
+      auto* next_branch = branches;
+      for (int from = has_eof_value; from < numb;)
+      {
+         const auto    k    = root->get_key(from);
+         const uint8_t byte = k[cpre.size()];
+         const int     to   = from + freq_table[byte];
+
+         auto new_child = clone_binary_range(bregion, r, root,
+                                             k.substr(0, cpre.size() + 1), from, to);
+         from           = to;
+
+         assert( next_branch < branches+nbranch );
+         *next_branch = { byte, new_child.index };
+         ++next_branch;
+         //fn->add_branch(uint16_t(byte) + 1, new_child);
+      }
+
       if (nbranch > 128)
       {
     //     TRIEDENT_WARN("REFACTOR TO FULL");
          auto init_full = [&](full_node* fn)
          {
-            auto bregion = r.rlock().get_new_region();
             fn->set_branch_region(bregion);
-
-            if (has_eof_value) [[unlikely]]
-            {
-               if (root->is_obj_id(0))
-                  fn->add_branch(0, root->get_key_val_ptr(0)->value_id());
-               else
-                  fn->add_branch(0,
-                                 make_value(bregion, r.rlock(), root->get_key_val_ptr(0)->value()));
-            }
-
-            for (int from = has_eof_value; from < numb;)
-            {
-               const auto    k    = root->get_key(from);
-               const uint8_t byte = k[cpre.size()];
-               const int     to   = from + freq_table[byte];
-
-               auto new_child = clone_binary_range(fn->branch_region(), r, root,
-                                                   k.substr(0, cpre.size() + 1), from, to);
-               from           = to;
-               fn->add_branch(uint16_t(byte) + 1, new_child);
-            }
+            fn->set_eof( eof_val );
+            for( auto& p : branches )
+               fn->add_branch( branch_index_type(p.first)+1, fast_meta_address(bregion,p.second) );
          };
          if constexpr (mode.is_unique())
          {
@@ -499,46 +517,23 @@ namespace arbtrie
          }
       }
 
-      // if unique, we can reuse r's id and avoid updating the parent!
-      /*
-      for( int i = 0; i < root->num_branches(); ++i ) {
-         auto kvp = root->get_key_val_ptr(i);
-         TRIEDENT_DEBUG( i, "]  key'", kvp->key(), "' == vid: ", kvp->value_id() );
-      }
-      */
-
       auto init_setlist = [&](setlist_node* sl)
       {
    //      TRIEDENT_WARN("REFACTOR TO SETLIST");
-         sl->set_branch_region(r.rlock().get_new_region());
+         sl->set_branch_region(bregion);
          assert(sl->_num_branches == 0);
-         assert(sl->branch_capacity() >= nbranch);
-         sl->_num_branches = nbranch;
+         assert(sl->branch_capacity() >= nbranch-has_eof_value);
 
-         if (has_eof_value) [[unlikely]]
-         {
-            TRIEDENT_DEBUG( "set value of setlist" );
-            if (root->is_obj_id(0))
-               sl->set_eof( root->get_key_val_ptr(0) ->value_id());  
-            else
-               sl->set_eof(
-                   make_value(sl->branch_region(), r.rlock(), root->get_key_val_ptr(0)->value()));
+         // TODO: nbranch should not count EOF
+         sl->_num_branches = nbranch-has_eof_value;
+         sl->set_eof( eof_val );
+
+         int nb = sl->_num_branches;
+         for( int i = 0; i < nb; ++i ) {
+            sl->set_index(i, branches[i].first, fast_meta_address(bregion,branches[i].second) );
          }
+         assert( sl->get_setlist_size() == nb );
 
-         int slidx = 0;
-         for (int from = has_eof_value; from < numb;)
-         {
-            const auto    k    = root->get_key(from);
-            const uint8_t byte = k[cpre.size()];
-            const int     to   = from + freq_table[byte];
-            assert(to <= root->num_branches());
-
-            auto new_child = clone_binary_range(sl->branch_region(), r, root,
-                                                k.substr(0, cpre.size() + 1), from, to);
-            from           = to;
-            assert( slidx < nbranch );
-            sl->set_index(slidx++, byte, new_child);
-         }
          assert(sl->validate());
       };
 

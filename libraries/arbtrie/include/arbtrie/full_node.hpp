@@ -28,6 +28,7 @@ namespace arbtrie
           : inner_node<full_node>(asize, nid, src, cfg)
       {
          _prefix_capacity = asize - sizeof(inner_node<full_node>) - branch_count* sizeof(id_index);
+         assert( (char*)branches() + branch_count * sizeof(id_index) <= tail() );
          memcpy(branches(), src->branches(), branch_count* sizeof(id_index));
       }
 
@@ -35,6 +36,7 @@ namespace arbtrie
           : inner_node<full_node>(asize, nid, cfg, 0)
       {
          _prefix_capacity = asize - sizeof(inner_node<full_node>) - branch_count* sizeof(id_index);
+         assert( (char*)branches() + branch_count * sizeof(id_index) <= tail() );
          memset(branches(), 0, branch_count* sizeof(id_index));
       }
 

@@ -108,19 +108,27 @@ namespace arbtrie
       /// should align on a page boundary
       struct segment_header
       {
+
          // the next position to allocate data, only
          // used by the thread that owns this segment and
          // set to uint64_t max when this segment is ready
          // to be marked read only to the seg_allocator
-         std::atomic<uint32_t> _alloc_pos = 16;  // sizeof(segment_header)
+         std::atomic<uint32_t> _alloc_pos = 128;  // sizeof(segment_header)
          uint32_t              _age;  // every time a segment is allocated it is assigned an age
                                       // which aids in reconstruction
+                                      
+         std::mutex            _write_lock;
+
+         // TODO: make sure the header gets synced... perhaps move this
+         // to another parallel data structure so we don't waste 64 bytes
+         // and don't have to write 4kb just because 8 bytes changed.
+        
          // used to calculate object density of segment header,
          // to establish madvise
          uint32_t _num_objects = 0;  // inc on alloc
          uint32_t _checksum    = 0;  // TODO
       };
-      static_assert(sizeof(segment_header) == 16);
+      static_assert( sizeof(segment_header) <= 128 );
 
       struct allocator_header
       {
@@ -326,7 +334,7 @@ namespace arbtrie
                           node_meta_type&                    met)
                    : _rlock(rlock),
                      _meta(met),
-                     _cached(_meta.load(std::memory_order_acquire)),
+                     _cached(_meta.load(std::memory_order_relaxed)),
                      _address(adr)
                {
                   //    assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
@@ -501,7 +509,7 @@ namespace arbtrie
           */
          std::pair<node_location, node_header*> alloc_data(uint32_t size, fast_meta_address adr)
          {
-            assert(size < segment_size - 16);
+            assert(size < segment_size - round_up_multiple<64>(sizeof(mapped_memory::segment_header)));
             // A - if no segment get a new segment
             if (not _alloc_seg_ptr or _alloc_seg_ptr->_alloc_pos.load(std::memory_order_relaxed) >
                                           segment_size) [[unlikely]]
@@ -509,12 +517,15 @@ namespace arbtrie
                auto [num, ptr] = _sega.get_new_segment();
                _alloc_seg_num  = num;
                _alloc_seg_ptr  = ptr;
+               if( not _alloc_seg_ptr->_write_lock.try_lock() ) {
+                  TRIEDENT_WARN( "unable to get write lock on segment" );
+               }
                _sega._header->seg_meta[_alloc_seg_num]._last_sync_pos.store(
                    0, std::memory_order_relaxed);
             }
 
             auto* sh           = _alloc_seg_ptr;
-            auto  rounded_size = (size + 15) & -16;
+            auto  rounded_size = round_up_multiple<64>(size);
 
             auto cur_apos = sh->_alloc_pos.load(std::memory_order_relaxed);
 
@@ -531,6 +542,7 @@ namespace arbtrie
                }
                _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
                sh->_alloc_pos.store(uint32_t(-1), std::memory_order_release);
+               _alloc_seg_ptr->_write_lock.unlock();
                _alloc_seg_ptr = nullptr;
                _alloc_seg_num = -1ull;
 
@@ -687,6 +699,7 @@ namespace arbtrie
 
       mapping                          _header_file;
       mapped_memory::allocator_header* _header;
+      bool _in_alloc = false;
    };
 
    /*
@@ -706,13 +719,14 @@ namespace arbtrie
    template <typename T>
    inline const T* seg_allocator::session::read_lock::object_ref<T>::header() const
    {
-      //assert( _meta.load(std::memory_order_relaxed).ref() );
+      assert( _meta.load(std::memory_order_relaxed).ref() );
       auto r = (const T*)_rlock.get_node_pointer(_meta.load(std::memory_order_acquire).loc());
       if constexpr (debug_memory)
       {
          if (not r->validate_checksum())
          {
             TRIEDENT_WARN("checksum: ", r->checksum);
+            abort();
          }
          assert(r->validate_checksum());
       }
@@ -789,6 +803,11 @@ namespace arbtrie
                                                                            node_type type,
                                                                            auto      init)
    {
+      if constexpr ( debug_memory ) {
+         assert( not _session._sega._in_alloc );
+         _session._sega._in_alloc = true;
+      }
+
       assert(size >= sizeof(node_header));
       assert(type != node_type::undefined);
 
@@ -828,6 +847,11 @@ namespace arbtrie
       assert(node_ptr->_ntype == type);
       assert(node_ptr->_node_id == id.to_int());
       assert(object_ref(*this, id, atom).type() != node_type::undefined);
+
+      if constexpr( debug_memory )  {
+         _session._sega._in_alloc = false;
+      }
+   
       return object_ref(*this, id, atom);
    }
 

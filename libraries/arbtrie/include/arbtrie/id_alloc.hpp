@@ -153,6 +153,7 @@ namespace arbtrie
       //TRIEDENT_WARN( "num_pages: ", num_pages, "  region: ", r.region ," next alloc: ", na );
       if (na < num_pages * ids_per_page)
       {
+         // TODO: change to C & E 
          // then skip the free list, and grab a new one!
          auto nid = rhead.next_alloc.fetch_add(1, std::memory_order_relaxed);
 

@@ -21,13 +21,16 @@ namespace arbtrie
          insert        = 2,  // fail if key does exist
          update        = 4,  // fail if key doesn't exist
          same_region   = 8,
+         remove        = 16,
          upsert        = insert | update,
          unique_upsert = unique | upsert,
          unique_insert = unique | insert,
          unique_update = unique | update,
+         unique_remove = unique | remove,
          shared_upsert = shared | upsert,
          shared_insert = shared | insert,
-         shared_update = shared | update
+         shared_update = shared | update,
+         shared_remove = shared | remove
       };
 
       constexpr upsert_mode(upsert_mode::type t) : flags(t){};
@@ -136,14 +139,20 @@ namespace arbtrie
                                fast_meta_address root,
                                key_view          key,
                                const value_type& val);
+
       fast_meta_address insert(session_rlock&    state,
                                fast_meta_address root,
                                key_view          key,
                                const value_type& val);
+
       fast_meta_address update(session_rlock&    state,
                                fast_meta_address root,
                                key_view          key,
                                const value_type& val);
+
+      fast_meta_address remove(session_rlock& state,
+                               fast_meta_address root,
+                               key_view key );
 
      public:
       ~write_session();

@@ -74,7 +74,7 @@ namespace arbtrie {
    // each thread will have a segment this size, so larger values
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
-   static constexpr const uint64_t segment_size = 8*MB;
+   static constexpr const uint64_t segment_size = 64*MB;
                                                             
    // the maximum value a node may have
    static constexpr const uint64_t max_value_size = segment_size / 2;

@@ -369,7 +369,7 @@ int  main(int argc, char** argv)
    std::vector<std::string> v;
    std::string              str;
 
-   int64_t batch_size = 1000000;
+   int64_t batch_size = 10;
 
    // Read the next line from File until it reaches the
    // end.
@@ -393,8 +393,8 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 4;
-         const int                  count  = 10'000'000;
+         const int                  rounds = 20;
+         const int                  count  = 1'000'000;
 
          auto iterate_all = [&]()
          {

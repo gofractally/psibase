@@ -167,6 +167,7 @@ namespace arbtrie
       static inline uint64_t key_hash(key_view k) { return XXH3_64bits(k.data(), k.size()); }
       static inline uint64_t value_hash(value_view k) { return XXH3_64bits(k.data(), k.size()); }
       static inline uint64_t value_hash(object_id k) { return XXH3_64bits(&k, sizeof(k)); }
+      static inline uint64_t value_hash(value_type::remove k) { return 0; }
       static inline uint64_t value_hash(fast_meta_address m) { 
          return value_hash( (object_id)m.to_address() );
       }
@@ -251,6 +252,7 @@ namespace arbtrie
                assert( _val_size >= vv.size() );
                assert(vv.size() <= max_inline_value_size);
                _val_size = vv.size();
+
                memcpy(val_ptr(), vv.data(), vv.size());
             }
          }

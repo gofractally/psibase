@@ -1,5 +1,7 @@
 #pragma once
 #include <arbtrie/debug.hpp>
+#undef NDEBUG
+#include <assert.h>
 
 namespace arbtrie
 {
@@ -233,6 +235,7 @@ namespace arbtrie
       nkvp->_val_size = kvp->_val_size;
 
       memcpy(nkvp->key_ptr(), kvp->key_ptr() + minus_prefix, kvps - sizeof(key_val_pair));
+      assert( nkvp->key_ptr() + (kvps-sizeof(key_val_pair)) <= (uint8_t*)tail() );
       auto b = _num_branches;
 
       key_offsets()[b]  = kidx;
@@ -256,6 +259,10 @@ namespace arbtrie
       memmove(new_vh, old_vh, num_branches());
       memmove(new_ko, old_ko, sizeof(key_index) * num_branches());
       memmove(new_kh, old_kh, num_branches());
+
+      assert( (char*)new_ko + sizeof(key_index) * num_branches() <= tail() );
+      assert( (char*)new_vh + num_branches() <= tail() );
+      assert( (char*)new_kh + num_branches() <= tail() );
    }
 
    inline void binary_node::insert(int lbx, key_view key, const value_type& val)
@@ -324,6 +331,9 @@ namespace arbtrie
 
       assert(get_key_val_ptr(lb)->key() == key);
       assert(tail() - _alloc_pos >= (char*)end_value_hashes());
+      assert( khp + lb1 + remain <= (uint8_t*)tail() );
+      assert( ((char*)kop) + lb1 + (sizeof(key_index)*remain) <= tail() );
+      assert( vhp + lb1 + remain <= (uint8_t*)tail() );
 
       /*
       for( int i = 0; i < num_branches(); ++i ) {

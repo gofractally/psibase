@@ -1,8 +1,8 @@
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/seg_allocator.hpp>
 
-//#undef NDEBUG
-//#include <assert.h>
+#undef NDEBUG
+#include <assert.h>
 
 namespace arbtrie
 {
@@ -158,8 +158,12 @@ namespace arbtrie
    {
       auto         state = ses.lock();
       auto         s     = get_segment(seg_num);
+      if( not s->_write_lock.try_lock() ) {
+         TRIEDENT_WARN( "unable to get write lock while compacting!" );
+         abort();
+      }
       auto         send  = (node_header*)((char*)s + segment_size);
-      char*        foc   = (char*)s + sizeof(mapped_memory::segment_header);
+      char*        foc   = (char*)s + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
       node_header* foo   = (node_header*)(foc);
 
       /*
@@ -180,9 +184,15 @@ namespace arbtrie
       auto start_seg_ptr = ses._alloc_seg_ptr;
       auto start_seg_num = ses._alloc_seg_num;
 
+      std::vector<std::pair<node_header*,temp_meta_type>> skipped;
+      std::vector<node_header*> skipped_ref;
+      std::vector<node_header*> skipped_try_start;
+    
       madvise(s, segment_size, MADV_SEQUENTIAL);
       while (foo < send and foo->address())
       {
+         assert(intptr_t(foo)%64 == 0);
+         assert(foo->_nsize < 2*4096 );
          assert(foo->validate_checksum());
          auto foo_address = foo->address();
          // skip anything that has been freed
@@ -190,6 +200,8 @@ namespace arbtrie
          auto obj_ref = state.get(foo_address);
          if (obj_ref.ref() == 0)
          {
+            if constexpr (debug_memory )
+               skipped_ref.push_back(foo);
             foo = foo->next();
             continue;
          }
@@ -203,115 +215,27 @@ namespace arbtrie
          auto current_loc = obj_ref.loc();
          if (current_loc.to_abs() != seg_num * segment_size + foo_idx)
          {
+            if constexpr (debug_memory )
+               skipped.push_back({foo, obj_ref.meta_data()} );
             foo = foo->next();
             continue;
          }
 
+
+         auto obj_size   = foo->size();
+         assert( obj_size < 4096*2 );
+         auto [loc, ptr] = ses.alloc_data(obj_size, foo_address);
+
+         if( obj_ref.try_start_move( obj_ref.loc() ) ) [[likely]]
          {
-            auto obj_size   = foo->size();
-            auto [loc, ptr] = ses.alloc_data(obj_size, foo_address);
+            memcpy(ptr, foo, obj_size);
+            if( node_meta_type::success != obj_ref.try_move( obj_ref.loc(), loc ) ) 
+                ses.unalloc(obj_size);
+         } else {
+            if constexpr (debug_memory )
+               skipped_try_start.push_back(foo);
 
-            // TODO:
-            //    This code probably doesn't work in the case that
-            //    foo is modified by changing its address, it will
-            //    probably detect that the old obj_ref has been
-            //    freed not realizing that foo is no longer pointing
-            //    at the old object ref after the move This happens
-            //    in a currently disabled case on upsert.
-            //
-            auto try_move = [&]()
-            {
-               int count = 0;
-               while (obj_ref.try_start_move(obj_ref.loc())) [[likely]]
-               {
-                  assert(foo->validate_checksum());
-                  memcpy(ptr, foo, obj_size);
-                  //  if( ptr->validate_checksum())
-                  switch (obj_ref.try_move(obj_ref.loc(), loc))
-                  {
-                     case node_meta_type::freed:
-                        // TRIEDENT_WARN("object freed while copying");
-                        return false;
-                     case node_meta_type::moved:
-                        // realloc or
-                        // TRIEDENT_WARN("object moved while copying");
-                        return false;
-                     case node_meta_type::dirty:
-                        if constexpr (use_wait_free_modify)
-                        {
-                           // TODO: verify whether foo->address() == foo_address
-                           if (foo->address() != foo_address)
-                           {
-                              TRIEDENT_WARN("The Address of Foo Changed! HELP ME");
-                              abort();
-                           }
-                         //  TRIEDENT_WARN("compactor moving dirty obj, try again");
-                           obj_ref.refresh();
-                           ++count;
-                           continue;
-                        }
-                        throw std::runtime_error("unexpected return dirty from try_move");
-                     case node_meta_type::success:
-                        if constexpr (use_wait_free_modify)
-                        {
-                           if (count)
-                           {
-                              TRIEDENT_WARN("success on attempt: ", count);
-                           }
-                        }
-                        return true;
-                  }
-               } // while try_start_move
-
-               //    TRIEDENT_WARN( "try_move failed in try_start_move" );
-               return false;
-            };
-
-            if (not try_move())
-            {
-               //  TRIEDENT_WARN("try move failed, unalloc...", foo->id());
-               //auto start_seg_num = ses._alloc_seg_num;
-               _header->seg_meta[ses._alloc_seg_num].free_object(foo->size());
-               // TODO: retry
-               // ses.unalloc(ptr->_nsize);
-            }
-            //if (not foo->validate_checksum())
-            {
-               //    TRIEDENT_WARN("moved object with invalid checksum: expected: ",
-               //                 foo->calculate_checksum(), " != ", foo->checksum);
-            }
          }
-
-         // release() does not grab the lock, so while we were copying the
-         // object may have been released (and realloc) and foo->check set to -1
-         // - this fixed bugs in mutex based version, TBD if this is needed now
-         /*
-         if (moved_foo->checksum == uint32_t(-1))
-         {
-            // since we alocated data, we need to indicate that it is not being
-            // used. TODO: investigating resetting the alloc_ptr by -foo->object_size()
-            _header->seg_meta[start_seg_num].free_object(foo->object_capacity());
-         }
-         */
-
-         // after moving the data, check to make sure that the checksum is still
-         // valid. This will difinitively prove that a clean copy was made.
-         // this is not safe because anyone could modify it while doing this calc,
-         // so a try_start_move, end_move would be required and this would have to
-         // run in a loop in case it was modified.
-         /*if (not ptr->validate_checksum())
-         {
-            bool source_still_valid = foo->validate_checksum();
-            // if it was invalid it means a modification in place was made without a lock
-            // it could also mean memory corruption in the application and this error
-            // should be raised to the user todo: how to report errors from the
-            // background process
-            std::cerr << foo->id() << ": mv checksum invalid: '" << moved_foo->checksum
-                      << "' src check: " << foo->checksum << " src valid:" << source_still_valid
-                      << "\n";
-            _header->seg_meta[start_seg_num].free_object(foo->object_capacity());
-         }
-         */
 
          // if ses.alloc_data() was forced to make space in a new segment
          // then we need to sync() the old write segment before moving forward
@@ -331,6 +255,48 @@ namespace arbtrie
          }
          foo = foo->next();
       }  // segment object iteration loop
+         
+      if constexpr ( debug_memory ) {
+         if( (char*)send - (char*)foo > 4096 ) {
+            TRIEDENT_WARN( "existing compact loop earlier than expected: ", (char*)send - (char*)foo );
+         }
+
+         foo   = (node_header*)(foc);
+         while( foo < send and foo->address() ) {
+            auto obj_ref = state.get( foo->address() );
+            auto foo_idx     = (char*)foo - (char*)s;
+            auto current_loc = obj_ref.loc();
+            if(current_loc.to_abs() == seg_num * segment_size + foo_idx) { 
+               for( auto s : skipped ) {
+                  if( s.first == foo ) { 
+                     TRIEDENT_WARN( "obj_ref: ", obj_ref.ref() );
+                     TRIEDENT_WARN( "obj_type: ", node_type_names[obj_ref.type()] );
+                     TRIEDENT_WARN( "obj_loc: ", current_loc.abs_index(), " seg: ", current_loc.segment() );
+                     TRIEDENT_WARN( "ptr: ", (void*)foo );
+                     TRIEDENT_WARN( "pos in segment: ", segment_size - ((char*)send - (char*)foo) );
+
+                     TRIEDENT_WARN( "SKIPPED BECAUSE POS DIDN'T MATCH" ); 
+                     TRIEDENT_DEBUG( "  old meta: ", s.second.to_int() );
+                     TRIEDENT_DEBUG( "  null_node: ", null_node.abs_index(), " seg: ", null_node.segment() );
+                     TRIEDENT_DEBUG( "  old loc: ", s.second.loc().abs_index(), " seg: ", s.second.loc().segment() );
+                     TRIEDENT_DEBUG( "  old ref: ", s.second.ref() );
+                     TRIEDENT_DEBUG( "  old type: ", node_type_names[s.second.type()] );
+                     TRIEDENT_DEBUG( "  old is_con: ", s.second.is_const() );
+                     TRIEDENT_DEBUG( "  old is_ch: ", s.second.is_copying() );
+                     assert(current_loc.to_abs() != seg_num * segment_size + foo_idx);
+                  }
+               }
+               for( auto s : skipped_ref ) {
+                  if( s == foo ) { TRIEDENT_WARN( "SKIPPED BECAUSE NOT REF" ); }
+               }
+               for( auto s : skipped_try_start ) {
+                  if( s == foo ) { TRIEDENT_WARN( "SKIPPED BECAUSE TRY START" ); }
+               }
+            }
+            foo = foo->next();
+         }
+      }
+
 
       // in order to maintain the invariant that the segment we just cleared
       // can be reused, we must make sure that the data we moved out has persisted to
@@ -345,8 +311,9 @@ namespace arbtrie
                                                          std::memory_order_relaxed);
       }
 
+      s->_write_lock.unlock();
       s->_num_objects = 0;
-      s->_alloc_pos   = 0;
+      s->_alloc_pos.store(0, std::memory_order_relaxed);
       s->_age         = -1;
       // the segment we just cleared, so its free space and objects get reset to 0
       // and its last_sync pos gets put to the end because there is no need to sync it
@@ -482,7 +449,7 @@ namespace arbtrie
                       << "\n";
 
          // for debug we clear the memory
-         assert(memset(sp, 0xff, segment_size));  // TODO: is this necessary?
+         // assert(memset(sp, 0xff, segment_size));  // TODO: is this necessary?
 
          auto shp  = new (sp) mapped_memory::segment_header();
          shp->_age = _header->next_alloc_age.fetch_add(1, std::memory_order_relaxed);
@@ -517,6 +484,10 @@ namespace arbtrie
             }
             //  TRIEDENT_DEBUG( "prepare segment: ", free_seg, "     end_ptr: ", _header->end_ptr.load() );
             //       std::cerr << "reusing segment..." << free_seg <<"\n";
+            auto sp = (mapped_memory::segment_header*)_block_alloc.get(free_seg);
+            if( not sp->_write_lock.try_lock() ) {
+               TRIEDENT_WARN( "write lock on get_new_segment!" );
+            }
             return prepare_segment(free_seg);
          }
       }

@@ -241,8 +241,10 @@ namespace arbtrie
       // returns the state prior to start modify
       temp_type start_modify()
       {
+         mut().lock();
          do {
             uint64_t prior = _meta.fetch_and( ~const_mask, std::memory_order_acquire );
+            assert( temp_meta_type( prior ).loc() == temp_meta_type(prior&~const_mask).loc() );
             if (not (prior & copy_mask) )
                return temp_type(prior);
 
@@ -256,18 +258,23 @@ namespace arbtrie
          // mem order release synchronizies with readers of the modification
          temp_type prior(_meta.fetch_or(const_mask, std::memory_order_release));
 
+         assert( prior.loc() == temp_meta_type(prior.to_int()|const_mask).loc() );
+
          // if a copy was started between start_modify() and end_modify() then
          // the copy bit would be set and the other thread will be waiting
          if (prior.is_copying())
             _meta.notify_all();
 
+         mut().unlock();
          return prior;
       }
 
       bool end_move() {
          auto prior = _meta.fetch_and(~copy_mask, std::memory_order_release);
+         assert( temp_type(prior).loc() == temp_meta_type(prior&~copy_mask).loc() );
          if( not (prior & const_mask) )
             _meta.notify_all();
+         mut().unlock();
          return false;
       }
 
@@ -276,6 +283,7 @@ namespace arbtrie
        */
       bool try_start_move(node_location expected)
       {
+         mut().lock();
          do {
             uint64_t prior = _meta.load( std::memory_order_relaxed );
             do {
@@ -332,6 +340,7 @@ namespace arbtrie
          if( not (expected & const_mask ) ) [[unlikely]]
             _meta.notify_all();
 
+         mut().unlock();
          return move_result::success;
       }
 

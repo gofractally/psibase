@@ -2,8 +2,8 @@
 #include <arbtrie/debug.hpp>
 #include <arbtrie/inner_node.hpp>
 
-//#undef NDEBUG
-//#include <assert.h>
+#undef NDEBUG
+#include <assert.h>
 namespace arbtrie
 {
 
@@ -59,7 +59,7 @@ namespace arbtrie
 
       uint8_t*       get_setlist_ptr() { return end_prefix(); }
       const uint8_t* get_setlist_ptr() const { return end_prefix(); }
-      int            get_setlist_size() const { return num_branches() - bool(_eof_value); }
+      int            get_setlist_size() const { return num_branches(); }
       key_view       get_setlist() const
       {
          return key_view((const char*)get_setlist_ptr(), get_setlist_size());
@@ -285,9 +285,12 @@ namespace arbtrie
           : inner_node(asize, nid, src, cfg)
       {
          assert(src->num_branches() <= branch_capacity());
+         assert( (char*)get_branch_ptr() + src->num_branches()*sizeof(id_index) <= tail() );
+         assert( (char*)get_setlist_ptr() + src->get_setlist_size() <= tail() );
 
          memcpy(get_setlist_ptr(), src->get_setlist_ptr(), src->get_setlist_size());
          memcpy(get_branch_ptr(), src->get_branch_ptr(), src->num_branches() * sizeof(id_index));
+
          assert(validate());
       }
 
@@ -318,12 +321,18 @@ namespace arbtrie
       auto nbranch  = num_branches() - has_eof_value();
       auto sl_found = slp + pos;
       auto sl_end   = slp + nbranch;
+
+      assert( (char*)sl_found+1 + (sl_end-sl_found) <= tail() );
       memmove(sl_found + 1, sl_found, sl_end - sl_found);
+
       *sl_found = br - 1;
 
       auto b_found = blp + pos;
       auto b_end   = blp + nbranch;
+
+      assert( (char*)b_found+1 + ((char*)b_end-(char*)b_found) <= tail() );
       memmove(b_found + 1, b_found, (char*)b_end - (char*)b_found);
+
       b_found->index = b.index;
 
       ++_num_branches;
