@@ -1,7 +1,9 @@
-use crate::services::{account_sys, package_sys, proxy_sys, psispace_sys, setcode_sys};
+use crate::services::{
+    account_sys, auth_delegate_sys, package_sys, proxy_sys, psispace_sys, setcode_sys,
+};
 use crate::{
     new_account_action, set_auth_service_action, set_code_action, set_key_action, AccountNumber,
-    Action, AnyPublicKey, Checksum256, GenesisService,
+    Action, AnyPublicKey, Checksum256, GenesisService, Pack, Reflect, Unpack,
 };
 use custom_error::custom_error;
 use regex::Regex;
@@ -42,8 +44,10 @@ custom_error! {
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-struct Meta {
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Pack, Unpack, Reflect)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
+pub struct Meta {
     name: String,
     description: String,
     depends: Vec<String>,
@@ -242,14 +246,12 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
-    pub fn commit_install(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
-        actions.push(
-            package_sys::Wrapper::pack().postinstall(package_sys::InstalledPackage {
-                name: self.meta.name.clone(),
-                depends: self.meta.depends.clone(),
-                accounts: self.meta.accounts.clone(),
-            }),
-        );
+    pub fn commit_install(
+        &mut self,
+        sender: AccountNumber,
+        actions: &mut Vec<Action>,
+    ) -> Result<(), anyhow::Error> {
+        actions.push(package_sys::Wrapper::pack_from(sender).postinstall(self.meta.clone()));
         Ok(())
     }
 
@@ -257,12 +259,16 @@ impl<R: Read + Seek> PackagedService<R> {
         &self,
         account: AccountNumber,
         key: &Option<AnyPublicKey>,
+        sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
         actions.push(new_account_action(account_sys::SERVICE, account));
         if let Some(key) = key {
             actions.push(set_key_action(account, key));
             actions.push(set_auth_service_action(account, key.auth_service()));
+        } else {
+            actions.push(auth_delegate_sys::Wrapper::pack_from(account).setOwner(sender));
+            actions.push(set_auth_service_action(account, auth_delegate_sys::SERVICE));
         }
         Ok(())
     }
@@ -270,12 +276,13 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn install_accounts(
         &mut self,
         actions: &mut Vec<Vec<Action>>,
+        sender: AccountNumber,
         key: &Option<AnyPublicKey>,
     ) -> Result<(), anyhow::Error> {
         // service accounts
         for (account, index, info) in &self.services {
             let mut group = vec![];
-            self.create_account(*account, key, &mut group)?;
+            self.create_account(*account, key, sender, &mut group)?;
             group.push(set_code_action(
                 *account,
                 read(&mut self.archive.by_index(*index)?)?.into(),
@@ -290,7 +297,7 @@ impl<R: Read + Seek> PackagedService<R> {
         for account in self.get_accounts() {
             if !self.has_service(*account) {
                 let mut group = vec![];
-                self.create_account(*account, key, &mut group)?;
+                self.create_account(*account, key, sender, &mut group)?;
                 actions.push(group);
             }
         }
@@ -301,6 +308,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn install(
         &mut self,
         actions: &mut Vec<Action>,
+        sender: AccountNumber,
         install_ui: bool,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
@@ -309,7 +317,7 @@ impl<R: Read + Seek> PackagedService<R> {
         }
 
         self.postinstall(actions)?;
-        self.commit_install(actions)?;
+        self.commit_install(sender, actions)?;
         Ok(())
     }
 

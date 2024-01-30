@@ -186,6 +186,11 @@ enum Command {
         /// A URL or path to a package repository (repeatable)
         #[clap(long, value_name = "URL")]
         package_source: Vec<String>,
+
+        /// Sender to use for installing. The packages and all accounts
+        /// that they create will be owned by this account.
+        #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+        sender: ExactAccountNumber,
     },
 
     /// Prints a list of apps
@@ -768,6 +773,7 @@ async fn install(
     args: &Args,
     mut client: reqwest::Client,
     packages: &[String],
+    sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
@@ -779,10 +785,10 @@ async fn install(
     let mut all_init_actions = vec![];
     for mut package in to_install {
         let mut account_actions = vec![];
-        package.install_accounts(&mut account_actions, key)?;
+        package.install_accounts(&mut account_actions, sender, key)?;
         all_account_actions.push((account_actions, package.name().to_string()));
         let mut actions = vec![];
-        package.install(&mut actions, true)?;
+        package.install(&mut actions, sender, true)?;
         all_init_actions.push((actions, package.name().to_string()));
     }
 
@@ -1049,7 +1055,18 @@ async fn main() -> Result<(), anyhow::Error> {
             packages,
             key,
             package_source,
-        } => install(&args, client, packages, key, package_source).await?,
+            sender,
+        } => {
+            install(
+                &args,
+                client,
+                packages,
+                (*sender).into(),
+                key,
+                package_source,
+            )
+            .await?
+        }
         Command::List {
             all,
             available,

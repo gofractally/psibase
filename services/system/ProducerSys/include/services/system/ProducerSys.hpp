@@ -14,6 +14,13 @@ namespace SystemService
       static constexpr auto service      = psibase::AccountNumber("producer-sys");
       static constexpr auto serviceFlags = psibase::CodeRow::allowWriteNative;
 
+      // An action authorized by this account must be authorized by at
+      // least one honest producer
+      static constexpr auto producerAccountWeak = psibase::AccountNumber("prods-weak");
+      // If two actions are authorized by this account, there is at least
+      // one honest producer that authorized both actions.
+      static constexpr auto producerAccountStrong = psibase::AccountNumber("prods-strong");
+
       void setConsensus(psibase::Consensus consensus);
       void setProducers(std::vector<psibase::Producer> prods);
 

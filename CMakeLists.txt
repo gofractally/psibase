@@ -106,6 +106,7 @@ if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
             -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
         BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegateSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm
@@ -375,6 +376,15 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthDelegateSys.psi
+    NAME AuthDelegateSys
+    DESCRIPTION "Auth service that delegates authorization to another account"
+    SERVICE auth-dlt-sys
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegateSys.wasm
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthEcSys.psi
     NAME AuthEcSys
     DESCRIPTION "Auth service using secp256k1 to verify signatures"
@@ -446,8 +456,10 @@ psibase_package(
         SERVER r-prod-sys
     SERVICE r-prod-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm
+    ACCOUNTS prods-weak prods-strong
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/ProducerSys/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS ProxySys AccountSys
 )
 
 psibase_package(
@@ -575,7 +587,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Default.psi
     NAME Default
     DESCRIPTION "All default services"
-    PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys DocSys
+    PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
                     ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
                     PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys
 )
@@ -584,7 +596,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Minimal.psi
     NAME Minimal
     DESCRIPTION "Minimum services for a functional chain"
-    PACKAGE_DEPENDS AccountSys AuthAnySys CpuSys CommonSys PackageSys ProducerSys ProxySys
+    PACKAGE_DEPENDS AccountSys AuthDelegateSys AuthAnySys CpuSys CommonSys PackageSys ProducerSys ProxySys
                     SetCodeSys TransactionSys
 )
 
@@ -610,6 +622,7 @@ install(
     FILES ${SERVICE_DIR}/index.json
           ${SERVICE_DIR}/AccountSys.psi
           ${SERVICE_DIR}/AuthAnySys.psi
+          ${SERVICE_DIR}/AuthDelegateSys.psi
           ${SERVICE_DIR}/AuthSys.psi
           ${SERVICE_DIR}/AuthEcSys.psi
           ${SERVICE_DIR}/CommonSys.psi

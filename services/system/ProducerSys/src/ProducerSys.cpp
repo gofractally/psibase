@@ -74,14 +74,20 @@ namespace SystemService
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
-   std::size_t getThreshold(const CftConsensus& bft)
+   std::size_t getThreshold(const CftConsensus& bft, AccountNumber account)
    {
-      return bft.producers.size() / 2 + 1;
+      if (account == ProducerSys::producerAccountWeak)
+         return 1;
+      else
+         return bft.producers.size() / 2 + 1;
    }
 
-   std::size_t getThreshold(const BftConsensus& bft)
+   std::size_t getThreshold(const BftConsensus& bft, AccountNumber account)
    {
-      return bft.producers.size() * 2 / 3 + 1;
+      if (account == ProducerSys::producerAccountWeak)
+         return (bft.producers.size() + 2) / 3;
+      else
+         return bft.producers.size() * 2 / 3 + 1;
    }
 
    void ProducerSys::checkAuthSys(uint32_t                    flags,
@@ -128,7 +134,8 @@ namespace SystemService
       auto threshold =
           expectedClaims.empty()
               ? 0
-              : std::visit([](const auto& c) { return getThreshold(c); }, status->consensus);
+              : std::visit([&](const auto& c) { return getThreshold(c, action.sender); },
+                           status->consensus);
       if (relevantClaims.size() < threshold)
       {
          abortMessage("runAs: have " + std::to_string(relevantClaims.size()) + "/" +
@@ -138,7 +145,8 @@ namespace SystemService
 
    void ProducerSys::canAuthUserSys(psibase::AccountNumber user)
    {
-      // noop
+      check(user == producerAccountStrong || user == producerAccountWeak,
+            "Can only authorize predefined accounts");
    }
 
 }  // namespace SystemService

@@ -4,6 +4,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <services/system/AccountSys.hpp>
 #include <services/system/AuthAnySys.hpp>
+#include <services/system/AuthDelegateSys.hpp>
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/CommonSys.hpp>
 #include <services/system/CpuSys.hpp>
@@ -106,11 +107,38 @@ namespace
       std::vector<Producer>   producerConfig = {{"firstproducer"_a, {}}};
       actions.push_back(psys.setProducers(producerConfig));
 
+      auto root = AccountNumber{"root"};
+      actions.push_back(asys.newAccount(root, AuthAnySys::service, true));
+
+      // If a package sets an auth service for an account, we should not override it
+      std::vector<AccountNumber> accountsWithAuth;
+      for (const auto& act : actions)
+      {
+         if (act.service == AccountSys::service && act.method == MethodNumber{"setAuthServ"})
+         {
+            accountsWithAuth.push_back(act.sender);
+         }
+      }
+      std::ranges::sort(accountsWithAuth);
+
+      for (auto& s : service_packages)
+      {
+         for (auto account : s.accounts())
+         {
+            if (!std::ranges::binary_search(accountsWithAuth, account))
+            {
+               actions.push_back(
+                   transactor<AuthDelegateSys>{account, AuthDelegateSys::service}.setOwner(root));
+               actions.push_back(asys.from(account).setAuthServ(AuthDelegateSys::service));
+            }
+         }
+      }
+
       if (has_package_sys)
       {
          for (auto& s : service_packages)
          {
-            s.commitInstall(actions);
+            s.commitInstall(actions, root);
          }
       }
 

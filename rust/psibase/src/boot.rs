@@ -1,13 +1,13 @@
-use crate::services::{account_sys, producer_sys, transaction_sys};
+use crate::services::{account_sys, auth_delegate_sys, producer_sys, transaction_sys};
 use crate::{
-    method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
-    AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData,
-    MethodNumber, PackagedService, ProducerConfigRow, SignedTransaction, Tapos, TimePointSec,
-    Transaction,
+    method_raw, new_account_action, set_auth_service_action, validate_dependencies, AccountNumber,
+    Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData, MethodNumber,
+    PackagedService, ProducerConfigRow, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::Pack;
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::io::{Cursor, Read, Seek};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
@@ -85,6 +85,7 @@ pub fn get_initial_actions<R: Read + Seek>(
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
     let has_package_sys = true;
+
     for s in &mut service_packages[..] {
         for account in s.get_accounts() {
             if !s.has_service(*account) {
@@ -111,18 +112,41 @@ pub fn get_initial_actions<R: Read + Seek>(
         },
     ));
 
-    if let Some(k) = initial_key {
-        for s in &service_packages[..] {
-            for account in s.get_accounts() {
-                actions.push(set_key_action(*account, k));
-                actions.push(set_auth_service_action(*account, k.auth_service()));
+    actions.push(new_account_action(account_sys::SERVICE, producer_sys::ROOT));
+    actions.push(
+        auth_delegate_sys::Wrapper::pack_from(producer_sys::ROOT)
+            .setOwner(producer_sys::PRODUCER_ACCOUNT_STRONG),
+    );
+    actions.push(set_auth_service_action(
+        producer_sys::ROOT,
+        auth_delegate_sys::SERVICE,
+    ));
+
+    // If a package sets an auth service for an account, we should not override it
+    let mut accounts_with_auth = HashSet::new();
+    for act in &actions {
+        if act.service == account_sys::SERVICE && act.method == method!("setAuthServ") {
+            accounts_with_auth.insert(act.sender);
+        }
+    }
+
+    for s in &service_packages[..] {
+        for account in s.get_accounts() {
+            if !accounts_with_auth.contains(account) {
+                actions.push(
+                    auth_delegate_sys::Wrapper::pack_from(*account).setOwner(producer_sys::ROOT),
+                );
+                actions.push(set_auth_service_action(
+                    *account,
+                    auth_delegate_sys::SERVICE,
+                ));
             }
         }
     }
 
     if has_package_sys {
         for s in &mut service_packages[..] {
-            s.commit_install(&mut actions)?;
+            s.commit_install(producer_sys::ROOT, &mut actions)?;
         }
     }
 
