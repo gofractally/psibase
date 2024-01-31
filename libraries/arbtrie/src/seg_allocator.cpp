@@ -1,9 +1,6 @@
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/seg_allocator.hpp>
 
-#undef NDEBUG
-#include <assert.h>
-
 namespace arbtrie
 {
    seg_allocator::seg_allocator(std::filesystem::path dir)

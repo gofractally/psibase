@@ -4,7 +4,7 @@
 #include <iostream>
 #include <thread>
 //#include <syncstream>
-// #undef NDEBUG
+ #undef NDEBUG
 #include <cassert>
 
 namespace arbtrie

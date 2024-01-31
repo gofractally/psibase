@@ -18,6 +18,11 @@ namespace arbtrie
      public:
       // return the root this iterator is based on
       node_handle get_root() const { return _root; }
+      // the key the iterator is currently pointing to
+      key_view key()const
+      {
+         return key_view((const char*)_branches.data(), _branches.size());
+      }
 
       bool next();  // moves to next key, return valid()
       bool prev();  // moves to the prv key, return valid()
@@ -37,8 +42,6 @@ namespace arbtrie
       // true if the iterator points to a key/value pair
       bool valid() const { return _path.size() > 0; }
 
-      // the key the iterator is currently pointing to
-      key_view key();
 
       // if the value is a subtree, return an iterator into that subtree
       iterator sub_iterator() const;

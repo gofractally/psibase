@@ -45,7 +45,7 @@ namespace arbtrie
       constexpr upsert_mode make_same_region() const { return {flags | same_region}; }
       constexpr bool        may_insert() const { return flags & insert; }
       constexpr bool        may_update() const { return flags & insert; }
-      constexpr bool        must_insert() const { return not(flags & update); }
+      constexpr bool        must_insert() const { return not(flags & (update|remove)); }
       constexpr bool        must_update() const { return not(flags & insert); }
       constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); }
       constexpr bool        is_remove() const { return flags & remove; }
@@ -345,7 +345,7 @@ namespace arbtrie
    {
       if (key.size() == 0)
       {
-         if (auto val_node_id = inner->get_branch(0))
+         if (auto val_node_id = inner->get_eof_value())
          {
             auto vr = root.rlock().get(val_node_id);
             if (vr.type() == node_type::value)
@@ -374,7 +374,7 @@ namespace arbtrie
             }
             else
             {
-               if (auto branch_id = inner->get_branch(0))
+               if (auto branch_id = inner->get_eof_value())
                {
                   auto bref = root.rlock().get(branch_id);
                   callback(true, bref.template as<value_node>()->value());

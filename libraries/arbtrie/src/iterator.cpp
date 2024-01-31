@@ -17,8 +17,8 @@ namespace arbtrie
          std::pair<branch_index_type, fast_meta_address> idx = in->lower_bound(0);
          if (idx.first == 0)
          {
-            assert( _path.back().second == 0 );
-         //   _path.back().second = 0;
+            assert(_path.back().second == 0);
+            //   _path.back().second = 0;
             return true;
          }
 
@@ -30,13 +30,14 @@ namespace arbtrie
             auto bref = r.rlock().get(idx.second);
             return lower_bound_impl(bref, {});
          }
-         popkey( node_prefix.size() + 1 );
+         popkey(node_prefix.size() + 1);
          _path.pop_back();
          return false;
       }
 
       auto cpre = common_prefix(node_prefix, query);
-      if (cpre != node_prefix) {
+      if (cpre != node_prefix)
+      {
          popkey(node_prefix.size());
          return false;
       }
@@ -57,7 +58,7 @@ namespace arbtrie
          pushkey(branch_to_char(idx.first));
          return lower_bound_impl(bref, remaining_query.substr(1));
       }
-      popkey(node_prefix.size()+1);
+      popkey(node_prefix.size() + 1);
       return false;
    }
 
@@ -65,10 +66,11 @@ namespace arbtrie
                                    const binary_node*       bn,
                                    key_view                 query)
    {
-      auto lbx = bn->lower_bound_idx(query);
+      auto lbx            = bn->lower_bound_idx(query);
       _path.back().second = lbx;
 
-      if (lbx >= bn->num_branches()){
+      if (lbx >= bn->num_branches())
+      {
          return false;
       }
 
@@ -118,7 +120,7 @@ namespace arbtrie
       auto  state = _rs._segas.lock();
 
       auto current = _path.back().second++;
-   //   TRIEDENT_WARN( "path.size: ", _path.size() );
+      //   TRIEDENT_WARN( "path.size: ", _path.size() );
 
       auto handle_inner = [&](auto* in)
       {
@@ -126,18 +128,18 @@ namespace arbtrie
 
          _path.back().second = lbx.first;
 
-         if ( not lbx.second )
+         if (not lbx.second)
          {
             popkey(in->get_prefix().size() + (current != 0));
             _path.pop_back();
             return next();
          }
-         if (current) 
+         if (current)
             _branches.back() = branch_to_char(lbx.first);
          else
             pushkey(branch_to_char(lbx.first));
 
-         auto oref = state.get(lbx.second);
+         auto oref   = state.get(lbx.second);
          bool result = lower_bound_impl(oref, {});
          assert(result);
          return result;
@@ -149,12 +151,15 @@ namespace arbtrie
          case node_type::binary:
          {
             auto bn = oref.as<binary_node>();
-            if( int(bn->num_branches()) - _path.back().second <= 0 )
+
+            if( current < bn->num_branches() )
+               popkey(bn->get_key_val_ptr(current)->key_size());
+
+            if (int(bn->num_branches()) - _path.back().second <= 0)
             {
                _path.pop_back();
                return next();
             }
-            popkey(bn->get_key_val_ptr(current)->key_size());
             pushkey(bn->get_key_val_ptr(current + 1)->key());
             return true;
          }
@@ -167,15 +172,17 @@ namespace arbtrie
       }
       // unreachable
    }
+#if 0
       key_view iterator::key()
       {
          return key_view((char*)_branches.data(), _branches.size());
-         /* TEST CODE 
-         if constexpr( false ) {
+         auto to_format = []( auto k ) { return k; };
+         // TEST CODE 
+         if constexpr( true) {
          std::vector<uint8_t> val;
          read_value(val);
          TRIEDENT_WARN( "======================================" );
-         TRIEDENT_DEBUG( "val: ", to_hex(std::string_view((char*)val.data(),val.size())));
+         TRIEDENT_DEBUG( "val: ", to_format(std::string_view((char*)val.data(),val.size())), "  branches: ", key_view((char*)_branches.data(), _branches.size()));
        //  return out;
          std::vector  tmp = _branches;
          _branches.clear();
@@ -189,17 +196,17 @@ namespace arbtrie
                {
                   auto bn  = pr.as<binary_node>();
                   auto kvp = bn->get_key_val_ptr(p.second);
-                  TRIEDENT_DEBUG( "BINARY: '", to_hex(kvp->key()), "'" );
+                  TRIEDENT_DEBUG( "BINARY: '", to_format(kvp->key()), "'" );
                   pushkey(kvp->key());
                   break;
                }
                case node_type::setlist:
                {
                   auto bn = pr.as<setlist_node>();
-                  TRIEDENT_DEBUG( "SETLST: '", to_hex(bn->get_prefix()), "'" );
+                  TRIEDENT_DEBUG( "SETLST: '", to_format(bn->get_prefix()), "'" );
                   pushkey(bn->get_prefix());
                   if (p.second) {
-                     TRIEDENT_DEBUG( "[", to_hex(branch_to_char(p.second) ),"]" );
+                     TRIEDENT_DEBUG( "[", to_format(branch_to_char(p.second) ),"]" );
                      pushkey(branch_to_char(p.second));
                   }
                   break;
@@ -207,10 +214,10 @@ namespace arbtrie
                case node_type::full:
                {
                   auto bn = pr.as<full_node>();
-                  TRIEDENT_DEBUG( "FULLND: '", to_hex(bn->get_prefix()), "'" );
+                  TRIEDENT_DEBUG( "FULLND: '", to_format(bn->get_prefix()), "'" );
                   pushkey(bn->get_prefix());
                   if (p.second) {
-                     TRIEDENT_DEBUG( "[", to_hex(branch_to_char(p.second) ),"]" );
+                     TRIEDENT_DEBUG( "[", to_format(branch_to_char(p.second) ),"]" );
                      pushkey(branch_to_char(p.second));
                   }
                   break;
@@ -224,14 +231,15 @@ namespace arbtrie
          auto out = key_view((char*)_branches.data(), _branches.size());
          auto pre = key_view((char*)tmp.data(), tmp.size());
          if( out != pre ) {
-            TRIEDENT_WARN( "\n",to_hex(out), " != \n", to_hex(pre),"\n",
-                           to_hex(std::string_view((char*)val.data(),val.size())));
+            TRIEDENT_WARN( "\n",to_format(out), " != \n", to_format(pre),"\n",
+                           to_format(std::string_view((char*)val.data(),val.size())));
          }
          TRIEDENT_WARN( "======================================" );
          assert( out == pre );
          return key_view((char*)_branches.data(), _branches.size());
          }
-         */
+         
       }
+#endif
 
 }  // namespace arbtrie

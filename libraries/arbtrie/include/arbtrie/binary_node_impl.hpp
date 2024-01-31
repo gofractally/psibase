@@ -1,7 +1,6 @@
 #pragma once
 #include <arbtrie/debug.hpp>
-#undef NDEBUG
-#include <assert.h>
+
 
 namespace arbtrie
 {

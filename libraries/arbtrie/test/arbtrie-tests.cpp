@@ -97,6 +97,27 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
       usleep(1000000 * 3);
    }
 }
+void validate_refcount(session_rlock& state, fast_meta_address i);
+void validate_refcount(session_rlock& state, fast_meta_address i, const auto* in)
+{
+   in->visit_branches_with_br(
+       [&](int br, fast_meta_address adr)
+       {
+          if (in->branch_region() != adr.region)
+             throw std::runtime_error("region refcount violated");
+          validate_refcount(state, adr);
+       });
+}
+void validate_refcount(session_rlock& state, fast_meta_address i, const binary_node* inner) {}
+void validate_refcount(session_rlock& state, fast_meta_address i, const value_node* inner) {}
+void validate_refcount(session_rlock& state, fast_meta_address i)
+{
+   if( i ) {
+      auto ref = state.get(i);
+      assert( ref.ref() == 1 );
+      cast_and_call(ref.header(), [&](const auto* ptr) { validate_refcount(state, i, ptr); });
+   }
+}
 
 TEST_CASE("insert-words")
 {
@@ -124,8 +145,30 @@ TEST_CASE("insert-words")
 
       int  count    = 0;
       bool inserted = false;
-      for (int i = 0; i < keys.size(); ++i)
+      for (int i = 0; i < keys.size(); ++i) {
          ws.upsert(root, keys[i], values[i]);
+         ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
+                 REQUIRE( found );
+                 REQUIRE( r.view() == std::string_view(values[i]) );
+                 if( not found )
+                    TRIEDENT_DEBUG( "looking for after insert key[",i,"]: ", keys[i] );
+                 assert( found );
+                 assert( r.view() == std::string_view(values[i]) );
+                 });
+      }
+      {
+      auto l = ws._segas.lock();
+      validate_refcount( l, root.address() );
+      }
+      for (int i = 0; i < keys.size(); ++i) {
+         ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
+                // TRIEDENT_DEBUG( "looking for key[",i,"]: ", keys[i] );
+                 REQUIRE( found );
+                 REQUIRE( r.view() == std::string_view(values[i]) );
+                 assert( found );
+                 assert( r.view() == std::string_view(values[i]) );
+                 });
+      }
 
       auto end   = std::chrono::steady_clock::now();
       auto delta = end - start;
@@ -154,6 +197,8 @@ TEST_CASE("insert-words")
             while (itr.next())
             {
                itr.key();
+               assert( itr.key().size() < 1024 );
+          //     std::cerr << itr.key() <<"\n";
                itr.read_value(data);
                ++item_count;
             }
@@ -168,11 +213,39 @@ TEST_CASE("insert-words")
          }
       };
       iterate_all();
+      TRIEDENT_WARN( "removing for keys in order" );
+      for( int i = 0; i < keys.size(); ++i ) {
+         ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
+                 if( not found )
+                  TRIEDENT_DEBUG( "looking before remove: ", keys[i] );
+                 REQUIRE( found );
+                 assert( found );
+                 });
+
+       //  TRIEDENT_DEBUG( "remove: ", keys[i] );
+         ws.remove( root, keys[i] );
+         {
+         auto l = ws._segas.lock();
+         validate_refcount( l, root.address() );
+         }
+         ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
+                 if( found )
+                  TRIEDENT_DEBUG( "checking remove: ", keys[i] );
+                 REQUIRE( not found );
+                 assert( not found );
+                 });
+      }
+      auto     itr        = ws.create_iterator(root);
+      REQUIRE(not itr.valid());
+      REQUIRE(not itr.lower_bound());
    };
+  // TRIEDENT_DEBUG( "load in file order" );
    test_words();
+   TRIEDENT_DEBUG( "load in reverse file order" );
    std::reverse( keys.begin(), keys.end() );
    std::reverse( values.begin(), values.end() );
    test_words();
+   TRIEDENT_DEBUG( "load in random order" );
    auto rng = std::default_random_engine {};
    std::shuffle( keys.begin(), keys.end(), rng );
    test_words();

@@ -8,8 +8,6 @@
 #define XXH_INLINE_ALL
 #include <arbtrie/xxhash.h>
 
-#undef NDEBUG
-#include <assert.h>
 
 namespace arbtrie
 {

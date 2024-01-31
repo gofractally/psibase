@@ -5,8 +5,6 @@
 
 #include <utility>
 
-#undef NDEBUG
-#include <assert.h>
 
 namespace arbtrie
 {
@@ -294,7 +292,7 @@ namespace arbtrie
    int write_session::remove(node_handle& r, key_view key)
    {
       auto state = _segas.lock();
-      r.give(update(state, r.take(), key, value_type::remove()));
+      r.give(remove(state, r.take(), key));
       return 0;
    }
 
@@ -351,8 +349,9 @@ namespace arbtrie
    {
       if constexpr (mode.is_unique())
       {
-         if (root.ref() != 1)
+         if (root.ref() != 1) {
             return upsert<mode.make_shared()>(root, key, val);
+         }
       }
       static_assert(std::is_same_v<NodeType, node_header>);
 
@@ -639,10 +638,12 @@ namespace arbtrie
                   auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1), val);
                   if constexpr ( mode.is_remove() ) {
                      if( not new_br ) {
-                        if( fn->num_branches() > 1 or fn->has_eof_value() ) {
-                           r.modify().as<NodeType>()->remove_branch(bidx);
+                        r.modify().as<NodeType>()->remove_branch(bidx);
+                        if( fn->num_branches() + fn->has_eof_value() > 0 ) {
+                      //     TRIEDENT_DEBUG( "modify()->remove_branch( ", char(bidx-1), ") " );
                            return r.address();
                         } else {
+                       //    TRIEDENT_DEBUG( "return null after removing all" );
                            return fast_meta_address();
                         }
                      }
@@ -705,13 +706,15 @@ namespace arbtrie
                   if constexpr (mode.is_unique())
                   {
                      release_node(state.get(fn->get_eof_value()));
-                     if (fn->num_branches() == 0)
-                        return fast_meta_address();
                      r.modify().as<NodeType>()->set_eof({});
+
+                     if (fn->num_branches() == 0) 
+                        return fast_meta_address();
                      return r.address();
                   }
                   else  // mode.is_shared()
                   {
+                     TRIEDENT_WARN( "release eof value (shared)" );
                      if (fn->num_branches() == 0)
                         return fast_meta_address();
                      return clone<mode>(r, fn, {},
@@ -857,6 +860,11 @@ namespace arbtrie
             auto new_prefix = rootpre.substr(cpre.size() + 1);
             auto cl         = clone<mode.make_shared()>(new_reg, r, fn, {.set_prefix = new_prefix});
             child_id        = cl.address();
+            if constexpr ( mode.is_unique() ) {
+              // TRIEDENT_WARN( "release old root if unique because it doesn't happen automatically for unique" );
+                              
+               release_node( r );
+            }
          }
 
          if (key.size() == cpre.size())
@@ -869,9 +877,9 @@ namespace arbtrie
                                       {.branch_cap = 2, .set_prefix = cpre},
                                       [&](setlist_node* sln)
                                       {
-                                         //                            TRIEDENT_WARN( "CHILD ID REGION INSTEAD OF NEW?");
+                                         TRIEDENT_WARN( "CHILD ID REGION INSTEAD OF NEW?");
                                          sln->set_branch_region(child_id.region);
-                                         sln->add_branch(0, v);
+                                         sln->set_eof( v );
                                          sln->add_branch(char_to_branch(root_prebranch), child_id);
                                       })
                 .address();
@@ -1025,10 +1033,11 @@ namespace arbtrie
             if (bn->is_obj_id(lb_idx))
                release_node(root.rlock().get(kvp->value_id()));
 
-            if (bn->num_branches() == 1)
+            root.modify().as<binary_node>([&](auto* b) { b->remove_value(lb_idx); });
+
+            if (bn->num_branches() == 0)
                return fast_meta_address();
 
-            root.modify().as<binary_node>([&](auto* b) { b->remove_value(lb_idx); });
             return root.address();
          }
          else  // not unique, must clone to update it

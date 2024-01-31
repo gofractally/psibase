@@ -241,7 +241,7 @@ namespace arbtrie
       // returns the state prior to start modify
       temp_type start_modify()
       {
-         mut().lock();
+         //mut().lock();
          do {
             uint64_t prior = _meta.fetch_and( ~const_mask, std::memory_order_acquire );
             if (not (prior & copy_mask) )
@@ -262,7 +262,7 @@ namespace arbtrie
          if (prior.is_copying())
             _meta.notify_all();
 
-         mut().unlock();
+         //mut().unlock();
          return prior;
       }
 
@@ -270,7 +270,7 @@ namespace arbtrie
          auto prior = _meta.fetch_and(~copy_mask, std::memory_order_release);
          if( not (prior & const_mask) )
             _meta.notify_all();
-         mut().unlock();
+         //mut().unlock();
          return false;
       }
 
@@ -279,7 +279,7 @@ namespace arbtrie
        */
       bool try_start_move(node_location expected)
       {
-         mut().lock();
+         //mut().lock();
          do {
             uint64_t prior = _meta.load( std::memory_order_relaxed );
             do {
@@ -336,7 +336,7 @@ namespace arbtrie
          if( not (expected & const_mask ) ) [[unlikely]]
             _meta.notify_all();
 
-         mut().unlock();
+         //mut().unlock();
          return move_result::success;
       }
 

@@ -355,6 +355,7 @@ namespace arbtrie
          memmove( key_hashes() + lb_idx, key_hashes() + lb1, remain );
          memmove( key_offsets() + lb_idx, key_offsets() + lb1, remain*sizeof(key_index) );
          memmove( value_hashes() + lb_idx, value_hashes() + lb1, remain );
+         --_num_branches;
          return cur->total_size();
       }
       void set_value(int lb_idx, const value_type& val)

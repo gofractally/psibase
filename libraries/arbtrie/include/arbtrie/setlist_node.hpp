@@ -2,8 +2,6 @@
 #include <arbtrie/debug.hpp>
 #include <arbtrie/inner_node.hpp>
 
-#undef NDEBUG
-#include <assert.h>
 namespace arbtrie
 {
 
@@ -215,7 +213,7 @@ namespace arbtrie
       void remove_branch(int_fast16_t br)
       {
          assert( br > 0 );
-         assert(num_branches() > 1);  // cannot remove the last branch
+         assert(num_branches() > 0); 
          assert(br < max_branch_count);
 
          uint8_t ch  = uint8_t(br - 1);
