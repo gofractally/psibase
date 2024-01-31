@@ -19,14 +19,14 @@ namespace SystemService
    };
    PSIO_REFLECT(AuthDelegateRecord, account, owner)
 
-   /// The `auth-dlt-sys` service is an auth service that can be used to authenticate actions for accounts.
+   /// The `auth-dlg-sys` service is an auth service that can be used to authenticate actions for accounts.
    ///
    /// Any account using this auth service must store in this service the name of
    /// the other account that owns it.
    class AuthDelegateSys : public psibase::Service<AuthDelegateSys>
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("auth-dlt-sys");
+      static constexpr auto service = psibase::AccountNumber("auth-dlg-sys");
       using AuthDelegateTable = psibase::Table<AuthDelegateRecord, &AuthDelegateRecord::account>;
       using Tables            = psibase::ServiceTables<AuthDelegateTable>;
 

@@ -379,7 +379,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthDelegateSys.psi
     NAME AuthDelegateSys
     DESCRIPTION "Auth service that delegates authorization to another account"
-    SERVICE auth-dlt-sys
+    SERVICE auth-dlg-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegateSys.wasm
     DEPENDS wasm
 )
