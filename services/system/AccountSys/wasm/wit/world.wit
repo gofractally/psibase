@@ -23,10 +23,12 @@ interface imports {
    add-to-tx: func(msg: funccallparams);
 
 
+   transfer: func(msg: string);
+
 }
 
 interface token-sys {
-    transfer: func(msg: string);
+    transfer: func(msg: string) -> string;
 }
 
 world example {

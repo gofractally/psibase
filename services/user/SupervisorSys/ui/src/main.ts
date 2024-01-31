@@ -1,4 +1,7 @@
+import { createHash } from "crypto";
 import { connectToParent, connectToChild } from "penpal";
+
+const hash = (str: string) => createHash("sha256").update(str).digest("hex");
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>

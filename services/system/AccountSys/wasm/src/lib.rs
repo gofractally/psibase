@@ -1,6 +1,8 @@
 cargo_component_bindings::generate!();
 
 use bindings::component::account_sys::imports;
+// use bindings::component::account_sys::token_sys;
+
 use bindings::component::account_sys::types::Funccallparams;
 use bindings::component::account_sys::types::User;
 
@@ -11,7 +13,8 @@ struct Component;
 impl Guest for Component {
     fn numbers(num1: u8, num2: u8, doubleup: bool) -> String {
         let mutiplier: u8 = if doubleup { 2 } else { 1 };
-        // let y = token_sys::transfer("whatever");
+        let y = imports::transfer("from transfer whatever");
+        println!("I got {:?} from y", y);
 
         struct Par {
             service: String,

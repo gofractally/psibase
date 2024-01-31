@@ -25,6 +25,7 @@ for system_dir in "${system_services[@]}"; do
     # Copy files
     rm -rf "$full_path" && cp -R dist/ "$full_path"
 
+echo Copied $system_dir
     # Check for build.sh and execute if it exists
     check_and_execute_build "$root_dir"
 done
