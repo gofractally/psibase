@@ -26,7 +26,7 @@ namespace arbtrie
       }
    };
 
-   inline const char* thread_name(const char* n = nullptr)
+   inline const char* thread_name(const char* n = "unset-thread-name")
    {
       static thread_local const char* thread_name = n;
       if (n)

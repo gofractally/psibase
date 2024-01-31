@@ -64,7 +64,7 @@ namespace arbtrie
             _node_id(nid.to_int())
       {
          assert(fast_meta_address::from_int(_node_id) == nid);
-         assert( round_up_multiple<64>(size) == size );
+         assert( intptr_t(this) % 64 == 0 );
       }
 
       void      set_address(fast_meta_address a) { _node_id = a.to_int(); }

@@ -72,14 +72,15 @@ namespace arbtrie
       }
       const id_index* get_branch_end_ptr() const
       {
-         return ((id_index*)tail()) - branch_capacity() + num_branches() - has_eof_value();
+         return ((id_index*)tail()) - branch_capacity() + num_branches();
       }
 
-      bool can_add_branch() const { return (num_branches() - has_eof_value()) < branch_capacity(); }
+      bool can_add_branch() const { return num_branches() < branch_capacity(); }
       void add_branch(branch_index_type br, fast_meta_address b);
 
       void set_index(int idx, uint8_t byte, fast_meta_address adr)
       {
+     //    TRIEDENT_DEBUG( idx, "]  b: ", int(byte) );
          assert(idx < _num_branches);
          assert(adr.region == branch_region());
          assert( (char*)(get_branch_ptr()+idx) < tail() );
@@ -95,6 +96,7 @@ namespace arbtrie
             uint8_t last = sl.front();
             for (int i = 1; i < sl.size(); ++i)
             {
+               //TRIEDENT_DEBUG( "last: ", int(last), " < ", int(uint8_t(sl[i])) );
                if (uint8_t(sl[i]) <= last)
                {
                   assert(!"order invalid");
@@ -113,17 +115,14 @@ namespace arbtrie
          uint8_t br2 = br - 1;
          auto    sl  = get_setlist_ptr();
          auto    slp = sl;
-         auto    sle = slp + num_branches() - has_eof_value();
-         //        std::cerr << "sle - slp: " << sle-slp <<"\n";
+         auto    sle = slp + num_branches();
+
          while (slp != sle)
          {
             if (uint8_t(*slp) >= uint8_t(br2))
-            {
                return slp - sl;
-            }
             ++slp;
          }
-         //       std::cerr << "lsp- sl: " << slp-sl <<"\n";
          return slp - sl;
       }
 
@@ -148,18 +147,15 @@ namespace arbtrie
          if (p == e)
             return std::pair<branch_index_type, fast_meta_address>(max_branch_count, {});
          return std::pair<branch_index_type, fast_meta_address>(
-             char_to_branch(*p), {branch_region(), get_branch_ptr()[(p - s) + bool(_eof_value)]});
+             char_to_branch(*p), {branch_region(), get_branch_ptr()[(p - s)]});
       }
 
       void set_branch(branch_index_type br, fast_meta_address b)
       {
          assert(br < 257);
-         assert(not(br == 0 and not bool(_eof_value)));
+         assert( br > 0 );
          assert(b);
          assert(b.region == branch_region());
-
-         if (br == 0) [[unlikely]]
-            return set_eof(b);
 
          auto pos = get_setlist().find(br - 1);
          assert(pos != key_view::npos);
@@ -169,9 +165,7 @@ namespace arbtrie
       fast_meta_address get_branch(uint_fast16_t br) const
       {
          assert(br < 257);
-
-         if (br == 0) [[unlikely]]
-            return _eof_value;
+         assert(br > 0 );
 
          auto pos = get_setlist().find(br - 1);
          if (pos == key_view::npos)
@@ -199,13 +193,12 @@ namespace arbtrie
       inline void visit_branches_with_br(
           std::invocable<branch_index_type, fast_meta_address> auto&& visitor) const
       {
-         const bool        has_eof = has_eof_value();
          const auto*       slp     = get_setlist_ptr();
          const auto*       start   = get_branch_ptr();
-         const auto* const end     = start + num_branches() - has_eof;
+         const auto* const end     = start + num_branches();
          const auto*       ptr     = start;
 
-         if (has_eof)
+         if (has_eof_value())
             visitor(0, fast_meta_address(_eof_value));
 
          while (ptr != end)
@@ -221,16 +214,9 @@ namespace arbtrie
       // branch exists and is set
       void remove_branch(int_fast16_t br)
       {
+         assert( br > 0 );
          assert(num_branches() > 1);  // cannot remove the last branch
          assert(br < max_branch_count);
-         assert(br >= 0);
-
-         if (br == 0)
-         {
-            assert(has_eof_value());
-            set_eof(id_address());
-            return;
-         }
 
          uint8_t ch  = uint8_t(br - 1);
          auto    sl  = get_setlist();
@@ -250,7 +236,7 @@ namespace arbtrie
       inline static int_fast16_t alloc_size(const clone_config& cfg)
       {
          auto min_size =
-             sizeof(setlist_node) + cfg.prefix_cap + (cfg.branch_cap) * (sizeof(id_index) + 1);
+             sizeof(setlist_node) + cfg.prefix_capacity()+ (cfg.branch_cap) * (sizeof(id_index) + 1);
          return round_up_multiple<64>(min_size);
       }
 
@@ -261,7 +247,7 @@ namespace arbtrie
          assert(cfg.branch_cap < 192);
 
          auto pcap     = cfg.set_prefix ? cfg.set_prefix->size()
-                                        : std::max<int>(cfg.prefix_cap, src->prefix_size());
+                                        : std::max<int>(cfg.prefix_capacity(), src->prefix_size());
          auto bcap     = std::max<int>(cfg.branch_cap, src->num_branches());
          auto min_size = sizeof(setlist_node) + pcap + (bcap) * (sizeof(id_index) + 1);
 
@@ -301,24 +287,18 @@ namespace arbtrie
    inline void setlist_node::add_branch(branch_index_type br, fast_meta_address b)
    {
       assert(br < max_branch_count);
-      assert(br >= 0);
-      assert(not(br == 0 and _eof_value));
+      assert(br > 0);
       assert(b.region == branch_region());
 
       id_index* branches = get_branch_ptr();
-      if (br == 0) [[unlikely]]
-      {
-         set_eof(b);
-         return;
-      }
-      assert(_num_branches < branch_capacity());
+      assert(_num_branches <= branch_capacity());
 
       auto pos = lower_bound_idx(br);
 
       auto slp = get_setlist_ptr();
       auto blp = get_branch_ptr();
 
-      auto nbranch  = num_branches() - has_eof_value();
+      auto nbranch  = num_branches();
       auto sl_found = slp + pos;
       auto sl_end   = slp + nbranch;
 

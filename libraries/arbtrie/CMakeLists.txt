@@ -27,4 +27,4 @@ endif()
 
 
 add_subdirectory(programs)
-#add_subdirectory(test)
+add_subdirectory(test)

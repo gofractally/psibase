@@ -484,7 +484,7 @@ namespace arbtrie
 
          void unalloc(uint32_t size)
          {
-            auto rounded_size = (size + 15) & -16;
+            auto rounded_size = round_up_multiple<64>(size);
             if (_alloc_seg_ptr) [[likely]]
             {
                auto cap = _alloc_seg_ptr->_alloc_pos.load(std::memory_order_relaxed);

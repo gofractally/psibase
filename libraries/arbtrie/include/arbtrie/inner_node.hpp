@@ -90,6 +90,7 @@ namespace arbtrie
 
       void set_eof(fast_meta_address e) { _eof_value = e.to_address(); }
       bool has_eof_value() const { return _eof_value; }
+      fast_meta_address get_eof_value()const { return _eof_value; }
 
       void set_prefix(key_view pre)
       {

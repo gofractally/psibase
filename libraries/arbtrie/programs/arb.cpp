@@ -962,37 +962,6 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
                 << " words/sec  total items: " << add_comma(count) << " from " << filename << "\n";
       usleep(1000000 * 3);
    }
-
-   /*
-   {
-      auto          start = std::chrono::steady_clock::now();
-      std::ifstream file(filename);
-
-      std::vector<std::string> v;
-      std::string              str;
-
-      // Read the next line from File until it reaches the
-      // end.
-      while (file >> str)
-      {
-         std::string val = str;
-         for (auto& c : val)
-            c = toupper(c);
-         // Now keep reading next line
-         // and push it in vector function until end of file
-         v.push_back(str);
-      }
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-
-      std::cout << "vector loaded " << std::setw(12)
-                << add_comma(
-                       int64_t((v.size()) /
-                               (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                << " words/sec  total items: " << add_comma(v.size()) << " from " << filename
-                << "\n";
-   }
-   */
 }
 
 void test_iterator()

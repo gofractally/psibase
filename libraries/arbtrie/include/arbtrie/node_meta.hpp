@@ -105,13 +105,12 @@ namespace arbtrie
        */
       struct bitfield
       {
-         uint64_t ref : 12       = 0;
+         uint64_t ref : 14       = 0;
          uint64_t type : 4       = 0;
          uint64_t copy_flag : 1  = 0;  // set this bit on start of copy, clear it on start of modify
          uint64_t const_flag : 1 = 1;  // 0 when modifying, 1 when not
-         // the location divided by 16, 1024 TB addressable,
-         // upgrade to cacheline gives 4096 TB addressable
-         uint64_t location : 46 = 0;
+         // gives 1024 TB addressable cachelines
+         uint64_t location : 44 = 0;
 
          constexpr bitfield& from_int(uint64_t i)
          {
@@ -144,11 +143,12 @@ namespace arbtrie
      public:
       using temp_type = node_meta<uint64_t>;
 
-      static constexpr const uint64_t ref_mask      = make_mask<0, 12>();
-      static constexpr const uint64_t type_mask     = make_mask<12, 4>();
-      static constexpr const uint64_t copy_mask     = make_mask<16, 1>();
-      static constexpr const uint64_t const_mask    = make_mask<17, 1>();
-      static constexpr const uint64_t location_mask = make_mask<18, 46>();
+      static constexpr const int     location_offset = 20;
+      static constexpr const uint64_t ref_mask      = make_mask<0, 14>();
+      static constexpr const uint64_t type_mask     = make_mask<14, 4>();
+      static constexpr const uint64_t copy_mask     = make_mask<18, 1>();
+      static constexpr const uint64_t const_mask    = make_mask<19, 1>();
+      static constexpr const uint64_t location_mask = make_mask<location_offset, 44>();
 
       /**
        *  Because retain() uses fetch_add() there is a possability of
@@ -244,7 +244,6 @@ namespace arbtrie
          mut().lock();
          do {
             uint64_t prior = _meta.fetch_and( ~const_mask, std::memory_order_acquire );
-            assert( temp_meta_type( prior ).loc() == temp_meta_type(prior&~const_mask).loc() );
             if (not (prior & copy_mask) )
                return temp_type(prior);
 
@@ -258,8 +257,6 @@ namespace arbtrie
          // mem order release synchronizies with readers of the modification
          temp_type prior(_meta.fetch_or(const_mask, std::memory_order_release));
 
-         assert( prior.loc() == temp_meta_type(prior.to_int()|const_mask).loc() );
-
          // if a copy was started between start_modify() and end_modify() then
          // the copy bit would be set and the other thread will be waiting
          if (prior.is_copying())
@@ -271,7 +268,6 @@ namespace arbtrie
 
       bool end_move() {
          auto prior = _meta.fetch_and(~copy_mask, std::memory_order_release);
-         assert( temp_type(prior).loc() == temp_meta_type(prior&~copy_mask).loc() );
          if( not (prior & const_mask) )
             _meta.notify_all();
          mut().unlock();

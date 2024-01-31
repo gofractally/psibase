@@ -116,6 +116,10 @@ namespace arbtrie
          uint16_t   idx;  // the index to update
          value_type val;
       };
+      struct clone_remove
+      {
+         uint16_t   idx;  // the index to remove
+      };
 
       struct clone_insert
       {
@@ -135,6 +139,9 @@ namespace arbtrie
       inline static int alloc_size(const binary_node*  src,
                                    const clone_config& cfg,
                                    const clone_update& upv);
+      inline static int alloc_size(const binary_node*  src,
+                                   const clone_config& cfg,
+                                   const clone_remove& upv);
 
       //                     int lb_idx,
       //                    key_view           key,
@@ -159,6 +166,12 @@ namespace arbtrie
                   const binary_node*  src,
                   const clone_config& cfg,
                   const clone_update& upv);
+
+      binary_node(int_fast16_t        asize,
+                  fast_meta_address nid,
+                  const binary_node*  src,
+                  const clone_config& cfg,
+                  const clone_remove& upv);
 
       //            int lb_idx,
       //            key_view           key,
@@ -330,8 +343,24 @@ namespace arbtrie
          //s += (num_branches() == _branch_cap) << 2;
          //return s <= spare_capacity();
       }
+
+      // return the number of bytes removed
+      int remove_value( int lb_idx ) {
+         assert( lb_idx < num_branches() );
+         auto lb1 = lb_idx + 1;
+         auto remain = num_branches() - lb1;
+         
+         auto cur = get_key_val_ptr(lb_idx);
+
+         memmove( key_hashes() + lb_idx, key_hashes() + lb1, remain );
+         memmove( key_offsets() + lb_idx, key_offsets() + lb1, remain*sizeof(key_index) );
+         memmove( value_hashes() + lb_idx, value_hashes() + lb1, remain );
+         return cur->total_size();
+      }
       void set_value(int lb_idx, const value_type& val)
       {
+         assert( not val.is_remove() );
+
          auto& idx = key_offsets()[lb_idx];
          idx.type = val.is_object_id();
          assert( (char*)get_key_val_ptr(lb_idx) < tail() );

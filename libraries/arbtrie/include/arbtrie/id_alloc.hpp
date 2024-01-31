@@ -200,7 +200,7 @@ namespace arbtrie
          {
             if (ff_index == eofl)  //end_of_freelist.to_aligned())
                throw std::runtime_error("reached end of free list, that shouldn't happen!");
-            alloced_id = r + id_index(ff_index >> 18);
+            alloced_id = r + id_index(ff_index >> node_meta<>::location_offset);
             ffa        = &get(alloced_id);
 
             next_free = ffa->to_int(std::memory_order_seq_cst);

@@ -31,8 +31,8 @@ namespace arbtrie
       auto dcap = std::max<int>( cfg.data_cap, src->key_val_section_size() );
       dcap += calc_key_val_pair_size( ins.key, ins.val );
 
-      return round_up_multiple<64>(sizeof(binary_node)) +
-             round_up_multiple<64>(bcap * 4) + round_up_multiple<64>(dcap);
+      return round_up_multiple<64>(sizeof(binary_node) +
+             round_up_multiple<64>(bcap * 4) + dcap);
    }
    inline int binary_node::alloc_size(const binary_node*  src,
                                       const clone_config& cfg,
@@ -45,12 +45,24 @@ namespace arbtrie
       return round_up_multiple<64>(sizeof(binary_node)) +
              round_up_multiple<64>(bcap * 4) + round_up_multiple<64>(dcap);
    }
+   inline int binary_node::alloc_size(const binary_node*  src,
+                                      const clone_config& cfg,
+                                      const clone_remove& rem)
+   {
+      auto v = src->get_key_val_ptr(rem.idx);
+      auto bcap = std::max<int>( cfg.branch_cap, src->num_branches() - 1);
+      auto dcap = std::max<int>( cfg.data_cap, src->key_val_section_size() - v->total_size() );
+
+      return round_up_multiple<64>(sizeof(binary_node)) +
+             round_up_multiple<64>(bcap * 4) + round_up_multiple<64>(dcap);
+   }
 
    inline binary_node::binary_node(int_fast16_t        asize,
                                    fast_meta_address   nid,
                                    const clone_config& cfg)
        : node_header(asize, nid, node_type::binary), _alloc_pos(0)
    {
+      assert(asize <= 4096 );
       _branch_cap = round_up_multiple<64>(4*cfg.branch_cap)/4;
    }
 
@@ -61,6 +73,7 @@ namespace arbtrie
        : node_header(asize, nid, node_type::binary, src->num_branches()),
          _alloc_pos(src->_alloc_pos)
    {
+      assert(asize <= 4096 );
       assert(not cfg.set_prefix);
       assert(alloc_size(src, cfg) <= asize);
 
@@ -93,6 +106,7 @@ namespace arbtrie
                                    const clone_update& up)
        : node_header(asize, nid, node_type::binary, src->num_branches()), _alloc_pos(0)
    {
+      assert(asize <= 4096 );
       assert(alloc_size(src, cfg, up) <= asize);
       _branch_cap = src->_branch_cap;
 
@@ -135,6 +149,61 @@ namespace arbtrie
       assert(spare_capacity() >= 0);
       // TODO:  make sure all code that updates inline value() also
       // updates the value_hash field
+   }
+
+   /**
+    *  Called to update a particular key with a new value that is of
+    *  a different size or type that required growth and/or we needed
+    *  to clone a shared state to make it unique anyway.
+    *
+    *  Rather than copying the data from src as quickly as possible,
+    *  which would copy dead space, we will copy it in-order creating
+    *  a new compact node that has the updated value in the right spot.
+    */
+   inline binary_node::binary_node(int_fast16_t        asize,
+                                   fast_meta_address   nid,
+                                   const binary_node*  src,
+                                   const clone_config& cfg,
+                                   const clone_remove& rem)
+       : node_header(asize, nid, node_type::binary, src->num_branches()-1), _alloc_pos(0)
+   {
+      assert(asize <= 4096 );
+      assert(alloc_size(src, cfg, rem) <= asize);
+      _branch_cap = src->_branch_cap;
+
+      auto kh  = key_hashes();
+      auto ko  = key_offsets();
+      auto vh  = value_hashes();
+      auto skh = src->key_hashes();
+      auto sko = src->key_offsets();
+      auto svh = src->value_hashes();
+
+      memcpy(kh, skh, num_branches());
+
+      const auto nb = src->num_branches();
+
+      int ci = 0; // clone index
+      int i  = 0; // src index
+
+      auto copy_key = [&](){
+         auto kvp = src->get_key_val_ptr(i);
+         auto ts = kvp->total_size();
+         _alloc_pos += ts;
+         auto nkvp = get_key_val_ptr_offset(_alloc_pos);
+         memcpy(nkvp, kvp, ts);
+         ko[ci].type = sko[i].type;
+         ko[ci].pos  = _alloc_pos;
+         vh[ci]      = svh[i];
+         ++ci;
+      };
+
+      for (; i < rem.idx; ++i)
+         copy_key();
+
+      for( ++i; i < nb; ++i ) 
+         copy_key();
+
+      assert(spare_capacity() >= 0);
    }
 
    /**
@@ -334,122 +403,8 @@ namespace arbtrie
       assert( khp + lb1 + remain <= (uint8_t*)tail() );
       assert( ((char*)kop) + lb1 + (sizeof(key_index)*remain) <= tail() );
       assert( vhp + lb1 + remain <= (uint8_t*)tail() );
-
-      /*
-      for( int i = 0; i < num_branches(); ++i ) {
-         auto kvp = get_key_val_ptr(i);
-         assert( kvp->_key_size < 5 );
-      }
-      */
    }
 
-   /*
-   binary_node* binary_node::clone() {
-      binary_node* copy = (binary_node*)node_header::clone();
-    //  copy->retain_values();
-      return copy;
-   }
-   */
-   /*
-   void binary_node::retain_branches(){
-      auto* pos   = values();
-      const auto* end   = pos + num_branches();
-      while( pos != end ) {
-         retain( *pos++ );
-      }
-   }
-
-   void binary_node::release() {
-      auto* pos   = values();
-      const auto* end   = pos + num_branches();
-      while( pos != end ) {
-         release( *pos++ );
-      }
-   }
-   */
-
-   /*
-   inline binary_node* binary_node::make( key_view key, id_type val ) {
-      auto asize = sizeof(node_header) + sizeof(val) + key.size() + 1 + sizeof(uint16_t);
-      auto bn = node_header::make<binary_node>(asize,1);
-
-      auto p = bn->start_keys();
-      bn->key_offset(0) = bn->tail() - p;
-      bn->values()[0] = val;
-      *p++ = key.size();
-      memcpy( p, key.data(), key.size());
-      return bn;
-   }
-
-   binary_node* binary_node::clone_range(key_view minus_prefix, int from, int to)const {
-      const auto nbranch = to - from;
-      auto key_data_size = nbranch; // init with the size field of the keys
-      for( int k = from; k < to; ++k ) 
-         key_data_size +=  *get_key_ptr(k);
-      key_data_size -= minus_prefix.size()*nbranch;
-      const auto asize = sizeof(node_header) + nbranch*(sizeof(uint16_t)+sizeof(id_type)) + key_data_size;
-      auto nn = node_header::make<binary_node>( asize, nbranch );
-
-      memcpy( nn->values(), &value(from), nbranch * sizeof(id_type) );
-      auto nv = nn->values(); // grap ptr to values so we can retain them in following loop
-
-      auto nntail = nn->tail();
-      char* key_pos = nn->start_keys();
-      for( int i = 0; i < nbranch; ++i ) {
-         // TODO retain( *nv++ ); 
-
-         nn->key_offset(i) = nntail - key_pos;
-         auto fk = get_key( from+i );
-         auto nks = fk.size() - minus_prefix.size();
-         *key_pos++ = nks;
-//         std::cerr << "clone_range " << from << " -> " << to 
-//                   << " i: " << i <<" '"<<fk<<"'" 
-//                   << " prefix: '" << minus_prefix << "'\n";
-         memcpy( key_pos, fk.data() + minus_prefix.size(), nks );
-         key_pos += nks;
-      }
-      return nn;
-   }
-   */
-
-   /**
-    * Creates a copy of this node with key inserted in order into the
-    * index. Val will be stored as the value of the key and no reference
-    * incrementing will be done on val. 
-    */
-   /*
-   binary_node* binary_node::clone_add(key_view key, id_type val)const {
-      assert( find_key_idx(key) == -1 );
-
-      // The new node will be larger by 1 id_type for the value, 1 index, 1 byte to
-      // store the length of the key and length of the key
-      auto asize = _nsize + sizeof(id_type) + sizeof(uint16_t) + 1 + key.size();
-      auto t = node_header::make<binary_node>( asize, num_branches()+1 );
-      auto lb = lower_bound_idx(key);
 
 
-      // insert the new offset
-      memcpy( t->key_offsets(), key_offsets(), lb * sizeof(uint16_t) );
-      t->key_offset(lb) = t->key_section_size();
-      memcpy( &t->key_offset(lb+1), &key_offset(lb), sizeof(uint16_t)*(num_branches() - lb) );
-
-      // insert the new value
-      memcpy( t->values(), values(), lb * sizeof(id_type) );
-      t->values()[lb] = val;
-      // TODO: retain(val) should we increment ref of val here?
-      memcpy( t->values()+lb+1, values()+lb, sizeof(id_type)*(num_branches() - lb) );
-      
-       
-      // insert the new key
-      auto start_key = t->start_keys();
-      *start_key++ = key.size();
-      memcpy( start_key, key.data(), key.size() );
-      start_key += key.size();
-
-      // copy keys from this to new 
-      auto key_data_len = key_section_size();
-      memcpy( start_key, start_keys(), key_data_len );
-      return t;
-   }
-   */
 }  // namespace arbtrie

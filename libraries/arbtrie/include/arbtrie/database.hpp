@@ -22,11 +22,13 @@ namespace arbtrie
          update        = 4,  // fail if key doesn't exist
          same_region   = 8,
          remove        = 16,
+         must_remove_f = 32,
          upsert        = insert | update,
          unique_upsert = unique | upsert,
          unique_insert = unique | insert,
          unique_update = unique | update,
          unique_remove = unique | remove,
+         unique_must_remove = unique | must_remove_f | remove,
          shared_upsert = shared | upsert,
          shared_insert = shared | insert,
          shared_update = shared | update,
@@ -46,6 +48,8 @@ namespace arbtrie
       constexpr bool        must_insert() const { return not(flags & update); }
       constexpr bool        must_update() const { return not(flags & insert); }
       constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); }
+      constexpr bool        is_remove() const { return flags & remove; }
+      constexpr bool        must_remove() const { return flags & must_remove_f; }
 
       // private: structural types cannot have private members,
       // but the flags field is not meant to be used directly

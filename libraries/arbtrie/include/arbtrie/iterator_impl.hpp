@@ -24,7 +24,7 @@ namespace arbtrie
          }
          case node_type::full:
          {
-            auto b0 = rr.as<full_node>()->get_branch(0);
+            auto b0 = rr.as<full_node>()->get_eof_value();
             assert(b0);
             auto v = state.get(b0).as<value_node>()->value();
             auto s = v.size();
@@ -34,7 +34,7 @@ namespace arbtrie
          }
          case node_type::setlist:
          {
-            auto b0 = rr.as<setlist_node>()->get_branch(0);
+            auto b0 = rr.as<setlist_node>()->get_eof_value();
             assert(b0);
             auto v = state.get(b0).as<value_node>()->value();
             auto s = v.size();

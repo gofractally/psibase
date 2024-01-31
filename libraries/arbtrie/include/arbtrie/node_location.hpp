@@ -11,7 +11,7 @@ namespace arbtrie {
       constexpr node_location(uint64_t v = 0) : loc_div_align(v) {}
 
       public:
-      static constexpr uint32_t alignment = 16;
+      static constexpr uint32_t alignment = 64;
 
       uint32_t segment() const { return loc_div_align / (segment_size / alignment); }
       // index() into array of objects of size alignment
@@ -25,6 +25,7 @@ namespace arbtrie {
          return node_location(abs);
       }
       static constexpr node_location from_absolute(uint64_t abs) {
+         assert( abs % alignment == 0 );
          return node_location( abs / alignment );
       }
 
