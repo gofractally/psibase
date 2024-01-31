@@ -1,4 +1,4 @@
-cargo_component_bindings::generate!();
+mod bindings;
 
 use bindings::component::account_sys::imports;
 use bindings::component::account_sys::types::Funccallparams;
