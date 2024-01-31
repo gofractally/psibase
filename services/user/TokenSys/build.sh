@@ -4,8 +4,8 @@ rust_name="token_sys"
 
 cd $root_dir
 # Wasm component
-cd ./wasm
-cargo component build --release && cp target/wasm32-wasi/release/$rust_name.wasm ../ui/public/loader/functions.wasm
+cd ./plugin
+cargo component build --release && cp target/wasm32-wasi/release/$rust_name.wasm ../ui/public/loader/plugin.wasm
 
 # Account-Sys
 cd ../ui

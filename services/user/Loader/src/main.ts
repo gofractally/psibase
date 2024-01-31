@@ -31,7 +31,7 @@ const functionCall = async (param: FunctionCallParam) => {
   const { load } = await import("rollup-plugin-wit-component");
 
   // account.sys.psibase.io/loader
-  const url = "/loader/functions.wasm";
+  const url = "/loader/plugin.wasm";
 
   console.log("fetching wasm...");
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
