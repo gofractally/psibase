@@ -1,0 +1,38 @@
+{
+  "name": "@psibase/supervisor-plugin",
+  "version": "0.0.91",
+  "description": "plugin that allows client-side inter-app communication",
+  "main": "./dist/index.js",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf ./dist/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gofractally/psibase.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "fractally",
+    "email": "info@fractally.com",
+    "url": "https://psibase.io"
+  },
+  "engines": {
+    "node": ">=12.0"
+  },
+  "bugs": {
+    "url": "https://github.com/gofractally/psibase/issues"
+  },
+  "homepage": "https://github.com/gofractally/psibase#readme",
+  "devDependencies": {
+    "eslint-plugin-prettier": "^3.4.0",
+    "prettier": "^2.2.1",
+    "typescript": "^4.2.4"
+  },
+  "dependencies": {
+    "penpal": "^6.2.2"
+  }
+}

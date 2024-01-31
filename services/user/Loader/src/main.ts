@@ -23,14 +23,38 @@ const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
 
 // const wasmUrl = (service: string) => `./${service}.wasm`;
 
+// 1. pendingFunction generator
+// 2. Create environment where cached data is available in the JS importables environment during runtime.
+//
+
+interface Importables {
+  [key: string]: string;
+}
+
+const runWasm = async (
+  wasm: ArrayBuffer,
+  importables: Importables,
+  method: string,
+  params: any[]
+) => {
+  // @ts-ignore
+  const { load } = await import("rollup-plugin-wit-component");
+
+  const { mod, imports, exports, files } = await load(
+    // @ts-expect-error fff
+    /* @vite-ignore */ wasmBytes,
+    importables
+  );
+  console.timeEnd("Load");
+
+  console.log(mod, "is the module I have", { imports, exports, files });
+  return mod[method](...params);
+};
+
 const functionCall = async (param: FunctionCallParam) => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
-  console.log("loading js... new hcange!");
-  const { load } = await import("rollup-plugin-wit-component");
-
-  // account.sys.psibase.io/loader
   const url = "/loader/plugin.wasm";
 
   console.log("fetching wasm...");
@@ -40,22 +64,13 @@ const functionCall = async (param: FunctionCallParam) => {
   //   console.log('from imported code: ', string);
   // };`;
 
-  let importables = [
+  let importables: Importables[] = [
     { [`component:${param.service}/imports`]: importableCode },
   ];
 
   console.log("loading wasm...");
 
   console.time("Load");
-  const { mod, imports, exports, files } = await load(
-    // @ts-expect-error fff
-    /* @vite-ignore */ wasmBytes,
-    importables
-  );
-  console.timeEnd("Load");
-
-  console.log(mod, "is the module I have", { imports, exports, files });
-  return mod[param.method](...param.params);
 };
 
 const connection = connectToParent({

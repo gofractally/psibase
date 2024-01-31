@@ -183,7 +183,7 @@ function App() {
             <div className="flex items-center gap-2">
                 <WalletIcon />
                 <Heading tag="h1" className="select-none text-gray-600">
-                    Wallet
+                    Mike's Wallet
                 </Heading>
             </div>
             <div>
