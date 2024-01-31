@@ -500,49 +500,52 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
 /// their corresponding imported functions in a `dest` module.
 /// 
 /// This also strips out unused functions from the final module.
-pub fn link(source: &[u8], dest: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    let source_module = Module::from_buffer(source)?;
-    let mut dest_module = Module::from_buffer(dest)?;
+pub fn link_module(source : &Module, dest : &mut Module) -> Result<(), anyhow::Error> {
+    validate_polyfill(&source)?;
+    validate_fill_target(dest)?;
 
-    validate_polyfill(&source_module)?;
-    validate_fill_target(&dest_module)?;
-
-    if should_polyfill(&dest_module) {
-        if let Some(targets) = get_polyfill_targets(&source_module, &dest_module)? 
+    if should_polyfill(dest) {
+        if let Some(targets) = get_polyfill_targets(&source, &dest)? 
         {
             for target in targets {
                 let PolyfillTarget {source_fid, dest_fid} = target;
 
                 // Get import ID
-                let import_id = dest_module.imports.get_imported_func(dest_fid).map(|i| i.id()).unwrap();
+                let import_id = dest.imports.get_imported_func(dest_fid).map(|i| i.id()).unwrap();
                 
-                // Copy the function into a new local function in the `dest_module`
-                let new_func = copy_func(source_fid, &source_module, &mut dest_module)?;
+                // Copy the function into a new local function in the `dest`
+                let new_func = copy_func(source_fid, &source, dest)?;
 
                 // Replace the old imported function with the new local function and delete the old import.
-                let dest_func = dest_module.funcs.get_mut(dest_fid);
+                let dest_func = dest.funcs.get_mut(dest_fid);
                 dest_func.kind = FunctionKind::Local(new_func);
-                dest_module.imports.delete(import_id);
+                dest.imports.delete(import_id);
             }
         }
     }
 
-    walrus::passes::gc::run(&mut dest_module);
+    walrus::passes::gc::run(dest);
+
+    // TODO: support debugging
+    // Prior version of this linker removed all custom sections because it was annoying to 
+    // keep them updated while reordering and modifying functions. But now that we are using
+    // walrus, dwarf data already in the dest module should be left intact.
+    // To support debugging, don't delete the custom sections, might also need to skip binaryen.
+
+    Ok(())
+}
+
+/// Produce a module that links exported functions in the `source` module to 
+/// their corresponding imported functions in a `dest` module.
+/// 
+/// This also strips out unused functions from the final module.
+/// This function exposes a purely &[u8] interface. See `link_module` for an interface
+/// that accepts walrus modules directly.
+pub fn link(source: &[u8], dest: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+    let source_module = Module::from_buffer(source)?;
+    let mut dest_module = Module::from_buffer(dest)?;
+
+    link_module(&source_module, &mut dest_module)?;
 
     Ok(dest_module.emit_wasm())
-
-
-    // // Remove all custom sections; psibase doesn't need them
-    // // and this is easier than translating them.
-    // //
-    // // TODO: need an option to to support debugging.
-    // //       * Don't trim out or reorder functions, since
-    // //         editing DWARF is a PITA
-    // //       * Leave custom sections as-is
-    // //       * Might also need to skip binaryen
-    // let sections = module.sections_mut();
-    // *sections = sections
-    //     .drain(..)
-    //     .filter(|s| !matches!(s, Section::Custom(_)))
-    //     .collect();
 }
