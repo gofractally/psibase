@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use anyhow::anyhow;
-use walrus::{FunctionId, Module, InstrSeqBuilder, LocalFunction, FunctionKind};
+use walrus::{FunctionId, FunctionKind, InstrSeqBuilder, LocalFunction, LocalId, Module, ValType};
 use walrus::FunctionKind::{Import, Local, Uninitialized};
 use walrus::ir::{Instr, InstrSeqId};
 
@@ -195,7 +197,10 @@ fn to_dest_func(source_fid : FunctionId, source : &Module, dest : &mut Module ) 
 /// in a `dest` module.
 /// 
 /// Returns the id of the new sequence
-fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module) -> Result<InstrSeqId, anyhow::Error> {
+fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, source : &Module, dest_seq : &mut InstrSeqBuilder, dest : &mut Module, id_maps : &mut IdMaps) -> Result<InstrSeqId, anyhow::Error> {
+    // Update the id map with the id of this new sequence. Needed to correctly identify 
+    // the corresponding target sequence id for a given source sequence id in a br instruction
+    id_maps.seq_id_map.insert(source_block_id, dest_seq.id());
 
     // Get the instructions from the specified source block
     let instrs = source_function.block(source_block_id).instrs.iter().map(|(instr, _)|{instr});
@@ -206,36 +211,38 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
     for instr in instrs {
 
         match instr {
-            Instr::RefFunc(ref_func_ins ) => {
-                let mut i = ref_func_ins.clone();
+            // Function reference updates
+            Instr::RefFunc(func_ref ) => {
+                let mut i = func_ref.clone();
                 i.func = to_dest_func(i.func, source, dest)?;
                 dest_seq.instr(i);
             }
-            Instr::Call(call_ins) => {
-                let mut i = call_ins.clone();
+            Instr::Call(func_ref) => {
+                let mut i = func_ref.clone();
                 i.func = to_dest_func(i.func, source, dest)?;
                 dest_seq.instr(i);
             }
             
-            Instr::Block(block_ins) => {
-                let mut i = block_ins.clone();
+            // Sequence reference updates
+            Instr::Block(seq_ref) => {
+                let mut i = seq_ref.clone();
                 let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
-                i.seq = to_dest_seq(i.seq, source_function, source, &mut new_dest_sequence, dest)?;
+                i.seq = to_dest_seq(i.seq, source_function, source, &mut new_dest_sequence, dest, id_maps)?;
                 dest_seq.instr(i);
             }
-            Instr::Loop(loop_ins) => {
-                let mut i = loop_ins.clone();
+            Instr::Loop(seq_ref) => {
+                let mut i = seq_ref.clone();
                 let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
-                i.seq = to_dest_seq( i.seq, source_function, source, &mut new_dest_sequence, dest)?;
+                i.seq = to_dest_seq( i.seq, source_function, source, &mut new_dest_sequence, dest, id_maps)?;
                 dest_seq.instr(i);
             }
-            Instr::IfElse(if_else_ins) => {
-                let mut i = if_else_ins.clone();
+            Instr::IfElse(if_else) => {
+                let mut i = if_else.clone();
                 let mut new_dest_seq_1 = dest_seq.dangling_instr_seq(None);
-                i.consequent = to_dest_seq(i.consequent, source_function, source, &mut new_dest_seq_1, dest)?;
+                i.consequent = to_dest_seq(i.consequent, source_function, source, &mut new_dest_seq_1, dest, id_maps)?;
 
                 let mut new_dest_seq_2 = dest_seq.dangling_instr_seq(None);
-                i.alternative = to_dest_seq(i.alternative, source_function, source, &mut new_dest_seq_2, dest)?;
+                i.alternative = to_dest_seq(i.alternative, source_function, source, &mut new_dest_seq_2, dest, id_maps)?;
 
                 dest_seq.instr(i);
             }
@@ -300,20 +307,42 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
             // Local reference updates
             Instr::LocalGet(local_ref) => {
                 let mut i = local_ref.clone();
-                let ty = source.locals.get(local_ref.local).ty();
-                i.local = dest.locals.add(ty);
+                i.local = id_maps.to_dest_loc_id(&local_ref.local, source.locals.get(i.local).ty(), dest);
                 dest_seq.instr(i);
             }
             Instr::LocalSet(local_ref) => {
                 let mut i = local_ref.clone();
-                let ty = source.locals.get(local_ref.local).ty();
-                i.local = dest.locals.add(ty);
+                i.local = id_maps.to_dest_loc_id(&local_ref.local, source.locals.get(i.local).ty(), dest);
                 dest_seq.instr(i);
             }
             Instr::LocalTee(local_ref) => {
                 let mut i = local_ref.clone();
-                let ty = source.locals.get(local_ref.local).ty();
-                i.local = dest.locals.add(ty);
+                i.local = id_maps.to_dest_loc_id(&local_ref.local, source.locals.get(i.local).ty(), dest);
+                dest_seq.instr(i);
+            }
+
+            // Branch sequence id updates
+            // "Labels are targets for branch instructions that reference them with label indices. 
+            // Unlike with other index spaces, indexing of labels is relative by nesting depth..."
+            // https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions
+            Instr::Br(block_ref) => {
+                let mut i = block_ref.clone();
+                i.block = id_maps.get_mapped_seq(&block_ref.block, "Br instruction references untracked sequence ID")?;
+                dest_seq.instr(i);
+            }
+            Instr::BrIf(block_ref) => {
+                let mut i = block_ref.clone();
+                i.block = id_maps.get_mapped_seq(&block_ref.block, "BrIf instruction references untracked sequence ID")?;
+                dest_seq.instr(i);
+            }
+            Instr::BrTable(block_table_ref) => {
+                let mut i = block_table_ref.clone();
+                let mut blocks : Vec<InstrSeqId> = vec![];
+                for b in i.blocks.into_vec().iter() {
+                    blocks.push(id_maps.get_mapped_seq(&b, "BrTable instruction references untracked sequence ID")?);
+                }
+                i.blocks = blocks.into();
+                i.default = id_maps.get_mapped_seq(&i.default, "BrTable instruction references untracked sequence ID")?;
                 dest_seq.instr(i);
             }
 
@@ -367,14 +396,6 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
                 return Err(anyhow!("Error: Polyfill module has unsupported instruction: ElemDrop"));
             }
 
-            // Branch sequences shouldn't need updates since they use relative indices:
-            // "Labels are targets for branch instructions that reference them with label indices. 
-            // Unlike with other index spaces, indexing of labels is relative by nesting depth..."
-            // https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions
-            Instr::Br(i) => {dest_seq.instr(i.clone());}
-            Instr::BrIf(i) => {dest_seq.instr(i.clone());}
-            Instr::BrTable(i) => {dest_seq.instr(i.clone());}
-
             // List every other instruction type, to enforce that new types are properly handled
             Instr::Const(i) => {dest_seq.instr(i.clone());}
             Instr::Binop(i) => {dest_seq.instr(i.clone());}
@@ -396,6 +417,48 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
     Ok(dest_seq.id())
 }
 
+/// Tracks the ids from a source wasm and their corresponding new id
+/// created in the destination wasm. 
+/// 
+/// Needed to ensure that various instructions in the destination are 
+/// consistently referencing the correct ids.
+struct IdMaps {
+    seq_id_map : HashMap<InstrSeqId, InstrSeqId>,
+    loc_id_map : HashMap<LocalId, LocalId>,
+}
+
+impl IdMaps {
+    fn get_mapped_seq(&self, seq_id: &InstrSeqId, err : &str) -> Result<InstrSeqId, anyhow::Error> {
+        if let Some(id) = self.seq_id_map.get(seq_id) {
+            return Ok(*id);
+        } else {
+            return Err(anyhow!(err.to_owned()));
+        }
+    }
+    
+    // Creates a new local in the dest module if this is the first time
+    // we have seen the specified local from the source module `loc_id`.
+    // If we have already seen a reference to this source local, then we
+    // replace the reference to the corresponding (already created) target local.
+    fn to_dest_loc_id(&mut self, loc_id: &LocalId, local_type : ValType, dest : &mut Module) -> LocalId {
+        if let Some(local_id) = self.loc_id_map.get(loc_id) {
+            return *local_id;
+        } else {
+            let new_local = dest.locals.add(local_type);
+            self.loc_id_map.insert(*loc_id, new_local);
+            return new_local;
+        }
+    }
+}
+
+impl Default for IdMaps {
+    fn default() -> Self {
+        IdMaps {
+            seq_id_map: HashMap::new(),
+            loc_id_map: HashMap::new(),
+        }
+    }
+}
 
 /// Copy all instructions from a function in a `source` module to a new function 
 /// in a `dest` module.
@@ -412,20 +475,24 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
     let tid = source_local_func.ty();
     let ty = source.types.get(tid);
     let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
+
+    
     let mut builder = walrus::FunctionBuilder::new(&mut dest.types, &params, &results);
+    
 
     // Copy the sequence of instructions in a function from a `source` module into 
     // the new `dest` instruction sequence. 
     let instr_seq_id = source_local_func.entry_block();
     let dest_instr_builder = &mut builder.func_body();
-    to_dest_seq(instr_seq_id, &source_local_func, source, dest_instr_builder, dest)?;
+    let mut id_maps: IdMaps = Default::default();
+    to_dest_seq(instr_seq_id, &source_local_func, source, dest_instr_builder, dest, &mut id_maps)?;
 
     // Make the new local function
     let args = params
         .iter()
         .map(|val_type| dest.locals.add(*val_type))
         .collect::<Vec<_>>();
-    
+
     Ok(builder.local_func(args))
 }
 
@@ -436,8 +503,6 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
 pub fn link(source: &[u8], dest: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
     let source_module = Module::from_buffer(source)?;
     let mut dest_module = Module::from_buffer(dest)?;
-    
-    walrus::passes::gc::run(&mut dest_module);
 
     validate_polyfill(&source_module)?;
     validate_fill_target(&dest_module)?;
