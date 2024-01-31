@@ -119,9 +119,8 @@ const connection = connectToParent({
 });
 
 connection.promise.then((parent) => {
-  console.info("this one!");
   // @ts-ignore
-  parent.add(3, 1).then((total) => console.log(total));
+  parent.add(3, 1).then((total) => console.log("Called add on parent and got: ", total));
 });
 
 // Create an iframe with a source of https://app.psibase.io/plugin.html

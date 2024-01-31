@@ -23,7 +23,8 @@ for system_dir in "${system_services[@]}"; do
     full_path="$root_dir$target_dir"
 
     # Copy files
-    rm -rf "$full_path" && mkdir -p "$full_path" && cp -R dist/ "$full_path"
+    echo $full_path
+    rm -rf "$full_path" && mkdir -p "$full_path" && cp -R dist/* "$full_path"
 
     # Check for build.sh and execute if it exists
     check_and_execute_build "$root_dir"
@@ -36,7 +37,8 @@ for user_dir in "${user_services[@]}"; do
     full_path="$root_dir$target_dir"
 
     # Copy files
-    rm -rf "$full_path" && mkdir -p "$full_path" && cp -R dist/ "$full_path"
+    echo $full_path
+    rm -rf "$full_path" && mkdir -p "$full_path" && cp -R dist/* "$full_path"
 
     # Check for build.sh and execute if it exists
     check_and_execute_build "$root_dir"
