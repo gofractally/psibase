@@ -5,7 +5,7 @@ function App() {
   const run = async () => {
     const res = await connect();
 
-    console.log(res, "came back");
+    console.log(res, "about to call functionCall");
     const back = await res.functionCall({
       service: "app2",
       method: "",
