@@ -158,6 +158,7 @@ Each peer has the following fields:
 | `admin_authz[n].mode`    | String            | One of `r` or `rw`                                                                                                                                                                                        |
 | `admin_authz[n].address` | String            | (`ip` only) The client's IP address                                                                                                                                                                       |
 | `admin_authz[n].key`     | String            | (`bearer` only) The key used to verify bearer tokens                                                                                                                                                      |
+| `http_timeout`           | Number            | The timeout in microseconds before the server closes idle connections                                                                                                                                     |
 | `loggers`                | Object            | A description of the [destinations for log records](#logging)                                                                                                                                             |
 
 Example:

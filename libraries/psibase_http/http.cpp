@@ -489,7 +489,7 @@ namespace psibase::http
          if (keep_alive)
          {
             auto sec = std::chrono::duration_cast<std::chrono::seconds>(
-                           server.http_config->idle_timeout_ms)
+                           std::chrono::microseconds{server.http_config->idle_timeout_us.load()})
                            .count();
             res.set(bhttp::field::keep_alive, "timeout=" + std::to_string(sec));
          }
@@ -1656,7 +1656,8 @@ namespace psibase::http
 
       void start_socket_timer(std::shared_ptr<SessionType>&& self)
       {
-         _expiration = steady_clock::now() + server.http_config->idle_timeout_ms;
+         _expiration = steady_clock::now() +
+                       std::chrono::microseconds{server.http_config->idle_timeout_us.load()};
          _timer->expires_at(_expiration);
          _timer->async_wait(
              [this, self = std::move(self)](beast::error_code ec) mutable
@@ -1665,7 +1666,7 @@ namespace psibase::http
                 {
                    return;
                 }
-                if (steady_clock::now() <= _expiration)
+                if (steady_clock::now() >= _expiration)
                 {
                    beast::error_code ec;
                    derived_session().close_impl(ec);
@@ -1707,6 +1708,9 @@ namespace psibase::http
       void on_read(beast::error_code ec, std::size_t bytes_transferred)
       {
          boost::ignore_unused(bytes_transferred);
+
+         if (_closed)
+            return;
 
          // This means they closed the connection
          if (ec == bhttp::error::end_of_stream)
@@ -1753,6 +1757,9 @@ namespace psibase::http
       void on_write(bool close, beast::error_code ec, std::size_t bytes_transferred)
       {
          boost::ignore_unused(bytes_transferred);
+
+         if (_closed)
+            return;
 
          if (ec)
          {
