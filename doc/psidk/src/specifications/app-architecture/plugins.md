@@ -66,9 +66,9 @@ Therefore `postMessage` does not immediately (synchronously) post to the other d
 
 ## Cross-domain security considerations
 
-Cross-domain messaging can be dangerous if the proper checks are not in place to ensure that the messages are going to/from whoever is intended. 
+It is important that plugins are instantiated in their own context on the client-side, and they use some middleware to communicate with each other (in our case, the supervisor). If the plugins were to be directly composed into a single component (directly calling another's exports) then there would be no way for the callee to know the identity of the caller. Routing calls through the supervisor allows the supervisor to enforce that the identity of the caller can be accessed from the callee, which allows the callee to construct permissions based on the caller's identity.
 
-The supervisor listens for cross-domain messages from its parent window and from the plugins it instantiates, and plugins will only listen for messages that come directly from the supervisor.
+Currently, the design is such that plugins are each instantiated in their own iframe and can only communicate via cross-domain messaging through `Window.postmessage`. The supervisor listens for cross-domain messages from its parent window and from the plugins it instantiates, and plugins will only listen for messages that come directly from the supervisor.
 
 If plugins make use of the standard psibase development libraries, then many of the security concerns are handled automatically. For example, it is automatically enforced that messages into your plugin are only allowed to come from the supervisor.
 
@@ -264,7 +264,7 @@ Although the code executes client-side, plugins are very similar to services. Fo
 
 Furthermore, writing a plugin often requires detailed knowledge about how to correctly call service actions, and in what order. 
 
-For these reasons, plugins should be thought of as the responsibility of the back-end / service developer. Correspondingly, they can be written in the same programming language as services.
+For these reasons, plugins should be thought of as the responsibility of the back-end / service developer.
 
 # Updating plugins
 
