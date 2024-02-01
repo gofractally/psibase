@@ -366,7 +366,7 @@ psibase_package(
         DATA      ${COMMON_SYS}/common-lib/dist/common-lib.js common/common-lib.js
         DATA GLOB ${COMMON_SYS}/common/*.mjs                  common/
         DATA      ${COMMON_SYS}/common/fonts                  common/fonts
-        DATA      ${COMMON_SYS}/ui/vanilla/common.index.html  ui/common.index.html
+        # DATA      ${COMMON_SYS}/ui/vanilla/common.index.html  ui/common.index.html
         DATA GLOB ${COMMON_SYS}/ui/dist/*                     /
         DATA GLOB ${THIRD_FILES}                              common
     DEPENDS ${CommonSys_js_dep}
