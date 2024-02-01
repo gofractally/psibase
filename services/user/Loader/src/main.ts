@@ -33,16 +33,16 @@ interface Importables {
 
 const runWasm = async (
   wasm: ArrayBuffer,
-  importables: Importables,
+  importables: Importables[],
   method: string,
   params: any[]
 ) => {
-  // @ts-ignore
   const { load } = await import("rollup-plugin-wit-component");
 
+  console.time("Load");
   const { mod, imports, exports, files } = await load(
     // @ts-expect-error fff
-    /* @vite-ignore */ wasmBytes,
+    wasm,
     importables
   );
   console.timeEnd("Load");
@@ -60,17 +60,12 @@ const functionCall = async (param: FunctionCallParam) => {
   console.log("fetching wasm...");
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
 
-  // const importableCode = `export function prnt(string) {
-  //   console.log('from imported code: ', string);
-  // };`;
-
   let importables: Importables[] = [
     { [`component:${param.service}/imports`]: importableCode },
   ];
 
-  console.log("loading wasm...");
-
-  console.time("Load");
+  const res = await runWasm(wasmBytes, importables, param.method, param.params);
+  return res;
 };
 
 const connection = connectToParent({
