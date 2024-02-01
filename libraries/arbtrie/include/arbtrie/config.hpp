@@ -7,18 +7,6 @@ namespace arbtrie {
    static constexpr const uint64_t GB = 1024ull * MB;
    static constexpr const uint64_t TB = 1024ull * GB;
 
-   /**
-    *  If true then compactor will detect when a modify occurred 
-    *  while copying and try again. The modify thread will never block,
-    *  but will notify the copy thread if it is waiting.
-    *
-    *  If false then the modify thread will wait for the pending copy
-    *  to complete and the compactor thread will wake it up once
-    *  the copy is complete. 
-    *
-    *  False avoids UB, true tests and checks for UB.
-    */
-   static constexpr const bool     use_wait_free_modify = false;
 
    /**
     *  Certain 
@@ -75,6 +63,11 @@ namespace arbtrie {
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
    static constexpr const uint64_t segment_size = 64*MB;
+
+   // the number of empty bytes allowed in a segment before it gets
+   // compacted
+   static constexpr const uint64_t segment_empty_threshold = segment_size/8;
+   static_assert( segment_empty_threshold < segment_size );
                                                             
    // the maximum value a node may have
    static constexpr const uint64_t max_value_size = segment_size / 2;

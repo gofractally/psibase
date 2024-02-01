@@ -393,7 +393,7 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 5;
+         const int                  rounds = 50;
          const int                  count  = 1'000'000;
 
          auto iterate_all = [&]()
@@ -802,6 +802,7 @@ int  main(int argc, char** argv)
                int64_t                    tc = 0;
                int                        cn = 0;
                std::optional<node_handle> lr;
+               std::optional<node_handle> tmp;
                while (not done.load(std::memory_order_relaxed))
                {
                   {
@@ -813,10 +814,15 @@ int  main(int argc, char** argv)
                      }
                      lr = rs.adopt(*last_root);
                   }
-                  auto itr    = rs.create_iterator(*lr);
+                  tmp = lr;
+                  lr.reset();
+
+                  auto itr    = rs.create_iterator(*tmp);
                   int  roundc = 100000;
-                  for (int i = 0; i < roundc; ++i)
+                  int added = 0;
+                  for (int i = 0; i < batch_size; ++i)
                   {
+                     ++added;
                      uint64_t val = rand64();  //bswap(++seq2);
                      //auto str = std::to_string(val);
                      key_view kstr((char*)&val, sizeof(val));
@@ -829,15 +835,19 @@ int  main(int argc, char** argv)
                      {
                         //  std::cerr << "everything ok "<<val <<"\n";
                      }
+                     if( (i & 0x4ff) == 0 )
+                     {
+                        read_count.fetch_add(added, std::memory_order_relaxed);
+                        added = 0;
+                     }
                   }
-                  read_count.fetch_add(roundc, std::memory_order_relaxed);
                }
             };
             rthreads.emplace_back(new std::thread(read_loop));
          }
 
          std::cerr << "insert dense rand while reading " << rthreads.size() << " threads\n";
-         for (int ro = 0; ro < rounds*8; ++ro)
+         for (int ro = 0; ro < 2000*5; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -849,6 +859,12 @@ int  main(int argc, char** argv)
                ws.insert(r, kstr, kstr);
                if (not last_root)
                   last_root = r;
+               if( i % batch_size == 0 ) {
+                  {
+                     std::unique_lock lock(_lr_mutex);
+                     last_root = r;
+                  }
+               }
             }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;

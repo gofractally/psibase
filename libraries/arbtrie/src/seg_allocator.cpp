@@ -1,5 +1,6 @@
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/seg_allocator.hpp>
+#include <arbtrie/binary_node.hpp>
 
 namespace arbtrie
 {
@@ -142,7 +143,7 @@ namespace arbtrie
       }
 
       // segments must be at least 25% empty before compaction is considered
-      if (most_empty_seg_num == -1ull or most_empty_seg_free < segment_size / 16)
+      if (most_empty_seg_num == -1ull or most_empty_seg_free < segment_empty_threshold)
       {
          return false;
       }
@@ -225,7 +226,11 @@ namespace arbtrie
 
          if( obj_ref.try_start_move( obj_ref.loc() ) ) [[likely]]
          {
-            memcpy(ptr, foo, obj_size);
+            if( obj_ref.type() == node_type::binary ) {
+               copy_binary_node( (binary_node*)ptr, (const binary_node*)foo ); 
+            } else {
+               memcpy(ptr, foo, obj_size);
+            }
             if( node_meta_type::success != obj_ref.try_move( obj_ref.loc(), loc ) ) 
                 ses.unalloc(obj_size);
          } else {
@@ -444,6 +449,7 @@ namespace arbtrie
          if (r)
             std::cerr << "MLOCK RETURNED: " << r << "  EINVAL:" << EINVAL << "  EAGAIN:" << EAGAIN
                       << "\n";
+        
 
          // for debug we clear the memory
          // assert(memset(sp, 0xff, segment_size));  // TODO: is this necessary?

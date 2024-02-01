@@ -72,6 +72,10 @@ namespace arbtrie
            return *this;
         }
 
+        void reset() {
+           release();
+        }
+
 
      private:
         void release();

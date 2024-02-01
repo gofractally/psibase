@@ -139,12 +139,10 @@ namespace arbtrie
       {
          // reserve() is thread safe and if two threads both try to alloc then
          // only one will actually do the work.
-         TRIEDENT_WARN("growing all id regions because use count(", prior_ucount, ") of region(",
-                       r.region, ") exceeded cap: numpages: ", num_pages, " -> ", num_pages + 1);
-         if (num_pages > 3)
-         {
-            TRIEDENT_WARN("usleep 3");
-            usleep(3 * 1000000);
+         if( num_pages > 3 ) {
+            TRIEDENT_WARN("growing all id regions because use count(", prior_ucount, ") of region(",
+                          r.region, ") exceeded cap: numpages: ", num_pages, " -> ", num_pages + 1);
+            // TODO: calculate a load factor before warning
          }
          num_pages = _block_alloc.reserve(num_pages + 1, true);
       }

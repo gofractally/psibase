@@ -322,7 +322,7 @@ namespace arbtrie
       bool insert_requires_refactor(key_view k, const value_type& v) const
       {
          auto space_req = 4 + calc_key_val_pair_size(k, v) + 32 * 4;
-         return (size() - spare_capacity() + space_req) > binary_refactor_threshold;
+         return num_branches() >= 254 or (size() - spare_capacity() + space_req) > binary_refactor_threshold;
       }
       bool update_requires_refactor(const key_val_pair* existing, const value_type& new_val) const
       {
@@ -474,6 +474,7 @@ namespace arbtrie
       }
       int lower_bound_idx(std::string_view key) const
       {
+         __builtin_prefetch( tail() - _alloc_pos );
          int left  = -1;
          int right = num_branches();
          while (right - left > 1)
