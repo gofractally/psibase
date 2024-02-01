@@ -119,8 +119,11 @@ const connection = connectToParent({
 });
 
 connection.promise.then((parent) => {
-  // @ts-ignore
-  parent.add(3, 1).then((total) => console.log("Called add on parent and got: ", total));
+  parent
+    // @ts-ignore
+    .add(3, 1)
+    // @ts-ignore
+    .then((total) => console.log("Called add on parent and got: ", total));
 });
 
 // Create an iframe with a source of https://app.psibase.io/plugin.html
@@ -137,4 +140,4 @@ connection.promise.then((parent) => {
 // Function is called `call` no params, returns a string
 
 // npm create vite@latest App1 -- --template react-ts
-// psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree psispace-sys / ./dist/ -S app2
+// psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload -r psispace-sys ./dist / -S supervisor-sys
