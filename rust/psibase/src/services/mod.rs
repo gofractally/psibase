@@ -10,6 +10,7 @@ pub mod cpu_sys;
 #[allow(non_snake_case)]
 pub mod nft_sys;
 
+pub mod package_sys;
 pub mod producer_sys;
 pub mod proxy_sys;
 pub mod psispace_sys;

@@ -8,7 +8,7 @@
 ## Build Instructions
 
 -   building will create `dist` directory
--   `psibase upload-tree psispace-sys / ./dist`
+-   `psibase upload -r psispace-sys ./dist /`
 
 ## Making sure your built files are bootstrapped with new tester and new chain
 

@@ -36,6 +36,8 @@ namespace psibase
       std::vector<std::span<const char>> codeSpan() const;
       std::vector<std::span<const char>> linearMemorySpan() const;
 
+      bool needGenesis() const;
+
       std::unique_ptr<SystemContext> getSystemContext();
       void                           addSystemContext(std::unique_ptr<SystemContext> context);
    };

@@ -1,18 +1,19 @@
 #pragma once
 
-#include <psibase/AccountNumber.hpp>
-#include <psibase/Rpc.hpp>
+#include "PackageSys.hpp"
 
-namespace SystemService
+namespace UserService
 {
-   struct AdminSys
+   class RPackageSys : public psibase::Service<RPackageSys>
    {
-      static constexpr auto service = psibase::AccountNumber("admin-sys");
+     public:
+      static constexpr auto service = psibase::AccountNumber("r-package-sys");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
-   PSIO_REFLECT(AdminSys,  //
+   PSIO_REFLECT(RPackageSys,
                 method(serveSys, request),
                 method(storeSys, path, contentType, content))
-}  // namespace SystemService
+
+}  // namespace UserService

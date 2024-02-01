@@ -23,7 +23,7 @@ async fn as_text(builder: reqwest::RequestBuilder) -> Result<String, anyhow::Err
     Ok(response.text().await?)
 }
 
-async fn as_json<T: DeserializeOwned>(
+pub async fn as_json<T: DeserializeOwned>(
     builder: reqwest::RequestBuilder,
 ) -> Result<T, anyhow::Error> {
     Ok(serde_json::de::from_str(&as_text(builder).await?)?)

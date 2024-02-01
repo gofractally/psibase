@@ -117,6 +117,14 @@ namespace psibase
 
    using KeyList = std::vector<std::pair<psibase::PublicKey, psibase::PrivateKey>>;
 
+   struct DatabaseConfig
+   {
+      std::uint64_t hotBytes  = 1ull << 27;
+      std::uint64_t warmBytes = 1ull << 27;
+      std::uint64_t coolBytes = 1ull << 27;
+      std::uint64_t coldBytes = 1ull << 27;
+   };
+
    /**
     * Manages a chain.
     * Only one TestChain can exist at a time.
@@ -136,6 +144,7 @@ namespace psibase
 
       static KeyList defaultKeys() { return {{defaultPubKey, defaultPrivKey}}; }
 
+      explicit TestChain(const DatabaseConfig&);
       TestChain(uint64_t hot_bytes  = 1ull << 27,
                 uint64_t warm_bytes = 1ull << 27,
                 uint64_t cool_bytes = 1ull << 27,

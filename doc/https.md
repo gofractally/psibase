@@ -57,7 +57,7 @@ If you're running `psinode` within a container, commands sent to psinode via the
 - Firefox uses its own certificate store and may not pick up the mkcert certificates automatically.
 - If you update apps, you will need to take additional action for the changes to be served by psinode. You have a couple options:
   1. After making your changes and rebuilding, delete the `db` file and `data` directory within the `psinode_db_secure` directory, restart psinode and boot the chain again. This will, of course, wipe the chain.
-  2. Use the `psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree` command to upload updated app build artifacts.
+  2. Use the `psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload` command to upload updated app build artifacts.
 
 ## Running an app server in dev mode for faster iteration
 

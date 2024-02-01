@@ -56,6 +56,26 @@ namespace psibase
       return result;
    }
 
+   bool SharedState::needGenesis() const
+   {
+      auto sharedDb = [&]
+      {
+         std::lock_guard<std::mutex> lock{impl->mutex};
+         return impl->db;
+      }();
+      auto     head = sharedDb.getHead();
+      Database db{std::move(sharedDb), std::move(head)};
+      auto     session = db.startRead();
+      if (auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey()))
+      {
+         if (status->head)
+         {
+            return false;
+         }
+      }
+      return true;
+   }
+
    std::unique_ptr<SystemContext> SharedState::getSystemContext()
    {
       std::lock_guard<std::mutex> lock{impl->mutex};

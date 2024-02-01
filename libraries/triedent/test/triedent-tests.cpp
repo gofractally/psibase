@@ -254,3 +254,51 @@ TEST_CASE("many refs")
       REQUIRE(osv(session->get(r.front(), {"k", 1})) == std::optional{std::string_view{"v", 1}});
    }
 }
+
+struct u64le_span
+{
+   u64le_span(std::uint64_t value)
+   {
+      for (auto& byte : buf)
+      {
+         byte = value & 0xFF;
+         value >>= 8;
+      }
+   }
+   operator std::span<const char>() const { return buf; }
+   char buf[8];
+};
+
+TEST_CASE("small cache")
+{
+   auto            db      = createDb(database::config{
+                       .hot_bytes = 4096, .warm_bytes = 4096, .cool_bytes = 4096, .cold_bytes = 4096});
+   auto            session = db->start_write_session();
+   auto            root    = session->get_top_root();
+   std::mt19937_64 gen;
+   for (int i = 0; i < 65536; ++i)
+   {
+      auto key   = gen();
+      auto value = gen();
+      session->upsert(root, u64le_span(key), u64le_span(value));
+   }
+}
+
+TEST_CASE("small cache no inplace")
+{
+   std::size_t     min_ring_size = 4096 - sizeof(ring_allocator::header);
+   auto            db            = createDb(database::config{.hot_bytes  = min_ring_size,
+                                                             .warm_bytes = min_ring_size,
+                                                             .cool_bytes = min_ring_size,
+                                                             .cold_bytes = 4096});
+   auto            session       = db->start_write_session();
+   auto            root          = session->get_top_root();
+   std::mt19937_64 gen;
+   for (int i = 0; i < 65536; ++i)
+   {
+      auto tmp   = root;
+      auto key   = gen();
+      auto value = gen();
+      session->upsert(root, u64le_span(key), u64le_span(value));
+   }
+}
