@@ -6,12 +6,14 @@ psibase - The psibase blockchain command line client
 
 ## SYNOPSIS
 
-`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*]  
+`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
 `psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
+`psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
+`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
-`psibase` [`-a` *url*] `upload` *service* *dest* *content-type* *source*  
-`psibase` [`-a` *url*] `upload-tree` *service* *dest* *source*  
+`psibase` [`-a` *url*] `search` *regex*\.\.\.  
+`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
 
 ## DESCRIPTION
@@ -39,9 +41,13 @@ psibase - The psibase blockchain command line client
 
 ### boot
 
-`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*]  
+`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 
 The boot command deploys a set of system services and web interfaces suitable for development. The chain will have a single block producer. The chain can only be booted once.
+
+- *packages*
+
+  Packages to install to the chain. If not specifed, a default set will be installed.
 
 - `-k`, `--key` *public-key*
 
@@ -53,6 +59,10 @@ The boot command deploys a set of system services and web interfaces suitable fo
 - `-p`, `--producer` *name*
 
   Set the name of the block producer. `psinode` should be configured to use the same name.
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
 ### create
 
@@ -105,6 +115,49 @@ Deploy a service
 
   Sender to use when creating the account [default: account-sys]
 
+### install
+
+`psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
+
+Install apps to the chain along with all dependencies. Packages that are already installed will not be modified.
+
+- *packages*
+
+  Packages to install
+
+- `-k` *public-key*
+
+  Set all accounts created by the new packages to authenticate using this key. If no key is provided, the accounts will not require authentication. The public key can be any of the following:
+  - A file containing a PEM or DER encoded public key
+  - A PKCS #11 URI
+  - An EOS style base58-encoded public key beginning `PUB_K1_`
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
+
+### list
+
+`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
+
+Prints a list of apps from the chain and/or package repositories
+
+- `--all`
+
+  Prints all known packages (default)
+  
+- `--available`
+
+  Prints packages that are available in the repository, but not installed on chain
+  
+- `--installed`
+
+  Prints packages that are currently installed
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
+
 ### modify
 
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
@@ -122,49 +175,45 @@ Modify an account
   - A PKCS #11 URI
   - An EOS style base58-encoded public key beginning `PUB_K1_`
 
+### search
+
+`psibase` [`-a` *url*] `search` *regex*\.\.\.  
+
+Search for packages
+
+- *regex*
+
+  Regular expressions to match agaist the package names and descriptions. If there are multiple patterns, they must all match for a package to be listed. The search is case-insensitive.
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
+
 ### upload
 
-`psibase` [`-a` *url*] `upload` *service* *dest* *content-type* *source*  
+`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
 
 Upload a file to a service. The service must provide a `storeSys` action.
+
+- `-r`, `--recursive`
+
+  If *source* is a directory, upload its contents recursively. The files may be split across multiple transactions if they are too large to fit in a single transaction.
+
+- `-t`, `--content-type` *content-type*
+
+  MIME Content-Type of the file. If not specified, it will be guessed from the file name. Cannot be used with `-r`.
 
 - *service*
 
   Service to upload to
-  
-- *dest*
 
-  Destination path within *service*
-  
-- *content-type*
-
-  MIME Content-Type of the file
-  
 - *source*
 
   Source filename to upload
 
-- `-S`, `--sender` *sender*
-
-  Account to use as the sender of the transaction. Defaults to the *service* account.
-
-### upload-tree
-
-`psibase` [`-a` *url*] `upload-tree` *service* *dest* *source*  
-
-Upload a directory tree to a service. The service must provide a `storeSys` action. The files may be split across multiple transactions if they are too large to fit in a single transaction.
-
-- *service*
-
-  Service to upload to
-  
 - *dest*
 
-  Destination path within *service*
-  
-- *source*
-
-  Source directory to upload
+  Destination path within *service*. If not specified, defaults to the file name of *source* or `/` for recursive uploads.
 
 - `-S`, `--sender` *sender*
 

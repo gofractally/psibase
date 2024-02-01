@@ -24,7 +24,8 @@
     - [Account numbers](specifications/data-formats/account-numbers.md)
     - [JSON](specifications/data-formats/json.md)
     - [Schema](specifications/data-formats/schema.md)
-    - [fracpack](specifications/data-formats/fracpack.md)    
+    - [fracpack](specifications/data-formats/fracpack.md)
+    - [App Packages](specifications/data-formats/package.md)
 
 - [Development guides](development/README.md)
   - [Services](development/services/README.md)

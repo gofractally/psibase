@@ -1,5 +1,6 @@
 mod account_number;
 mod action_template;
+mod actions;
 mod block;
 mod boot;
 mod crypto;
@@ -15,6 +16,7 @@ mod method_number;
 pub mod native;
 pub mod native_raw;
 mod native_tables;
+mod package;
 pub mod reflect;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
@@ -33,6 +35,7 @@ mod web_services;
 
 pub use account_number::*;
 pub use action_template::*;
+pub use actions::*;
 pub use block::*;
 pub use boot::*;
 pub use crypto::*;
@@ -46,6 +49,7 @@ pub use local_socket::*;
 pub use method_number::*;
 pub use native::*;
 pub use native_tables::*;
+pub use package::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use schema::*;

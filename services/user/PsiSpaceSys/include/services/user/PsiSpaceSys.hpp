@@ -33,20 +33,19 @@ namespace SystemService
    /// Provide web hosting
    ///
    /// This service provides web hosting to non-service accounts. It supports both an
-   /// upload UI (TODO) and command-line upload using `psibase upload` and
-   /// `psibase upload tree`.
+   /// upload UI (TODO) and command-line upload using `psibase upload`.
    ///
    /// Uploading a directory tree:
    ///
    /// ```
-   /// psibase -a $ROOT_URL -s $PVT_KEY upload-tree -S $ACCOUNT psispace-sys / $DIR
+   /// psibase -a $ROOT_URL -s $PVT_KEY upload -r -S $ACCOUNT psispace-sys $DIR /
    /// ```
    ///
    /// Uploading a single file:
    ///
    /// ```
    /// psibase -a $ROOT_URL -s $PVT_KEY upload -S $ACCOUNT psispace-sys
-   ///         /index.html text/html $PATH_TO_FILE
+   ///           $PATH_TO_FILE /index.html
    /// ```
    ///
    /// You don't need the `-a` and `-s` options if your running a local test chain at

@@ -75,6 +75,11 @@ export async function getJson(url) {
     return res.json();
 }
 
+export async function getArrayBuffer(url) {
+    const res = await get(url);
+    return res.arrayBuffer();
+}
+
 export async function postText(url, text) {
     return throwIfError(
         await fetch(url, {

@@ -114,6 +114,8 @@ function(add suffix)
         target_sources(psitestlib${suffix} PRIVATE
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
+            tester/src/package.cpp
+            tester/src/zip.cpp
             tester/src/testUtils.cpp
             service/src/intrinsic.cpp
             service/src/ossl.c
@@ -144,6 +146,7 @@ function(add suffix)
             psibase${suffix}
             catch2
             boost
+            -lz
             -lsecp256k1
             -lc++
             -lc++abi
@@ -169,6 +172,7 @@ function(add suffix)
             ../../services/user/FractalSys/include
             ../../services/user/InviteSys/include
             ../../services/user/NftSys/include
+            ../../services/user/PackageSys/include
             ../../services/user/PsiSpaceSys/include
             ../../services/user/SymbolSys/include
             ../../services/user/TokenSys/include
@@ -199,6 +203,7 @@ function(add suffix)
             native/src/OpenSSLProver.cpp
             native/src/pkcs11.cpp
             native/src/PKCS11Prover.cpp
+            native/src/prefix.cpp
             native/src/Prover.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
@@ -232,6 +237,7 @@ if(IS_WASM)
     install(FILES sdk/WASI.cmake DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/share/cmake/Modules/Platform COMPONENT libpsibase)
     install(PROGRAMS sdk/psibase-wasm-opt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/cmake COMPONENT libpsibase)
     install(PROGRAMS sdk/nop-wasm-opt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/cmake COMPONENT libpsibase)
+    install(FILES sdk/pack_service.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/psibase COMPONENT libpsibase)
 
     configure_file(sdk/psibase-config.cmake.build ${ROOT_BINARY_DIR}/psibase-config.cmake @ONLY)
     configure_file(sdk/psidk-cmake-args.build ${ROOT_BINARY_DIR}/psidk-cmake-args @ONLY)
@@ -239,4 +245,5 @@ if(IS_WASM)
     configure_file(sdk/WASI.cmake ${ROOT_BINARY_DIR}/cmake/Platform/WASI.cmake COPYONLY)
     configure_file(sdk/psibase-wasm-opt ${ROOT_BINARY_DIR}/psibase-wasm-opt COPYONLY)
     configure_file(sdk/nop-wasm-opt ${ROOT_BINARY_DIR}/nop-wasm-opt COPYONLY)
+    configure_file(sdk/pack_service.cmake ${ROOT_BINARY_DIR}/pack_service.cmake COPYONLY)
 endif()

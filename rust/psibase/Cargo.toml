@@ -14,6 +14,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 anyhow = "1.0"
 async-graphql = "4.0"
+async-trait = "0.1.77"
+async-recursion = "1.0.5"
 chrono = "0.4"
 custom_error = "1.9"
 fracpack = { path = "../fracpack" }
@@ -25,12 +27,14 @@ mime_guess = "2.0"
 percent-encoding = "2.3"
 psibase_macros = { path = "../psibase_macros" }
 psibase_names = { path = "../psibase_names" }
+regex = "1"
 ripemd = "0.1"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11.12"
 serde_json = "1.0"
 serde-wasm-bindgen = "0.6.0"
 wasm-bindgen = "0.2"
+zip = { version = "0.6", default-features = false, features = ["deflate"]}
 sec1 = "0.7"
 spki = "0.7"
 der = { version = "0.7", features = ["alloc", "pem", "std"] }
@@ -45,6 +49,7 @@ reqwest = { version = "0.11", default-features = false, features = ["json","rust
 rpassword = "7.2"
 secp256k1 = { version="0.27", features = ["global-context", "bitcoin_hashes"] }
 sha2 = "0.10"
+tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 pkcs8 = { version = "0.10", features = ["pem"] }
 subprocess = "0.2"

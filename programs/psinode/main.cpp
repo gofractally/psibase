@@ -9,6 +9,7 @@
 #include <psibase/log.hpp>
 #include <psibase/node.hpp>
 #include <psibase/peer_manager.hpp>
+#include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/shortest_path_routing.hpp>
 #include <psibase/version.hpp>
@@ -32,10 +33,6 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
-
-#ifdef __APPLE__
-#include <libproc.h>
-#endif
 
 using namespace psibase;
 using namespace psibase::net;
@@ -215,32 +212,6 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
    v = result;
 };
 
-std::filesystem::path get_prefix()
-{
-#ifdef __APPLE__
-   int   ret;
-   pid_t pid;
-   char  pathbuf[2048];
-
-   pid = getpid();
-   ret = proc_pidpath(pid, pathbuf, sizeof(pathbuf));
-
-   if (ret <= 0)
-      throw std::runtime_error("unable to get process path");
-
-   std::filesystem::path prefix(std::string(pathbuf, ret));
-   prefix = prefix.parent_path();
-#else
-   auto prefix = std::filesystem::read_symlink("/proc/self/exe").parent_path();
-#endif
-
-   if (prefix.filename() == "bin")
-   {
-      prefix = prefix.parent_path();
-   }
-   return prefix;
-}
-
 std::filesystem::path option_path;
 ConfigFileOptions     config_options{.expandValue = [](std::string_view key)
                                  {
@@ -307,7 +278,7 @@ void validate(boost::any& v, const std::vector<std::string>& values, native_serv
 
 std::filesystem::path config_template_path()
 {
-   return get_prefix() / "share" / "psibase" / "config.in";
+   return installPrefix() / "share" / "psibase" / "config.in";
 }
 
 void load_service(const native_service& config,
@@ -318,7 +289,8 @@ void load_service(const native_service& config,
    auto& service = services[host];
    if (config.root.empty())
       return;
-   for (const auto& entry : std::filesystem::recursive_directory_iterator{config.root})
+   for (const auto& entry : std::filesystem::recursive_directory_iterator{
+            config.root, std::filesystem::directory_options::follow_directory_symlink})
    {
       auto                 extension = entry.path().filename().extension().native();
       http::native_content result;
@@ -345,6 +317,14 @@ void load_service(const native_service& config,
       else if (extension == ".wasm")
       {
          result.content_type = "application/wasm";
+      }
+      else if (extension == ".json")
+      {
+         result.content_type = "application/json";
+      }
+      else if (extension == ".psi")
+      {
+         result.content_type = "application/zip";
       }
       if (!result.content_type.empty() && entry.is_regular_file())
       {
@@ -1737,8 +1717,8 @@ void run(const std::string&              db_path,
       http_config->listen              = listen;
       http_config->host                = host;
       http_config->enable_transactions = !host.empty();
-      http_config->status =
-          http::http_status{.slow = system->sharedDatabase.isSlow(), .startup = 1};
+      http_config->status              = http::http_status{
+                       .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
 
       for (const auto& entry : services)
       {
@@ -1811,9 +1791,8 @@ void run(const std::string&              db_path,
                               [&chainContext, &node, &connect_one, &http_config, &timer, &runResult,
                                &server_work, restart, soft]()
                               {
-                                 auto status     = http_config->status.load();
-                                 status.shutdown = true;
-                                 http_config->status.store(status);
+                                 atomic_set_field(http_config->status,
+                                                  [](auto& status) { status.shutdown = true; });
                                  boost::asio::use_service<http::server_service>(
                                      static_cast<boost::asio::execution_context&>(chainContext))
                                      .async_close(restart,
@@ -2300,10 +2279,7 @@ void run(const std::string&              db_path,
    node.set_producer_id(producer);
    http_config->enable_p2p = enable_incoming_p2p;
    {
-      // For now no one else writes the status, so we don't need an atomic RMW.
-      auto status         = http_config->status.load();
-      status.startup      = false;
-      http_config->status = status;
+      atomic_set_field(http_config->status, [](auto& status) { status.startup = false; });
    }
 
    bool showedBootMsg = false;
@@ -2418,7 +2394,7 @@ int main(int argc, char* argv[])
 {
    // Must run before any additional threads are started
    {
-      auto prefix = get_prefix();
+      auto prefix = installPrefix();
       ::setenv("PREFIX", prefix.c_str(), 1);
       ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
    }

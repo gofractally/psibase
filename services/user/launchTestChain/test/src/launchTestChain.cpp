@@ -24,7 +24,7 @@ namespace
 
 SCENARIO("Testing default psibase chain")
 {
-   DefaultTestChain t({}, 1ull << 32, 1ull << 32, 1ull << 32, 1ull << 32);
+   DefaultTestChain t({"Default"}, true, {1ull << 32, 1ull << 32, 1ull << 32, 1ull << 32});
 
    auto alice     = t.from(t.addAccount("alice"_a));
    auto bob       = t.from(t.addAccount("bob"_a));
