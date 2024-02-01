@@ -100,7 +100,7 @@ const functionCall = async (param: FunctionCallParam) => {
   const connection = await getConnection(service);
   console.log(`Created / Fetched connection to ${service}`, connection);
   const res = await connection.functionCall(param);
-  console.log(`Received ${res} from ${service}`);
+  console.log(`Received ${res} from ${service} on Supervisor-Sys`);
 
   return {
     res,
