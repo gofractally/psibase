@@ -488,10 +488,13 @@ namespace psibase::http
          res.keep_alive(keep_alive);
          if (keep_alive)
          {
-            auto sec = std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::microseconds{server.http_config->idle_timeout_us.load()})
-                           .count();
-            res.set(bhttp::field::keep_alive, "timeout=" + std::to_string(sec));
+            if (auto usec = server.http_config->idle_timeout_us.load())
+            {
+               auto sec =
+                   std::chrono::duration_cast<std::chrono::seconds>(std::chrono::microseconds{usec})
+                       .count();
+               res.set(bhttp::field::keep_alive, "timeout=" + std::to_string(sec));
+            }
          }
       };
 
@@ -1656,8 +1659,10 @@ namespace psibase::http
 
       void start_socket_timer(std::shared_ptr<SessionType>&& self)
       {
-         _expiration = steady_clock::now() +
-                       std::chrono::microseconds{server.http_config->idle_timeout_us.load()};
+         auto usec = server.http_config->idle_timeout_us.load();
+         if (usec == 0)
+            return;
+         _expiration = steady_clock::now() + std::chrono::microseconds{usec};
          _timer->expires_at(_expiration);
          _timer->async_wait(
              [this, self = std::move(self)](beast::error_code ec) mutable
