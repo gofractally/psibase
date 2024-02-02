@@ -2584,7 +2584,7 @@ int main(int argc, char* argv[])
    // specify default token/service
    opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in µs.");
-   opt("http-timeout", po::value(&http_timeout)->value_name("seconds"),
+   opt("http-timeout", po::value(&http_timeout)->default_value({}, "")->value_name("seconds"),
        "The maximum time for HTTP clients to send or receive a message");
    desc.add(common_opts);
    opt = desc.add_options();
