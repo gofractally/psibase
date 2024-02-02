@@ -51,10 +51,10 @@ namespace SystemService
       /// This action allows any user who has already set an owning account with `AuthDelegateSys::setOwner`.
       void canAuthUserSys(psibase::AccountNumber user);
 
-      /// Set the sender's public key
+      /// Set the owner of the sender account
       ///
-      /// This is the public key that must be claimed by the transaction whenever a sender using this auth service
-      /// submits a transaction.
+      /// Whenever a sender using this auth service submits a transaction, authorization
+      /// for the owned account will check authorization for the owner instead.
       void setOwner(psibase::AccountNumber owner);
 
      private:
