@@ -1,4 +1,5 @@
 import {
+  // CachedFunction,
   cachedFunctions,
   generateFulfiledFunction,
   generatePendingFunction,
@@ -61,6 +62,7 @@ const functionCall = async (
   param: FunctionCallParam,
   attempts = 0
 ): Promise<any> => {
+  console.log(cachedFunctions, "are cached functions.");
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
@@ -111,9 +113,16 @@ const functionCall = async (
   }
 };
 
+const addCacheFunction = (func: any) => {
+  console.log("now caching", func);
+  cachedFunctions.push(func);
+  console.log(cachedFunctions, "are now cached functions");
+};
+
 const connection = connectToParent({
   methods: {
     functionCall,
+    addCacheFunction,
   },
 });
 

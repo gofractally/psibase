@@ -3,18 +3,18 @@ interface Func {
   method: string;
 }
 
-interface CachedFunction extends Func {
+export interface CachedFunction extends Func {
   params: string;
   result: any;
 }
 
 export const cachedFunctions: CachedFunction[] = [
-  {
-    service: "token-sys",
-    method: "transfer",
-    params: "3",
-    result: "BlueCat came out?",
-  },
+  // {
+  //   service: "token-sys",
+  //   method: "transfer",
+  //   params: "3",
+  //   result: "BlueCat came out?",
+  // },
 ];
 
 export const getImportedFunctions = (): Func[] => {
@@ -26,29 +26,30 @@ export const getImportedFunctions = (): Func[] => {
   ];
 };
 
+const hash = (str: string) => str;
+
 export const generateFulfiledFunction = (func: Func, result: any): string =>
   `export function ${func.method}(arg1, arg2, arg3) {
       return ${typeof result == "number" ? result : `'${result}'`}
     }`;
 
 export const generatePendingFunction = (func: Func): string => {
-  // const id = hash(func.service + func.method);
-
-  // const parentConnection = await connectToParent().promise;
-  //   const toCall = {
-  //     service: "${func.service}",
-  //     method: "${func.method}",
-  //     params: "this is hardcoded atm...",
-  //   };
-
-  //   parentConnection.functionCall(toCall);
-  //   console.log('attempting to call plugin call');
-  //   // parentConnection.pluginCall("${id}", toCall);
-  //   throw new Error("Pending function throw, this is by design.")
+  const id = hash(func.service + func.method);
 
   return `export async function ${func.method}(arg1, arg2, arg3) {
-  
-      return 5;
+
+    const parentConnection = await connectToParent().promise;
+    const toCall = {
+      service: "${func.service}",
+      method: "${func.method}",
+      params: "this is hardcoded atm...",
+    };
+
+    parentConnection.functionCall(toCall);
+    console.log('attempting to call plugin call ${id}');
+    throw new Error("Pending function throw, this is by design.")
+
+    return 5;
       
     }
     

@@ -14,6 +14,7 @@ interface FunctionCallParam<T = any> {
 
 interface PenpalObj {
   functionCall: (param: FunctionCallParam) => Promise<any>;
+  addCacheFunction: (func: any) => Promise<void>;
 }
 
 const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
@@ -45,7 +46,10 @@ const getLoaderDomain = (subDomain = "supervisor-sys"): string => {
 
 const getConnection = async (service: string): Promise<PenpalObj> => {
   // const existingService = loadedServices.find((s) => s.service === service);
-  // if (existingService) return existingService.obj;
+  // if (existingService) {
+  //   console.log(`recycling existing service;`);
+  //   return existingService.obj;
+  // }
   const obj = await createIFrameService(service);
   console.log(obj, "is my iframe service");
   loadedServices.push({ service, obj });
@@ -100,6 +104,16 @@ const functionCall = async (param: FunctionCallParam) => {
   const connection = await getConnection(service);
   console.log(`Created / Fetched connection to ${service}`, connection);
   const res = await connection.functionCall(param);
+  // {
+  //   service: "token-sys",
+  //   method: "transfer",
+  //   params: "3",
+  //   result: "BlueCat came out?",
+  // },
+  console.log({ ...param, result: res }, "good & ready.", connection);
+  connection.addCacheFunction({ ...param, result: res });
+
+  // store res data onto
   console.log(`Received ${res} from ${service} on Supervisor-Sys`);
 
   return {

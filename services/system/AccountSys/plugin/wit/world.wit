@@ -22,17 +22,17 @@ interface imports {
    funccall: func(msg: funccallparams);
    add-to-tx: func(msg: funccallparams);
 
-
+   transfer: func(to: string, amount: u32) -> string;
 }
 
-interface token-sys {
-    transfer: func(msg: string);
-}
+// interface token-sys {
+//     transfer: func(msg: string);
+// }
 
 world example {
 
     import imports;
-    import token-sys;
+    // import token-sys;
 
     use types.{user};
     export hire: func(user: user) -> string;
