@@ -74,12 +74,12 @@ namespace SystemService
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
-   std::size_t getThreshold(const CftConsensus& bft, AccountNumber account)
+   std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
    {
       if (account == ProducerSys::producerAccountWeak)
          return 1;
       else
-         return bft.producers.size() / 2 + 1;
+         return cft.producers.size() / 2 + 1;
    }
 
    std::size_t getThreshold(const BftConsensus& bft, AccountNumber account)
