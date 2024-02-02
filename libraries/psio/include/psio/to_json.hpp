@@ -229,17 +229,17 @@ template <typename S> void to_json(float value, S& stream)              { return
    template <typename... T, typename S>
    void to_json(const std::variant<T...>& obj, S& stream)
    {
-      stream.write('[');
+      stream.write('{');
       increase_indent(stream);
       write_newline(stream);
       std::visit(
           [&](const auto& t) { to_json(get_type_name<std::decay_t<decltype(t)>>(), stream); }, obj);
-      stream.write(',');
+      stream.write(':');
       write_newline(stream);
       std::visit([&](auto& x) { return to_json(x, stream); }, obj);
       decrease_indent(stream);
       write_newline(stream);
-      stream.write(']');
+      stream.write('}');
    }
 
    template <typename... T, typename S>

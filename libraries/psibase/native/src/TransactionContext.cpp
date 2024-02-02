@@ -142,8 +142,16 @@ namespace psibase
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
       ActionContext ac = {self, action, self.transactionTrace.actionTraces.back()};
-      auto&         ec = self.getExecutionContext(transactionServiceNum);
-      ec.execProcessTransaction(ac);
+      try
+      {
+         auto& ec = self.getExecutionContext(transactionServiceNum);
+         ec.execProcessTransaction(ac);
+      }
+      catch (std::exception& e)
+      {
+         atrace.error = e.what();
+         throw;
+      }
    }
 
    void TransactionContext::execVerifyProof(size_t i)
@@ -181,8 +189,16 @@ namespace psibase
       auto& atrace     = transactionTrace.actionTraces.emplace_back();
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.service);
-      ec.execVerify(ac);
+      try
+      {
+         auto& ec = getExecutionContext(action.service);
+         ec.execVerify(ac);
+      }
+      catch (std::exception& e)
+      {
+         atrace.error = e.what();
+         throw;
+      }
    }
 
    void TransactionContext::execNonTrxAction(uint64_t      callerFlags,
@@ -198,8 +214,16 @@ namespace psibase
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.service);
-      ec.execCalled(callerFlags, ac);
+      try
+      {
+         auto& ec = getExecutionContext(action.service);
+         ec.execCalled(callerFlags, ac);
+      }
+      catch (std::exception& e)
+      {
+         atrace.error = e.what();
+         throw;
+      }
    }
 
    void TransactionContext::execCalledAction(uint64_t      callerFlags,
@@ -208,8 +232,16 @@ namespace psibase
    {
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.service);
-      ec.execCalled(callerFlags, ac);
+      try
+      {
+         auto& ec = getExecutionContext(action.service);
+         ec.execCalled(callerFlags, ac);
+      }
+      catch (std::exception& e)
+      {
+         atrace.error = e.what();
+         throw;
+      }
    }
 
    // TODO: different wasmConfig, controlled by config file
@@ -224,8 +256,16 @@ namespace psibase
 
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
-      auto&         ec = getExecutionContext(action.service);
-      ec.execServe(ac);
+      try
+      {
+         auto& ec = getExecutionContext(action.service);
+         ec.execServe(ac);
+      }
+      catch (std::exception& e)
+      {
+         atrace.error = e.what();
+         throw;
+      }
    }
 
    ExecutionContext& TransactionContext::getExecutionContext(AccountNumber service)

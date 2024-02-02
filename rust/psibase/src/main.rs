@@ -12,7 +12,8 @@ use psibase::{
     push_transaction, reg_server, set_auth_service_action, set_code_action, set_key_action,
     sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
     DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
-    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
+    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
+    Transaction,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -48,6 +49,9 @@ struct Args {
     /// Suppress "Ok" message
     #[clap(long)]
     suppress_ok: bool,
+
+    #[clap(long, value_name = "FORMAT", default_value = "stack")]
+    trace: TraceFormat,
 
     #[clap(subcommand)]
     command: Command,
@@ -301,6 +305,7 @@ async fn create(
         &args.api,
         client,
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await?;
     if !args.suppress_ok {
@@ -342,6 +347,7 @@ async fn modify(
         &args.api,
         client,
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await?;
     if !args.suppress_ok {
@@ -400,6 +406,7 @@ async fn deploy(
         &args.api,
         client,
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await?;
     if !args.suppress_ok {
@@ -460,6 +467,7 @@ async fn upload(
         &args.api,
         client,
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await?;
     if !args.suppress_ok {
@@ -529,7 +537,7 @@ async fn monitor_trx(
     progress: ProgressBar,
     n: u64,
 ) -> Result<(), anyhow::Error> {
-    let result = push_transaction(&args.api, client.clone(), trx.packed()).await;
+    let result = push_transaction(&args.api, client.clone(), trx.packed(), args.trace).await;
     if let Err(err) = result {
         progress.suspend(|| {
             println!("=====\n{:?}", err);
@@ -608,7 +616,7 @@ async fn boot(
     push_boot(args, &client, boot_transactions.packed()).await?;
     progress.inc(1);
     for transaction in transactions {
-        push_transaction(&args.api, client.clone(), transaction.packed()).await?;
+        push_transaction(&args.api, client.clone(), transaction.packed(), args.trace).await?;
         progress.inc(1)
     }
     if !args.suppress_ok {
@@ -753,6 +761,7 @@ async fn monitor_install_trx(
         &args.api,
         client.clone(),
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await;
 
