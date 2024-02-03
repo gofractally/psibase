@@ -67,6 +67,7 @@ function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
     const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useCurrentUser();
+    const [label, setLabel] = useState("");
 
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
@@ -106,6 +107,8 @@ function App() {
             method: "numbers",
             params: [200, 14, true],
         });
+
+        setLabel(res.res);
         // @ts-ignore
         const msNow = new Date() / 1;
         setWaitTime(msNow - msThen);
@@ -199,7 +202,7 @@ function App() {
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
             <div>
-                <h1>Wait time</h1>
+                <h1>Wait time {label}</h1>
                 <h2>{waitTime}</h2>
                 <button onClick={() => onClick()}>Do something</button>
             </div>

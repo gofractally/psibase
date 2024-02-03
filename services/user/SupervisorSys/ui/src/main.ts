@@ -12,9 +12,21 @@ interface FunctionCallParam<T = any> {
   params: T;
 }
 
+interface Func {
+  service: string;
+  method: string;
+}
+
+export interface CachedFunction extends Func {
+  params: string;
+  result: any;
+}
+
 interface PenpalObj {
-  functionCall: (param: FunctionCallParam) => Promise<any>;
-  addCacheFunction: (func: any) => Promise<void>;
+  functionCall: (
+    param: FunctionCallParam,
+    cachedFunction: CachedFunction[]
+  ) => Promise<any>;
 }
 
 const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
@@ -78,6 +90,7 @@ const createIFrameService = async (service: string): Promise<PenpalObj> => {
     methods: {
       functionCall,
       addToTx,
+      pluginCall,
       add: (a: number, b: number) => a + b,
     },
   });
@@ -90,7 +103,15 @@ const addToTx = async (param: FunctionCallParam) => {
   return param;
 };
 
-const functionCall = async (param: FunctionCallParam) => {
+type Result<T = any> = { tag: "Ok"; value: T } | { tag: "Loading" };
+
+const cachedFunctions: CachedFunction[] = [];
+
+const functionCall = async (
+  param: FunctionCallParam,
+  attempt = 0
+): Promise<{ res: any; service: string }> => {
+  console.log(cachedFunctions, "is cached functions on supervisor");
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
@@ -103,26 +124,33 @@ const functionCall = async (param: FunctionCallParam) => {
 
   const connection = await getConnection(service);
   console.log(`Created / Fetched connection to ${service}`, connection);
-  const res = await connection.functionCall(param);
-  // {
-  //   service: "token-sys",
-  //   method: "transfer",
-  //   params: "3",
-  //   result: "BlueCat came out?",
-  // },
-  console.log({ ...param, result: res }, "good & ready.", connection);
-  connection.addCacheFunction({ ...param, result: res });
-
-  // store res data onto
-  console.log(`Received ${res} from ${service} on Supervisor-Sys`);
-
-  return {
-    res,
-    service,
-  };
+  const res = (await connection.functionCall(param, cachedFunctions)) as Result;
+  if (res.tag == "Loading") {
+    const maxAttempts = 10;
+    const isTooManyAttempts = attempt >= maxAttempts;
+    if (isTooManyAttempts) {
+      throw new Error(`Exceeded max attempts of ${maxAttempts}`);
+    } else {
+      return functionCall(param, attempt + 1);
+    }
+  } else if (res.tag == "Ok") {
+    return {
+      res: res.value,
+      service,
+    };
+  } else {
+    throw new Error(`Unrecognised tag returned`);
+  }
 };
 
 const getLoggedInUser = async () => "alice";
+
+const pluginCall = async (x: any) => {
+  console.log(`PLUGINCALL GOT`, x);
+  const res = await functionCall(x);
+  console.log(`PLUGINCALL RETURNED`, res);
+  cachedFunctions.push({ ...x, result: res.res });
+};
 
 const connection = connectToParent({
   methods: {

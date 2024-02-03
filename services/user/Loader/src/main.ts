@@ -1,6 +1,5 @@
 import {
-  // CachedFunction,
-  cachedFunctions,
+  CachedFunction, // CachedFunction,
   generateFulfiledFunction,
   generatePendingFunction,
   getImportedFunctions,
@@ -34,6 +33,8 @@ const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
 // 2. Create environment where cached data is available in the JS importables environment during runtime.
 //
 
+type Result<T = any> = { tag: "Ok"; value: T } | { tag: "Loading" };
+
 interface Importables {
   [key: string]: string;
 }
@@ -60,9 +61,8 @@ const runWasm = async (
 
 const functionCall = async (
   param: FunctionCallParam,
-  attempts = 0
-): Promise<any> => {
-  console.log(cachedFunctions, "are cached functions.");
+  cachedFunctions: CachedFunction[]
+): Promise<Result> => {
   if (!isValidFunctionCallParam(param))
     throw new Error(`Invalid function call param.`);
 
@@ -72,6 +72,7 @@ const functionCall = async (
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
 
   const importedFunctionsFromWit = getImportedFunctions();
+  console.log({ importedFunctionsFromWit, cachedFunctions });
   const fulfilledFunctions = cachedFunctions.map((func) =>
     generateFulfiledFunction(func, func.result)
   );
@@ -95,34 +96,37 @@ const functionCall = async (
   ];
 
   console.log(
-    `${missingFunctions.length} pending functions. ${fulfilledFunctions.length} fulfilled functions.`
+    `${missingFunctions.length} pending functions. ${fulfilledFunctions.length} fulfilled functions. ${missingFunctions} ${fulfilledFunctions}`
   );
 
   try {
     // this is returning the data back to the supervisor-sys
-    return await runWasm(wasmBytes, importables, param.method, param.params);
+    const res = await runWasm(
+      wasmBytes,
+      importables,
+      param.method,
+      param.params
+    );
+    return {
+      tag: "Ok",
+      value: res,
+    };
   } catch (e) {
     // this will occur when a pending function is called, which is known to fail
     // we need to run it again, with a fulfilled function instead.
-    const maxAttempts = 10;
-    if (attempts >= maxAttempts) {
-      throw new Error(`Exceeded max attempts of ${maxAttempts}`);
-    } else {
-      return functionCall(param, attempts + 1);
-    }
-  }
-};
+    console.log(connection, "is the connection we got access too.");
 
-const addCacheFunction = (func: any) => {
-  console.log("now caching", func);
-  cachedFunctions.push(func);
-  console.log(cachedFunctions, "are now cached functions");
+    // return back to the supervisor that we're unsuccessful, assuming its because the cache isn't expansive enough yet.
+    // the supervisor can see this, give it's cache more time to build and then try again.
+    return {
+      tag: "Loading",
+    };
+  }
 };
 
 const connection = connectToParent({
   methods: {
     functionCall,
-    addCacheFunction,
   },
 });
 

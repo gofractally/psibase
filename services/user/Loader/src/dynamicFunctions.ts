@@ -45,11 +45,10 @@ export const generatePendingFunction = (func: Func): string => {
       params: "this is hardcoded atm...",
     };
 
-    parentConnection.functionCall(toCall);
-    console.log('attempting to call plugin call ${id}');
-    throw new Error("Pending function throw, this is by design.")
 
-    return 5;
+    console.log('attempting to call plugin call ${id}', parentConnection);
+    parentConnection.pluginCall(toCall);
+    throw new Error("Pending function throw, this is by design.")
       
     }
     

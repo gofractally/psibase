@@ -27,10 +27,11 @@ impl Guest for Component {
         let _x = imports::add_to_tx(&test_params);
 
         format!(
-            "Hello, {} + {} equals {}",
+            "Hello, {} + {} equals {}. {}",
             num1,
             num2,
-            (num1 + num2) * mutiplier
+            (num1 + num2) * mutiplier,
+            y
         )
     }
 
