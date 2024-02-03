@@ -314,6 +314,7 @@ namespace arbtrie
       const char* end_index_data() const { return body() + index_data_size(); }
 
       inline int key_val_section_size() const { return int(_alloc_pos); }
+      int        data_capacity()const { return tail() - (const uint8_t*)end_index_data(); }
       int        spare_capacity() const
       {
          return (tail() - key_val_section_size()) - (const uint8_t*)end_index_data();
@@ -481,6 +482,21 @@ namespace arbtrie
          {
             int middle = (left + right) >> 1;
             if (get_key(middle) < key)
+               left = middle;
+            else
+               right = middle;
+         }
+         return right;
+      }
+      int reverse_lower_bound_idx(std::string_view key) const
+      {
+         __builtin_prefetch( tail() - _alloc_pos );
+         int left  = -1;
+         int right = num_branches();
+         while (right - left > 1)
+         {
+            int middle = (left + right) >> 1;
+            if (get_key(middle) > key)
                left = middle;
             else
                right = middle;

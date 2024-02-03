@@ -203,7 +203,8 @@ namespace arbtrie
    {
       assert(asize <= 4096);
       assert(alloc_size(src, cfg, rem) <= asize);
-      _branch_cap = src->_branch_cap;
+      auto bcap   = std::max<int>(cfg.branch_cap, src->num_branches()-1);
+      _branch_cap = round_up_multiple<64>(bcap * 4) / 4;
 
       auto kh  = key_hashes();
       auto ko  = key_offsets();
@@ -226,6 +227,7 @@ namespace arbtrie
          _alloc_pos += ts;
          auto nkvp = get_key_val_ptr_offset(_alloc_pos);
          memcpy(nkvp, kvp, ts);
+         kh[ci]      = skh[i];
          ko[ci].type = sko[i].type;
          ko[ci].pos  = _alloc_pos;
          vh[ci]      = svh[i];

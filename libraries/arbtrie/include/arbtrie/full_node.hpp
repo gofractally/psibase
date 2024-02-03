@@ -65,6 +65,22 @@ namespace arbtrie
          }
          return {max_branch_count, {}};
       }
+      std::pair<branch_index_type, fast_meta_address> reverse_lower_bound(branch_index_type br) const
+      {
+         auto       beg = branches();
+         auto       ptr = beg + br - 1;
+
+         while (ptr >= beg)
+         {
+            if (*ptr) {
+               return {1 + (ptr - beg), fast_meta_address(branch_region(), *ptr)};
+            }
+            --ptr;
+         }
+         if (has_eof_value())
+            return {0, _eof_value};
+         return {-1, {}};
+      }
 
       void add_branch(branch_index_type br, fast_meta_address b)
       {

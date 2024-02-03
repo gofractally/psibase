@@ -2,6 +2,10 @@
 
 namespace arbtrie
 {
+   bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
+   {
+      return query == key_view();
+   }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
    {
       return query == key_view();
@@ -62,6 +66,61 @@ namespace arbtrie
       return false;
    }
 
+   bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view query)
+   {
+      auto node_prefix = in->get_prefix();
+      pushkey(node_prefix);
+
+      if (query >= node_prefix)
+      {
+         // go to first branch
+         std::pair<branch_index_type, fast_meta_address> idx = in->reverse_lower_bound(256);
+         if (idx.first == 0)
+         {
+            assert(_path.back().second == 0);
+            return true;
+         }
+
+         if (idx.second)
+         {
+            _path.back().second = idx.first;
+            pushkey(branch_to_char(idx.first));
+
+            auto bref = r.rlock().get(idx.second);
+            return reverse_lower_bound_impl(bref, {});
+         }
+         popkey(node_prefix.size() + 1);
+         _path.pop_back();
+         return false;
+      }
+
+      auto cpre = common_prefix(node_prefix, query);
+      if (cpre != node_prefix)
+      {
+         popkey(node_prefix.size());
+         return false;
+      }
+
+      auto remaining_query = query.substr(cpre.size());
+      assert(remaining_query.size() > 0);
+
+      std::pair<branch_index_type, fast_meta_address> idx =
+          in->reverse_lower_bound(char_to_branch(remaining_query.front()));
+
+      if (idx.second)
+      {
+         assert(idx.first != 0);  // that would be handled in query <= node_prefix
+
+         _path.back().second = idx.first;
+
+         auto bref = r.rlock().get(idx.second);
+         pushkey(branch_to_char(idx.first));
+         return reverse_lower_bound_impl(bref, remaining_query.substr(1));
+      }
+      popkey(node_prefix.size() + 1);
+      return false;
+   }
+
    bool iterator::lower_bound_impl(object_ref<node_header>& r,
                                    const binary_node*       bn,
                                    key_view                 query)
@@ -81,13 +140,37 @@ namespace arbtrie
 
       return true;
    }
+   bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r,
+                                   const binary_node*       bn,
+                                   key_view                 query)
+   {
+      auto lbx            = bn->reverse_lower_bound_idx(query);
+      _path.back().second = lbx;
+
+      if (lbx < 0 )
+         return false;
+
+      _path.back().second = lbx;
+      auto kvp            = bn->get_key_val_ptr(lbx);
+      pushkey(bn->get_key_val_ptr(lbx)->key());
+      _size = kvp->value_size();
+
+      return true;
+   }
 
    bool iterator::lower_bound_impl(object_ref<node_header>& r, key_view query)
    {
       _path.push_back({r.address(), 0});
-      //_stack.push_back( { .node = r.address(), .branch = 0 } );
       if (not cast_and_call(r.header(),
                             [&](const auto* n) { return lower_bound_impl(r, n, query); }))
+         return next();
+      return true;
+   }
+   bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r, key_view query)
+   {
+      _path.push_back({r.address(), 257});
+      if (not cast_and_call(r.header(),
+                            [&](const auto* n) { return reverse_lower_bound_impl(r, n, query); }))
          return next();
       return true;
    }
@@ -105,6 +188,22 @@ namespace arbtrie
 
       auto rr = state.get(_root.address());
       if (not lower_bound_impl(rr, prefix))
+         return end();
+      return true;
+   }
+   bool iterator::reverse_lower_bound(key_view prefix)
+   {
+      if (not _root.address())
+         return end();
+
+      auto& db    = _rs._db;
+      auto  state = _rs._segas.lock();
+      _branches.clear();
+      _branches.reserve(prefix.size());
+      _path.clear();
+
+      auto rr = state.get(_root.address());
+      if (not reverse_lower_bound_impl(rr, prefix))
          return end();
       return true;
    }

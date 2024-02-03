@@ -123,6 +123,23 @@ namespace arbtrie
          }
          return slp - sl;
       }
+      // find the position of the first branch <= br
+      int_fast16_t reverse_lower_bound_idx(uint_fast16_t br) const
+      {
+         assert(br > 0 and br <= 256);
+         uint8_t br2 = br - 1;
+         const auto    sl  = get_setlist_ptr();
+         const auto    sle = sl + num_branches();
+         auto    slp = sle -1;
+
+         while (slp >= sl)
+         {
+            if (uint8_t(*slp) <= uint8_t(br2))
+               return slp - sl;
+            --slp;
+         }
+         return slp - sl;
+      }
 
       std::pair<branch_index_type, fast_meta_address> lower_bound(branch_index_type br) const
       {
@@ -144,6 +161,28 @@ namespace arbtrie
             ++p;
          if (p == e)
             return std::pair<branch_index_type, fast_meta_address>(max_branch_count, {});
+         return std::pair<branch_index_type, fast_meta_address>(
+             char_to_branch(*p), {branch_region(), get_branch_ptr()[(p - s)]});
+      }
+
+      std::pair<branch_index_type, fast_meta_address> reverse_lower_bound(branch_index_type br) const
+      {
+         if (br == 0) 
+         {
+            if (_eof_value)
+               return std::pair<int_fast16_t, fast_meta_address>(0, _eof_value);
+            return std::pair<int_fast16_t, fast_meta_address>(-1,{});
+         }
+
+         uint8_t        b = br - 1;
+         const uint8_t* s = get_setlist_ptr();
+         const auto*    e = s + get_setlist_size() -1;
+
+         const uint8_t* p = e;
+         while (p >= s and b < *p)
+            --p;
+         if (p < s)
+            return std::pair<branch_index_type, fast_meta_address>(-1, {});
          return std::pair<branch_index_type, fast_meta_address>(
              char_to_branch(*p), {branch_region(), get_branch_ptr()[(p - s)]});
       }

@@ -5,7 +5,6 @@
 
 #include <utility>
 
-
 namespace arbtrie
 {
 
@@ -349,7 +348,8 @@ namespace arbtrie
    {
       if constexpr (mode.is_unique())
       {
-         if (root.ref() != 1) {
+         if (root.ref() != 1)
+         {
             return upsert<mode.make_shared()>(root, key, val);
          }
       }
@@ -364,20 +364,26 @@ namespace arbtrie
          case node_type::setlist:
             result = upsert_inner<mode, setlist_node>(root, key, val);
             break;
+    //     case node_type::bitset:
+     //       result = upsert_inner<mode, bitset_node>(root, key, val);
+      //      break;
          case node_type::full:
             result = upsert_inner<mode, full_node>(root, key, val);
             break;
          default:
             throw std::runtime_error("unhandled type in upsert");
       }
-      if constexpr (mode.is_shared())
+      if constexpr (mode.is_remove())
+      {
+         if (result != root.address())
+            release_node(root);
+      } 
+      else if constexpr (mode.is_shared())
       {
          assert((result != root.address()));
          release_node(root);
-      } else if constexpr (mode.is_remove() ){
-         if( result != root.address() )
-            release_node(root);
       }
+      
       return result;
    }
 
@@ -427,7 +433,7 @@ namespace arbtrie
       int  total_kv_size = 0;
       for (auto i = from; i < to; ++i)
       {
-         auto kvp = src->get_key_val_ptr( i);
+         auto kvp = src->get_key_val_ptr(i);
          total_kv_size += kvp->total_size();
       }
       assert(total_kv_size > minus_prefix.size() * nbranch);
@@ -534,7 +540,7 @@ namespace arbtrie
          assert(sl->_num_branches == 0);
          assert(sl->branch_capacity() >= nbranch - has_eof_value);
 
-         sl->_num_branches = nbranch - has_eof_value; 
+         sl->_num_branches = nbranch - has_eof_value;
          sl->set_eof(eof_val);
 
          int nb = sl->_num_branches;
@@ -636,21 +642,28 @@ namespace arbtrie
                if constexpr (mode.is_unique())
                {
                   auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1), val);
-                  if constexpr ( mode.is_remove() ) {
-                     if( not new_br ) {
+                  if constexpr (mode.is_remove())
+                  {
+                     if (not new_br)
+                     {
                         r.modify().as<NodeType>()->remove_branch(bidx);
-                        if( fn->num_branches() + fn->has_eof_value() > 0 ) {
-                      //     TRIEDENT_DEBUG( "modify()->remove_branch( ", char(bidx-1), ") " );
+                        if (fn->num_branches() + fn->has_eof_value() > 0)
+                        {
+                           //     TRIEDENT_DEBUG( "modify()->remove_branch( ", char(bidx-1), ") " );
                            return r.address();
-                        } else {
-                       //    TRIEDENT_DEBUG( "return null after removing all" );
+                        }
+                        else
+                        {
+                           //    TRIEDENT_DEBUG( "return null after removing all" );
                            return fast_meta_address();
                         }
                      }
-                     if( br != new_br ) 
+                     if (br != new_br)
                         r.modify().as<NodeType>()->set_branch(bidx, new_br);
                      return r.address();
-                  } else {
+                  }
+                  else
+                  {
                      if (br != new_br)
                         r.modify().as<NodeType>()->set_branch(bidx, new_br);
                      return r.address();
@@ -658,6 +671,40 @@ namespace arbtrie
                }
                else  // shared_node
                {     // if shared and we inserted then it had better be different!
+                  if constexpr (mode.is_remove())
+                  {
+                 //    TRIEDENT_DEBUG( "remove key ", key );
+                     brn.retain();  // because upsert will release() it
+                     auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1), val);
+                     assert(br != new_br);
+                     if (not new_br)
+                     {
+                  //      TRIEDENT_DEBUG( "not new_br" );
+                        if (fn->num_branches() + fn->has_eof_value() > 1)
+                        {
+                   //        TRIEDENT_DEBUG( "numbr + hasval " );
+                           auto cl = clone<mode>(r, fn, {});
+                           release_node(brn);  // because we retained before upsert(),
+                                               // and retained again in clone
+                           cl.modify().template as<NodeType>()->remove_branch(bidx);
+                           return cl.address();
+                        }
+                        return fast_meta_address();
+                     }
+                     else
+                     {
+                   //     TRIEDENT_DEBUG( "updated new_br" );
+                        auto cl = clone<mode>(r, fn, {});
+                        release_node(brn);  // because we retained before upsert(),
+                                            // and retained again in clone
+                        assert(br != new_br);
+                        cl.modify().template as<NodeType>()->set_branch(bidx, new_br);
+                        return cl.address();
+                     }
+                  }
+                  // must be update/insert or remove that didn't return null
+                  // clone before upsert because upsert will release the branch when
+                  // it returns the new one
                   auto cl     = clone<mode>(r, fn, {});
                   auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1), val);
                   assert(br != new_br);
@@ -667,7 +714,11 @@ namespace arbtrie
             }
             else  // new branch
             {
-               if constexpr (mode.must_update())
+               if constexpr (mode.must_remove())
+                  throw std::runtime_error("unable to find key to remove it");
+               else if constexpr (mode.is_remove())
+                  return r.address();
+               else if constexpr (mode.must_update())
                   throw std::runtime_error("unable to find key to update value");
                else
                {
@@ -701,25 +752,31 @@ namespace arbtrie
          {
             if constexpr (mode.is_remove())
             {
+         //      TRIEDENT_DEBUG( "remove key ends on this node" );
                if (fn->has_eof_value())
                {
                   if constexpr (mode.is_unique())
                   {
+                  //   TRIEDENT_DEBUG( "mode is unique?" );
                      release_node(state.get(fn->get_eof_value()));
                      r.modify().as<NodeType>()->set_eof({});
 
-                     if (fn->num_branches() == 0) 
+                     if (fn->num_branches() == 0)
                         return fast_meta_address();
                      return r.address();
                   }
                   else  // mode.is_shared()
                   {
-                     TRIEDENT_WARN( "release eof value (shared)" );
+                     //TRIEDENT_WARN("release eof value (shared)");
                      if (fn->num_branches() == 0)
+                     {
+                      //  TRIEDENT_DEBUG("  num_branch == 0, return null");
                         return fast_meta_address();
+                     }
                      return clone<mode>(r, fn, {},
                                         [&](auto cl)
                                         {
+          //                                 TRIEDENT_DEBUG("remove eof value from clone");
                                            release_node(state.get(cl->get_eof_value()));
                                            cl->set_eof({});
                                         })
@@ -733,7 +790,7 @@ namespace arbtrie
             }
             else  // must be insert/update on this node
             {
-             //  TRIEDENT_WARN("upsert value node on inner node");
+               //  TRIEDENT_WARN("upsert value node on inner node");
                if (fn->has_eof_value())  //val_nid)
                {
                   fast_meta_address val_nid = fn->get_eof_value();
@@ -755,9 +812,9 @@ namespace arbtrie
                      auto new_id = upsert_value<mode>(old_val, val);
                      assert(new_id != val_nid);  // because shared state
                      release_node(old_val);
-                     auto cl = clone<mode>(r, fn, {.branch_cap = 16},
-                                           [&](auto cl) { cl->set_eof(new_id); });
-                     return cl.address();
+                     return clone<mode>(r, fn, {.branch_cap = 16},
+                                        [&](auto cl) { cl->set_eof(new_id); })
+                         .address();
                   }
                }
                else  // there is no value stored here
@@ -795,6 +852,7 @@ namespace arbtrie
       {
          if constexpr (mode.is_remove())
          {
+            TRIEDENT_DEBUG( "remove key that doesn't share the same prefix" );
             if constexpr (mode.must_remove())
                throw std::runtime_error("attempt to remove key that does not exist");
             return r.address();
@@ -860,10 +918,11 @@ namespace arbtrie
             auto new_prefix = rootpre.substr(cpre.size() + 1);
             auto cl         = clone<mode.make_shared()>(new_reg, r, fn, {.set_prefix = new_prefix});
             child_id        = cl.address();
-            if constexpr ( mode.is_unique() ) {
-              // TRIEDENT_WARN( "release old root if unique because it doesn't happen automatically for unique" );
-                              
-               release_node( r );
+            if constexpr (mode.is_unique())
+            {
+               // TRIEDENT_WARN( "release old root if unique because it doesn't happen automatically for unique" );
+
+               release_node(r);
             }
          }
 
@@ -877,9 +936,9 @@ namespace arbtrie
                                       {.branch_cap = 2, .set_prefix = cpre},
                                       [&](setlist_node* sln)
                                       {
-                                         TRIEDENT_WARN( "CHILD ID REGION INSTEAD OF NEW?");
+                                         TRIEDENT_WARN("CHILD ID REGION INSTEAD OF NEW?");
                                          sln->set_branch_region(child_id.region);
-                                         sln->set_eof( v );
+                                         sln->set_eof(v);
                                          sln->add_branch(char_to_branch(root_prebranch), child_id);
                                       })
                 .address();

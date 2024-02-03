@@ -16,7 +16,6 @@ namespace arbtrie
    {
       enum type : int
       {
-         shared        = 0,
          unique        = 1,  // ref count of all parent nodes and this is 1
          insert        = 2,  // fail if key does exist
          update        = 4,  // fail if key doesn't exist
@@ -29,10 +28,10 @@ namespace arbtrie
          unique_update = unique | update,
          unique_remove = unique | remove,
          unique_must_remove = unique | must_remove_f | remove,
-         shared_upsert = shared | upsert,
-         shared_insert = shared | insert,
-         shared_update = shared | update,
-         shared_remove = shared | remove
+         shared_upsert = upsert,
+         shared_insert = insert,
+         shared_update = update,
+         shared_remove = remove
       };
 
       constexpr upsert_mode(upsert_mode::type t) : flags(t){};

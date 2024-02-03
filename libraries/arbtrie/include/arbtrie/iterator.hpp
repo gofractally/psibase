@@ -27,11 +27,17 @@ namespace arbtrie
       bool next();  // moves to next key, return valid()
       bool prev();  // moves to the prv key, return valid()
 
-      // moves to the lower_bound key > search, return valid()
+      // lower_bound(search) + next()
       bool upper_bound(key_view search);
 
-      // moves to the lower_bound key with prefix, return valid()
+      // moves to the first key >= prefix from the begin, return valid()
       bool lower_bound(key_view prefix = {});
+
+      // moves to the first key <= prefix from the end, return valid()
+      bool reverse_lower_bound(key_view prefix = {});
+
+      // reverse_lower_bound(prefix) + prev()
+      bool reverse_upper_bound(key_view prefix = {});
 
       // moves to the last key with prefix, return valid()
       bool last(key_view prefix = {});
@@ -99,6 +105,11 @@ namespace arbtrie
       bool lower_bound_impl(object_ref<node_header>& r, const binary_node* bn, key_view prefix);
       bool lower_bound_impl(object_ref<node_header>& r, const value_node* bn, key_view prefix);
       bool lower_bound_impl(object_ref<node_header>& r, key_view prefix);
+
+      bool reverse_lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view prefix);
+      bool reverse_lower_bound_impl(object_ref<node_header>& r, const binary_node* bn, key_view prefix);
+      bool reverse_lower_bound_impl(object_ref<node_header>& r, const value_node* bn, key_view prefix);
+      bool reverse_lower_bound_impl(object_ref<node_header>& r, key_view prefix);
    };
 
 }  // namespace arbtrie

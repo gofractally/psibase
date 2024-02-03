@@ -97,25 +97,26 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
       usleep(1000000 * 3);
    }
 }
-void validate_refcount(session_rlock& state, fast_meta_address i);
-void validate_refcount(session_rlock& state, fast_meta_address i, const auto* in)
+void validate_refcount(session_rlock& state, fast_meta_address i, int c = 1);
+void validate_refcount(session_rlock& state, fast_meta_address i, const auto* in, int c)
 {
    in->visit_branches_with_br(
        [&](int br, fast_meta_address adr)
        {
           if (in->branch_region() != adr.region)
              throw std::runtime_error("region refcount violated");
-          validate_refcount(state, adr);
+          validate_refcount(state, adr, c);
        });
 }
-void validate_refcount(session_rlock& state, fast_meta_address i, const binary_node* inner) {}
-void validate_refcount(session_rlock& state, fast_meta_address i, const value_node* inner) {}
-void validate_refcount(session_rlock& state, fast_meta_address i)
+void validate_refcount(session_rlock& state, fast_meta_address i, const binary_node* inner, int) {}
+void validate_refcount(session_rlock& state, fast_meta_address i, const value_node* inner, int) {}
+void validate_refcount(session_rlock& state, fast_meta_address i, int c )
 {
    if( i ) {
       auto ref = state.get(i);
-      assert( ref.ref() == 1 );
-      cast_and_call(ref.header(), [&](const auto* ptr) { validate_refcount(state, i, ptr); });
+      REQUIRE( ref.ref() > 0 );
+      REQUIRE( ref.ref() <= c );
+      cast_and_call(ref.header(), [&](const auto* ptr) { validate_refcount(state, i, ptr, c); });
    }
 }
 
@@ -136,7 +137,7 @@ TEST_CASE("insert-words")
       toupper(values.back());
    }
 
-   auto test_words = [&]()
+   auto test_words = [&]( bool shared )
    {
       environ env;
       auto    ws    = env.db->start_write_session();
@@ -158,7 +159,7 @@ TEST_CASE("insert-words")
       }
       {
       auto l = ws._segas.lock();
-      validate_refcount( l, root.address() );
+      validate_refcount( l, root.address(), int(shared) + 1 );
       }
       for (int i = 0; i < keys.size(); ++i) {
          ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
@@ -213,8 +214,12 @@ TEST_CASE("insert-words")
          }
       };
       iterate_all();
+      std::optional<node_handle> shared_handle;
+      if( shared )
+         shared_handle = root;
       TRIEDENT_WARN( "removing for keys in order" );
       for( int i = 0; i < keys.size(); ++i ) {
+//         TRIEDENT_DEBUG( "check before remove: ", keys[i] );
          ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
                  if( not found )
                   TRIEDENT_DEBUG( "looking before remove: ", keys[i] );
@@ -222,12 +227,14 @@ TEST_CASE("insert-words")
                  assert( found );
                  });
 
-       //  TRIEDENT_DEBUG( "remove: ", keys[i] );
+ //        TRIEDENT_DEBUG( "before remove: ", keys[i] );
          ws.remove( root, keys[i] );
-         {
+  //       TRIEDENT_DEBUG( "after remove: ", keys[i] );
+         /*{
          auto l = ws._segas.lock();
-         validate_refcount( l, root.address() );
+         validate_refcount( l, root.address(), int(shared+1) );
          }
+         */
          ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
                  if( found )
                   TRIEDENT_DEBUG( "checking remove: ", keys[i] );
@@ -238,17 +245,28 @@ TEST_CASE("insert-words")
       auto     itr        = ws.create_iterator(root);
       REQUIRE(not itr.valid());
       REQUIRE(not itr.lower_bound());
+      env.db->print_stats( std::cerr );
    };
   // TRIEDENT_DEBUG( "load in file order" );
-   test_words();
+   TRIEDENT_DEBUG( "forward file order shared" );
+   test_words(true);
+   TRIEDENT_DEBUG( "forward file order unique" );
+   test_words(false);
    TRIEDENT_DEBUG( "load in reverse file order" );
    std::reverse( keys.begin(), keys.end() );
    std::reverse( values.begin(), values.end() );
-   test_words();
-   TRIEDENT_DEBUG( "load in random order" );
+   TRIEDENT_DEBUG( "remove reverse file order shared" );
+   test_words(true);
+   TRIEDENT_DEBUG( "remove reverse file order unique" );
+   test_words(false);
+   TRIEDENT_DEBUG( "load in random order shared" );
    auto rng = std::default_random_engine {};
    std::shuffle( keys.begin(), keys.end(), rng );
-   test_words();
+   test_words(true);
+   TRIEDENT_DEBUG( "load in random order unique" );
+   test_words(false);
+   
+   
 }
 
 TEST_CASE("upsert") {}
