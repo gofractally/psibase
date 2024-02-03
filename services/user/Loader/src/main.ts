@@ -96,10 +96,16 @@ const functionCall = async (
   ];
 
   console.log(
-    `${missingFunctions.length} pending functions. ${fulfilledFunctions.length} fulfilled functions. ${missingFunctions} ${fulfilledFunctions}`
+    `${missingFunctions.length} pending functions. ${
+      fulfilledFunctions.length
+    } fulfilled functions. ${JSON.stringify(missingFunctions)} ${JSON.stringify(
+      fulfilledFunctions
+    )}`
   );
 
   try {
+    console.count("runWasm");
+    console.log("runWasm:", param, cachedFunctions);
     // this is returning the data back to the supervisor-sys
     const res = await runWasm(
       wasmBytes,

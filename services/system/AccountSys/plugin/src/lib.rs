@@ -11,7 +11,7 @@ struct Component;
 impl Guest for Component {
     fn numbers(num1: u8, num2: u8, doubleup: bool) -> String {
         let mutiplier: u8 = if doubleup { 2 } else { 1 };
-        let y = imports::transfer("whatever", 32);
+        let y = imports::transfer("bobby", 117);
 
         println!("{:?} logged on rust from transfer", y);
         struct Par {

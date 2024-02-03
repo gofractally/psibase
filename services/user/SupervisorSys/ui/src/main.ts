@@ -6,6 +6,8 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   </div>
 `;
 
+const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
+
 interface FunctionCallParam<T = any> {
   service: string;
   method: string;
@@ -131,6 +133,7 @@ const functionCall = async (
     if (isTooManyAttempts) {
       throw new Error(`Exceeded max attempts of ${maxAttempts}`);
     } else {
+      await wait(1);
       return functionCall(param, attempt + 1);
     }
   } else if (res.tag == "Ok") {

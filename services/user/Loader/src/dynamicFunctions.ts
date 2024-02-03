@@ -36,15 +36,14 @@ export const generateFulfiledFunction = (func: Func, result: any): string =>
 export const generatePendingFunction = (func: Func): string => {
   const id = hash(func.service + func.method);
 
-  return `export async function ${func.method}(arg1, arg2, arg3) {
+  return `export async function ${func.method}(...args) {
 
     const parentConnection = await connectToParent().promise;
     const toCall = {
       service: "${func.service}",
       method: "${func.method}",
-      params: "this is hardcoded atm...",
+      params: [...args],
     };
-
 
     console.log('attempting to call plugin call ${id}', parentConnection);
     parentConnection.pluginCall(toCall);

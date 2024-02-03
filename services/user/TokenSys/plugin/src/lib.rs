@@ -25,7 +25,7 @@ impl Guest for Component {
         // println!("i got from the func {}", logged_in_user);
 
         format!(
-            "I am {} telling yet and I am gonna send {} tokens to {}",
+            "TokenSys: {} is sending {} tokens to {}.",
             logged_in_user, amount, to
         )
     }

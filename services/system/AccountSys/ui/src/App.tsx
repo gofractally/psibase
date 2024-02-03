@@ -68,6 +68,7 @@ function App() {
     const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useCurrentUser();
     const [label, setLabel] = useState("");
+    const [status, setStatus] = useState("Ready");
 
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
@@ -92,6 +93,8 @@ function App() {
 
     const [waitTime, setWaitTime] = useState(0);
     const onClick = async () => {
+        setStatus("Loading");
+        setWaitTime(0);
         // @ts-ignore
         const msThen = new Date() / 1;
         console.log("clicked");
@@ -109,9 +112,11 @@ function App() {
         });
 
         setLabel(res.res);
+        setStatus("Loaded.");
         // @ts-ignore
         const msNow = new Date() / 1;
-        setWaitTime(msNow - msThen);
+        const msDifference = Math.ceil((msNow - msThen) / 1000);
+        setWaitTime(msDifference);
         console.log(res, "res");
 
         const transaction = {
@@ -143,49 +148,6 @@ function App() {
         console.log("trace is", trace);
     };
 
-    // const init = async () => {
-    //     if (ran.current) return;
-    //     ran.current = true;
-    //     console.count("init");
-
-    //     const supervisor = await connect();
-    //     console.log(supervisor, "came back casey");
-    //     try {
-    //         // todo
-    //         // make it work with several params?
-    //         const res = await supervisor.functionCall({
-    //             service: "account-sys",
-    //             method: "numbers",
-    //             params: [200, 14, true],
-    //         });
-    //         console.log({ supervisor, res, x: 111 });
-    //         console.log(res, "numbers *");
-    //         const user = {
-    //             name: "john",
-    //             age: 29,
-    //         };
-
-    //         const strings = await supervisor.functionCall({
-    //             service: "account-sys",
-    //             method: "strings",
-    //             params: ["user", 2],
-    //         });
-    //         console.log(strings, "strings *");
-    //         const peoples = await supervisor.functionCall({
-    //             service: "account-sys",
-    //             method: "peoples",
-    //             params: [[user, user]],
-    //         });
-    //         console.log(peoples, "peoples *");
-    //     } catch (e) {
-    //         console.error(e);
-    //     }
-    // };
-
-    // useEffect(() => {
-    //     init();
-    // }, []);
-
     useInitialized(async () => {
         try {
             setCurrentUser(await getLoggedInUser());
@@ -202,9 +164,15 @@ function App() {
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
             <div>
-                <h1>Wait time {label}</h1>
-                <h2>{waitTime}</h2>
-                <button onClick={() => onClick()}>Do something</button>
+                <h1>{status}</h1>
+                <h2>Wait time: {waitTime} seconds</h2>
+                <h2>Result: {label}</h2>
+                <button
+                    className="rounded-lg bg-blue-500 px-4 py-2 text-white"
+                    onClick={() => onClick()}
+                >
+                    Do something
+                </button>
             </div>
             <div className="flex items-center gap-2">
                 <AccountIcon />
