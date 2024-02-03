@@ -8,14 +8,7 @@ export interface CachedFunction extends Func {
   result: any;
 }
 
-export const cachedFunctions: CachedFunction[] = [
-  // {
-  //   service: "token-sys",
-  //   method: "transfer",
-  //   params: "3",
-  //   result: "BlueCat came out?",
-  // },
-];
+export const cachedFunctions: CachedFunction[] = [];
 
 export const getImportedFunctions = (): Func[] => {
   return [
