@@ -40,14 +40,14 @@ const runWasm = async (
   const { load } = await import("rollup-plugin-wit-component");
 
   console.time("Load");
-  const { mod, imports, exports, files } = await load(
+  const mod = await load(
     // @ts-expect-error fff
     wasm,
     importables
   );
   console.timeEnd("Load");
 
-  console.log(mod, "is the module I have", { imports, exports, files });
+  console.log(mod, "is the module I have");
   return mod[method](...params);
 };
 
