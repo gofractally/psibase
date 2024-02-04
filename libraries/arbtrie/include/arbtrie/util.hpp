@@ -21,12 +21,12 @@ namespace arbtrie {
    }
 
    // This always returns a view into the first argument
-   inline std::string_view common_prefix(std::string_view a, std::string_view b)
+   inline key_view common_prefix(key_view a, key_view b)
    {
       return {a.begin(), std::mismatch(a.begin(), a.end(), b.begin(), b.end()).first};
    }
 
-   inline std::string to_hex( std::string_view sv ) {
+   inline std::string to_hex( key_view sv ) {
       std::string out;
       out.reserve( sv.size()*2 );
       for( auto c : sv )
@@ -36,4 +36,7 @@ namespace arbtrie {
    inline std::string to_hex( char c ) {
       return std::format("{:02x}", uint8_t(c));
    }
+   inline std::string_view to_str( key_view k ) { return std::string_view( (const char*)k.data(), k.size() ); }
+   inline key_view to_key_view( const std::string& str ) { return key_view( (uint8_t*)str.data(), str.size()); }
+   inline value_view to_value_view( const std::string& str ) { return value_view( (uint8_t*)str.data(), str.size()); }
 } // namespace arbtrie

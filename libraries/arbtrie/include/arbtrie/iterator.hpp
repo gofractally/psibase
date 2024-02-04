@@ -16,12 +16,19 @@ namespace arbtrie
       iterator(read_session& s, node_handle r) : _rs(s), _root(std::move(r)) {}
 
      public:
+      // TODO: npos size == 1024 / max key length
+      static constexpr const std::array<uint8_t,128> nposa = [](){
+         std::array<uint8_t,128> ar; ar.fill(0xff);
+      return ar; }();
+      static constexpr const key_view npos = key_view( nposa.data(), nposa.size() );
+      static_assert( npos > key_view() );
+
       // return the root this iterator is based on
       node_handle get_root() const { return _root; }
       // the key the iterator is currently pointing to
       key_view key()const
       {
-         return key_view((const char*)_branches.data(), _branches.size());
+         return key_view(_branches.data(), _branches.size());
       }
 
       bool next();  // moves to next key, return valid()
@@ -34,12 +41,13 @@ namespace arbtrie
       bool lower_bound(key_view prefix = {});
 
       // moves to the first key <= prefix from the end, return valid()
-      bool reverse_lower_bound(key_view prefix = {});
+      bool reverse_lower_bound(key_view prefix = npos);
 
       // reverse_lower_bound(prefix) + prev()
       bool reverse_upper_bound(key_view prefix = {});
 
       // moves to the last key with prefix, return valid()
+      //   = reverse_lower_bound(prefix)
       bool last(key_view prefix = {});
 
       // moves to the key(), return valid()
@@ -79,13 +87,13 @@ namespace arbtrie
          _path.clear();
       }
 
-      //auto brs() { return std::string_view((char*)_branches.data(),_branches.size() ); }
-      void pushkey(std::string_view k)
+      //auto brs() { return key_view((char*)_branches.data(),_branches.size() ); }
+      void pushkey(key_view k)
       {
          _branches.resize(_branches.size() + k.size());
          memcpy(_branches.data() + _branches.size() - k.size(), k.data(), k.size());
       }
-      void pushkey(char c) { 
+      void pushkey(uint8_t c) { 
          _branches.push_back(c); 
       }
       void popkey(int s) { 

@@ -60,7 +60,7 @@ namespace arbtrie
       int            get_setlist_size() const { return num_branches(); }
       key_view       get_setlist() const
       {
-         return key_view((const char*)get_setlist_ptr(), get_setlist_size());
+         return key_view(get_setlist_ptr(), get_setlist_size());
       }
 
       id_index*       get_branch_ptr() { return ((id_index*)tail()) - branch_capacity(); }
@@ -134,8 +134,9 @@ namespace arbtrie
 
          while (slp >= sl)
          {
-            if (uint8_t(*slp) <= uint8_t(br2))
+            if (uint8_t(*slp) <= uint8_t(br2)) {
                return slp - sl;
+            }
             --slp;
          }
          return slp - sl;
@@ -179,10 +180,15 @@ namespace arbtrie
          const auto*    e = s + get_setlist_size() -1;
 
          const uint8_t* p = e;
-         while (p >= s and b < *p)
+         while (p >= s and b < *p) {
             --p;
-         if (p < s)
-            return std::pair<branch_index_type, fast_meta_address>(-1, {});
+         }
+         if (p < s) {
+            if( _eof_value )
+               return std::pair<int_fast16_t, fast_meta_address>(0, _eof_value);
+            else
+               return std::pair<branch_index_type, fast_meta_address>(-1, {});
+         }
          return std::pair<branch_index_type, fast_meta_address>(
              char_to_branch(*p), {branch_region(), get_branch_ptr()[(p - s)]});
       }

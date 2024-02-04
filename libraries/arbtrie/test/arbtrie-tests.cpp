@@ -72,7 +72,7 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
       {
          val = key;
          toupper(val);
-         ws.upsert(root, key, val);
+         ws.upsert(root, to_key_view(key), to_value_view(val) );
          /*
          ws.get(root, key,
                 [&](bool found, const value_type& r)
@@ -147,14 +147,14 @@ TEST_CASE("insert-words")
       int  count    = 0;
       bool inserted = false;
       for (int i = 0; i < keys.size(); ++i) {
-         ws.upsert(root, keys[i], values[i]);
-         ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
+         ws.upsert(root, to_key_view(keys[i]), to_value_view(values[i]));
+         ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
                  REQUIRE( found );
-                 REQUIRE( r.view() == std::string_view(values[i]) );
+                 REQUIRE( r.view() == to_value_view(values[i]) );
                  if( not found )
                     TRIEDENT_DEBUG( "looking for after insert key[",i,"]: ", keys[i] );
                  assert( found );
-                 assert( r.view() == std::string_view(values[i]) );
+                 assert( r.view() == to_value_view(values[i]) );
                  });
       }
       {
@@ -162,12 +162,12 @@ TEST_CASE("insert-words")
       validate_refcount( l, root.address(), int(shared) + 1 );
       }
       for (int i = 0; i < keys.size(); ++i) {
-         ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
+         ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
                 // TRIEDENT_DEBUG( "looking for key[",i,"]: ", keys[i] );
                  REQUIRE( found );
-                 REQUIRE( r.view() == std::string_view(values[i]) );
+                 REQUIRE( r.view() == to_value_view(values[i]) );
                  assert( found );
-                 assert( r.view() == std::string_view(values[i]) );
+                 assert( r.view() == to_value_view(values[i]) );
                  });
       }
 
@@ -201,6 +201,7 @@ TEST_CASE("insert-words")
                assert( itr.key().size() < 1024 );
           //     std::cerr << itr.key() <<"\n";
                itr.read_value(data);
+               assert( itr.key().size() == data.size() );
                ++item_count;
             }
             auto end   = std::chrono::steady_clock::now();
@@ -211,6 +212,18 @@ TEST_CASE("insert-words")
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000))
                       << " items/sec  total items: " << add_comma(item_count) << "\n";
             REQUIRE(item_count == keys.size());
+
+            int rcount = 0; 
+            itr.reverse_lower_bound();
+            while( itr.valid() ) {
+               itr.read_value(data);
+ //              TRIEDENT_DEBUG( rcount, "] itr.key: ", to_str(itr.key()), " = ", std::string_view(data.data(),data.size()) );
+               REQUIRE( itr.key().size() == data.size() );
+               itr.prev();
+               ++rcount;
+            }
+            REQUIRE(rcount == keys.size());
+
          }
       };
       iterate_all();
@@ -220,7 +233,7 @@ TEST_CASE("insert-words")
       TRIEDENT_WARN( "removing for keys in order" );
       for( int i = 0; i < keys.size(); ++i ) {
 //         TRIEDENT_DEBUG( "check before remove: ", keys[i] );
-         ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
+         ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
                  if( not found )
                   TRIEDENT_DEBUG( "looking before remove: ", keys[i] );
                  REQUIRE( found );
@@ -228,14 +241,14 @@ TEST_CASE("insert-words")
                  });
 
  //        TRIEDENT_DEBUG( "before remove: ", keys[i] );
-         ws.remove( root, keys[i] );
+         ws.remove( root, to_key_view(keys[i]) );
   //       TRIEDENT_DEBUG( "after remove: ", keys[i] );
          /*{
          auto l = ws._segas.lock();
          validate_refcount( l, root.address(), int(shared+1) );
          }
          */
-         ws.get( root, keys[i], [&]( bool found, const value_type& r  ){
+         ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
                  if( found )
                   TRIEDENT_DEBUG( "checking remove: ", keys[i] );
                  REQUIRE( not found );
@@ -260,13 +273,17 @@ TEST_CASE("insert-words")
    TRIEDENT_DEBUG( "remove reverse file order unique" );
    test_words(false);
    TRIEDENT_DEBUG( "load in random order shared" );
+   {
    auto rng = std::default_random_engine {};
    std::shuffle( keys.begin(), keys.end(), rng );
+   }
+   {
+   auto rng = std::default_random_engine {};
+   std::shuffle( values.begin(), values.end(), rng );
+   }
    test_words(true);
    TRIEDENT_DEBUG( "load in random order unique" );
    test_words(false);
-   
-   
 }
 
 TEST_CASE("upsert") {}

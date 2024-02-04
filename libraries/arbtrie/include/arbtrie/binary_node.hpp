@@ -2,7 +2,6 @@
 #include <arbtrie/node_header.hpp>
 #include <arbtrie/value_type.hpp>
 
-
 namespace arbtrie
 {
 
@@ -118,7 +117,7 @@ namespace arbtrie
       };
       struct clone_remove
       {
-         uint16_t   idx;  // the index to remove
+         uint16_t idx;  // the index to remove
       };
 
       struct clone_insert
@@ -151,24 +150,24 @@ namespace arbtrie
       binary_node(int_fast16_t asize, fast_meta_address nid, const clone_config& cfg);
       // clone
       binary_node(int_fast16_t        asize,
-                  fast_meta_address nid,
+                  fast_meta_address   nid,
                   const binary_node*  src,
                   const clone_config& cfg);
       // clone + insert
       binary_node(int_fast16_t        asize,
-                  fast_meta_address nid,
+                  fast_meta_address   nid,
                   const binary_node*  src,
                   const clone_config& cfg,
                   const clone_insert& ins);
 
       binary_node(int_fast16_t        asize,
-                  fast_meta_address nid,
+                  fast_meta_address   nid,
                   const binary_node*  src,
                   const clone_config& cfg,
                   const clone_update& upv);
 
       binary_node(int_fast16_t        asize,
-                  fast_meta_address nid,
+                  fast_meta_address   nid,
                   const binary_node*  src,
                   const clone_config& cfg,
                   const clone_remove& upv);
@@ -181,8 +180,9 @@ namespace arbtrie
       static inline uint64_t value_hash(value_view k) { return XXH3_64bits(k.data(), k.size()); }
       static inline uint64_t value_hash(object_id k) { return XXH3_64bits(&k, sizeof(k)); }
       static inline uint64_t value_hash(value_type::remove k) { return 0; }
-      static inline uint64_t value_hash(fast_meta_address m) { 
-         return value_hash( (object_id)m.to_address() );
+      static inline uint64_t value_hash(fast_meta_address m)
+      {
+         return value_hash((object_id)m.to_address());
       }
 
       static inline uint8_t key_header_hash(uint64_t kh) { return uint8_t(kh); }
@@ -222,11 +222,8 @@ namespace arbtrie
          inline const uint8_t* key_ptr() const { return _key; }
          inline uint8_t*       val_ptr() { return _key + _key_size; }
          inline const uint8_t* val_ptr() const { return _key + _key_size; }
-         inline key_view       key() const { return key_view((char*)_key, _key_size); }
-         inline value_view     value() const
-         {
-            return value_view((char*)_key + _key_size, value_size());
-         }
+         inline key_view       key() const { return key_view(_key, _key_size); }
+         inline value_view     value() const { return value_view(_key + _key_size, value_size()); }
 
          inline const fast_meta_address value_id() const
          {
@@ -255,14 +252,14 @@ namespace arbtrie
             assert(v.size() <= _val_size);
             if (v.is_object_id())
             {
-               assert( _val_size >= sizeof(object_id) );
+               assert(_val_size >= sizeof(object_id));
                _val_size   = sizeof(object_id);
                object_id() = v.id().to_address();
             }
             else
             {
                auto vv = v.view();
-               assert( _val_size >= vv.size() );
+               assert(_val_size >= vv.size());
                assert(vv.size() <= max_inline_value_size);
                _val_size = vv.size();
 
@@ -314,7 +311,7 @@ namespace arbtrie
       const char* end_index_data() const { return body() + index_data_size(); }
 
       inline int key_val_section_size() const { return int(_alloc_pos); }
-      int        data_capacity()const { return tail() - (const uint8_t*)end_index_data(); }
+      int        data_capacity() const { return tail() - (const uint8_t*)end_index_data(); }
       int        spare_capacity() const
       {
          return (tail() - key_val_section_size()) - (const uint8_t*)end_index_data();
@@ -323,7 +320,8 @@ namespace arbtrie
       bool insert_requires_refactor(key_view k, const value_type& v) const
       {
          auto space_req = 4 + calc_key_val_pair_size(k, v) + 32 * 4;
-         return num_branches() >= 254 or (size() - spare_capacity() + space_req) > binary_refactor_threshold;
+         return num_branches() >= 254 or
+                (size() - spare_capacity() + space_req) > binary_refactor_threshold;
       }
       bool update_requires_refactor(const key_val_pair* existing, const value_type& new_val) const
       {
@@ -346,26 +344,27 @@ namespace arbtrie
       }
 
       // return the number of bytes removed
-      int remove_value( int lb_idx ) {
-         assert( lb_idx < num_branches() );
-         auto lb1 = lb_idx + 1;
+      int remove_value(int lb_idx)
+      {
+         assert(lb_idx < num_branches());
+         auto lb1    = lb_idx + 1;
          auto remain = num_branches() - lb1;
-         
+
          auto cur = get_key_val_ptr(lb_idx);
 
-         memmove( key_hashes() + lb_idx, key_hashes() + lb1, remain );
-         memmove( key_offsets() + lb_idx, key_offsets() + lb1, remain*sizeof(key_index) );
-         memmove( value_hashes() + lb_idx, value_hashes() + lb1, remain );
+         memmove(key_hashes() + lb_idx, key_hashes() + lb1, remain);
+         memmove(key_offsets() + lb_idx, key_offsets() + lb1, remain * sizeof(key_index));
+         memmove(value_hashes() + lb_idx, value_hashes() + lb1, remain);
          --_num_branches;
          return cur->total_size();
       }
       void set_value(int lb_idx, const value_type& val)
       {
-         assert( not val.is_remove() );
+         assert(not val.is_remove());
 
          auto& idx = key_offsets()[lb_idx];
-         idx.type = val.is_object_id();
-         assert( (char*)get_key_val_ptr(lb_idx) < tail() );
+         idx.type  = val.is_object_id();
+         assert((char*)get_key_val_ptr(lb_idx) < tail());
          get_key_val_ptr(lb_idx)->set_value(val);
       }
 
@@ -413,40 +412,40 @@ namespace arbtrie
       inline key_val_pair* get_key_val_ptr(int n)
       {
          assert(n < num_branches());
-         assert( key_offset_from_tail(n) < _nsize - sizeof(binary_node) );
+         assert(key_offset_from_tail(n) < _nsize - sizeof(binary_node));
          return (key_val_pair*)(tail() - key_offset_from_tail(n));
       }
       inline const key_val_pair* get_key_val_ptr(int n) const
       {
          assert(n < num_branches());
-         assert( key_offset_from_tail(n) < _nsize - sizeof(binary_node) );
+         assert(key_offset_from_tail(n) < _nsize - sizeof(binary_node));
          return (const key_val_pair*)(tail() - key_offset_from_tail(n));
       }
 
       inline const key_val_pair* get_key_val_ptr_offset(int n) const
       {
-         assert( (tail() - n) > ((uint8_t*)this) + sizeof(binary_node) );
+         assert((tail() - n) > ((uint8_t*)this) + sizeof(binary_node));
          return (const key_val_pair*)(tail() - n);
       }
       inline key_val_pair* get_key_val_ptr_offset(int n) { return (key_val_pair*)(tail() - n); }
 
-      inline std::string_view get_key(int n) { return get_key_val_ptr(n)->key(); }
-      inline std::string_view get_key(int n) const { return get_key_val_ptr(n)->key(); }
+      inline key_view get_key(int n) { return get_key_val_ptr(n)->key(); }
+      inline key_view get_key(int n) const { return get_key_val_ptr(n)->key(); }
 
-      key_val_pair* find_key_val(std::string_view key)
+      key_val_pair* find_key_val(key_view key)
       {
          auto idx = find_key_idx(key);
          return idx >= 0 ? get_key_val_ptr(idx) : nullptr;
       }
-      const key_val_pair* find_key_val(std::string_view key) const
+      const key_val_pair* find_key_val(key_view key) const
       {
          auto idx = find_key_idx(key);
          return idx >= 0 ? get_key_val_ptr(idx) : nullptr;
       }
 
-      int find_key_idx(std::string_view key, uint64_t khash) const
+      int find_key_idx(key_view key, uint64_t khash) const
       {
-         key_view hashes((char*)key_hashes(), num_branches());
+         key_view hashes(key_hashes(), num_branches());
          auto     khh = key_header_hash(khash);
          //  TRIEDENT_WARN( "find key: '", key, "' with h: ", int(khh), "  nb: ", num_branches() );
 
@@ -464,7 +463,7 @@ namespace arbtrie
             base   = bidx + 1;
          }
       }
-      int find_key_idx(std::string_view key) const
+      int find_key_idx(key_view key) const
       {
          int idx = lower_bound_idx(key);
          if (idx >= num_branches())
@@ -473,9 +472,9 @@ namespace arbtrie
             return -1;
          return idx;
       }
-      int lower_bound_idx(std::string_view key) const
+      int lower_bound_idx(key_view key) const
       {
-         __builtin_prefetch( tail() - _alloc_pos );
+         __builtin_prefetch(tail() - _alloc_pos);
          int left  = -1;
          int right = num_branches();
          while (right - left > 1)
@@ -488,20 +487,29 @@ namespace arbtrie
          }
          return right;
       }
-      int reverse_lower_bound_idx(std::string_view key) const
+      int reverse_lower_bound_idx(key_view key) const
       {
-         __builtin_prefetch( tail() - _alloc_pos );
+         __builtin_prefetch(tail() - _alloc_pos);
+         auto nb = num_branches() - 1;
+
+         auto ridx = [&](int i) { return nb - i; };
+
          int left  = -1;
          int right = num_branches();
          while (right - left > 1)
          {
-            int middle = (left + right) >> 1;
-            if (get_key(middle) > key)
+            int  middle = (left + right) >> 1;
+            auto k      = get_key(ridx(middle));
+            if (k > key)
                left = middle;
             else
+            {
+               if (k == key) [[unlikely]]
+                  return ridx(middle);
                right = middle;
+            }
          }
-         return right;
+         return ridx(right);
       }
 
       bool validate() const

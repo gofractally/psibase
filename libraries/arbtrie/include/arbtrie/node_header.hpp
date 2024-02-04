@@ -16,17 +16,13 @@ namespace arbtrie
    static constexpr const int max_branch_count = 257;
 
    using branch_index_type = int_fast16_t;
-   inline constexpr branch_index_type char_to_branch(char c)
-   {
-      return branch_index_type(uint8_t(c)) + 1;
-   }
    inline constexpr branch_index_type char_to_branch(uint8_t c)
    {
-      return branch_index_type(uint8_t(c)) + 1;
+      return branch_index_type(c) + 1;
    }
-   inline constexpr char branch_to_char(branch_index_type b)
+   inline constexpr uint8_t branch_to_char(branch_index_type b)
    {
-      return char(b - 1);
+      return uint8_t(b - 1);
    }
 
    /**
@@ -101,7 +97,7 @@ namespace arbtrie
       value_view     value() const
       {
          assert(_nsize >= sizeof(node_header));
-         return value_view(body(), value_size());
+         return value_view((uint8_t*)body(), value_size());
       }
 
       // size rounded up to the nearest 16 bytes

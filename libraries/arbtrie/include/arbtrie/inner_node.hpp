@@ -107,7 +107,7 @@ namespace arbtrie
       uint16_t        prefix_size() const { return _prefix_size; }
       inline key_view get_prefix() const
       {
-         return key_view((const char*)start_prefix(), prefix_size());
+         return key_view(start_prefix(), prefix_size());
       }
    } __attribute__((packed));
    static_assert(sizeof(inner_node<void>) == 28);

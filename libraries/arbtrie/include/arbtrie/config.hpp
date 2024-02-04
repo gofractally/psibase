@@ -84,8 +84,8 @@ namespace arbtrie {
    static constexpr const uint64_t binary_node_max_size  = 4096;
    static constexpr const uint64_t binary_node_max_keys  = 400;
 
-   using key_view       = std::string_view;
-   using value_view     = std::string_view;
+   using key_view       = std::basic_string_view<uint8_t>;
+   using value_view     = std::basic_string_view<uint8_t>;
    using segment_offset = uint32_t;
    using segment_number = uint64_t;
 }

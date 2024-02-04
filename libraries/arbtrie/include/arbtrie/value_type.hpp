@@ -8,8 +8,8 @@ namespace arbtrie {
    struct value_type {
       struct remove{};
 
-      value_type( const char* str ):data(std::string_view(str)){}
-      value_type( const std::string& vv ):data(std::string_view(vv)){}
+      value_type( const char* str ):data(key_view((uint8_t*)str)){}
+      value_type( const std::string& vv ):data(key_view((uint8_t*)vv.data(), vv.size())){}
       value_type( value_view vv ):data(vv){}
       value_type( remove vv ):data(vv){}
       value_type( fast_meta_address i ):data(i){}
@@ -43,7 +43,7 @@ namespace arbtrie {
       friend std::ostream& operator << ( std::ostream& out, const value_type& v ) {
          if( v.is_object_id() )
             return out << v.id();
-         return out << v.view();
+         return out << to_str(v.view());
       }
       private:
          std::variant<value_view,fast_meta_address,remove> data;

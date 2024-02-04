@@ -124,7 +124,7 @@ void print_pre(session_rlock&           state,
                std::vector<std::string> path,
                int                      depth = 1)
 {
-   prefix += in->get_prefix();
+   prefix += to_str(in->get_prefix());
    path.push_back(to_hex(in->get_prefix()));
 
    in->visit_branches_with_br(
@@ -140,13 +140,13 @@ void print_pre(session_rlock&           state,
              std::cerr << node_type_names[va.type()] << "    ";
              // std::cerr << va->value();
              // assert(to_upper(prefix) == va->value());
-             print_hex(va->value());
+             print_hex(to_str(va->value()));
              std::cerr << "\n";
              return;
           }
           auto c = branch_to_char(br);
-          path.push_back("-" + to_hex(std::string_view(&c, 1)));
-          print_pre(state, bid, prefix + branch_to_char(br), path, depth + 1);
+          path.push_back("-" + to_hex(key_view(&c, 1)));
+          print_pre(state, bid, prefix + char(branch_to_char(br)), path, depth + 1);
           path.pop_back();
        });
    path.pop_back();
@@ -164,7 +164,7 @@ void print_pre(session_rlock&           state,
       auto kvp = bn->get_key_val_ptr(i);
       print_hex(prefix);
       std::cerr << "-";
-      print_hex(std::string(kvp->key()));
+      print_hex(std::string(to_str(kvp->key())));
 
       std::cerr << "     ";
       for (auto s : path)
@@ -250,17 +250,17 @@ void print(session_rlock& state, const binary_node* bn, int depth = 0)
       //   std::cerr << k.size() <<" ";
       std::cerr << "'";
       //    print_hex(kvp->key());
-      std::cerr << kvp->key() << "' = '" << v << "'\n";
+      std::cerr << to_str(kvp->key()) << "' = '" << to_str(v) << "'\n";
    }
 }
 
 void print(session_rlock& state, const setlist_node* sl, int depth = 0)
 {
-   std::cerr << "SLN r" << state.get(sl->address()).ref() << "   cpre\"" << sl->get_prefix()
+   std::cerr << "SLN r" << state.get(sl->address()).ref() << "   cpre\"" << to_str(sl->get_prefix())
              << "\"  id: " << sl->address() << " ";
    if (sl->has_eof_value())
    {
-      std::cerr << " = '" << state.get(sl->get_branch(0)).as<value_node>()->value()
+      std::cerr << " = '" << to_str(state.get(sl->get_branch(0)).as<value_node>()->value())
                 << "' branches: " << std::dec << sl->num_branches() << " \n";
    }
    else
@@ -344,7 +344,6 @@ void print(session_rlock& state, fast_meta_address i, int depth)
          return;
    }
 }
-void test_iterator();
 
 void test_binary_node();
 void test_refactor();
@@ -352,7 +351,6 @@ int  main(int argc, char** argv)
 {
    arbtrie::thread_name("main");
    //test_binary_node();
-   //test_iterator();
    //   test_refactor();
    //   return 0;
    //
@@ -403,7 +401,7 @@ int  main(int argc, char** argv)
                auto     itr        = ws.create_iterator(r);
                assert(not itr.valid());
 
-               std::vector<char> data;
+               std::vector<uint8_t> data;
                auto              start = std::chrono::steady_clock::now();
                if (itr.lower_bound())
                {
@@ -438,7 +436,7 @@ int  main(int argc, char** argv)
              //  auto l = ws._segas.lock();
                uint64_t val = rand64();
                ++seq;
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                /*
                ws.get(r, kstr,
@@ -490,7 +488,7 @@ int  main(int argc, char** argv)
             {
                uint64_t val = ++seq3;
                seq++;
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                /*
                ws.get(r, kstr,
@@ -542,7 +540,7 @@ int  main(int argc, char** argv)
             {
                uint64_t val = bswap(seq3++);
                ++seq;
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                if ((i % batch_size) == 0)
                {
@@ -592,7 +590,7 @@ int  main(int argc, char** argv)
             {
                uint64_t val = bswap(seq4--);
                ++seq;
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                if ((i % batch_size) == 0)
                {
@@ -642,7 +640,7 @@ int  main(int argc, char** argv)
             {
                ++seq;
                auto kstr = std::to_string(rand64());
-               ws.insert(r, kstr, kstr);
+               ws.insert(r, to_key_view(kstr), to_value_view(kstr));
                if ((i % batch_size) == 0)
                {
                   last_root = r;
@@ -668,7 +666,7 @@ int  main(int argc, char** argv)
             for (int i = 0; i < count; ++i)
             {
                uint64_t val = ++seq2;
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
@@ -702,7 +700,7 @@ int  main(int argc, char** argv)
                uint64_t val  = (rnd % (seq2 - 1)) + 1;
                uint64_t val2 = val;
                //   TRIEDENT_DEBUG( "val: ", val, " val2: ", val2 );
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
@@ -736,7 +734,7 @@ int  main(int argc, char** argv)
             {
                uint64_t val = bswap(start_big_end++);
                //TRIEDENT_WARN( "find ", start_big_end );
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
@@ -770,7 +768,7 @@ int  main(int argc, char** argv)
             for (int i = 0; i < count; ++i)
             {
                uint64_t val = rand64();  //bswap(++seq2);
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                itr.lower_bound(kstr);
             }
             auto end   = std::chrono::steady_clock::now();
@@ -825,7 +823,7 @@ int  main(int argc, char** argv)
                      ++added;
                      uint64_t val = rand64();  //bswap(++seq2);
                      //auto str = std::to_string(val);
-                     key_view kstr((char*)&val, sizeof(val));
+                     key_view kstr((uint8_t*)&val, sizeof(val));
                      //key_view kstr(str);
                      if (not itr.lower_bound(kstr))
                      {
@@ -855,7 +853,7 @@ int  main(int argc, char** argv)
                uint64_t val = rand64();
                auto     str = std::to_string(val);
                ++seq;
-               key_view kstr((char*)&val, sizeof(val));
+               key_view kstr((uint8_t*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                if (not last_root)
                   last_root = r;
@@ -951,17 +949,17 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
       {
          val = key;
          toupper(val);
-         ws.upsert(root, key, val);
-         ws.get(root, key,
+         ws.upsert(root, to_key_view(key), to_value_view(val));
+         ws.get(root, to_key_view(key),
                 [&](bool found, const value_type& r)
                 {
                    if (key == "psych")
                    {
-                      TRIEDENT_WARN("get ", key, " =  ", r.view());
+                      TRIEDENT_WARN("get ", key, " =  ", to_str(r.view()));
                       inserted = true;
                    }
                    assert(found);
-                   assert(r.view() == val);
+                   assert(r.view() == to_value_view(val));
                 });
 
          ++count;
@@ -980,65 +978,6 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
    }
 }
 
-void test_iterator()
-{
-   environ env;
-   {
-      auto ws   = env.db->start_write_session();
-      auto root = ws.create_root();
-      load_words(ws, root);
-
-      //   ws.upsert(root, "hello", "world");
-      //   ws.upsert(root, "daniel", "larimer");
-      //  ws.upsert(root, "anna", "taylor");
-
-      auto itr = ws.create_iterator(root);
-      assert(not itr.valid());
-      //auto l = ws._segas.lock();
-      //print_pre(l, root.id(), "", 1);
-
-      std::vector<char> data;
-      auto              start = std::chrono::steady_clock::now();
-      int               count = 0;
-      std::string       last;
-      std::string       cur;
-      if (itr.lower_bound())
-      {
-         itr.read_value(data);
-         cur = std::string_view(data.data(), data.size());
-         //    std::cerr << itr.key() << " = " << std::string_view(data.data(), data.size()) << "\n";
-         assert(cur > last);
-         last = cur;
-         ++count;
-      }
-      else
-      {
-         assert(!"this should be found!");
-      }
-      while (itr.next())
-      {
-         itr.read_value(data);
-         cur           = std::string_view(data.data(), data.size());
-         std::string k = std::string(itr.key());
-         toupper(k);
-         // assert( cur > last );
-         //    std::cerr << itr.key() << " = " << std::string_view(data.data(), data.size()) << "\n";
-         assert(k == cur);
-         last = cur;
-         ++count;
-      }
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-      std::cout << "iterated " << std::setw(12)
-                << add_comma(int64_t(count) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000))
-                << " keyval/sec  items: " << add_comma(count) << " \n";
-
-      //}
-   }
-   usleep(100000);
-   env.db->print_stats(std::cout);
-}
 void test_binary_node()
 {
    environ env;
@@ -1049,10 +988,10 @@ void test_binary_node()
       auto                       state    = ws._segas.lock();
       TRIEDENT_DEBUG("upsert hello = world");
 
-      ws.upsert(cur_root, "hello", "world");
+      ws.upsert(cur_root, to_key_view("hello"), to_value_view("world"));
       print(state, cur_root.address(), 1);
-      ws.upsert(cur_root, "long",
-                "message                                                          ends");
+      ws.upsert(cur_root, to_key_view("long"),
+                to_key_view("message                                                          ends"));
 
       print(state, cur_root.address(), 1);
 
@@ -1064,8 +1003,8 @@ void test_binary_node()
       print(state, last_root->address(), 1);
 
       std::cerr << "\n ========== inserting 'update' = 'world' ==========\n";
-      ws.upsert(cur_root, "update",
-                "long                                                      world");
+      ws.upsert(cur_root, to_key_view("update"),
+                to_value_view("long                                                      world"));
 
       std::cerr << "root.........\n";
       print(state, cur_root.address(), 1);
@@ -1076,7 +1015,7 @@ void test_binary_node()
       last_root.reset();
 
       std::cerr << "\n ========== inserting 'mayday' = 'help me, somebody' ==========\n";
-      ws.upsert(cur_root, "mayday", "help me, somebody");
+      ws.upsert(cur_root, to_key_view("mayday"), to_value_view("help me, somebody"));
       print(state, cur_root.address(), 1);
 
       std::cerr << "root.........\n";
@@ -1103,7 +1042,7 @@ void test_refactor()
             //     std::cerr << "==================   start upsert  " << i << "=====================\n";
             std::string v            = std::to_string(rand64());
             std::string value_buffer = v + "==============123456790=======" + v;
-            ws.upsert(cur_root, v, value_buffer);
+            ws.upsert(cur_root, to_key_view(v), to_value_view(value_buffer));
             // std::cerr << " after upsert and set backup\n";
             last_root = cur_root;
             if (i >= 179)

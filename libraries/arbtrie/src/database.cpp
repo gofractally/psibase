@@ -259,7 +259,7 @@ namespace arbtrie
                                   value_view               new_val)
    {
       assert(oref.ref() == 1);
-      std::cerr << "TODO: remake_value()  new: '" << new_val << "'  old: '" << vn->value() << "'\n";
+      TRIEDENT_WARN( "TODO: remake_value()  ");
       return make_value(oref.address().region, oref.rlock(), new_val);
       // reallocate the value and update where the oref points
    }
