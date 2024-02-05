@@ -230,8 +230,8 @@ void validate(boost::any& v, const std::vector<std::string>& values, Timeout*, i
       return;
    }
 
-   std::uint64_t value = 0;
-   bool          frac;
+   std::uint64_t value   = 0;
+   bool          frac    = false;
    std::uint64_t divisor = 1;
    auto          iter    = s.begin();
    auto          end     = s.end();
