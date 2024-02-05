@@ -1,3 +1,14 @@
+# NOTE for integration into CommonSys and build
+# - move Loader code to CommonSys
+# - separate Loader build from deployment
+# - deployment will be just a line in CommonSys package
+
+# build Loader code (that will be shared with AccountSys and TokenSys)
+yarn --mutex network && yarn build
+
+# Services that will receive Loader code
+system_services=("AccountSys")
+user_services=("TokenSys")
 
 # Function to check for and execute build.sh
 check_and_execute_build() {
@@ -9,12 +20,6 @@ check_and_execute_build() {
         bash "$build_script"
     fi
 }
-
-# Install the loader in the public dir of these services
-system_services=("AccountSys")
-user_services=("TokenSys")
-
-npm i && npm run build
 
 # Loop through the system directories and execute the command for each
 for system_dir in "${system_services[@]}"; do

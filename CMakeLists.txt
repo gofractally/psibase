@@ -205,6 +205,7 @@ set(JS_DIRS
     services/system/AccountSys/ui:AccountSys_js
     services/user/PsiSpaceSys/ui:PsiSpaceSys_js
     services/user/CommonSys/ui:CommonSys_js
+    services/user/SupervisorSys/ui:SupervisorSys_js
     services/user/TokenSys/ui:TokenSys_js
     services/user/ExploreSys/ui:ExploreSys_js
     services/user/InviteSys/ui:InviteSys_js
@@ -513,8 +514,8 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/SupervisorSys.psi
     NAME SupervisorSys
     DESCRIPTION "Token service"
-    PACKAGE_DEPENDS NftSys ProxySys
-    SERVICE token-sys
+    PACKAGE_DEPENDS NftSys ProxySys AccountSys
+    SERVICE supervisor-sys
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
     DEPENDS SupervisorSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist/index.html
 )
