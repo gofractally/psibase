@@ -157,6 +157,8 @@ namespace arbtrie
                                fast_meta_address root,
                                key_view key );
 
+      value_type _cur_val;
+
      public:
       ~write_session();
 
@@ -198,25 +200,23 @@ namespace arbtrie
 
      private:
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert(object_ref<NodeType>& root, key_view key, const value_type& val);
+      fast_meta_address upsert(object_ref<NodeType>& root, key_view key);
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert(object_ref<NodeType>&& root, key_view key, const value_type& val);
+      fast_meta_address upsert(object_ref<NodeType>&& root, key_view key);
 
       template <upsert_mode mode, typename NodeType>
       fast_meta_address upsert_inner(object_ref<node_header>& r,
-                                     key_view                 key,
-                                     const value_type&        val);
+                                     key_view                 key);
 
       template <upsert_mode mode, typename NodeType>
       fast_meta_address upsert_inner(object_ref<node_header>&& r,
-                                     key_view                  key,
-                                     const value_type&         val)
+                                     key_view                  key)
       {
-         return upsert_inner<mode>(r, key, val);
+         return upsert_inner<mode>(r, key);
       }
 
       template <upsert_mode mode>
-      fast_meta_address upsert_value(object_ref<node_header>& root, const value_type& val);
+      fast_meta_address upsert_value(object_ref<node_header>& root);
 
       //=======================
       // binary_node operations
@@ -228,15 +228,13 @@ namespace arbtrie
 
       template <upsert_mode mode>
       fast_meta_address upsert_binary(object_ref<node_header>& root,
-                                      key_view                 key,
-                                      const value_type&        val);
+                                      key_view                 key );
 
       template <upsert_mode mode>
       fast_meta_address update_binary_key(object_ref<node_header>& root,
                                           const binary_node*       bn,
                                           uint16_t                 lb_idx,
-                                          key_view                 key,
-                                          const value_type&        val);
+                                          key_view                 key );
    };
 
    class database

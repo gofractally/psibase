@@ -82,7 +82,9 @@ namespace arbtrie {
 
    static constexpr const uint64_t binary_refactor_threshold = 4096;
    static constexpr const uint64_t binary_node_max_size  = 4096;
-   static constexpr const uint64_t binary_node_max_keys  = 400;
+   static constexpr const uint64_t binary_node_max_keys  = 253;
+   static constexpr const int      binary_node_initial_size = 2048;
+   static constexpr const int      binary_node_initial_branch_cap = 64;
 
    using key_view       = std::basic_string_view<uint8_t>;
    using value_view     = std::basic_string_view<uint8_t>;
