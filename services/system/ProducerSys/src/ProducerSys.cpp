@@ -74,14 +74,20 @@ namespace SystemService
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
-   std::size_t getThreshold(const CftConsensus& bft)
+   std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
    {
-      return bft.producers.size() / 2 + 1;
+      if (account == ProducerSys::producerAccountWeak)
+         return 1;
+      else
+         return cft.producers.size() / 2 + 1;
    }
 
-   std::size_t getThreshold(const BftConsensus& bft)
+   std::size_t getThreshold(const BftConsensus& bft, AccountNumber account)
    {
-      return bft.producers.size() * 2 / 3 + 1;
+      if (account == ProducerSys::producerAccountWeak)
+         return (bft.producers.size() + 2) / 3;
+      else
+         return bft.producers.size() * 2 / 3 + 1;
    }
 
    void ProducerSys::checkAuthSys(uint32_t                    flags,
@@ -118,27 +124,27 @@ namespace SystemService
              }
           },
           status->consensus);
-      std::sort(expectedClaims.begin(), expectedClaims.end(), compare_claim);
       std::sort(claims.begin(), claims.end(), compare_claim);
-      std::vector<psibase::Claim> relevantClaims;
-      std::set_intersection(claims.begin(), claims.end(), expectedClaims.begin(),
-                            expectedClaims.end(), std::back_inserter(relevantClaims),
-                            compare_claim);
+      auto matching = std::ranges::count_if(
+          expectedClaims, [&](const auto& claim)
+          { return claim == Claim{} || std::ranges::binary_search(claims, claim, compare_claim); });
 
       auto threshold =
           expectedClaims.empty()
               ? 0
-              : std::visit([](const auto& c) { return getThreshold(c); }, status->consensus);
-      if (relevantClaims.size() < threshold)
+              : std::visit([&](const auto& c) { return getThreshold(c, action.sender); },
+                           status->consensus);
+      if (matching < threshold)
       {
-         abortMessage("runAs: have " + std::to_string(relevantClaims.size()) + "/" +
-                      std::to_string(threshold) + " producers required to authorize");
+         abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold) +
+                      " producers required to authorize");
       }
    }
 
    void ProducerSys::canAuthUserSys(psibase::AccountNumber user)
    {
-      // noop
+      check(user == producerAccountStrong || user == producerAccountWeak,
+            "Can only authorize predefined accounts");
    }
 
 }  // namespace SystemService

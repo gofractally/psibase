@@ -160,6 +160,7 @@ function(add suffix)
             tester/include
             ../../services/system/AccountSys/include
             ../../services/system/ProducerSys/include
+            ../../services/system/AuthDelegateSys/include
             ../../services/system/AuthEcSys/include
             ../../services/system/AuthAnySys/include
             ../../services/system/CpuSys/include

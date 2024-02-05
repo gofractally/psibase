@@ -8,6 +8,7 @@
 #include <psibase/zip.hpp>
 #include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
+#include <services/user/PackageSys.hpp>
 #include <span>
 #include <string>
 #include <tuple>
@@ -16,15 +17,7 @@
 
 namespace psibase
 {
-
-   struct Meta
-   {
-      std::string                name;
-      std::string                description;
-      std::vector<std::string>   depends;
-      std::vector<AccountNumber> accounts;
-   };
-   PSIO_REFLECT(Meta, name, description, depends, accounts)
+   using UserService::PackageMeta;
 
    struct PackageInfo
    {
@@ -54,11 +47,11 @@ namespace psibase
       void storeData(std::vector<Action>& actions);
       void regServer(std::vector<Action>& actions);
       void postinstall(std::vector<Action>& actions);
-      void commitInstall(std::vector<Action>& actions);
+      void commitInstall(std::vector<Action>& actions, AccountNumber sender);
 
       std::vector<char>                                                    buf;
       zip::ZipReader                                                       archive;
-      Meta                                                                 meta;
+      PackageMeta                                                          meta;
       std::vector<std::tuple<AccountNumber, zip::FileHeader, ServiceInfo>> services;
       std::vector<std::pair<AccountNumber, zip::FileHeader>>               data;
       std::optional<zip::FileHeader>                                       postinstallScript;

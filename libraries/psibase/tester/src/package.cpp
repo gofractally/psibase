@@ -218,12 +218,9 @@ namespace psibase
       }
    }
 
-   void PackagedService::commitInstall(std::vector<Action>& actions)
+   void PackagedService::commitInstall(std::vector<Action>& actions, AccountNumber sender)
    {
-      actions.push_back(
-          transactor<PackageSys>{PackageSys::service, PackageSys::service}.postinstall(
-              InstalledPackage{
-                  .name = meta.name, .depends = meta.depends, .accounts = meta.accounts}));
+      actions.push_back(transactor<PackageSys>{sender, PackageSys::service}.postinstall(meta));
    }
 
    void dfs(const auto&                       reg,
