@@ -224,7 +224,7 @@ void validate(boost::any& v, const std::vector<std::string>& values, Timeout*, i
    boost::program_options::validators::check_first_occurrence(v);
    std::string_view s = boost::program_options::validators::get_single_string(values);
 
-   if (s == "" || s == "inf")
+   if (s == "" || s == "inf" || s == "off" || s == "no" || s == "false")
    {
       v = Timeout::none();
       return;
@@ -264,7 +264,7 @@ void validate(boost::any& v, const std::vector<std::string>& values, Timeout*, i
       {
          divisor *= 1000;
       }
-      else if (s == "us" || s == "µs")
+      else if (s == "us" || s == "µs" || s == "μs")
       {
          divisor *= 1000000;
       }
