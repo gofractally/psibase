@@ -140,7 +140,7 @@ void print_pre(session_rlock&           state,
              std::cerr << node_type_names[va.type()] << "    ";
              // std::cerr << va->value();
              // assert(to_upper(prefix) == va->value());
-             print_hex(to_str(va->value()));
+             //print_hex(to_str(va->value()));
              std::cerr << "\n";
              return;
           }

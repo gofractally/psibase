@@ -7,12 +7,26 @@
 
 namespace arbtrie
 {
+   template <typename NodeType, typename... CArgs>
+   object_ref<NodeType> make(id_region           reg,
+                             session_rlock&      state,
+                             std::invocable<NodeType*> auto&&  uinit,
+                             CArgs&&... cargs)
+   {
+      auto asize     = NodeType::alloc_size(cargs...);
+      auto make_init = [&](node_header* cl)
+      {
+         assert(cl->_nsize == asize);
+         uinit(new (cl) NodeType(cl->_nsize, cl->address(), cargs...));
+      };
+      return state.alloc(reg, asize, NodeType::type, make_init);
+   }
 
    template <typename NodeType>
    object_ref<NodeType> make(id_region           reg,
                              session_rlock&      state,
                              const clone_config& cfg,
-                             auto                uinit)
+                             auto&&                uinit)
    {
       auto asize     = NodeType::alloc_size(cfg);
       auto make_init = [&](node_header* cl)
@@ -26,7 +40,7 @@ namespace arbtrie
    object_ref<NodeType> remake(session_rlock&      state,
                                fast_meta_address   reuseid,
                                const clone_config& cfg,
-                               auto                uinit)
+                               auto&&                uinit)
    {
       auto asize     = NodeType::alloc_size(cfg);
       auto make_init = [&](node_header* cl)
@@ -59,7 +73,7 @@ namespace arbtrie
                                    object_ref<ORefType>&          r,
                                    const NodeType*                src,
                                    const clone_config&            cfg,
-                                   std::invocable<NodeType*> auto uinit,
+                                   std::invocable<NodeType*> auto&& uinit,
                                    CArgs&&... cargs)
    {
       assert(r.type() == src->get_type());
@@ -85,7 +99,7 @@ namespace arbtrie
        object_ref<ORefType>&          r,
        const NodeType*                src,
        const clone_config&            cfg   = {},
-       std::invocable<NodeType*> auto uinit = [](NodeType*) {})
+       std::invocable<NodeType*> auto&& uinit = [](NodeType*) {})
    {
       return clone_impl<mode.make_same_region()>(r.address().region, r, src, cfg,
                                                  std::forward<decltype(uinit)>(uinit));
@@ -97,7 +111,7 @@ namespace arbtrie
        object_ref<ORefType>&          r,
        const NodeType*                src,
        const clone_config&            cfg   = {},
-       std::invocable<NodeType*> auto uinit = [](NodeType*) {})
+       std::invocable<NodeType*> auto&& uinit = [](NodeType*) {})
    {
       return clone_impl<mode>(reg, r, src, cfg, std::forward<decltype(uinit)>(uinit));
    }
@@ -106,7 +120,7 @@ namespace arbtrie
    object_ref<NodeType> clone(object_ref<ORefType>&          r,
                               const NodeType*                src,
                               const clone_config&            cfg,
-                              std::invocable<NodeType*> auto uinit,
+                              std::invocable<NodeType*> auto&& uinit,
                               CArgs&&... cargs)
    {
       return clone_impl<mode.make_same_region()>(r.address()._region, r, src, cfg,
@@ -118,7 +132,7 @@ namespace arbtrie
                               object_ref<ORefType>&          r,
                               const NodeType*                src,
                               const clone_config&            cfg,
-                              std::invocable<NodeType*> auto uinit,
+                              std::invocable<NodeType*> auto&& uinit,
                               CArgs&&... cargs)
    {
       return clone_impl<mode>(reg, r, src, cfg, std::forward<decltype(uinit)>(uinit),
@@ -242,6 +256,8 @@ namespace arbtrie
    {
       if (val.is_object_id())
          return val.id();
+      return make<value_node>( reg, state, [](auto){},val.view() ).address();
+      /*
       auto v = val.view();
       return state
           .alloc(reg, sizeof(node_header) + v.size(), node_type::value,
@@ -251,9 +267,11 @@ namespace arbtrie
                     memcpy(node->body(), v.data(), v.size());
                  })
           .address();
+          */
    }
 
    // allocates new data but reuses the existing id
+   template <upsert_mode mode>
    fast_meta_address remake_value(object_ref<node_header>& oref,
                                   const value_node*        vn,
                                   value_view               new_val)
@@ -398,14 +416,21 @@ namespace arbtrie
    template <upsert_mode mode>
    fast_meta_address write_session::upsert_value(object_ref<node_header>& root)
    {
-      if (_cur_val.is_object_id())
-         return _cur_val.id();
-      if constexpr (mode.is_shared())
-         return make_value(root.address().region, root.rlock(), _cur_val.view());
+      auto state = root.rlock();
+      if (_cur_val.is_object_id()) {
+         throw std::runtime_error( "updating subtree not impl" );
+      }
+      if constexpr (mode.is_shared()) {
+         return make_value(state.get_new_region(), root.rlock(), _cur_val.view());
+      }
       else if constexpr (mode.is_unique())
       {
+         assert( root.ref() == 1 );
          if (root.ref() != 1)
+         {
+            TRIEDENT_WARN( "HOW IS THIS POSSIBLE?" );
             return make_value(root.address().region, root.rlock(), _cur_val.view());
+         }
 
          auto vn = root.as<value_node>();
          if (vn->value_size() == _cur_val.size())
@@ -416,7 +441,7 @@ namespace arbtrie
             memcpy(mvn->body(), vv.data(), vv.size());
             return root.address();
          }
-         return remake_value(root, vn, _cur_val.view());
+         return remake_value<mode>(root, vn, _cur_val.view());
       }
    }
 

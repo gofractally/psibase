@@ -5,20 +5,11 @@
 namespace arbtrie
 {
 
-   struct value_node : public node_header
-   {
-      static const node_type type = node_type::value;
-
-      uint32_t calculate_checksum()const {
-         return XXH3_64bits( ((const char*)this)+sizeof(checksum), 
-                      _nsize - sizeof(checksum) );
-      }
-      void visit_branches( auto )const{};
-   };
 
 };  // namespace arbtrie
 
 #include <arbtrie/setlist_node.hpp>
+#include <arbtrie/value_node.hpp>
 #include <arbtrie/full_node.hpp>
 #include <arbtrie/index_node.hpp>
 #include <arbtrie/binary_node.hpp>

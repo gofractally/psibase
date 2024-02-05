@@ -93,12 +93,6 @@ namespace arbtrie
       const char*    body() const { return (const char*)(this + 1); }
       char*          tail() { return ((char*)this) + _nsize; }
       const uint8_t* tail() const { return ((const uint8_t*)this) + _nsize; }
-      uint32_t       value_size() const { return _nsize - sizeof(node_header); }
-      value_view     value() const
-      {
-         assert(_nsize >= sizeof(node_header));
-         return value_view((uint8_t*)body(), value_size());
-      }
 
       // size rounded up to the nearest 16 bytes
       inline uint32_t     object_capacity() const { return (_nsize + 15) & -16; }

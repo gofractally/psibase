@@ -286,7 +286,31 @@ TEST_CASE("insert-words")
    test_words(false);
 }
 
-TEST_CASE("upsert") {}
+TEST_CASE("update") {
+   environ env;
+   auto    ws    = env.db->start_write_session();
+   auto    root  = ws.create_root();
+   ws.upsert( root, to_key_view( "hello" ), to_value_view( "world" ) );
+   ws.update( root, to_key_view("hello"), to_value_view( "heaven" ) );
+   ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
+           REQUIRE( found );
+           REQUIRE( val.view() == to_value_view("heaven") );
+           });
+   ws.update( root, to_key_view("hello"), to_value_view( 
+           "heaven is a great place to go! Let's get out of here. This line must be long." ) );
+   ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
+           REQUIRE( found );
+           REQUIRE( val.view() == to_value_view("heaven is a great place to go! Let's get out of here. This line must be long." ) );
+           });
+   ws.update( root, to_key_view("hello"), to_value_view( "short") );
+   env.db->print_stats( std::cerr );
+   ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
+           REQUIRE( found );
+           REQUIRE( val.view() == to_value_view("short" ) );
+           });
+   root  = ws.create_root();
+   env.db->print_stats( std::cerr );
+}
 
 TEST_CASE("lower_bound") {}
 
