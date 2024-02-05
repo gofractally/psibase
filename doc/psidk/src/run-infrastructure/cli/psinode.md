@@ -79,7 +79,7 @@ psinode - The psibase blockchain server
 
 - `--http-timeout` *seconds*
 
-  tells psinode how long to wait before closing an idle connection.
+  tells psinode how long to wait before closing an idle connection. The value is in seconds unless it has an explicit unit symbol. A value of `inf` means that connections will never time out.
 
 ### TLS Options
 
