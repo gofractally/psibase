@@ -214,7 +214,7 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
 
 struct Timeout
 {
-   std::chrono::microseconds duration = {};
+   std::chrono::microseconds duration = std::chrono::seconds(-1);
    static Timeout            none() { return {}; }
    friend bool               operator==(const Timeout&, const Timeout&) = default;
 };
