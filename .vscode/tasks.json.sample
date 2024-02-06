@@ -4,7 +4,7 @@
         {
             "label": "Full Build",
             "type": "shell",
-            "command": "mkdir -p build && cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=yes -DBUILD_JS=yes -DBUILD_NATIVE=yes -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX=\"psidk\" .. && make install",
+            "command": "mkdir -p build && cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX=\"psidk\" .. && make install",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -18,7 +18,7 @@
         {
             "label": "Build Services",
             "type": "shell",
-            "command": "mkdir -p build && cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug -DBUILD_DEBUG_WASM=ON -DBUILD_RUST=yes -DBUILD_DOC=no -DBUILD_JS=no -DBUILD_NATIVE=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX=\"psidk\" .. && make install",
+            "command": "mkdir -p build && cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug -DBUILD_DEBUG_WASM=ON -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX=\"psidk\" .. && make install",
             "group": {
                 "kind": "build"
             },
