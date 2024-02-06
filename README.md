@@ -94,11 +94,6 @@ The following are some of the common/useful build flags you can use to configure
 | Flag                           | Example Values    | Description                                                                                          |
 | ------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------- |
 | BUILD_DEBUG_WASM               | `yes`,`no`        | Build debug wasms (Needed for using the debugger)                                                    |
-| BUILD_DOC                      | `yes`,`no`        | Build the technical documentation                                                                    |
-| BUILD_JS                       | `yes`,`no`        | Build application front-ends                                                                         |
-| BUILD_NATIVE                   | `yes`,`no`        | Build the native programs (`psinode`, `psitest`)                                                     |
-| BUILD_RELEASE_WASM             | `yes`,`no`        | Build optimized release wasms                                                                        |
-| BUILD_RUST                     | `yes`,`no`        | Build `psibase` CLI tool                                                                             |
 | CMAKE_BUILD_TYPE               | `Debug`,`Release` | Determines level of optimization for the native programs                                             |
 | CMAKE_EXPORT_COMPILE_COMMANDS  | `yes`,`no`        | Tell CMake to generate compile_commands.json, used by various tools (e.g. clang format intellisense) |
 | CMAKE_INSTALL_PREFIX           | `psidk`           | Binary install location.                                                                             |
