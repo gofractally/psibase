@@ -420,6 +420,8 @@ psibase_package(
     DEPENDS wasm
 )
 
+set(DOC_SYS)
+
 if(BUILD_DOC)
     psibase_package(
         OUTPUT ${SERVICE_DIR}/DocSys.psi
@@ -430,6 +432,11 @@ if(BUILD_DOC)
         PACKAGE_DEPENDS PsiSpaceSys AccountSys
         DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
     )
+    install(
+        FILES ${SERVICE_DIR}/DocSys.psi
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
+        COMPONENT ServerData)
+    set(DOC_SYS DocSys)
 endif()
 
 psibase_package(
@@ -586,7 +593,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Default.psi
     NAME Default
     DESCRIPTION "All default services"
-    PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
+    PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys ${DOC_SYS}
                     ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
                     PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys
 )
@@ -614,7 +621,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
-    DocSys ExploreSys FractalSys InviteSys NftSys Minimal PackageSys ProducerSys ProxySys
+    ${DOC_SYS} ExploreSys FractalSys InviteSys NftSys Minimal PackageSys ProducerSys ProxySys
     PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
@@ -627,7 +634,6 @@ install(
           ${SERVICE_DIR}/CommonSys.psi
           ${SERVICE_DIR}/Default.psi
           ${SERVICE_DIR}/CpuSys.psi
-          ${SERVICE_DIR}/DocSys.psi
           ${SERVICE_DIR}/ExploreSys.psi
           ${SERVICE_DIR}/FractalSys.psi
           ${SERVICE_DIR}/InviteSys.psi
