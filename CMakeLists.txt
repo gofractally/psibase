@@ -27,18 +27,12 @@ endif ()
 
 file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
-option(CLIO_ONLY "Only build clio" OFF)
-
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
 
-option(BUILD_NATIVE "Build native code" ON)
-if(BUILD_NATIVE)
-    add_subdirectory(native)
-    file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\")\n")
-endif()
+add_subdirectory(native)
+file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\")\n")
 
-option(BUILD_RELEASE_WASM "Build release wasms" ON)
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
 include(GNUInstallDirs)
@@ -59,7 +53,7 @@ elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI)
 endif()
 
-if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
+if(DEFINED WASI_SDK_PREFIX)
     ProcessorCount(NUM_PROCS)
     # This is used by the VerifySys service. The kinds of keys supported need to be configured
     # here.  We use a minimized build to keep the size of the service down. Static linking is
@@ -89,7 +83,7 @@ if(DEFINED WASI_SDK_PREFIX AND NOT CLIO_ONLY)
         STEP_TARGETS configure
         CMAKE_ARGS
             -DCMAKE_BUILD_TYPE=
-            -DBUILD_RELEASE_WASM=${BUILD_RELEASE_WASM}
+            -DBUILD_RELEASE_WASM=ON
             -DBUILD_DEBUG_WASM=${BUILD_DEBUG_WASM}
             -DCMAKE_TARGET_MESSAGES=${CMAKE_TARGET_MESSAGES}
             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/wasm/toolchain.cmake
@@ -143,72 +137,70 @@ else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
 
-option(BUILD_DOC "Build doc" OFF)
-if(BUILD_DOC)
-    set(DOC_DEP doc)
-    ExternalProject_Add(
-        gen-cpp-doc
-        DEPENDS             wasm
-        SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
-        CONFIGURE_COMMAND   ""
-        BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-        INSTALL_COMMAND     ""
-    )
-    ExternalProject_Add(
-        md2man
-        SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
-        CONFIGURE_COMMAND   ""
-        BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-        INSTALL_COMMAND     ""
-    )
-    
-    function(ADD_BOOK_FILES path extension)
-        file(COPY ${CMAKE_CURRENT_SOURCE_DIR}${path} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}${path})
-        file(GLOB DOC_FILES ${CMAKE_CURRENT_BINARY_DIR}${path}*.${extension})
-        set(doc-src ${doc-src} ${DOC_FILES} PARENT_SCOPE)
-    endfunction()
-    
-    configure_file(doc/psidk/book.toml.in doc/psidk/book.toml)
-    configure_file(doc/psidk/theme/index.hbs doc/psidk/theme/index.hbs)
-    ADD_BOOK_FILES("/doc/psidk/theme/js/" "js")
-    ADD_BOOK_FILES("/doc/psidk/theme/css/" "css")
-    ADD_BOOK_FILES("/doc/psidk/src/_img/" "svg")
-    
-    file(GLOB_RECURSE doc-src ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/*.md)
-    list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)   
-    
-    file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/development/services/cpp-service/*.cpp)
-    file(GLOB_RECURSE doc-cmake doc/src/development/services/cpp-service/*/CMakeLists.txt)
-    file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
-    file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
-        DEPENDS gen-cpp-doc ${doc-src} ${doc-cpp} ${doc-cmake} ${doc-headers} ${doc-service-headers}
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/book
-        COMMAND mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk
-        COMMAND find ${CMAKE_CURRENT_BINARY_DIR}/book "(" -name ".*" -o -name "*~" ")" -delete
-        VERBATIM
-    )
-    add_custom_target(
-        ${DOC_DEP}
-        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
-    )
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psinode.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-    )
-    add_custom_target(psinode.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1 TYPE MAN COMPONENT ServerData)
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psibase.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-    )
-    add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
-endif()
+# Documentation
+ExternalProject_Add(
+    gen-cpp-doc
+    DEPENDS             wasm
+    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
+    CONFIGURE_COMMAND   ""
+    BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    INSTALL_COMMAND     ""
+)
+ExternalProject_Add(
+    md2man
+    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
+    CONFIGURE_COMMAND   ""
+    BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    INSTALL_COMMAND     ""
+)
 
+function(ADD_BOOK_FILES path extension)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}${path} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}${path})
+    file(GLOB DOC_FILES ${CMAKE_CURRENT_BINARY_DIR}${path}*.${extension})
+    set(doc-src ${doc-src} ${DOC_FILES} PARENT_SCOPE)
+endfunction()
+
+configure_file(doc/psidk/book.toml.in doc/psidk/book.toml)
+configure_file(doc/psidk/theme/index.hbs doc/psidk/theme/index.hbs)
+ADD_BOOK_FILES("/doc/psidk/theme/js/" "js")
+ADD_BOOK_FILES("/doc/psidk/theme/css/" "css")
+ADD_BOOK_FILES("/doc/psidk/src/_img/" "svg")
+
+file(GLOB_RECURSE doc-src ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/*.md)
+list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)
+
+file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/development/services/cpp-service/*.cpp)
+file(GLOB_RECURSE doc-cmake doc/src/development/services/cpp-service/*/CMakeLists.txt)
+file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
+file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
+    DEPENDS gen-cpp-doc ${doc-src} ${doc-cpp} ${doc-cmake} ${doc-headers} ${doc-service-headers}
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/book
+    COMMAND mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk
+    COMMAND find ${CMAKE_CURRENT_BINARY_DIR}/book "(" -name ".*" -o -name "*~" ")" -delete
+    VERBATIM
+)
+add_custom_target(
+    doc
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
+)
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
+    DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psinode.md
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
+)
+add_custom_target(psinode.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1 TYPE MAN COMPONENT ServerData)
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
+    DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psibase.md
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
+)
+add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
+
+# Run yarn to build service UIs
 set(JS_DIRS
     services/system/AccountSys/ui:AccountSys_js
     services/user/PsiSpaceSys/ui:PsiSpaceSys_js
@@ -238,36 +230,34 @@ function(add_js_target ENTRY OUTPUT_FILE)
     set(${DEP}_dep ${DEP} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE} PARENT_SCOPE)
 endfunction()
 
-option(BUILD_JS "Build JS" ON)
-if(BUILD_JS)
-    list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
-    file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
-    file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
+list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
+file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
+file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
 
-    # Builds the Common Sys Lib
-    add_js_target(${COMMON_DIR} common-lib.js)
+# Builds the Common Sys Lib
+add_js_target(${COMMON_DIR} common-lib.js)
 
-    foreach(ENTRY ${JS_DIRS})
-        add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
-    endforeach()
+foreach(ENTRY ${JS_DIRS})
+    add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
+endforeach()
 
-    set(WASM_PSIBASE_BYPRODUCTS
-        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
-        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm
-        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm.d.ts
-        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.d.ts
-        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.js
-    )
-    add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS})
-    add_custom_command(
-        OUTPUT ${WASM_PSIBASE_BYPRODUCTS}
-        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
-        COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase --out-name wasm-psibase
-    )
-    add_custom_target(wasm-psibase ALL DEPENDS ${WASM_PSIBASE_BYPRODUCTS})
-    add_dependencies(wasm-psibase rust)
+set(WASM_PSIBASE_BYPRODUCTS
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.js
+)
+add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS})
+add_custom_command(
+    OUTPUT ${WASM_PSIBASE_BYPRODUCTS}
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
+    COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase --out-name wasm-psibase
+)
+add_custom_target(wasm-psibase ALL DEPENDS ${WASM_PSIBASE_BYPRODUCTS})
+add_dependencies(wasm-psibase rust)
 
-    function(psinode_files target pfx)
+function(psinode_files target pfx)
     add_custom_target(
     ${target}
     ALL
@@ -282,19 +272,18 @@ if(BUILD_JS)
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
     COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/admin-sys/packages
     )
-    endfunction()
+endfunction()
 
-    psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-    add_dependencies(AdminSys_js wasm-psibase)
+psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
+add_dependencies(AdminSys_js wasm-psibase)
 
-    include(GNUInstallDirs)
-    install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
-    install(DIRECTORY services/user/CommonSys/common/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
-    install(FILES services/user/CommonSys/common/rpc.mjs services/user/CommonSys/common/keyConversions.mjs DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/admin-sys/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
-endif()
+include(GNUInstallDirs)
+install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
+install(DIRECTORY services/user/CommonSys/common/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
+install(FILES services/user/CommonSys/common/rpc.mjs services/user/CommonSys/common/keyConversions.mjs DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/admin-sys/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
 
-# Build services
+# Build service packages
 include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
@@ -420,17 +409,15 @@ psibase_package(
     DEPENDS wasm
 )
 
-if(BUILD_DOC)
-    psibase_package(
-        OUTPUT ${SERVICE_DIR}/DocSys.psi
-        NAME DocSys
-        DESCRIPTION "Psibase documentation"
-        SERVICE doc-sys
-        DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
-        PACKAGE_DEPENDS PsiSpaceSys AccountSys
-        DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
-    )
-endif()
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/DocSys.psi
+    NAME DocSys
+    DESCRIPTION "Psibase documentation"
+    SERVICE doc-sys
+    DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
+    PACKAGE_DEPENDS PsiSpaceSys AccountSys
+    DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
+)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/PsiSpaceSys.psi
@@ -645,19 +632,16 @@ install(
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 
-option(BUILD_RUST "Build rust" ON)
-if(BUILD_RUST)
-    ExternalProject_Add(
-        rust
-        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
-        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-        BUILD_ALWAYS 1
-        INSTALL_COMMAND ""
-    )
-    install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
-endif()
+ExternalProject_Add(
+    rust
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
+    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_ALWAYS 1
+    INSTALL_COMMAND ""
+)
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
