@@ -57,7 +57,7 @@ pub async fn get_tapos_for_head(
 
 #[derive(Debug, Copy, Clone)]
 pub enum TraceFormat {
-    Message,
+    Error,
     Stack,
     Full,
     Json,
@@ -68,13 +68,20 @@ impl TraceFormat {
         if let Some(e) = &trace.error {
             if !e.is_empty() {
                 let message = match self {
-                    TraceFormat::Message => e.to_string(),
+                    TraceFormat::Error => e.to_string(),
                     TraceFormat::Stack => trace.fmt_stack(),
                     TraceFormat::Full => trace.to_string(),
                     TraceFormat::Json => serde_json::to_string(&trace)?,
                 };
                 Err(Error::ExecutionFailed { message })?;
             }
+        }
+        match self {
+            TraceFormat::Full => {
+                print!("{}", trace.to_string())
+            }
+            TraceFormat::Json => serde_json::to_writer_pretty(std::io::stdout().lock(), &trace)?,
+            _ => {}
         }
         Ok(())
     }
@@ -84,7 +91,7 @@ impl FromStr for TraceFormat {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         match s {
-            "message" => Ok(TraceFormat::Message),
+            "error" => Ok(TraceFormat::Error),
             "stack" => Ok(TraceFormat::Stack),
             "full" => Ok(TraceFormat::Full),
             "json" => Ok(TraceFormat::Json),

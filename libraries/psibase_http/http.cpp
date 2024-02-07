@@ -653,7 +653,7 @@ namespace psibase::http
             auto* p = session.get();
             net::post(p->stream.get_executor(),
                       [callback = std::move(callback), session = std::move(session),
-                       result = static_cast<decltype(result)>(result)]()
+                       result = static_cast<decltype(result)>(result)]() mutable
                       {
                          session->queue_.pause_read = false;
                          callback(std::move(result));
@@ -810,33 +810,24 @@ namespace psibase::http
                return;
             }
 
-            server.http_config->push_boot_async(
-                std::move(req.body()),
-                [error, ok,
-                 session = send.self.derived_session().shared_from_this()](push_boot_result result)
+            run_native_handler(
+                server.http_config->push_boot_async,
+                [error, ok, session = send.self.derived_session().shared_from_this()](
+                    push_transaction_result&& result)
                 {
-                   net::post(session->stream.get_executor(),
-                             [error, ok, session = std::move(session), result = std::move(result)]
-                             {
-                                try
-                                {
-                                   session->queue_.pause_read = false;
-                                   if (!result)
-                                      session->queue_(ok({'t', 'r', 'u', 'e'}, "application/json"));
-                                   else
-                                      session->queue_(
-                                          error(bhttp::status::internal_server_error, *result));
-                                   if (session->queue_.can_read())
-                                      session->do_read();
-                                }
-                                catch (...)
-                                {
-                                   session->do_close();
-                                }
-                             });
+                   if (auto* trace = std::get_if<TransactionTrace>(&result))
+                   {
+                      std::vector<char>   data;
+                      psio::vector_stream stream{data};
+                      psio::to_json(*trace, stream);
+                      session->queue_(ok(std::move(data), "application/json"));
+                   }
+                   else
+                   {
+                      session->queue_(error(bhttp::status::internal_server_error,
+                                            std::get<std::string>(result)));
+                   }
                 });
-            send.pause_read = true;
-            return;
          }  // push_boot
          else if (req_target == "/native/push_transaction" &&
                   server.http_config->push_transaction_async)
