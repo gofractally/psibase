@@ -49,6 +49,8 @@ struct Args {
     #[clap(long)]
     suppress_ok: bool,
 
+    /// Controls how transaction traces are reported. Possible values are
+    /// error, stack, full, or json
     #[clap(long, value_name = "FORMAT", default_value = "stack")]
     trace: TraceFormat,
 
