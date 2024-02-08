@@ -235,6 +235,11 @@ namespace arbtrie
                                           const binary_node*       bn,
                                           uint16_t                 lb_idx,
                                           key_view                 key );
+      template <upsert_mode mode>
+      fast_meta_address remove_binary_key(object_ref<node_header>& root,
+                                          const binary_node*       bn,
+                                          uint16_t                 lb_idx,
+                                          key_view                 key );
    };
 
    class database

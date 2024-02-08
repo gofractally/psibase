@@ -126,6 +126,8 @@ namespace arbtrie
 
       if (r.region == 0)
       {
+         // TODO: allow region 0 once we have caught all places where 
+         // region is uninitilized and therefore overflowing region 0
          TRIEDENT_WARN("who is alloc to region 0!\n");
       }
 

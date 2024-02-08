@@ -45,16 +45,14 @@ namespace arbtrie
      */
    inline int binary_node::alloc_size(const clone_config& cfg)
    {
-      return round_up_multiple<64>(sizeof(binary_node)) +
-             round_up_multiple<64>(cfg.branch_cap * 4) + round_up_multiple<64>(cfg.data_cap);
+      return alloc_size( cfg.branch_cap, cfg.data_cap );
    }
 
    inline int binary_node::alloc_size(const binary_node* src, const clone_config& cfg)
    {
       auto bcap = std::max<int>(cfg.branch_cap, src->num_branches());
       auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size());
-      return round_up_multiple<64>(sizeof(binary_node)) + round_up_multiple<64>(bcap * 4) +
-             round_up_multiple<64>(dcap);
+      return alloc_size( bcap, dcap );
    }
 
    inline int binary_node::alloc_size(const binary_node*  src,
@@ -64,20 +62,20 @@ namespace arbtrie
       auto bcap = std::max<int>(cfg.branch_cap, src->num_branches() + 1);
       auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size());
       dcap += calc_key_val_pair_size(ins.key, ins.val);
-
-      return round_up_multiple<64>(sizeof(binary_node) + round_up_multiple<64>(bcap * 4) + dcap);
+      return alloc_size( bcap, dcap );
    }
    inline int binary_node::alloc_size(const binary_node*  src,
                                       const clone_config& cfg,
                                       const clone_update& ins)
    {
-      auto bcap = std::max<int>(cfg.branch_cap, src->num_branches());
+      auto bcap = std::max<int>(cfg.branch_cap, src->_branch_cap);
       auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size());
-      dcap += ins.val.size();
+      auto keyval = src->get_key_val_ptr(ins.idx);
+      dcap += ins.val.size() - keyval->value_size();
 
-      return round_up_multiple<64>(sizeof(binary_node)) + round_up_multiple<64>(bcap * 4) +
-             round_up_multiple<64>(dcap);
+      return alloc_size( bcap, dcap );
    }
+
    inline int binary_node::alloc_size(const binary_node*  src,
                                       const clone_config& cfg,
                                       const clone_remove& rem)
@@ -86,8 +84,7 @@ namespace arbtrie
       auto bcap = std::max<int>(cfg.branch_cap, src->num_branches() - 1);
       auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size() - v->total_size());
 
-      return round_up_multiple<64>(sizeof(binary_node)) + round_up_multiple<64>(bcap * 4) +
-             round_up_multiple<64>(dcap);
+      return alloc_size( bcap, dcap );
    }
 
    inline binary_node::binary_node(int_fast16_t        asize,
@@ -96,7 +93,7 @@ namespace arbtrie
        : node_header(asize, nid, node_type::binary), _alloc_pos(0)
    {
       assert(asize <= 4096);
-      _branch_cap = round_up_multiple<64>(4 * cfg.branch_cap) / 4;
+      _branch_cap = cfg.branch_cap;
    }
 
    inline binary_node::binary_node(int_fast16_t        asize,
@@ -112,7 +109,7 @@ namespace arbtrie
 
       TRIEDENT_WARN("clone binary node");
       auto bcap   = std::max<int>(cfg.branch_cap, src->num_branches());
-      _branch_cap = round_up_multiple<64>(bcap * 4) / 4;
+      _branch_cap = min_branch_cap(0);//round_up_multiple<64>(bcap * 4) / 4;
 
       memcpy(key_hashes(), src->key_hashes(), num_branches());
       memcpy(key_offsets(), src->key_offsets(), sizeof(key_index) * num_branches());
@@ -142,7 +139,8 @@ namespace arbtrie
    {
       assert(asize <= 4096);
       assert(alloc_size(src, cfg, up) <= asize);
-      _branch_cap = src->_branch_cap;
+      _branch_cap = min_branch_cap(src->num_branches());
+      _dead_space = 0;
 
       auto kh  = key_hashes();
       auto ko  = key_offsets();
@@ -154,18 +152,20 @@ namespace arbtrie
       memcpy(kh, skh, num_branches());
 
       const auto nb = src->num_branches();
-      for (int i = 0; i < nb; ++i)
+      const uint8_t* seq = search_seq_table.data() + ((nb - 1) * nb) / 2;
+      for (int x = 0; x < nb; ++x)
       {
-         auto kvp = src->get_key_val_ptr(i);
-         if (i != up.idx)
+         auto idx = seq[x];
+         auto kvp = src->get_key_val_ptr(idx);
+         if (idx != up.idx) [[likely]]
          {
             auto ts = kvp->total_size();
             _alloc_pos += ts;
             auto nkvp = get_key_val_ptr_offset(_alloc_pos);
             memcpy(nkvp, kvp, ts);
-            ko[i].type = sko[i].type;
-            ko[i].pos  = _alloc_pos;
-            vh[i]      = svh[i];
+            ko[idx].type = sko[idx].type;
+            ko[idx].pos  = _alloc_pos;
+            vh[idx]      = svh[idx];
          }
          else
          {
@@ -175,9 +175,9 @@ namespace arbtrie
             nkvp->set_key(kvp->key());
             nkvp->_val_size = vs;
             up.val.place_into(nkvp->val_ptr(), vs);
-            vh[i]      = value_header_hash(value_hash(nkvp->value()));
-            ko[i].pos  = _alloc_pos;
-            ko[i].type = up.val.is_object_id();
+            vh[idx]      = value_header_hash(value_hash(nkvp->value()));
+            ko[idx].pos  = _alloc_pos;
+            ko[idx].type = up.val.is_object_id();
          }
       }
       assert(spare_capacity() >= 0);
@@ -203,8 +203,7 @@ namespace arbtrie
    {
       assert(asize <= 4096);
       assert(alloc_size(src, cfg, rem) <= asize);
-      auto bcap   = std::max<int>(cfg.branch_cap, src->num_branches()-1);
-      _branch_cap = round_up_multiple<64>(bcap * 4) / 4;
+      _branch_cap = min_branch_cap(src->num_branches()-1); //round_up_multiple<64>(bcap * 4) / 4;
 
       auto kh  = key_hashes();
       auto ko  = key_offsets();
@@ -241,77 +240,16 @@ namespace arbtrie
          copy_key();
 
       assert(spare_capacity() >= 0);
-   }
 
-   /*
-   inline binary_node::binary_node(int_fast16_t        asize,
-                                   fast_meta_address   nid,
-                                   const binary_node*  src,
-                                   const clone_config& cfg,
-                                   const clone_insert& ins)
-       : node_header(asize, nid, node_type::binary, src->num_branches()),
-         _alloc_pos(0)
-   {
-      assert(not cfg.set_prefix);
-      assert(alloc_size(src, cfg, ins) <= asize);
-//      TRIEDENT_WARN("clone insert binary node");
-
-      auto bcap   = std::max<int>(cfg.branch_cap, src->num_branches() + 1);
-      _branch_cap = round_up_multiple<16>(bcap);
-
-      auto kh  = key_hashes();
-      auto ko  = key_offsets();
-      auto vh  = value_hashes();
-      auto skh = src->key_hashes();
-      auto sko = src->key_offsets();
-      auto svh = src->value_hashes();
-
-      int        lb     = ins.lb_idx;
-      int        lb1    = lb + 1;
-      const auto remain = src->num_branches() - lb;
-
-      _num_branches = src->_num_branches + 1;
-
-      memcpy(key_hashes(), src->key_hashes(), lb);
-      memcpy(value_hashes(), src->value_hashes(), lb);
-
-      memcpy(key_hashes() + lb1, src->key_hashes() + lb, remain);
-      memcpy(value_hashes() + lb1, src->value_hashes() + lb, remain);
-
-      const auto     nb  = src->num_branches();
-      const uint8_t* seq = search_seq_table.data() + ((nb + 1) * nb) / 2;
-      for (int i = 0; i < _num_branches; ++i)
-      {
-         int idx  = seq[i];
-         int sidx = idx - (idx > lb);
-         if (idx == lb) [[unlikely]]
-         {
-            auto vs = ins.val.size();
-            _alloc_pos += 2 + ins.key.size() + vs;
-
-            auto nkvp = get_key_val_ptr_offset(_alloc_pos);
-            nkvp->set_key(ins.key);
-            nkvp->_val_size = vs;
-            ins.val.place_into(nkvp->val_ptr(), vs);
-            ko[idx].pos  = _alloc_pos;
-            ko[idx].type = ins.val.is_object_id();
-            kh[idx]      = key_header_hash(key_hash(nkvp->key()));
-            vh[idx]      = value_header_hash(value_hash(nkvp->value()));
-         }
-         else
-         {
-            auto kvp = src->get_key_val_ptr(sidx);
-            auto ts  = kvp->total_size();
-            _alloc_pos += ts;
-            auto nkvp = get_key_val_ptr_offset(_alloc_pos);
-            memcpy(nkvp, kvp, ts);
-
-            ko[idx].type = sko[sidx].type;
-            ko[idx].pos  = _alloc_pos;
+      if constexpr ( debug_memory ) {
+         for( int i = 0; i < src->num_branches(); ++i ) {
+            if( i != rem.idx ) {
+               auto k = src->get_key_val_ptr(i)->key();
+               assert( get_key_val_ptr( find_key_idx(k) )->key() == k );
+            }
          }
       }
    }
-   */
 
    /**
     *  Used by compactor to optimize the order keys are searched in memory
@@ -323,6 +261,7 @@ namespace arbtrie
       memcpy( ptr->key_hashes(), src->key_hashes(), ptr->_num_branches );
       memcpy( ptr->value_hashes(), src->value_hashes(), ptr->_num_branches );
       ptr->_alloc_pos = 0;
+      ptr->_dead_space = 0;
       auto sko = src->key_offsets();
       auto ko  = ptr->key_offsets();
       auto nb = src->_num_branches;
@@ -339,82 +278,96 @@ namespace arbtrie
          ko[idx].type = sko[idx].type;
          ko[idx].pos  = ptr->_alloc_pos;
       }
+      assert(src->validate());
+      assert(ptr->validate());
    }
    /**
     *  Called to allcoate a new binary node while adding
-    *  an new key/value pair
+    *  an new key/value pair and removing any dead space
     */
    inline binary_node::binary_node(int_fast16_t        asize,
                                    fast_meta_address   nid,
                                    const binary_node*  src,
                                    const clone_config& cfg,
                                    const clone_insert& ins)
-       : node_header(asize, nid, node_type::binary, src->num_branches()),
-         _alloc_pos(src->_alloc_pos)
+       : node_header(asize, nid, node_type::binary, src->num_branches()), 
+         _alloc_pos(0),_dead_space(0)
    {
       assert(not cfg.set_prefix);
       assert(alloc_size(src, cfg, ins) <= asize);
-     // TRIEDENT_WARN("clone insert binary node");
 
-      // copy existing key/values
-      auto kvss = key_val_section_size();
-      memcpy(tail() - kvss, src->tail() - kvss, kvss);
-
-      auto bcap   = std::max<int>(cfg.branch_cap, src->num_branches() + 1);
-      _branch_cap = round_up_multiple<16>(bcap);
-      //_branch_cap = round_up_multiple<32>(src->num_branches() + cfg.branch_cap);
-      //     TRIEDENT_WARN("CLONE ADD!!! src kv section size ", src->key_val_section_size(),
-      //                  " cfg.spareb: ", cfg.branch_cap, " nbranch: ", src->num_branches(),
-      //                 " nbc: ", int(_branch_cap) );
-
-      auto kvs = calc_key_val_pair_size(ins.key, ins.val);
-      // allocate new key/value
-      _alloc_pos += kvs;
-      assert(_alloc_pos <= 4096);
-      assert(spare_capacity() >= 0);
-      auto kvp       = get_key_val_ptr_offset(_alloc_pos);
-      kvp->_key_size = ins.key.size();
-      memcpy(kvp->key_ptr(), ins.key.data(), ins.key.size());
-
-      key_index kidx;
-      kidx.pos = _alloc_pos;
-
-      if (ins.val.is_object_id())
-      {
-         kidx.type       = key_index::obj_id;
-         kvp->_val_size  = sizeof(object_id);
-         kvp->value_id() = ins.val.id().to_address();
-      }
-      else
-      {
-         const auto& vv = ins.val.view();
-         kvp->_val_size = vv.size();
-         memcpy(kvp->val_ptr(), vv.data(), vv.size());
-      }
-
-      // locate where to insert the new key
-      auto kh = key_hash(ins.key);
-      auto vh = ins.val.visit([](auto&& v) { return value_hash(v); });  //ins.val);
+      _branch_cap = min_branch_cap( std::max<int>(cfg.branch_cap, src->num_branches() + 1) );
+      assert( _nsize >= alloc_size( _branch_cap, src->key_val_section_size() + calc_key_val_pair_size( ins.key, ins.val) ) );
 
       const auto lb     = ins.lb_idx;
       const auto lb1    = lb + 1;
       const auto remain = src->num_branches() - lb;
 
       memcpy(key_hashes(), src->key_hashes(), lb);
-      memcpy(key_offsets(), src->key_offsets(), lb * sizeof(key_index));
       memcpy(value_hashes(), src->value_hashes(), lb);
 
       memcpy(key_hashes() + lb1, src->key_hashes() + lb, remain);
-      memcpy(key_offsets() + lb1, src->key_offsets() + lb, remain * sizeof(key_index));
       memcpy(value_hashes() + lb1, src->value_hashes() + lb, remain);
 
-      //     TRIEDENT_DEBUG( "CA KH: ", int(key_header_hash(kh)) );
-      key_hashes()[lb]   = key_header_hash(kh);
-      key_offsets()[lb]  = kidx;
-      value_hashes()[lb] = value_header_hash(vh);
+      auto sko = src->key_offsets();
+      auto ko  = key_offsets();
+      auto nb = src->_num_branches + 1;
 
-      ++_num_branches;  // key_hashes(), key_offsets(), etc depend upon this
-      assert(get_type() == node_type::binary);
+      /**
+       *  Copy the keys so they are sorted in the order of binary
+       *  search which should cause searches to traverse the data
+       *  in a linear manner.
+       */
+      const uint8_t* seq = search_seq_table.data() + ((nb - 1) * nb) / 2;
+      for( int i = 0; i < nb; ++i ) {
+         int idx  = seq[i];
+         if( idx == lb ) [[unlikely]] {
+            auto ts = calc_key_val_pair_size(ins.key, ins.val);
+            auto* kvp = get_key_val_ptr_offset(_alloc_pos += ts);
+            kvp->set_key(ins.key);
+
+            key_hashes()[lb]   = key_header_hash(key_hash(ins.key));
+
+            ko[idx].pos  = _alloc_pos;
+            if ( ins.val.is_object_id() )
+            {
+               ko[idx].type = key_index::obj_id;
+               kvp->_val_size  = sizeof(object_id);
+               kvp->value_id() = ins.val.id().to_address();
+               value_hashes()[lb] = value_header_hash(value_hash(ins.val.id()));
+            }
+            else
+            {
+               ko[idx].type = key_index::inline_data;
+               const auto& vv = ins.val.view();
+               kvp->_val_size = vv.size();
+               memcpy(kvp->val_ptr(), vv.data(), vv.size());
+               value_hashes()[lb] = value_header_hash(value_hash(vv));
+            }
+         }
+         else 
+         {
+            auto sidx = idx - (idx > lb);
+            const auto* skvp = src->get_key_val_ptr(sidx);
+            ko[idx].type = sko[sidx].type;
+
+            auto ts  = skvp->total_size();
+            auto* kvp = get_key_val_ptr_offset(_alloc_pos += ts);
+            memcpy(kvp, skvp, ts);
+            ko[idx].pos  = _alloc_pos;
+         }
+      }
+
+      ++_num_branches; 
+
+      if constexpr ( debug_memory ) {
+         assert( get_key_val_ptr( find_key_idx(ins.key) )->key() == ins.key );
+         for( int i = 0; i < src->num_branches(); ++i ) {
+            auto k = src->get_key_val_ptr(i)->key();
+            assert( get_key_val_ptr( find_key_idx(k) )->key() == k );
+         }
+      }
+      assert(validate());
    }
 
    // used by clone_binary_range to insert key/val pairs
@@ -426,7 +379,7 @@ namespace arbtrie
    {
       auto kvps = kvp->total_size() - minus_prefix;
       assert(spare_capacity() >= kvps);
-      assert(_branch_cap - _num_branches > 0);
+      assert(_branch_cap - _num_branches >= 0);
 
       _alloc_pos += kvps;
 
@@ -448,9 +401,15 @@ namespace arbtrie
       ++_num_branches;
    }
 
-   inline void binary_node::raise_branch_cap(short new_cap)
+   inline void binary_node::reserve_branch_cap(short min_children)
    {
-      assert(new_cap > _branch_cap);
+      assert( min_children >= num_branches() );
+      if( min_children <= _branch_cap ) 
+         return;
+      auto new_cap = min_branch_cap( min_children );
+
+      assert( new_cap > _branch_cap and
+              new_cap >= min_children );
 
       auto old_kh = key_hashes();
       auto old_ko = key_offsets();
@@ -462,59 +421,79 @@ namespace arbtrie
 
       memmove(new_vh, old_vh, num_branches());
       memmove(new_ko, old_ko, sizeof(key_index) * num_branches());
-      memmove(new_kh, old_kh, num_branches());
+      //memmove(new_kh, old_kh, num_branches());
 
+      assert( new_kh == old_kh );
       assert((char*)new_ko + sizeof(key_index) * num_branches() <= tail());
       assert((char*)new_vh + num_branches() <= tail());
       assert((char*)new_kh + num_branches() <= tail());
    }
 
+   inline void binary_node::reinsert( int lbx, key_view key, const value_type& val )
+   {
+      assert( get_key_val_ptr(lbx)->key() == key );
+      auto kvs = calc_key_val_pair_size(key, val);
+
+      assert( kvs <= spare_capacity() );
+
+      _alloc_pos += kvs;
+      auto ko = key_offsets();
+      ko[lbx].pos = _alloc_pos;
+      auto kvp = get_key_val_ptr(lbx);
+      kvp->set_key(key);
+      if( val.is_object_id() ) {
+         kvp->_val_size  = sizeof(object_id);
+         kvp->value_id() = val.id().to_address();
+         ko[lbx].type= key_index::obj_id;
+      }
+      else {
+         auto vv = val.view();
+         kvp->_val_size = vv.size();
+         memcpy(kvp->val_ptr(), vv.data(), vv.size());
+      }
+      assert( validate() );
+   }
+
    inline void binary_node::insert(int lbx, key_view key, const value_type& val)
    {
       assert(get_type() == node_type::binary);
-
-      //assert(num_branches() < _branch_cap);
-
       assert(can_insert(key, val));
-      // TODO:
-      //   the data we need to prefetch includes:
-      //   the key idx used for lower-bound search
-      //   the key/value header hashes that we have to move
-      //   once the lower bound is found....
 
       auto kvs = calc_key_val_pair_size(key, val);
 
-      if (num_branches() == _branch_cap)
-         raise_branch_cap(_branch_cap + 8);
-      //  if( num_branches() >= _branch_cap )
-      //     _branch_cap= num_branches() + 2;
+      reserve_branch_cap( num_branches() + 1 );
+
+     // TRIEDENT_DEBUG( "spare cap: ", spare_capacity(), " bcap: ", _branch_cap, " kvs: ", kvs,
+      //                " sai: ", size_after_insert(kvs), "  nsize: ", _nsize, 
+       //               " asize: ", _alloc_pos, " data_cap: ", data_capacity() );
+
+      assert( kvs <= spare_capacity() );
 
       _alloc_pos += kvs;
       auto kvp       = get_key_val_ptr_offset(_alloc_pos);
-      kvp->_key_size = key.size();
-      memcpy(kvp->key_ptr(), key.data(), key.size());
+      kvp->set_key( key );
 
       key_index kidx;
-      kidx.pos = _alloc_pos;
+      kidx.pos  = _alloc_pos;
+      kidx.type = (key_index::value_type)val.is_object_id();
 
-      if (val.is_object_id())
+      if (kidx.type )
       {
          kvp->_val_size  = sizeof(object_id);
          kvp->value_id() = val.id().to_address();
-         kidx.type       = key_index::obj_id;
       }
       else
       {
          auto vv = val.view();
-         assert(vv.size() < max_inline_value_size);
          kvp->_val_size = vv.size();
          memcpy(kvp->val_ptr(), vv.data(), vv.size());
       }
+      assert( kvp->total_size() == kvs );
 
       const auto kh = key_hash(key);
       const auto vh = value_hash(kvp->value());
 
-      const auto lb     = lbx;  //, lower_bound_idx(key);
+      const auto lb     = lbx;  
       const auto lb1    = lb + 1;
       const auto remain = num_branches() - lb;
 
@@ -526,18 +505,20 @@ namespace arbtrie
       memmove(kop + lb1, kop + lb, remain * sizeof(key_index));
       memmove(khp + lb1, khp + lb, remain);
 
-      //   TRIEDENT_DEBUG( "INSERT KH: ", int(key_header_hash(kh)) );
       key_hashes()[lb]   = key_header_hash(kh);
       key_offsets()[lb]  = kidx;
       value_hashes()[lb] = value_header_hash(vh);
 
       ++_num_branches;
 
+      assert( find_key_idx( key, key_hash(key) ) >= 0 );
       assert(get_key_val_ptr(lb)->key() == key);
       assert(tail() - _alloc_pos >= (char*)end_value_hashes());
       assert(khp + lb1 + remain <= (uint8_t*)tail());
       assert(((char*)kop) + lb1 + (sizeof(key_index) * remain) <= tail());
       assert(vhp + lb1 + remain <= (uint8_t*)tail());
+      assert( spare_capacity() >= 0 );
+      assert( validate() );
    }
 
 }  // namespace arbtrie

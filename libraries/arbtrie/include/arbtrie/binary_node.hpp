@@ -106,9 +106,12 @@ namespace arbtrie
       static const int_fast16_t key_not_found         = -1;
       static const node_type    type                  = node_type::binary;
 
-      uint16_t _alloc_pos;   // mult by 16 to get bytes from tail of first key_val_pair
-      uint16_t _branch_cap;  // space reserved for branchs, must be <= num_branches()
-      uint8_t  _key_hashes[];
+      uint16_t _alloc_pos  = 0;
+      uint16_t _branch_cap = 0;  // space reserved for branches, must be <= num_branches()
+      int16_t  _dead_space =
+          0;  // space from deleted keys that could be reclaimed by moving everything
+              // around
+      uint8_t _key_hashes[];
 
       struct clone_update
       {
@@ -126,6 +129,26 @@ namespace arbtrie
          key_view   key;
          value_type val;
       };
+
+      /**
+       *  Pad out the first cacheline of the node with branch index data,
+       *  then grow by one cachline at a time.
+       */
+      static constexpr int min_branch_cap(int children)
+      {
+         constexpr int header_branches = (cacheline_size - sizeof(binary_node)) / 4;
+         int extra_branches = round_up_multiple<cacheline_size/4>(children - header_branches);
+         return header_branches + extra_branches;
+      }
+
+      // val hash, key hash, key pos = 4 bytes
+      static constexpr int index_data_size(int cap) { return 4 * cap; }
+
+      static constexpr int alloc_size(int numb, int kvs)
+      {
+         return round_up_multiple<cacheline_size>(sizeof(binary_node) +
+                                                  index_data_size(min_branch_cap(numb)) + kvs);
+      }
 
       /**
        * Always a multiple of 64, aka the typical cache line size
@@ -236,6 +259,8 @@ namespace arbtrie
             assert(_val_size == sizeof(object_id));
             return *((id_address*)(_key + _key_size));
          }
+         void set_value(id_address adr) { memcpy(val_ptr(), &adr, sizeof(adr)); }
+
          void set_key(key_view v)
          {
             _key_size = v.size();
@@ -278,7 +303,7 @@ namespace arbtrie
 
       static_assert(sizeof(key_val_pair) == 2);
 
-      void raise_branch_cap(short newcap);
+      void reserve_branch_cap(short min_children);
 
       uint8_t*       key_hashes() { return _key_hashes; }
       const uint8_t* key_hashes() const { return _key_hashes; }
@@ -301,14 +326,11 @@ namespace arbtrie
                   uint8_t               vhash,
                   key_index::value_type t);
 
-      // data size of the index inclusive of spare slots
-      int index_data_size() const
-      {
-         return 4 * _branch_cap + sizeof(binary_node) - sizeof(node_header);
-      }
-
       // this includes the padding space
-      const char* end_index_data() const { return body() + index_data_size(); }
+      const char* end_index_data() const
+      {
+         return (const char*)(this) + sizeof(binary_node) + index_data_size(_branch_cap);
+      }
 
       inline int key_val_section_size() const { return int(_alloc_pos); }
       int        data_capacity() const { return tail() - (const uint8_t*)end_index_data(); }
@@ -317,34 +339,48 @@ namespace arbtrie
          return (tail() - key_val_section_size()) - (const uint8_t*)end_index_data();
       }
 
-      bool insert_requires_refactor(key_view k, const value_type& v) const
-      {
-         auto space_req = 4 + calc_key_val_pair_size(k, v) + 32 * 4;
-         return num_branches() >= 254 or
-                (size() - spare_capacity() + space_req) > binary_refactor_threshold;
+
+      int size_after_insert( int delta_key_val )const {
+         return alloc_size( std::max<int>(_branch_cap,num_branches() + 1), key_val_section_size() + delta_key_val);
       }
-      bool update_requires_refactor(const key_val_pair* existing, const value_type& new_val) const
+      int size_after_update( int delta_key_val )const {
+         return alloc_size( std::max<int>(_branch_cap,num_branches()), key_val_section_size() + delta_key_val);
+      }
+      bool can_update_with_compaction( int delta_key_val )const {
+         return binary_refactor_threshold > size_after_update( delta_key_val - _dead_space);
+      }
+      bool can_insert(int delta_key_val_pair) const
       {
-         auto space_req = calc_key_val_pair_size(existing->key(), new_val) - existing->key_size() -
-                          existing->value_size();
-         return (size() - spare_capacity() + space_req) > binary_refactor_threshold;
+         if (_num_branches < binary_node_max_keys ) [[likely]]
+            return _nsize >= size_after_insert( delta_key_val_pair );
+         return false;
+      }
+      bool can_insert( key_view key, const value_type& val )const {
+         return can_insert( calc_key_val_pair_size(key,val) );
       }
 
-      bool can_insert(key_view k, const value_type& val) const
+      bool can_insert_with_compaction(int delta_key_val_pair)const
       {
-         int  s  = calc_key_val_pair_size(k, val);
-         auto sc = spare_capacity();
-         if (s < sc and num_branches() < _branch_cap)
-            return true;
-         s += 32;  // room to grow the branch cap
-         return s < sc;
-         // if numb == branch_cap then size += 4 else size += 0
-         //s += (num_branches() == _branch_cap) << 2;
-         //return s <= spare_capacity();
+         if (_num_branches < binary_node_max_keys ) [[likely]]
+            return binary_refactor_threshold > size_after_insert( delta_key_val_pair - _dead_space );
+         return false;
+      }
+
+      bool can_update( const key_val_pair* cur, const value_type& val )const {
+         return _nsize >= size_after_update( val.size() - cur->value_size() );
+      }
+
+      bool update_requires_refactor(const key_val_pair* cur, const value_type& v ) const{
+         return not can_update_with_compaction( v.size() - cur->value_size() );
+      }
+
+      bool insert_requires_refactor(key_view k, const value_type& v)const
+      {
+         return not can_insert_with_compaction( calc_key_val_pair_size(k, v) );
       }
 
       // return the number of bytes removed
-      int remove_value(int lb_idx)
+      int16_t remove_value(branch_index_type lb_idx)
       {
          assert(lb_idx < num_branches());
          auto lb1    = lb_idx + 1;
@@ -352,12 +388,20 @@ namespace arbtrie
 
          auto cur = get_key_val_ptr(lb_idx);
 
+         --_num_branches;
+
          memmove(key_hashes() + lb_idx, key_hashes() + lb1, remain);
          memmove(key_offsets() + lb_idx, key_offsets() + lb1, remain * sizeof(key_index));
          memmove(value_hashes() + lb_idx, value_hashes() + lb1, remain);
-         --_num_branches;
-         return cur->total_size();
+
+         reserve_branch_cap(_num_branches);
+         const auto ts = cur->total_size();
+         _dead_space += ts;
+
+         assert( validate() );
+         return ts;
       }
+
       void set_value(int lb_idx, const value_type& val)
       {
          assert(not val.is_remove());
@@ -368,11 +412,20 @@ namespace arbtrie
          get_key_val_ptr(lb_idx)->set_value(val);
       }
 
+      inline static constexpr bool can_inline(int size )
+      {
+         return size <= max_inline_value_size;
+      }
       inline static constexpr bool can_inline(const value_type& val)
       {
          return val.size() <= max_inline_value_size;
       }
-      inline static constexpr bool can_inline(object_id val) { return true; }
+      inline static constexpr bool can_inline(value_view val)
+      {
+         return val.size() <= max_inline_value_size;
+      }
+      inline static constexpr bool can_inline(object_id) { return true; }
+      inline static constexpr bool can_inline(fast_meta_address) { return true; }
 
       // calculates the space required to store this key/val exclusive of node_header,
       // assuming that if value cannot be inlined it will be converted to an object_id
@@ -390,7 +443,7 @@ namespace arbtrie
       inline static int calc_key_val_pair_size(key_view key, const value_type& val)
       {
          if (val.is_object_id())
-            return calc_key_val_pair_size(key, val.id());
+            return calc_key_val_pair_size(key, val.id().to_address());
          return calc_key_val_pair_size(key, val.view());
       }
 
@@ -514,14 +567,16 @@ namespace arbtrie
 
       bool validate() const
       {
-         assert(_nsize < 4096);
+         assert( spare_capacity() >= 0 );
+         assert(_nsize <= 4096);
          auto nb = num_branches();
          for (int i = 0; i < nb; ++i)
          {
             auto kvp = get_key_val_ptr(i);
+           // TRIEDENT_DEBUG( i, "] pos: ", key_offsets()[i].pos, " ", to_str( kvp->key()) );
             assert((uint8_t*)kvp < tail());
             assert(kvp->value_size() > 0);
-            assert(kvp->key_size() < 130);
+            assert(kvp->key_size() < 25);
          }
 
          return true;
@@ -567,8 +622,11 @@ namespace arbtrie
 
       void insert(int kidx, key_view key, const value_type& val);
 
+      // reinsert existing key (likely because size grew)
+      void reinsert(int kidx, key_view key, const value_type& val);
+
    } __attribute((packed));
-   static_assert(sizeof(binary_node) == sizeof(node_header) + 4);
+   static_assert(sizeof(binary_node) == sizeof(node_header) + 6);
 
 }  // namespace arbtrie
 //

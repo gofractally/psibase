@@ -116,7 +116,11 @@ namespace arbtrie
          std::atomic<uint32_t> _alloc_pos = 128;  // sizeof(segment_header)
          uint32_t              _age;  // every time a segment is allocated it is assigned an age
                                       // which aids in reconstruction
-                                      
+
+         bool                  _mlocked = false;                             
+
+         // this is really an over-write lock, it does not prevent
+         // modifications to objects, that is achieved by reference counts
          std::mutex            _write_lock;
 
          // TODO: make sure the header gets synced... perhaps move this
@@ -395,6 +399,7 @@ namespace arbtrie
 
             read_lock& operator=(const read_lock&) = delete;
             read_lock& operator=(read_lock&)       = delete;
+            read_lock& operator=(read_lock&&)      = delete;
 
             session& _session;
          };
@@ -621,7 +626,6 @@ namespace arbtrie
        * written.
        */
       const node_header* get_object(node_location loc) const;
-      //const node_header* get_object(object_id oid) const;
 
       /**
        *  After all writes are complete, and there is not enough space
@@ -655,6 +659,8 @@ namespace arbtrie
 
       // allocates new segments
       block_allocator _block_alloc;
+      int             _total_mlocked = 0;
+      std::vector<int> _mlocked;
 
       /**
        *  This is the highest the alloc_ptr is allowed to
@@ -674,21 +680,6 @@ namespace arbtrie
        */
       std::atomic<uint64_t> _session_lock_ptrs[64];
 
-      /**
-      * At the start of each access to the DB, 
-      * a read thread must copy the end_ptr and store
-      * it in this array indexed by the thread number. When
-      * the thread is done accessing the data it will reset
-      * the pointer to max_int64.  Each read pos is an index
-      * into _free_segments
-      *
-      * TODO: perhaps these need to be on their own cache line
-      * since different threads are writing to them, if so then
-      * we can store other session-local data on that cache line
-      * for free.
-      */
-      //std::atomic<uint64_t> _session_ptrs[64];  // R* above
-
       // to allocate a new session in thread-safe way you
       // load, find first non-zero bit, and attempt to set it via C&S,
       // the index of the bit is the session id.
@@ -700,7 +691,7 @@ namespace arbtrie
       mapping                          _header_file;
       mapped_memory::allocator_header* _header;
       bool _in_alloc = false;
-   };
+   }; // seg_allocator
 
    /*
    template <typename T>

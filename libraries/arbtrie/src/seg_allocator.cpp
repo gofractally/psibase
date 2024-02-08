@@ -19,6 +19,9 @@ namespace arbtrie
       for (auto& sptr : _session_lock_ptrs)
          sptr.store(uint32_t(-1ull));
       _done.store(false);
+
+      _mlocked.resize(256);
+      for( auto& i : _mlocked ) i = -1;
    }
 
    seg_allocator::~seg_allocator()
@@ -47,45 +50,6 @@ namespace arbtrie
          _compact_thread.join();
    }
 
-   /**
-    * This must be called via a session because the session is responsible
-    * for documenting what regions could be read
-    *
-    * All objects are const because they cannot be modified after being
-    * written.
-   const node_header* seg_allocator::get_object(object_location loc) const
-   {
-      return nullptr;
-   }
-   const node_header* seg_allocator::get_object(object_id oid) const
-   {
-      return nullptr;
-   }
-    */
-
-   /**
-    *  After all writes are complete, and there is not enough space
-    *  to allocate the next object the alloc_ptr gets set to MAX and
-    *  the page gets 
-   void seg_allocator::finalize_segment(segment_number)
-   {
-      /// add maxsegsize - (seg_end-alloc_ptr) to free space
-      /// set seg.alloc_ptr = max
-      /// set seg as read only
-      /// mark seg as random access if average object size is
-      /// less than 2x page size.
-      /// mark seg as seq access if average object size is greater than 1mb
-      /// else mark seg as normal access
-   }
-    */
-
-   /**
-    *  After all data has been removed from a segment
-    * - madvise free/don't need 
-    * - add the segment number to the free segments at allocator_header::end_ptr
-    * - increment allocator_header::end_ptr
-   void seg_allocator::release_segment(segment_number) {}
-    */
 
    void seg_allocator::compact_loop()
    {
@@ -97,6 +61,29 @@ namespace arbtrie
       {
          if (not compact_next_segment())
          {
+            /// don't let the alloc threads starve for want of a free segment
+            /// if the free segment queue is getting low, top it up... but 
+            /// don't top it up just because read threads have things blocked
+            /// because they could "block" for a long time... hrmn... could we
+            /// put this at prior ap loc?
+            auto min = get_min_read_ptr();
+            auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed); 
+            auto ep  = _header->end_ptr.load(std::memory_order_relaxed);
+            if( min - ap <= 1 and  (ep - ap) < 3 ) {
+                TRIEDENT_DEBUG( "speculative segment creation" );
+
+                auto seg = get_new_segment();
+                munlock(seg.second, segment_size);
+                madvise(seg.second, segment_size, MADV_RANDOM);
+                seg.second->_alloc_pos.store(0, std::memory_order_relaxed );
+                seg.second->_age = -1;
+
+                _header->seg_meta[seg.first].clear();
+                _header->free_seg_buffer[_header->end_ptr.load(std::memory_order_relaxed) &
+                                         (max_segment_count - 1)] = seg.first;
+                auto prev = _header->end_ptr.fetch_add(1, std::memory_order_release);
+                set_session_end_ptrs(prev);
+            }
             /*
             std::cerr << "sleeping because most seg: " << most_empty_seg_num
                       << " empty: " << most_empty_seg_free << " "
@@ -156,10 +143,10 @@ namespace arbtrie
    {
       auto         state = ses.lock();
       auto         s     = get_segment(seg_num);
-      if( not s->_write_lock.try_lock() ) {
-         TRIEDENT_WARN( "unable to get write lock while compacting!" );
-         abort();
-      }
+    //  if( not s->_write_lock.try_lock() ) {
+    //     TRIEDENT_WARN( "unable to get write lock while compacting!" );
+    //     abort();
+    //  }
       auto         send  = (node_header*)((char*)s + segment_size);
       char*        foc   = (char*)s + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
       node_header* foo   = (node_header*)(foc);
@@ -313,7 +300,7 @@ namespace arbtrie
                                                          std::memory_order_relaxed);
       }
 
-      s->_write_lock.unlock();
+   //   s->_write_lock.unlock();
       s->_num_objects = 0;
       s->_alloc_pos.store(0, std::memory_order_relaxed);
       s->_age         = -1;
@@ -446,9 +433,20 @@ namespace arbtrie
          // TODO: only do this if not already mlock
          auto r = mlock(sp, segment_size);
 
-         if (r)
+         if (r) {
             std::cerr << "MLOCK RETURNED: " << r << "  EINVAL:" << EINVAL << "  EAGAIN:" << EAGAIN
                       << "\n";
+         } else {
+            ++_total_mlocked;
+            int idx = _total_mlocked % _mlocked.size();
+            if( _mlocked[idx] == -1 )
+               _mlocked[idx] = sn;
+            else {
+               auto olock = _block_alloc.get( _mlocked[idx] );
+               munlock( olock, segment_size );
+               _mlocked[idx] = sn;
+            }
+         }
         
 
          // for debug we clear the memory
@@ -488,9 +486,12 @@ namespace arbtrie
             //  TRIEDENT_DEBUG( "prepare segment: ", free_seg, "     end_ptr: ", _header->end_ptr.load() );
             //       std::cerr << "reusing segment..." << free_seg <<"\n";
             auto sp = (mapped_memory::segment_header*)_block_alloc.get(free_seg);
-            if( not sp->_write_lock.try_lock() ) {
-               TRIEDENT_WARN( "write lock on get_new_segment!" );
-            }
+        //  This lock is not needed, but just there to prove the read-lock system
+        //  is working as intened. If re-enabled, it probably need to be moved to
+        //  prepare segment because new segments don't end up locked... only reused ones
+        //    if( not sp->_write_lock.try_lock() ) {
+        //       TRIEDENT_WARN( "write lock on get_new_segment!" );
+        //    }
             return prepare_segment(free_seg);
          }
       }

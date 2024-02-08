@@ -391,7 +391,7 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 50;
+         const int                  rounds = 5;
          const int                  count  = 1'000'000;
 
          auto iterate_all = [&]()
@@ -908,7 +908,7 @@ int  main(int argc, char** argv)
       }
       db.stop_compact_thread();
 
-//      db.print_stats(std::cout);
+      db.print_stats(std::cout);
    }
    catch (const std::exception& e)
    {

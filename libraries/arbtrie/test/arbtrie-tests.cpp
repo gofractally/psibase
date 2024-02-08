@@ -232,17 +232,20 @@ TEST_CASE("insert-words")
          shared_handle = root;
       TRIEDENT_WARN( "removing for keys in order" );
       for( int i = 0; i < keys.size(); ++i ) {
-//         TRIEDENT_DEBUG( "check before remove: ", keys[i] );
+        // TRIEDENT_DEBUG( "check before remove: ", keys[i] );
          ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
                  if( not found )
-                  TRIEDENT_DEBUG( "looking before remove: ", keys[i] );
+                 {
+                  TRIEDENT_WARN( "looking before remove: ", keys[i] );
+                  abort();
+                  }
                  REQUIRE( found );
                  assert( found );
                  });
 
  //        TRIEDENT_DEBUG( "before remove: ", keys[i] );
          ws.remove( root, to_key_view(keys[i]) );
-  //       TRIEDENT_DEBUG( "after remove: ", keys[i] );
+        //TRIEDENT_DEBUG( "after remove: ", keys[i] );
          /*{
          auto l = ws._segas.lock();
          validate_refcount( l, root.address(), int(shared+1) );
@@ -296,13 +299,26 @@ TEST_CASE("update") {
            REQUIRE( found );
            REQUIRE( val.view() == to_value_view("heaven") );
            });
+   ws.update( root, to_key_view("hello"), to_value_view( "small" ) );
+   ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
+           REQUIRE( found );
+           REQUIRE( val.view() == to_value_view("small") );
+           });
    ws.update( root, to_key_view("hello"), to_value_view( 
            "heaven is a great place to go! Let's get out of here. This line must be long." ) );
    ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
            REQUIRE( found );
            REQUIRE( val.view() == to_value_view("heaven is a great place to go! Let's get out of here. This line must be long." ) );
            });
+   INFO( "setting a short (inline) value over an existing non-inline value" );  
    ws.update( root, to_key_view("hello"), to_value_view( "short") );
+
+   SECTION( "updating an inline value that is smaller than object id to big value" ) {
+      ws.upsert( root, to_key_view( "a" ), to_value_view( "a" ) );
+      ws.update( root, to_key_view( "a" ), 
+                 to_value_view( "object_id is larger than 'a'.. what do we do here? This must be longer than 63 bytes" ) );
+   }
+
    env.db->print_stats( std::cerr );
    ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
            REQUIRE( found );

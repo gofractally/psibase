@@ -7,6 +7,7 @@ namespace arbtrie {
    static constexpr const uint64_t GB = 1024ull * MB;
    static constexpr const uint64_t TB = 1024ull * GB;
 
+   static constexpr const int cacheline_size = 64;
 
    /**
     *  Certain 
@@ -82,7 +83,7 @@ namespace arbtrie {
 
    static constexpr const uint64_t binary_refactor_threshold = 4096;
    static constexpr const uint64_t binary_node_max_size  = 4096;
-   static constexpr const uint64_t binary_node_max_keys  = 253;
+   static constexpr const int      binary_node_max_keys  = 253; /// must be less than 255
    static constexpr const int      binary_node_initial_size = 2048;
    static constexpr const int      binary_node_initial_branch_cap = 64;
 

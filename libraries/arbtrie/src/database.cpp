@@ -8,9 +8,9 @@
 namespace arbtrie
 {
    template <typename NodeType, typename... CArgs>
-   object_ref<NodeType> make(id_region           reg,
-                             session_rlock&      state,
-                             std::invocable<NodeType*> auto&&  uinit,
+   object_ref<NodeType> make(id_region                        reg,
+                             session_rlock&                   state,
+                             std::invocable<NodeType*> auto&& uinit,
                              CArgs&&... cargs)
    {
       auto asize     = NodeType::alloc_size(cargs...);
@@ -26,7 +26,7 @@ namespace arbtrie
    object_ref<NodeType> make(id_region           reg,
                              session_rlock&      state,
                              const clone_config& cfg,
-                             auto&&                uinit)
+                             auto&&              uinit)
    {
       auto asize     = NodeType::alloc_size(cfg);
       auto make_init = [&](node_header* cl)
@@ -40,7 +40,7 @@ namespace arbtrie
    object_ref<NodeType> remake(session_rlock&      state,
                                fast_meta_address   reuseid,
                                const clone_config& cfg,
-                               auto&&                uinit)
+                               auto&&              uinit)
    {
       auto asize     = NodeType::alloc_size(cfg);
       auto make_init = [&](node_header* cl)
@@ -69,10 +69,10 @@ namespace arbtrie
    //
    //===============================================
    template <upsert_mode mode, typename ORefType, typename NodeType, typename... CArgs>
-   object_ref<NodeType> clone_impl(id_region                      reg,
-                                   object_ref<ORefType>&          r,
-                                   const NodeType*                src,
-                                   const clone_config&            cfg,
+   object_ref<NodeType> clone_impl(id_region                        reg,
+                                   object_ref<ORefType>&            r,
+                                   const NodeType*                  src,
+                                   const clone_config&              cfg,
                                    std::invocable<NodeType*> auto&& uinit,
                                    CArgs&&... cargs)
    {
@@ -96,9 +96,9 @@ namespace arbtrie
 
    template <upsert_mode mode, typename ORefType, typename NodeType>
    object_ref<NodeType> clone(
-       object_ref<ORefType>&          r,
-       const NodeType*                src,
-       const clone_config&            cfg   = {},
+       object_ref<ORefType>&            r,
+       const NodeType*                  src,
+       const clone_config&              cfg   = {},
        std::invocable<NodeType*> auto&& uinit = [](NodeType*) {})
    {
       return clone_impl<mode.make_same_region()>(r.address().region, r, src, cfg,
@@ -107,19 +107,19 @@ namespace arbtrie
 
    template <upsert_mode mode, typename ORefType, typename NodeType>
    object_ref<NodeType> clone(
-       id_region                      reg,
-       object_ref<ORefType>&          r,
-       const NodeType*                src,
-       const clone_config&            cfg   = {},
+       id_region                        reg,
+       object_ref<ORefType>&            r,
+       const NodeType*                  src,
+       const clone_config&              cfg   = {},
        std::invocable<NodeType*> auto&& uinit = [](NodeType*) {})
    {
       return clone_impl<mode>(reg, r, src, cfg, std::forward<decltype(uinit)>(uinit));
    }
 
    template <upsert_mode mode, typename ORefType, typename NodeType, typename... CArgs>
-   object_ref<NodeType> clone(object_ref<ORefType>&          r,
-                              const NodeType*                src,
-                              const clone_config&            cfg,
+   object_ref<NodeType> clone(object_ref<ORefType>&            r,
+                              const NodeType*                  src,
+                              const clone_config&              cfg,
                               std::invocable<NodeType*> auto&& uinit,
                               CArgs&&... cargs)
    {
@@ -128,10 +128,10 @@ namespace arbtrie
                                                  std::forward<CArgs>(cargs)...);
    }
    template <upsert_mode mode, typename ORefType, typename NodeType, typename... CArgs>
-   object_ref<NodeType> clone(id_region                      reg,
-                              object_ref<ORefType>&          r,
-                              const NodeType*                src,
-                              const clone_config&            cfg,
+   object_ref<NodeType> clone(id_region                        reg,
+                              object_ref<ORefType>&            r,
+                              const NodeType*                  src,
+                              const clone_config&              cfg,
                               std::invocable<NodeType*> auto&& uinit,
                               CArgs&&... cargs)
    {
@@ -254,9 +254,12 @@ namespace arbtrie
 
    fast_meta_address make_value(id_region reg, session_rlock& state, const value_type& val)
    {
-      if (val.is_object_id())
-         return val.id();
-      return make<value_node>( reg, state, [](auto){},val.view() ).address();
+      assert( not val.is_object_id() );
+    //  if (val.is_object_id())
+    //     return val.id();
+      return make<value_node>(
+                 reg, state, [](auto) {}, val.view())
+          .address();
       /*
       auto v = val.view();
       return state
@@ -277,7 +280,7 @@ namespace arbtrie
                                   value_view               new_val)
    {
       assert(oref.ref() == 1);
-      TRIEDENT_WARN( "TODO: remake_value()  ");
+      TRIEDENT_WARN("TODO: remake_value()  ");
       return make_value(oref.address().region, oref.rlock(), new_val);
       // reallocate the value and update where the oref points
    }
@@ -353,8 +356,7 @@ namespace arbtrie
    }
 
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert(object_ref<NodeType>&& root,
-                                           key_view               key)
+   fast_meta_address write_session::upsert(object_ref<NodeType>&& root, key_view key)
    {
       return upsert<mode>(root, key);
    }
@@ -362,8 +364,7 @@ namespace arbtrie
     *  Inserts key under root, if necessary 
     */
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert(object_ref<NodeType>& root,
-                                           key_view              key )
+   fast_meta_address write_session::upsert(object_ref<NodeType>& root, key_view key)
    {
       if constexpr (mode.is_unique())
       {
@@ -381,9 +382,9 @@ namespace arbtrie
          case node_type::setlist:
             result = upsert_inner<mode, setlist_node>(root, key);
             break;
-    //     case node_type::bitset:
-     //       result = upsert_inner<mode, bitset_node>(root, key, val);
-      //      break;
+            //     case node_type::bitset:
+            //       result = upsert_inner<mode, bitset_node>(root, key, val);
+            //      break;
          case node_type::full:
             result = upsert_inner<mode, full_node>(root, key);
             break;
@@ -394,13 +395,13 @@ namespace arbtrie
       {
          if (result != root.address())
             release_node(root);
-      } 
+      }
       else if constexpr (mode.is_shared())
       {
          assert((result != root.address()));
          release_node(root);
       }
-      
+
       return result;
    }
 
@@ -416,32 +417,35 @@ namespace arbtrie
    template <upsert_mode mode>
    fast_meta_address write_session::upsert_value(object_ref<node_header>& root)
    {
-      auto state = root.rlock();
-      if (_cur_val.is_object_id()) {
-         throw std::runtime_error( "updating subtree not impl" );
-      }
-      if constexpr (mode.is_shared()) {
+      auto& state = root.rlock();
+      if (_cur_val.is_object_id())
+         return _cur_val.id();  // replace what ever was here with a subtree
+
+      if constexpr (mode.is_shared())
+      {
          return make_value(state.get_new_region(), root.rlock(), _cur_val.view());
       }
       else if constexpr (mode.is_unique())
       {
-         assert( root.ref() == 1 );
-         if (root.ref() != 1)
+         assert(root.ref() == 1);
+         if (root.type() == node_type::value)
          {
-            TRIEDENT_WARN( "HOW IS THIS POSSIBLE?" );
-            return make_value(root.address().region, root.rlock(), _cur_val.view());
+            auto vn = root.as<value_node>();
+            assert(_cur_val.is_view());
+            auto vv = _cur_val.view();
+            if (vn->value_capacity() >= _cur_val.size())
+            {
+               TRIEDENT_DEBUG("update in place");
+               root.modify().as<value_node>()->set_value(vv);
+               return root.address();
+            }
+            TRIEDENT_DEBUG("remake value to make more space");
+            return remake_value<mode>(root, vn, _cur_val.view());
          }
-
-         auto vn = root.as<value_node>();
-         if (vn->value_size() == _cur_val.size())
+         else  // replacing a subtree with some other kind of value
          {
-            auto mod_lock = root.modify();
-            auto mvn      = mod_lock.as<value_node>();
-            auto vv       = _cur_val.view();
-            memcpy(mvn->body(), vv.data(), vv.size());
-            return root.address();
+            return make_value(state.get_new_region(), root.rlock(), _cur_val.view());
          }
-         return remake_value<mode>(root, vn, _cur_val.view());
       }
    }
 
@@ -595,7 +599,6 @@ namespace arbtrie
    {
       auto init_fn = [&](full_node* fn)
       {
-         //      fn->set_branch_region(r.rlock().get_new_region());
          fn->set_branch_region(src->branch_region());
          src->visit_branches_with_br(
              [&](short br, fast_meta_address oid)
@@ -638,8 +641,7 @@ namespace arbtrie
    //
    //========================================
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_inner(object_ref<node_header>& r,
-                                                 key_view                 key )
+   fast_meta_address write_session::upsert_inner(object_ref<node_header>& r, key_view key)
    {
       auto& state = r.rlock();
       auto  fn    = r.as<NodeType>();
@@ -695,16 +697,16 @@ namespace arbtrie
                {     // if shared and we inserted then it had better be different!
                   if constexpr (mode.is_remove())
                   {
-                 //    TRIEDENT_DEBUG( "remove key ", key );
+                     //    TRIEDENT_DEBUG( "remove key ", key );
                      brn.retain();  // because upsert will release() it
                      auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
                      assert(br != new_br);
                      if (not new_br)
                      {
-                  //      TRIEDENT_DEBUG( "not new_br" );
+                        //      TRIEDENT_DEBUG( "not new_br" );
                         if (fn->num_branches() + fn->has_eof_value() > 1)
                         {
-                   //        TRIEDENT_DEBUG( "numbr + hasval " );
+                           //        TRIEDENT_DEBUG( "numbr + hasval " );
                            auto cl = clone<mode>(r, fn, {});
                            release_node(brn);  // because we retained before upsert(),
                                                // and retained again in clone
@@ -715,7 +717,7 @@ namespace arbtrie
                      }
                      else
                      {
-                   //     TRIEDENT_DEBUG( "updated new_br" );
+                        //     TRIEDENT_DEBUG( "updated new_br" );
                         auto cl = clone<mode>(r, fn, {});
                         release_node(brn);  // because we retained before upsert(),
                                             // and retained again in clone
@@ -744,8 +746,8 @@ namespace arbtrie
                   throw std::runtime_error("unable to find key to update value");
                else
                {
-                  auto new_bin =
-                      make_binary(fn->branch_region(), state, key.substr(cpre.size() + 1), _cur_val);
+                  auto new_bin = make_binary(fn->branch_region(), state,
+                                             key.substr(cpre.size() + 1), _cur_val);
                   if constexpr (mode.is_unique())
                   {
                      if (fn->can_add_branch())
@@ -774,12 +776,12 @@ namespace arbtrie
          {
             if constexpr (mode.is_remove())
             {
-         //      TRIEDENT_DEBUG( "remove key ends on this node" );
+               //      TRIEDENT_DEBUG( "remove key ends on this node" );
                if (fn->has_eof_value())
                {
                   if constexpr (mode.is_unique())
                   {
-                  //   TRIEDENT_DEBUG( "mode is unique?" );
+                     //   TRIEDENT_DEBUG( "mode is unique?" );
                      release_node(state.get(fn->get_eof_value()));
                      r.modify().as<NodeType>()->set_eof({});
 
@@ -792,13 +794,13 @@ namespace arbtrie
                      //TRIEDENT_WARN("release eof value (shared)");
                      if (fn->num_branches() == 0)
                      {
-                      //  TRIEDENT_DEBUG("  num_branch == 0, return null");
+                        //  TRIEDENT_DEBUG("  num_branch == 0, return null");
                         return fast_meta_address();
                      }
                      return clone<mode>(r, fn, {},
                                         [&](auto cl)
                                         {
-          //                                 TRIEDENT_DEBUG("remove eof value from clone");
+                                           //                                 TRIEDENT_DEBUG("remove eof value from clone");
                                            release_node(state.get(cl->get_eof_value()));
                                            cl->set_eof({});
                                         })
@@ -874,7 +876,7 @@ namespace arbtrie
       {
          if constexpr (mode.is_remove())
          {
-            TRIEDENT_DEBUG( "remove key that doesn't share the same prefix" );
+            TRIEDENT_DEBUG("remove key that doesn't share the same prefix");
             if constexpr (mode.must_remove())
                throw std::runtime_error("attempt to remove key that does not exist");
             return r.address();
@@ -992,8 +994,7 @@ namespace arbtrie
    }  // end upsert<T>
 
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert_binary(object_ref<node_header>& root,
-                                                  key_view                 key )
+   fast_meta_address write_session::upsert_binary(object_ref<node_header>& root, key_view key)
    {
       auto bn = root.as<binary_node>();
 
@@ -1077,15 +1078,59 @@ namespace arbtrie
          }
 
          if (binary_node::can_inline(_cur_val))
-            return clone<mode>(root, bn, {}, binary_node::clone_insert(lb_idx, key, _cur_val)).address();
+            return clone<mode>(root, bn, {}, binary_node::clone_insert(lb_idx, key, _cur_val))
+                .address();
          else
-            return clone<mode>(root, bn, {},
-                               binary_node::clone_insert(
-                                   lb_idx, key, make_value(bn->branch_region(), root.rlock(), _cur_val)))
+            return clone<mode>(
+                       root, bn, {},
+                       binary_node::clone_insert(
+                           lb_idx, key, make_value(bn->branch_region(), root.rlock(), _cur_val)))
                 .address();
       }
-      return update_binary_key<mode>(root, bn, lb_idx, key);
+      if constexpr (mode.is_remove())
+      {
+         return remove_binary_key<mode>(root, bn, lb_idx, key);
+      }
+      else
+      {
+         return update_binary_key<mode>(root, bn, lb_idx, key);
+      }
    }  // upsert_binary
+
+   template <upsert_mode mode>
+   fast_meta_address write_session::remove_binary_key(object_ref<node_header>& root,
+                                                      const binary_node*       bn,
+                                                      uint16_t                 lb_idx,
+                                                      key_view                 key)
+   {
+      auto kvp = bn->get_key_val_ptr(lb_idx);
+      assert(kvp->key() == key);
+      if constexpr (mode.is_unique())
+      {
+         if (bn->is_obj_id(lb_idx))
+            release_node(root.rlock().get(kvp->value_id()));
+
+         root.modify().as<binary_node>([&](auto* b) { b->remove_value(lb_idx); });
+
+         if (bn->num_branches() == 0)
+            return fast_meta_address();
+
+         return root.address();
+      }
+      else  // not unique, must clone to update it
+      {
+         if (bn->num_branches() > 1)
+         {
+            auto cl = clone<mode>(root, bn, {}, binary_node::clone_remove(lb_idx)).address();
+
+            if (bn->is_obj_id(lb_idx))
+               release_node(root.rlock().get(kvp->value_id()));
+
+            return cl;
+         }
+         return fast_meta_address();
+      }
+   }
 
    /**
     *  update_binary_key
@@ -1100,106 +1145,171 @@ namespace arbtrie
    fast_meta_address write_session::update_binary_key(object_ref<node_header>& root,
                                                       const binary_node*       bn,
                                                       uint16_t                 lb_idx,
-                                                      key_view                 key )
+                                                      key_view                 key)
    {
-      auto kvp = bn->get_key_val_ptr(lb_idx);
+      const auto* kvp     = bn->get_key_val_ptr(lb_idx);
       assert(kvp->key() == key);
 
-      if constexpr (mode.is_remove())
-      {
-         if constexpr (mode.is_unique())
-         {
-            if (bn->is_obj_id(lb_idx))
-               release_node(root.rlock().get(kvp->value_id()));
+      auto        delta_s = _cur_val.size() - kvp->value_size();
 
-            root.modify().as<binary_node>([&](auto* b) { b->remove_value(lb_idx); });
-
-            if (bn->num_branches() == 0)
-               return fast_meta_address();
-
-            return root.address();
-         }
-         else  // not unique, must clone to update it
-         {
-            if (bn->num_branches() > 1)
-            {
-               auto cl = clone<mode>(root, bn, {}, binary_node::clone_remove(lb_idx)).address();
-
-               if (bn->is_obj_id(lb_idx))
-                  release_node(root.rlock().get(kvp->value_id()));
-
-               return cl;
-            }
-            return fast_meta_address();
-         }
-      }
-
-      if (bn->update_requires_refactor(kvp, _cur_val))
+      if ( not bn->can_update_with_compaction( delta_s ) )
       {
          auto rid = refactor<mode>(root, bn);
-
-         assert((mode.is_unique() and (rid.address() == root.address())) or
-                ((mode.is_shared()) and (rid.address() != root.address())));
-
-         // if it wasn't unique before and the id changed then
-         // it has become unique. If it was unique before, then
-         // it remains unique now.
          return upsert<mode.make_unique()>(rid, key);
       }
 
       if constexpr (mode.is_unique())
       {
-         if (bn->is_obj_id(lb_idx))
+         if (delta_s <= 0) // update doesn't require reinsert
          {
-            // if val.size() can inline then
-            auto oldr = root.rlock().get(kvp->value_id());
-            auto nid  = upsert_value<mode>(oldr);
-            if (nid != oldr.address())
+            if (bn->is_obj_id(lb_idx)) // current address (subtree/value_node)
             {
-               root.modify().as<binary_node>()->get_key_val_ptr(lb_idx)->value_id() =
-                   nid.to_address();
-               release_node(oldr);
+               auto cval = root.rlock().get(kvp->value_id());
+               if( _cur_val.is_object_id() ) { // so is updated value
+                  // store the new value, if necessary
+                  if( _cur_val.id() != cval.address() ) 
+                     root.modify().as<binary_node>()->set_value(lb_idx, _cur_val.id());
+
+                  // release the old value regardless because old and update value each
+                  // owns one retain() for a total of 2, but only stored once.
+                  release_node(cval); 
+                  return root.address();  // update in place is complete
+               } 
+               else  // updated value is data 
+               {
+                  if( bn->can_inline(_cur_val.view()) ){ 
+                     // that can be inlined in the same space as existing address
+                     assert( _cur_val.view().size() <= sizeof(object_id) );
+                     root.modify().as<binary_node>([&](auto* b){
+                        b->get_key_val_ptr(lb_idx)->set_value(_cur_val.view());
+                        b->key_offsets()[lb_idx].type = binary_node::key_index::inline_data;
+                     });
+                  }
+                  else  // data must be put in a value node
+                  {
+                     // TODO: make_value knows type, why erase it again
+                     auto nval = make_value( bn->branch_region(),
+                                             root.rlock(), _cur_val );
+                     root.modify().as<binary_node>()->set_value(lb_idx, nval);
+                  }
+                  // release the old value regardless because old and update value each
+                  // owns one retain() for a total of 2, but only stored once.
+                  release_node(cval);
+                  return root.address();  // update in place is complete
+               }
             }
-            return root.address();
+            else // current key value is not obj id
+            {
+               if( _cur_val.is_object_id() ) { // but the incoming value is
+                  assert( kvp->value_size() >= sizeof(object_id) ); // because delta_s <= 0
+                  root.modify().as<binary_node>()->set_value( lb_idx, _cur_val );
+                  return root.address(); // we are done
+               }
+               else // new value is data 
+               {
+                  if( _cur_val.view().size() <= kvp->value_size() )
+                  {  //  that is less than equal to the old value
+                     root.modify().as<binary_node>([&](auto* b){
+                        b->get_key_val_ptr(lb_idx)->set_value(_cur_val.view());
+                        assert(b->key_offsets()[lb_idx].type == binary_node::key_index::inline_data);
+                     });
+                     return root.address();
+                  } else {
+                     // it must be too big to inline (delta_s <= 0) 
+                     // and must be big enough to store an address
+                     assert( not bn->can_inline(_cur_val.view().size()) );
+                     assert( kvp->value_size() >= sizeof(object_id) );
+
+                     // TODO: make_value knows the type already, why erase it again
+                     auto nval = make_value( bn->branch_region(),
+                                             root.rlock(), _cur_val );
+
+                     root.modify().as<binary_node>([&](auto* b){
+                        b->get_key_val_ptr(lb_idx)->set_value(nval);
+                        assert(b->key_offsets()[lb_idx].type == binary_node::key_index::obj_id);
+                     });
+                     return root.address();
+                  }
+               }
+            }
          }
-         else if (kvp->value_size() >= _cur_val.size())
+         else // delta_s > 0, reinsert or grow required 
          {
-            root.modify().as<binary_node>()->set_value(lb_idx, _cur_val);
-            return root.address();
+             if( bn->is_obj_id(lb_idx) ) {
+                // must be able to inline otherwise delta_s == 0 because
+                // non-inline would be an object id
+                assert( bn->can_inline( _cur_val ) );
+                // because otherwise delta_s would be == 0
+                assert( not _cur_val.is_object_id() );
+
+                auto cval = root.rlock().get(kvp->value_id());
+                  root.modify().as<binary_node>([&](auto* b){
+                     b->key_offsets()[lb_idx].type = binary_node::key_index::inline_data;
+                  });
+                release_node(cval);
+             }
+
+             // calculate the size needed to reinsert
+             auto new_kvps = bn->calc_key_val_pair_size(key, _cur_val);
+
+             if( _cur_val.is_view() ) { // if new value is data
+                if( bn->can_inline( _cur_val.view() ) ) { // that can be inlined
+                   if( bn->can_insert( new_kvps ) ) { // and we can insert it, then reinsert!
+                      root.modify().as<binary_node>()->reinsert( lb_idx, key, _cur_val );
+                      return root.address();
+                   }
+                   else  // clone update 
+                   {
+                     return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, _cur_val))
+                         .address();
+                   }
+                }
+                else // cannot be inlined, so make a new value node
+                {
+                   auto nval = make_value( bn->branch_region(),
+                                           root.rlock(), _cur_val );
+                   if( bn->can_insert( sizeof(object_id)) ) // reinsert if possible
+                   { 
+                     // TODO: why erase type on reinsert?
+                     root.modify().as<binary_node>()->reinsert( lb_idx, key, nval );
+                     return root.address();
+                   } 
+                   else  // clone to reinsert new node
+                   {
+                     return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, nval))
+                         .address();
+                   }
+                }
+             } 
+             else  // new value is an object id
+             {  
+                assert( kvp->value_size() < sizeof(object_id) ); // otherwse delta_s <= 0
+                                                                 
+                if( bn->can_insert( sizeof(object_id)) ) {
+                  // TODO: why erase type on reinsert?
+                  root.modify().as<binary_node>()->reinsert( lb_idx, key, _cur_val );
+                  return root.address();
+                } else {
+                     return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, _cur_val))
+                         .address();
+                }
+             }
          }
-      }  // else mode is shared or needs a clone anyway
-
-      fast_meta_address old_val_oid;
-      if (bn->is_obj_id(lb_idx))
-         old_val_oid = kvp->value_id();
-
-      if (binary_node::can_inline(_cur_val))
+      } 
+      else  // shared mode
       {
-         // if val is an object id, the we must release_node
-         // on the current object id, assuming it is different,
-         // before we set the new object id, but we cannot release it
-         // until *after* clone has retained everything it needs to,
-         // so we should save the objid here... release it on the
-         // other side of clone
-
-         auto new_bin_node = clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, _cur_val));
-         auto nkvp         = new_bin_node->get_key_val_ptr(lb_idx);
-         if (old_val_oid and (not bn->is_obj_id(lb_idx) or nkvp->value_id() != old_val_oid))
-            release_node(root.rlock().get(old_val_oid));
-         return new_bin_node.address();
+         if( _cur_val.is_view() ) {
+            if( not bn->can_inline( _cur_val.view().size() ) ){
+                auto nval = make_value( bn->branch_region(),
+                                        root.rlock(), _cur_val );
+                return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, nval))
+                    .address();
+            }
+         }
+         return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, _cur_val))
+             .address();
       }
-      else
-      {
-         auto vid          = make_value(bn->branch_region(), root.rlock(), _cur_val);
-         auto new_bin_node = clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, vid));
-
-         auto nkvp = new_bin_node->get_key_val_ptr(lb_idx);
-         if (old_val_oid and (not bn->is_obj_id(lb_idx) or nkvp->value_id() != old_val_oid))
-            release_node(root.rlock().get(old_val_oid));
-
-         return new_bin_node.address();
-      }
-   }
+   } // upsert_binary_key()
 
    fast_meta_address write_session::make_binary(id_region         reg,
                                                 session_rlock&    state,
@@ -1210,23 +1320,24 @@ namespace arbtrie
       //created.  Currently adding 128 (2 cachelines) + what ever ounding out to nearest
       // 64 bytes is already going on.
       auto ss = binary_node::calc_key_val_pair_size(key, val) + binary_node_initial_size;
-      return make<binary_node>(reg, state, {.branch_cap = binary_node_initial_branch_cap, .data_cap = ss},
-                               [&](binary_node* bn)
-                               {
-                                  if (val.is_object_id())
-                                  {
-                                     bn->insert(0, key, val.id());
-                                  }
-                                  else
-                                  {
-                                     auto vv = val.view();
-                                     if (binary_node::can_inline(vv))
-                                        bn->insert(0, key, vv);
-                                     else
-                                        bn->insert(0, key,
-                                                   make_value(bn->branch_region(), state, vv));
-                                  }
-                               })
+      return make<binary_node>(
+                 reg, state, {.branch_cap = binary_node_initial_branch_cap, .data_cap = ss},
+                 [&](binary_node* bn)
+                 {
+                    bn->set_branch_region(state.get_new_region());
+                    if (val.is_object_id())
+                    {
+                       bn->insert(0, key, val.id());
+                    }
+                    else
+                    {
+                       auto vv = val.view();
+                       if (binary_node::can_inline(vv))
+                          bn->insert(0, key, vv);
+                       else
+                          bn->insert(0, key, make_value(bn->branch_region(), state, vv));
+                    }
+                 })
           .address();
    }
 
