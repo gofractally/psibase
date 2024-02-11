@@ -1,31 +1,31 @@
 const PLUGIN_CALL_REQUEST = "PLUGIN_CALL_REQUEST" as const;
 
 export interface FunctionCallArgs {
-  service: string;
-  method: string;
-  params: any[];
+    service: string;
+    method: string;
+    params: any[];
 }
 
 export interface PluginCallRequest {
-  type: typeof PLUGIN_CALL_REQUEST;
-  payload: {
-    id: string;
-    args: any[];
-  };
+    type: typeof PLUGIN_CALL_REQUEST;
+    payload: {
+        id: string;
+        args: FunctionCallArgs;
+    };
 }
 
 export const isPluginCallRequest = (data: any): data is PluginCallRequest =>
-  data &&
-  data.type == PLUGIN_CALL_REQUEST &&
-  typeof data.payload.id == "string";
+    data &&
+    data.type == PLUGIN_CALL_REQUEST &&
+    typeof data.payload.id == "string";
 
 export const buildPluginCallRequest = (
-  id: string,
-  args: any[]
+    id: string,
+    args: FunctionCallArgs
 ): PluginCallRequest => ({
-  type: PLUGIN_CALL_REQUEST,
-  payload: {
-    id,
-    args,
-  },
+    type: PLUGIN_CALL_REQUEST,
+    payload: {
+        id,
+        args,
+    },
 });

@@ -8,9 +8,13 @@ export {
     isIFrameIntialized,
     buildMessageIFrameInitialized,
 } from "./supervisor/IFrameIntialized";
-export { isPluginCallRequest } from "./supervisor/PluginCallRequest";
+export {
+    isPluginCallRequest,
+    buildPluginCallRequest,
+} from "./supervisor/PluginCallRequest";
 export {
     isPluginCallResponse,
     type PluginCallResponse,
 } from "./supervisor/PluginCallResponse";
 export { isFunctionCallResponse } from "./supervisor/FunctionCallResponse";
+export { generateRandomString } from "./generateRandomString";

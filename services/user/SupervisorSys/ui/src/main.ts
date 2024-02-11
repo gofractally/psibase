@@ -1,11 +1,13 @@
+import { FunctionCallArgs } from "../../../CommonSys/common/messaging/supervisor";
 import {
   FunctionCallRequest,
   buildMessageIFrameInitialized,
   PluginCallResponse,
   isFunctionCallRequest,
   isPluginCallResponse,
+  generateRandomString,
+  buildPluginCallRequest,
 } from "@messaging";
-import { connectToChild } from "penpal";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -18,12 +20,6 @@ interface FunctionCallParam<T = any> {
   method: string;
   params: T;
 }
-
-interface PenpalObj {
-  functionCall: (param: FunctionCallParam) => Promise<any>;
-}
-
-const loadedServices: { service: string; obj: PenpalObj }[] = [];
 
 // Connect spins up the supervisor iframe,
 // The app sends a message to supervisor for app2,
@@ -43,20 +39,13 @@ const getLoaderDomain = (subDomain = "supervisor-sys"): string => {
   return url.origin + "/loader";
 };
 
-const getConnection = async (service: string): Promise<PenpalObj> => {
-  // const existingService = loadedServices.find((s) => s.service === service);
-  // if (existingService) return existingService.obj;
-  const obj = await createIFrameService(service);
-  console.log(obj, "is my iframe service");
-  loadedServices.push({ service, obj });
+const buildIFrameId = (service: string) => `iframe-${service}`;
 
-  return obj;
-};
-
-const createIFrameService = async (service: string): Promise<PenpalObj> => {
+const initiateLoader = async (service: string): Promise<void> => {
   const iframe = document.createElement("iframe");
   iframe.src = getLoaderDomain(service);
   iframe.style.display = "none";
+  iframe.id = buildIFrameId(service);
 
   if (
     document.readyState === "complete" ||
@@ -68,17 +57,45 @@ const createIFrameService = async (service: string): Promise<PenpalObj> => {
       document.body.appendChild(iframe);
     });
   }
+};
 
-  const connection = connectToChild({
-    iframe,
-    methods: {
-      functionCall,
-      addToTx,
-      add: (a: number, b: number) => a + b,
-    },
+interface PendingFunctionCall<T = any | undefined> {
+  id: string;
+  args: FunctionCallArgs;
+  result: T;
+  nestedCalls: PendingFunctionCall[];
+}
+
+let pendingFunctionCalls: PendingFunctionCall[] = [];
+
+const addRootFunctionCall = (message: FunctionCallRequest) => {
+  const idAlreadyExists = pendingFunctionCalls.some(
+    (call) => call.id == message.payload.id
+  );
+  if (idAlreadyExists)
+    throw new Error(
+      `Cannot create new pending function call, ID ${message.payload.id} already exists`
+    );
+
+  pendingFunctionCalls.push({
+    id: message.payload.id,
+    args: message.payload.args,
+    nestedCalls: [],
+    result: undefined,
   });
+};
 
-  return connection.promise as unknown as Promise<PenpalObj>;
+const sendPluginCallRequest = (param: FunctionCallRequest) => {
+  const id = generateRandomString();
+  const message = buildPluginCallRequest(id, param.payload.args);
+
+  const iframe = document.getElementById(
+    buildIFrameId(param.payload.args.service)
+  );
+  if (!iframe)
+    throw new Error(
+      `Failed to find iframe for service ${param.payload.args.service}`
+    );
 };
 
 const addToTx = async (param: FunctionCallParam) => {
@@ -86,28 +103,12 @@ const addToTx = async (param: FunctionCallParam) => {
   return param;
 };
 
-const functionCall = async (param: FunctionCallParam) => {
-  console.log(
-    "Received params on the supervisor, now passing to the loader...",
-    param
-  );
-
-  const { service } = param;
-
-  const connection = await getConnection(service);
-  console.log(`Created / Fetched connection to ${service}`, connection);
-  const res = await connection.functionCall(param);
-  console.log(`Received ${res} from ${service} on Supervisor-Sys`);
-
-  return {
-    res,
-    service,
-  };
-};
-
 const onFunctionCallRequest = (message: FunctionCallRequest) => {
   // TODO Fulfill
   console.log(message);
+  // Append to pending functioncalls
+  addRootFunctionCall(message);
+  sendPluginCallRequest();
 };
 
 const onPluginCallResponse = (message: PluginCallResponse) => {

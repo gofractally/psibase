@@ -50,15 +50,14 @@ const baseUrl = "https://account-sys.psibase.127.0.0.1.sslip.io:8080";
 
 // npm run build && psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree r-account-sys / ./dist/ -S r-account-sys
 
-// const supervisor = new Supervisor();
+const supervisor = new Supervisor();
 
-const name = "x";
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
     const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useCurrentUser();
 
-    const [res, setRes] = useState(name);
+    const [res, setRes] = useState("Empty");
 
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
@@ -79,7 +78,15 @@ function App() {
 
     const [waitTime, setWaitTime] = useState(0);
     const onClick = async () => {
-        console.log(new Supervisor()); // // @ts-ignore
+        const res = await supervisor.functionCall({
+            service: "account-sys",
+            method: "numbers",
+            params: [2, 2, false],
+        });
+
+        console.log(res, "came back on supervisor");
+
+        setRes(res as string);
     };
 
     useInitialized(async () => {
