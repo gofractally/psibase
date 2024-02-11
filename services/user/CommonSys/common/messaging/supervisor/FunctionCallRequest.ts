@@ -14,8 +14,5 @@ export interface FunctionCallRequest {
     };
 }
 
-export const isFunctionCallRequest = (
-    data: any
-): data is FunctionCallRequest => {
-    return data && data.type == FUNCTION_CALL_REQUEST;
-};
+export const isFunctionCallRequest = (data: any): data is FunctionCallRequest =>
+    data && data.type == FUNCTION_CALL_REQUEST;

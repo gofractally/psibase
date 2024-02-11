@@ -1,10 +1,11 @@
-import { PluginCallRequest } from "../../CommonSys/common/messaging/supervisor/PluginCallRequest";
-import { buildPluginCallResponse } from "../../CommonSys/common/messaging/supervisor/PluginCallResponse";
 import importableCode from "./importables.js?raw";
 import {
   FunctionCallArgs,
   PluginCallResponse,
   isPluginCallRequest,
+  PluginCallRequest,
+  buildPluginCallResponse,
+  FunctionCallResult,
 } from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -38,7 +39,11 @@ const runWasm = async (
   return mod[method](...params);
 };
 
-const functionCall = async (param: FunctionCallArgs) => {
+const functionCall = async (
+  id: string,
+  param: FunctionCallArgs,
+  cached: FunctionCallResult[]
+) => {
   const url = "/loader/plugin.wasm";
 
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
@@ -49,7 +54,7 @@ const functionCall = async (param: FunctionCallArgs) => {
 
   const res = await runWasm(wasmBytes, importables, param.method, param.params);
 
-  const message = buildPluginCallResponse("3", res);
+  const message = buildPluginCallResponse(id, res);
   sendPluginCallResponse(message);
   return res;
 };
