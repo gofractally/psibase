@@ -1,5 +1,4 @@
 import importableCode from "./importables.js?raw";
-import { connectToParent } from "penpal";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -13,13 +12,6 @@ interface FunctionCallParam<T = any> {
   method: string;
   params: T;
 }
-
-const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
-  typeof param === "object" &&
-  param !== null &&
-  "service" in param &&
-  "method" in param &&
-  "params" in param;
 
 // const wasmUrl = (service: string) => `./${service}.wasm`;
 
@@ -52,9 +44,6 @@ const runWasm = async (
 };
 
 const functionCall = async (param: FunctionCallParam) => {
-  if (!isValidFunctionCallParam(param))
-    throw new Error(`Invalid function call param.`);
-
   const url = "/loader/plugin.wasm";
 
   console.log("fetching wasm...");
@@ -68,18 +57,11 @@ const functionCall = async (param: FunctionCallParam) => {
   return res;
 };
 
-const connection = connectToParent({
-  methods: {
-    functionCall,
-  },
-});
+const onRawEvent = (message: MessageEvent) => {
+  console.log({ rawMessageLoader: message });
+};
 
-connection.promise.then((parent) => {
-  console.log("Loader got parent", parent);
-  // @ts-ignore
-  parent.add(3, 1).then((total) => console.log(total));
-});
-
+window.addEventListener("message", onRawEvent);
 window.parent.postMessage(
   {
     type: "LOADER_INITIALIZED",

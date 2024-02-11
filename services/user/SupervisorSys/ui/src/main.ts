@@ -39,7 +39,7 @@ const subdomain = extractSubdomain(url);
 
 console.log(subdomain); // Output: account-sys
 
-const createLoaderDomain = (subDomain = "supervisor-sys"): string => {
+const createBaseDomain = (subDomain = "supervisor-sys"): string => {
   const currentUrl = window.location.href;
   const url = new URL(currentUrl);
   const hostnameParts = url.hostname.split(".");
@@ -48,8 +48,11 @@ const createLoaderDomain = (subDomain = "supervisor-sys"): string => {
   hostnameParts.unshift(subDomain);
   url.hostname = hostnameParts.join(".");
 
-  return url.origin + "/loader";
+  return url.origin;
 };
+
+const createLoaderDomain = (subDomain = "supervisor-sys") =>
+  createBaseDomain(subDomain) + "/loader";
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
 
