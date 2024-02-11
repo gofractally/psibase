@@ -3,7 +3,7 @@ import { connectToParent } from "penpal";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
-    <h1>App 2 / Loader</h1>
+    <h1>Loader</h1>
     <p>This is a generated SPA designed to act as the loader, its sole purpose is to be rendered in an iframe and run a WASM Component, then execute functions in the WASM component and send the results back to its parent iframe.</p>
   </div>
 `;
@@ -79,3 +79,11 @@ connection.promise.then((parent) => {
   // @ts-ignore
   parent.add(3, 1).then((total) => console.log(total));
 });
+
+window.parent.postMessage(
+  {
+    type: "LOADER_INITIALIZED",
+    payload: {},
+  },
+  "*"
+);

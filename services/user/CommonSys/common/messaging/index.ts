@@ -3,11 +3,12 @@ export { Supervisor } from "./supervisor";
 export {
     type FunctionCallRequest,
     isFunctionCallRequest,
+    type FunctionCallArgs,
 } from "./supervisor/FunctionCallRequest";
 export {
     isIFrameIntialized,
     buildMessageIFrameInitialized,
-} from "./supervisor/IFrameIntialized";
+} from "./supervisor/SupervisorInitialized";
 export {
     isPluginCallRequest,
     buildPluginCallRequest,

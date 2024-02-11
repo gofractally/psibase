@@ -1,4 +1,3 @@
-import { FunctionCallArgs } from "../../../CommonSys/common/messaging/supervisor";
 import {
   FunctionCallRequest,
   buildMessageIFrameInitialized,
@@ -7,6 +6,7 @@ import {
   isPluginCallResponse,
   generateRandomString,
   buildPluginCallRequest,
+  FunctionCallArgs,
 } from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -15,19 +15,31 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   </div>
 `;
 
-interface FunctionCallParam<T = any> {
-  service: string;
-  method: string;
-  params: T;
-}
-
 // Connect spins up the supervisor iframe,
 // The app sends a message to supervisor for app2,
 // Supervisor spins up app2 in an iframe
 // Sends a message to app2, app2 sends a message back to supervisor
 // Supervisor sends a message back to app1
 
-const getLoaderDomain = (subDomain = "supervisor-sys"): string => {
+const extractSubdomain = (urlString: string): string => {
+  const url = new URL(urlString);
+
+  const hostnameParts = url.hostname.split(".");
+
+  if (hostnameParts.length >= 3) {
+    return hostnameParts[0];
+  }
+
+  throw new Error(`Failed parsing sub-domain in ${urlString}`);
+};
+
+// Example usage
+const url = "https://account-sys.psibase.127.0.0.1.sslip.io:8080";
+const subdomain = extractSubdomain(url);
+
+console.log(subdomain); // Output: account-sys
+
+const createLoaderDomain = (subDomain = "supervisor-sys"): string => {
   const currentUrl = window.location.href;
   const url = new URL(currentUrl);
   const hostnameParts = url.hostname.split(".");
@@ -41,22 +53,38 @@ const getLoaderDomain = (subDomain = "supervisor-sys"): string => {
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
 
-const initiateLoader = async (service: string): Promise<void> => {
-  const iframe = document.createElement("iframe");
-  iframe.src = getLoaderDomain(service);
-  iframe.style.display = "none";
-  iframe.id = buildIFrameId(service);
+const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
+  const iFrameId = buildIFrameId(service);
+  const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
+  if (loader) return loader;
 
-  if (
-    document.readyState === "complete" ||
-    document.readyState === "interactive"
-  ) {
-    document.body.appendChild(iframe);
-  } else {
-    document.addEventListener("DOMContentLoaded", () => {
-      document.body.appendChild(iframe);
+  const iframe = document.createElement("iframe");
+  iframe.id = iFrameId;
+  iframe.src = createLoaderDomain(service);
+  iframe.style.display = "none";
+
+  return new Promise((resolve) => {
+    window.addEventListener("message", (event) => {
+      console.log("EEEE", event);
+      if (event.data.type == "LOADER_INITIALIZED") {
+        const service = extractSubdomain(event.origin);
+        console.log(`✨ Successfully booted loader for service "${service}"`);
+        const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
+        resolve(loader);
+      }
     });
-  }
+
+    if (
+      document.readyState === "complete" ||
+      document.readyState === "interactive"
+    ) {
+      document.body.appendChild(iframe);
+    } else {
+      document.addEventListener("DOMContentLoaded", () => {
+        document.body.appendChild(iframe);
+      });
+    }
+  });
 };
 
 interface PendingFunctionCall<T = any | undefined> {
@@ -85,30 +113,21 @@ const addRootFunctionCall = (message: FunctionCallRequest) => {
   });
 };
 
-const sendPluginCallRequest = (param: FunctionCallRequest) => {
+const sendPluginCallRequest = async (param: FunctionCallRequest) => {
   const id = generateRandomString();
   const message = buildPluginCallRequest(id, param.payload.args);
 
-  const iframe = document.getElementById(
-    buildIFrameId(param.payload.args.service)
-  );
-  if (!iframe)
-    throw new Error(
-      `Failed to find iframe for service ${param.payload.args.service}`
-    );
-};
+  const iframe = await getLoader(param.payload.args.service);
+  console.log({ iframe });
 
-const addToTx = async (param: FunctionCallParam) => {
-  console.log("supervisor addToTx", param);
-  return param;
+  iframe.contentWindow?.postMessage(message, "*");
 };
 
 const onFunctionCallRequest = (message: FunctionCallRequest) => {
-  // TODO Fulfill
-  console.log(message);
+  console.log("onFunctionCallRequest:", message);
   // Append to pending functioncalls
   addRootFunctionCall(message);
-  sendPluginCallRequest();
+  sendPluginCallRequest(message);
 };
 
 const onPluginCallResponse = (message: PluginCallResponse) => {
