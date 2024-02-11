@@ -14,7 +14,7 @@
     "noEmit": true,
 
     "paths": {
-      "@messaging": ["../../messaging"]
+      "@messaging": ["../../CommonSys/common/messaging"]
     },
 
     /* Linting */

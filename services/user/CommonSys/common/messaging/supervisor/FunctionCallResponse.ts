@@ -1,4 +1,4 @@
-import { FUNCTION_CALL_RESPONSE, Message } from ".";
+import { FUNCTION_CALL_RESPONSE, Message } from "./index";
 
 export interface FunctionCallResponse extends Message {
     type: typeof FUNCTION_CALL_RESPONSE;

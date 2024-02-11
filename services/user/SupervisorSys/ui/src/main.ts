@@ -1,12 +1,10 @@
 import {
   FunctionCallRequest,
-  isFunctionCallRequest,
-} from "../../../CommonSys/common/messaging/supervisor/FunctionCallRequest";
-import {
+  buildMessageIFrameInitialized,
   PluginCallResponse,
+  isFunctionCallRequest,
   isPluginCallResponse,
-} from "../../../CommonSys/common/messaging/supervisor/PluginCallResponse";
-import { buildMessageIFrameInitialized } from "./messaging/IFrameIntialized";
+} from "@messaging";
 import { connectToChild } from "penpal";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -133,7 +131,5 @@ addEventListener("message", onRawEvent);
 const initializeSupervisor = () => {
   window.parent.postMessage(buildMessageIFrameInitialized(), "*");
 };
-
-console.log({ name });
 
 initializeSupervisor();

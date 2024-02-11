@@ -17,7 +17,6 @@ import {
 import { getLoggedInUser, updateAccountInCommonNav } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
 
-// import { Supervisor } from "@supervisor";
 import { Supervisor } from "@messaging";
 
 import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
