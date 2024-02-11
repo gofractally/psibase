@@ -1,14 +1,11 @@
 // vite.config.js
+import path from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  //   build: {
-  //     rollupOptions: {
-  //       output: {
-  //         chunkFileNames: "[name].js",
-  //         entryFileNames: "index.js",
-  //         assetFileNames: "[name][extname]",
-  //       },
-  //     },
-  //   },
+  resolve: {
+    alias: {
+      "@messaging": path.resolve(__dirname, "../CommonSys/common/messaging"),
+    },
+  },
 });

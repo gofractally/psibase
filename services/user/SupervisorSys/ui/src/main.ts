@@ -139,7 +139,6 @@ const onPluginCallResponse = (message: PluginCallResponse) => {
 };
 
 const onRawEvent = (message: MessageEvent<any>) => {
-  console.log("Supervisor-sys Raw Event Received:", message);
   if (isFunctionCallRequest(message.data)) {
     // TODO Assert origin of supervisor-sys
     onFunctionCallRequest(message.data);

@@ -6,11 +6,17 @@ export interface FunctionCallArgs {
     params: any[];
 }
 
+interface Results<T = any> extends FunctionCallArgs {
+    id: string;
+    result: T;
+}
+
 export interface PluginCallRequest {
     type: typeof PLUGIN_CALL_REQUEST;
     payload: {
         id: string;
         args: FunctionCallArgs;
+        precomputedResults: Results[];
     };
 }
 
@@ -21,11 +27,13 @@ export const isPluginCallRequest = (data: any): data is PluginCallRequest =>
 
 export const buildPluginCallRequest = (
     id: string,
-    args: FunctionCallArgs
+    args: FunctionCallArgs,
+    precomputedResults: Results[] = []
 ): PluginCallRequest => ({
     type: PLUGIN_CALL_REQUEST,
     payload: {
         id,
         args,
+        precomputedResults,
     },
 });

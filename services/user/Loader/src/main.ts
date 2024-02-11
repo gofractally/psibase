@@ -1,4 +1,11 @@
+import { PluginCallRequest } from "../../CommonSys/common/messaging/supervisor/PluginCallRequest";
+import { buildPluginCallResponse } from "../../CommonSys/common/messaging/supervisor/PluginCallResponse";
 import importableCode from "./importables.js?raw";
+import {
+  FunctionCallArgs,
+  PluginCallResponse,
+  isPluginCallRequest,
+} from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -6,18 +13,6 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     <p>This is a generated SPA designed to act as the loader, its sole purpose is to be rendered in an iframe and run a WASM Component, then execute functions in the WASM component and send the results back to its parent iframe.</p>
   </div>
 `;
-
-interface FunctionCallParam<T = any> {
-  service: string;
-  method: string;
-  params: T;
-}
-
-// const wasmUrl = (service: string) => `./${service}.wasm`;
-
-// 1. pendingFunction generator
-// 2. Create environment where cached data is available in the JS importables environment during runtime.
-//
 
 interface Importables {
   [key: string]: string;
@@ -43,10 +38,9 @@ const runWasm = async (
   return mod[method](...params);
 };
 
-const functionCall = async (param: FunctionCallParam) => {
+const functionCall = async (param: FunctionCallArgs) => {
   const url = "/loader/plugin.wasm";
 
-  console.log("fetching wasm...");
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
 
   let importables: Importables[] = [
@@ -54,11 +48,22 @@ const functionCall = async (param: FunctionCallParam) => {
   ];
 
   const res = await runWasm(wasmBytes, importables, param.method, param.params);
+
+  const message = buildPluginCallResponse("3", res);
+  sendPluginCallResponse(message);
   return res;
 };
 
+const sendPluginCallResponse = (response: PluginCallResponse) => {};
+
+const onPluginCallRequest = (request: PluginCallRequest) => {
+  // I still need to pre-build the shit here....
+};
+
 const onRawEvent = (message: MessageEvent) => {
-  console.log({ rawMessageLoader: message });
+  if (isPluginCallRequest(message.data)) {
+    onPluginCallRequest(message.data);
+  }
 };
 
 window.addEventListener("message", onRawEvent);
