@@ -7,13 +7,15 @@ export interface FunctionCallResult<T = any> extends FunctionCallArgs {
     result: T;
 }
 
+export interface PluginCallPayload {
+    id: string;
+    args: FunctionCallArgs;
+    precomputedResults: FunctionCallResult[];
+}
+
 export interface PluginCallRequest {
     type: typeof PLUGIN_CALL_REQUEST;
-    payload: {
-        id: string;
-        args: FunctionCallArgs;
-        precomputedResults: FunctionCallResult[];
-    };
+    payload: PluginCallPayload;
 }
 
 export const isPluginCallRequest = (data: any): data is PluginCallRequest =>

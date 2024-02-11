@@ -12,26 +12,37 @@ export const getImportedFunctions = (): Func[] => {
   ];
 };
 
-export const generateFulfilledFunction = (func: Func, result: any): string =>
-  `export function ${func.method}(arg1, arg2, arg3) {
+export const generateFulfilledFunction = (
+  method: string,
+  result: string | number
+): string =>
+  `export function ${method}(arg1, arg2, arg3) {
         return ${typeof result == "number" ? result : `'${result}'`}
       }`;
+
+export interface FunctionCallArgs {
+  service: string;
+  method: string;
+  params: any[];
+}
+export interface FunctionCallResult<T = any> extends FunctionCallArgs {
+  id: string;
+  result: T;
+}
 
 export const generatePendingFunction = (func: Func, id: string): string => {
   return `export async function ${func.method}(...args) {
       console.log('pendingFunctionRan');
   
       const payload = {
-        params: {      
           service: "${func.service}",
           method: "${func.method}",
-          params: [...args]
-        },
-        context: { id: "${id}" }
+          params: [...args],
+          id: "${id}",
       };
   
       console.log('attempting to call plugin call ${id}', payload);
-      window.parent.postMessage({ type: 'PluginCall', payload }, "*");
+      window.parent.postMessage({ type: 'PLUGIN_CALL_REQUEST', payload }, "*");
       throw new Error("Pending function throw, this is by design.")
       }
       

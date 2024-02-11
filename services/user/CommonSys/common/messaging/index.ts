@@ -1,5 +1,4 @@
 export { Supervisor } from "./supervisor";
-
 export {
     type FunctionCallArgs,
     type FunctionCallRequest,
@@ -11,6 +10,7 @@ export {
 } from "./supervisor/SupervisorInitialized";
 export {
     type FunctionCallResult,
+    type PluginCallPayload,
     type PluginCallRequest,
     isPluginCallRequest,
     buildPluginCallRequest,

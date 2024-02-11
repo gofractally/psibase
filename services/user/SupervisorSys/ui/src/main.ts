@@ -4,9 +4,11 @@ import {
   PluginCallResponse,
   isFunctionCallRequest,
   isPluginCallResponse,
-  generateRandomString,
-  buildPluginCallRequest,
   FunctionCallArgs,
+  isPluginCallRequest,
+  PluginCallRequest,
+  PluginCallPayload,
+  generateRandomString,
 } from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -116,26 +118,70 @@ const addRootFunctionCall = (message: FunctionCallRequest) => {
   });
 };
 
-const sendPluginCallRequest = async (param: FunctionCallRequest) => {
-  const id = generateRandomString();
-  const message = buildPluginCallRequest(id, param.payload.args);
-
-  const iframe = await getLoader(param.payload.args.service);
-  console.log({ iframe });
-
-  iframe.contentWindow?.postMessage(message, "*");
+const sendPluginCallRequest = async (param: PluginCallPayload) => {
+  const iframe = await getLoader(param.args.service);
+  iframe.contentWindow?.postMessage(param, "*");
 };
 
 const onFunctionCallRequest = (message: FunctionCallRequest) => {
   console.log("onFunctionCallRequest:", message);
   // Append to pending functioncalls
   addRootFunctionCall(message);
-  sendPluginCallRequest(message);
+  sendPluginCallRequest({
+    id: message.payload.id,
+    args: message.payload.args,
+    precomputedResults: [],
+  });
+};
+
+const checkForResolution = () => {
+  const checkForTrigger = (funCall: PendingFunctionCall): void => {
+    const isAllSettled = funCall.nestedCalls.every(
+      (call) => typeof call.result !== undefined
+    );
+    if (isAllSettled) {
+      sendPluginCallRequest({
+        id: funCall.id,
+        args: funCall.args,
+        precomputedResults: funCall.nestedCalls.map(({ id, args, result }) => ({
+          id,
+          service: args.service,
+          method: args.method,
+          params: args.params,
+          result,
+        })),
+      });
+    }
+    funCall.nestedCalls.forEach(checkForTrigger);
+  };
+  pendingFunctionCalls.forEach(checkForTrigger);
 };
 
 const onPluginCallResponse = (message: PluginCallResponse) => {
   // TODO Fulfill
   console.log(message);
+  // update the pre-cached data...
+
+  const id = message.payload.id;
+  const updateFunctionCall = (funCall: PendingFunctionCall): void => {
+    if (funCall.id == id) {
+      funCall.result = message.payload.result;
+    } else {
+      funCall.nestedCalls.forEach(updateFunctionCall);
+    }
+  };
+
+  pendingFunctionCalls.forEach(updateFunctionCall);
+  checkForResolution();
+};
+
+const onPluginCallRequest = (message: PluginCallRequest) => {
+  console.log(message, "plugin call request, yet to be fulfilled...");
+  // create a new id for this request and put it in the nest.
+
+  const parentId = message.payload.id;
+  const subId = generateRandomString();
+  pendingFunctionCalls.forEach((call) => {});
 };
 
 const onRawEvent = (message: MessageEvent<any>) => {
@@ -145,6 +191,9 @@ const onRawEvent = (message: MessageEvent<any>) => {
   } else if (isPluginCallResponse(message.data)) {
     // TODO Assert origin of plugin call
     onPluginCallResponse(message.data);
+  } else if (isPluginCallRequest(message.data)) {
+    // TODO Assert origin of plugin call request
+    onPluginCallRequest(message.data);
   }
 };
 
