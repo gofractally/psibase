@@ -5,6 +5,7 @@
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
         "paths": {
+            "@messaging": ["../../../user/CommonSys/common/messaging"],
             "/common": ["../../../user/CommonSys/common"]
         },
         "skipLibCheck": true,

@@ -1,8 +1,17 @@
-import { connectToParent, connectToChild } from "penpal";
+import {
+  FunctionCallRequest,
+  isFunctionCallRequest,
+} from "../../../CommonSys/common/messaging/supervisor/FunctionCallRequest";
+import {
+  PluginCallResponse,
+  isPluginCallResponse,
+} from "../../../CommonSys/common/messaging/supervisor/PluginCallResponse";
+import { buildMessageIFrameInitialized } from "./messaging/IFrameIntialized";
+import { connectToChild } from "penpal";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
-    SupervisorSys
+    SupervisorSys here
   </div>
 `;
 
@@ -15,13 +24,6 @@ interface FunctionCallParam<T = any> {
 interface PenpalObj {
   functionCall: (param: FunctionCallParam) => Promise<any>;
 }
-
-const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
-  typeof param === "object" &&
-  param !== null &&
-  "service" in param &&
-  "method" in param &&
-  "params" in param;
 
 const loadedServices: { service: string; obj: PenpalObj }[] = [];
 
@@ -87,9 +89,6 @@ const addToTx = async (param: FunctionCallParam) => {
 };
 
 const functionCall = async (param: FunctionCallParam) => {
-  if (!isValidFunctionCallParam(param))
-    throw new Error(`Invalid function call param.`);
-
   console.log(
     "Received params on the supervisor, now passing to the loader...",
     param
@@ -108,20 +107,33 @@ const functionCall = async (param: FunctionCallParam) => {
   };
 };
 
-const getLoggedInUser = async () => "alice";
+const onFunctionCallRequest = (message: FunctionCallRequest) => {
+  // TODO Fulfill
+  console.log(message);
+};
 
-const connection = connectToParent({
-  methods: {
-    functionCall,
-    addToTx,
-    getLoggedInUser,
-  },
-});
+const onPluginCallResponse = (message: PluginCallResponse) => {
+  // TODO Fulfill
+  console.log(message);
+};
 
-connection.promise.then((parent) => {
-  parent
-    // @ts-ignore
-    .add(3, 1)
-    // @ts-ignore
-    .then((total) => console.log("Called add on parent and got: ", total));
-});
+const onRawEvent = (message: MessageEvent<any>) => {
+  console.log("Supervisor-sys Raw Event Received:", message);
+  if (isFunctionCallRequest(message.data)) {
+    // TODO Assert origin of supervisor-sys
+    onFunctionCallRequest(message.data);
+  } else if (isPluginCallResponse(message.data)) {
+    // TODO Assert origin of plugin call
+    onPluginCallResponse(message.data);
+  }
+};
+
+addEventListener("message", onRawEvent);
+
+const initializeSupervisor = () => {
+  window.parent.postMessage(buildMessageIFrameInitialized(), "*");
+};
+
+console.log({ name });
+
+initializeSupervisor();

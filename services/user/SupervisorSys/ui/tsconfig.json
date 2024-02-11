@@ -13,6 +13,10 @@
     "isolatedModules": true,
     "noEmit": true,
 
+    "paths": {
+      "@messaging": ["../../messaging"]
+    },
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
