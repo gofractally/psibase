@@ -59,7 +59,7 @@ namespace arbtrie
          */
         fast_meta_address take() { 
            auto tmp = _id;
-           _id = {};//.id = 0;
+           _id.reset();
            return tmp;
         }
 

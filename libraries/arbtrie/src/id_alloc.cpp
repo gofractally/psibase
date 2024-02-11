@@ -12,6 +12,8 @@ namespace arbtrie {
          auto idh = new (_ids_state_file.data()) id_alloc_state();
          for( auto& r : idh->regions ) {
             r.first_free.store( temp_meta_type().set_location(end_of_freelist).to_int());
+            // skip the first 8... reserved 
+            // must skip 0 because it is reserved for NULL ids
             r.use_count.store(8);
             r.next_alloc.store(8);
          }
@@ -45,8 +47,6 @@ namespace arbtrie {
      if( _state )
        _state->clean_shutdown = 1;
   }
-
-
 
 
 

@@ -41,13 +41,21 @@ namespace arbtrie
 
       void print_region_stats();
 
+      // @group recover_api
+      //   These methods are used as part of recovery only
+      // @{
+      node_meta_type& get_or_alloc(fast_meta_address nid);
+      void clear_all();
+      void release_unreachable();
+      // @}
+
      private:
       struct region_header
       {
          std::mutex            alloc_mutex;
          std::atomic<uint32_t> use_count;
          std::atomic<uint32_t> next_alloc;
-         std::atomic<uint64_t> first_free;  // TODO: must init to node_location::end_of_freelist
+         std::atomic<uint64_t> first_free;  
       };
 
       struct id_alloc_state
@@ -55,8 +63,8 @@ namespace arbtrie
          uint64_t              magic   = 0;  // TODO: identify this file type
          uint64_t              version = 0;
          std::atomic<uint16_t> next_region;
-         bool                  clean_shutdown = 0;
          std::atomic<uint64_t> free_release_count;
+         std::atomic<bool>     clean_shutdown = 0;
          region_header         regions[1 << 16];
       };
 
@@ -90,6 +98,15 @@ namespace arbtrie
       }
    }
 
+   inline node_meta_type& id_alloc::get_or_alloc(fast_meta_address nid) {
+      uint64_t abs_pos        = nid.index * sizeof(node_meta_type);
+      uint64_t block_num      = abs_pos / id_page_size;
+      if( block_num > 0xffff )
+         throw std::runtime_error( "block num out of range!" );
+      if( block_num >= _block_alloc.num_blocks() )
+         _block_alloc.reserve( block_num+1, true );
+      return get(nid);
+   }
    inline node_meta_type& id_alloc::get(fast_meta_address nid)
    {
       // TODO verify compiler converted all multiply and divide operations to shifts
@@ -170,6 +187,7 @@ namespace arbtrie
             // race condition caused attempt to allocate beyond end of page,
             // must undo the add to restore balance... then consult free list
             rhead.next_alloc.fetch_sub(1, std::memory_order_relaxed);
+            TRIEDENT_WARN( "id alloc race condition detected, should be fine, just letting you know" );
          }
       }
       // there must be something in the free list because if use count implied no
@@ -227,8 +245,9 @@ namespace arbtrie
 
    inline void id_alloc::free_id(fast_meta_address adr)
    {
-      if constexpr (debug_memory)
+      if constexpr (debug_memory) {
          _state->free_release_count.fetch_sub(1, std::memory_order_relaxed);
+      }
 
       auto& rhead     = _state->regions[adr.region];
       auto& next_free = get(adr);

@@ -165,21 +165,21 @@ namespace arbtrie
       return cast_and_call(this, [&](const auto* t) { return t->calculate_checksum(); });
    }
 
-   node_handle write_session::set_root(node_handle r)
+
+   node_handle read_session::get_root(int index)
    {
-      uint64_t old_r;
-      uint64_t new_r = r.address().to_int();
-      {  // lock scope
-         std::unique_lock lock(_db._root_change_mutex);
-         old_r = _db._dbm->top_root.exchange(new_r, std::memory_order_relaxed);
-      }
-      return r.give(fast_meta_address::from_int(old_r));
-   }
-   node_handle read_session::get_root()
-   {
-      std::unique_lock lock(_db._root_change_mutex);
+      assert( index < num_top_roots );
+      assert( index >= 0 );
+
+      // must take the lock to prevent a race condition around 
+      // retaining the current top root... otherwise we must
+      //     read the current top root address,
+      //     read / lookup the meta for the address
+      //     attempt to retain the meta while making sure the top root
+      //     hasn't changed, the lock is probably faster anyway
+      std::unique_lock lock(_db._root_change_mutex[index]);
       return node_handle(
-          *this, fast_meta_address::from_int(_db._dbm->top_root.load(std::memory_order_relaxed)));
+          *this, fast_meta_address::from_int(_db._dbm->top_root[index].load(std::memory_order_relaxed)));
    }
 
    database::database(std::filesystem::path dir, config cfg, access_mode mode)
@@ -188,24 +188,30 @@ namespace arbtrie
       if (_dbfile.size() == 0)
       {
          _dbfile.resize(sizeof(database_memory));
-         new (_dbfile.data())
-             database_memory{.magic = file_magic, .flags = file_type_database_root, .top_root = 0};
+         new (_dbfile.data()) database_memory();
       }
 
       if (_dbfile.size() != sizeof(database_memory))
          throw std::runtime_error("Wrong size for file: " + (dir / "db").native());
 
-      _dbm = reinterpret_cast<database_memory*>(_dbfile.data());
-
       if (_dbm->magic != file_magic)
          throw std::runtime_error("Not a arbtrie file: " + (dir / "db").native());
-      //     if ((_dbm->flags & file_type_mask) != file_type_database_root)
-      //        throw std::runtime_error("Not a arbtrie db file: " + (dir / "db").native());
+
+      _dbm = reinterpret_cast<database_memory*>(_dbfile.data());
+      if( not _dbm->clean_shutdown ) {
+          TRIEDENT_WARN( "database was not shutdown cleanly" );
+      }
+      _dbm->clean_shutdown = false;
+
       if (cfg.run_compact_thread)
          _sega.start_compact_thread();
    }
 
-   database::~database() {}
+   database::~database() {
+      _sega.sync( sync_type::sync );
+      _dbm->clean_shutdown = true;
+      _dbfile.sync(sync_type::sync);
+   }
 
    void database::create(std::filesystem::path dir, config cfg)
    {
@@ -244,6 +250,10 @@ namespace arbtrie
       //  assert(not _have_write_session);
       _have_write_session = true;
       return write_session(*this);
+   }
+   read_session database::start_read_session()
+   {
+      return read_session(*this);
    }
 
    template <typename NodeType>
@@ -368,8 +378,17 @@ namespace arbtrie
    {
       if constexpr (mode.is_unique())
       {
-         if (root.ref() != 1)
+         // TODO: is this node in a synced section of a segment,
+         // then it is implicity shared because we cannot modify it 
+         // in place without risking losing those changes.
+         //
+         // Note that a new mode, 'sync mode' can be used to only
+         // perform that more expensive check if the database is
+         // operating in 'sync mode'
+         if (root.ref() != 1) {
+            assert( root.ref() != 0 );
             return upsert<mode.make_shared()>(root, key);
+         }
       }
       static_assert(std::is_same_v<NodeType, node_header>);
 
@@ -401,6 +420,12 @@ namespace arbtrie
          assert((result != root.address()));
          release_node(root);
       }
+    //  else // if unique mode
+    //   We cannot assert this because there is one case where the root
+    //   changes under unique mode; however, in that case it is released
+    //   so we still don't have to release here 
+    //   assert( result == root.address() );
+    //
 
       return result;
    }
@@ -603,7 +628,12 @@ namespace arbtrie
          src->visit_branches_with_br(
              [&](short br, fast_meta_address oid)
              {
-                fn->add_branch(br, oid);
+                // TODO: it should be possible to remove this branch
+                // because it will always mispredict once 
+                if( br ) [[likely]]
+                   fn->add_branch(br, oid);
+                else
+                   fn->set_eof( oid );
                 if constexpr (mode.is_shared())
                    r.rlock().get(oid).retain();
              });
@@ -725,15 +755,19 @@ namespace arbtrie
                         cl.modify().template as<NodeType>()->set_branch(bidx, new_br);
                         return cl.address();
                      }
+                  } 
+                  else  // update/insert
+                  {
+                     // clone before upsert because upsert will release the branch when
+                     // it returns the new one
+                //     TRIEDENT_DEBUG( "clone: ", r.address(), " before upsert into branch: ", brn.address() );
+                     auto cl     = clone<mode>(r, fn, {});
+                     auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
+                     assert(br != new_br);
+                     cl.modify().template as<NodeType>()->set_branch(bidx, new_br);
+                 //    TRIEDENT_DEBUG( "returning clone: ", cl.address() );
+                     return cl.address();
                   }
-                  // must be update/insert or remove that didn't return null
-                  // clone before upsert because upsert will release the branch when
-                  // it returns the new one
-                  auto cl     = clone<mode>(r, fn, {});
-                  auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
-                  assert(br != new_br);
-                  cl.modify().template as<NodeType>()->set_branch(bidx, new_br);
-                  return cl.address();
                }
             }
             else  // new branch
@@ -944,8 +978,7 @@ namespace arbtrie
             child_id        = cl.address();
             if constexpr (mode.is_unique())
             {
-               // TRIEDENT_WARN( "release old root if unique because it doesn't happen automatically for unique" );
-
+              // release old root if unique because it doesn't happen automatically for unique;
                release_node(r);
             }
          }

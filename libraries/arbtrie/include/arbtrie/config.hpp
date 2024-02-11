@@ -3,6 +3,8 @@
 
 namespace arbtrie {
 
+   static constexpr const uint32_t num_top_roots = 488;
+
    static constexpr const uint64_t MB = 1024ull*1024ull;
    static constexpr const uint64_t GB = 1024ull * MB;
    static constexpr const uint64_t TB = 1024ull * GB;
@@ -91,4 +93,11 @@ namespace arbtrie {
    using value_view     = std::basic_string_view<uint8_t>;
    using segment_offset = uint32_t;
    using segment_number = uint64_t;
+
+   struct recover_args
+   {
+   //   recover_args() noexcept : validate_checksum(false), recover_unsync(false){};
+      bool validate_checksum = false;
+      bool recover_unsync    = false;
+   };
 }

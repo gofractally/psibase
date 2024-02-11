@@ -225,7 +225,7 @@ namespace arbtrie
             visitor(fast_meta_address(_eof_value));
 
          auto*             ptr = get_branch_ptr();
-         const auto* const end = ptr + num_branches() - has_eof;
+         const auto* const end = ptr + num_branches();
          while (ptr != end)
          {
             visitor(fast_meta_address{branch_region(), *ptr});

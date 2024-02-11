@@ -392,7 +392,7 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
          const int                  rounds = 5;
-         const int                  count  = 1'000'000;
+         const int                  count  = 1'00'000;
 
          auto iterate_all = [&]()
          {
@@ -457,10 +457,13 @@ int  main(int argc, char** argv)
 
                if ((seq % batch_size) == (batch_size-1))
                {
-                  last_root = r;
+                  TRIEDENT_DEBUG( "set root" );
+                  ws.set_root<sync_type::sync>(r);
                }
             }
-            last_root = r;
+            TRIEDENT_DEBUG( "set root" );
+            ws.set_root(r);
+          //  last_root = r;
 
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
@@ -506,15 +509,9 @@ int  main(int argc, char** argv)
                       });
                       */
                if ((i % batch_size) == 0)
-               {
-                  auto l = ws._segas.lock();
                   last_root = r;
-               }
             }
-            {
-            auto l = ws._segas.lock();
             last_root  = r;
-            }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
 
@@ -576,10 +573,6 @@ int  main(int argc, char** argv)
          }
          //print_pre(l, r.address(), "");
          iterate_all();
-         {
-            auto l = ws._segas.lock();
-            validate_invariant(l, r.address());
-         }
 
          uint64_t seq4 = -1;
          std::cerr << "insert big endian rev seq\n";
@@ -627,10 +620,6 @@ int  main(int argc, char** argv)
          //auto l = ws._segas.lock();
          //print_pre(l, r.address(), "");
          iterate_all();
-         {
-            auto l = ws._segas.lock();
-            validate_invariant(l, r.address());
-         }
 
          std::cerr << "insert to_string(rand) \n";
          for (int ro = 0; true and ro < rounds; ++ro)
@@ -985,41 +974,41 @@ void test_binary_node()
       auto                       ws = env.db->start_write_session();
       std::optional<node_handle> last_root;
       auto                       cur_root = ws.create_root();
-      auto                       state    = ws._segas.lock();
+ //     auto                       state    = ws._segas.lock();
       TRIEDENT_DEBUG("upsert hello = world");
 
       ws.upsert(cur_root, to_key_view("hello"), to_value_view("world"));
-      print(state, cur_root.address(), 1);
+ //     print(state, cur_root.address(), 1);
       ws.upsert(cur_root, to_key_view("long"),
                 to_key_view("message                                                          ends"));
 
-      print(state, cur_root.address(), 1);
+ //     print(state, cur_root.address(), 1);
 
       last_root = cur_root;
 
       std::cerr << "root.........\n";
-      print(state, cur_root.address(), 1);
+  //    print(state, cur_root.address(), 1);
       std::cerr << "last_root.........\n";
-      print(state, last_root->address(), 1);
+ //     print(state, last_root->address(), 1);
 
       std::cerr << "\n ========== inserting 'update' = 'world' ==========\n";
       ws.upsert(cur_root, to_key_view("update"),
                 to_value_view("long                                                      world"));
 
       std::cerr << "root.........\n";
-      print(state, cur_root.address(), 1);
+   //   print(state, cur_root.address(), 1);
       std::cerr << "last_root.........\n";
-      print(state, last_root->address(), 1);
+   //   print(state, last_root->address(), 1);
 
       std::cerr << "\n ========== releasing last_root ==========\n";
       last_root.reset();
 
       std::cerr << "\n ========== inserting 'mayday' = 'help me, somebody' ==========\n";
       ws.upsert(cur_root, to_key_view("mayday"), to_value_view("help me, somebody"));
-      print(state, cur_root.address(), 1);
+  //    print(state, cur_root.address(), 1);
 
       std::cerr << "root.........\n";
-      print(state, cur_root.address(), 1);
+    //  print(state, cur_root.address(), 1);
    }
    usleep(1000000);
    env.db->print_stats(std::cout);
@@ -1030,7 +1019,7 @@ void test_refactor()
    environ env;
    env.db->start_compact_thread();
    auto ws    = env.db->start_write_session();
-   auto state = ws._segas.lock();
+//   auto state = ws._segas.lock();
 
    {
       std::optional<node_handle> last_root;

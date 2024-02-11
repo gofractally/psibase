@@ -12,26 +12,57 @@ namespace arbtrie
 {
    using session_rlock = seg_allocator::session::read_lock;
 
+   struct node_stats
+   {
+      node_stats()
+      {
+         memset(node_counts, 0, sizeof(node_counts));
+         memset(node_data_size, 0, sizeof(node_data_size));
+      }
+      int total_nodes() const
+      {
+         int sum = 0;
+         for (auto c : node_counts)
+            sum += c;
+         return sum;
+      }
+      int64_t total_size() const
+      {
+         int64_t sum = 0;
+         for (auto c : node_data_size)
+            sum += c;
+         return sum;
+      }
+      double average_depth() const { return double(total_depth) / total_nodes(); }
+
+      int     node_counts[num_types];
+      int64_t node_data_size[num_types];
+      int     max_depth   = 0;
+      int64_t total_depth = 0;
+
+      friend auto operator <=>( const node_stats&, const node_stats& ) = default;
+   };
+
    struct upsert_mode
    {
       enum type : int
       {
-         unique        = 1,  // ref count of all parent nodes and this is 1
-         insert        = 2,  // fail if key does exist
-         update        = 4,  // fail if key doesn't exist
-         same_region   = 8,
-         remove        = 16,
-         must_remove_f = 32,
-         upsert        = insert | update,
-         unique_upsert = unique | upsert,
-         unique_insert = unique | insert,
-         unique_update = unique | update,
-         unique_remove = unique | remove,
+         unique             = 1,  // ref count of all parent nodes and this is 1
+         insert             = 2,  // fail if key does exist
+         update             = 4,  // fail if key doesn't exist
+         same_region        = 8,
+         remove             = 16,
+         must_remove_f      = 32,
+         upsert             = insert | update,
+         unique_upsert      = unique | upsert,
+         unique_insert      = unique | insert,
+         unique_update      = unique | update,
+         unique_remove      = unique | remove,
          unique_must_remove = unique | must_remove_f | remove,
-         shared_upsert = upsert,
-         shared_insert = insert,
-         shared_update = update,
-         shared_remove = remove
+         shared_upsert      = upsert,
+         shared_insert      = insert,
+         shared_update      = update,
+         shared_remove      = remove
       };
 
       constexpr upsert_mode(upsert_mode::type t) : flags(t){};
@@ -44,7 +75,7 @@ namespace arbtrie
       constexpr upsert_mode make_same_region() const { return {flags | same_region}; }
       constexpr bool        may_insert() const { return flags & insert; }
       constexpr bool        may_update() const { return flags & insert; }
-      constexpr bool        must_insert() const { return not(flags & (update|remove)); }
+      constexpr bool        must_insert() const { return not(flags & (update | remove)); }
       constexpr bool        must_update() const { return not(flags & insert); }
       constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); }
       constexpr bool        is_remove() const { return flags & remove; }
@@ -104,33 +135,69 @@ namespace arbtrie
       friend class database;
       friend class root_data;
       friend class root;
+      friend class node_handle;
       read_session(database& db);
       database& _db;
 
-      int get(object_ref<node_header>& root, key_view key, auto callback);
-      int get(object_ref<node_header>& root, const auto* inner, key_view key, auto callback);
-      int get(object_ref<node_header>& root, const binary_node*, key_view key, auto callback);
-      int get(object_ref<node_header>& root, const value_node*, key_view key, auto callback);
+      int get(object_ref<node_header>&                root,
+              key_view                                key,
+              std::invocable<bool, value_type> auto&& callback);
+      int get(object_ref<node_header>&                root,
+              const auto*                             inner,
+              key_view                                key,
+              std::invocable<bool, value_type> auto&& callback);
+      int get(object_ref<node_header>& root,
+              const binary_node*,
+              key_view                                key,
+              std::invocable<bool, value_type> auto&& callback);
+      int get(object_ref<node_header>& root,
+              const value_node*,
+              key_view                                key,
+              std::invocable<bool, value_type> auto&& callback);
+
+      seg_allocator::session _segas;
 
      public:
       iterator    create_iterator(node_handle h) { return iterator(*this, h); }
       node_handle adopt(const node_handle& h) { return node_handle(*this, h.address()); }
 
-      inline int get(const node_handle& r, key_view key, auto callback);
-      // callback( key_view key, value_type )
-      inline void lower_bound(const node_handle& r, key_view key, auto callback);
-
-      // TODO make private
-      seg_allocator::session _segas;
+      inline int get(const node_handle&                      r,
+                     key_view                                key,
+                     std::invocable<bool, value_view> auto&& callback);
 
       // reads the last value called by
-      node_handle get_root();
+      node_handle get_root(int index = 0);
 
       /**
+       * resizes result to the size of the value and copies the value into result
        * @return -1 if not found, otherwise the size of the value
        */
       int  get(root& r, key_view key, std::vector<char>* result = nullptr);
       bool validate(const root& r);
+
+      void visit_nodes(const node_handle& r, auto&& on_node);
+
+      node_stats get_node_stats(const node_handle& r)
+      {
+         node_stats result;
+         visit_nodes(r,
+                     [&](int depth, const auto* node)
+                     {
+                        if (node->type < num_types)
+                        {
+                           result.node_counts[node->type]++;
+                           result.node_data_size[node->type] += node->_nsize;
+                        }
+                        else
+                        {
+                           TRIEDENT_WARN("unknown type! ", node->type);
+                        }
+                        if (result.max_depth < depth)
+                           result.max_depth = depth;
+                        result.total_depth += depth;
+                     });
+         return result;
+      }
    };
 
    class write_session : public read_session
@@ -153,9 +220,7 @@ namespace arbtrie
                                key_view          key,
                                const value_type& val);
 
-      fast_meta_address remove(session_rlock& state,
-                               fast_meta_address root,
-                               key_view key );
+      fast_meta_address remove(session_rlock& state, fast_meta_address root, key_view key);
 
       value_type _cur_val;
 
@@ -168,7 +233,8 @@ namespace arbtrie
        *  references it goes out of scope. If node handle isn't
        *  saved via a call to set_root(), or storing it as a value
        *  associated with a key under the tree saved as set_root()
-       *  it will not survivie the current process.
+       *  it will not survivie the current process and its data will
+       *  be "dead" database data until it is cleaned up.
        *
        *  Each node handle is an immutable reference to the
        *  state of the tree so it is important to keep only
@@ -180,7 +246,13 @@ namespace arbtrie
       // makes the passed node handle the official state of the
       // database and returns the old state so the caller can
       // choose when it gets released
-      node_handle set_root(node_handle);
+      //
+      // @returns the prior root so caller can choose when/where
+      // to release it, if ignored it will be released immediately
+      template <sync_type sype = sync_type::none>
+      node_handle set_root(node_handle, int index = 0);
+      template <sync_type stype = sync_type::sync>
+      void sync();
 
       /**
        * @return -1 on insert, otherwise the size of the old value
@@ -205,12 +277,10 @@ namespace arbtrie
       fast_meta_address upsert(object_ref<NodeType>&& root, key_view key);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner(object_ref<node_header>& r,
-                                     key_view                 key);
+      fast_meta_address upsert_inner(object_ref<node_header>& r, key_view key);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner(object_ref<node_header>&& r,
-                                     key_view                  key)
+      fast_meta_address upsert_inner(object_ref<node_header>&& r, key_view key)
       {
          return upsert_inner<mode>(r, key);
       }
@@ -227,19 +297,18 @@ namespace arbtrie
                                     const value_type& val);
 
       template <upsert_mode mode>
-      fast_meta_address upsert_binary(object_ref<node_header>& root,
-                                      key_view                 key );
+      fast_meta_address upsert_binary(object_ref<node_header>& root, key_view key);
 
       template <upsert_mode mode>
       fast_meta_address update_binary_key(object_ref<node_header>& root,
                                           const binary_node*       bn,
                                           uint16_t                 lb_idx,
-                                          key_view                 key );
+                                          key_view                 key);
       template <upsert_mode mode>
       fast_meta_address remove_binary_key(object_ref<node_header>& root,
                                           const binary_node*       bn,
                                           uint16_t                 lb_idx,
-                                          key_view                 key );
+                                          key_view                 key);
    };
 
    class database
@@ -263,23 +332,38 @@ namespace arbtrie
       void print_stats(std::ostream& os, bool detail = false);
       void print_region_stats();
 
+      void recover(recover_args args = recover_args());
+      bool validate();
+
      private:
       friend class write_session;
       friend class read_session;
 
       struct database_memory
       {
-         std::uint32_t magic;
-         std::uint32_t flags;
+         database_memory() {
+              for( auto& r : top_root ) r.store( 0, std::memory_order_relaxed );
+         }
+         uint32_t magic = file_magic;
+         uint32_t flags = file_type_database_root;
+         std::atomic<bool> clean_shutdown = true;
          // top_root is protected by _root_change_mutex to prevent race conditions
          // which involve loading or storing top_root, bumping refcounts, decrementing
          // refcounts, cloning, and cleaning up node children when the refcount hits 0.
          // Since it's protected by a mutex, it normally wouldn't need to be atomic.
          // However, making it atomic hopefully aids SIGKILL behavior, which is impacted
          // by instruction reordering and multi-instruction non-atomic writes.
-         std::atomic<uint64_t> top_root;
+         //
+         // There are 488 top roots because database_memory should be no larger than
+         // a page size (the min memsync unit) and therefore there is no extra overhead
+         // for syncing 4096 bytes vs 64 bytes.  Having more than one top-root allows
+         // different trees to be versioned and maintained independently. If all trees
+         // were implemented as values on keys of a root tree then they could not be
+         // operated on in parallel.
+         std::atomic<uint64_t> top_root[num_top_roots];
       };
-      mutable std::mutex _root_change_mutex;
+      mutable std::mutex _sync_mutex;
+      mutable std::mutex _root_change_mutex[num_top_roots];
       bool               _have_write_session;
 
       seg_allocator    _sega;
@@ -297,7 +381,6 @@ namespace arbtrie
       _db._have_write_session = false;
    }
 
-   
    template <typename T>
    void release_node(object_ref<T>& r)
    {
@@ -314,8 +397,6 @@ namespace arbtrie
             n->visit_branches(release_id);
       }
    }
-   
-   
 
    template <typename T>
    void release_node(object_ref<T>&& r)
@@ -323,27 +404,31 @@ namespace arbtrie
       release_node(r);
    }
 
-   inline int read_session::get(const node_handle& r, key_view key, auto callback)
+   inline int read_session::get(const node_handle&                      r,
+                                key_view                                key,
+                                std::invocable<bool, value_view> auto&& callback)
    {
-      auto state = _segas.lock();
       if (not r.address()) [[unlikely]]
       {
          callback(false, value_view());
          return false;
       }
-      auto ref = state.get(r.address());
+      auto state = _segas.lock();
+      auto ref   = state.get(r.address());
       return get(ref, key, std::forward<decltype(callback)>(callback));
    }
 
-   int read_session::get(object_ref<node_header>& root, key_view key, auto callback)
+   int read_session::get(object_ref<node_header>&                root,
+                         key_view                                key,
+                         std::invocable<bool, value_type> auto&& callback)
    {
       return cast_and_call(root.header(),
                            [&](const auto* n) { return get(root, n, key, callback); });
    }
-   int read_session::get(object_ref<node_header>& root,
-                         const auto*              inner,
-                         key_view                 key,
-                         auto                     callback)
+   int read_session::get(object_ref<node_header>&                root,
+                         const auto*                             inner,
+                         key_view                                key,
+                         std::invocable<bool, value_type> auto&& callback)
    {
       if (key.size() == 0)
       {
@@ -388,11 +473,19 @@ namespace arbtrie
       callback(false, value_type());
       return 0;
    }
+   int read_session::get(object_ref<node_header>&                root,
+                         const value_node*                       vn,
+                         key_view                                key,
+                         std::invocable<bool, value_type> auto&& callback)
+   {
+      callback(true, vn->value());
+      return 0;
+   }
 
-   int read_session::get(object_ref<node_header>& root,
-                         const binary_node*       bn,
-                         key_view                 key,
-                         auto                     callback)
+   int read_session::get(object_ref<node_header>&                root,
+                         const binary_node*                      bn,
+                         key_view                                key,
+                         std::invocable<bool, value_type> auto&& callback)
    {
       if (int idx = bn->find_key_idx(key, binary_node::key_hash(key)); idx >= 0)
       {
@@ -414,14 +507,63 @@ namespace arbtrie
       callback(false, value_view());
       return 0;
    }
-   int read_session::get(object_ref<node_header>& root,
-                         const value_node*,
-                         key_view key,
-                         auto     callback)
+
+   void visit_node(object_ref<node_header>&& n, int depth, auto& on_node)
    {
-      return 0;
+      assert( n.type() == n.header()->get_type() );
+      assert( n.ref() > 0 );
+      cast_and_call(n.header(),
+                    [&](const auto* no)
+                    {
+                       on_node(depth, no);
+                       no->visit_branches([&](auto adr)
+                                          { visit_node(n.rlock().get(adr), depth + 1, on_node); });
+                    });
    }
 
+   void read_session::visit_nodes(const node_handle& h, auto&& on_node)
+   {
+      auto state = _segas.lock();
+      visit_node(state.get(h.address()), 0, on_node);
+   }
+
+   /**
+    * @param r is passed by value, so it owns a reference,
+    *        it gives this reference to the top root and the
+    *        old top root's reference is taken over by r
+    */
+   template<sync_type stype>
+   node_handle write_session::set_root(node_handle r, int index)
+   {
+      assert( index < num_top_roots );
+      assert( index >= 0 );
+
+      uint64_t old_r;
+      uint64_t new_r = r.take().to_int();
+      {  
+         if constexpr ( stype != sync_type::none )
+            _db._sega.sync( stype );
+         { // lock scope
+           std::unique_lock lock(_db._root_change_mutex[index]); 
+           old_r = _db._dbm->top_root[index].exchange(new_r, std::memory_order_relaxed);
+         }
+         if constexpr ( stype != sync_type::none ) {
+            if( old_r != new_r ) {
+               _db._dbfile.sync( stype );
+            }
+         }
+      }
+      return r.give(fast_meta_address::from_int(old_r));
+   }
+
+   template<sync_type stype>
+   void write_session::sync() {
+      if constexpr( stype != sync_type::none ) {
+         std::unique_lock lock(_db._root_change_mutex);
+         _db._sega.sync(stype);
+         _db._dbfile.sync(stype);
+      }
+   }
 }  // namespace arbtrie
 
 #include <arbtrie/iterator_impl.hpp>

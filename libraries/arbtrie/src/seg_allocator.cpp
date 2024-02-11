@@ -164,7 +164,6 @@ namespace arbtrie
       //   std::cerr << "seg " << seg_num <<" alloc pos: " << s->_alloc_pos <<"\n";
 
       auto seg_state = seg_num * segment_size;
-      auto seg_end   = (seg_num + 1) * segment_size;
 
       auto start_seg_ptr = ses._alloc_seg_ptr;
       auto start_seg_num = ses._alloc_seg_num;
@@ -235,8 +234,14 @@ namespace arbtrie
          }
          else if (start_seg_ptr != ses._alloc_seg_ptr)
          {
-            // TODO: only sync from alloc pos at last sync
-            msync(start_seg_ptr, segment_size, MS_SYNC);
+            auto lsp = _header->seg_meta[start_seg_num]._last_sync_pos.load( std::memory_order_relaxed );
+            char* sp = (char*)start_seg_ptr;
+
+            if( lsp > segment_size ) lsp = segment_size;
+            else sp += lsp;
+            if( -1 == msync(sp, segment_size-lsp, MS_SYNC) ) {
+               TRIEDENT_WARN( "mysync errono: " , strerror(errno) ,"\n");
+            }
             _header->seg_meta[start_seg_num]._last_sync_pos.store(segment_size,
                                                                   std::memory_order_relaxed);
             start_seg_ptr = ses._alloc_seg_ptr;
@@ -294,14 +299,14 @@ namespace arbtrie
       {
          if (-1 == msync(start_seg_ptr, start_seg_ptr->_alloc_pos, MS_SYNC))
          {
-            std::cerr << "msync errorno: " << errno << "\n";
+            std::cerr << "msync errorno: " << strerror(errno) << "\n";
          }
          _header->seg_meta[seg_num]._last_sync_pos.store(start_seg_ptr->_alloc_pos,
                                                          std::memory_order_relaxed);
       }
 
    //   s->_write_lock.unlock();
-      s->_num_objects = 0;
+   //   s->_num_objects = 0;
       s->_alloc_pos.store(0, std::memory_order_relaxed);
       s->_age         = -1;
       // the segment we just cleared, so its free space and objects get reset to 0
@@ -502,8 +507,15 @@ namespace arbtrie
       if (st == sync_type::none)
          return;
 
+      static const uint64_t page_size      = getpagesize();
+      static const uint64_t page_size_mask = ~(page_size - 1);
+
+      std::unique_lock lock(_sync_mutex);
+
       auto total_segs = _block_alloc.num_blocks();
 
+      // TODO: maintain a set of dirty segments and only
+      //       consider those segments
       for (uint32_t i = 0; i < total_segs; ++i)
       {
          auto seg        = get_segment(i);
@@ -513,14 +525,11 @@ namespace arbtrie
          if (last_alloc > segment_size)
             last_alloc = segment_size;
 
-         static const uint64_t page_size      = getpagesize();
-         static const uint64_t page_size_mask = ~(page_size - 1);
-
-         auto sync_bytes   = last_alloc - (last_sync & page_size_mask);
-         auto seg_sync_ptr = (((intptr_t)seg + last_sync) & page_size_mask);
-
          if (last_alloc > last_sync)
          {
+            auto sync_bytes   = last_alloc - (last_sync & page_size_mask);
+            auto seg_sync_ptr = (((intptr_t)seg + last_sync) & page_size_mask);
+
             if (-1 == msync((char*)seg_sync_ptr, sync_bytes, msync_flag(st)))
             {
                std::cerr << "ps: " << getpagesize() << " len: " << sync_bytes << " rounded:  \n";
@@ -567,9 +576,9 @@ namespace arbtrie
          std::cerr << std::setw(12) << space_objs.second << " | ";
          std::cerr << std::setw(12)
                    << (seg->_alloc_pos == -1 ? "END" : std::to_string(seg->_alloc_pos)) << " | ";
-         std::cerr << std::setw(12) << seg->_num_objects << " | ";
-         total_retained += seg->_num_objects - space_objs.second;
-         std::cerr << std::setw(12) << seg->_num_objects - space_objs.second << " | ";
+         //std::cerr << std::setw(12) << seg->_num_objects << " | ";
+         //total_retained += seg->_num_objects - space_objs.second;
+         //std::cerr << std::setw(12) << seg->_num_objects - space_objs.second << " | ";
          std::cerr << std::setw(8) << seg->_age << " \n";
       }
       std::cerr << "total free: " << total_free_space / 1024 / 1024. << "Mb  "

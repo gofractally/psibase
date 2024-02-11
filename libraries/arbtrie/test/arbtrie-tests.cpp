@@ -1,5 +1,5 @@
-#include <arbtrie/database.hpp>
 #include <algorithm>
+#include <arbtrie/database.hpp>
 
 #include <random>
 
@@ -72,7 +72,7 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
       {
          val = key;
          toupper(val);
-         ws.upsert(root, to_key_view(key), to_value_view(val) );
+         ws.upsert(root, to_key_view(key), to_value_view(val));
          /*
          ws.get(root, key,
                 [&](bool found, const value_type& r)
@@ -110,12 +110,13 @@ void validate_refcount(session_rlock& state, fast_meta_address i, const auto* in
 }
 void validate_refcount(session_rlock& state, fast_meta_address i, const binary_node* inner, int) {}
 void validate_refcount(session_rlock& state, fast_meta_address i, const value_node* inner, int) {}
-void validate_refcount(session_rlock& state, fast_meta_address i, int c )
+void validate_refcount(session_rlock& state, fast_meta_address i, int c)
 {
-   if( i ) {
+   if (i)
+   {
       auto ref = state.get(i);
-      REQUIRE( ref.ref() > 0 );
-      REQUIRE( ref.ref() <= c );
+      REQUIRE(ref.ref() > 0);
+      REQUIRE(ref.ref() <= c);
       cast_and_call(ref.header(), [&](const auto* ptr) { validate_refcount(state, i, ptr, c); });
    }
 }
@@ -137,7 +138,7 @@ TEST_CASE("insert-words")
       toupper(values.back());
    }
 
-   auto test_words = [&]( bool shared )
+   auto test_words = [&](bool shared)
    {
       environ env;
       auto    ws    = env.db->start_write_session();
@@ -146,29 +147,31 @@ TEST_CASE("insert-words")
 
       int  count    = 0;
       bool inserted = false;
-      for (int i = 0; i < keys.size(); ++i) {
-         ws.upsert(root, to_key_view(keys[i]), to_value_view(values[i]));
-         ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
-                 REQUIRE( found );
-                 REQUIRE( r.view() == to_value_view(values[i]) );
-                 if( not found )
-                    TRIEDENT_DEBUG( "looking for after insert key[",i,"]: ", keys[i] );
-                 assert( found );
-                 assert( r.view() == to_value_view(values[i]) );
-                 });
-      }
+      for (int i = 0; i < keys.size(); ++i)
       {
-      auto l = ws._segas.lock();
-      validate_refcount( l, root.address(), int(shared) + 1 );
+         ws.upsert(root, to_key_view(keys[i]), to_value_view(values[i]));
+         ws.get(root, to_key_view(keys[i]),
+                [&](bool found, const value_type& r)
+                {
+                   REQUIRE(found);
+                   REQUIRE(r.view() == to_value_view(values[i]));
+                   if (not found)
+                      TRIEDENT_DEBUG("looking for after insert key[", i, "]: ", keys[i]);
+                   assert(found);
+                   assert(r.view() == to_value_view(values[i]));
+                });
       }
-      for (int i = 0; i < keys.size(); ++i) {
-         ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
-                // TRIEDENT_DEBUG( "looking for key[",i,"]: ", keys[i] );
-                 REQUIRE( found );
-                 REQUIRE( r.view() == to_value_view(values[i]) );
-                 assert( found );
-                 assert( r.view() == to_value_view(values[i]) );
-                 });
+      for (int i = 0; i < keys.size(); ++i)
+      {
+         ws.get(root, to_key_view(keys[i]),
+                [&](bool found, const value_type& r)
+                {
+                   // TRIEDENT_DEBUG( "looking for key[",i,"]: ", keys[i] );
+                   REQUIRE(found);
+                   REQUIRE(r.view() == to_value_view(values[i]));
+                   assert(found);
+                   assert(r.view() == to_value_view(values[i]));
+                });
       }
 
       auto end   = std::chrono::steady_clock::now();
@@ -198,10 +201,10 @@ TEST_CASE("insert-words")
             while (itr.next())
             {
                itr.key();
-               assert( itr.key().size() < 1024 );
-          //     std::cerr << itr.key() <<"\n";
+               assert(itr.key().size() < 1024);
+               //     std::cerr << itr.key() <<"\n";
                itr.read_value(data);
-               assert( itr.key().size() == data.size() );
+               assert(itr.key().size() == data.size());
                ++item_count;
             }
             auto end   = std::chrono::steady_clock::now();
@@ -213,119 +216,223 @@ TEST_CASE("insert-words")
                       << " items/sec  total items: " << add_comma(item_count) << "\n";
             REQUIRE(item_count == keys.size());
 
-            int rcount = 0; 
+            int rcount = 0;
             itr.reverse_lower_bound();
-            while( itr.valid() ) {
+            while (itr.valid())
+            {
                itr.read_value(data);
- //              TRIEDENT_DEBUG( rcount, "] itr.key: ", to_str(itr.key()), " = ", std::string_view(data.data(),data.size()) );
-               REQUIRE( itr.key().size() == data.size() );
+               //              TRIEDENT_DEBUG( rcount, "] itr.key: ", to_str(itr.key()), " = ", std::string_view(data.data(),data.size()) );
+               REQUIRE(itr.key().size() == data.size());
                itr.prev();
                ++rcount;
             }
             REQUIRE(rcount == keys.size());
-
          }
       };
       iterate_all();
       std::optional<node_handle> shared_handle;
-      if( shared )
+      if (shared)
          shared_handle = root;
-      TRIEDENT_WARN( "removing for keys in order" );
-      for( int i = 0; i < keys.size(); ++i ) {
-        // TRIEDENT_DEBUG( "check before remove: ", keys[i] );
-         ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
-                 if( not found )
-                 {
-                  TRIEDENT_WARN( "looking before remove: ", keys[i] );
-                  abort();
-                  }
-                 REQUIRE( found );
-                 assert( found );
-                 });
+      TRIEDENT_WARN("removing for keys in order");
+      for (int i = 0; i < keys.size(); ++i)
+      {
+         // TRIEDENT_DEBUG( "check before remove: ", keys[i] );
+         ws.get(root, to_key_view(keys[i]),
+                [&](bool found, const value_type& r)
+                {
+                   if (not found)
+                   {
+                      TRIEDENT_WARN("looking before remove: ", keys[i]);
+                      abort();
+                   }
+                   REQUIRE(found);
+                   assert(found);
+                });
 
- //        TRIEDENT_DEBUG( "before remove: ", keys[i] );
-         ws.remove( root, to_key_view(keys[i]) );
-        //TRIEDENT_DEBUG( "after remove: ", keys[i] );
+         //        TRIEDENT_DEBUG( "before remove: ", keys[i] );
+         ws.remove(root, to_key_view(keys[i]));
+         //TRIEDENT_DEBUG( "after remove: ", keys[i] );
          /*{
          auto l = ws._segas.lock();
          validate_refcount( l, root.address(), int(shared+1) );
          }
          */
-         ws.get( root, to_key_view(keys[i]), [&]( bool found, const value_type& r  ){
-                 if( found )
-                  TRIEDENT_DEBUG( "checking remove: ", keys[i] );
-                 REQUIRE( not found );
-                 assert( not found );
-                 });
+         ws.get(root, to_key_view(keys[i]),
+                [&](bool found, const value_type& r)
+                {
+                   if (found)
+                      TRIEDENT_DEBUG("checking remove: ", keys[i]);
+                   REQUIRE(not found);
+                   assert(not found);
+                });
       }
-      auto     itr        = ws.create_iterator(root);
+      auto itr = ws.create_iterator(root);
       REQUIRE(not itr.valid());
       REQUIRE(not itr.lower_bound());
-      env.db->print_stats( std::cerr );
+      env.db->print_stats(std::cerr);
    };
-  // TRIEDENT_DEBUG( "load in file order" );
-   TRIEDENT_DEBUG( "forward file order shared" );
+   // TRIEDENT_DEBUG( "load in file order" );
+   TRIEDENT_DEBUG("forward file order shared");
    test_words(true);
-   TRIEDENT_DEBUG( "forward file order unique" );
+   TRIEDENT_DEBUG("forward file order unique");
    test_words(false);
-   TRIEDENT_DEBUG( "load in reverse file order" );
-   std::reverse( keys.begin(), keys.end() );
-   std::reverse( values.begin(), values.end() );
-   TRIEDENT_DEBUG( "remove reverse file order shared" );
+   TRIEDENT_DEBUG("load in reverse file order");
+   std::reverse(keys.begin(), keys.end());
+   std::reverse(values.begin(), values.end());
+   TRIEDENT_DEBUG("remove reverse file order shared");
    test_words(true);
-   TRIEDENT_DEBUG( "remove reverse file order unique" );
+   TRIEDENT_DEBUG("remove reverse file order unique");
    test_words(false);
-   TRIEDENT_DEBUG( "load in random order shared" );
+   TRIEDENT_DEBUG("load in random order shared");
    {
-   auto rng = std::default_random_engine {};
-   std::shuffle( keys.begin(), keys.end(), rng );
+      auto rng = std::default_random_engine{};
+      std::shuffle(keys.begin(), keys.end(), rng);
    }
    {
-   auto rng = std::default_random_engine {};
-   std::shuffle( values.begin(), values.end(), rng );
+      auto rng = std::default_random_engine{};
+      std::shuffle(values.begin(), values.end(), rng);
    }
    test_words(true);
-   TRIEDENT_DEBUG( "load in random order unique" );
+   TRIEDENT_DEBUG("load in random order unique");
    test_words(false);
 }
 
-TEST_CASE("update") {
+TEST_CASE("update")
+{
    environ env;
-   auto    ws    = env.db->start_write_session();
-   auto    root  = ws.create_root();
-   ws.upsert( root, to_key_view( "hello" ), to_value_view( "world" ) );
-   ws.update( root, to_key_view("hello"), to_value_view( "heaven" ) );
-   ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
-           REQUIRE( found );
-           REQUIRE( val.view() == to_value_view("heaven") );
-           });
-   ws.update( root, to_key_view("hello"), to_value_view( "small" ) );
-   ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
-           REQUIRE( found );
-           REQUIRE( val.view() == to_value_view("small") );
-           });
-   ws.update( root, to_key_view("hello"), to_value_view( 
-           "heaven is a great place to go! Let's get out of here. This line must be long." ) );
-   ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
-           REQUIRE( found );
-           REQUIRE( val.view() == to_value_view("heaven is a great place to go! Let's get out of here. This line must be long." ) );
-           });
-   INFO( "setting a short (inline) value over an existing non-inline value" );  
-   ws.update( root, to_key_view("hello"), to_value_view( "short") );
+   auto    ws   = env.db->start_write_session();
+   auto    root = ws.create_root();
+   ws.upsert(root, to_key_view("hello"), to_value_view("world"));
+   ws.update(root, to_key_view("hello"), to_value_view("heaven"));
+   ws.get(root, to_key_view("hello"),
+          [](bool found, const value_type& val)
+          {
+             REQUIRE(found);
+             REQUIRE(val.view() == to_value_view("heaven"));
+          });
+   ws.update(root, to_key_view("hello"), to_value_view("small"));
+   ws.get(root, to_key_view("hello"),
+          [](bool found, const value_type& val)
+          {
+             REQUIRE(found);
+             REQUIRE(val.view() == to_value_view("small"));
+          });
+   ws.update(root, to_key_view("hello"),
+             to_value_view(
+                 "heaven is a great place to go! Let's get out of here. This line must be long."));
+   ws.get(
+       root, to_key_view("hello"),
+       [](bool found, const value_type& val)
+       {
+          REQUIRE(found);
+          REQUIRE(
+              val.view() ==
+              to_value_view(
+                  "heaven is a great place to go! Let's get out of here. This line must be long."));
+       });
+   INFO("setting a short (inline) value over an existing non-inline value");
+   ws.update(root, to_key_view("hello"), to_value_view("short"));
 
-   SECTION( "updating an inline value that is smaller than object id to big value" ) {
-      ws.upsert( root, to_key_view( "a" ), to_value_view( "a" ) );
-      ws.update( root, to_key_view( "a" ), 
-                 to_value_view( "object_id is larger than 'a'.. what do we do here? This must be longer than 63 bytes" ) );
+   SECTION("updating an inline value that is smaller than object id to big value")
+   {
+      ws.upsert(root, to_key_view("a"), to_value_view("a"));
+      ws.update(root, to_key_view("a"),
+                to_value_view("object_id is larger than 'a'.. what do we do here? This must be "
+                              "longer than 63 bytes"));
    }
 
-   env.db->print_stats( std::cerr );
-   ws.get( root, to_key_view( "hello" ), []( bool found, const value_type& val ) {
-           REQUIRE( found );
-           REQUIRE( val.view() == to_value_view("short" ) );
-           });
-   root  = ws.create_root();
-   env.db->print_stats( std::cerr );
+   env.db->print_stats(std::cerr);
+   ws.get(root, to_key_view("hello"),
+          [](bool found, const value_type& val)
+          {
+             REQUIRE(found);
+             REQUIRE(val.view() == to_value_view("short"));
+          });
+   root = ws.create_root();
+   env.db->print_stats(std::cerr);
+}
+
+TEST_CASE("recover")
+{
+   node_stats v1;
+   node_stats v2;
+   node_stats v3;
+   node_stats v4;
+   node_stats v5;
+   environ env;
+   {
+      auto ws   = env.db->start_write_session();
+      auto root = ws.create_root();
+      load_words(ws, root);
+      ws.set_root<sync_type::sync>(root);
+      auto stats = v1 = ws.get_node_stats(root);
+      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
+      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
+      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
+      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+   }
+
+   TRIEDENT_WARN("RELOADING");
+   delete env.db;
+   env.db = new database("arbtriedb", {.run_compact_thread = false});
+   {
+      auto ws    = env.db->start_write_session();
+      auto root  = ws.get_root();
+      auto stats = v2 = ws.get_node_stats(root);
+      REQUIRE( v2 == v1 );
+      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
+      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
+      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
+      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+      for (int i = 0; i < num_types; ++i)
+         TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
+   }
+   env.db->recover();
+   TRIEDENT_WARN("AFTER RECOVER");
+   {
+      auto ws    = env.db->start_write_session();
+      auto root  = ws.get_root();
+      auto stats = v3 = ws.get_node_stats(root);
+      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
+      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
+      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
+      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+      for (int i = 0; i < num_types; ++i)
+         TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
+      REQUIRE( v3 == v1 );
+   }
+   {
+      TRIEDENT_WARN("INSERT 1 Million Rows");
+      auto ws   = env.db->start_write_session();
+      auto root = ws.get_root();
+      for (uint64_t i = 0; i < 1000'000; ++i)
+      {
+         key_view kstr((uint8_t*)&i, sizeof(i));
+         ws.insert(root, kstr, kstr);
+      }
+      ws.set_root<sync_type::sync>(root);
+      auto stats = v4 = ws.get_node_stats(root);
+      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
+      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
+      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
+      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+   }
+   delete env.db;
+   env.db = new database("arbtriedb", {.run_compact_thread = false});
+   env.db->recover();
+   TRIEDENT_WARN("AFTER RECOVER 2");
+   {
+      auto ws    = env.db->start_write_session();
+      auto root  = ws.get_root();
+      auto stats = v5 = ws.get_node_stats(root);
+      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
+      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
+      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
+      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+      for (int i = 0; i < num_types; ++i)
+         TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
+      REQUIRE( v5 == v4 );
+   }
 }
 
 TEST_CASE("lower_bound") {}
@@ -335,8 +442,6 @@ TEST_CASE("iterate") {}
 TEST_CASE("subtree") {}
 
 TEST_CASE("erase") {}
-
-TEST_CASE("recover") {}
 
 /**
  *  Verify that everything continues to work even if the maximum reference count

@@ -8,6 +8,7 @@ add_library(arbtrie
     src/mapping.cpp
     src/seg_allocator.cpp
     src/id_alloc.cpp
+    src/recover.cpp
             )
 
 target_include_directories(arbtrie PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})

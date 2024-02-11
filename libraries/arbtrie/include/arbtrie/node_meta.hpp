@@ -26,8 +26,9 @@ namespace arbtrie
       //bitfield = 8,
       //merge    = 9,  // delta applied to existing node
    };
+   static constexpr int num_types = 7;
    static const char* node_type_names[] = {"freelist", "binary", "value",
-                                           "setlist",  "full",   "undefined"};
+                                           "setlist",  "full",   "bitset", "undefined"};
 
    inline std::ostream& operator<<(std::ostream& out, node_type t)
    {
@@ -365,6 +366,7 @@ namespace arbtrie
             _meta.fetch_sub(1, std::memory_order_relaxed);
             return false;
          }
+         assert( prior.ref() > 0 );
          return true;
       }
       temp_type release()
