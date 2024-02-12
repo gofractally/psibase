@@ -20,5 +20,8 @@ export {
     isPluginCallResponse,
     buildPluginCallResponse,
 } from "./supervisor/PluginCallResponse";
-export { isFunctionCallResponse } from "./supervisor/FunctionCallResponse";
+export {
+    isFunctionCallResponse,
+    buildFunctionCallResponse,
+} from "./supervisor/FunctionCallResponse";
 export { generateRandomString } from "./generateRandomString";

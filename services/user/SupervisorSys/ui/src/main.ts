@@ -9,6 +9,8 @@ import {
   PluginCallRequest,
   PluginCallPayload,
   generateRandomString,
+  buildPluginCallRequest,
+  buildFunctionCallResponse,
 } from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -70,7 +72,6 @@ const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
 
   return new Promise((resolve) => {
     window.addEventListener("message", (event) => {
-      console.log("EEEE", event);
       if (event.data.type == "LOADER_INITIALIZED") {
         const service = extractSubdomain(event.origin);
         console.log(`✨ Successfully booted loader for service "${service}"`);
@@ -92,10 +93,10 @@ const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
   });
 };
 
-interface PendingFunctionCall<T = any | undefined> {
+interface PendingFunctionCall<T = any> {
   id: string;
   args: FunctionCallArgs;
-  result: T;
+  result?: T;
   nestedCalls: PendingFunctionCall[];
 }
 
@@ -116,11 +117,19 @@ const addRootFunctionCall = (message: FunctionCallRequest) => {
     nestedCalls: [],
     result: undefined,
   });
+
+  console.log("added Root functioncall", pendingFunctionCalls);
 };
 
 const sendPluginCallRequest = async (param: PluginCallPayload) => {
   const iframe = await getLoader(param.args.service);
-  iframe.contentWindow?.postMessage(param, "*");
+  console.log("sending?", param);
+  iframe.contentWindow?.postMessage(buildPluginCallRequest(param), "*");
+  console.log(
+    "Send message to",
+    param.args.service,
+    buildPluginCallRequest(param)
+  );
 };
 
 const onFunctionCallRequest = (message: FunctionCallRequest) => {
@@ -134,13 +143,17 @@ const onFunctionCallRequest = (message: FunctionCallRequest) => {
   });
 };
 
+const sendFunctionCallResponse = (id: string, response: any) => {
+  window.parent.postMessage(buildFunctionCallResponse(id, response), "*");
+};
+
 const checkForResolution = () => {
   const checkForTrigger = (funCall: PendingFunctionCall): void => {
-    const isAllSettled = funCall.nestedCalls.every(
-      (call) => typeof call.result !== undefined
-    );
-    if (isAllSettled) {
-      sendPluginCallRequest({
+    const isAllSettledWithNoResult =
+      funCall.nestedCalls.every((call) => typeof call.result !== undefined) &&
+      !funCall.result;
+    if (isAllSettledWithNoResult) {
+      const message = {
         id: funCall.id,
         args: funCall.args,
         precomputedResults: funCall.nestedCalls.map(({ id, args, result }) => ({
@@ -150,20 +163,31 @@ const checkForResolution = () => {
           params: args.params,
           result,
         })),
-      });
+      };
+      console.log("all is settled, sending root plugin call", message);
+
+      sendPluginCallRequest(message);
     }
     funCall.nestedCalls.forEach(checkForTrigger);
   };
-  pendingFunctionCalls.forEach(checkForTrigger);
+  console.log("shoudl check pending function calls", pendingFunctionCalls);
+  pendingFunctionCalls
+    .filter((x) => typeof x.result !== undefined)
+    .forEach(checkForTrigger);
+
+  const toSend = pendingFunctionCalls.filter((call) => !!call.result);
+  toSend.forEach(({ id, result }) => {
+    sendFunctionCallResponse(id, result);
+  });
+  pendingFunctionCalls = pendingFunctionCalls.filter(
+    (funcCall) => !toSend.some((x) => x.id == funcCall.id)
+  );
 };
 
 const onPluginCallResponse = (message: PluginCallResponse) => {
-  // TODO Fulfill
-  console.log(message);
-  // update the pre-cached data...
-
   const id = message.payload.id;
   const updateFunctionCall = (funCall: PendingFunctionCall): void => {
+    console.count("updateFunctionCall");
     if (funCall.id == id) {
       funCall.result = message.payload.result;
     } else {
@@ -181,7 +205,27 @@ const onPluginCallRequest = (message: PluginCallRequest) => {
 
   const parentId = message.payload.id;
   const subId = generateRandomString();
-  pendingFunctionCalls.forEach((call) => {});
+  // this is called in the event that the plugincall reaches out to foreign services
+  // it needs to store iti
+
+  const addToPendingFunctionCall = (pendingCall: PendingFunctionCall) => {
+    if (pendingCall.id == parentId) {
+      pendingCall.nestedCalls.push({
+        id: subId,
+        args: message.payload.args,
+        nestedCalls: [],
+      });
+
+      sendPluginCallRequest({
+        id: subId,
+        args: message.payload.args,
+        precomputedResults: [],
+      });
+    }
+    pendingCall.nestedCalls.forEach(addToPendingFunctionCall);
+  };
+
+  pendingFunctionCalls.forEach(addToPendingFunctionCall);
 };
 
 const onRawEvent = (message: MessageEvent<any>) => {

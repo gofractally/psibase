@@ -1,3 +1,4 @@
+import { buildMessageLoaderInitialized } from "../../CommonSys/common/messaging/supervisor/LoaderInitialized";
 import {
   generateFulfilledFunction,
   generatePendingFunction,
@@ -10,7 +11,6 @@ import {
   PluginCallRequest,
   buildPluginCallResponse,
   PluginCallPayload,
-  buildMessageIFrameInitialized,
 } from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -84,8 +84,9 @@ const functionCall = async ({
   }
 };
 
-const sendPluginCallResponse = (response: PluginCallResponse) =>
-  window.postMessage(response, "*");
+const sendPluginCallResponse = (response: PluginCallResponse) => {
+  window.parent.postMessage(response, "*");
+};
 
 const onPluginCallRequest = (request: PluginCallRequest) =>
   functionCall(request.payload);
@@ -97,4 +98,4 @@ const onRawEvent = (message: MessageEvent) => {
 };
 
 window.addEventListener("message", onRawEvent);
-window.parent.postMessage(buildMessageIFrameInitialized(), "*");
+window.parent.postMessage(buildMessageLoaderInitialized(), "*");

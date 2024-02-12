@@ -19,4 +19,4 @@ export {
 } from "./FunctionCallRequest";
 export { isIFrameIntialized } from "./SupervisorInitialized";
 export { isFunctionCallResponse } from "./FunctionCallResponse";
-export { buildMessageIFrameInitialized } from "./LoaderInitialized";
+export { buildMessageLoaderInitialized as buildMessageIFrameInitialized } from "./LoaderInitialized";

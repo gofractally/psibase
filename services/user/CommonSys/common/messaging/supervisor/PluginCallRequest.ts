@@ -24,14 +24,8 @@ export const isPluginCallRequest = (data: any): data is PluginCallRequest =>
     typeof data.payload.id == "string";
 
 export const buildPluginCallRequest = (
-    id: string,
-    args: FunctionCallArgs,
-    precomputedResults: FunctionCallResult[] = []
+    payload: PluginCallPayload
 ): PluginCallRequest => ({
     type: PLUGIN_CALL_REQUEST,
-    payload: {
-        id,
-        args,
-        precomputedResults,
-    },
+    payload,
 });

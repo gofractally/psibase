@@ -2,9 +2,7 @@ export const LOADER_INITIALIZED = "LOADER_INITIALIZED" as const;
 
 export interface LoaderInitialized {
     type: typeof LOADER_INITIALIZED;
-    payload: {
-        service: string;
-    };
+    payload: {};
 }
 
 export const isLoaderInitialized = (
@@ -14,11 +12,7 @@ export const isLoaderInitialized = (
     return message && message.type == LOADER_INITIALIZED;
 };
 
-export const buildMessageIFrameInitialized = (
-    service: string
-): LoaderInitialized => ({
-    payload: {
-        service,
-    },
+export const buildMessageLoaderInitialized = (): LoaderInitialized => ({
+    payload: {},
     type: LOADER_INITIALIZED,
 });
