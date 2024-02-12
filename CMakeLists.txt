@@ -211,7 +211,9 @@ set(JS_DIRS
     services/user/InviteSys/ui:InviteSys_js
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
-set(COMMON_DIR services/user/CommonSys/common-lib/:CommonSysLib_js)
+set(COMMON_DIR services/user/CommonSys/common-lib/packages/rpc/:CommonSysLib_js)
+# set(COMMON_RPC_DIR services/user/CommonSys/common-lib/packages/rpc/:CommonSysRpcLib_js)
+# set(COMMON_LOADER_DIR services/user/CommonSys/common-lib/packages/loader/:CommonSysLoaderLib_js)
 
 function(add_js_target ENTRY OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
@@ -222,7 +224,7 @@ function(add_js_target ENTRY OUTPUT_FILE)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE}
         DEPENDS ${DEPENDENCIES}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && rm -rf ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist && yarn --mutex network && yarn build
     )
     add_custom_target(
         ${DEP}
@@ -234,9 +236,12 @@ endfunction()
 list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
 file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
+file(GLOB common-loader LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/loader/*)
 
-# Builds the Common Sys Lib
+# Builds the Common Sys Libs
 add_js_target(${COMMON_DIR} common-lib.js)
+# add_js_target(${COMMON_RPC_DIR} common-lib.js)
+# add_js_target(${COMMON_LOADER_DIR} ${common-loader})
 
 foreach(ENTRY ${JS_DIRS})
     add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
@@ -354,11 +359,12 @@ psibase_package(
     SERVICE common-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
         SERVER common-sys
-        DATA      ${COMMON_SYS}/common-lib/dist/common-lib.js common/common-lib.js
-        DATA GLOB ${COMMON_SYS}/common/*.mjs                  common/
-        DATA      ${COMMON_SYS}/common/fonts                  common/fonts
-        DATA GLOB ${COMMON_SYS}/ui/dist/*                     /
-        DATA GLOB ${THIRD_FILES}                              common
+        DATA      ${COMMON_SYS}/common-lib/packages/rpc/dist/common-lib.js common/common-lib.js
+        DATA GLOB ${COMMON_SYS}/common-lib/packages/loader/dist/*          common/loader
+        DATA GLOB ${COMMON_SYS}/common/*.mjs                               common/
+        DATA      ${COMMON_SYS}/common/fonts                               common/fonts
+        DATA GLOB ${COMMON_SYS}/ui/dist/*                                  /
+        DATA GLOB ${THIRD_FILES}                                           common
     DEPENDS ${CommonSys_js_dep}
     DEPENDS wasm
     PACKAGE_DEPENDS ProxySys

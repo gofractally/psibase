@@ -2,8 +2,10 @@
 # - move Loader code to CommonSys
 # - separate Loader build from deployment
 # - deployment will be just a line in CommonSys package
+SERVICES_DIR="/root/psibase/services"
 
-# build Loader code (that will be shared with AccountSys and TokenSys)
+# build Loader code (that will be shared with all apps)
+pushd "$SERVICES_DIR/user/CommonSys/common-lib/packages/loader"
 rm -rf dist
 rm -rf node_modules
 yarn --mutex network && yarn build
@@ -26,12 +28,13 @@ check_and_execute_build() {
 # Loop through the system directories and execute the command for each
 for system_dir in "${system_services[@]}"; do
     # echo "Starting system loop..."
-    root_dir="../../system/$system_dir"
-    target_dir="/ui/public/loader"
+    root_dir="$SERVICES_DIR/system/$system_dir"
+    target_dir="/ui/public/common/loader"
     full_path="$root_dir$target_dir"
 
     # Copy files
-    rm -rf "$full_path" && mkdir -p "$full_path" && cp -R dist/* "$full_path"
+    rm -rf "$full_path" && mkdir -p "$full_path"
+    cp -R dist/* "$full_path"
 
     # Check for build.sh and execute if it exists
     check_and_execute_build "$root_dir"
@@ -40,13 +43,18 @@ done
 # Loop through the user directories and execute the command for each
 for user_dir in "${user_services[@]}"; do
     # echo "Starting user loop..."
-    root_dir="../../user/$user_dir"
-    target_dir="/ui/public/loader"
+    root_dir="$SERVICES_DIR/user/$user_dir"
+    target_dir="/ui/public/common/loader"
     full_path="$root_dir$target_dir"
 
-    # Copy files
-    rm -rf "$full_path" && mkdir -p "$full_path" && cp -R dist/* "$full_path"
+    # Wipe build products of targeted app
+    rm -rf "$full_path" && mkdir -p "$full_path"
+    echo "mkdir: $full_path"
+    # Copy loader files to that app
+    cp -R dist/* "$full_path"
 
     # Check for build.sh and execute if it exists
     check_and_execute_build "$root_dir"
 done
+
+popd
