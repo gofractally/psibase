@@ -190,21 +190,61 @@ namespace arbtrie
       auto& set_ref(uint16_t ref)
       {
          assert(ref < max_ref_count);
+         if constexpr (std::is_same_v<Storage, uint64_t>)
          _meta = bitfield(to_int()).set_ref(ref).to_int();
+         else { 
+
+            bitfield bf(0);
+            bf.set_ref(ref);
+            uint64_t bfi = bf.to_int() & ref_mask;
+
+            uint64_t desired;
+            auto expect = _meta.load( std::memory_order_relaxed );
+            do {
+               desired = (expect & ~(ref_mask)) | bfi;
+            } while( not _meta.compare_exchange_weak( expect, desired, std::memory_order_relaxed) );
+         }
          return *this;
       }
 
       auto& set_type(node_type t)
       {
-         _meta = bitfield(to_int()).set_type(t).to_int();
+         if constexpr (std::is_same_v<Storage, uint64_t>)
+            _meta = bitfield(to_int()).set_type(t).to_int();
+         else {
+            static_assert( false, "not an atomic operation" );
+         }
+         return *this;
+      }
+      node_meta& set_location(node_location nl)
+      {
+         if constexpr (std::is_same_v<Storage, uint64_t>)
+            _meta = bitfield(to_int()).set_location(nl).to_int();
+         else 
+            static_assert( false, "not an atomic operation" );
          return *this;
       }
 
-      auto& set_location(node_location nl)
-      {
-         _meta = bitfield(to_int()).set_location(nl).to_int();
+      node_meta& set_location_and_type( node_location l, node_type t, auto memory_order ) {
+         if constexpr (std::is_same_v<Storage, uint64_t>)
+            return set_location(l).set_type(t);
+         else {
+            bitfield bf(0);
+            bf.set_type(t);
+            bf.set_location(l);
+            uint64_t bfi = bf.to_int() & (location_mask|type_mask);
+
+            uint64_t desired;
+            auto expect = _meta.load( std::memory_order_relaxed );
+            do {
+               desired = (expect & ~(location_mask|type_mask)) | bfi;
+            } while( not _meta.compare_exchange_weak( expect, desired, memory_order ) );
+            assert( type() == t );
+            assert( loc() == l );
+         }
          return *this;
       }
+
       auto& clear_copy_flag()
       {
          _meta &= ~copy_mask;
@@ -215,6 +255,11 @@ namespace arbtrie
       {
          _meta.store(v, memory_order);
       }
+      auto exchange(temp_type v, std::memory_order memory_order = std::memory_order_relaxed)
+      {
+         return temp_type( _meta.exchange(v.to_int(), memory_order) );
+      }
+
       void store(temp_type v, std::memory_order memory_order = std::memory_order_relaxed)
       {
          _meta.store(v.to_int(), memory_order);

@@ -37,15 +37,16 @@ namespace arbtrie
       return state.alloc(reg, asize, NodeType::type, make_init);
    }
    template <typename NodeType>
-   object_ref<NodeType> remake(session_rlock&      state,
-                               fast_meta_address   reuseid,
+   object_ref<NodeType> remake( object_ref<node_header>& r,
                                const clone_config& cfg,
                                auto&&              uinit)
    {
       auto asize     = NodeType::alloc_size(cfg);
       auto make_init = [&](node_header* cl)
       { uinit(new (cl) NodeType(asize, cl->address(), cfg)); };
-      return state.realloc(reuseid, asize, NodeType::type, make_init);
+
+      auto  modlock = r.modify();
+      return r.rlock().realloc(r, asize, NodeType::type, make_init);
    }
 
    //===============================================
@@ -89,7 +90,8 @@ namespace arbtrie
 
       if constexpr (mode.is_unique() and mode.is_same_region())
       {
-         return r.rlock().realloc(r.address(), asize, src->get_type(), copy_init);
+         auto mod_lock = r.modify();
+         return r.rlock().realloc(r/*r.address()*/, asize, src->get_type(), copy_init);
       }
       return r.rlock().alloc(reg, asize, src->get_type(), copy_init);
    }
@@ -593,7 +595,7 @@ namespace arbtrie
          };
          if constexpr (mode.is_unique())
          {
-            return remake<full_node>(r.rlock(), root->address(), {.set_prefix = cpre}, init_full);
+            return remake<full_node>( r/*root->address()*/, {.set_prefix = cpre}, init_full);
          }
          else
          {
@@ -624,7 +626,7 @@ namespace arbtrie
 
       if constexpr (mode.is_unique())
       {
-         return remake<setlist_node>(r.rlock(), root->address(),
+         return remake<setlist_node>( r/*root->address()*/,
                                      {.branch_cap = nbranch, .set_prefix = cpre}, init_setlist);
       }
       else
@@ -658,7 +660,7 @@ namespace arbtrie
          assert(fn->num_branches() >= full_node_threshold);
       };
       if constexpr (mode.is_unique())
-         return remake<full_node>(r.rlock(), r.address(), {.set_prefix = src->get_prefix()},
+         return remake<full_node>(r, {.set_prefix = src->get_prefix()},
                                   init_fn);
       else
          return make<full_node>(r.address().region, r.rlock(), {.set_prefix = src->get_prefix()},

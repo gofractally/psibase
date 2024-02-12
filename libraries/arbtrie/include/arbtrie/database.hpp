@@ -228,6 +228,7 @@ namespace arbtrie
       fast_meta_address remove(session_rlock& state, fast_meta_address root, key_view key);
 
       value_type _cur_val;
+      bool       _sync_lock = false;
 
      public:
       ~write_session();
@@ -377,6 +378,12 @@ namespace arbtrie
       mapping          _dbfile;
       database_memory* _dbm;
       config           _config;
+
+
+      /**
+       *  At most one write session may have the sync lock
+       */
+      std::atomic<int64_t> _sync_lock;
    };
 
    template <typename NodeType>

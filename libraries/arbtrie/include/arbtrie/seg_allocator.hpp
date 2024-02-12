@@ -119,7 +119,7 @@ namespace arbtrie
          // used to calculate object density of segment header,
          // to establish madvise
          // uint32_t _num_objects = 0;  // inc on alloc
-         uint32_t _checksum    = 0;  // TODO
+         uint32_t _checksum = 0;  // TODO
       };
       static_assert(sizeof(segment_header) <= 64);
 
@@ -174,11 +174,11 @@ namespace arbtrie
    {
      protected:
       friend class database;
-      void release_unreachable();
-      void reset_meta_nodes( recover_args args );
-      void reset_reference_counts();
-      int64_t  clear_lock_bits();
-      void sync_segment( int seg, sync_type st );
+      void    release_unreachable();
+      void    reset_meta_nodes(recover_args args);
+      void    reset_reference_counts();
+      int64_t clear_lock_bits();
+      void    sync_segment(int seg, sync_type st);
 
      public:
       // only 64 bits in bitfield used to allocate sessions
@@ -225,10 +225,37 @@ namespace arbtrie
                template <typename T>
                T* as()
                {
-                  _observed_ptr = _rlock.get_node_pointer(_locked_val.loc());
+                  if (_observed_ptr)
+                     return (T*)_observed_ptr;
                   assert(_locked_val.ref());
-                  assert(_observed_ptr->validate_checksum());
+
+                  return (T*)(_observed_ptr = _rlock.get_node_pointer(_locked_val.loc()));
+#if 0
+                  if constexpr ( false ) {
+                  // if locked_val is in a synced segment or
+                  // in the alloc segment of another session, then this must
+                  // memcpy the data to a new location in current session 
+                  // before returning it and then increment the free space
+                  // in the other segment
+                  auto loc = _locked_val.loc();
+                  auto lseg = loc.segment();
+                  _sync_lock = _rlock.get_sync_lock(lseg);
+
+                  if( sync_lock->try_modify() ) {
+                     return _observed_ptr;
+                  } else {
+                     _sync_lock = nullptr;
+                     auto oref = _rlock.realloc( _observed_ptr->address(),
+                                     _observed_ptr->_nsize,
+                                     _observed_ptr->get_type(),
+                                     [&]( auto ptr ) {
+                                        memcpy( ptr, _observed_ptr, _observed_ptr->_nsize );
+                                     });
+                     _observed_ptr = rlock.get_node_pointer( oref.loc() );
+                  }
                   return (T*)_observed_ptr;
+                  }
+#endif
                }
                template <typename T>
                void as(auto&& call_with_tptr)
@@ -248,14 +275,16 @@ namespace arbtrie
                {
                   // TODO: check to see if checksum actually changed?
                   // to let us know if we are making empty changes
-                  if (_observed_ptr) [[likely]]
-                  {
-                     assert(_observed_ptr->validate_checksum());
-                     //_observed_ptr->checksum = update_checksum();
-                  }
-                  else
-                     TRIEDENT_WARN("got modify lock but never read data");
+                  //   if (_observed_ptr) [[likely]]
+                  //   {
+                  //      assert(_observed_ptr->validate_checksum());
+                  //_observed_ptr->checksum = update_checksum();
+                  //   }
+                  //    else
+                  //       TRIEDENT_WARN("got modify lock but never read data");
 
+                  //        if( _sync_lock )
+                  //           _sync_lock->end_modify();
                   _meta.end_modify();
                }
                bool            _released = false;
@@ -263,6 +292,7 @@ namespace arbtrie
                node_meta_type& _meta;
                read_lock&      _rlock;
                node_header*    _observed_ptr = nullptr;
+               //  sync_lock*      _sync_lock = nullptr;
             };
 
             template <typename T = node_header>
@@ -308,7 +338,21 @@ namespace arbtrie
                };
                void store(temp_meta_type tmt, auto memory_order)
                {
-                  _meta.store(_cached = tmt, memory_order);
+                  if constexpr (not debug_memory)
+                  {
+                     _meta.store(_cached = tmt, memory_order);
+                  }
+                  else
+                  {
+                     auto clok = _cached.loc();
+                     auto old  = _meta.exchange(_cached = tmt, memory_order);
+                     if (old.loc() != clok)
+                     {
+                        TRIEDENT_WARN(
+                            "stomping on location that changed from cache,"
+                            " this may result in memory leak until compacted");
+                     }
+                  }
                }
 
                //explicit inline operator bool() const { return bool(id()); }
@@ -319,7 +363,7 @@ namespace arbtrie
 
                //bool cache_object();
 
-               void refresh() { _cached = _meta.load(std::memory_order_acquire); }
+               void refresh(auto memory_order) { _cached = _meta.load(memory_order); }
 
                auto& rlock() { return _rlock; }
                auto& rlock() const { return _rlock; }
@@ -361,10 +405,11 @@ namespace arbtrie
                                           uint32_t  size,
                                           node_type type,
                                           auto      initfunc);
-            object_ref<node_header> realloc(fast_meta_address reuse,
-                                            uint32_t          size,
-                                            node_type         type,
-                                            auto              initfunc);
+            object_ref<node_header> realloc(object_ref<node_header>& r,
+                                            // fast_meta_address reuse,
+                                            uint32_t  size,
+                                            node_type type,
+                                            auto      initfunc);
 
             /**
              * @defgroup Region Alloc Helpers
@@ -525,10 +570,10 @@ namespace arbtrie
                auto [num, ptr] = _sega.get_new_segment();
                _alloc_seg_num  = num;
                _alloc_seg_ptr  = ptr;
-             //  if (not _alloc_seg_ptr->_write_lock.try_lock())
-             //  {
-             //     TRIEDENT_WARN("unable to get write lock on segment");
-             //  }
+               //  if (not _alloc_seg_ptr->_write_lock.try_lock())
+               //  {
+               //     TRIEDENT_WARN("unable to get write lock on segment");
+               //  }
                _sega._header->seg_meta[_alloc_seg_num]._last_sync_pos.store(
                    0, std::memory_order_relaxed);
             }
@@ -662,9 +707,9 @@ namespace arbtrie
       id_alloc _id_alloc;
 
       // allocates new segments
-      block_allocator  _block_alloc;
-      alignas(64) std::atomic<uint32_t>    _total_mlocked = 0;
-      alignas(64) std::array<std::atomic<int32_t>,256> _mlocked;
+      block_allocator _block_alloc;
+      alignas(64) std::atomic<uint32_t> _total_mlocked = 0;
+      alignas(64) std::array<std::atomic<int32_t>, 256> _mlocked;
 
       /**
        *  This is the highest the alloc_ptr is allowed to
@@ -733,12 +778,15 @@ namespace arbtrie
    using object_ref = seg_allocator::session::read_lock::object_ref<T>;
 
    /// @pre refcount of id is 1
-   inline object_ref<node_header> seg_allocator::session::read_lock::realloc(fast_meta_address adr,
-                                                                             uint32_t          size,
-                                                                             node_type         type,
-                                                                             auto              init)
+   inline object_ref<node_header> seg_allocator::session::read_lock::realloc(
+       object_ref<node_header>& oref,
+       uint32_t                 size,
+       node_type                type,
+       auto                     init)
    {
-      auto oref    = get(adr);
+      auto adr = oref.address();
+      assert(oref.meta().is_changing());
+
       auto l       = oref.loc();
       auto seg     = l.segment();
       auto obj_ptr = (node_header*)((char*)_session._sega._block_alloc.get(seg) + l.abs_index());
@@ -776,12 +824,8 @@ namespace arbtrie
       assert(node_ptr->_ntype == type);
       assert(node_ptr->_node_id == adr.to_int());
 
-      // we can stomp on the data because it is impossible for the ref count to
-      // increase while realloc and even if compactor moves the data from the
-      // old location, the new data should take priority and this thread shouldn't
-      // be holding the modify lock while realloc and
-      oref.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
-                 std::memory_order_release);
+      oref.meta().set_location_and_type(loc, type, std::memory_order_release);
+      oref.refresh(std::memory_order_relaxed);
       return oref;
    }
 
