@@ -1,29 +1,23 @@
-import { connectToParent, connectToChild } from "penpal";
+import {
+  FunctionCallRequest,
+  buildMessageIFrameInitialized,
+  PluginCallResponse,
+  isFunctionCallRequest,
+  isPluginCallResponse,
+  FunctionCallArgs,
+  isPluginCallRequest,
+  PluginCallRequest,
+  PluginCallPayload,
+  generateRandomString,
+  buildPluginCallRequest,
+  buildFunctionCallResponse,
+} from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
-    SupervisorSys
+    SupervisorSys here
   </div>
 `;
-
-interface FunctionCallParam<T = any> {
-  service: string;
-  method: string;
-  params: T;
-}
-
-interface PenpalObj {
-  functionCall: (param: FunctionCallParam) => Promise<any>;
-}
-
-const isValidFunctionCallParam = (param: any): param is FunctionCallParam =>
-  typeof param === "object" &&
-  param !== null &&
-  "service" in param &&
-  "method" in param &&
-  "params" in param;
-
-const loadedServices: { service: string; obj: PenpalObj }[] = [];
 
 // Connect spins up the supervisor iframe,
 // The app sends a message to supervisor for app2,
@@ -31,7 +25,19 @@ const loadedServices: { service: string; obj: PenpalObj }[] = [];
 // Sends a message to app2, app2 sends a message back to supervisor
 // Supervisor sends a message back to app1
 
-const getLoaderDomain = (subDomain = "supervisor-sys"): string => {
+const extractSubdomain = (urlString: string): string => {
+  const url = new URL(urlString);
+
+  const hostnameParts = url.hostname.split(".");
+
+  if (hostnameParts.length >= 3) {
+    return hostnameParts[0];
+  }
+
+  throw new Error(`Failed parsing sub-domain in ${urlString}`);
+};
+
+const createBaseDomain = (subDomain = "supervisor-sys"): string => {
   const currentUrl = window.location.href;
   const url = new URL(currentUrl);
   const hostnameParts = url.hostname.split(".");
@@ -40,88 +46,193 @@ const getLoaderDomain = (subDomain = "supervisor-sys"): string => {
   hostnameParts.unshift(subDomain);
   url.hostname = hostnameParts.join(".");
 
-  return url.origin + "/loader";
+  return url.origin;
 };
 
-const getConnection = async (service: string): Promise<PenpalObj> => {
-  // const existingService = loadedServices.find((s) => s.service === service);
-  // if (existingService) return existingService.obj;
-  const obj = await createIFrameService(service);
-  console.log(obj, "is my iframe service");
-  loadedServices.push({ service, obj });
+const createLoaderDomain = (subDomain = "supervisor-sys") =>
+  createBaseDomain(subDomain) + "/loader";
 
-  return obj;
-};
+const buildIFrameId = (service: string) => `iframe-${service}`;
 
-const createIFrameService = async (service: string): Promise<PenpalObj> => {
+const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
+  const iFrameId = buildIFrameId(service);
+  const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
+  if (loader) return loader;
+
   const iframe = document.createElement("iframe");
-  iframe.src = getLoaderDomain(service);
+  iframe.id = iFrameId;
+  iframe.src = createLoaderDomain(service);
   iframe.style.display = "none";
 
-  if (
-    document.readyState === "complete" ||
-    document.readyState === "interactive"
-  ) {
-    document.body.appendChild(iframe);
-  } else {
-    document.addEventListener("DOMContentLoaded", () => {
-      document.body.appendChild(iframe);
+  return new Promise((resolve) => {
+    window.addEventListener("message", (event) => {
+      if (event.data.type == "LOADER_INITIALIZED") {
+        const service = extractSubdomain(event.origin);
+        console.log(`✨ Successfully booted loader for service "${service}"`);
+        const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
+        resolve(loader);
+      }
     });
-  }
 
-  const connection = connectToChild({
-    iframe,
-    methods: {
-      functionCall,
-      addToTx,
-      add: (a: number, b: number) => a + b,
-    },
+    if (
+      document.readyState === "complete" ||
+      document.readyState === "interactive"
+    ) {
+      document.body.appendChild(iframe);
+    } else {
+      document.addEventListener("DOMContentLoaded", () => {
+        document.body.appendChild(iframe);
+      });
+    }
   });
-
-  return connection.promise as unknown as Promise<PenpalObj>;
 };
 
-const addToTx = async (param: FunctionCallParam) => {
-  console.log("supervisor addToTx", param);
-  return param;
-};
+interface PendingFunctionCall<T = any> {
+  id: string;
+  args: FunctionCallArgs;
+  result?: T;
+  nestedCalls: PendingFunctionCall[];
+}
 
-const functionCall = async (param: FunctionCallParam) => {
-  if (!isValidFunctionCallParam(param))
-    throw new Error(`Invalid function call param.`);
+let pendingFunctionCalls: PendingFunctionCall[] = [];
 
-  console.log(
-    "Received params on the supervisor, now passing to the loader...",
-    param
+const addRootFunctionCall = (message: FunctionCallRequest) => {
+  const idAlreadyExists = pendingFunctionCalls.some(
+    (call) => call.id == message.payload.id
   );
+  if (idAlreadyExists)
+    throw new Error(
+      `Cannot create new pending function call, ID ${message.payload.id} already exists`
+    );
 
-  const { service } = param;
-
-  const connection = await getConnection(service);
-  console.log(`Created / Fetched connection to ${service}`, connection);
-  const res = await connection.functionCall(param);
-  console.log(`Received ${res} from ${service} on Supervisor-Sys`);
-
-  return {
-    res,
-    service,
-  };
+  pendingFunctionCalls.push({
+    id: message.payload.id,
+    args: message.payload.args,
+    nestedCalls: [],
+    result: undefined,
+  });
 };
 
-const getLoggedInUser = async () => "alice";
+const sendPluginCallRequest = async (
+  param: PluginCallPayload,
+  from: string
+) => {
+  console.log(param, "was plugin call request to send x from", from);
+  const iframe = await getLoader(param.args.service);
+  iframe.contentWindow?.postMessage(buildPluginCallRequest(param), "*");
+};
 
-const connection = connectToParent({
-  methods: {
-    functionCall,
-    addToTx,
-    getLoggedInUser,
-  },
-});
+const onFunctionCallRequest = (message: FunctionCallRequest) => {
+  addRootFunctionCall(message);
+  sendPluginCallRequest(
+    {
+      id: message.payload.id,
+      args: message.payload.args,
+      precomputedResults: [],
+    },
+    "fun"
+  );
+};
 
-connection.promise.then((parent) => {
-  parent
-    // @ts-ignore
-    .add(3, 1)
-    // @ts-ignore
-    .then((total) => console.log("Called add on parent and got: ", total));
-});
+const sendFunctionCallResponse = (id: string, response: any) => {
+  window.parent.postMessage(buildFunctionCallResponse(id, response), "*");
+};
+
+const checkForResolution = () => {
+  const checkForTrigger = (funCall: PendingFunctionCall): void => {
+    const isAllSettledWithNoResult =
+      funCall.nestedCalls.every((call) => typeof call.result !== undefined) &&
+      !funCall.result;
+    if (isAllSettledWithNoResult) {
+      const message = {
+        id: funCall.id,
+        args: funCall.args,
+        precomputedResults: funCall.nestedCalls.map(({ id, args, result }) => ({
+          id,
+          service: args.service,
+          method: args.method,
+          params: args.params,
+          result,
+        })),
+      };
+
+      sendPluginCallRequest(message, "checkfortrigger");
+    }
+    funCall.nestedCalls.forEach(checkForTrigger);
+  };
+  pendingFunctionCalls
+    .filter((x) => typeof x.result !== undefined)
+    .forEach(checkForTrigger);
+
+  const toSend = pendingFunctionCalls.filter((call) => !!call.result);
+  toSend.forEach(({ id, result }) => {
+    sendFunctionCallResponse(id, result);
+  });
+  pendingFunctionCalls = pendingFunctionCalls.filter(
+    (funcCall) => !toSend.some((x) => x.id == funcCall.id)
+  );
+};
+
+const onPluginCallResponse = (message: PluginCallResponse) => {
+  const id = message.payload.id;
+  const updateFunctionCall = (funCall: PendingFunctionCall): void => {
+    if (funCall.id == id) {
+      funCall.result = message.payload.result;
+    } else {
+      funCall.nestedCalls.forEach(updateFunctionCall);
+    }
+  };
+
+  pendingFunctionCalls.forEach(updateFunctionCall);
+  checkForResolution();
+};
+
+const onPluginCallRequest = (message: PluginCallRequest) => {
+  const parentId = message.payload.id;
+  const subId = generateRandomString();
+
+  const addToPendingFunctionCall = (pendingCall: PendingFunctionCall) => {
+    if (pendingCall.id == parentId) {
+      pendingCall.nestedCalls.push({
+        id: subId,
+        args: message.payload.args,
+        nestedCalls: [],
+      });
+
+      console.log(message.payload, pendingCall, "shouldnt be undefined");
+
+      sendPluginCallRequest(
+        {
+          id: subId,
+          args: message.payload.args,
+          precomputedResults: [],
+        },
+        "add to pending function call"
+      );
+    }
+    pendingCall.nestedCalls.forEach(addToPendingFunctionCall);
+  };
+
+  pendingFunctionCalls.forEach(addToPendingFunctionCall);
+};
+
+const onRawEvent = (message: MessageEvent<any>) => {
+  if (isFunctionCallRequest(message.data)) {
+    // TODO Assert origin of supervisor-sys
+    onFunctionCallRequest(message.data);
+  } else if (isPluginCallResponse(message.data)) {
+    // TODO Assert origin of plugin call
+    onPluginCallResponse(message.data);
+  } else if (isPluginCallRequest(message.data)) {
+    // TODO Assert origin of plugin call request
+    onPluginCallRequest(message.data);
+  }
+};
+
+addEventListener("message", onRawEvent);
+
+const initializeSupervisor = () => {
+  window.parent.postMessage(buildMessageIFrameInitialized(), "*");
+};
+
+initializeSupervisor();

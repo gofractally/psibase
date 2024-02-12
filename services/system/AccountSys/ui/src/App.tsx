@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 
 import {
     useAccountsWithKeys,
@@ -16,9 +16,10 @@ import {
 } from "./components";
 import { getLoggedInUser, updateAccountInCommonNav } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
-import { connect } from "@psibase/plugin";
 
-import { getTaposForHeadBlock, signAndPushTransaction } from "common/rpc.mjs";
+import { Supervisor } from "@messaging";
+
+import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
 
 // deploy the wasm
 // install the plugin
@@ -49,24 +50,14 @@ const baseUrl = "https://account-sys.psibase.127.0.0.1.sslip.io:8080";
 
 // npm run build && psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree r-account-sys / ./dist/ -S r-account-sys
 
-const useConnect = () => {
-    const [supervisor, setSupervisor] = useState();
-    const ran = useRef(false);
-
-    useEffect(() => {
-        if (ran.current) return;
-        ran.current = true;
-        // @ts-ignore
-        connect().then((x) => setSupervisor(x));
-    }, []);
-
-    return supervisor;
-};
+const supervisor = new Supervisor();
 
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
     const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useCurrentUser();
+
+    const [res, setRes] = useState("Empty");
 
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
@@ -85,103 +76,18 @@ function App() {
         dropAccount(account);
     };
 
-    const ran = useRef(false);
-
-    const supervisor = useConnect();
-
     const [waitTime, setWaitTime] = useState(0);
     const onClick = async () => {
-        // @ts-ignore
-        const msThen = new Date() / 1;
-        console.log("clicked");
-        console.log(supervisor, "xx");
-
-        // @ts-ignore
-        const loggedInUser = await supervisor!.getLoggedInUser();
-        console.log("i am", loggedInUser);
-
-        // @ts-ignore
         const res = await supervisor.functionCall({
             service: "account-sys",
             method: "numbers",
-            params: [200, 14, true],
+            params: [2, 2, false],
         });
-        // @ts-ignore
-        const msNow = new Date() / 1;
-        setWaitTime(msNow - msThen);
-        console.log(res, "res");
 
-        const transaction = {
-            tapos: {
-                ...(await getTaposForHeadBlock(baseUrl)),
-                expiration: new Date(Date.now() + 10000),
-            },
-            actions: [
-                {
-                    sender: "alice", // account requesting action
-                    service: "account-sys", // service executing action
-                    method: "newAccount", // method to execute
-                    data: {
-                        name: "betty",
-                        authService: "auth-any-sys",
-                    },
-                },
-            ],
-        };
-        // const privateKeys = [
-        // "PVT_K1_2bfGi9rYsXQSXXTvJbDAPhHLQUojjaNLomdm3cEJ1XTzMqUt3V",
-        // ];
+        console.log(res, "came back on supervisor");
 
-        const trace = await signAndPushTransaction(
-            baseUrl,
-            transaction
-            // privateKeys
-        );
-        console.log("trace is", trace);
+        setRes(res as string);
     };
-
-    // const init = async () => {
-    //     if (ran.current) return;
-    //     ran.current = true;
-    //     console.count("init");
-
-    //     const supervisor = await connect();
-    //     console.log(supervisor, "came back casey");
-    //     try {
-    //         // todo
-    //         // make it work with several params?
-    //         const res = await supervisor.functionCall({
-    //             service: "account-sys",
-    //             method: "numbers",
-    //             params: [200, 14, true],
-    //         });
-    //         console.log({ supervisor, res, x: 111 });
-    //         console.log(res, "numbers *");
-    //         const user = {
-    //             name: "john",
-    //             age: 29,
-    //         };
-
-    //         const strings = await supervisor.functionCall({
-    //             service: "account-sys",
-    //             method: "strings",
-    //             params: ["user", 2],
-    //         });
-    //         console.log(strings, "strings *");
-    //         const peoples = await supervisor.functionCall({
-    //             service: "account-sys",
-    //             method: "peoples",
-    //             params: [[user, user]],
-    //         });
-    //         console.log(peoples, "peoples *");
-    //     } catch (e) {
-    //         console.error(e);
-    //     }
-    // };
-
-    // useEffect(() => {
-    //     init();
-    // }, []);
 
     useInitialized(async () => {
         try {
@@ -201,6 +107,7 @@ function App() {
             <div>
                 <h1>Wait time</h1>
                 <h2>{waitTime}</h2>
+                <h3>{res}</h3>
                 <button onClick={() => onClick()}>Do something</button>
             </div>
             <div className="flex items-center gap-2">
