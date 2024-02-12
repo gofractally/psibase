@@ -11,7 +11,7 @@ struct Component;
 impl Guest for Component {
     fn numbers(num1: u8, num2: u8, doubleup: bool) -> String {
         let mutiplier: u8 = if doubleup { 2 } else { 1 };
-        // let y = token_sys::transfer("whatever");
+        // let y = imports::transfer("whatever");
 
         struct Par {
             service: String,
@@ -26,10 +26,11 @@ impl Guest for Component {
         let _x = imports::add_to_tx(&test_params);
 
         format!(
-            "Hello, {} + {} equals {}",
+            "Hello, {} + {} equals {}.",
             num1,
             num2,
-            (num1 + num2) * mutiplier
+            (num1 + num2) * mutiplier,
+            // y
         )
     }
 

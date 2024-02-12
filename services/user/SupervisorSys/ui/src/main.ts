@@ -113,18 +113,25 @@ const addRootFunctionCall = (message: FunctionCallRequest) => {
   });
 };
 
-const sendPluginCallRequest = async (param: PluginCallPayload) => {
+const sendPluginCallRequest = async (
+  param: PluginCallPayload,
+  from: string
+) => {
+  console.log(param, "was plugin call request to send x from", from);
   const iframe = await getLoader(param.args.service);
   iframe.contentWindow?.postMessage(buildPluginCallRequest(param), "*");
 };
 
 const onFunctionCallRequest = (message: FunctionCallRequest) => {
   addRootFunctionCall(message);
-  sendPluginCallRequest({
-    id: message.payload.id,
-    args: message.payload.args,
-    precomputedResults: [],
-  });
+  sendPluginCallRequest(
+    {
+      id: message.payload.id,
+      args: message.payload.args,
+      precomputedResults: [],
+    },
+    "fun"
+  );
 };
 
 const sendFunctionCallResponse = (id: string, response: any) => {
@@ -149,7 +156,7 @@ const checkForResolution = () => {
         })),
       };
 
-      sendPluginCallRequest(message);
+      sendPluginCallRequest(message, "checkfortrigger");
     }
     funCall.nestedCalls.forEach(checkForTrigger);
   };
@@ -192,11 +199,16 @@ const onPluginCallRequest = (message: PluginCallRequest) => {
         nestedCalls: [],
       });
 
-      sendPluginCallRequest({
-        id: subId,
-        args: message.payload.args,
-        precomputedResults: [],
-      });
+      console.log(message.payload, pendingCall, "shouldnt be undefined");
+
+      sendPluginCallRequest(
+        {
+          id: subId,
+          args: message.payload.args,
+          precomputedResults: [],
+        },
+        "add to pending function call"
+      );
     }
     pendingCall.nestedCalls.forEach(addToPendingFunctionCall);
   };

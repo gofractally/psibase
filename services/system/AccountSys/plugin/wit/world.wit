@@ -21,12 +21,12 @@ interface imports {
    prnt: func(msg: string);
    funccall: func(msg: funccallparams);
    add-to-tx: func(msg: funccallparams);
+   transfer: func(msg: string) -> string;
 
 
 }
 
 interface token-sys {
-    transfer: func(msg: string);
 }
 
 world example {
