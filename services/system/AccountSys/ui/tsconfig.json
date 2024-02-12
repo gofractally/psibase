@@ -2,18 +2,23 @@
     "compilerOptions": {
         "target": "ESNext",
         "useDefineForClassFields": true,
-        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "lib": [
+            "DOM",
+            "DOM.Iterable",
+            "ESNext"
+        ],
         "allowJs": false,
         "paths": {
-            "@messaging": ["../../../user/CommonSys/common/messaging"],
-            "/common": ["../../../user/CommonSys/common"]
+            "/common": [
+                "../../../user/CommonSys/common"
+            ]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "forceConsistentCasingInFileNames": true,
-        "module": "NodeNext",
+        "module": "ESNext",
         "moduleResolution": "Node",
         "resolveJsonModule": true,
         "isolatedModules": true,

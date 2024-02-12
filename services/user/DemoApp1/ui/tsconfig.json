@@ -20,7 +20,15 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@messaging": [
+        "../../../user/CommonSys/common/messaging"
+      ],
+      "/common": [
+        "../../../user/CommonSys/common"
+      ]
+    },
   },
   "include": [
     "ui/src"
