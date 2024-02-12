@@ -1,22 +1,30 @@
 import "./App.css";
-import { connect } from "@psibase/plugin";
+import React, { useState } from "react";
+
+import { Supervisor } from "@messaging";
+
+const supervisor = new Supervisor();
 
 function App() {
-  const run = async () => {
-    const res = await connect();
+  const [res, setRes] = useState("Empty");
 
-    console.log(res, "about to call functionCall");
-    const back = await res.functionCall({
-      service: "account-sys",
-      method: "call",
+  const run = async () => {
+    console.info("DemoApp1 connected to Supervisor");
+
+    console.log("calling demoapp2.callintoplugin");
+    const _res = await supervisor.functionCall({
+      service: "demoapp2",
+      method: "callintoplugin",
       params: [],
     });
-    console.log(back, "came back on app2?");
+    console.log("demosapp2.callintoplugin() returned:", _res);
+    setRes(res as string);
   };
 
   return (
     <>
-      <h1>Psibase App Demo</h1>
+      <h1>Psibase Demo App 1</h1>
+      <h3>{res}</h3>
       <div className="card">
         <button onClick={() => run()}>Say Hello</button>
       </div>

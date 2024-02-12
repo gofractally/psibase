@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 
 import {
     useAccountsWithKeys,
@@ -16,10 +16,6 @@ import {
 } from "./components";
 import { getLoggedInUser, updateAccountInCommonNav } from "./helpers";
 import { ImportAccountForm } from "./components/ImportAccountForm";
-
-import { Supervisor } from "@messaging";
-
-import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
 
 // deploy the wasm
 // install the plugin
@@ -50,14 +46,10 @@ const baseUrl = "https://account-sys.psibase.127.0.0.1.sslip.io:8080";
 
 // npm run build && psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload-tree r-account-sys / ./dist/ -S r-account-sys
 
-const supervisor = new Supervisor();
-
 function App() {
     const [accountsWithKeys, dropAccount, addAccounts] = useAccountsWithKeys();
     const [allAccounts, refreshAccounts] = useAccounts();
     const [currentUser, setCurrentUser] = useCurrentUser();
-
-    const [res, setRes] = useState("Empty");
 
     const onLogout = (account: string) => {
         const isLoggingOutOfCurrentUser = currentUser === account;
@@ -76,19 +68,6 @@ function App() {
         dropAccount(account);
     };
 
-    const [waitTime, setWaitTime] = useState(0);
-    const onClick = async () => {
-        const res = await supervisor.functionCall({
-            service: "account-sys",
-            method: "numbers",
-            params: [2, 2, false],
-        });
-
-        console.log(res, "came back on supervisor");
-
-        setRes(res as string);
-    };
-
     useInitialized(async () => {
         try {
             setCurrentUser(await getLoggedInUser());
@@ -104,12 +83,6 @@ function App() {
 
     return (
         <div className="mx-auto max-w-screen-xl space-y-4 p-2 sm:px-8">
-            <div>
-                <h1>Wait time</h1>
-                <h2>{waitTime}</h2>
-                <h3>{res}</h3>
-                <button onClick={() => onClick()}>Do something</button>
-            </div>
             <div className="flex items-center gap-2">
                 <AccountIcon />
                 <Heading tag="h1" className="select-none text-gray-600">

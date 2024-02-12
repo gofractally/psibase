@@ -1,0 +1,20 @@
+[package]
+name = "demoapp2"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# This set ups WASI Preview 2 bindings to work with `cargo component 0.7.0`
+wit-bindgen = { version = "0.16.0", default-features = false, features = [
+    "realloc",
+] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "component:demoapp2"
+
+[package.metadata.component.dependencies]

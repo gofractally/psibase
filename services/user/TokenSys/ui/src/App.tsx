@@ -15,7 +15,6 @@ import {
 import { TokenBalance } from "./types";
 import WalletIcon from "./assets/app-wallet-icon.svg";
 import { tokenContract } from "./contracts";
-import { useConnect } from "./useConnect";
 
 initializeApplet(async () => {
     setOperations(tokenContract.operations);
@@ -41,12 +40,9 @@ function App() {
         useTransferHistory(userName);
     const [debitModeResult, invalidateDebitModeQuery] =
         useUserDebitModeConf(userName);
-    const [balancesResult, invalidateBalancesQuery] = useUserBalances("alice");
-    console.log({ balancesResult });
+    const [balancesResult, invalidateBalancesQuery] = useUserBalances(userName);
     const [sharedBalancesResult, invalidateSharedBalancesQuery] =
         useSharedBalances();
-
-    const supervisor = useConnect();
 
     const refetchData = async () => {
         await wait(2000);
@@ -94,7 +90,6 @@ function App() {
     const onSubmit: SubmitHandler<TransferInputs> = async (
         data: TransferInputs
     ) => {
-        console.log("attempting transfer", data);
         setTransferError("");
         setFormSubmitted(true);
         try {
@@ -129,23 +124,13 @@ function App() {
         const decimal = (amountSegments[1] ?? "0").padEnd(token.precision, "0");
         const parsedAmount = `${amountSegments[0]}${decimal}`;
 
-        const params = {
+        await tokenContract.creditOp({
             tokenId: token.token,
             symbol,
             receiver: to,
             amount: parsedAmount,
             memo: "Working",
-        };
-
-        // @ts-ignore
-        const res = await supervisor!.functionCall({
-            service: "token-sys",
-            method: "transfer",
-            params: ["bob", 30],
         });
-        console.log(params, "are the params");
-        console.log(supervisor, "is supervisor");
-        // await tokenContract.creditOp(params);
     };
 
     const tokensOptions =
@@ -183,7 +168,7 @@ function App() {
             <div className="flex items-center gap-2">
                 <WalletIcon />
                 <Heading tag="h1" className="select-none text-gray-600">
-                    Mike's Wallet
+                    Wallet
                 </Heading>
             </div>
             <div>
@@ -207,7 +192,7 @@ function App() {
                         <div className="text-sm italic">
                             Tokens sent to this account when switched "ON" will
                             appear in a "Pending transfers" list until manually
-                            accepted or rejected. TEST
+                            accepted or rejected.
                         </div>
                     </div>
                 </div>
