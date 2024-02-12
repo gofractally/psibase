@@ -37,12 +37,6 @@ const extractSubdomain = (urlString: string): string => {
   throw new Error(`Failed parsing sub-domain in ${urlString}`);
 };
 
-// Example usage
-const url = "https://account-sys.psibase.127.0.0.1.sslip.io:8080";
-const subdomain = extractSubdomain(url);
-
-console.log(subdomain); // Output: account-sys
-
 const createBaseDomain = (subDomain = "supervisor-sys"): string => {
   const currentUrl = window.location.href;
   const url = new URL(currentUrl);
@@ -117,24 +111,14 @@ const addRootFunctionCall = (message: FunctionCallRequest) => {
     nestedCalls: [],
     result: undefined,
   });
-
-  console.log("added Root functioncall", pendingFunctionCalls);
 };
 
 const sendPluginCallRequest = async (param: PluginCallPayload) => {
   const iframe = await getLoader(param.args.service);
-  console.log("sending?", param);
   iframe.contentWindow?.postMessage(buildPluginCallRequest(param), "*");
-  console.log(
-    "Send message to",
-    param.args.service,
-    buildPluginCallRequest(param)
-  );
 };
 
 const onFunctionCallRequest = (message: FunctionCallRequest) => {
-  console.log("onFunctionCallRequest:", message);
-  // Append to pending functioncalls
   addRootFunctionCall(message);
   sendPluginCallRequest({
     id: message.payload.id,
@@ -164,13 +148,11 @@ const checkForResolution = () => {
           result,
         })),
       };
-      console.log("all is settled, sending root plugin call", message);
 
       sendPluginCallRequest(message);
     }
     funCall.nestedCalls.forEach(checkForTrigger);
   };
-  console.log("shoudl check pending function calls", pendingFunctionCalls);
   pendingFunctionCalls
     .filter((x) => typeof x.result !== undefined)
     .forEach(checkForTrigger);
@@ -187,7 +169,6 @@ const checkForResolution = () => {
 const onPluginCallResponse = (message: PluginCallResponse) => {
   const id = message.payload.id;
   const updateFunctionCall = (funCall: PendingFunctionCall): void => {
-    console.count("updateFunctionCall");
     if (funCall.id == id) {
       funCall.result = message.payload.result;
     } else {
@@ -200,13 +181,8 @@ const onPluginCallResponse = (message: PluginCallResponse) => {
 };
 
 const onPluginCallRequest = (message: PluginCallRequest) => {
-  console.log(message, "plugin call request, yet to be fulfilled...");
-  // create a new id for this request and put it in the nest.
-
   const parentId = message.payload.id;
   const subId = generateRandomString();
-  // this is called in the event that the plugincall reaches out to foreign services
-  // it needs to store iti
 
   const addToPendingFunctionCall = (pendingCall: PendingFunctionCall) => {
     if (pendingCall.id == parentId) {
