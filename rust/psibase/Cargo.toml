@@ -17,6 +17,7 @@ async-graphql = "4.0"
 async-trait = "0.1.77"
 async-recursion = "1.0.5"
 chrono = "0.4"
+const_format = "0.2"
 custom_error = "1.9"
 fracpack = { path = "../fracpack" }
 futures = "0.3"

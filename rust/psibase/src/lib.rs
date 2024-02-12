@@ -21,6 +21,7 @@ pub mod reflect;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod schema;
+pub mod semver;
 mod serve_http;
 mod service;
 pub mod services;
