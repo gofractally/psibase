@@ -9,8 +9,8 @@ rm -rf node_modules
 yarn --mutex network && yarn build
 
 # Services that will receive Loader code
-system_services=("AccountSys")
-user_services=("TokenSys" "DemoApp1" "DemoApp2")
+system_services=()
+user_services=("DemoApp1" "DemoApp2")
 
 # Function to check for and execute build.sh
 check_and_execute_build() {

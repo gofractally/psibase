@@ -25,3 +25,4 @@ dist-ssr
 
 # common system folder
 ui/public/loader
+ui/public/common
