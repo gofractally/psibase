@@ -176,6 +176,9 @@ namespace arbtrie
       friend class database;
       void release_unreachable();
       void reset_meta_nodes( recover_args args );
+      void reset_reference_counts();
+      int64_t  clear_lock_bits();
+      void sync_segment( int seg, sync_type st );
 
      public:
       // only 64 bits in bitfield used to allocate sessions
@@ -660,8 +663,8 @@ namespace arbtrie
 
       // allocates new segments
       block_allocator  _block_alloc;
-      int              _total_mlocked = 0;
-      std::vector<int> _mlocked;
+      alignas(64) std::atomic<uint32_t>    _total_mlocked = 0;
+      alignas(64) std::array<std::atomic<int32_t>,256> _mlocked;
 
       /**
        *  This is the highest the alloc_ptr is allowed to

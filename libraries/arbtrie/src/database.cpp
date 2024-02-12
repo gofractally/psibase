@@ -191,15 +191,32 @@ namespace arbtrie
          new (_dbfile.data()) database_memory();
       }
 
+      _dbm = reinterpret_cast<database_memory*>(_dbfile.data());
+
       if (_dbfile.size() != sizeof(database_memory))
          throw std::runtime_error("Wrong size for file: " + (dir / "db").native());
 
       if (_dbm->magic != file_magic)
          throw std::runtime_error("Not a arbtrie file: " + (dir / "db").native());
 
-      _dbm = reinterpret_cast<database_memory*>(_dbfile.data());
       if( not _dbm->clean_shutdown ) {
-          TRIEDENT_WARN( "database was not shutdown cleanly" );
+         TRIEDENT_WARN( "database was not shutdown cleanly, memory may have leaked" );
+         int num_modify = _sega.clear_lock_bits();
+
+         if( num_modify ) 
+            TRIEDENT_WARN( num_modify, " node(s) failed to complete modification before shutdown" );
+         TRIEDENT_DEBUG( "validating database state" );
+         std::cerr << std::setw(5) << "root" <<" | " << std::setw(10) << "nodes" << " | "
+                   << std::setw(10) << " size (MB) " << " | "
+                   << std::setw(10) << " avg depth  " << "\n";
+         auto s = start_read_session();
+         for( int i = 0; i < num_top_roots; ++i ) {
+            auto r     = s.get_root(i);
+            if( r.address() ) {
+               auto stat = s.get_node_stats(r);
+               std::cerr << std::setw(5) << i << " | "  << stat << "\n";
+            }
+         }
       }
       _dbm->clean_shutdown = false;
 

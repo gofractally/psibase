@@ -392,7 +392,7 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
          const int                  rounds = 5;
-         const int                  count  = 1'00'000;
+         const int                  count  = 1'000'000;
 
          auto iterate_all = [&]()
          {
@@ -457,7 +457,6 @@ int  main(int argc, char** argv)
 
                if ((seq % batch_size) == (batch_size-1))
                {
-                  TRIEDENT_DEBUG( "set root" );
                   ws.set_root<sync_type::sync>(r);
                }
             }
@@ -509,9 +508,9 @@ int  main(int argc, char** argv)
                       });
                       */
                if ((i % batch_size) == 0)
-                  last_root = r;
+                  ws.set_root<sync_type::sync>(r);
             }
-            last_root  = r;
+            ws.set_root<sync_type::sync>(r);
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
 
@@ -541,7 +540,7 @@ int  main(int argc, char** argv)
                ws.insert(r, kstr, kstr);
                if ((i % batch_size) == 0)
                {
-                  last_root = r;
+                  ws.set_root<sync_type::sync>(r);
                }
                
                /*
@@ -561,7 +560,7 @@ int  main(int argc, char** argv)
                       */
                       
             }
-            last_root  = r;
+            ws.set_root<sync_type::sync>(r);
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
 
@@ -587,7 +586,7 @@ int  main(int argc, char** argv)
                ws.insert(r, kstr, kstr);
                if ((i % batch_size) == 0)
                {
-                  last_root = r;
+                  ws.set_root<sync_type::sync>(r);
                }
                
                /*
@@ -607,7 +606,7 @@ int  main(int argc, char** argv)
                       */
                       
             }
-            last_root  = r;
+            ws.set_root<sync_type::sync>(r);
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
 
@@ -632,10 +631,10 @@ int  main(int argc, char** argv)
                ws.insert(r, to_key_view(kstr), to_value_view(kstr));
                if ((i % batch_size) == 0)
                {
-                  last_root = r;
+                  ws.set_root<sync_type::sync>(r);
                }
             }
-            last_root  = r;
+            ws.set_root<sync_type::sync>(r);
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
 

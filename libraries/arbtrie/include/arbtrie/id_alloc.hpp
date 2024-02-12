@@ -45,8 +45,18 @@ namespace arbtrie
       //   These methods are used as part of recovery only
       // @{
       node_meta_type& get_or_alloc(fast_meta_address nid);
+
+      // set all meta nodes to 0
       void clear_all();
+
+      // release all refs, if prior was <= 1 move to free list
       void release_unreachable();
+
+      // set all refs > 1 to 1, leave 0 alone
+      void reset_all_refs();
+
+      // return the number of modify bits that were set
+      int64_t clear_lock_bits();
       // @}
 
      private:

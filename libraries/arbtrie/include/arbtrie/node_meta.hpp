@@ -109,7 +109,7 @@ namespace arbtrie
          uint64_t ref : 14       = 0;
          uint64_t type : 4       = 0;
          uint64_t copy_flag : 1  = 0;  // set this bit on start of copy, clear it on start of modify
-         uint64_t const_flag : 1 = 1;  // 0 when modifying, 1 when not
+         uint64_t modify_flag : 1 = 0;  // 0 when modifying, 1 when not
          // gives 1024 TB addressable cachelines
          uint64_t location : 44 = 0;
 
@@ -148,7 +148,7 @@ namespace arbtrie
       static constexpr const uint64_t ref_mask      = make_mask<0, 14>();
       static constexpr const uint64_t type_mask     = make_mask<14, 4>();
       static constexpr const uint64_t copy_mask     = make_mask<18, 1>();
-      static constexpr const uint64_t const_mask    = make_mask<19, 1>();
+      static constexpr const uint64_t modify_mask   = make_mask<19, 1>();
       static constexpr const uint64_t location_mask = make_mask<location_offset, 44>();
 
       /**
@@ -180,8 +180,8 @@ namespace arbtrie
             return _meta.load(order);
       }
 
-      bool          is_changing() const { return not is_const(); }
-      bool          is_const() const { return to_int() & const_mask; }
+      bool          is_changing() const { return to_int() & modify_mask; }
+      bool          is_const() const { return not is_changing(); }
       bool          is_copying() const { return to_int() & copy_mask; }
       uint16_t      ref() const { return bitfield(to_int()).ref; }
       node_location loc() const { return node_location::from_aligned(bitfield(to_int()).location); }
@@ -242,13 +242,12 @@ namespace arbtrie
       // returns the state prior to start modify
       temp_type start_modify()
       {
-         //mut().lock();
          do {
-            uint64_t prior = _meta.fetch_and( ~const_mask, std::memory_order_acquire );
+            uint64_t prior = _meta.fetch_or( modify_mask, std::memory_order_acquire );
             if (not (prior & copy_mask) )
                return temp_type(prior);
 
-            _meta.wait(prior & ~const_mask);
+            _meta.wait(prior | modify_mask);
          } while( true );
       }
 
@@ -256,22 +255,20 @@ namespace arbtrie
       {
          // set the const flag to 1 to signal that modification is complete
          // mem order release synchronizies with readers of the modification
-         temp_type prior(_meta.fetch_or(const_mask, std::memory_order_release));
+         temp_type prior(_meta.fetch_and(~modify_mask, std::memory_order_release));
 
          // if a copy was started between start_modify() and end_modify() then
          // the copy bit would be set and the other thread will be waiting
          if (prior.is_copying())
             _meta.notify_all();
 
-         //mut().unlock();
          return prior;
       }
 
       bool end_move() {
          auto prior = _meta.fetch_and(~copy_mask, std::memory_order_release);
-         if( not (prior & const_mask) )
+         if( prior & modify_mask )
             _meta.notify_all();
-         //mut().unlock();
          return false;
       }
 
@@ -280,7 +277,6 @@ namespace arbtrie
        */
       bool try_start_move(node_location expected)
       {
-         //mut().lock();
          do {
             uint64_t prior = _meta.load( std::memory_order_relaxed );
             do {
@@ -334,7 +330,7 @@ namespace arbtrie
          } while (
              not _meta.compare_exchange_weak(expected, ex.to_int(), std::memory_order_release));
 
-         if( not (expected & const_mask ) ) [[unlikely]]
+         if( expected & modify_mask ) [[unlikely]]
             _meta.notify_all();
 
          //mut().unlock();
@@ -394,8 +390,8 @@ namespace arbtrie
             // no one should use meta.  Setting it to 0
           //  if (prior.ref() == 1)
           //     _meta.store(0, std::memory_order_relaxed);
-            if (prior.ref() == 0)
-               throw std::runtime_error("double release detected");
+            if (prior.ref() == 0) 
+               abort();
          }
          return prior;
       }
@@ -403,7 +399,7 @@ namespace arbtrie
 
       node_meta(const node_meta<uint64_t>& cpy) : _meta(cpy._meta) {}
 
-      constexpr node_meta(uint64_t v = const_mask) : _meta(v) {}
+      constexpr node_meta(uint64_t v = 0) : _meta(v) {}
 
       /*
       node_meta& operator=(auto&& m)

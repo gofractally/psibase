@@ -2,6 +2,9 @@
 #include <arbtrie/seg_allocator.hpp>
 #include <arbtrie/binary_node.hpp>
 
+      static const uint64_t page_size      = getpagesize();
+      static const uint64_t page_size_mask = ~(page_size - 1);
+
 namespace arbtrie
 {
    seg_allocator::seg_allocator(std::filesystem::path dir)
@@ -20,8 +23,8 @@ namespace arbtrie
          sptr.store(uint32_t(-1ull));
       _done.store(false);
 
-      _mlocked.resize(256);
-      for( auto& i : _mlocked ) i = -1;
+      //_mlocked.resize(256);
+      for( auto& i : _mlocked ) i.store( -1, std::memory_order_relaxed);;
    }
 
    seg_allocator::~seg_allocator()
@@ -234,16 +237,7 @@ namespace arbtrie
          }
          else if (start_seg_ptr != ses._alloc_seg_ptr)
          {
-            auto lsp = _header->seg_meta[start_seg_num]._last_sync_pos.load( std::memory_order_relaxed );
-            char* sp = (char*)start_seg_ptr;
-
-            if( lsp > segment_size ) lsp = segment_size;
-            else sp += lsp;
-            if( -1 == msync(sp, segment_size-lsp, MS_SYNC) ) {
-               TRIEDENT_WARN( "mysync errono: " , strerror(errno) ,"\n");
-            }
-            _header->seg_meta[start_seg_num]._last_sync_pos.store(segment_size,
-                                                                  std::memory_order_relaxed);
+            sync_segment( start_seg_num, sync_type::sync );
             start_seg_ptr = ses._alloc_seg_ptr;
             start_seg_num = ses._alloc_seg_num;
          }
@@ -313,6 +307,13 @@ namespace arbtrie
       // and its last_sync pos gets put to the end because there is no need to sync it
       // because its data has already been synced by the compactor
       _header->seg_meta[seg_num].clear();
+
+      // TODO: if I store the index in _mlocked then I don't have to search for it
+      for( auto& ml : _mlocked )
+         if( ml.load(std::memory_order_relaxed) == seg_num ) {
+            ml.store( -1, std::memory_order_relaxed);
+            break; 
+         }
 
       munlock(s, segment_size);
       // it is unlikely to be accessed, and if it is don't pre-fetch
@@ -442,15 +443,15 @@ namespace arbtrie
             std::cerr << "MLOCK RETURNED: " << r << "  EINVAL:" << EINVAL << "  EAGAIN:" << EAGAIN
                       << "\n";
          } else {
-            ++_total_mlocked;
-            int idx = _total_mlocked % _mlocked.size();
-            if( _mlocked[idx] == -1 )
-               _mlocked[idx] = sn;
-            else {
-               auto olock = _block_alloc.get( _mlocked[idx] );
+            auto prev = _total_mlocked.fetch_add(1, std::memory_order_relaxed);
+            int idx = prev  % _mlocked.size();
+            auto cur_val = _mlocked[idx].load(std::memory_order_relaxed); 
+            if( cur_val != -1 )
+            {
+               auto olock = _block_alloc.get( cur_val );
                munlock( olock, segment_size );
-               _mlocked[idx] = sn;
             }
+            _mlocked[idx].store( sn, std::memory_order_relaxed );
          }
         
 
@@ -502,13 +503,33 @@ namespace arbtrie
       }
       return prepare_segment(_block_alloc.alloc());
    }
+
+   void seg_allocator::sync_segment( int s, sync_type st ) {
+      auto seg        = get_segment(s);
+      auto last_sync  = _header->seg_meta[s]._last_sync_pos.load(std::memory_order_relaxed);
+      auto last_alloc = seg->_alloc_pos.load(std::memory_order_relaxed);
+
+      if (last_alloc > segment_size)
+         last_alloc = segment_size;
+
+      if (last_alloc > last_sync)
+      {
+         auto sync_bytes   = last_alloc - (last_sync & page_size_mask);
+         auto seg_sync_ptr = (((intptr_t)seg + last_sync) & page_size_mask);
+
+         if (-1 == msync((char*)seg_sync_ptr, sync_bytes, msync_flag(st)))
+         {
+            std::cerr << "ps: " << getpagesize() << " len: " << sync_bytes << " rounded:  \n";
+            std::cerr << "msync errno: " << std::string(strerror(errno))
+                      << " seg_alloc::sync() seg: " << s << "\n";
+         }
+         _header->seg_meta[s]._last_sync_pos.store(last_alloc);
+      }
+   }
    void seg_allocator::sync(sync_type st)
    {
       if (st == sync_type::none)
          return;
-
-      static const uint64_t page_size      = getpagesize();
-      static const uint64_t page_size_mask = ~(page_size - 1);
 
       std::unique_lock lock(_sync_mutex);
 
@@ -517,28 +538,7 @@ namespace arbtrie
       // TODO: maintain a set of dirty segments and only
       //       consider those segments
       for (uint32_t i = 0; i < total_segs; ++i)
-      {
-         auto seg        = get_segment(i);
-         auto last_sync  = _header->seg_meta[i]._last_sync_pos.load(std::memory_order_relaxed);
-         auto last_alloc = seg->_alloc_pos.load(std::memory_order_relaxed);
-
-         if (last_alloc > segment_size)
-            last_alloc = segment_size;
-
-         if (last_alloc > last_sync)
-         {
-            auto sync_bytes   = last_alloc - (last_sync & page_size_mask);
-            auto seg_sync_ptr = (((intptr_t)seg + last_sync) & page_size_mask);
-
-            if (-1 == msync((char*)seg_sync_ptr, sync_bytes, msync_flag(st)))
-            {
-               std::cerr << "ps: " << getpagesize() << " len: " << sync_bytes << " rounded:  \n";
-               std::cerr << "msync errno: " << std::string(strerror(errno))
-                         << " seg_alloc::sync() seg: " << i << "\n";
-            }
-            _header->seg_meta[i]._last_sync_pos.store(last_alloc);
-         }
-      }
+         sync_segment( i, st );
    }
 
    void seg_allocator::dump()

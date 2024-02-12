@@ -41,6 +41,11 @@ namespace arbtrie
       int64_t total_depth = 0;
 
       friend auto operator <=>( const node_stats&, const node_stats& ) = default;
+      inline friend auto& operator << ( auto& stream, const node_stats& s ) {
+         return stream << std::setw(10) << s.total_nodes() << " | " 
+                       << std::setw(10) << s.total_size()/double(MB) << " |"
+                       << std::setw(10) << s.average_depth() << " avg depth";
+      }
    };
 
    struct upsert_mode
@@ -336,6 +341,8 @@ namespace arbtrie
       bool validate();
 
      private:
+      void reset_reference_counts();
+
       friend class write_session;
       friend class read_session;
 
