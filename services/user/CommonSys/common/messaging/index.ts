@@ -5,7 +5,7 @@ export {
     isFunctionCallRequest,
 } from "./supervisor/FunctionCallRequest";
 export {
-    isIFrameIntialized,
+    isIFrameInitialized,
     buildMessageIFrameInitialized,
 } from "./supervisor/SupervisorInitialized";
 export {

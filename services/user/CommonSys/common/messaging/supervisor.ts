@@ -1,6 +1,6 @@
 import { generateRandomString } from "./generateRandomString";
 import {
-    isIFrameIntialized,
+    isIFrameInitialized,
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
@@ -68,14 +68,14 @@ export class Supervisor {
 
     handleRawEvent(messageEvent: MessageEvent) {
         // TODO check the sources of these events, e.g. the origin, what iframe did it come from?;
-        if (isIFrameIntialized(messageEvent.data)) {
-            this.onSupervisorIntialized();
+        if (isIFrameInitialized(messageEvent.data)) {
+            this.onSupervisorInitialized();
         } else if (isFunctionCallResponse(messageEvent.data)) {
             this.onFunctionCallResponse(messageEvent.data);
         }
     }
 
-    onSupervisorIntialized() {
+    onSupervisorInitialized() {
         console.log("Supervisor successfully initialized. 🔥");
         this.isSupervisorInitialized = true;
     }

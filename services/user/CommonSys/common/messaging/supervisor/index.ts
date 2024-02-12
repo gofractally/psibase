@@ -17,6 +17,6 @@ export {
     type FunctionCallRequest,
     type FunctionCallArgs,
 } from "./FunctionCallRequest";
-export { isIFrameIntialized } from "./SupervisorInitialized";
+export { isIFrameInitialized } from "./SupervisorInitialized";
 export { isFunctionCallResponse } from "./FunctionCallResponse";
 export { buildMessageLoaderInitialized as buildMessageIFrameInitialized } from "./LoaderInitialized";

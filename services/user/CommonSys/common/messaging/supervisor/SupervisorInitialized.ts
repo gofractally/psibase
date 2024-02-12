@@ -5,7 +5,7 @@ export interface SupervisorInitialized {
     payload: {};
 }
 
-export const isIFrameIntialized = (
+export const isIFrameInitialized = (
     message: any
 ): message is SupervisorInitialized => {
     // TODO add further assertions on expectations in the payload.
