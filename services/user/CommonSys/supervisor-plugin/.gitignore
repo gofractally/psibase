@@ -21,4 +21,4 @@ node_modules
 *.sln
 *.sw?
 
-public/loader
+public/common/wasm-loader

@@ -24,5 +24,4 @@ dist-ssr
 *.sw?
 
 # common system folder
-ui/public/loader
-ui/public/common
+ui/public/*

@@ -5,7 +5,7 @@
 SERVICES_DIR="/root/psibase/services"
 
 # build Loader code (that will be shared with all apps)
-pushd "$SERVICES_DIR/user/CommonSys/common-lib/packages/loader"
+pushd "$SERVICES_DIR/user/CommonSys/common-lib/packages/wasm-loader"
 rm -rf dist
 rm -rf node_modules
 yarn --mutex network && yarn build
@@ -29,11 +29,12 @@ check_and_execute_build() {
 for system_dir in "${system_services[@]}"; do
     # echo "Starting system loop..."
     root_dir="$SERVICES_DIR/system/$system_dir"
-    target_dir="/ui/public/common/loader"
+    target_dir="/ui/public/common/wasm-loader"
     full_path="$root_dir$target_dir"
 
-    # Copy files
+    # Wipe build products of targeted app
     rm -rf "$full_path" && mkdir -p "$full_path"
+    # Copy loader files to that app
     cp -R dist/* "$full_path"
 
     # Check for build.sh and execute if it exists
@@ -44,12 +45,11 @@ done
 for user_dir in "${user_services[@]}"; do
     # echo "Starting user loop..."
     root_dir="$SERVICES_DIR/user/$user_dir"
-    target_dir="/ui/public/common/loader"
+    target_dir="/ui/public/common/wasm-loader"
     full_path="$root_dir$target_dir"
 
     # Wipe build products of targeted app
     rm -rf "$full_path" && mkdir -p "$full_path"
-    echo "mkdir: $full_path"
     # Copy loader files to that app
     cp -R dist/* "$full_path"
 
