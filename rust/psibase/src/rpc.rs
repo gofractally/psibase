@@ -1,13 +1,15 @@
+use crate::TransactionTrace;
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Value;
+use std::str::FromStr;
 
 custom_error! { Error
     Message{message:String}                         = "{message}",
-    ExecutionFailed{message:String, trace:Value}    = "{message}",
+    ExecutionFailed{message:String}    = "{message}",
+    UnknownTraceFormat = "Unknown trace format"
 }
 
 async fn as_text(builder: reqwest::RequestBuilder) -> Result<String, anyhow::Error> {
@@ -53,37 +55,73 @@ pub async fn get_tapos_for_head(
         .context("Failed to get tapos for head block")
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum TraceFormat {
+    Error,
+    Stack,
+    Full,
+    Json,
+}
+
+impl TraceFormat {
+    pub fn error_for_trace(&self, trace: TransactionTrace) -> Result<(), anyhow::Error> {
+        if let Some(e) = &trace.error {
+            if !e.is_empty() {
+                let message = match self {
+                    TraceFormat::Error => e.to_string(),
+                    TraceFormat::Stack => trace.fmt_stack(),
+                    TraceFormat::Full => trace.to_string(),
+                    TraceFormat::Json => serde_json::to_string(&trace)?,
+                };
+                Err(Error::ExecutionFailed { message })?;
+            }
+        }
+        match self {
+            TraceFormat::Full => {
+                print!("{}", trace.to_string())
+            }
+            TraceFormat::Json => serde_json::to_writer_pretty(std::io::stdout().lock(), &trace)?,
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+impl FromStr for TraceFormat {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
+        match s {
+            "error" => Ok(TraceFormat::Error),
+            "stack" => Ok(TraceFormat::Stack),
+            "full" => Ok(TraceFormat::Full),
+            "json" => Ok(TraceFormat::Json),
+            _ => Err(Error::UnknownTraceFormat)?,
+        }
+    }
+}
+
 async fn push_transaction_impl(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
+    fmt: TraceFormat,
 ) -> Result<(), anyhow::Error> {
-    let trace: Value = as_json(
+    let trace: TransactionTrace = as_json(
         client
             .post(base_url.join("native/push_transaction")?)
             .body(packed),
     )
     .await?;
-    // println!("{:#?}", trace);
-    let err = trace.get("error").and_then(|v| v.as_str());
-    if let Some(e) = err {
-        if !e.is_empty() {
-            return Err(Error::ExecutionFailed {
-                message: e.to_string(),
-                trace,
-            }
-            .into());
-        }
-    }
-    Ok(())
+    fmt.error_for_trace(trace)
 }
 
 pub async fn push_transaction(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
+    fmt: TraceFormat,
 ) -> Result<(), anyhow::Error> {
-    push_transaction_impl(base_url, client, packed)
+    push_transaction_impl(base_url, client, packed, fmt)
         .await
         .context("Failed to push transaction")?;
     Ok(())

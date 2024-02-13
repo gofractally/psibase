@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{Action, Hex, Pack, Reflect, Unpack};
 use serde::{Deserialize, Serialize};
+use serde_aux::prelude::deserialize_number_from_string;
 
 #[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -11,6 +12,7 @@ pub struct ActionTrace {
     pub action: Action,
     pub raw_retval: Hex<Vec<u8>>,
     pub inner_traces: Vec<InnerTrace>,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub total_time: i64,
     pub error: Option<String>,
 }
@@ -159,4 +161,44 @@ fn format_transaction_trace(
         format_string(e, indent + 11, f)?;
     }
     Ok(())
+}
+
+fn format_error_stack<T: std::fmt::Write>(atrace: &ActionTrace, f: &mut T) -> fmt::Result {
+    if atrace.error.is_some() {
+        writeln!(
+            f,
+            "{} => {}::{}",
+            atrace.action.sender, atrace.action.service, atrace.action.method
+        )?;
+        for inner in &atrace.inner_traces {
+            match &inner.inner {
+                InnerTraceEnum::ConsoleTrace(_) => (),
+                InnerTraceEnum::EventTrace(_) => (),
+                InnerTraceEnum::ActionTrace(a) => format_error_stack(a, f)?,
+            }
+        }
+    }
+    Ok(())
+}
+
+fn format_transaction_error_stack<T: std::fmt::Write>(
+    ttrace: &TransactionTrace,
+    f: &mut T,
+) -> fmt::Result {
+    for a in &ttrace.action_traces {
+        format_error_stack(a, f)?;
+        if let Some(message) = &ttrace.error {
+            writeln!(f, "{}", message)?;
+        }
+        break;
+    }
+    Ok(())
+}
+
+impl TransactionTrace {
+    pub fn fmt_stack(&self) -> String {
+        let mut result = String::new();
+        format_transaction_error_stack(self, &mut result).unwrap();
+        result
+    }
 }
