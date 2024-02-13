@@ -6,7 +6,7 @@
         "allowJs": false,
         "paths": {
             "/common": ["../../CommonSys/common"],
-            "@psibase/common-lib": ["../../CommonSys/common-lib/src"],
+            "@psibase/common-lib": ["../../CommonSys/common-lib/packages/rpc/src"],
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
