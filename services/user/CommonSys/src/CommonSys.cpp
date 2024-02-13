@@ -51,6 +51,13 @@ namespace SystemService
                 .body        = {json.begin(), json.end()},
             };
          }
+         if (request.target == "/common/wasm-loader")
+         {
+            if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
+            {
+               return result;
+            }
+         }
       }
 
       if (request.method == "POST")

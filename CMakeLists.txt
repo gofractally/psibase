@@ -225,7 +225,7 @@ function(add_js_target ENTRY OUTPUT_FILE)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE}
         DEPENDS ${DEPENDENCIES}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && rm -rf ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist && yarn --mutex network && yarn build
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && rm -rf ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist && rm -rf ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/node-modules && yarn --mutex network && yarn build
     )
     add_custom_target(
         ${DEP}
