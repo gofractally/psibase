@@ -123,7 +123,7 @@ namespace arbtrie
       }
 
       // return the base pointer for the mapped segment
-      inline void* get(id i) { 
+      inline void* get(id i) noexcept { 
          assert( i < _num_blocks.load(std::memory_order_relaxed) );
          // this is safe because block mapping reserved capacity so 
          // resize should never move the data

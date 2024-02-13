@@ -24,22 +24,6 @@ void toupper(std::string& s)
       c = std::toupper(c);
 }
 
-std::string add_comma(uint64_t s)
-{
-   if (s < 1000)
-      return std::to_string(s);
-   if (s < 1000000)
-   {
-      return std::to_string(s / 1000) + ',' + std::to_string((s % 1000) + 1000).substr(1);
-   }
-   if (s < 1000000000)
-   {
-      return std::to_string(s / 1000000) + ',' +
-             std::to_string(((s % 1000000) / 1000) + 1000).substr(1) + "," +
-             std::to_string((s % 1000) + 1000).substr(1);
-   }
-   return std::to_string(s);
-};
 
 struct environ
 {

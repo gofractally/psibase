@@ -143,6 +143,7 @@ namespace arbtrie
       friend class node_handle;
       read_session(database& db);
       database& _db;
+      seg_allocator::session _segas;
 
       int get(object_ref<node_header>&                root,
               key_view                                key,
@@ -159,8 +160,6 @@ namespace arbtrie
               const value_node*,
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
-
-      seg_allocator::session _segas;
 
      public:
       iterator    create_iterator(node_handle h) { return iterator(*this, h); }
@@ -555,8 +554,9 @@ namespace arbtrie
       uint64_t old_r;
       uint64_t new_r = r.take().to_int();
       {  
-         if constexpr ( stype != sync_type::none )
-            _db._sega.sync( stype );
+         if constexpr ( stype != sync_type::none ) {
+            _segas.sync(stype); 
+         }
          { // lock scope
            std::unique_lock lock(_db._root_change_mutex[index]); 
            old_r = _db._dbm->top_root[index].exchange(new_r, std::memory_order_relaxed);

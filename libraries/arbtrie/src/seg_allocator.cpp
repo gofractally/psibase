@@ -10,7 +10,9 @@ namespace arbtrie
    seg_allocator::seg_allocator(std::filesystem::path dir)
        : _id_alloc(dir / "ids"),
          _block_alloc(dir / "segs", segment_size, max_segment_count),
-         _header_file(dir / "header", access_mode::read_write, true)
+         _header_file(dir / "header", access_mode::read_write, true),
+         _seg_sync_locks( max_segment_count ),
+         _dirty_segs( max_segment_count )
    {
       if (_header_file.size() == 0)
       {
@@ -504,7 +506,7 @@ namespace arbtrie
       return prepare_segment(_block_alloc.alloc());
    }
 
-   void seg_allocator::sync_segment( int s, sync_type st ) {
+   void seg_allocator::sync_segment( int s, sync_type st ) noexcept {
       auto seg        = get_segment(s);
       auto last_sync  = _header->seg_meta[s]._last_sync_pos.load(std::memory_order_relaxed);
       auto last_alloc = seg->_alloc_pos.load(std::memory_order_relaxed);
@@ -517,11 +519,15 @@ namespace arbtrie
          auto sync_bytes   = last_alloc - (last_sync & page_size_mask);
          auto seg_sync_ptr = (((intptr_t)seg + last_sync) & page_size_mask);
 
+         static uint64_t total_synced = 0;
          if (-1 == msync((char*)seg_sync_ptr, sync_bytes, msync_flag(st)))
          {
             std::cerr << "ps: " << getpagesize() << " len: " << sync_bytes << " rounded:  \n";
             std::cerr << "msync errno: " << std::string(strerror(errno))
                       << " seg_alloc::sync() seg: " << s << "\n";
+         } else {
+            total_synced += sync_bytes;
+ //           TRIEDENT_DEBUG( "total synced: ", add_comma(total_synced), " flag: ", msync_flag(st), " MS_SYNC: ", MS_SYNC );
          }
          _header->seg_meta[s]._last_sync_pos.store(last_alloc);
       }
@@ -533,12 +539,14 @@ namespace arbtrie
 
       std::unique_lock lock(_sync_mutex);
 
-      auto total_segs = _block_alloc.num_blocks();
-
-      // TODO: maintain a set of dirty segments and only
-      //       consider those segments
-      for (uint32_t i = 0; i < total_segs; ++i)
-         sync_segment( i, st );
+      auto ndsi = get_last_dirty_seg_idx();
+      while( _last_synced_index < ndsi ) {
+         auto lsi = _last_synced_index%max_segment_count;
+         _seg_sync_locks[lsi].start_sync();
+         sync_segment( _dirty_segs[ndsi % max_segment_count], st );
+         _seg_sync_locks[lsi].end_sync();
+         ++_last_synced_index;
+      }
    }
 
    void seg_allocator::dump()
