@@ -100,8 +100,13 @@ namespace arbtrie
 
       uint32_t calculate_checksum() const;
 
-      void update_checksum() { checksum = 0xbaadbaad; }                  //calculate_checksum(); }
-      bool validate_checksum() const { return checksum == 0xbaadbaad; }  //calculate_checksum(); }
+      void update_checksum() { checksum = calculate_checksum(); }
+      bool has_checksum()const { return checksum; }
+      bool validate_checksum() const { 
+         if( checksum )
+            return (checksum == calculate_checksum()); 
+         return true;
+      }
    } __attribute((packed));
    static_assert(sizeof(node_header) == 16);
 

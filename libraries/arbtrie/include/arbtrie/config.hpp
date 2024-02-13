@@ -3,13 +3,37 @@
 
 namespace arbtrie {
 
+   // designed to fit within 4096 bytes with other header information
+   // so msync the page doesn't waste data.
    static constexpr const uint32_t num_top_roots = 488;
+
+   /**
+    * This will slow down performance, but ensures the checksum should
+    * be accurate at all times. If this is not set, the checksum will
+    * be zeroed on modify until a later point (eg. compaction, or setroot)
+    * chooses to update it.
+    */
+   static constexpr const bool update_checksum_on_modify     = true;
+
+   /**
+    *  Checksum's are deferred until just before msync so that data
+    *  at rest always has a checksum. The idea is that until the user
+    *  chooses to flush to disk there is no gaurantee that the data
+    *  will survivie a hardware crash.
+    */
+   static constexpr const bool update_checksum_on_msync      = false and not update_checksum_on_modify;
+   static constexpr const bool update_checksum_on_compact    = true and not update_checksum_on_modify;
+   static constexpr const bool validate_checksum_on_compact  = true; 
+
+   static_assert( not (update_checksum_on_msync and update_checksum_on_modify) );
+   static_assert( not (update_checksum_on_compact and update_checksum_on_modify) );
 
    static constexpr const uint64_t MB = 1024ull*1024ull;
    static constexpr const uint64_t GB = 1024ull * MB;
    static constexpr const uint64_t TB = 1024ull * GB;
 
    static constexpr const int cacheline_size = 64;
+
 
    /**
     *  Certain 

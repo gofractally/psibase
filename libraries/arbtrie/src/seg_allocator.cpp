@@ -1,9 +1,9 @@
+#include <arbtrie/binary_node.hpp>
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/seg_allocator.hpp>
-#include <arbtrie/binary_node.hpp>
 
-      static const uint64_t page_size      = getpagesize();
-      static const uint64_t page_size_mask = ~(page_size - 1);
+static const uint64_t page_size      = getpagesize();
+static const uint64_t page_size_mask = ~(page_size - 1);
 
 namespace arbtrie
 {
@@ -11,8 +11,8 @@ namespace arbtrie
        : _id_alloc(dir / "ids"),
          _block_alloc(dir / "segs", segment_size, max_segment_count),
          _header_file(dir / "header", access_mode::read_write, true),
-         _seg_sync_locks( max_segment_count ),
-         _dirty_segs( max_segment_count )
+         _seg_sync_locks(max_segment_count),
+         _dirty_segs(max_segment_count)
    {
       if (_header_file.size() == 0)
       {
@@ -26,7 +26,9 @@ namespace arbtrie
       _done.store(false);
 
       //_mlocked.resize(256);
-      for( auto& i : _mlocked ) i.store( -1, std::memory_order_relaxed);;
+      for (auto& i : _mlocked)
+         i.store(-1, std::memory_order_relaxed);
+      ;
    }
 
    seg_allocator::~seg_allocator()
@@ -55,7 +57,6 @@ namespace arbtrie
          _compact_thread.join();
    }
 
-
    void seg_allocator::compact_loop()
    {
       using namespace std::chrono_literals;
@@ -67,27 +68,28 @@ namespace arbtrie
          if (not compact_next_segment())
          {
             /// don't let the alloc threads starve for want of a free segment
-            /// if the free segment queue is getting low, top it up... but 
+            /// if the free segment queue is getting low, top it up... but
             /// don't top it up just because read threads have things blocked
             /// because they could "block" for a long time... hrmn... could we
             /// put this at prior ap loc?
             auto min = get_min_read_ptr();
-            auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed); 
+            auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
             auto ep  = _header->end_ptr.load(std::memory_order_relaxed);
-            if( min - ap <= 1 and  (ep - ap) < 3 ) {
-                TRIEDENT_DEBUG( "speculative segment creation" );
+            if (min - ap <= 1 and (ep - ap) < 3)
+            {
+               TRIEDENT_DEBUG("speculative segment creation");
 
-                auto seg = get_new_segment();
-                munlock(seg.second, segment_size);
-                madvise(seg.second, segment_size, MADV_RANDOM);
-                seg.second->_alloc_pos.store(0, std::memory_order_relaxed );
-                seg.second->_age = -1;
+               auto seg = get_new_segment();
+               munlock(seg.second, segment_size);
+               madvise(seg.second, segment_size, MADV_RANDOM);
+               seg.second->_alloc_pos.store(0, std::memory_order_relaxed);
+               seg.second->_age = -1;
 
-                _header->seg_meta[seg.first].clear();
-                _header->free_seg_buffer[_header->end_ptr.load(std::memory_order_relaxed) &
-                                         (max_segment_count - 1)] = seg.first;
-                auto prev = _header->end_ptr.fetch_add(1, std::memory_order_release);
-                set_session_end_ptrs(prev);
+               _header->seg_meta[seg.first].clear();
+               _header->free_seg_buffer[_header->end_ptr.load(std::memory_order_relaxed) &
+                                        (max_segment_count - 1)] = seg.first;
+               auto prev = _header->end_ptr.fetch_add(1, std::memory_order_release);
+               set_session_end_ptrs(prev);
             }
             /*
             std::cerr << "sleeping because most seg: " << most_empty_seg_num
@@ -146,15 +148,15 @@ namespace arbtrie
 
    void seg_allocator::compact_segment(session& ses, uint64_t seg_num)
    {
-      auto         state = ses.lock();
-      auto         s     = get_segment(seg_num);
-    //  if( not s->_write_lock.try_lock() ) {
-    //     TRIEDENT_WARN( "unable to get write lock while compacting!" );
-    //     abort();
-    //  }
-      auto         send  = (node_header*)((char*)s + segment_size);
-      char*        foc   = (char*)s + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
-      node_header* foo   = (node_header*)(foc);
+      auto state = ses.lock();
+      auto s     = get_segment(seg_num);
+      //  if( not s->_write_lock.try_lock() ) {
+      //     TRIEDENT_WARN( "unable to get write lock while compacting!" );
+      //     abort();
+      //  }
+      auto         send = (node_header*)((char*)s + segment_size);
+      char*        foc  = (char*)s + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
+      node_header* foo  = (node_header*)(foc);
 
       /*
       std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num << " "
@@ -173,23 +175,26 @@ namespace arbtrie
       auto start_seg_ptr = ses._alloc_seg_ptr;
       auto start_seg_num = ses._alloc_seg_num;
 
-      std::vector<std::pair<node_header*,temp_meta_type>> skipped;
-      std::vector<node_header*> skipped_ref;
-      std::vector<node_header*> skipped_try_start;
-    
+      std::vector<std::pair<node_header*, temp_meta_type>> skipped;
+      std::vector<node_header*>                            skipped_ref;
+      std::vector<node_header*>                            skipped_try_start;
+
       madvise(s, segment_size, MADV_SEQUENTIAL);
       while (foo < send and foo->address())
       {
-         assert(intptr_t(foo)%64 == 0);
-         assert(foo->_nsize < 2*4096 );
-         assert(foo->validate_checksum());
+         assert(intptr_t(foo) % 64 == 0);
+         assert(foo->_nsize < 2 * 4096);
+
+         if constexpr (update_checksum_on_modify)
+            assert(foo->validate_checksum());
+
          auto foo_address = foo->address();
          // skip anything that has been freed
          // note the ref can go to 0 before foo->check is set to -1
          auto obj_ref = state.get(foo_address);
          if (obj_ref.ref() == 0)
          {
-            if constexpr (debug_memory )
+            if constexpr (debug_memory)
                skipped_ref.push_back(foo);
             foo = foo->next();
             continue;
@@ -204,30 +209,46 @@ namespace arbtrie
          auto current_loc = obj_ref.loc();
          if (current_loc.to_abs() != seg_num * segment_size + foo_idx)
          {
-            if constexpr (debug_memory )
-               skipped.push_back({foo, obj_ref.meta_data()} );
+            if constexpr (debug_memory)
+               skipped.push_back({foo, obj_ref.meta_data()});
             foo = foo->next();
             continue;
          }
 
-
-         auto obj_size   = foo->size();
-         assert( obj_size < 4096*2 );
+         auto obj_size = foo->size();
+         assert(obj_size < 4096 * 2);
          auto [loc, ptr] = ses.alloc_data(obj_size, foo_address);
 
-         if( obj_ref.try_start_move( obj_ref.loc() ) ) [[likely]]
+         if (obj_ref.try_start_move(obj_ref.loc())) [[likely]]
          {
-            if( obj_ref.type() == node_type::binary ) {
-               copy_binary_node( (binary_node*)ptr, (const binary_node*)foo ); 
-            } else {
+            if (obj_ref.type() == node_type::binary)
+            {
+               copy_binary_node((binary_node*)ptr, (const binary_node*)foo);
+            }
+            else
+            {
                memcpy(ptr, foo, obj_size);
             }
-            if( node_meta_type::success != obj_ref.try_move( obj_ref.loc(), loc ) ) 
-                ses.unalloc(obj_size);
-         } else {
-            if constexpr (debug_memory )
+            if constexpr ( update_checksum_on_compact ) {
+               if( not ptr->has_checksum() )
+                  ptr->update_checksum();
+            }
+            if constexpr (validate_checksum_on_compact)
+            {
+               if (not ptr->validate_checksum())
+               {
+                  TRIEDENT_WARN("invalid checksum detected: ", foo_address,
+                                " checksum: ", foo->checksum, " != ", foo->calculate_checksum(),
+                                " type: ", node_type_names[ptr->_ntype]);
+               }
+            }
+            if (node_meta_type::success != obj_ref.try_move(obj_ref.loc(), loc))
+               ses.unalloc(obj_size);
+         }
+         else
+         {
+            if constexpr (debug_memory)
                skipped_try_start.push_back(foo);
-
          }
 
          // if ses.alloc_data() was forced to make space in a new segment
@@ -239,60 +260,79 @@ namespace arbtrie
          }
          else if (start_seg_ptr != ses._alloc_seg_ptr)
          {
-            sync_segment( start_seg_num, sync_type::sync );
+            sync_segment(start_seg_num, sync_type::sync);
             start_seg_ptr = ses._alloc_seg_ptr;
             start_seg_num = ses._alloc_seg_num;
          }
          foo = foo->next();
       }  // segment object iteration loop
-         
-      if constexpr ( debug_memory ) {
-         if( (char*)send - (char*)foo > 4096 ) {
-            TRIEDENT_WARN( "existing compact loop earlier than expected: ", (char*)send - (char*)foo );
+
+      if constexpr (debug_memory)
+      {
+         if ((char*)send - (char*)foo > 4096)
+         {
+            TRIEDENT_WARN("existing compact loop earlier than expected: ",
+                          (char*)send - (char*)foo);
          }
 
-         foo   = (node_header*)(foc);
-         while( foo < send and foo->address() ) {
-            auto obj_ref = state.get( foo->address() );
+         foo = (node_header*)(foc);
+         while (foo < send and foo->address())
+         {
+            auto obj_ref     = state.get(foo->address());
             auto foo_idx     = (char*)foo - (char*)s;
             auto current_loc = obj_ref.loc();
-            if(current_loc.to_abs() == seg_num * segment_size + foo_idx) { 
-               for( auto s : skipped ) {
-                  if( s.first == foo ) { 
-                     TRIEDENT_WARN( "obj_ref: ", obj_ref.ref() );
-                     TRIEDENT_WARN( "obj_type: ", node_type_names[obj_ref.type()] );
-                     TRIEDENT_WARN( "obj_loc: ", current_loc.abs_index(), " seg: ", current_loc.segment() );
-                     TRIEDENT_WARN( "ptr: ", (void*)foo );
-                     TRIEDENT_WARN( "pos in segment: ", segment_size - ((char*)send - (char*)foo) );
+            if (current_loc.to_abs() == seg_num * segment_size + foo_idx)
+            {
+               for (auto s : skipped)
+               {
+                  if (s.first == foo)
+                  {
+                     TRIEDENT_WARN("obj_ref: ", obj_ref.ref());
+                     TRIEDENT_WARN("obj_type: ", node_type_names[obj_ref.type()]);
+                     TRIEDENT_WARN("obj_loc: ", current_loc.abs_index(),
+                                   " seg: ", current_loc.segment());
+                     TRIEDENT_WARN("ptr: ", (void*)foo);
+                     TRIEDENT_WARN("pos in segment: ", segment_size - ((char*)send - (char*)foo));
 
-                     TRIEDENT_WARN( "SKIPPED BECAUSE POS DIDN'T MATCH" ); 
-                     TRIEDENT_DEBUG( "  old meta: ", s.second.to_int() );
-                     TRIEDENT_DEBUG( "  null_node: ", null_node.abs_index(), " seg: ", null_node.segment() );
-                     TRIEDENT_DEBUG( "  old loc: ", s.second.loc().abs_index(), " seg: ", s.second.loc().segment() );
-                     TRIEDENT_DEBUG( "  old ref: ", s.second.ref() );
-                     TRIEDENT_DEBUG( "  old type: ", node_type_names[s.second.type()] );
-                     TRIEDENT_DEBUG( "  old is_con: ", s.second.is_const() );
-                     TRIEDENT_DEBUG( "  old is_ch: ", s.second.is_copying() );
+                     TRIEDENT_WARN("SKIPPED BECAUSE POS DIDN'T MATCH");
+                     TRIEDENT_DEBUG("  old meta: ", s.second.to_int());
+                     TRIEDENT_DEBUG("  null_node: ", null_node.abs_index(),
+                                    " seg: ", null_node.segment());
+                     TRIEDENT_DEBUG("  old loc: ", s.second.loc().abs_index(),
+                                    " seg: ", s.second.loc().segment());
+                     TRIEDENT_DEBUG("  old ref: ", s.second.ref());
+                     TRIEDENT_DEBUG("  old type: ", node_type_names[s.second.type()]);
+                     TRIEDENT_DEBUG("  old is_con: ", s.second.is_const());
+                     TRIEDENT_DEBUG("  old is_ch: ", s.second.is_copying());
                      assert(current_loc.to_abs() != seg_num * segment_size + foo_idx);
                   }
                }
-               for( auto s : skipped_ref ) {
-                  if( s == foo ) { TRIEDENT_WARN( "SKIPPED BECAUSE NOT REF" ); }
+               for (auto s : skipped_ref)
+               {
+                  if (s == foo)
+                  {
+                     TRIEDENT_WARN("SKIPPED BECAUSE REF 0");
+                  }
                }
-               for( auto s : skipped_try_start ) {
-                  if( s == foo ) { TRIEDENT_WARN( "SKIPPED BECAUSE TRY START" ); }
+               for (auto s : skipped_try_start)
+               {
+                  if (s == foo)
+                  {
+                     TRIEDENT_WARN("SKIPPED BECAUSE TRY START");
+                  }
                }
             }
             foo = foo->next();
          }
       }
 
-
       // in order to maintain the invariant that the segment we just cleared
       // can be reused, we must make sure that the data we moved out has persisted to
       // disk.
       if (start_seg_ptr)
       {
+         // TODO: don't hardcode MS_SYNC here, this will cause unnessary SSD wear on
+         //       systems that opt not to flush
          if (-1 == msync(start_seg_ptr, start_seg_ptr->_alloc_pos, MS_SYNC))
          {
             std::cerr << "msync errorno: " << strerror(errno) << "\n";
@@ -301,20 +341,21 @@ namespace arbtrie
                                                          std::memory_order_relaxed);
       }
 
-   //   s->_write_lock.unlock();
-   //   s->_num_objects = 0;
+      //   s->_write_lock.unlock();
+      //   s->_num_objects = 0;
       s->_alloc_pos.store(0, std::memory_order_relaxed);
-      s->_age         = -1;
+      s->_age = -1;
       // the segment we just cleared, so its free space and objects get reset to 0
       // and its last_sync pos gets put to the end because there is no need to sync it
       // because its data has already been synced by the compactor
       _header->seg_meta[seg_num].clear();
 
       // TODO: if I store the index in _mlocked then I don't have to search for it
-      for( auto& ml : _mlocked )
-         if( ml.load(std::memory_order_relaxed) == seg_num ) {
-            ml.store( -1, std::memory_order_relaxed);
-            break; 
+      for (auto& ml : _mlocked)
+         if (ml.load(std::memory_order_relaxed) == seg_num)
+         {
+            ml.store(-1, std::memory_order_relaxed);
+            break;
          }
 
       munlock(s, segment_size);
@@ -441,21 +482,23 @@ namespace arbtrie
          // TODO: only do this if not already mlock
          auto r = mlock(sp, segment_size);
 
-         if (r) {
+         if (r)
+         {
             std::cerr << "MLOCK RETURNED: " << r << "  EINVAL:" << EINVAL << "  EAGAIN:" << EAGAIN
                       << "\n";
-         } else {
-            auto prev = _total_mlocked.fetch_add(1, std::memory_order_relaxed);
-            int idx = prev  % _mlocked.size();
-            auto cur_val = _mlocked[idx].load(std::memory_order_relaxed); 
-            if( cur_val != -1 )
-            {
-               auto olock = _block_alloc.get( cur_val );
-               munlock( olock, segment_size );
-            }
-            _mlocked[idx].store( sn, std::memory_order_relaxed );
          }
-        
+         else
+         {
+            auto prev    = _total_mlocked.fetch_add(1, std::memory_order_relaxed);
+            int  idx     = prev % _mlocked.size();
+            auto cur_val = _mlocked[idx].load(std::memory_order_relaxed);
+            if (cur_val != -1)
+            {
+               auto olock = _block_alloc.get(cur_val);
+               munlock(olock, segment_size);
+            }
+            _mlocked[idx].store(sn, std::memory_order_relaxed);
+         }
 
          // for debug we clear the memory
          // assert(memset(sp, 0xff, segment_size));  // TODO: is this necessary?
@@ -494,19 +537,20 @@ namespace arbtrie
             //  TRIEDENT_DEBUG( "prepare segment: ", free_seg, "     end_ptr: ", _header->end_ptr.load() );
             //       std::cerr << "reusing segment..." << free_seg <<"\n";
             auto sp = (mapped_memory::segment_header*)_block_alloc.get(free_seg);
-        //  This lock is not needed, but just there to prove the read-lock system
-        //  is working as intened. If re-enabled, it probably need to be moved to
-        //  prepare segment because new segments don't end up locked... only reused ones
-        //    if( not sp->_write_lock.try_lock() ) {
-        //       TRIEDENT_WARN( "write lock on get_new_segment!" );
-        //    }
+            //  This lock is not needed, but just there to prove the read-lock system
+            //  is working as intened. If re-enabled, it probably need to be moved to
+            //  prepare segment because new segments don't end up locked... only reused ones
+            //    if( not sp->_write_lock.try_lock() ) {
+            //       TRIEDENT_WARN( "write lock on get_new_segment!" );
+            //    }
             return prepare_segment(free_seg);
          }
       }
       return prepare_segment(_block_alloc.alloc());
    }
 
-   void seg_allocator::sync_segment( int s, sync_type st ) noexcept {
+   void seg_allocator::sync_segment(int s, sync_type st) noexcept
+   {
       auto seg        = get_segment(s);
       auto last_sync  = _header->seg_meta[s]._last_sync_pos.load(std::memory_order_relaxed);
       auto last_alloc = seg->_alloc_pos.load(std::memory_order_relaxed);
@@ -525,9 +569,11 @@ namespace arbtrie
             std::cerr << "ps: " << getpagesize() << " len: " << sync_bytes << " rounded:  \n";
             std::cerr << "msync errno: " << std::string(strerror(errno))
                       << " seg_alloc::sync() seg: " << s << "\n";
-         } else {
+         }
+         else
+         {
             total_synced += sync_bytes;
- //           TRIEDENT_DEBUG( "total synced: ", add_comma(total_synced), " flag: ", msync_flag(st), " MS_SYNC: ", MS_SYNC );
+            //           TRIEDENT_DEBUG( "total synced: ", add_comma(total_synced), " flag: ", msync_flag(st), " MS_SYNC: ", MS_SYNC );
          }
          _header->seg_meta[s]._last_sync_pos.store(last_alloc);
       }
@@ -540,10 +586,11 @@ namespace arbtrie
       std::unique_lock lock(_sync_mutex);
 
       auto ndsi = get_last_dirty_seg_idx();
-      while( _last_synced_index < ndsi ) {
-         auto lsi = _last_synced_index%max_segment_count;
+      while (_last_synced_index < ndsi)
+      {
+         auto lsi = _last_synced_index % max_segment_count;
          _seg_sync_locks[lsi].start_sync();
-         sync_segment( _dirty_segs[ndsi % max_segment_count], st );
+         sync_segment(_dirty_segs[ndsi % max_segment_count], st);
          _seg_sync_locks[lsi].end_sync();
          ++_last_synced_index;
       }

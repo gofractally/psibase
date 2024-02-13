@@ -265,6 +265,12 @@ namespace arbtrie
               private:
                void unlock()
                {
+                  if ( _observed_ptr ) {
+                     if constexpr ( update_checksum_on_modify )
+                        _observed_ptr->update_checksum();
+                     else
+                        _observed_ptr->checksum = 0;
+                  }
                   // allow msync to continue
                   if (_sync_lock)
                      _sync_lock->end_modify();
@@ -802,25 +808,10 @@ namespace arbtrie
       //auto& atom           = _session._sega._id_alloc.get(id);
       auto [loc, node_ptr] = _session.alloc_data(size, adr);
 
-      if constexpr (debug_memory)
-      {
-         auto      seg_end = (char*)_session._sega._block_alloc.get(seg) + segment_size;
-         uint32_t* check   = (uint32_t*)(((char*)node_ptr) + size);
-         if (loc.abs_index() + size < segment_size)
-         {
-            auto old = *check;
-            init(node_ptr);
-            assert(*check == 0 or *check == old or *check == 0xbaadbaad);
-         }
-         else
-            init(node_ptr);
-      }
-      else
-      {
-         init(node_ptr);
-      }
+      init(node_ptr);
+      if constexpr ( update_checksum_on_modify )
+         node_ptr->update_checksum();
 
-      assert(node_ptr->validate_checksum());
       assert(node_ptr->_nsize == size);
       assert(node_ptr->_ntype == type);
       assert(node_ptr->_node_id == adr.to_int());
@@ -856,27 +847,10 @@ namespace arbtrie
       //TRIEDENT_WARN( "alloc id: ", id, " type: " , node_type_names[type], " loc: ", loc._offset, " size: ", size);
 
       //init(node_ptr);
-      if constexpr (debug_memory)
-      {
-         uint32_t* check = (uint32_t*)(((char*)node_ptr) + size);
-         if (loc.abs_index() + size < segment_size)
-         {
-            auto old = *check;
-            init(node_ptr);
-            assert(*check == 0 or *check == old or *check == 0xbaadbaad);
-         }
-         else
-            init(node_ptr);
-      }
-      else
-      {
-         init(node_ptr);
-      }
+      init(node_ptr);
+      if constexpr ( update_checksum_on_modify )
+         node_ptr->update_checksum();
 
-      assert(node_ptr->validate_checksum());
-
-      auto tmp = temp_meta_type().set_type(type).set_location(loc).set_ref(1);
-      //atom.store(object_meta(type, loc, 1).to_int(), std::memory_order_release);
       atom.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
                  std::memory_order_release);
 
