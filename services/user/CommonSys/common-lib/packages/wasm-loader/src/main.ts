@@ -49,7 +49,7 @@ const functionCall = async ({
   args,
   precomputedResults,
 }: PluginCallPayload) => {
-  const url = "/common/wasm-loader/plugin.wasm";
+  const url = "/plugin.wasm";
 
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
   const importedFunctionsFromWit = getImportedFunctions();
