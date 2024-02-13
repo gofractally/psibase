@@ -1,3 +1,5 @@
+#! /bin/bash
+
 root_dir="/root/psibase/services/user/DemoApp2"
 account_name="demoapp2"
 rust_name="demoapp2"
