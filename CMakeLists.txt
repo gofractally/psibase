@@ -249,7 +249,7 @@ add_js_target(${COMMON_LOADER_DIR} index.html)
 # Each of these UIs receives the build output of CommonSys, so CommonSys files are listed as dependencies
 # Q: Is this needed? CommonSys files should be served *through CommonSys* and not be copied...
 foreach(ENTRY ${JS_DIRS})
-    add_js_target(${ENTRY} index.html ${common} ${common-fonts} ${common-loader} CommonSysRpcLib_js)
+    add_js_target(${ENTRY} index.html ${common} ${common-fonts} ${common-loader} CommonSysRpcLib_js CommonSysLoaderLib_js)
 endforeach()
 
 set(WASM_PSIBASE_BYPRODUCTS
