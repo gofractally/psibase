@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
         "@messaging": path.resolve(
-            "../../../user/CommonSys/common/messaging"
+            "../../CommonSys/common/messaging"
         ),
     },
 },

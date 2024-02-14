@@ -11,6 +11,8 @@ import {
   generateRandomString,
   buildPluginCallRequest,
   buildFunctionCallResponse,
+  isPreLoadServicesRequest,
+  PreLoadServicesRequest,
 } from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -216,6 +218,12 @@ const onPluginCallRequest = (message: PluginCallRequest) => {
   pendingFunctionCalls.forEach(addToPendingFunctionCall);
 };
 
+const onPreloadServicesRequest = ({
+  payload,
+}: PreLoadServicesRequest): void => {
+  payload.services.forEach(getLoader);
+};
+
 const onRawEvent = (message: MessageEvent<any>) => {
   if (isFunctionCallRequest(message.data)) {
     // TODO Assert origin of supervisor-sys
@@ -226,6 +234,8 @@ const onRawEvent = (message: MessageEvent<any>) => {
   } else if (isPluginCallRequest(message.data)) {
     // TODO Assert origin of plugin call request
     onPluginCallRequest(message.data);
+  } else if (isPreLoadServicesRequest(message.data)) {
+    onPreloadServicesRequest(message.data);
   }
 };
 
