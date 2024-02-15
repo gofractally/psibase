@@ -362,7 +362,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
         SERVER common-sys
         DATA      ${COMMON_SYS}/common-lib/packages/rpc/dist/common-lib.js common/common-lib.js
-        DATA      ${COMMON_SYS}/common-lib/packages/wasm-loader/dist/* common/wasm-loader/
+        DATA GLOB ${COMMON_SYS}/common-lib/packages/wasm-loader/dist* common/wasm-loader/
         DATA GLOB ${COMMON_SYS}/common/*.mjs                  common/
         DATA      ${COMMON_SYS}/common/fonts                  common/fonts
         DATA GLOB ${COMMON_SYS}/ui/dist/*                     /
