@@ -368,6 +368,8 @@ psibase_package(
         DATA GLOB ${COMMON_SYS}/ui/dist/*                     /
         DATA GLOB ${THIRD_FILES}                              common
     DEPENDS ${CommonSys_js_dep}
+    DEPENDS ${CommonSysRpcLib_js_dep}
+    DEPENDS ${CommonSysLoaderLib_js_dep}
     DEPENDS wasm
     PACKAGE_DEPENDS ProxySys
 )
