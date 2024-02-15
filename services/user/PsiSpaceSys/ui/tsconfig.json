@@ -6,21 +6,23 @@
         "allowJs": false,
         "paths": {
             "/common": ["../../CommonSys/common"],
-            "@psibase/common-lib": ["../../CommonSys/common-lib/packages/rpc/src"],
+            "@psibase/common-lib": [
+                "../../CommonSys/common-lib/packages/rpc/src"
+            ]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "forceConsistentCasingInFileNames": true,
-        "module": "NodeNext",
+        "module": "ESNext",
         "moduleResolution": "Node",
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": ["src", "../../CommonSys/common/rpc.d.ts"],
+    "include": ["src"],
     "references": [
         {
             "path": "./tsconfig.node.json"

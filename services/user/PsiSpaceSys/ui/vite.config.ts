@@ -4,14 +4,13 @@ import path from "path";
 import alias from "@rollup/plugin-alias";
 import svgr from "vite-plugin-svgr";
 
+type BuildAliases = {
+    find: RegExp | string;
+    replacement: string;
+}[];
+
 const psibase = (appletContract: string, isServing?: boolean) => {
-    const buildAliases = [
-        {
-            find: "/common/iframeResizer.contentWindow.js",
-            replacement: path.resolve(
-                "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
-            ),
-        },
+    const buildAliases: BuildAliases = [
         {
             // bundle non-external (above) common files except fonts (which should only be referenced)
             find: /^\/common(?!\/(?:fonts))(.*)$/,
@@ -19,6 +18,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
         },
     ];
 
+    // HMR
     if (isServing) {
         buildAliases.push({
             find: "@psibase/common-lib",
@@ -35,12 +35,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                         assetsDir: "",
                         cssCodeSplit: false,
                         rollupOptions: {
-                            external: [
-                                "/common/rootdomain.mjs",
-                                "/common/rpc.mjs",
-                                "/common/iframeResizer.js",
-                                "/common/common-lib.js",
-                            ],
+                            external: [/^\/common\/.*\.js$/], // matches /common/*.js
                             makeAbsoluteExternalsRelative: false,
                             output: {
                                 entryFileNames: "index.js",
@@ -78,8 +73,8 @@ const psibase = (appletContract: string, isServing?: boolean) => {
             },
         },
         alias({
+            // build-time aliases
             entries: [
-                { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
                 {
                     find: "@psibase/common-lib",
                     replacement: "/common/common-lib.js",
