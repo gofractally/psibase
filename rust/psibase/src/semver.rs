@@ -86,7 +86,7 @@ impl PartialOrd for Prerelease<'_> {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Version<'a> {
+pub struct Version<'a> {
     maj: DecNum<'a>,
     min: DecNum<'a>,
     patch: DecNum<'a>,
@@ -94,7 +94,7 @@ struct Version<'a> {
 }
 
 impl<'a> Version<'a> {
-    fn new(s: &'a str) -> Result<Self, anyhow::Error> {
+    pub fn new(s: &'a str) -> Result<Self, anyhow::Error> {
         let re = Regex::new(SEMVER)?;
         let Some(captures) = re.captures(s) else {
             Err(Error::InvalidVersion)?

@@ -1,30 +1,15 @@
-use crate::{version_match, Meta, PackageRef};
+use crate::{version_match, Meta, PackageRef, Version};
 use custom_error::custom_error;
 use std::collections::{HashMap, HashSet};
 use varisat::{ExtendFormula, Lit, Solver};
 
-// a requires b or c
-// each package is a variable
-
-// A package must not be installed unless at least one of the following holds:
-// - It is in the input set
-// - A package that depends on it is installed
-
-// If a package is installed, then its dependencies must be satified
-// If a package is installed, then no conflicting packages can be installed
-// If a package is installed, then no other version of the same package shall be installed
-
-// Minimize out-dated input packages
-// then minimize out-dated dep packages
+// The following rules are hard requirements:
+// - If a package is installed, then its dependencies must be satified
+// - If a package is installed, then no conflicting packages can be installed
+// - If a package is installed, then no other version of the same package shall be installed
+// - A package is only installed if it is required (transitively) to satisfy the request
 //
-// A package is out-dated if an old version is installed
-
-// A solution A is better than solution B if
-// for every package that A and B have in common,
-// A is at least as recent as B
-// AND
-// A has at least one package that is more recent than B
-// This is not a partial ordering
+// In addition, the solver prefers newer versions over older versions.
 
 custom_error! {
     pub Error
@@ -37,8 +22,6 @@ pub struct DepGraph<'a> {
     input: Vec<PackageRef>,
     solver: Solver<'a>,
 }
-
-// Two packages conflict
 
 fn topological_sort_impl(
     reg: &mut HashMap<String, Meta>,
@@ -62,6 +45,8 @@ fn topological_sort_impl(
     Ok(())
 }
 
+// Sorts packages in dependency order. Only includes packages
+// that are required by the inputs.
 fn topological_sort(packages: Vec<Meta>, input: &[PackageRef]) -> Result<Vec<Meta>, anyhow::Error> {
     let mut by_name = HashMap::new();
     for package in packages {
@@ -81,9 +66,6 @@ impl<'a> DepGraph<'a> {
             solver: Solver::new(),
         }
     }
-    // first collect set of potential packages
-    // then apply all rules
-    // then iteratively relax optimization rules until a match is found
     pub fn add(&mut self, meta: Meta) {
         let name = meta.name.clone();
         let version = meta.version.clone();
@@ -104,17 +86,57 @@ impl<'a> DepGraph<'a> {
         if !self.solver.solve()? {
             Err(Error::CannotResolvePackages)?
         } else {
-            let mut result = vec![];
-            let model: HashSet<Lit> = self.solver.model().unwrap().into_iter().collect();
-            for (_, packages) in &self.packages {
-                for (_, (meta, var)) in packages {
-                    if model.contains(var) {
-                        result.push(meta.clone());
+            loop {
+                let model: HashSet<Lit> = self.solver.model().unwrap().into_iter().collect();
+                if !self.improve_solution(&model) {
+                    let mut result = vec![];
+                    for (_, packages) in &self.packages {
+                        for (_, (meta, var)) in packages {
+                            if model.contains(var) {
+                                result.push(meta.clone());
+                            }
+                        }
+                    }
+                    return topological_sort(result, &self.input);
+                }
+            }
+        }
+    }
+    // Attempts to find a solution that has
+    // - No package older than the currently chosen version AND
+    // - At least one package newer than the currently chosen version
+    // Note that the added clauses are carried through all future iterations
+    // even if the packages that they refer to are dropped from the
+    // install set. This is necessary to prevent an infinite loop
+    // in pathological cases.
+    fn improve_solution(&mut self, model: &HashSet<Lit>) -> bool {
+        let mut better = vec![];
+        for (_, packages) in &self.packages {
+            let mut versions: Vec<(String, Lit)> = Vec::new();
+            let mut found = None;
+            for (_, (meta, var)) in packages {
+                if model.contains(var) {
+                    found = Some(meta.version.clone());
+                } else {
+                    versions.push((meta.version.clone(), *var));
+                }
+            }
+            if let Some(current) = found {
+                let current_version = Version::new(&current).unwrap();
+                for (version, var) in versions {
+                    if &Version::new(&version).unwrap() < &current_version {
+                        self.solver.add_clause(&[!var]);
+                    } else {
+                        better.push(var);
                     }
                 }
             }
-            topological_sort(result, &self.input)
         }
+        if better.is_empty() {
+            return false;
+        }
+        self.solver.add_clause(&better);
+        self.solver.solve().unwrap_or(false)
     }
     fn get_matching(&self, pattern: &PackageRef) -> Vec<Lit> {
         let mut result = vec![];
@@ -160,60 +182,12 @@ impl<'a> DepGraph<'a> {
     }
 }
 
-fn bit_and(solver: &mut Solver, lhs: Lit, rhs: Lit) -> Lit {
-    let result = solver.new_lit();
-    solver.add_clause(&[result, !lhs, !rhs]);
-    solver.add_clause(&[!result, lhs]);
-    solver.add_clause(&[!result, rhs]);
-    result
-}
-
-fn bit_xor(solver: &mut Solver, lhs: Lit, rhs: Lit) -> Lit {
-    let result = solver.new_lit();
-    solver.add_clause(&[!result, lhs, rhs]);
-    solver.add_clause(&[result, lhs, !rhs]);
-    solver.add_clause(&[result, !lhs, rhs]);
-    solver.add_clause(&[!result, !lhs, !rhs]);
-    result
-}
-
-fn bit_add(solver: &mut Solver, lhs: Lit, rhs: Lit) -> (Lit, Lit) {
-    let result = bit_xor(solver, lhs, rhs);
-    let carry = bit_and(solver, lhs, rhs);
-    (result, carry)
-}
-
 fn bit_or(solver: &mut Solver, lhs: Lit, rhs: Lit) -> Lit {
     let result = solver.new_lit();
     solver.add_clause(&[result, !rhs]);
     solver.add_clause(&[result, !lhs]);
     solver.add_clause(&[!result, lhs, rhs]);
     result
-}
-
-fn num_bit_add(solver: &mut Solver, bits: &mut [Lit], value: Lit, max: usize) -> Option<Lit> {
-    // TODO: don't calculate unnecessary final carry
-    let mut carry = value;
-    for bit in bits {
-        (carry, *bit) = bit_add(solver, *bit, carry);
-    }
-    if (max + 1) & max == 0 {
-        Some(carry)
-    } else {
-        None
-    }
-}
-
-pub fn count(solver: &mut Solver, vars: &[Lit]) -> Vec<Lit> {
-    let mut total = vec![];
-    let mut i = 0;
-    for var in vars {
-        if let Some(carry) = num_bit_add(solver, &mut total, *var, i) {
-            total.push(carry);
-        }
-        i += 1;
-    }
-    total
 }
 
 fn zero_or_one_of(solver: &mut Solver, vars: &[Lit]) {
