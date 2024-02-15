@@ -22,6 +22,7 @@
       "/common": ["../../CommonSys/common"]
     }
   },
+  "include": ["./src"],
   "references": [
     {
       "path": "./tsconfig.node.json"
