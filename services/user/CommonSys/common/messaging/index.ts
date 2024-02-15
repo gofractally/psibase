@@ -25,3 +25,8 @@ export {
     buildFunctionCallResponse,
 } from "./supervisor/FunctionCallResponse";
 export { generateRandomString } from "./generateRandomString";
+export {
+    type PreLoadServicesRequest,
+    buildPreLoadServicesRequest,
+    isPreLoadServicesRequest,
+} from "./supervisor/PreLoadServicesRequest";
