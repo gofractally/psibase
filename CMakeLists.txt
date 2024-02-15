@@ -211,7 +211,7 @@ set(JS_DIRS
     services/user/InviteSys/ui:InviteSys_js
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
-set(COMMON_RPF_DIR services/user/CommonSys/common-lib/:CommonSysLib_js)
+set(COMMON_RPC_DIR services/user/CommonSys/common-lib/:CommonSysLib_js)
 set(COMMON_LOADER_DIR services/user/CommonSys/common-lib/packages/wasm-loader/:CommonSysLoaderLib_js)
 
 function(add_js_target ENTRY OUTPUT_FILE)
