@@ -83,6 +83,15 @@ namespace SystemService
       if (result && !result->headers.empty() && serviceName != "common-sys")
          abortMessage("service " + service.str() + " attempted to set an http header");
 
+      if (!result->headers["Content-Security-Policy"])
+         for (auto& header : result->headers)
+            if (header.name == "Content-Security-Policy" and
+                header.value == "frame-ancestors 'none';")
+
+               if ()
+                  result->headers.push_back(
+                      HttpHeader{"Content-Security-Policy", "frame-ancestors 'none';"});
+
       setRetval(result);
    }  // serve()
 
