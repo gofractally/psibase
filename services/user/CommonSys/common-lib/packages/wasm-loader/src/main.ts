@@ -1,4 +1,4 @@
-import { buildMessageLoaderInitialized } from "../../CommonSys/common/messaging/supervisor/LoaderInitialized";
+import { buildMessageLoaderInitialized } from "../../../../common/messaging/supervisor/LoaderInitialized";
 import {
   generateFulfilledFunction,
   generatePendingFunction,
@@ -49,7 +49,7 @@ const functionCall = async ({
   args,
   precomputedResults,
 }: PluginCallPayload) => {
-  const url = "/loader/plugin.wasm";
+  const url = "/plugin.wasm";
 
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
   const importedFunctionsFromWit = getImportedFunctions();

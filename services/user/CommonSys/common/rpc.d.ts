@@ -12,10 +12,14 @@ declare module "common/rpc.mjs" {
     function getJson<T = any>(url: string): Promise<T>;
     function getArrayBuffer(url: string): Promise<ArrayBuffer>;
     function postJson<T = any>(url: string, json: any): Promise<T>;
-    function postArrayBuffer<T = any>(url: string, arrayBuffer: ArrayBuffer): Promise<T>;
-    function postArrayBufferGetJson<T = any>(url: string, arrayBuffer: ArrayBuffer): Promise<T>;
-
-
+    function postArrayBuffer<T = any>(
+        url: string,
+        arrayBuffer: ArrayBuffer
+    ): Promise<T>;
+    function postArrayBufferGetJson<T = any>(
+        url: string,
+        arrayBuffer: ArrayBuffer
+    ): Promise<T>;
 
     const MessageTypes = {
         Action: "Action",
@@ -119,11 +123,6 @@ declare module "common/rpc.mjs" {
         transaction: any,
         privateKeys?: string[] // TODO: remove optional once we're done with fake-auth
     ): Promise<any>;
-    function signAndPushTransaction(
-        baseUrl: string,
-        transaction: any,
-        privateKeys?: string[] 
-    ): Promise<any>
     function packAndDigestTransaction(
         baseUrl: string,
         transaction: any
@@ -156,5 +155,5 @@ declare module "common/rpc.mjs" {
 
     type MessageMetadata = {
         sender: string;
-    }
+    };
 }

@@ -1,11 +1,11 @@
 {
-  "name": "app2",
+  "name": "@psibase/plugin-loader",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build --base /loader",
+    "build": "tsc && vite build --base /common/wasm-loader",
     "preview": "vite preview"
   },
   "devDependencies": {

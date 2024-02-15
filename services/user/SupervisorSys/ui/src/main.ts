@@ -50,7 +50,7 @@ const createBaseDomain = (subDomain = "supervisor-sys"): string => {
 };
 
 const createLoaderDomain = (subDomain = "supervisor-sys") =>
-  createBaseDomain(subDomain) + "/loader";
+  createBaseDomain(subDomain) + "/common/wasm-loader";
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
 

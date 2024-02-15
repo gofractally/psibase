@@ -171,9 +171,9 @@
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
 "@rollup/browser@^4.9.0":
-  version "4.9.6"
-  resolved "https://registry.yarnpkg.com/@rollup/browser/-/browser-4.9.6.tgz#bd8345934bccfe5203cd942427f727c7239ee273"
-  integrity sha512-DZM71SdnT/FFasPfEb2awbnMSlmQkTJNCINJZwcrVAtKCa10+zdVi3kT5ntwzJBT7xfGgjsB570cxllYCa955g==
+  version "4.10.0"
+  resolved "https://registry.yarnpkg.com/@rollup/browser/-/browser-4.10.0.tgz#027c5fc313dbd43adf0f2763772d47827e90ec12"
+  integrity sha512-nMeUB86/H3ld6nRrGv4bS6ZgRvCI0C+PBU3SGaJYSgObw0sN/BGUehIXjMIzTD9Bwx7ncJZ9vcJggGWbkoL6Og==
   dependencies:
     "@types/estree" "1.0.5"
 
@@ -400,20 +400,15 @@ ora@^6.1.2:
     strip-ansi "^7.0.1"
     wcwidth "^1.0.1"
 
-penpal@^6.2.2:
-  version "6.2.2"
-  resolved "https://registry.yarnpkg.com/penpal/-/penpal-6.2.2.tgz#20a0a0592881a959e8c87116d854f9528b1aa601"
-  integrity sha512-RQD7hTx14/LY7QoS3tQYO3/fzVtwvZI+JeS5udgsu7FPaEDjlvfK9HBcme9/ipzSPKnrxSgacI9PI7154W62YQ==
-
 picocolors@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/picocolors/-/picocolors-1.0.0.tgz#cb5bdc74ff3f51892236eaf79d68bc44564ab81c"
   integrity sha512-1fygroTLlHu66zi26VoTDv8yRgm0Fccecssto+MhsZ0D/DGW2sm8E8AjW7NU5VVTRt5GxbeZ5qBuJr+HyLYkjQ==
 
 postcss@^8.4.27:
-  version "8.4.34"
-  resolved "https://registry.yarnpkg.com/postcss/-/postcss-8.4.34.tgz#563276e86b4ff20dfa5eed0d394d4c53853b2051"
-  integrity sha512-4eLTO36woPSocqZ1zIrFD2K1v6wH7pY1uBh0JIM2KKfrVtGvPFiAku6aNOP0W1Wr9qwnaCsF0Z+CrVnryB2A8Q==
+  version "8.4.35"
+  resolved "https://registry.yarnpkg.com/postcss/-/postcss-8.4.35.tgz#60997775689ce09011edf083a549cea44aabe2f7"
+  integrity sha512-u5U8qYpBCpN13BsiEB0CbR1Hhh4Gc0zLFuedrHJKMctHCHAGrMdG0PRM/KErzAL3CU6/eckEtmHNB3x6e3c0vA==
   dependencies:
     nanoid "^3.3.7"
     picocolors "^1.0.0"

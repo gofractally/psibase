@@ -211,7 +211,8 @@ set(JS_DIRS
     services/user/InviteSys/ui:InviteSys_js
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
-set(COMMON_DIR services/user/CommonSys/common-lib/:CommonSysLib_js)
+set(COMMON_RPC_DIR services/user/CommonSys/common-lib/packages/rpc/:CommonSysRpcLib_js)
+set(COMMON_LOADER_DIR services/user/CommonSys/common-lib/packages/wasm-loader/:CommonSysLoaderLib_js)
 
 function(add_js_target ENTRY OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
@@ -235,11 +236,17 @@ list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
 file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
 
-# Builds the Common Sys Lib
-add_js_target(${COMMON_DIR} common-lib.js)
+# TODO: Can this be a dist folder, i.e., a build product?
+file(GLOB common-loader LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/dist/*)
 
+# Builds the Common Sys files that the UIs (just below) depend on
+add_js_target(${COMMON_RPC_DIR} common-lib.js)
+add_js_target(${COMMON_LOADER_DIR} index.html)
+
+# Build each UI
+# Each of these UIs receives the build output of CommonSys, so CommonSys files are listed as dependencies
 foreach(ENTRY ${JS_DIRS})
-    add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
+    add_js_target(${ENTRY} index.html ${common} ${common-fonts} ${common-loader} CommonSysRpcLib_js CommonSysLoaderLib_js)
 endforeach()
 
 set(WASM_PSIBASE_BYPRODUCTS
@@ -354,12 +361,15 @@ psibase_package(
     SERVICE common-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
         SERVER common-sys
-        DATA      ${COMMON_SYS}/common-lib/dist/common-lib.js common/common-lib.js
-        DATA GLOB ${COMMON_SYS}/common/*.mjs                  common/
-        DATA      ${COMMON_SYS}/common/fonts                  common/fonts
-        DATA GLOB ${COMMON_SYS}/ui/dist/*                     /
-        DATA GLOB ${THIRD_FILES}                              common
+        DATA      ${COMMON_SYS}/common-lib/packages/rpc/dist/common-lib.js common/common-lib.js
+        DATA GLOB ${COMMON_SYS}/common-lib/packages/wasm-loader/dist/*     common/wasm-loader/
+        DATA GLOB ${COMMON_SYS}/common/*.mjs                               common/
+        DATA      ${COMMON_SYS}/common/fonts                               common/fonts
+        DATA GLOB ${COMMON_SYS}/ui/dist/*                                  /
+        DATA GLOB ${THIRD_FILES}                                           common
     DEPENDS ${CommonSys_js_dep}
+    DEPENDS ${CommonSysRpcLib_js_dep}
+    DEPENDS ${CommonSysLoaderLib_js_dep}
     DEPENDS wasm
     PACKAGE_DEPENDS ProxySys
 )

@@ -23,15 +23,15 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@messaging": [
-        "../../../user/CommonSys/common/messaging"
+        "../../CommonSys/common/messaging"
       ],
       "/common": [
-        "../../../user/CommonSys/common"
+        "../../CommonSys/common"
       ]
     },
   },
   "include": [
-    "ui/src"
+    "src"
   ],
   "references": [
     {

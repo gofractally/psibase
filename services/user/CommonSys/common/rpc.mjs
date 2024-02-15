@@ -1,8 +1,4 @@
-import {
-    privateStringToKeyPair,
-    publicKeyPairToFracpack,
-    signatureToFracpack,
-} from "/common/keyConversions.mjs";
+import { privateStringToKeyPair } from "/common/keyConversions.mjs";
 import hashJs from "https://cdn.skypack.dev/hash.js";
 
 /** Global Values */
@@ -600,7 +596,6 @@ const messageRouting = [
 ];
 
 export async function initializeApplet(initializer = () => {}) {
-
     const rootUrl = await siblingUrl(null, null, null);
     window.iFrameResizer = {
         targetOrigin: rootUrl,

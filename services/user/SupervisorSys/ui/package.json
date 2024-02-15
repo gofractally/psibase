@@ -1,5 +1,5 @@
 {
-  "name": "ui",
+  "name": "@psibase/supervisor-sys",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@bytecodealliance/preview2-shim": "^0.14.1",
-    "penpal": "^6.2.2",
     "rollup-plugin-wit-component": "^0.1.3"
   }
 }
