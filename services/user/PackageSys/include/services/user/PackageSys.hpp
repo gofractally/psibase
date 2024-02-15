@@ -4,14 +4,22 @@
 
 namespace UserService
 {
+   struct PackageRef
+   {
+      std::string name;
+      std::string version;
+   };
+   PSIO_REFLECT(PackageRef, name, version)
+
    struct PackageMeta
    {
       std::string                         name;
+      std::string                         version;
       std::string                         description;
-      std::vector<std::string>            depends;
+      std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
    };
-   PSIO_REFLECT(PackageMeta, name, description, depends, accounts)
+   PSIO_REFLECT(PackageMeta, name, version, description, depends, accounts)
 
    struct PackageKey
    {
@@ -23,8 +31,9 @@ namespace UserService
    struct InstalledPackage
    {
       std::string                         name;
+      std::string                         version;
       std::string                         description;
-      std::vector<std::string>            depends;
+      std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
       psibase::AccountNumber              owner;
 

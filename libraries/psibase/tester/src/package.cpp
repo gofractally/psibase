@@ -224,11 +224,11 @@ namespace psibase
    }
 
    void dfs(const auto&                       reg,
-            std::span<const std::string>      names,
+            std::span<const PackageRef>       names,
             std::map<std::string_view, bool>& found,
             std::vector<PackagedService>&     result)
    {
-      for (const auto& name : names)
+      for (const auto& [name, version] : names)
       {
          if (auto [pos, inserted] = found.try_emplace(name, false); !inserted)
          {
@@ -257,9 +257,14 @@ namespace psibase
 
    std::vector<PackagedService> DirectoryRegistry::resolve(std::span<const std::string> packages)
    {
+      std::vector<PackageRef> in;
+      for (const auto& name : packages)
+      {
+         in.push_back({name, "*"});
+      }
       std::vector<PackagedService>     result;
       std::map<std::string_view, bool> found;
-      dfs(*this, packages, found, result);
+      dfs(*this, in, found, result);
       return result;
    }
 

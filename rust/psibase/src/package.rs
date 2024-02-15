@@ -47,18 +47,34 @@ custom_error! {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Pack, Unpack, Reflect)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
+pub struct PackageRef {
+    pub name: String,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Pack, Unpack, Reflect)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
 pub struct Meta {
-    name: String,
-    description: String,
-    depends: Vec<String>,
-    accounts: Vec<AccountNumber>,
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub depends: Vec<PackageRef>,
+    pub accounts: Vec<AccountNumber>,
+}
+
+impl Meta {
+    fn depends(&self) -> impl Iterator<Item = &String> {
+        return self.depends.iter().map(|dep| &dep.name);
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PackageInfo {
     pub name: String,
+    pub version: String,
     pub description: String,
-    pub depends: Vec<String>,
+    pub depends: Vec<PackageRef>,
     pub accounts: Vec<AccountNumber>,
     pub sha256: Checksum256,
     pub file: String,
@@ -69,6 +85,7 @@ impl PackageInfo {
     fn meta(&self) -> Meta {
         Meta {
             name: self.name.clone(),
+            version: self.version.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -375,7 +392,8 @@ pub fn validate_dependencies<T: Read + Seek>(
     for p in &mut packages[..] {
         for account in p.get_required_accounts()? {
             if let Some(package) = accounts.get(&account) {
-                if &p.meta.name != package && !p.meta.depends.contains(package) {
+                if &p.meta.name != package && !p.meta.depends.iter().any(|dep| &dep.name == package)
+                {
                     Err(Error::MissingDepPackage {
                         name: p.meta.name.clone(),
                         dep: package.clone(),
@@ -393,9 +411,9 @@ pub fn validate_dependencies<T: Read + Seek>(
 }
 
 #[async_recursion(?Send)]
-async fn dfs<T: PackageRegistry + ?Sized>(
+async fn dfs<'a, T: PackageRegistry + ?Sized, I: IntoIterator<Item = &'a String>>(
     reg: &T,
-    names: &[String],
+    names: I,
     found: &mut HashMap<String, bool>,
     result: &mut Vec<PackagedService<<T as PackageRegistry>::R>>,
 ) -> Result<(), anyhow::Error> {
@@ -407,7 +425,7 @@ async fn dfs<T: PackageRegistry + ?Sized>(
         } else {
             found.insert(name.clone(), false);
             let package = reg.get(name.as_str()).await?;
-            dfs(reg, &package.meta.depends, found, result).await?;
+            dfs(reg, package.meta.depends(), found, result).await?;
             result.push(package);
             *found.get_mut(name).unwrap() = true;
         }
@@ -588,10 +606,14 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
 }
 
 #[async_recursion(?Send)]
-pub async fn additional_packages<T: PackageRegistry + ?Sized>(
+pub async fn additional_packages<
+    'a,
+    T: PackageRegistry + ?Sized,
+    I: IntoIterator<Item = &'a String>,
+>(
     installed: &PackageList,
     reg: &T,
-    names: &[String],
+    names: I,
     found: &mut HashMap<String, bool>,
     result: &mut Vec<PackagedService<<T as PackageRegistry>::R>>,
 ) -> Result<(), anyhow::Error> {
@@ -604,7 +626,7 @@ pub async fn additional_packages<T: PackageRegistry + ?Sized>(
             found.insert(name.clone(), false);
             if !installed.contains(name.as_str()) {
                 let package = reg.get(name.as_str()).await?;
-                additional_packages(installed, reg, &package.meta.depends, found, result).await?;
+                additional_packages(installed, reg, package.meta.depends(), found, result).await?;
                 result.push(package);
             }
             *found.get_mut(name).unwrap() = true;

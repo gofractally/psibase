@@ -1,8 +1,8 @@
 #include <services/user/PackageSys.hpp>
 
+#include <psibase/check.hpp>
 #include <services/system/AccountSys.hpp>
 #include <services/system/AuthDelegateSys.hpp>
-#include <psibase/check.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -14,7 +14,7 @@ namespace UserService
       AccountNumber getAuthServ(AccountNumber account)
       {
          auto db = AccountSys::Tables(AccountSys::service);
-         if(auto row = db.open<AccountTable>().getIndex<0>().get(account))
+         if (auto row = db.open<AccountTable>().getIndex<0>().get(account))
             return row->authService;
          else
             abortMessage("Unknown account " + account.str());
@@ -27,28 +27,36 @@ namespace UserService
          else
             abortMessage("Cannot find owner for " + account.str());
       }
-   }
+   }  // namespace
 
    void PackageSys::postinstall(PackageMeta package)
    {
       auto sender = getSender();
-      for(AccountNumber account : package.accounts)
+      for (AccountNumber account : package.accounts)
       {
-         if(auto auth = getAuthServ(account); auth != AuthDelegateSys::service)
+         if (auto auth = getAuthServ(account); auth != AuthDelegateSys::service)
          {
             // - A single account doesn't need to use delegation
             // - Accounts that have special auth defined in this package are okay
-            if (account != sender && std::ranges::find(package.accounts, auth) == package.accounts.end())
-               abortMessage("Account " + account.str() +  " in " + package.name + " does not use " + AuthDelegateSys::service.str() + " as its auth service");
+            if (account != sender &&
+                std::ranges::find(package.accounts, auth) == package.accounts.end())
+               abortMessage("Account " + account.str() + " in " + package.name + " does not use " +
+                            AuthDelegateSys::service.str() + " as its auth service");
          }
          else
          {
             if (getOwner(account) != sender)
-               abortMessage("Account " + account.str() +  " in " + package.name + " is not owned by " + sender.str());
+               abortMessage("Account " + account.str() + " in " + package.name +
+                            " is not owned by " + sender.str());
          }
       }
       auto table = Tables(psibase::getReceiver()).open<InstalledPackageTable>();
-      table.put({.name = std::move(package.name), .description = std::move(package.description), .depends = std::move(package.depends), .accounts = std::move(package.accounts), .owner = sender});
+      table.put({.name        = std::move(package.name),
+                 .version     = std::move(package.version),
+                 .description = std::move(package.description),
+                 .depends     = std::move(package.depends),
+                 .accounts    = std::move(package.accounts),
+                 .owner       = sender});
    }
 }  // namespace UserService
 
