@@ -137,7 +137,7 @@ namespace arbtrie
       static constexpr int min_branch_cap(int children)
       {
          constexpr int header_branches = (cacheline_size - sizeof(binary_node)) / 4;
-         int extra_branches = round_up_multiple<cacheline_size/4>(children - header_branches);
+         int extra_branches = round_up_multiple<cacheline_size / 4>(children - header_branches);
          return header_branches + extra_branches;
       }
 
@@ -165,9 +165,21 @@ namespace arbtrie
                                    const clone_config& cfg,
                                    const clone_remove& upv);
 
-      //                     int lb_idx,
-      //                    key_view           key,
-      //                   is_value_type auto val);
+      inline static int alloc_size(const clone_config& cfg,
+                                   id_region,
+                                   key_view          k1,
+                                   const value_type& v1,
+                                   key_view          k2,
+                                   const value_type& v2);
+
+      binary_node(int_fast16_t        asize,
+                  fast_meta_address   nid,
+                  const clone_config& cfg,
+                  id_region           branch_reg,
+                  key_view            k1,
+                  const value_type&   v1,
+                  key_view            k2,
+                  const value_type&   v2);
 
       // make empty
       binary_node(int_fast16_t asize, fast_meta_address nid, const clone_config& cfg);
@@ -201,12 +213,9 @@ namespace arbtrie
 
       static inline uint64_t key_hash(key_view k) { return XXH3_64bits(k.data(), k.size()); }
       static inline uint64_t value_hash(value_view k) { return XXH3_64bits(k.data(), k.size()); }
-      static inline uint64_t value_hash(object_id k) { return XXH3_64bits(&k, sizeof(k)); }
+      static inline uint64_t value_hash(id_address k) { return XXH3_64bits(&k, sizeof(k)); }
       static inline uint64_t value_hash(value_type::remove k) { return 0; }
-      static inline uint64_t value_hash(fast_meta_address m)
-      {
-         return value_hash((object_id)m.to_address());
-      }
+      static inline uint64_t value_hash(fast_meta_address m) { return value_hash(m.to_address()); }
 
       static inline uint8_t key_header_hash(uint64_t kh) { return uint8_t(kh); }
       static inline uint8_t value_header_hash(uint64_t vh) { return uint8_t(vh); }
@@ -250,13 +259,13 @@ namespace arbtrie
 
          inline const fast_meta_address value_id() const
          {
-            assert(_val_size == sizeof(object_id));
+            assert(_val_size == sizeof(id_address));
             return *((const id_address*)(_key + _key_size));
          }
 
          inline id_address& value_id()
          {
-            assert(_val_size == sizeof(object_id));
+            assert(_val_size == sizeof(id_address));
             return *((id_address*)(_key + _key_size));
          }
          void set_value(id_address adr) { memcpy(val_ptr(), &adr, sizeof(adr)); }
@@ -277,8 +286,8 @@ namespace arbtrie
             assert(v.size() <= _val_size);
             if (v.is_object_id())
             {
-               assert(_val_size >= sizeof(object_id));
-               _val_size   = sizeof(object_id);
+               assert(_val_size >= sizeof(id_address));
+               _val_size   = sizeof(id_address);
                object_id() = v.id().to_address();
             }
             else
@@ -302,6 +311,11 @@ namespace arbtrie
       } __attribute((packed)) __attribute((aligned(1)));
 
       static_assert(sizeof(key_val_pair) == 2);
+      value_type get_value( int index )const {
+         if( is_obj_id(index) )
+            return fast_meta_address(get_key_val_ptr(index)->value_id());
+         return get_key_val_ptr(index)->value();
+      }
 
       void reserve_branch_cap(short min_children);
 
@@ -339,44 +353,51 @@ namespace arbtrie
          return (tail() - key_val_section_size()) - (const uint8_t*)end_index_data();
       }
 
-
-      int size_after_insert( int delta_key_val )const {
-         return alloc_size( std::max<int>(_branch_cap,num_branches() + 1), key_val_section_size() + delta_key_val);
+      int size_after_insert(int delta_key_val) const
+      {
+         return alloc_size(std::max<int>(_branch_cap, num_branches() + 1),
+                           key_val_section_size() + delta_key_val);
       }
-      int size_after_update( int delta_key_val )const {
-         return alloc_size( std::max<int>(_branch_cap,num_branches()), key_val_section_size() + delta_key_val);
+      int size_after_update(int delta_key_val) const
+      {
+         return alloc_size(std::max<int>(_branch_cap, num_branches()),
+                           key_val_section_size() + delta_key_val);
       }
-      bool can_update_with_compaction( int delta_key_val )const {
-         return binary_refactor_threshold > size_after_update( delta_key_val - _dead_space);
+      bool can_update_with_compaction(int delta_key_val) const
+      {
+         return binary_refactor_threshold > size_after_update(delta_key_val - _dead_space);
       }
       bool can_insert(int delta_key_val_pair) const
       {
-         if (_num_branches < binary_node_max_keys ) [[likely]]
-            return _nsize >= size_after_insert( delta_key_val_pair );
+         if (_num_branches < binary_node_max_keys) [[likely]]
+            return _nsize >= size_after_insert(delta_key_val_pair);
          return false;
       }
-      bool can_insert( key_view key, const value_type& val )const {
-         return can_insert( calc_key_val_pair_size(key,val) );
+      bool can_insert(key_view key, const value_type& val) const
+      {
+         return can_insert(calc_key_val_pair_size(key, val));
       }
 
-      bool can_insert_with_compaction(int delta_key_val_pair)const
+      bool can_insert_with_compaction(int delta_key_val_pair) const
       {
-         if (_num_branches < binary_node_max_keys ) [[likely]]
-            return binary_refactor_threshold > size_after_insert( delta_key_val_pair - _dead_space );
+         if (_num_branches < binary_node_max_keys) [[likely]]
+            return binary_refactor_threshold > size_after_insert(delta_key_val_pair - _dead_space);
          return false;
       }
 
-      bool can_update( const key_val_pair* cur, const value_type& val )const {
-         return _nsize >= size_after_update( val.size() - cur->value_size() );
-      }
-
-      bool update_requires_refactor(const key_val_pair* cur, const value_type& v ) const{
-         return not can_update_with_compaction( v.size() - cur->value_size() );
-      }
-
-      bool insert_requires_refactor(key_view k, const value_type& v)const
+      bool can_update(const key_val_pair* cur, const value_type& val) const
       {
-         return not can_insert_with_compaction( calc_key_val_pair_size(k, v) );
+         return _nsize >= size_after_update(val.size() - cur->value_size());
+      }
+
+      bool update_requires_refactor(const key_val_pair* cur, const value_type& v) const
+      {
+         return not can_update_with_compaction(v.size() - cur->value_size());
+      }
+
+      bool insert_requires_refactor(key_view k, const value_type& v) const
+      {
+         return not can_insert_with_compaction(calc_key_val_pair_size(k, v));
       }
 
       // return the number of bytes removed
@@ -398,7 +419,7 @@ namespace arbtrie
          const auto ts = cur->total_size();
          _dead_space += ts;
 
-         assert( validate() );
+         assert(validate());
          return ts;
       }
 
@@ -412,10 +433,7 @@ namespace arbtrie
          get_key_val_ptr(lb_idx)->set_value(val);
       }
 
-      inline static constexpr bool can_inline(int size )
-      {
-         return size <= max_inline_value_size;
-      }
+      inline static constexpr bool can_inline(int size) { return size <= max_inline_value_size; }
       inline static constexpr bool can_inline(const value_type& val)
       {
          return val.size() <= max_inline_value_size;
@@ -424,7 +442,7 @@ namespace arbtrie
       {
          return val.size() <= max_inline_value_size;
       }
-      inline static constexpr bool can_inline(object_id) { return true; }
+      inline static constexpr bool can_inline(id_address) { return true; }
       inline static constexpr bool can_inline(fast_meta_address) { return true; }
 
       // calculates the space required to store this key/val exclusive of node_header,
@@ -433,7 +451,7 @@ namespace arbtrie
       {
          // 4 = key_index, keyhash, valhash
          return sizeof(key_val_pair) + key.size() +
-                (can_inline(val) ? val.size() : sizeof(object_id));
+                (can_inline(val) ? val.size() : sizeof(id_address));
       }
       inline static int calc_key_val_pair_size(key_view key, id_address val)
       {
@@ -567,13 +585,13 @@ namespace arbtrie
 
       bool validate() const
       {
-         assert( spare_capacity() >= 0 );
+         assert(spare_capacity() >= 0);
          assert(_nsize <= 4096);
          auto nb = num_branches();
          for (int i = 0; i < nb; ++i)
          {
             auto kvp = get_key_val_ptr(i);
-           // TRIEDENT_DEBUG( i, "] pos: ", key_offsets()[i].pos, " ", to_str( kvp->key()) );
+            // TRIEDENT_DEBUG( i, "] pos: ", key_offsets()[i].pos, " ", to_str( kvp->key()) );
             assert((uint8_t*)kvp < tail());
             assert(kvp->value_size() > 0);
             assert(kvp->key_size() < 25);
@@ -613,7 +631,7 @@ namespace arbtrie
          {
             if (pos->type == key_index::obj_id)
             {
-               assert(get_key_val_ptr_offset(pos->pos)->value_size() == sizeof(object_id));
+               assert(get_key_val_ptr_offset(pos->pos)->value_size() == sizeof(id_address));
                visitor(fast_meta_address(get_key_val_ptr_offset(pos->pos)->value_id()));
             }
             ++pos;

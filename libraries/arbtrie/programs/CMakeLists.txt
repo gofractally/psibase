@@ -9,6 +9,11 @@ target_link_libraries(arbt PUBLIC Boost::program_options arbtrie)
 target_include_directories(arbt PUBLIC ${Boost_INCLUDE_DIRS})
 set_target_properties(arbt PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
+add_executable(benchmark-arbtrie bench.cpp)
+target_link_libraries(benchmark-arbtrie PUBLIC Boost::program_options arbtrie)
+target_include_directories(benchmark-arbtrie PUBLIC ${Boost_INCLUDE_DIRS})
+set_target_properties(benchmark-arbtrie PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+
 #add_executable(mermaid mermaid.cpp)
 #target_link_libraries(mermaid PUBLIC Boost::program_options triedent)
 #target_include_directories(mermaid PUBLIC ${Boost_INCLUDE_DIRS} )

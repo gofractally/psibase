@@ -13,8 +13,9 @@ namespace arbtrie {
     * be zeroed on modify until a later point (eg. compaction, or setroot)
     * chooses to update it.
     */
-   static constexpr const bool update_checksum_on_modify     = true;
+   static constexpr const bool update_checksum_on_modify     = false;
 
+   static constexpr const bool use_binary_nodes = true;
    /**
     *  Checksum's are deferred until just before msync so that data
     *  at rest always has a checksum. The idea is that until the user
@@ -109,9 +110,11 @@ namespace arbtrie {
 
    static constexpr const uint64_t binary_refactor_threshold = 4096;
    static constexpr const uint64_t binary_node_max_size  = 4096;
-   static constexpr const int      binary_node_max_keys  = 253; /// must be less than 255
+   static constexpr const int      binary_node_max_keys  = 254; /// must be less than 255
    static constexpr const int      binary_node_initial_size = 2048;
    static constexpr const int      binary_node_initial_branch_cap = 64;
+
+   static_assert( binary_node_max_keys < 255);
 
    using key_view       = std::basic_string_view<uint8_t>;
    using value_view     = std::basic_string_view<uint8_t>;

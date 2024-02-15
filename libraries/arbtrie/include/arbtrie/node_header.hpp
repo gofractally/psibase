@@ -50,7 +50,7 @@ namespace arbtrie
                          fast_meta_address nid,
                          node_type         type       = node_type::freelist,
                          uint16_t          num_branch = 0)
-          : checksum(0xbaadbaad),
+          : checksum(0),
             _ntype(type),
             _nsize(size),
             _num_branches(num_branch),

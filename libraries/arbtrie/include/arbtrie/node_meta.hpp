@@ -18,7 +18,7 @@ namespace arbtrie
       value     = 2,  // just the data, no key
       setlist   = 3,  // list of branches
       full      = 4,  // 256 full id_type
-      bitset    = 5,
+      bitset    = 5,  // 1 bit per present branch
       undefined = 6,  // no type has been defined yet
 
       // future, requires taking a bit, or removing undefined/freelist

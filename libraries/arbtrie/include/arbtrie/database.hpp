@@ -34,17 +34,37 @@ namespace arbtrie
          return sum;
       }
       double average_depth() const { return double(total_depth) / total_nodes(); }
+      double average_binary_size() const
+      {
+         return double(node_data_size[node_type::binary] / node_counts[node_type::binary]);
+      }
+      double average_value_size() const
+      {
+         return double(node_data_size[node_type::value] / node_counts[node_type::value]);
+      }
 
       int     node_counts[num_types];
       int64_t node_data_size[num_types];
       int     max_depth   = 0;
       int64_t total_depth = 0;
+      int64_t total_keys  = 0;
 
-      friend auto operator <=>( const node_stats&, const node_stats& ) = default;
-      inline friend auto& operator << ( auto& stream, const node_stats& s ) {
-         return stream << std::setw(10) << s.total_nodes() << " | " 
-                       << std::setw(10) << s.total_size()/double(MB) << " |"
-                       << std::setw(10) << s.average_depth() << " avg depth";
+      friend auto         operator<=>(const node_stats&, const node_stats&) = default;
+      inline friend auto& operator<<(auto& stream, const node_stats& s)
+      {
+         return stream 
+        << std::setw(10) << std::right << add_comma(s.total_keys) << " keys | "
+        << std::setw(10) << std::right << add_comma(s.total_nodes()) << " nodes | "
+        << std::setw(10) << std::right << add_comma(s.node_counts[node_type::value]) << " value nodes | " 
+        << std::setw(10) << std::right << add_comma(s.node_counts[node_type::binary]) << " binary nodes | " 
+        << std::setw(10) << std::right << add_comma(s.node_counts[node_type::setlist]) << " setlist nodes | " 
+        << std::setw(10) << std::right << add_comma(s.node_counts[node_type::full]) << " full nodes | " 
+        << std::setw(10) << std::right << s.total_size() / double(GB) << " GB | " 
+        << std::setw(10) << std::right
+                       << s.average_depth() << " avg depth | " << std::setw(10) << std::right
+                       << s.average_binary_size() << " avg binary size | " << std::setw(10)
+                       << std::right << s.average_value_size() << " avg value node size | "
+                       << std::setw(10) << std::right << s.max_depth << " max depth  ";
       }
    };
 
@@ -79,11 +99,13 @@ namespace arbtrie
       constexpr upsert_mode make_unique() const { return {flags | unique}; }
       constexpr upsert_mode make_same_region() const { return {flags | same_region}; }
       constexpr bool        may_insert() const { return flags & insert; }
-      constexpr bool        may_update() const { return flags & insert; }
+      constexpr bool        may_update() const { return flags & update; }
       constexpr bool        must_insert() const { return not(flags & (update | remove)); }
       constexpr bool        must_update() const { return not(flags & insert); }
+      constexpr bool        is_insert() const { return (flags & insert); }
       constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); }
       constexpr bool        is_remove() const { return flags & remove; }
+      constexpr bool        is_update() const { return flags & update; }
       constexpr bool        must_remove() const { return flags & must_remove_f; }
 
       // private: structural types cannot have private members,
@@ -142,7 +164,7 @@ namespace arbtrie
       friend class root;
       friend class node_handle;
       read_session(database& db);
-      database& _db;
+      database&              _db;
       seg_allocator::session _segas;
 
       int get(object_ref<node_header>&                root,
@@ -183,10 +205,24 @@ namespace arbtrie
 
       node_stats get_node_stats(const node_handle& r)
       {
+         if (not r.address())
+            return {};
          node_stats result;
          visit_nodes(r,
                      [&](int depth, const auto* node)
                      {
+                        if constexpr (std::is_same_v<decltype(node), const binary_node*>)
+                           result.total_keys += node->_num_branches;
+                        if constexpr (std::is_same_v<decltype(node), const value_node*>)
+                           result.total_keys++;
+                           /*
+                        if constexpr (std::is_same_v<decltype(node), const setlist_node*> or
+                                      std::is_same_v<decltype(node), const full_node*> or
+                                      std::is_same_v<decltype(node), const bitset_node*>)
+                           result.total_keys +=
+                               ((const inner_node<setlist_node>*)node)->has_eof_value();
+                               */
+
                         if (node->type < num_types)
                         {
                            result.node_counts[node->type]++;
@@ -291,7 +327,10 @@ namespace arbtrie
       }
 
       template <upsert_mode mode>
-      fast_meta_address upsert_value(object_ref<node_header>& root);
+      fast_meta_address upsert_eof_value(object_ref<node_header>& root);
+
+      template <upsert_mode mode>
+      fast_meta_address upsert_value(object_ref<node_header>& root, key_view key);
 
       //=======================
       // binary_node operations
@@ -348,11 +387,13 @@ namespace arbtrie
 
       struct database_memory
       {
-         database_memory() {
-              for( auto& r : top_root ) r.store( 0, std::memory_order_relaxed );
+         database_memory()
+         {
+            for (auto& r : top_root)
+               r.store(0, std::memory_order_relaxed);
          }
-         uint32_t magic = file_magic;
-         uint32_t flags = file_type_database_root;
+         uint32_t          magic          = file_magic;
+         uint32_t          flags          = file_type_database_root;
          std::atomic<bool> clean_shutdown = true;
          // top_root is protected by _root_change_mutex to prevent race conditions
          // which involve loading or storing top_root, bumping refcounts, decrementing
@@ -377,7 +418,6 @@ namespace arbtrie
       mapping          _dbfile;
       database_memory* _dbm;
       config           _config;
-
 
       /**
        *  At most one write session may have the sync lock
@@ -521,10 +561,13 @@ namespace arbtrie
       return 0;
    }
 
+   // NOTE This will currently recurse into subtree's which could create
+   // infinite loop or over counting... TODO: fix this so it doesn't recurse
+   // through subtrees
    void visit_node(object_ref<node_header>&& n, int depth, auto& on_node)
    {
-      assert( n.type() == n.header()->get_type() );
-      assert( n.ref() > 0 );
+      assert(n.type() == n.header()->get_type());
+      assert(n.ref() > 0);
       cast_and_call(n.header(),
                     [&](const auto* no)
                     {
@@ -545,34 +588,39 @@ namespace arbtrie
     *        it gives this reference to the top root and the
     *        old top root's reference is taken over by r
     */
-   template<sync_type stype>
+   template <sync_type stype>
    node_handle write_session::set_root(node_handle r, int index)
    {
-      assert( index < num_top_roots );
-      assert( index >= 0 );
+      assert(index < num_top_roots);
+      assert(index >= 0);
 
       uint64_t old_r;
       uint64_t new_r = r.take().to_int();
-      {  
-         if constexpr ( stype != sync_type::none ) {
-            _segas.sync(stype); 
+      {
+         if constexpr (stype != sync_type::none)
+         {
+            _segas.sync(stype);
          }
-         { // lock scope
-           std::unique_lock lock(_db._root_change_mutex[index]); 
-           old_r = _db._dbm->top_root[index].exchange(new_r, std::memory_order_relaxed);
+         {  // lock scope
+            std::unique_lock lock(_db._root_change_mutex[index]);
+            old_r = _db._dbm->top_root[index].exchange(new_r, std::memory_order_relaxed);
          }
-         if constexpr ( stype != sync_type::none ) {
-            if( old_r != new_r ) {
-               _db._dbfile.sync( stype );
+         if constexpr (stype != sync_type::none)
+         {
+            if (old_r != new_r)
+            {
+               _db._dbfile.sync(stype);
             }
          }
       }
       return r.give(fast_meta_address::from_int(old_r));
    }
 
-   template<sync_type stype>
-   void write_session::sync() {
-      if constexpr( stype != sync_type::none ) {
+   template <sync_type stype>
+   void write_session::sync()
+   {
+      if constexpr (stype != sync_type::none)
+      {
          std::unique_lock lock(_db._root_change_mutex);
          _db._sega.sync(stype);
          _db._dbfile.sync(stype);

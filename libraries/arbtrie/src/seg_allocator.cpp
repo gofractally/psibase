@@ -77,8 +77,6 @@ namespace arbtrie
             auto ep  = _header->end_ptr.load(std::memory_order_relaxed);
             if (min - ap <= 1 and (ep - ap) < 3)
             {
-               TRIEDENT_DEBUG("speculative segment creation");
-
                auto seg = get_new_segment();
                munlock(seg.second, segment_size);
                madvise(seg.second, segment_size, MADV_RANDOM);
@@ -235,6 +233,11 @@ namespace arbtrie
             }
             if constexpr (validate_checksum_on_compact)
             {
+               if constexpr ( update_checksum_on_modify ) {
+                  if( not ptr->has_checksum() )
+                     TRIEDENT_WARN("missing checksum detected: ", foo_address,
+                                   " type: ", node_type_names[ptr->_ntype]);
+               }
                if (not ptr->validate_checksum())
                {
                   TRIEDENT_WARN("invalid checksum detected: ", foo_address,

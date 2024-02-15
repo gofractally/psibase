@@ -812,6 +812,7 @@ namespace arbtrie
       if constexpr ( update_checksum_on_modify )
          node_ptr->update_checksum();
 
+      assert(type == node_type::value or node_ptr->_branch_id_region != 0 );
       assert(node_ptr->_nsize == size);
       assert(node_ptr->_ntype == type);
       assert(node_ptr->_node_id == adr.to_int());
@@ -850,6 +851,8 @@ namespace arbtrie
       init(node_ptr);
       if constexpr ( update_checksum_on_modify )
          node_ptr->update_checksum();
+
+      assert(type == node_type::value or node_ptr->_branch_id_region != 0 );
 
       atom.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
                  std::memory_order_release);

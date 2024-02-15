@@ -55,6 +55,17 @@ namespace arbtrie
       return alloc_size( bcap, dcap );
    }
 
+   inline int binary_node::alloc_size(const clone_config& cfg, id_region,
+                                key_view k1, const value_type& v1,
+                                key_view k2, const value_type& v2 ) {
+      auto bcap = std::max<int>(cfg.branch_cap, 2);
+      auto dcap = cfg.data_cap + 
+                  calc_key_val_pair_size( k1,v1 ) +
+                  calc_key_val_pair_size( k2,v2 );
+      return alloc_size( bcap, dcap );
+   }
+
+
    inline int binary_node::alloc_size(const binary_node*  src,
                                       const clone_config& cfg,
                                       const clone_insert& ins)
@@ -95,6 +106,28 @@ namespace arbtrie
       assert(asize <= 4096);
       _branch_cap = cfg.branch_cap;
    }
+   inline binary_node::binary_node(int_fast16_t        asize,
+                                   fast_meta_address   nid,
+                                   const clone_config& cfg,
+                                   id_region           branch_reg, 
+                                   key_view k1, const value_type& v1,
+                                   key_view k2, const value_type& v2 )
+       : node_header(asize, nid, node_type::binary, 0), _alloc_pos(0)
+   {
+      _branch_id_region = branch_reg.region;
+      _branch_cap = min_branch_cap(2);
+      if( k1 < k2 )
+      {
+         insert( 0, k1, v1 );
+         insert( 1, k2, v2 );
+      }
+      else 
+      {
+         insert( 0, k2, v2 );
+         insert( 1, k1, v1 );
+      }
+      assert( num_branches() == 2 );
+   }
 
    inline binary_node::binary_node(int_fast16_t        asize,
                                    fast_meta_address   nid,
@@ -107,9 +140,10 @@ namespace arbtrie
       assert(not cfg.set_prefix);
       assert(alloc_size(src, cfg) <= asize);
 
+      _branch_id_region = src->_branch_id_region;
+
       TRIEDENT_WARN("clone binary node");
-      auto bcap   = std::max<int>(cfg.branch_cap, src->num_branches());
-      _branch_cap = min_branch_cap(0);//round_up_multiple<64>(bcap * 4) / 4;
+      _branch_cap = min_branch_cap(0);
 
       memcpy(key_hashes(), src->key_hashes(), num_branches());
       memcpy(key_offsets(), src->key_offsets(), sizeof(key_index) * num_branches());
@@ -141,6 +175,7 @@ namespace arbtrie
       assert(alloc_size(src, cfg, up) <= asize);
       _branch_cap = min_branch_cap(src->num_branches());
       _dead_space = 0;
+      _branch_id_region = src->_branch_id_region;
 
       auto kh  = key_hashes();
       auto ko  = key_offsets();
@@ -204,6 +239,7 @@ namespace arbtrie
       assert(asize <= 4096);
       assert(alloc_size(src, cfg, rem) <= asize);
       _branch_cap = min_branch_cap(src->num_branches()-1); //round_up_multiple<64>(bcap * 4) / 4;
+      _branch_id_region = src->_branch_id_region;
 
       auto kh  = key_hashes();
       auto ko  = key_offsets();
@@ -280,6 +316,8 @@ namespace arbtrie
       }
       assert(src->validate());
       assert(ptr->validate());
+      if( src->has_checksum() )
+         ptr->update_checksum();
    }
    /**
     *  Called to allcoate a new binary node while adding
@@ -295,6 +333,7 @@ namespace arbtrie
    {
       assert(not cfg.set_prefix);
       assert(alloc_size(src, cfg, ins) <= asize);
+      _branch_id_region = src->_branch_id_region;
 
       _branch_cap = min_branch_cap( std::max<int>(cfg.branch_cap, src->num_branches() + 1) );
       assert( _nsize >= alloc_size( _branch_cap, src->key_val_section_size() + calc_key_val_pair_size( ins.key, ins.val) ) );
@@ -332,7 +371,7 @@ namespace arbtrie
             if ( ins.val.is_object_id() )
             {
                ko[idx].type = key_index::obj_id;
-               kvp->_val_size  = sizeof(object_id);
+               kvp->_val_size  = sizeof(id_address);
                kvp->value_id() = ins.val.id().to_address();
                value_hashes()[lb] = value_header_hash(value_hash(ins.val.id()));
             }
@@ -442,7 +481,7 @@ namespace arbtrie
       auto kvp = get_key_val_ptr(lbx);
       kvp->set_key(key);
       if( val.is_object_id() ) {
-         kvp->_val_size  = sizeof(object_id);
+         kvp->_val_size  = sizeof(id_address);
          kvp->value_id() = val.id().to_address();
          ko[lbx].type= key_index::obj_id;
       }
@@ -479,7 +518,7 @@ namespace arbtrie
 
       if (kidx.type )
       {
-         kvp->_val_size  = sizeof(object_id);
+         kvp->_val_size  = sizeof(id_address);
          kvp->value_id() = val.id().to_address();
       }
       else
