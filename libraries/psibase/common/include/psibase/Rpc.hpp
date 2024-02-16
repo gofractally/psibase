@@ -18,10 +18,6 @@ namespace psibase
       }
    };
 
-   // bool operator==(const HttpHeader& lhs, const HttpHeader& rhs) {
-   // return lhs.name == rhs.name && lhs.value == rhs.value;
-   // }
-
    PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
 
    // TODO: consider adding headers to this

@@ -80,7 +80,8 @@ namespace SystemService
       psibase::Actor<ServerInterface> iface(act.service, service);
 
       auto reqTarget = req.target;
-      auto result    = iface.serveSys(std::move(req));
+
+      auto result = iface.serveSys(std::move(req));
       if (result && !result->headers.empty() && serviceName != "common-sys")
          abortMessage("service " + service.str() + " attempted to set an http header");
 
