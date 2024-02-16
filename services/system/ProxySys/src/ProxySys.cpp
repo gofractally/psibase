@@ -79,19 +79,21 @@ namespace SystemService
       // TODO: avoid repacking (both directions)
       psibase::Actor<ServerInterface> iface(act.service, service);
 
-      auto result = iface.serveSys(std::move(req));
+      auto reqTarget = req.target;
+      auto result    = iface.serveSys(std::move(req));
       if (result && !result->headers.empty() && serviceName != "common-sys")
          abortMessage("service " + service.str() + " attempted to set an http header");
 
-      // bool operator==(const HttpHeader& lhs, const HttpHeader& rhs)
-      // {
-      //    return lhs.name == rhs.name && lhs.value == rhs.value;
-      // }
-      HttpHeader frameAncestorHeader = {"Content-Security-Policy", "frame-ancestors 'none';"};
-      // Check if the target header is already in the vector; if the header was not found, add it
-      auto pos = std::find(result->headers.begin(), result->headers.end(), frameAncestorHeader);
-      if (pos == result->headers.end())
-         result->headers.push_back(frameAncestorHeader);
+      if (reqTarget.size() == 0 || reqTarget.starts_with("/index.html"))
+      {
+         // Check if the target header is already in the vector; if the header was not found, add it
+         HttpHeader frameAncestorHeader = {"Content-Security-Policy", "frame-ancestors 'none';"};
+         auto pos = std::find(result->headers.begin(), result->headers.end(), frameAncestorHeader);
+         if (pos == result->headers.end())
+         {
+            result->headers.push_back(frameAncestorHeader);
+         }
+      }
 
       setRetval(result);
    }  // serve()
