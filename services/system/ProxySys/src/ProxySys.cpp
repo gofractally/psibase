@@ -83,14 +83,15 @@ namespace SystemService
       if (result && !result->headers.empty() && serviceName != "common-sys")
          abortMessage("service " + service.str() + " attempted to set an http header");
 
-      if (!result->headers["Content-Security-Policy"])
-         for (auto& header : result->headers)
-            if (header.name == "Content-Security-Policy" and
-                header.value == "frame-ancestors 'none';")
-
-               if ()
-                  result->headers.push_back(
-                      HttpHeader{"Content-Security-Policy", "frame-ancestors 'none';"});
+      // bool operator==(const HttpHeader& lhs, const HttpHeader& rhs)
+      // {
+      //    return lhs.name == rhs.name && lhs.value == rhs.value;
+      // }
+      HttpHeader frameAncestorHeader = {"Content-Security-Policy", "frame-ancestors 'none';"};
+      // Check if the target header is already in the vector; if the header was not found, add it
+      auto pos = std::find(result->headers.begin(), result->headers.end(), frameAncestorHeader);
+      if (pos == result->headers.end())
+         result->headers.push_back(frameAncestorHeader);
 
       setRetval(result);
    }  // serve()
