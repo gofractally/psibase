@@ -8,19 +8,19 @@ jobs:
     name: "Get latest builder images"
     runs-on: ubuntu-latest
     outputs:
-      2004_image: ${{ steps.latest-builders.outputs.latest_2004_image }}
-      2204_image: ${{ steps.latest-builders.outputs.latest_2204_image }}
+      image_2004: ${{ steps.latest-builders.outputs.latest_2004_image }}
+      image_2204: ${{ steps.latest-builders.outputs.latest_2204_image }}
     steps:
       - name: Determine latest builder images
         id: latest-builders
         run: |
           REGISTRY="ghcr.io"
           2004_IMAGE="gofractally/psibase-builder-ubuntu-2004"
-          LAST_2004_TAG=$(./.github/scripts/latest-tag.sh "${2004_IMAGE}")
+          LAST_2004_TAG=$(./.github/scripts/latest-tag.sh "${REGISTRY}/${2004_IMAGE}")
           echo "latest_2004_image=${REGISTRY}/${2004_IMAGE}:${LAST_2004_TAG}" >> $GITHUB_OUTPUT
           
           2204_IMAGE="gofractally/psibase-builder-ubuntu-2204"
-          LAST_2204_TAG=$(./.github/scripts/latest-tag.sh "${2204_IMAGE}")
+          LAST_2204_TAG=$(./.github/scripts/latest-tag.sh "${REGISTRY}/${2204_IMAGE}")
           echo "latest_2204_image=${REGISTRY}/${2204_IMAGE}:${LAST_2204_TAG}" >> $GITHUB_OUTPUT
 
   build:
@@ -31,9 +31,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - builder-image: ${{ needs.setup-job.outputs.2004_image }}
+          - builder-image: ${{ needs.setup-job.outputs.image_2004 }}
             ubuntu-version: "2004"
-          - builder-image: ${{ needs.setup-job.outputs.2204_image }}
+          - builder-image: ${{ needs.setup-job.outputs.image_2204 }}
             ubuntu-version: "2204"
     steps:
       - name: Timestamp
