@@ -4,21 +4,41 @@ on:
   workflow_call:
 
 jobs:
+  setup-job:
+    name: "Get latest builder images"
+    runs-on: ubuntu-latest
+    outputs:
+      2004_image: ${{ steps.latest-builders.outputs.latest_2004_image }}
+      2204_image: ${{ steps.latest-builders.outputs.latest_2204_image }}
+    steps:
+      - name: Determine latest builder images
+        id: latest-builders
+        run: |
+          REGISTRY="ghcr.io"
+          2004_IMAGE="gofractally/psibase-builder-ubuntu-2004"
+          LAST_2004_TAG=$(./.github/scripts/latest-tag.sh "${2004_IMAGE}")
+          echo "latest_2004_image=${REGISTRY}/${2004_IMAGE}:${LAST_2004_TAG}" >> $GITHUB_OUTPUT
+          
+          2204_IMAGE="gofractally/psibase-builder-ubuntu-2204"
+          LAST_2204_TAG=$(./.github/scripts/latest-tag.sh "${2204_IMAGE}")
+          echo "latest_2204_image=${REGISTRY}/${2204_IMAGE}:${LAST_2204_TAG}" >> $GITHUB_OUTPUT
+
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
+    needs: setup-job
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2004:9e5daca8d7a08cf877ac4c40a9d3c12cdb44e534"
+          - builder-image: ${{ needs.setup-job.outputs.2004_image }}
             ubuntu-version: "2004"
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:9e5daca8d7a08cf877ac4c40a9d3c12cdb44e534"
+          - builder-image: ${{ needs.setup-job.outputs.2204_image }}
             ubuntu-version: "2204"
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp
-        run: echo timestamp=`date -u +"%Y-%m-%d-%H-%M-%S"` >>$GITHUB_OUTPUT
+        run: echo timestamp=`date -u +"%Y-%m-%d-%H-%M-%S"` >> $GITHUB_OUTPUT
       - name: Checkout
         uses: actions/checkout@v3
         with:
