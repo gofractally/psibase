@@ -4,7 +4,7 @@ import {
   generatePendingFunction,
   getImportedFunctions,
 } from "./dynamicFunctions";
-import { $init, provider } from "./graph";
+import { $init, provider } from "../component_parser/component_parser";
 import importableCode from "./importables.js?raw";
 import {
   PluginCallResponse,
@@ -97,11 +97,11 @@ let ranOnce = false;
 const run = async () => {
   if (ranOnce) return;
   $init.then(async () => {
-    const Graph = new provider.Graph();
+    const ComponentParser = new provider.ComponentParser();
 
     if (!process.env.NODE_ENV || process.env.NODE_ENV === "development") {
       // @ts-ignore
-      globalThis.Graph = Graph;
+      globalThis.ComponentParser = ComponentParser;
     }
 
     const url =
@@ -110,7 +110,7 @@ const run = async () => {
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
 
-    const component = Graph.addComponent("hello", bytes);
+    const component = ComponentParser.parse("hello", bytes);
 
     console.log({ array: bytes, component });
   });
