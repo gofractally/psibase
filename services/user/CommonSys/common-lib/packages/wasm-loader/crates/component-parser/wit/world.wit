@@ -47,7 +47,10 @@ interface provider {
     }
 
     resource component-parser {
-        /// Parses a wasm component file into a component object
+        /// Constructs a new component-parser.
+        constructor();
+
+        /// Parses a wasm component file into a component object.
         parse: func(name: string, bytes: list<u8>) -> result<component, string>;
     }
 

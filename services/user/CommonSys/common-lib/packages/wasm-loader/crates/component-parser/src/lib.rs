@@ -9,6 +9,11 @@ use wasmparser::{ComponentExternalKind, ComponentTypeRef};
 pub struct ComponentParser;
 
 impl GuestComponentParser for ComponentParser {
+
+    fn new() -> Self {
+        Self {}
+    }
+
     fn parse(&self, name: String, bytes: Vec::<u8>) -> Result<Component, String>
     {
         let component = wasm_compose::graph::Component::from_bytes(name, bytes)
