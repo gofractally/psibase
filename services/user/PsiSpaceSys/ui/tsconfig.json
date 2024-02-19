@@ -6,7 +6,7 @@
         "allowJs": false,
         "paths": {
             "/common": ["../../CommonSys/common"],
-            "@psibase/common-lib": ["../../CommonSys/common-lib/packages/rpc/src"],
+            "@psibase/common-lib": ["../../CommonSys/common/packages/rpc/src"]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
@@ -20,7 +20,7 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": ["src", "../../CommonSys/common/rpc.d.ts"],
+    "include": ["src", "../../CommonSys/common/packages/rpc/dist/rpc.d.ts"],
     "references": [
         {
             "path": "./tsconfig.node.json"

@@ -22,7 +22,9 @@ const psibase = (appletContract: string, isServing?: boolean) => {
     if (isServing) {
         buildAliases.push({
             find: "@psibase/common-lib",
-            replacement: path.resolve("../../CommonSys/common-lib/src"),
+            replacement: path.resolve(
+                "../../CommonSys/common/packages/rpc/src"
+            ),
         });
     }
 
