@@ -4,6 +4,7 @@ import {
   generatePendingFunction,
   getImportedFunctions,
 } from "./dynamicFunctions";
+import { $init, provider } from "./graph";
 import importableCode from "./importables.js?raw";
 import {
   PluginCallResponse,
@@ -91,7 +92,32 @@ const sendPluginCallResponse = (response: PluginCallResponse) => {
 const onPluginCallRequest = (request: PluginCallRequest) =>
   functionCall(request.payload);
 
+let ranOnce = false;
+
+const run = async () => {
+  if (ranOnce) return;
+  $init.then(async () => {
+    const Graph = new provider.Graph();
+
+    if (!process.env.NODE_ENV || process.env.NODE_ENV === "development") {
+      // @ts-ignore
+      globalThis.Graph = Graph;
+    }
+
+    const url =
+      "https://account-sys.psibase.127.0.0.1.sslip.io:8080/loader/plugin.wasm";
+    const file = await fetch(url);
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    const component = Graph.addComponent("hello", bytes);
+
+    console.log({ array: bytes, component });
+  });
+};
+
 const onRawEvent = (message: MessageEvent) => {
+  run();
   if (isPluginCallRequest(message.data)) {
     onPluginCallRequest(message.data);
   }
