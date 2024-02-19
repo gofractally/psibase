@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/component-parser",
     "crates/graph",
-    "crates/fastly-static-site",
+    "crates/fastly-static-site"
 ]
