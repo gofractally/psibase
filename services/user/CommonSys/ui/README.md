@@ -10,7 +10,7 @@
 ## Build Instructions
 
 -   building will create `dist` directory
--   `psibase upload-tree [service-name] / ./dist`
+-   `psibase upload -r [service-name] ./dist /`
 
 ## Making sure your built files are bootstrapped with new tester and new chain
 

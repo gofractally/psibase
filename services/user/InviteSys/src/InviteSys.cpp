@@ -9,8 +9,8 @@
 #include <services/user/NftSys.hpp>
 #include <services/user/TokenSys.hpp>
 
-#include <psibase/serveContent.hpp>
 #include <psibase/Bitset.hpp>
+#include <psibase/serveContent.hpp>
 #include <vector>
 
 using namespace psibase;
@@ -30,7 +30,7 @@ using std::vector;
 InviteSys::InviteSys(psio::shared_view_ptr<Action> action)
 {
    MethodNumber m{action->method()};
-   if (m != MethodNumber{"init"})
+   if (m != MethodNumber{"init"} && m != MethodNumber{"storeSys"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
       check(initRecord.has_value(), UserService::Errors::uninitialized);

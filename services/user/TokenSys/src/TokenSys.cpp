@@ -73,12 +73,16 @@ void TokenSys::init()
    nftService.setUserConf(userConfig::manualDebit, true);
 
    // Configure manual debit for Nft on Token
-   std::tuple<EnumElement, bool> params{userConfig::manualDebit, true};
-   Action                        setUsrConf{.sender  = NftSys::service,
-                                            .service = TokenSys::service,
-                                            .method  = "setUserConf"_m,
-                                            .rawData = psio::convert_to_frac(params)};
-   to<TransactionSys>().runAs(std::move(setUsrConf), std::vector<ServiceMethod>{});
+   {
+      auto holder  = getTokenHolder(NftSys::service);
+      auto flagBit = TokenHolderRecord::Configurations::value(userConfig::manualDebit);
+
+      holder.config.set(flagBit, true);
+      holder.eventHead = emit().history().userConfSet(holder.eventHead, NftSys::service,
+                                                      userConfig::manualDebit, true);
+
+      Tables().open<TokenHolderTable>().put(holder);
+   }
 
    // Create system token
    auto tid = tokService.create(Precision{8}, Quantity{1'000'000'000e8});

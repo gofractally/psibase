@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PsinodeConfig } from "./configuration/interfaces";
 import { NavHeader } from "./components/nav-header";
 import { StatusBanner } from "./components/status-banner";
+import { BootPage } from "./boot-wizard/boot-page";
 import { ConfigurationPage } from "./configuration/configuration-page";
 import { usePollJson } from "./hooks";
 import { LogsPage } from "./log/logs-page";
@@ -13,7 +14,14 @@ import { Peer } from "./peers/interfaces";
 
 import "./App.css";
 
-const MENU_ITEMS = ["Dashboard", "Peers", "Logs", "Configuration", "Power"];
+const MENU_ITEMS = [
+    "Dashboard",
+    "Peers",
+    "Logs",
+    "Configuration",
+    "Power",
+    "Boot",
+];
 
 function App() {
     const [activeItem, setActiveItem] = useState("");
@@ -35,11 +43,28 @@ function App() {
     const [config, configError, refetchConfig] = usePollJson<PsinodeConfig>(
         "/native/admin/config"
     );
+    const [status, statusError] = usePollJson<string[]>("/native/admin/status");
+
+    let activeMenuItems = [
+        "Dashboard",
+        "Peers",
+        "Logs",
+        "Configuration",
+        "Power",
+    ];
+    if (status && status.includes("needgenesis")) {
+        activeMenuItems.push("Boot");
+    }
 
     return (
         <>
-            <NavHeader menuItems={MENU_ITEMS} activeItem={activeItem} />
-            <StatusBanner peersError={peersError} configError={configError} />
+            <NavHeader menuItems={activeMenuItems} activeItem={activeItem} />
+            <StatusBanner
+                status={status}
+                statusError={statusError}
+                peersError={peersError}
+                configError={configError}
+            />
             {activeItem === "Dashboard" ? (
                 <DashboardPage />
             ) : activeItem === "Logs" ? (
@@ -57,9 +82,9 @@ function App() {
                     refetchConfig={refetchConfig}
                 />
             ) : activeItem === "Power" ? (
-                <PowerPage
-                    producer={config?.producer}
-                />
+                <PowerPage />
+            ) : activeItem === "Boot" ? (
+                <BootPage config={config} refetchConfig={refetchConfig} />
             ) : null}
         </>
     );

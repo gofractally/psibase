@@ -9,7 +9,7 @@
         "test": "vitest",
         "build": "tsc && vite build",
         "start": "vite preview",
-        "deploy": "psibase upload-tree fractal-sys / dist"
+        "deploy": "psibase upload -r fractal-sys dist /"
     },
     "dependencies": {
         "@dnd-kit/core": "^6.0.3",
