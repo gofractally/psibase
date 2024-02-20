@@ -212,6 +212,118 @@ void validate(boost::any& v, const std::vector<std::string>& values, byte_size*,
    v = result;
 };
 
+struct Timeout
+{
+   std::chrono::microseconds duration = std::chrono::seconds(-1);
+   static Timeout            none() { return {}; }
+   friend bool               operator==(const Timeout&, const Timeout&) = default;
+};
+
+void validate(boost::any& v, const std::vector<std::string>& values, Timeout*, int)
+{
+   boost::program_options::validators::check_first_occurrence(v);
+   std::string_view s = boost::program_options::validators::get_single_string(values);
+
+   if (s == "" || s == "inf" || s == "off" || s == "no" || s == "false")
+   {
+      v = Timeout::none();
+      return;
+   }
+
+   std::uint64_t value   = 0;
+   bool          frac    = false;
+   std::uint64_t divisor = 1;
+   auto          iter    = s.begin();
+   auto          end     = s.end();
+   for (; iter != end; ++iter)
+   {
+      char ch = *iter;
+      if (ch == '.' && !frac)
+      {
+         frac = true;
+      }
+      else if (ch >= '0' && ch <= '9')
+      {
+         value = value * 10 + (ch - '0');
+         if (frac)
+            divisor *= 10;
+      }
+      else
+      {
+         break;
+      }
+   }
+   s = {iter, end};
+   if (!s.empty())
+   {
+      s = s.substr(std::min(s.find_first_not_of(" \t"), s.size()));
+      if (s == "s")
+      {
+      }
+      else if (s == "ms")
+      {
+         divisor *= 1000;
+      }
+      else if (s == "us" || s == "µs" || s == "μs")
+      {
+         divisor *= 1000000;
+      }
+      else if (s == "ns")
+      {
+         divisor *= 1000000000;
+      }
+      else
+      {
+         throw boost::program_options::invalid_option_value(std::string(s));
+      }
+   }
+   v = Timeout{std::chrono::microseconds{value * 1000000 / divisor}};
+};
+
+std::string to_string(const Timeout& timeout)
+{
+   auto ms = timeout.duration.count();
+   if (timeout == Timeout::none())
+   {
+      return "inf";
+   }
+   if (ms % 1000 == 0)
+   {
+      return std::to_string(ms / 1000) + " s";
+   }
+   else
+   {
+      return std::to_string(ms) + " ms";
+   }
+}
+
+void to_json(const Timeout& obj, auto& stream)
+{
+   if (obj != Timeout::none())
+   {
+      std::int64_t us = std::chrono::duration_cast<std::chrono::microseconds>(obj.duration).count();
+      to_json(us, stream);
+   }
+   else
+   {
+      stream.write("null", 4);
+   }
+}
+
+void from_json(Timeout& obj, auto& stream)
+{
+   std::optional<std::int64_t> us;
+   from_json(us, stream);
+   if (us)
+   {
+      obj.duration = std::chrono::microseconds{*us};
+   }
+   else
+   {
+      obj = Timeout::none();
+   }
+}
+
 std::filesystem::path option_path;
 ConfigFileOptions     config_options{.expandValue = [](std::string_view key)
                                  {
@@ -463,7 +575,7 @@ struct transaction_queue
    {
       bool                            is_boot = false;
       std::vector<char>               packed_signed_trx;
-      http::push_boot_callback        boot_callback;
+      http::push_transaction_callback boot_callback;
       http::push_transaction_callback callback;
    };
 
@@ -499,7 +611,6 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
          {
             for (auto& trx : transactions)
             {
-               trace = {};
                if (!trx.proofs.empty())
                   // Proofs execute as of the state at the beginning of a block.
                   // That state is empty, so there are no proof services installed.
@@ -519,15 +630,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 
       try
       {
-         if (trace.error)
-         {
-            entry.boot_callback(std::move(trace.error));
-         }
-         else
-         {
-            entry.boot_callback(std::nullopt);
-            return true;
-         }
+         entry.boot_callback(std::move(trace));
       }
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
@@ -1323,6 +1426,7 @@ struct PsinodeConfig
    std::vector<native_service> services;
    http::admin_service         admin;
    std::vector<authz>          admin_authz;
+   Timeout                     http_timeout;
    psibase::loggers::Config    loggers;
 };
 PSIO_REFLECT(PsinodeConfig,
@@ -1339,6 +1443,7 @@ PSIO_REFLECT(PsinodeConfig,
              services,
              admin,
              admin_authz,
+             http_timeout,
              loggers);
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
@@ -1427,6 +1532,11 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
           "", "admin-authz", admin_authz, [](std::string_view text) { return std::string(text); },
           "Authorization for admin access");
    }
+   if (config.http_timeout != Timeout::none())
+   {
+      file.set("", "http-timeout", to_string(config.http_timeout),
+               "The maximum time for HTTP clients to send or receive a message");
+   }
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
@@ -1464,6 +1574,7 @@ void run(const std::string&              db_path,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
          std::vector<authz>&             admin_authz,
+         Timeout&                        http_timeout,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
@@ -1712,7 +1823,7 @@ void run(const std::string&              db_path,
       // TODO: command-line options
       http_config->num_threads         = 4;
       http_config->max_request_size    = 20 * 1024 * 1024;
-      http_config->idle_timeout_ms     = std::chrono::milliseconds{4000};
+      http_config->idle_timeout_us     = http_timeout.duration.count();
       http_config->allow_origin        = "*";
       http_config->listen              = listen;
       http_config->host                = host;
@@ -1728,9 +1839,9 @@ void run(const std::string&              db_path,
       http_config->admin_authz = admin_authz;
 
       // TODO: speculative execution on non-producers
-      http_config->push_boot_async =
-          [queue, &transactionStats, &transactionStatsMutex](
-              std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
+      http_config->push_boot_async = [queue, &transactionStats, &transactionStatsMutex](
+                                         std::vector<char>               packed_signed_transactions,
+                                         http::push_transaction_callback callback)
       {
          {
             std::lock_guard l{transactionStatsMutex};
@@ -1903,132 +2014,135 @@ void run(const std::string&              db_path,
 
       http_config->set_config =
           [&chainContext, &node, &db_path, &runResult, &http_config, &host, &admin, &admin_authz,
-           &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one,
+           &http_timeout, &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one,
            setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
 
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream),
-                            &db_path, &runResult, &http_config, &host, &services, &admin,
-                            &admin_authz, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
-                            &connect_one, setPKCS11Libs, callback = std::move(callback)]() mutable
-                           {
-                              std::optional<http::services_t> new_services;
-                              for (auto& entry : config.services)
-                              {
-                                 entry.root = parse_path(entry.root.native(),
-                                                         std::filesystem::current_path() / db_path);
-                              }
-                              if (services != config.services || host != config.host)
-                              {
-                                 new_services.emplace();
-                                 for (const auto& entry : config.services)
-                                 {
-                                    load_service(entry, *new_services, config.host);
-                                 }
-                              }
-                              // Error handling for PKCS #11 modules loading is tricky because
-                              // it involves global state outside of our direct control
-                              try
-                              {
-                                 setPKCS11Libs(config.pkcs11_modules);
-                              }
-                              catch (std::runtime_error& e)
-                              {
-                                 PSIBASE_LOG(loggers::generic::get(), warning) << e.what();
-                                 PSIBASE_LOG(loggers::generic::get(), warning)
-                                     << "Rolling back config";
-                                 setPKCS11Libs(pkcs11_modules);
-                                 callback(e.what());
-                                 return;
-                              }
-                              // All configuration errors should be detected before this point
-                              node.set_producer_id(config.producer);
-                              http_config->enable_p2p = config.p2p;
-                              if (!http_config->status.load().shutdown)
-                              {
-                                 node.autoconnect(std::vector(config.peers),
-                                                  config.autoconnect.value, connect_one);
-                              }
-                              pkcs11_modules = config.pkcs11_modules;
-                              host           = config.host;
-                              services       = config.services;
-                              admin          = config.admin;
-                              admin_authz    = config.admin_authz;
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
+              &runResult, &http_config, &host, &services, &admin, &admin_authz, &http_timeout,
+              &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one, setPKCS11Libs,
+              callback = std::move(callback)]() mutable
+             {
+                std::optional<http::services_t> new_services;
+                for (auto& entry : config.services)
+                {
+                   entry.root =
+                       parse_path(entry.root.native(), std::filesystem::current_path() / db_path);
+                }
+                if (services != config.services || host != config.host)
+                {
+                   new_services.emplace();
+                   for (const auto& entry : config.services)
+                   {
+                      load_service(entry, *new_services, config.host);
+                   }
+                }
+                // Error handling for PKCS #11 modules loading is tricky because
+                // it involves global state outside of our direct control
+                try
+                {
+                   setPKCS11Libs(config.pkcs11_modules);
+                }
+                catch (std::runtime_error& e)
+                {
+                   PSIBASE_LOG(loggers::generic::get(), warning) << e.what();
+                   PSIBASE_LOG(loggers::generic::get(), warning) << "Rolling back config";
+                   setPKCS11Libs(pkcs11_modules);
+                   callback(e.what());
+                   return;
+                }
+                // All configuration errors should be detected before this point
+                node.set_producer_id(config.producer);
+                http_config->enable_p2p = config.p2p;
+                if (!http_config->status.load().shutdown)
+                {
+                   node.autoconnect(std::vector(config.peers), config.autoconnect.value,
+                                    connect_one);
+                }
+                pkcs11_modules = config.pkcs11_modules;
+                host           = config.host;
+                services       = config.services;
+                admin          = config.admin;
+                admin_authz    = config.admin_authz;
+                http_timeout   = config.http_timeout;
 #ifdef PSIBASE_ENABLE_SSL
-                              tls_cert = config.tls.certificate;
-                              tls_key  = config.tls.key;
-                              root_ca  = config.tls.trustfiles;
+                tls_cert = config.tls.certificate;
+                tls_key  = config.tls.key;
+                root_ca  = config.tls.trustfiles;
 #endif
-                              loggers::configure(config.loggers);
-                              {
-                                 std::shared_lock l{http_config->mutex};
-                                 http_config->host                = host;
-                                 http_config->listen              = config.listen;
-                                 http_config->admin               = admin;
-                                 http_config->admin_authz         = admin_authz;
-                                 http_config->enable_transactions = !host.empty();
-                                 if (new_services)
-                                 {
-                                    // Use swap instead of move to delay freeing the old
-                                    // services until after releasing the mutex
-                                    http_config->services.swap(*new_services);
-                                 }
-                              }
-                              {
-                                 auto       path = std::filesystem::path(db_path) / "config";
-                                 ConfigFile file{config_options};
-                                 {
-                                    std::ifstream in(path);
-                                    file.parse(in);
-                                 }
-                                 to_config(config, file);
-                                 {
-                                    std::ofstream out(path);
-                                    file.write(out);
-                                 }
-                                 runResult.configChanged = true;
-                              }
-                              callback(std::nullopt);
-                           });
+                loggers::configure(config.loggers);
+                {
+                   std::shared_lock l{http_config->mutex};
+                   http_config->host                = host;
+                   http_config->listen              = config.listen;
+                   http_config->admin               = admin;
+                   http_config->admin_authz         = admin_authz;
+                   http_config->enable_transactions = !host.empty();
+                   http_config->idle_timeout_us     = http_timeout.duration.count();
+                   if (new_services)
+                   {
+                      // Use swap instead of move to delay freeing the old
+                      // services until after releasing the mutex
+                      http_config->services.swap(*new_services);
+                   }
+                }
+                {
+                   auto       path = std::filesystem::path(db_path) / "config";
+                   ConfigFile file{config_options};
+                   {
+                      std::ifstream in(path);
+                      file.parse(in);
+                   }
+                   to_config(config, file);
+                   {
+                      std::ofstream out(path);
+                      file.write(out);
+                   }
+                   runResult.configChanged = true;
+                }
+                callback(std::nullopt);
+             });
       };
 
       http_config->get_config = [&chainContext, &node, &http_config, &host, &admin, &admin_authz,
-                                 &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
+                                 &http_timeout, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
                                  &services](http::get_config_callback callback)
       {
-         boost::asio::post(
-             chainContext,
-             [&chainContext, &node, &http_config, &host, &services, &admin, &admin_authz, &tls_cert,
-              &tls_key, &root_ca, &pkcs11_modules, callback = std::move(callback)]() mutable
-             {
-                PsinodeConfig result;
-                result.p2p                                       = http_config->enable_p2p;
-                std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
-                result.producer                                  = node.producer_name();
-                result.pkcs11_modules                            = pkcs11_modules;
-                result.host                                      = host;
-                result.listen                                    = http_config->listen;
+         boost::asio::post(chainContext,
+                           [&chainContext, &node, &http_config, &host, &services, &admin,
+                            &admin_authz, &http_timeout, &tls_cert, &tls_key, &root_ca,
+                            &pkcs11_modules, callback = std::move(callback)]() mutable
+                           {
+                              PsinodeConfig result;
+                              result.p2p = http_config->enable_p2p;
+                              std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
+                              result.producer       = node.producer_name();
+                              result.pkcs11_modules = pkcs11_modules;
+                              result.host           = host;
+                              result.listen         = http_config->listen;
 #ifdef PSIBASE_ENABLE_SSL
-                result.tls.certificate = tls_cert;
-                result.tls.key         = tls_key;
-                result.tls.trustfiles  = root_ca;
+                              result.tls.certificate = tls_cert;
+                              result.tls.key         = tls_key;
+                              result.tls.trustfiles  = root_ca;
 #endif
-                result.services    = services;
-                result.admin       = admin;
-                result.admin_authz = admin_authz;
-                result.loggers     = loggers::Config::get();
-                callback(
-                    [result = std::move(result)]() mutable
-                    {
-                       std::vector<char>   json;
-                       psio::vector_stream stream(json);
-                       to_json(result, stream);
-                       return json;
-                    });
-             });
+                              result.services     = services;
+                              result.admin        = admin;
+                              result.admin_authz  = admin_authz;
+                              result.http_timeout = http_timeout;
+                              result.loggers      = loggers::Config::get();
+                              callback(
+                                  [result = std::move(result)]() mutable
+                                  {
+                                     std::vector<char>   json;
+                                     psio::vector_stream stream(json);
+                                     to_json(result, stream);
+                                     return json;
+                                  });
+                           });
       };
 
       http_config->get_keys = [&chainContext, &prover](auto callback)
@@ -2417,6 +2531,7 @@ int main(int argc, char* argv[])
    std::string                 tls_key;
    byte_size                   db_cache_size;
    byte_size                   db_size;
+   Timeout                     http_timeout;
 
    namespace po = boost::program_options;
 
@@ -2460,6 +2575,8 @@ int main(int argc, char* argv[])
    // specify default token/service
    opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
        "Transaction leeway, in µs.");
+   opt("http-timeout", po::value(&http_timeout)->default_value({}, "")->value_name("seconds"),
+       "The maximum time for HTTP clients to send or receive a message");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
@@ -2548,8 +2665,8 @@ int main(int argc, char* argv[])
          restart.shouldRestart     = true;
          restart.soft              = true;
          run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, pkcs11_modules, peers,
-             autoconnect, enable_incoming_p2p, host, listen, services, admin, admin_authz, root_ca,
-             tls_cert, tls_key, leeway_us, restart);
+             autoconnect, enable_incoming_p2p, host, listen, services, admin, admin_authz,
+             http_timeout, root_ca, tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

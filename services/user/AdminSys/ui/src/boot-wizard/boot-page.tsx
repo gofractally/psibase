@@ -55,7 +55,37 @@ interface ProducerFormProps {
     setCurrentPage: (page: string) => void;
 }
 
-type BootState = undefined | [string, number, number] | string;
+interface InnerTrace {
+    ActionTrace?: ActionTrace;
+    ConsoleTrace?: any;
+    EventTrace?: any;
+}
+
+interface Action {
+    sender: string;
+    service: string;
+    method: string;
+    rawData: string;
+}
+
+interface ActionTrace {
+    action: Action;
+    rawRetval: string;
+    innerTraces: { inner: InnerTrace }[];
+    totalTime: number;
+    error?: string;
+}
+
+interface TransactionTrace {
+    actionTraces: ActionTrace[];
+    error?: string;
+}
+
+type BootState =
+    | undefined
+    | [string, number, number]
+    | string
+    | TransactionTrace;
 
 interface InstallFormProps {
     packages: string[];
@@ -175,6 +205,40 @@ export const ProducerForm = ({
     );
 };
 
+function getActionStack(trace: ActionTrace): Action[] | undefined {
+    if (trace.error) {
+        for (let atrace of trace.innerTraces) {
+            if (atrace.inner.ActionTrace) {
+                let result = getActionStack(atrace.inner.ActionTrace);
+                if (result) {
+                    return [trace.action, ...result];
+                }
+            }
+        }
+        return [trace.action];
+    }
+}
+
+const getStack = (trace: TransactionTrace) => {
+    for (let atrace of trace.actionTraces) {
+        let stack = getActionStack(atrace);
+        if (stack) {
+            return (
+                <p>
+                    {stack.map((act) => (
+                        <>
+                            {" "}
+                            {`${act.sender} => ${act.service}::${act.method}`}{" "}
+                            <br />
+                        </>
+                    ))}
+                    {trace.error}
+                </p>
+            );
+        }
+    }
+};
+
 async function runBoot(
     packageNames: string[],
     producer: string,
@@ -210,7 +274,15 @@ async function runBoot(
         let [boot_transactions, transactions] =
             wasm.js_create_boot_transactions(producer, packages);
         setBootState(["push", 0, transactions.length + 1]);
-        await postArrayBuffer("/native/push_boot", boot_transactions.buffer);
+        let trace = await postArrayBufferGetJson(
+            "/native/push_boot",
+            boot_transactions.buffer
+        );
+        if (trace.error) {
+            setBootState(trace);
+            console.error(trace.error);
+            return;
+        }
         i = 1;
         for (const t of transactions) {
             console.log(`Pushing transaction number: ${i}`);
@@ -220,7 +292,7 @@ async function runBoot(
                 t.buffer
             );
             if (trace.error) {
-                setBootState(`Boot failed: ${trace.error}`);
+                setBootState(trace);
                 console.error(trace.error);
                 return;
             }
@@ -284,6 +356,8 @@ export const ProgressPage = ({ state }: ProgressPageProps) => {
         return <>Preparing to install</>;
     } else if (typeof state === "string") {
         return <>{state}</>;
+    } else if ("actionTraces" in state) {
+        return <>Boot failed: {getStack(state)}</>;
     } else if (state[0] == "fetch") {
         return (
             <>

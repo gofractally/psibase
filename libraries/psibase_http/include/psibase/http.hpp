@@ -19,15 +19,13 @@
 
 namespace psibase::http
 {
-   using push_boot_result   = std::optional<std::string>;
-   using push_boot_callback = std::function<void(push_boot_result)>;
-   using push_boot_t =
-       std::function<void(std::vector<char> packed_signed_transactions, push_boot_callback)>;
-
    using push_transaction_result   = std::variant<TransactionTrace, std::string>;
    using push_transaction_callback = std::function<void(push_transaction_result)>;
    using push_transaction_t =
        std::function<void(std::vector<char> packed_signed_trx, push_transaction_callback)>;
+
+   using push_boot_t =
+       std::function<void(std::vector<char> packed_signed_transactions, push_transaction_callback)>;
 
    using shutdown_t = std::function<void(std::vector<char>)>;
 
@@ -301,12 +299,12 @@ namespace psibase::http
 
    struct http_config
    {
-      uint32_t                  num_threads      = {};
-      uint32_t                  max_request_size = {};
-      std::chrono::milliseconds idle_timeout_ms  = {};
-      std::string               allow_origin     = {};
-      std::vector<listen_spec>  listen           = {};
-      std::string               host             = {};
+      uint32_t                 num_threads      = {};
+      uint32_t                 max_request_size = {};
+      std::atomic<int64_t>     idle_timeout_us  = {};
+      std::string              allow_origin     = {};
+      std::vector<listen_spec> listen           = {};
+      std::string              host             = {};
 #ifdef PSIBASE_ENABLE_SSL
       tls_context_ptr tls_context = {};
 #endif

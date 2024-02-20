@@ -488,10 +488,13 @@ namespace psibase::http
          res.keep_alive(keep_alive);
          if (keep_alive)
          {
-            auto sec = std::chrono::duration_cast<std::chrono::seconds>(
-                           server.http_config->idle_timeout_ms)
-                           .count();
-            res.set(bhttp::field::keep_alive, "timeout=" + std::to_string(sec));
+            if (auto usec = server.http_config->idle_timeout_us.load(); usec >= 0)
+            {
+               auto sec =
+                   std::chrono::duration_cast<std::chrono::seconds>(std::chrono::microseconds{usec})
+                       .count();
+               res.set(bhttp::field::keep_alive, "timeout=" + std::to_string(sec));
+            }
          }
       };
 
@@ -653,7 +656,7 @@ namespace psibase::http
             auto* p = session.get();
             net::post(p->stream.get_executor(),
                       [callback = std::move(callback), session = std::move(session),
-                       result = static_cast<decltype(result)>(result)]()
+                       result = static_cast<decltype(result)>(result)]() mutable
                       {
                          session->queue_.pause_read = false;
                          callback(std::move(result));
@@ -810,33 +813,24 @@ namespace psibase::http
                return;
             }
 
-            server.http_config->push_boot_async(
-                std::move(req.body()),
-                [error, ok,
-                 session = send.self.derived_session().shared_from_this()](push_boot_result result)
+            run_native_handler(
+                server.http_config->push_boot_async,
+                [error, ok, session = send.self.derived_session().shared_from_this()](
+                    push_transaction_result&& result)
                 {
-                   net::post(session->stream.get_executor(),
-                             [error, ok, session = std::move(session), result = std::move(result)]
-                             {
-                                try
-                                {
-                                   session->queue_.pause_read = false;
-                                   if (!result)
-                                      session->queue_(ok({'t', 'r', 'u', 'e'}, "application/json"));
-                                   else
-                                      session->queue_(
-                                          error(bhttp::status::internal_server_error, *result));
-                                   if (session->queue_.can_read())
-                                      session->do_read();
-                                }
-                                catch (...)
-                                {
-                                   session->do_close();
-                                }
-                             });
+                   if (auto* trace = std::get_if<TransactionTrace>(&result))
+                   {
+                      std::vector<char>   data;
+                      psio::vector_stream stream{data};
+                      psio::to_json(*trace, stream);
+                      session->queue_(ok(std::move(data), "application/json"));
+                   }
+                   else
+                   {
+                      session->queue_(error(bhttp::status::internal_server_error,
+                                            std::get<std::string>(result)));
+                   }
                 });
-            send.pause_read = true;
-            return;
          }  // push_boot
          else if (req_target == "/native/push_transaction" &&
                   server.http_config->push_transaction_async)
@@ -1485,6 +1479,8 @@ namespace psibase::http
 
          bool can_read() const { return !is_full() && !pause_read; }
 
+         bool is_empty() const { return items.empty(); }
+
          // Called when a message finishes sending
          // Returns `true` if the caller should initiate a read
          bool on_write()
@@ -1492,6 +1488,10 @@ namespace psibase::http
             BOOST_ASSERT(!items.empty());
             const auto was_full = is_full();
             items.erase(items.begin());
+            if (items.empty() && pause_read)
+               self.stop_socket_timer();
+            else
+               self.start_socket_timer(self.derived_session().shared_from_this());
             if (!items.empty())
                (*items.front())();
             return was_full && !pause_read;
@@ -1537,7 +1537,10 @@ namespace psibase::http
 
             // If there was no previous work, start this one
             if (items.size() == 1)
+            {
+               self.start_socket_timer(self.derived_session().shared_from_this());
                (*items.front())();
+            }
          }
          template <class Msg, typename F>
          void operator()(websocket_upgrade, Msg&& msg, F&& f)
@@ -1602,7 +1605,7 @@ namespace psibase::http
       beast::flat_buffer                 buffer;
       std::unique_ptr<net::steady_timer> _timer;
       bool                               _closed = false;
-      steady_clock::time_point           last_activity_timepoint;
+      steady_clock::time_point           _expiration;
 
       // The parser is stored in an optional container so we can
       // construct it from scratch it at the beginning of each new message.
@@ -1631,7 +1634,6 @@ namespace psibase::http
       {
          PSIBASE_LOG(logger, debug) << "Accepted connection";
          _timer.reset(new boost::asio::steady_timer(derived_session().stream.get_executor()));
-         last_activity_timepoint = steady_clock::now();
          start_socket_timer(derived_session().shared_from_this());
          do_read();
       }
@@ -1646,10 +1648,13 @@ namespace psibase::http
          return result;
       }
 
-     private:
       void start_socket_timer(std::shared_ptr<SessionType>&& self)
       {
-         _timer->expires_after(server.http_config->idle_timeout_ms);
+         auto usec = server.http_config->idle_timeout_us.load();
+         if (usec < 0)
+            return;
+         _expiration = steady_clock::now() + std::chrono::microseconds{usec};
+         _timer->expires_at(_expiration);
          _timer->async_wait(
              [this, self = std::move(self)](beast::error_code ec) mutable
              {
@@ -1657,12 +1662,7 @@ namespace psibase::http
                 {
                    return;
                 }
-                auto session_duration = steady_clock::now() - last_activity_timepoint;
-                if (session_duration <= server.http_config->idle_timeout_ms)
-                {
-                   start_socket_timer(std::move(self));
-                }
-                else
+                if (steady_clock::now() >= _expiration)
                 {
                    beast::error_code ec;
                    derived_session().close_impl(ec);
@@ -1679,6 +1679,12 @@ namespace psibase::http
              });
       }
 
+      void stop_socket_timer()
+      {
+         _expiration = steady_clock::time_point::max();
+         _timer->cancel();
+      }
+
      public:
       void do_read()
       {
@@ -1688,7 +1694,6 @@ namespace psibase::http
          // Apply a reasonable limit to the allowed size
          // of the body in bytes to prevent abuse.
          parser->body_limit(server.http_config->max_request_size);
-         last_activity_timepoint = steady_clock::now();
          // Read a request using the parser-oriented interface
          bhttp::async_read(derived_session().stream, buffer, *parser,
                            beast::bind_front_handler(&http_session::on_read,
@@ -1699,6 +1704,9 @@ namespace psibase::http
       void on_read(beast::error_code ec, std::size_t bytes_transferred)
       {
          boost::ignore_unused(bytes_transferred);
+
+         if (_closed)
+            return;
 
          // This means they closed the connection
          if (ec == bhttp::error::end_of_stream)
@@ -1728,6 +1736,15 @@ namespace psibase::http
          // Send the response
          handle_request(server, parser->release(), queue_);
 
+         // The queue being empty means that we're waiting for the
+         // request to be processed asynchronously, and there are
+         // no pending writes.
+         if (queue_.is_empty())
+         {
+            assert(!queue_.can_read());
+            stop_socket_timer();
+         }
+
          // If we aren't at the queue limit, try to pipeline another request
          if (queue_.can_read())
             do_read();
@@ -1736,6 +1753,9 @@ namespace psibase::http
       void on_write(bool close, beast::error_code ec, std::size_t bytes_transferred)
       {
          boost::ignore_unused(bytes_transferred);
+
+         if (_closed)
+            return;
 
          if (ec)
          {

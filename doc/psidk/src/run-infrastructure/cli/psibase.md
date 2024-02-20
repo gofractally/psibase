@@ -37,6 +37,14 @@ psibase - The psibase blockchain command line client
   - A PKCS #11 URI
   - An EOS style base58-encoded private key beginning `PVT_K1_`
 
+- `--trace` *format*
+
+  For commands that push transactions to the chain, determines how the result is reported.
+  - `error`: If the transaction failed, show the error message
+  - `stack` (default): If the transaction failed, show a stack trace from the action that caused the error
+  - `full`: Shows all actions in the trace
+  - `json`: Shows the full transaction trace as JSON
+
 ## COMMANDS
 
 ### boot

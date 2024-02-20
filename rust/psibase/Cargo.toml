@@ -30,6 +30,7 @@ psibase_names = { path = "../psibase_names" }
 regex = "1"
 ripemd = "0.1"
 serde = { version = "1.0", features = ["derive", "rc"] }
+serde-aux = "4.4"
 serde_bytes = "0.11.12"
 serde_json = "1.0"
 serde-wasm-bindgen = "0.6.0"
