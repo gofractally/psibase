@@ -1,4 +1,4 @@
-import { postJson } from "common/rpc.mjs";
+import { postJson } from "@psibase/common-lib";
 import { useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { Button, Form } from "../components";
