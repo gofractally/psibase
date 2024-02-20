@@ -14,6 +14,33 @@ export class RPCError extends Error {
     }
 }
 
+export type ChangeHistoryPayload = {
+    pathname: string;
+    search: string;
+    hash: string;
+};
+
+export interface GetClaimParams {
+    service: string;
+    sender: string;
+    method: string;
+    params: any;
+}
+
+export type Claim = {
+    service: string;
+    rawData: string; // hex bytes
+};
+
+export type WrappedClaim = {
+    claim: Claim;
+    pubkey: string; // Public key string
+};
+
+export type MessageMetadata = {
+    sender: string;
+};
+
 /** Global Values */
 let rootDomain = "";
 let contractName = "";
@@ -29,11 +56,10 @@ const bufferedMessages: any[] = [];
 const callbacks: any[] = [null];
 const promises: any[] = [null];
 const transactions: any = {};
-const debug : Boolean = false;
+const debug: Boolean = false;
 
 function debugPrint(...args: any[]): void {
-    if (debug)
-        console.debug(...args);
+    if (debug) console.debug(...args);
 }
 
 export async function getRootDomain() {
@@ -46,7 +72,7 @@ export async function getRootDomain() {
 }
 
 export async function siblingUrl(
-    baseUrl?: string,
+    baseUrl?: string | null,
     service?: string,
     path?: string
 ): Promise<string> {
@@ -651,7 +677,6 @@ const messageRouting = [
 ];
 
 export async function initializeApplet(initializer = () => {}) {
-
     const rootUrl = await siblingUrl(undefined, undefined, undefined);
 
     (window as any).iFrameResizer = {
@@ -702,7 +727,6 @@ export async function initializeApplet(initializer = () => {}) {
     await import("/common/iframeResizer.contentWindow.js");
 
     await initializer();
-
 }
 
 const sendHistoryChange = () => {
