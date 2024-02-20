@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { genKeyPair, KeyType } from "common/keyConversions.mjs";
+import { genKeyPair, KeyType } from "@psibase/common-lib";
 
 export const GenerateKeyPair = () => {
     const [pub, setPub] = useState("");

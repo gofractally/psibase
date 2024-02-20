@@ -4,7 +4,30 @@ import path from "path";
 import alias from "@rollup/plugin-alias";
 import svgr from "vite-plugin-svgr";
 
-const psibase = (appletContract: string) => {
+const psibase = (appletContract: string, isServing?: boolean) => {
+    const buildAliases = [
+        {
+            find: "/common/iframeResizer.contentWindow.js",
+            replacement: path.resolve(
+                "../../../user/CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
+            ),
+        },
+        {
+            // bundle non-external (above) common files except fonts (which should only be referenced)
+            find: /^\/common(?!\/(?:fonts))(.*)$/,
+            replacement: path.resolve("../../../user/CommonSys/common$1"),
+        },
+    ];
+
+    if (isServing) {
+        buildAliases.push({
+            find: "@psibase/common-lib",
+            replacement: path.resolve(
+                "../../../user/CommonSys/common/packages/rpc/src"
+            ),
+        });
+    }
+
     return [
         {
             name: "psibase",
@@ -22,8 +45,7 @@ const psibase = (appletContract: string) => {
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
-                                "/common/rpc.mjs",
-                                "/common/keyConversions.mjs",
+                                "/common/common-lib.js",
                                 "/common/iframeResizer.js",
                                 "/common/useLocalStorage.mjs",
                             ],
@@ -59,31 +81,16 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: [
-                            {
-                                find: "/common/iframeResizer.contentWindow.js",
-                                replacement: path.resolve(
-                                    "../../../user/CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
-                                ),
-                            },
-                            {
-                                // bundle non-external (above) common files except fonts (which should only be referenced)
-                                find: /^\/common(?!\/(?:fonts))(.*)$/,
-                                replacement: path.resolve(
-                                    "../../../user/CommonSys/common$1"
-                                ),
-                            },
-                        ],
+                        alias: buildAliases,
                     },
                 };
             },
         },
         alias({
             entries: [
-                { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
                 {
-                    find: "common/keyConversions.mjs",
-                    replacement: "/common/keyConversions.mjs",
+                    find: "@psibase/common-lib",
+                    replacement: "/common/common-lib.js",
                 },
                 {
                     find: "common/useLocalStorage.mjs",
@@ -95,6 +102,10 @@ const psibase = (appletContract: string) => {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig({
-    plugins: [react(), svgr({ exportAsDefault: true }), psibase("account-sys")],
-});
+export default defineConfig(({ command }) => ({
+    plugins: [
+        react(),
+        svgr({ exportAsDefault: true }),
+        psibase("account-sys", command === "serve"),
+    ],
+}));
