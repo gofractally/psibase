@@ -54,7 +54,7 @@ namespace eosio
          {
             size_t new_next_page = align(next_addr, wasm_page_size);
             if (GROW_MEMORY((new_next_page - next_page) >> 16) == -1)
-               psibase::raw::abortMessage("failed to allocate pages", 24);
+               psibase::raw::abortMessage("service exceeded its memory limit", 33);
             next_page = new_next_page;
          }
 
