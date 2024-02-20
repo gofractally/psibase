@@ -1,5 +1,5 @@
 <script>
-    import { initializeApplet } from "/common/rpc.mjs?client";
+    import { initializeApplet } from "@psibase/common-lib";
     import { onDestroy, onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { loadData } from "/src/lib/loadData.js";
