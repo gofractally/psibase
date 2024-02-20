@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   privateStringToKeyPair,
   publicKeyPairToString,
-} from "common/keyConversions.mjs";
-import { postGraphQLGetJson } from "common/rpc.mjs";
+  postGraphQLGetJson,
+} from "@psibase/common-lib";
 
 export const parsePrivateKey = (
   privateKey: string | null
@@ -51,7 +51,7 @@ const unixTime = () => Math.floor(Date.now() / 1000)
 
 export const fetchInvite = async (publicKey: string) => {
   const query = queryInviteKey(publicKey);
-  return postGraphQLGetJson<{ data: { getInvite: { actor: string, expiry: number, inviter: string, newAccountToken: boolean, pubkey: string, state: InviteStates }}}>("/graphql", query)
+  return postGraphQLGetJson("/graphql", query)
 };
 
 export const useInviteToken = (privateKey: string | null) => {

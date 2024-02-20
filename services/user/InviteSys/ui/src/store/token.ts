@@ -3,7 +3,7 @@ import {
   privateKeyPairToString,
   privateStringToKeyPair,
   publicKeyPairToString,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
 
 export const extractInviteTokenKeyPair = () => {
   const urlParams = new URLSearchParams(window.location.search);

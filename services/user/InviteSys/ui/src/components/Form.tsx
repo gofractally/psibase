@@ -6,6 +6,7 @@ import { Icon, IconType } from "./Icon";
 
 export const Label: React.FC<{
     htmlFor: string;
+    children: React.ReactNode;
 }> = (props) => (
     <label className="block text-sm font-normal text-gray-600" {...props}>
         {props.children}
@@ -179,6 +180,7 @@ export interface LabeledSetProps {
     label: string;
     description?: string;
     className?: string;
+    children: React.ReactNode;
 }
 
 export const LabeledSet = forwardRef<HTMLDivElement, LabeledSetProps>(

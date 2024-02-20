@@ -1,9 +1,10 @@
-import { useInviteToken } from "store/queries/usePrivateKey";
-import { Button } from "components";
-import { useParam } from "store";
 import { useMutation } from "@tanstack/react-query";
-import { psiboardApplet } from "service";
-import { AppletId, operation } from "common/rpc.mjs";
+import { AppletId, operation } from "@psibase/common-lib";
+
+import { useInviteToken } from "../../store/queries/usePrivateKey";
+import { Button } from "../../components";
+import { useParam } from "../../store";
+import { psiboardApplet } from "../../service";
 
 export const SelectAccount = () => {
   const account = useParam("account");
@@ -31,7 +32,7 @@ export const SelectAccount = () => {
     },
   });
 
-  if (!isValid) return <div className="text-red-500">Token is not valid! {tokenError}</div>;
+  if (!isValid) return <div className="text-red-500">Token is not valid! {tokenError as string}</div>;
   if (error) return <div className="text-red-500">{JSON.stringify(error)}</div>;
 
   return (
