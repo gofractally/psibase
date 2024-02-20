@@ -1,4 +1,4 @@
-use crate::{version_match, Meta, PackageRef, Version};
+use crate::{version_match, PackageInfo, PackageRef, Version};
 use custom_error::custom_error;
 use std::collections::{HashMap, HashSet};
 use varisat::{ExtendFormula, Lit, Solver};
@@ -17,17 +17,36 @@ custom_error! {
     DependencyCycle = "Cycle in service dependencies",
 }
 
-pub struct DepGraph<'a> {
-    packages: HashMap<String, HashMap<String, (Meta, Lit)>>,
+pub fn solve_dependencies(
+    packages: Vec<PackageInfo>,
     input: Vec<PackageRef>,
+    pinned: Vec<PackageRef>,
+) -> Result<Vec<PackageInfo>, anyhow::Error> {
+    let mut graph = DepGraph::new();
+    for package in packages {
+        graph.add(package);
+    }
+    for package in input {
+        graph.add_input(package);
+    }
+    for package in pinned {
+        graph.pin(package);
+    }
+    graph.solve()
+}
+
+pub struct DepGraph<'a> {
+    packages: HashMap<String, HashMap<String, (PackageInfo, Lit)>>,
+    input: Vec<PackageRef>,
+    pinned: HashMap<String, String>,
     solver: Solver<'a>,
 }
 
 fn topological_sort_impl(
-    reg: &mut HashMap<String, Meta>,
+    reg: &mut HashMap<String, PackageInfo>,
     names: &[PackageRef],
     found: &mut HashMap<String, bool>,
-    result: &mut Vec<Meta>,
+    result: &mut Vec<PackageInfo>,
 ) -> Result<(), anyhow::Error> {
     for name in names {
         if let Some(completed) = found.get(&name.name) {
@@ -47,11 +66,19 @@ fn topological_sort_impl(
 
 // Sorts packages in dependency order. Only includes packages
 // that are required by the inputs.
-fn topological_sort(packages: Vec<Meta>, input: &[PackageRef]) -> Result<Vec<Meta>, anyhow::Error> {
+fn topological_sort(
+    packages: Vec<PackageInfo>,
+    input: &[PackageRef],
+    ignore: &HashMap<String, String>,
+) -> Result<Vec<PackageInfo>, anyhow::Error> {
     let mut by_name = HashMap::new();
     for package in packages {
         let name = package.name.clone();
         by_name.insert(name, package);
+    }
+    let mut found = HashMap::new();
+    for (name, _) in ignore {
+        found.insert(name.clone(), true);
     }
     let mut result = vec![];
     topological_sort_impl(&mut by_name, input, &mut HashMap::new(), &mut result)?;
@@ -63,10 +90,11 @@ impl<'a> DepGraph<'a> {
         DepGraph {
             packages: HashMap::new(),
             input: Vec::new(),
+            pinned: HashMap::new(),
             solver: Solver::new(),
         }
     }
-    pub fn add(&mut self, meta: Meta) {
+    pub fn add(&mut self, meta: PackageInfo) {
         let name = meta.name.clone();
         let version = meta.version.clone();
         let value = (meta, self.solver.new_lit());
@@ -79,9 +107,13 @@ impl<'a> DepGraph<'a> {
     pub fn add_input(&mut self, input: PackageRef) {
         self.input.push(input);
     }
-    pub fn solve(&mut self) -> Result<Vec<Meta>, anyhow::Error> {
-        self.add_roots();
-        self.add_depends();
+    pub fn pin(&mut self, package: PackageRef) {
+        self.pinned.insert(package.name, package.version);
+    }
+    pub fn solve(&mut self) -> Result<Vec<PackageInfo>, anyhow::Error> {
+        self.add_pinned();
+        self.add_roots()?;
+        self.add_depends()?;
         self.add_conflicts();
         if !self.solver.solve()? {
             Err(Error::CannotResolvePackages)?
@@ -97,7 +129,7 @@ impl<'a> DepGraph<'a> {
                             }
                         }
                     }
-                    return topological_sort(result, &self.input);
+                    return topological_sort(result, &self.input, &self.pinned);
                 }
             }
         }
@@ -138,32 +170,40 @@ impl<'a> DepGraph<'a> {
         self.solver.add_clause(&better);
         self.solver.solve().unwrap_or(false)
     }
-    fn get_matching(&self, pattern: &PackageRef) -> Vec<Lit> {
+    fn get_matching(&self, pattern: &PackageRef) -> Result<Vec<Lit>, anyhow::Error> {
         let mut result = vec![];
         if let Some(packages) = self.packages.get(&pattern.name) {
             for (k, v) in packages {
-                if version_match(&pattern.version, k).unwrap() {
+                if version_match(&pattern.version, k)? {
                     result.push(v.1);
                 }
             }
         }
-        result
+        Ok(result)
     }
-    fn add_depends(&mut self) {
+    fn add_depends(&mut self) -> Result<(), anyhow::Error> {
         for packages in self.packages.values() {
             for (meta, var) in packages.values() {
                 for dep in &meta.depends {
-                    let group = self.get_matching(dep);
-                    any_if(&mut self.solver, *var, group);
+                    if let Some(matched) = self.matches_pinned(dep) {
+                        if !matched {
+                            self.solver.add_clause(&[!*var]);
+                        }
+                    } else {
+                        let group = self.get_matching(dep)?;
+                        any_if(&mut self.solver, *var, group);
+                    }
                 }
             }
         }
+        Ok(())
     }
-    fn add_roots(&mut self) {
+    fn add_roots(&mut self) -> Result<(), anyhow::Error> {
         for input in &self.input {
-            let group = self.get_matching(input);
+            let group = self.get_matching(input)?;
             any(&mut self.solver, &group);
         }
+        Ok(())
     }
     fn add_conflicts(&mut self) {
         // partition packages by name
@@ -178,6 +218,26 @@ impl<'a> DepGraph<'a> {
         }
         for group in packages_by_name.values() {
             zero_or_one_of(&mut self.solver, group);
+        }
+    }
+    fn matches_pinned(&self, package: &PackageRef) -> Option<bool> {
+        if let Some(pinned_version) = self.pinned.get(&package.name) {
+            Some(&package.version == pinned_version)
+        } else {
+            None
+        }
+    }
+    fn add_pinned(&mut self) {
+        for (name, version) in &self.pinned {
+            if let Some(packages) = self.packages.get(name) {
+                for (k, v) in packages {
+                    if k == version {
+                        self.solver.add_clause(&[v.1]);
+                    } else {
+                        self.solver.add_clause(&[!v.1]);
+                    }
+                }
+            }
         }
     }
 }
@@ -226,7 +286,7 @@ mod tests {
     #[test]
     fn test_solve_one() -> Result<(), anyhow::Error> {
         let mut graph = DepGraph::new();
-        let a: Meta = serde_json::from_str(
+        let a: PackageInfo = serde_json::from_str(
             r#"{"name":"A","description":"","version":"1.0.0","depends":[],"accounts":[]}"#,
         )?;
         graph.add(a.clone());
@@ -241,7 +301,7 @@ mod tests {
     #[test]
     fn test_solve_simple_dep() -> Result<(), anyhow::Error> {
         let mut graph = DepGraph::new();
-        let packages: Vec<Meta> = serde_json::from_str(
+        let packages: Vec<PackageInfo> = serde_json::from_str(
             r#"[
 {"name":"A","description":"","version":"1.0.0","depends":[],"accounts":[]},
 {"name":"B","description":"","version":"1.0.0","depends":[{"name":"A","version":"1.0.0"}],"accounts":[]}
@@ -258,7 +318,7 @@ mod tests {
         Ok(())
     }
 
-    fn get_ids(input: &Vec<Meta>) -> Vec<(&str, &str)> {
+    fn get_ids(input: &Vec<PackageInfo>) -> Vec<(&str, &str)> {
         let mut result = vec![];
         for meta in input {
             result.push((meta.name.as_str(), meta.version.as_str()));
@@ -269,7 +329,7 @@ mod tests {
     #[test]
     fn test_solve_version() -> Result<(), anyhow::Error> {
         let mut graph = DepGraph::new();
-        let packages: Vec<Meta> = serde_json::from_str(
+        let packages: Vec<PackageInfo> = serde_json::from_str(
             r#"[
 {"name":"A","description":"","version":"1.0.0","depends":[],"accounts":[]},
 {"name":"A","description":"","version":"1.1.0","depends":[],"accounts":[]},
@@ -291,7 +351,7 @@ mod tests {
     #[test]
     fn test_version_select() -> Result<(), anyhow::Error> {
         let mut graph = DepGraph::new();
-        let packages: Vec<Meta> = serde_json::from_str(
+        let packages: Vec<PackageInfo> = serde_json::from_str(
             r#"[
 {"name":"A","description":"","version":"1.0.0","depends":[],"accounts":[]},
 {"name":"A","description":"","version":"1.1.0","depends":[],"accounts":[]},

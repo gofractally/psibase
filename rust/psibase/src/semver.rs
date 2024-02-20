@@ -5,9 +5,11 @@ use std::cmp::Ordering;
 
 custom_error! {
     pub Error
-    InvalidVersion = "Invalid version",
+        InvalidVersion{version: String} = "Invalid version: {version}",
     UnmatchedCloseParen = "Unexpected )",
     UnmatchedOpenParen = "Expected )",
+    ExpectedVersion = "Expected version",
+    ExpectedOperator = "Expected operator",
 }
 
 const SEMVER_IDENT: &str = r"(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)";
@@ -21,7 +23,7 @@ const SEMVER: &str = formatcp!(
     build = SEMVER_BUILDID
 );
 const SEMVER_MATCH: &str = formatcp!(
-    r"^({num})(?:\.({num})(?:\.({num})(?:-({pre}))?(?:\+({build}))?)?)?$",
+    r"^\*|({num})(?:\.\*|({num})(?:\.\*|({num})(?:-({pre}))?(?:\+({build}))?)?)?$",
     num = SEMVER_NUM,
     pre = SEMVER_PRERELEASE,
     build = SEMVER_BUILDID
@@ -97,16 +99,33 @@ impl<'a> Version<'a> {
     pub fn new(s: &'a str) -> Result<Self, anyhow::Error> {
         let re = Regex::new(SEMVER)?;
         let Some(captures) = re.captures(s) else {
-            Err(Error::InvalidVersion)?
+            Err(Error::InvalidVersion {
+                version: s.to_string(),
+            })?
         };
         let maj = DecNum {
-            value: captures.get(1).ok_or(Error::InvalidVersion)?.as_str(),
+            value: captures
+                .get(1)
+                .ok_or(Error::InvalidVersion {
+                    version: s.to_string(),
+                })?
+                .as_str(),
         };
         let min = DecNum {
-            value: captures.get(2).ok_or(Error::InvalidVersion)?.as_str(),
+            value: captures
+                .get(2)
+                .ok_or(Error::InvalidVersion {
+                    version: s.to_string(),
+                })?
+                .as_str(),
         };
         let patch = DecNum {
-            value: captures.get(3).ok_or(Error::InvalidVersion)?.as_str(),
+            value: captures
+                .get(3)
+                .ok_or(Error::InvalidVersion {
+                    version: s.to_string(),
+                })?
+                .as_str(),
         };
         let pre = captures.get(4).map(|m| Prerelease { value: m.as_str() });
         Ok(Version {
@@ -143,7 +162,9 @@ impl<'a> VersionMatch<'a> {
     fn new(op: VersionOp, s: &'a str) -> Result<Self, anyhow::Error> {
         let re = Regex::new(SEMVER_MATCH)?;
         let Some(captures) = re.captures(s) else {
-            Err(Error::InvalidVersion)?
+            Err(Error::InvalidVersion {
+                version: s.to_string(),
+            })?
         };
         let maj = captures.get(1).map(|m| DecNum { value: m.as_str() });
         let min = captures.get(2).map(|m| DecNum { value: m.as_str() });
@@ -417,7 +438,7 @@ fn append_op(stack: &mut Vec<Stack>, token: &str) -> Result<(), anyhow::Error> {
         "&&" => StackBinOp::And,
         "||" => StackBinOp::Or,
         "," => StackBinOp::Comma,
-        _ => Err(Error::InvalidVersion)?,
+        _ => Err(Error::ExpectedOperator)?,
     };
     let value = stack.pop_op(op);
     stack.push(Stack::Version(value));
@@ -512,7 +533,7 @@ impl<'a> CompiledVersion<'a> {
         }
         match state {
             State::ExpectOperator => {}
-            State::ExpectVersion | State::ExpectGroup => Err(Error::InvalidVersion)?,
+            State::ExpectVersion | State::ExpectGroup => Err(Error::ExpectedVersion)?,
         }
         let result = stack.pop_op(StackBinOp::Comma);
         if !stack.is_empty() {
