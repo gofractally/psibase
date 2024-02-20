@@ -39,6 +39,24 @@ const res = await supervisor.call({
 })
 ```
 
+#### Proposed Supervisor API
+
+```
+const myplugin = "plugin1.psibase";
+// uniquely identify this app
+const sessionID = uuid();
+// allow Supervisor to preload needed plugins
+const preloadPlugins = [
+    "app2"
+];
+const supervisor = await Supervisor.connect(sessionID, myplugin, preloadPlugins);
+const res = await supervisor.call({
+    app: "app2",
+    method: "method_name",
+    params: { ... },
+})
+```
+
 App1's call is routed through the Supervisor, which then routes the call to the intended app.
 This hierarchy of apps ensures all apps can verify the source/destination of their function calls is the Supervisor, which provides a security guaranty.
 
