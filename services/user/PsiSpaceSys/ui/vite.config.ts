@@ -39,7 +39,6 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
-                                "/common/rpc.mjs",
                                 "/common/iframeResizer.js",
                                 "/common/common-lib.js",
                             ],
@@ -81,7 +80,6 @@ const psibase = (appletContract: string, isServing?: boolean) => {
         },
         alias({
             entries: [
-                { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
                 {
                     find: "@psibase/common-lib",
                     replacement: "/common/common-lib.js",
