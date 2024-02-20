@@ -47,6 +47,6 @@ namespace SystemService
    PSIO_REFLECT(ProducerSys,
                 method(setConsensus, consensus),
                 method(setProducers, producers),
-                method(checkAuthSys, flags, requester, action, allowedActions, claims),
+                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user))
 }  // namespace SystemService
