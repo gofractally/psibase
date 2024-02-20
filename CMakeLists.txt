@@ -265,6 +265,46 @@ add_custom_command(
 add_custom_target(wasm-psibase ALL DEPENDS ${WASM_PSIBASE_BYPRODUCTS})
 add_dependencies(wasm-psibase rust)
 
+set(PARSER_COMPONENT_OUTPUT
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/target/wasm32-unknown-unknown/release/component_parser.wasm
+)
+add_custom_command(
+    OUTPUT ${PARSER_COMPONENT_OUTPUT}
+    COMMAND cargo component build 
+        --release 
+        --target wasm32-unknown-unknown
+        --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/Cargo.toml 
+        --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/target
+)
+add_custom_target(GenComponentParser ALL DEPENDS ${PARSER_COMPONENT_OUTPUT})
+
+set(PARSER_CORE_OUTPUT
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/component_parser.core.wasm
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/component_parser.core2.wasm
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/component_parser.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/component_parser.js
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/psibase-component-parser-provider.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-cli-environment.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-cli-exit.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-cli-stderr.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-cli-stdin.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-cli-stdout.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-clocks-wall-clock.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-filesystem-preopens.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-filesystem-types.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-io-error.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-io-streams.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/component_parser/interfaces/wasi-random-random.d.ts
+)
+add_custom_command(
+    OUTPUT ${PARSER_CORE_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/ 
+        npx jco transpile --tla-compat ./target/wasm32-unknown-unknown/release/component_parser.wasm -o ./component_parser_js
+)
+add_custom_target(GenComponentParserCore ALL DEPENDS ${PARSER_CORE_OUTPUT})
+add_dependencies(GenComponentParserCore GenComponentParser)
+add_dependencies(CommonSysLoaderLib_js GenComponentParserCore)
+
 function(psinode_files target pfx)
     add_custom_target(
     ${target}

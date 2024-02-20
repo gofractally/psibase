@@ -4,7 +4,7 @@ import {
   generatePendingFunction,
   getImportedFunctions,
 } from "./dynamicFunctions";
-import { $init, provider } from "../component_parser/component_parser";
+import { $init, provider } from "../component_parser_js/component_parser";
 import importableCode from "./importables.js?raw";
 import {
   PluginCallResponse,
