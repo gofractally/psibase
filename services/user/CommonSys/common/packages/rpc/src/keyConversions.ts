@@ -45,7 +45,7 @@ function base58ToBinary(size: number, s: string): Uint8Array {
 }
 
 function binaryToBase58(bignum: Uint8Array): string {
-    const result = [];
+    const result: number[] = [];
     for (const byte of bignum) {
         let carry = byte;
         for (let j = 0; j < result.length; ++j) {
@@ -69,8 +69,8 @@ function binaryToBase58(bignum: Uint8Array): string {
     return String.fromCharCode(...result);
 }
 
-function digestSuffixRipemd160(data: any, suffix: string) {
-    const d = [];
+function digestSuffixRipemd160(data: Uint8Array, suffix: string) {
+    const d: number[] = [];
     for (let i = 0; i < data.length; ++i) {
         d[i] = data[i];
     }

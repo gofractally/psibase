@@ -834,7 +834,7 @@ export function action<ActionParams>(
     application: string,
     actionName: string,
     params: ActionParams,
-    sender = null
+    sender: string | null = null
 ) {
     sendToParent({
         type: MessageTypes.Action,
