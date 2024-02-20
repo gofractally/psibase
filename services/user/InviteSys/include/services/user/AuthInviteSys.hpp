@@ -15,7 +15,8 @@ namespace UserService
 
       void checkAuthSys(uint32_t                                  flags,
                         psibase::AccountNumber                    requester,
-                        psibase::Action                           action,
+                        psibase::AccountNumber                    sender,
+                        SystemService::ServiceMethod              action,
                         std::vector<SystemService::ServiceMethod> allowedActions,
                         std::vector<psibase::Claim>               claims);
       void canAuthUserSys(psibase::AccountNumber user);
@@ -27,7 +28,7 @@ namespace UserService
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
    PSIO_REFLECT(AuthInviteSys,  //
-                method(checkAuthSys, flags, requester, action, allowedActions, claims),
+                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
                 method(requireAuth, pubkey),
                 method(serveSys, request),
