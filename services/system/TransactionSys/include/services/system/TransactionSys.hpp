@@ -116,6 +116,7 @@ namespace SystemService
       ///                     the sender of the `runAs` action.
       ///                     This is often different from
       ///                     `action.sender`.
+      /// * `sender`          The sender being requested for the action.
       /// * `action`:         Action to authenticate
       /// * `allowedActions`: Argument from `runAs`
       /// * `claims`:         Claims in transaction (e.g. public keys).
@@ -124,7 +125,8 @@ namespace SystemService
       // TODO: return error message instead?
       void checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
-                        psibase::Action             action,
+                        psibase::AccountNumber      sender,
+                        ServiceMethod               action,
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
@@ -139,7 +141,7 @@ namespace SystemService
       void canAuthUserSys(psibase::AccountNumber user);
    };
    PSIO_REFLECT(AuthInterface,
-                method(checkAuthSys, flags, requester, action, allowedActions, claims),
+                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user))
 
    struct TransactionSysStatus
@@ -198,14 +200,14 @@ namespace SystemService
 
       /// This action enables the boot procedure to be split across multiple blocks
       ///
-      /// It is only called once, immediately after the boot transaction. 
+      /// It is only called once, immediately after the boot transaction.
       ///
-      /// `bootTransactions` defines the list of subsequent transaction hashes to which 
-      /// the node operator is committing as part of the boot sequence. The subsequent 
-      /// transactions listed must then be pushed in order, and no other transactions 
+      /// `bootTransactions` defines the list of subsequent transaction hashes to which
+      /// the node operator is committing as part of the boot sequence. The subsequent
+      /// transactions listed must then be pushed in order, and no other transactions
       /// will be accepted until [finishBoot] is run.
       void startBoot(psio::view<const std::vector<psibase::Checksum256>> bootTransactions);
-      
+
       /// Only called once during chain initialization
       ///
       /// This enables the auth checking system. Before this point, `TransactionSys`
