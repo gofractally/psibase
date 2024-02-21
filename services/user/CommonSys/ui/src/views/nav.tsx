@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { siblingUrl as getSiblingUrl } from "common/rpc.mjs";
+import { siblingUrl as getSiblingUrl } from "@psibase/common-lib";
 
 import Ninebox from "../images/ninebox.svg";
 import PsibaseLogo from "../images/psibase.svg";

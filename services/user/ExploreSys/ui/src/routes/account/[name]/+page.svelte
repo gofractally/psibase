@@ -1,5 +1,5 @@
 <script>
-    import { getJson, siblingUrl } from "common/rpc.mjs?client";
+    import { getJson, siblingUrl } from "@psibase/common-lib";
     import { page } from "$app/stores";
     import { onMount } from "svelte";
     import { LeftArrowIcon } from "/src/assets/icons";

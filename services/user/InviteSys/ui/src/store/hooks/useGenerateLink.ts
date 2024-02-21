@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
-import { genKeyPair, KeyType } from "common/keyConversions.mjs";
-import { psiboardApplet } from "service";
+import { genKeyPair, KeyType } from "@psibase/common-lib";
+import { psiboardApplet } from "../../service";
 
 const appletAddress = async() => {
     const appletName = await psiboardApplet.getAppletName()

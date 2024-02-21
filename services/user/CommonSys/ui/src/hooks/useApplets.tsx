@@ -10,7 +10,7 @@ import {
     storeCallback,
     verifyFields,
     WrappedClaim,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 
 import {
     ClientOps,
@@ -258,9 +258,14 @@ export const useApplets = () => {
             const actionSenderClaims = claimParams
                 .filter((action: any) => action.sender)
                 .map((claimParams) => {
-                    const authService = accountsMap.get(claimParams.sender)?.authService;
+                    const authService = accountsMap.get(
+                        claimParams.sender
+                    )?.authService;
                     // For now we only support `auth-ec-sys` and `auth-sys`
-                    if (authService !== "auth-ec-sys" && authService !== "auth-sys") {
+                    if (
+                        authService !== "auth-ec-sys" &&
+                        authService !== "auth-sys"
+                    ) {
                         return undefined;
                     }
 

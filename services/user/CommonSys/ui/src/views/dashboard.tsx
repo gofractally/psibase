@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { siblingUrl } from "common/rpc.mjs";
+import { siblingUrl } from "@psibase/common-lib";
 import { AppletEntry, applets } from "../config";
-import { Heading, Text } from "../components";
+import { Heading } from "../components";
 
 export const Dashboard = ({ currentUser }: { currentUser: string }) => {
     const [hrefs, setHrefs] = useState<{ [key: string]: string }>({});

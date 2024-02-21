@@ -6,9 +6,8 @@ import {
   setQueries,
   postGraphQLGetJson,
   uint8ArrayToHex,
-} from "/common/rpc.mjs";
-
-import { publicStringToDER } from "/common/keyConversions.mjs";
+  publicStringToDER,
+} from "/common/common-lib.js";
 
 const html = htm.bind(React.createElement);
 
@@ -33,7 +32,7 @@ await initializeApplet(async () => {
                   }
                 }
                }
-             }`,
+             }`
           );
 
           const edges = queryResult?.data?.accWithKey?.edges || [];
@@ -60,7 +59,7 @@ await initializeApplet(async () => {
                  account
                  pubkey
                }
-             }`,
+             }`
           );
 
           console.info("queryResult >>>", queryResult);

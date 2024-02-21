@@ -1,5 +1,4 @@
-import { defineConfig, loadEnv } from "vite";
-import { AppletId, query } from "common/rpc.mjs";
+import { AppletId, query } from "@psibase/common-lib";
 
 export const fetchQuery = <T>(
     queryName: string,

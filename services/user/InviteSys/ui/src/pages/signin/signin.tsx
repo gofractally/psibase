@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import {
     privateStringToKeyPair,
     publicKeyPairToString,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
 import { SubmitHandler, useForm } from "react-hook-form";
 
-import { Button, Form, Heading, Text } from "components";
+import { Button, Form, Heading, Text } from "../../components";
 
 export interface AccountPair {
     privateKey: string;

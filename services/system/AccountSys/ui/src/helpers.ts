@@ -4,7 +4,7 @@ import {
     query,
     siblingUrl,
     setActiveAccount,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 import { AccountWithAuth } from "./App";
 export interface MsgProps {
     addMsg: any;
@@ -45,13 +45,11 @@ export const fetchAccountsByKey = async (publicKey: string) => {
         }
     );
     if (publicKey.startsWith("PUB_")) {
-        const accEcKeys = await fetchQuery<{ account: string; pubkey: string }[]>(
-            "accWithKey",
-            "auth-ec-sys",
-            {
-                key: publicKey,
-            }
-        );
+        const accEcKeys = await fetchQuery<
+            { account: string; pubkey: string }[]
+        >("accWithKey", "auth-ec-sys", {
+            key: publicKey,
+        });
         return accKeys.concat(accEcKeys);
     } else {
         return accKeys;

@@ -1,4 +1,4 @@
-import { postJson } from "common/rpc.mjs";
+import { postJson } from "@psibase/common-lib";
 import { Button } from "../components";
 import { Divider } from "../components/divider";
 

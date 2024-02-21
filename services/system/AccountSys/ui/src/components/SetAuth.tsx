@@ -1,4 +1,4 @@
-import { AppletId, getJson, operation } from "common/rpc.mjs";
+import { AppletId, getJson, operation } from "@psibase/common-lib";
 
 let setAuth = async () => {
     const thisApplet = await getJson("/common/thisservice");

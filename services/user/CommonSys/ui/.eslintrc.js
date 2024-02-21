@@ -12,7 +12,7 @@ module.exports = {
         react: {
             version: "detect",
         },
-        "import/core-modules": ["common/rpc.mjs"],
+        "import/core-modules": ["@psibase/common-lib"],
         "import/resolver": {
             node: {
                 paths: ["src"],

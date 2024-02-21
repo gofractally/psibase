@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { useMutation } from "@tanstack/react-query";
-import { KeyType, genKeyPair, privateStringToKeyPair, publicKeyPairToString } from "common/keyConversions.mjs";
-import { useForm } from "react-hook-form";
 import type { SubmitHandler, UseFormReturn } from "react-hook-form";
-import { psiboardApplet } from "service";
-import { Button, Heading, Input, Text } from "components";
-import { isAccountAvailable } from "store/queries/isAccountTaken";
-import { parsePrivateKey } from "store/queries/usePrivateKey";
-import { useParam } from "store";
-import { addAccount } from "store/queries/fetchUser";
-import { AppletId, operation } from "common/rpc.mjs";
+import { useForm } from "react-hook-form";
+import { AppletId, operation, KeyType, genKeyPair, privateStringToKeyPair, publicKeyPairToString } from "@psibase/common-lib";
+
+import { psiboardApplet } from "../../service";
+import { Button, Heading, Input, Text } from "../../components";
+import { isAccountAvailable } from "../../store/queries/isAccountTaken";
+import { parsePrivateKey } from "../../store/queries/usePrivateKey";
+import { useParam } from "../../store";
+import { addAccount } from "../../store/queries/fetchUser";
 
 interface Inputs {
     account_name: string;

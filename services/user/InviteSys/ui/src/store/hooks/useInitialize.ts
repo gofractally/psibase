@@ -1,14 +1,11 @@
 import {
   initializeApplet,
-  AppletId,
   setOperations,
   setQueries,
-  operation,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 
 import { useEffect } from "react";
-import { Service } from "service";
-import { extractInviteTokenKeyPair } from "store/token";
+import { Service } from "../../service";
 
 export const useInitilize = (service: Service) => {
   useEffect(() => {
