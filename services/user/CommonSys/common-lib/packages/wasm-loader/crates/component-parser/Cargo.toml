@@ -1,0 +1,21 @@
+[package]
+name = "component-parser"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.79"
+wasmparser = "0.200.0"
+wasm-compose = "0.200.0"
+wit-component = "0.200.0"
+wit-bindgen = { version = "0.18.0", default-features = false, features = ["realloc"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "component:component-parser"
+
+[package.metadata.component.dependencies]

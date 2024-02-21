@@ -13,6 +13,7 @@
     "vite": "^4.3.8"
   },
   "dependencies": {
+    "@bytecodealliance/jco": "^1.0.0",
     "rollup-plugin-wit-component": "^0.1.3"
   }
 }

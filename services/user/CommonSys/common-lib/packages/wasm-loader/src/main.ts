@@ -1,10 +1,10 @@
 import { buildMessageLoaderInitialized } from "../../../../common/messaging/supervisor/LoaderInitialized";
+import { $init, provider } from "./component_parser";
 import {
+  Func,
   generateFulfilledFunction,
   generatePendingFunction,
-  getImportedFunctions,
 } from "./dynamicFunctions";
-import { $init, provider } from "./graph";
 import importableCode from "./importables.js?raw";
 import {
   PluginCallResponse,
@@ -52,8 +52,21 @@ const functionCall = async ({
 }: PluginCallPayload) => {
   const url = "/plugin.wasm";
 
-  const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
-  const importedFunctionsFromWit = getImportedFunctions();
+  const [wasmBytes] = await Promise.all([
+    fetch(url).then((res) => res.arrayBuffer()),
+    $init,
+  ]);
+  const bytes = new Uint8Array(wasmBytes);
+
+  const ComponentParser = new provider.ComponentParser();
+
+  const { wit } = ComponentParser.parse("hello", bytes);
+  const parsedFunctions = parseFunctions(wit);
+
+  const importedFunctionsFromWit: Func[] = parsedFunctions.map((x) => ({
+    method: x.functionName,
+    service: args.service,
+  }));
 
   const fulfilledFunctions = precomputedResults.map((func) =>
     generateFulfilledFunction(func.method, func.result)
@@ -94,14 +107,44 @@ const onPluginCallRequest = (request: PluginCallRequest) =>
 
 let ranOnce = false;
 
+interface ParsedFunction {
+  packageName: string;
+  functionName: string;
+  parameters: { name: string; type: string }[];
+}
+
+const parseFunctions = (data: string): ParsedFunction[] => {
+  const parsedFunctions: ParsedFunction[] = [];
+  const functionRegex = /export (\w+): func\(([^)]*)\) -> (\w+);/g;
+  let match;
+
+  while ((match = functionRegex.exec(data)) !== null) {
+    const [, functionName, parameters, packageName] = match;
+    const parameterArray = parameters
+      .split(",")
+      .map((param) => param.trim())
+      .map((paramAndType) => {
+        const [name, type] = paramAndType.split(":").map((x) => x.trim());
+        return { name, type };
+      });
+    parsedFunctions.push({
+      packageName,
+      functionName,
+      parameters: parameterArray,
+    });
+  }
+
+  return parsedFunctions;
+};
+
 const run = async () => {
   if (ranOnce) return;
   $init.then(async () => {
-    const Graph = new provider.Graph();
+    const ComponentParser = new provider.ComponentParser();
 
     if (!process.env.NODE_ENV || process.env.NODE_ENV === "development") {
       // @ts-ignore
-      globalThis.Graph = Graph;
+      globalThis.ComponentParser = ComponentParser;
     }
 
     const url =
@@ -110,9 +153,13 @@ const run = async () => {
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
 
-    const component = Graph.addComponent("hello", bytes);
+    const { wit } = ComponentParser.parse("hello", bytes);
 
-    console.log({ array: bytes, component });
+    console.log("functions", wit.split("\n"));
+    console.log("raw", JSON.stringify(wit));
+
+    const parsedFunctions = parseFunctions(wit);
+    console.log(parsedFunctions);
   });
 };
 
