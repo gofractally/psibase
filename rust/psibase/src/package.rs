@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::str::FromStr;
+use wasm_bindgen::prelude::*;
 use zip::ZipArchive;
 
 use async_trait::async_trait;
@@ -764,4 +765,25 @@ impl PackageList {
         }
         self
     }
+}
+
+fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
+    result.map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[wasm_bindgen]
+pub fn js_resolve_packages(
+    js_index: JsValue,
+    js_packages: JsValue,
+    js_pinned: JsValue,
+) -> Result<JsValue, JsValue> {
+    let index: Vec<PackageInfo> = js_err(serde_wasm_bindgen::from_value(js_index))?;
+    let packages: Vec<String> = js_err(serde_wasm_bindgen::from_value(js_packages))?;
+    let pinned: Vec<PackageRef> = js_err(serde_wasm_bindgen::from_value(js_pinned))?;
+
+    Ok(serde_wasm_bindgen::to_value(&js_err(solve_dependencies(
+        index,
+        js_err(make_refs(&packages))?,
+        pinned,
+    ))?)?)
 }

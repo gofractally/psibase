@@ -18,10 +18,16 @@ type ServicesType = {
     [key: string]: boolean;
 };
 
+interface PackageRef {
+    name: string;
+    version: string;
+}
+
 interface PackageMeta {
     name: string;
+    version: string;
     description: string;
-    depends: string[];
+    depends: PackageRef[];
     accounts: string[];
 }
 
@@ -31,8 +37,6 @@ interface PackageInfo extends PackageMeta {
 }
 
 type PackageIndex = PackageInfo[];
-
-type PackageMap = { [key: string]: PackageInfo };
 
 interface TypeFormProps {
     typeForm: UseFormReturn<InstallType>;
@@ -88,7 +92,7 @@ type BootState =
     | TransactionTrace;
 
 interface InstallFormProps {
-    packages: string[];
+    packages: PackageInfo[];
     producerForm: UseFormReturn<ProducerType>;
     config?: PsinodeConfig;
     refetchConfig: () => void;
@@ -240,7 +244,7 @@ const getStack = (trace: TransactionTrace) => {
 };
 
 async function runBoot(
-    packageNames: string[],
+    packageInfo: PackageInfo[],
     producer: string,
     config: PsinodeConfig | undefined,
     refetchConfig: () => void,
@@ -264,9 +268,9 @@ async function runBoot(
         // fetch packages
         let packages: ArrayBuffer[] = [];
         let i = 0;
-        for (let name of packageNames) {
-            setBootState(["fetch", i, packageNames.length]);
-            packages.push(await getArrayBuffer(`/packages/${name}.psi`));
+        for (let info of packageInfo) {
+            setBootState(["fetch", i, packageInfo.length]);
+            packages.push(await getArrayBuffer(`/packages/${info.file}`));
             i++;
         }
         // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
@@ -322,8 +326,10 @@ export const InstallForm = ({
         <>
             {nameChange && <h3>{nameChange}</h3>}
             <h2>The following packages will be installed:</h2>
-            {packages.map((name) => (
-                <p>{name}</p>
+            {packages.map((info) => (
+                <p>
+                    {info.name}-{info.version}
+                </p>
             ))}
             <form
                 onSubmit={() => {
@@ -396,44 +402,6 @@ function useGetJson<R>(url: string): [R | undefined, string | undefined] {
     return [value, error];
 }
 
-function dfs(
-    index: PackageMap,
-    names: string[],
-    found: { [key: string]: boolean },
-    result: string[]
-) {
-    for (let name of names) {
-        let complete = found[name];
-        if (complete === false) {
-            throw new Error(`package ${name} depends on itself`);
-        } else if (complete === undefined) {
-            found[name] = false;
-            let meta = index[name];
-            if (!meta) {
-                throw new Error(`package ${name} not found`);
-            }
-            dfs(index, meta.depends, found, result);
-            result.push(name);
-            found[name] = true;
-        }
-    }
-}
-
-function makePackageMap(index: PackageIndex): PackageMap {
-    let result: PackageMap = {};
-    for (let meta of index) {
-        result[meta.name] = meta;
-    }
-    return result;
-}
-
-function resolvePackages(index: PackageMap, names: string[]): string[] {
-    let found = {};
-    let result: string[] = [];
-    dfs(index, names, found, result);
-    return result;
-}
-
 export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
     const [bootState, setBootState] = useState<BootState>();
 
@@ -480,9 +448,10 @@ export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
                       .filter((name) => servicesForm.getValues(name));
         return (
             <InstallForm
-                packages={resolvePackages(
-                    makePackageMap(serviceIndex),
-                    namedPackages
+                packages={wasm.js_resolve_packages(
+                    serviceIndex,
+                    namedPackages,
+                    []
                 )}
                 config={config}
                 refetchConfig={refetchConfig}
