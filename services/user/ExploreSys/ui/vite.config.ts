@@ -25,7 +25,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
         buildAliases.push({
             find: "@psibase/common-lib",
             replacement: path.resolve(
-                "../../CommonSys/common/packages/rpc/src"
+                "../../CommonSys/common/packages/common-lib/src"
             ),
         });
     }
