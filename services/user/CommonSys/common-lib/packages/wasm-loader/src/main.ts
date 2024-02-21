@@ -1,3 +1,4 @@
+// @ts-ignore
 import { buildMessageLoaderInitialized } from "../../../../common/messaging/supervisor/LoaderInitialized";
 import {
   generateFulfilledFunction,
@@ -49,6 +50,11 @@ const functionCall = async ({
   args,
   precomputedResults,
 }: PluginCallPayload) => {
+  console.log("where am i");
+  console.log("where am i");
+  console.log("where am i");
+  console.log("where am i");
+  console.log("where am i");
   const url = "/plugin.wasm";
 
   const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
@@ -92,6 +98,7 @@ const onPluginCallRequest = (request: PluginCallRequest) =>
   functionCall(request.payload);
 
 const onRawEvent = (message: MessageEvent) => {
+  console.log("**************");
   if (isPluginCallRequest(message.data)) {
     onPluginCallRequest(message.data);
   }

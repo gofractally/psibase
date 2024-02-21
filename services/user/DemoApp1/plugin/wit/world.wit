@@ -1,0 +1,23 @@
+package component:demoapp1;
+
+interface imports {
+
+    get-logged-in-user: func() -> string;
+
+}
+
+
+
+interface account-sys {
+
+    derp: func() -> string;
+}
+
+world example {
+
+    import imports;
+    import account-sys;
+
+
+    export hello-world: func() -> string;
+}

@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
-
-import { Supervisor } from "@messaging";
-
 import "./App.css";
+import { Supervisor } from "@messaging";
+import { useEffect, useState } from "react";
 
 const supervisor = new Supervisor();
 
@@ -23,8 +21,8 @@ function App() {
 
     console.log("calling demoapp2.callintoplugin");
     const res = await supervisor.functionCall({
-      service: "demoapp2",
-      method: "callintoplugin",
+      service: "demoapp1",
+      method: "hello-world",
       params: [],
     });
     setRes(res as string);
