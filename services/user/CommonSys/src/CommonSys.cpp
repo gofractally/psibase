@@ -89,7 +89,7 @@ namespace SystemService
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
       {
          result->headers = {
-             {"Content-Security-Policy", "frame-ancestors 'none';"},
+             {"Content-Security-Policy", "frame-ancestors 'self';"},
          };
          return result;
       }
