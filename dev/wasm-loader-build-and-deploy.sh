@@ -6,7 +6,7 @@ rust_name="common-sys"
 
 cd $root_dir
 
-cd ./common-lib/packages/wasm-loader
+cd ./common/packages/wasm-loader
 rm -rf node_modules
 rm -rf dist
 yarn --mutex network && yarn build

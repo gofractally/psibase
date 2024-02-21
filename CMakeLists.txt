@@ -212,7 +212,7 @@ set(JS_DIRS
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
 set(COMMON_RPC_DIR services/user/CommonSys/common/packages/rpc/:CommonSysRpcLib_js)
-set(COMMON_LOADER_DIR services/user/CommonSys/common-lib/packages/wasm-loader/:CommonSysLoaderLib_js)
+set(COMMON_LOADER_DIR services/user/CommonSys/common/packages/wasm-loader/:CommonSysLoaderLib_js)
 
 function(add_js_target ENTRY OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
@@ -237,7 +237,7 @@ file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/use
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
 
 # TODO: Can this be a dist folder, i.e., a build product?
-file(GLOB common-loader LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/dist/*)
+file(GLOB common-loader LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wasm-loader/dist/*)
 
 # Builds the Common Sys files that the UIs (just below) depend on
 add_js_target(${COMMON_RPC_DIR} common-lib.js)
@@ -360,7 +360,7 @@ psibase_package(
     SERVICE common-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
         SERVER common-sys
-        DATA GLOB ${COMMON_SYS}/common-lib/packages/wasm-loader/dist/*     common/wasm-loader/
+        DATA GLOB ${COMMON_SYS}/common/packages/wasm-loader/dist/*         common/wasm-loader/
         DATA      ${COMMON_SYS}/common/packages/rpc/dist/common-lib.js     common/common-lib.js
         DATA GLOB ${COMMON_SYS}/common/*.mjs                               common/
         DATA      ${COMMON_SYS}/common/fonts                               common/fonts
