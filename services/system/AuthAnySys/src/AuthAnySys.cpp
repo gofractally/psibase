@@ -10,7 +10,8 @@ namespace SystemService
 {
    void AuthAnySys::checkAuthSys(uint32_t                    flags,
                                  psibase::AccountNumber      requester,
-                                 psibase::Action             action,
+                                 psibase::AccountNumber      sender,
+                                 ServiceMethod               action,
                                  std::vector<ServiceMethod>  allowedActions,
                                  std::vector<psibase::Claim> claims)
    {
