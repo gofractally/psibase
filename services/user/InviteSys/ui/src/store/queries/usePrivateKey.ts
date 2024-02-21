@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   privateStringToKeyPair,
   publicKeyPairToString,
-} from "common/keyConversions.mjs";
-import { postGraphQLGetJson } from "common/rpc.mjs";
+  postGraphQLGetJson,
+} from "@psibase/common-lib";
 
 export const parsePrivateKey = (
   privateKey: string | null

@@ -1,4 +1,4 @@
-import { AppletId, query, operation } from "common/rpc.mjs";
+import { AppletId, query, operation } from "@psibase/common-lib";
 
 export const fetchUser = async (): Promise<string> => {
   const accountSys = new AppletId("account-sys");

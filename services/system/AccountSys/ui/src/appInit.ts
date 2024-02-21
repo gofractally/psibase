@@ -8,13 +8,11 @@ import {
     uint8ArrayToHex,
     WrappedClaim,
     MessageMetadata,
-} from "common/rpc.mjs";
-import {
     publicStringToDER,
     privateStringToKeyPair,
     signatureToBin,
     signatureToFracpack,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
 import { AccountWithKey, KeyPair, KeyPairWithAccounts } from "./App";
 import { fetchAccounts } from "./helpers";
 
@@ -85,7 +83,7 @@ class KeyStore {
         }
 
         const k = privateStringToKeyPair(keyPair.privateKey);
-        const packedSignature = serializeSignature(claim,{
+        const packedSignature = serializeSignature(claim, {
             keyType: k.keyType,
             signature: k.keyPair.sign(trxDigest),
         });
@@ -194,11 +192,9 @@ class KeyStore {
 
 const keystore = new KeyStore();
 
-
-export const initAppFn = (setAppInitialized: () => void) =>
-{
+export const initAppFn = (setAppInitialized: () => void) => {
     setAppInitialized();
-}
+};
 
 /*
 

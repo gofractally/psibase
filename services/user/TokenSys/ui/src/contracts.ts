@@ -5,7 +5,7 @@ import {
     Action,
     Qry,
     postGraphQLGetJson,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 import {
     GqlResponse,
     queryTokens,

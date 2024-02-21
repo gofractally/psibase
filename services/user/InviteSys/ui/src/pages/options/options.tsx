@@ -1,9 +1,10 @@
-import { Button, Heading, Icon, Text } from "components";
-import { useParam } from "store";
-import { useUsers, useUser } from "store/hooks/useUser";
-import { useInviteToken } from "store/queries/usePrivateKey";
-import { useGenerateLink } from "store/hooks/useGenerateLink";
 import { Link } from "react-router-dom";
+
+import { Button, Heading, Icon, Text } from "../../components";
+import { useParam } from "../../store";
+import { useUsers, useUser } from "../../store/hooks/useUser";
+import { useInviteToken } from "../../store/queries/usePrivateKey";
+import { useGenerateLink } from "../../store/hooks/useGenerateLink";
 
 export const Options = () => {
   const token = useParam("token");
@@ -29,7 +30,7 @@ export const Options = () => {
   if (tokenError)
     return (
       <Text size="base" className="mb-2 text-red-500">
-        {tokenError}
+        {tokenError as string}
       </Text>
     );
 
@@ -119,7 +120,7 @@ export const Options = () => {
           >
             Generate invite link
           </Button>
-          {inviteError && <Text size="xs">{inviteError}</Text>}
+          {inviteError as string && <Text size="xs">{inviteError as string}</Text>}
           <Text size="xs">
             {isInviting ? (
               "Loading..."

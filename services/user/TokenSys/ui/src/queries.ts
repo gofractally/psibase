@@ -1,4 +1,4 @@
-import { AppletId, query } from "common/rpc.mjs";
+import { AppletId, query } from "@psibase/common-lib";
 import { useGraphQLQuery } from "common/useGraphQLQuery.mjs";
 
 import { TokenBalance, TokenMeta } from "./types";

@@ -8,16 +8,16 @@ use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
 use psibase::services::psispace_sys;
 use psibase::{
-    account, apply_proxy, create_boot_transactions, get_tapos_for_head, new_account_action,
-    push_transaction, reg_server, set_auth_service_action, set_code_action, set_key_action,
-    sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
-    DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
-    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, Transaction,
+    account, apply_proxy, as_json, create_boot_transactions, get_tapos_for_head,
+    new_account_action, push_transaction, reg_server, set_auth_service_action, set_code_action,
+    set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
+    AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
+    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
+    Transaction,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sha2::Sha256;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
@@ -48,6 +48,11 @@ struct Args {
     /// Suppress "Ok" message
     #[clap(long)]
     suppress_ok: bool,
+
+    /// Controls how transaction traces are reported. Possible values are
+    /// error, stack, full, or json
+    #[clap(long, value_name = "FORMAT", default_value = "stack")]
+    trace: TraceFormat,
 
     #[clap(subcommand)]
     command: Command,
@@ -306,6 +311,7 @@ async fn create(
         &args.api,
         client,
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await?;
     if !args.suppress_ok {
@@ -347,6 +353,7 @@ async fn modify(
         &args.api,
         client,
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await?;
     if !args.suppress_ok {
@@ -405,6 +412,7 @@ async fn deploy(
         &args.api,
         client,
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await?;
     if !args.suppress_ok {
@@ -465,6 +473,7 @@ async fn upload(
         &args.api,
         client,
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await?;
     if !args.suppress_ok {
@@ -534,7 +543,7 @@ async fn monitor_trx(
     progress: ProgressBar,
     n: u64,
 ) -> Result<(), anyhow::Error> {
-    let result = push_transaction(&args.api, client.clone(), trx.packed()).await;
+    let result = push_transaction(&args.api, client.clone(), trx.packed(), args.trace).await;
     if let Err(err) = result {
         progress.suspend(|| {
             println!("=====\n{:?}", err);
@@ -613,39 +622,11 @@ async fn boot(
     push_boot(args, &client, boot_transactions.packed()).await?;
     progress.inc(1);
     for transaction in transactions {
-        push_transaction(&args.api, client.clone(), transaction.packed()).await?;
+        push_transaction(&args.api, client.clone(), transaction.packed(), args.trace).await?;
         progress.inc(1)
     }
     if !args.suppress_ok {
         println!("Ok");
-    }
-    Ok(())
-}
-
-async fn push_boot_impl(
-    args: &Args,
-    client: &reqwest::Client,
-    packed: Vec<u8>,
-) -> Result<(), anyhow::Error> {
-    let mut response = client
-        .post(args.api.join("native/push_boot")?)
-        .body(packed)
-        .send()
-        .await?;
-    if response.status().is_client_error() {
-        response = response.error_for_status()?;
-    }
-    if response.status().is_server_error() {
-        return Err(anyhow!("{}", response.text().await?));
-    }
-    let text = response.text().await?;
-    let json: Value = serde_json::de::from_str(&text)?;
-    // println!("{:#?}", json);
-    let err = json.get("error").and_then(|v| v.as_str());
-    if let Some(e) = err {
-        if !e.is_empty() {
-            return Err(anyhow!("{}", e));
-        }
     }
     Ok(())
 }
@@ -655,10 +636,11 @@ async fn push_boot(
     client: &reqwest::Client,
     packed: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
-    push_boot_impl(args, client, packed)
-        .await
-        .context("Failed to boot")?;
-    Ok(())
+    args.trace
+        .error_for_trace(
+            as_json(client.post(args.api.join("native/push_boot")?).body(packed)).await?,
+        )
+        .context("Failed to boot")
 }
 
 fn normalize_upload_path(path: &Option<String>) -> String {
@@ -758,6 +740,7 @@ async fn monitor_install_trx(
         &args.api,
         client.clone(),
         sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
     )
     .await;
 

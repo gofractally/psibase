@@ -3,12 +3,11 @@ import ReactDOM from "react-dom";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { Layout } from "layouts";
-import { Options, SignIn, SignUp } from "pages";
-import { StateProvider } from "store";
-
+import { Layout } from "./layouts";
+import { Options, SignIn, SignUp } from "./pages";
+import { StateProvider } from "./store";
 import "./styles/globals.css";
-import { SelectAccount } from "pages/select/select-account";
+import { SelectAccount } from "./pages/select/select-account";
 
 export const queryClient = new QueryClient();
 

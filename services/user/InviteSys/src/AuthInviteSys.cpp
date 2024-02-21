@@ -15,7 +15,8 @@ namespace UserService
 {
    void AuthInviteSys::checkAuthSys(uint32_t                   flags,
                                     AccountNumber              requester,
-                                    Action                     action,
+                                    AccountNumber              sender,
+                                    ServiceMethod              action,
                                     std::vector<ServiceMethod> allowedActions,
                                     std::vector<Claim>         claims)
    {

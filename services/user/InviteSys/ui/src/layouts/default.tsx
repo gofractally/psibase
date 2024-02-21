@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 
-import { useInitilize } from "store/hooks/useInitialize";
-import { psiboardApplet } from "service";
+import { useInitilize } from "../store/hooks/useInitialize";
+import { psiboardApplet } from "../service";
 
 export const Layout = () => {
   useInitilize(psiboardApplet);

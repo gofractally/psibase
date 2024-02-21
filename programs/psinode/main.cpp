@@ -575,7 +575,7 @@ struct transaction_queue
    {
       bool                            is_boot = false;
       std::vector<char>               packed_signed_trx;
-      http::push_boot_callback        boot_callback;
+      http::push_transaction_callback boot_callback;
       http::push_transaction_callback callback;
    };
 
@@ -611,7 +611,6 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
          {
             for (auto& trx : transactions)
             {
-               trace = {};
                if (!trx.proofs.empty())
                   // Proofs execute as of the state at the beginning of a block.
                   // That state is empty, so there are no proof services installed.
@@ -631,15 +630,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 
       try
       {
-         if (trace.error)
-         {
-            entry.boot_callback(std::move(trace.error));
-         }
-         else
-         {
-            entry.boot_callback(std::nullopt);
-            return true;
-         }
+         entry.boot_callback(std::move(trace));
       }
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
@@ -1848,9 +1839,9 @@ void run(const std::string&              db_path,
       http_config->admin_authz = admin_authz;
 
       // TODO: speculative execution on non-producers
-      http_config->push_boot_async =
-          [queue, &transactionStats, &transactionStatsMutex](
-              std::vector<char> packed_signed_transactions, http::push_boot_callback callback)
+      http_config->push_boot_async = [queue, &transactionStats, &transactionStatsMutex](
+                                         std::vector<char>               packed_signed_transactions,
+                                         http::push_transaction_callback callback)
       {
          {
             std::lock_guard l{transactionStatsMutex};

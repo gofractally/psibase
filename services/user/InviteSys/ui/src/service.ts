@@ -2,8 +2,6 @@ import {
   publicKeyPairToFracpack,
   publicKeyPairToString,
   publicStringToKeyPair,
-} from "common/keyConversions.mjs";
-import {
   action,
   AppletId,
   getJson,
@@ -11,7 +9,7 @@ import {
   query,
   uint8ArrayToHex,
   WrappedClaim,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 
 const OPERATIONS_KEY = "OPERATIONS_KEY";
 const QUERIES_KEY = "QUERIES_KEY";

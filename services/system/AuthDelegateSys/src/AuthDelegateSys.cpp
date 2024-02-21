@@ -9,11 +9,12 @@ namespace SystemService
 {
    void AuthDelegateSys::checkAuthSys(std::uint32_t              flags,
                                       AccountNumber              requester,
-                                      Action                     action,
+                                      AccountNumber              sender,
+                                      ServiceMethod              action,
                                       std::vector<ServiceMethod> allowedActions,
                                       std::vector<Claim>         claims)
    {
-      auto row = db.open<AuthDelegateTable>().getIndex<0>().get(action.sender);
+      auto row = db.open<AuthDelegateTable>().getIndex<0>().get(sender);
       check(row.has_value(), "sender does not have an owning account");
 
       if (requester == row->owner)
@@ -24,11 +25,10 @@ namespace SystemService
       auto accountIndex     = accountTable.getIndex<0>();
       auto account          = accountIndex.get(row->owner);
       if (!account)
-         abortMessage("unknown owner \"" + action.sender.str() + "\"");
+         abortMessage("unknown owner \"" + sender.str() + "\"");
 
-      action.sender = row->owner;
       Actor<AuthInterface> auth(AuthDelegateSys::service, account->authService);
-      auth.checkAuthSys(flags, requester, std::move(action), std::move(allowedActions),
+      auth.checkAuthSys(flags, requester, row->owner, std::move(action), std::move(allowedActions),
                         std::move(claims));
    }
 

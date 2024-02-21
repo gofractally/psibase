@@ -1,10 +1,4 @@
 import { useState } from "react";
-// import {
-//     initializeApplet,
-//     AppletId,
-//     query,
-//     setOperations,
-// } from "common/rpc.mjs";
 import {
     initializeApplet,
     AppletId,

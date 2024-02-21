@@ -1,7 +1,7 @@
 import {
     privateStringToKeyPair,
-    publicKeyPairToFracpack,
-    signatureToFracpack,
+    publicKeyPairToDER,
+    signatureToBin,
 } from "./keyConversions";
 import hashJs from "hash.js";
 
@@ -13,6 +13,33 @@ export class RPCError extends Error {
         this.trace = trace;
     }
 }
+
+export type ChangeHistoryPayload = {
+    pathname: string;
+    search: string;
+    hash: string;
+};
+
+export interface GetClaimParams {
+    service: string;
+    sender: string;
+    method: string;
+    params: any;
+}
+
+export type Claim = {
+    service: string;
+    rawData: string; // hex bytes
+};
+
+export type WrappedClaim = {
+    claim: Claim;
+    pubkey: string; // Public key string
+};
+
+export type MessageMetadata = {
+    sender: string;
+};
 
 /** Global Values */
 let rootDomain = "";
@@ -29,11 +56,10 @@ const bufferedMessages: any[] = [];
 const callbacks: any[] = [null];
 const promises: any[] = [null];
 const transactions: any = {};
-const debug : Boolean = false;
+const debug: Boolean = false;
 
 function debugPrint(...args: any[]): void {
-    if (debug)
-        console.debug(...args);
+    if (debug) console.debug(...args);
 }
 
 export async function getRootDomain() {
@@ -46,7 +72,7 @@ export async function getRootDomain() {
 }
 
 export async function siblingUrl(
-    baseUrl?: string,
+    baseUrl?: string | null,
     service?: string,
     path?: string
 ): Promise<string> {
@@ -86,6 +112,11 @@ export async function getText(url: string) {
 export async function getJson<T = any>(url: string): Promise<T> {
     const res = await get(url, { headers: { Accept: "application/json" } });
     return res.json();
+}
+
+export async function getArrayBuffer(url: string) {
+    const res = await get(url);
+    return res.arrayBuffer();
 }
 
 export async function postText(url: string, text: string) {
@@ -141,7 +172,10 @@ export async function postTextGetJson(url: string, text: string) {
     return res.json();
 }
 
-export async function postGraphQLGetJson(url: string, graphQL: string) {
+export async function postGraphQLGetJson<GqlResponse>(
+    url: string,
+    graphQL: string
+): Promise<GqlResponse> {
     const res = await postGraphQL(url, graphQL);
     return res.json();
 }
@@ -271,8 +305,8 @@ export async function signTransaction(
         else return k;
     });
     const claims = keys.map((k) => ({
-        service: "verifyec-sys",
-        rawData: uint8ArrayToHex(publicKeyPairToFracpack(k)),
+        service: "verify-sys",
+        rawData: uint8ArrayToHex(publicKeyPairToDER(k)),
     }));
     transaction = new Uint8Array(
         await packTransaction(baseUrl, { ...transaction, claims })
@@ -280,7 +314,7 @@ export async function signTransaction(
     const digest = new (hashJs as any).sha256().update(transaction).digest();
     const proofs = keys.map((k) =>
         uint8ArrayToHex(
-            signatureToFracpack({
+            signatureToBin({
                 keyType: k.keyType,
                 signature: k.keyPair.sign(digest),
             })
@@ -646,7 +680,6 @@ const messageRouting = [
 ];
 
 export async function initializeApplet(initializer = () => {}) {
-
     const rootUrl = await siblingUrl(undefined, undefined, undefined);
 
     (window as any).iFrameResizer = {
@@ -697,7 +730,6 @@ export async function initializeApplet(initializer = () => {}) {
     await import("/common/iframeResizer.contentWindow.js");
 
     await initializer();
-
 }
 
 const sendHistoryChange = () => {
@@ -805,7 +837,7 @@ export function action<ActionParams>(
     application: string,
     actionName: string,
     params: ActionParams,
-    sender = null
+    sender: string | null = null
 ) {
     sendToParent({
         type: MessageTypes.Action,

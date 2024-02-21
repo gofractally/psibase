@@ -22,7 +22,9 @@ const psibase = (appletContract: string, isServing?: boolean) => {
     if (isServing) {
         buildAliases.push({
             find: "@psibase/common-lib",
-            replacement: path.resolve("../../CommonSys/common-lib/src"),
+            replacement: path.resolve(
+                "../../CommonSys/common/packages/rpc/src"
+            ),
         });
     }
 
@@ -37,7 +39,6 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
-                                "/common/rpc.mjs",
                                 "/common/iframeResizer.js",
                                 "/common/common-lib.js",
                             ],
@@ -79,7 +80,6 @@ const psibase = (appletContract: string, isServing?: boolean) => {
         },
         alias({
             entries: [
-                { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
                 {
                     find: "@psibase/common-lib",
                     replacement: "/common/common-lib.js",
