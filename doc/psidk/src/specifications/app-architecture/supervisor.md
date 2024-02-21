@@ -26,7 +26,7 @@ The supervisor will poll the root domain to watch for events that have been subs
 
 ### Communication with plugins
 
-Let's inspect inter-app communication via plugins at 3 levels of detail.
+#### Inter-app communication via plugins at 3 levels of detail.
 
 First, here's what the frontend code looks like for an app to call method `method_name` on app `app2`:
 
@@ -39,22 +39,31 @@ const res = await supervisor.call({
 })
 ```
 
-#### Proposed Supervisor API
+##### Proposed Supervisor API
 
 ```
-const myplugin = "plugin1.psibase";
-// uniquely identify this app
-const sessionID = uuid();
-// allow Supervisor to preload needed plugins
-const preloadPlugins = [
-    "app2"
+const services = [{
+    service: "sample_srvc_name",
+}, {
+    service: "srvc_name2",
+    plugin: "plugin2" // optional; assumed to be simply "plugin" by default
+}
 ];
-const supervisor = await Supervisor.connect(sessionID, myplugin, preloadPlugins);
+
+// Supervisor.connect(...) will internally create a uuid to represent the client session
+const supervisor = await Supervisor.connect(options: {
+    services   // optional: for, e.g., preloading. the <wasm filename>.wasm
+    // if not provided, Supervisor will load the wasm specified in supervisor.call()
+});
+
 const res = await supervisor.call({
-    app: "app2",
+    service: "service_name",
+    plugin: "plugin_name", // optional
     method: "method_name",
-    params: { ... },
-})
+    params: {
+        arg1: "arg value 1"
+    }
+});
 ```
 
 App1's call is routed through the Supervisor, which then routes the call to the intended app.
@@ -119,17 +128,13 @@ Finally, Supervisor mediates the call from app1 to app2's plugin (as well as a r
 '------------------------------------------------------------------------------------'
 ```
 
-The supervisor is instantiated in an iframe by a psibase app, and is responsible for instantiating plugins in their own subdomains using hidden iframes.
-
 For example, if `app1.psibase` is requested from a psibase infrastructure provider, then the element stored at the root path in that service is returned to the client. That UI element is the root page of the psibase app, which will then request the supervisor from its domain on the server. After the supervisor loads, the psibase app can call into the supervisor in order to execute functionality defined in app2's plugin.
 
 > ⚠️ For security, plugins should only listen for messages from the supervisor (identified by its domain). Otherwise, an attacker app could instantiate the victim app within its own iframe and impersonate the supervisor.
 
 #### Supervisor initialization
 
-An app uses a library call that instantiates the supervisor inside a hidden iframe and gives the supervisor an ID for identifying the window/session (to help distinguish messages if the app is open in multiple browser tabs).
-
-Q: Is it still a thing for the Supervisor to say where the plugin is?
+Internally, instantiation of the supervisor creates an ID for identifying the window/session (to help distinguish messages to handle the case where the app is open in multiple browser tabs).
 
 TASK: Update below if/as Supervisor API changes
 
