@@ -9,7 +9,9 @@
             "/common": ["../../CommonSys/common"],
             "$lib": ["./src/lib"],
             "$lib/*": ["./src/lib/*"],
-            "@psibase/common-lib": ["../../CommonSys/common/packages/rpc/src"]
+            "@psibase/common-lib": [
+                "../../CommonSys/common/packages/common-lib/src"
+            ]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,

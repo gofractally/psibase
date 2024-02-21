@@ -5,7 +5,9 @@
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
         "paths": {
-            "@psibase/common-lib": ["../../CommonSys/common/packages/rpc/src"]
+            "@psibase/common-lib": [
+                "../../CommonSys/common/packages/common-lib/src"
+            ]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,

@@ -7,7 +7,7 @@
         "paths": {
             "/common": ["../../../user/CommonSys/common"],
             "@psibase/common-lib": [
-                "../../../user/CommonSys/common/packages/rpc/src"
+                "../../../user/CommonSys/common/packages/common-lib/src"
             ]
         },
         "skipLibCheck": true,
