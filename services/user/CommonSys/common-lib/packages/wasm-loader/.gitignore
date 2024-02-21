@@ -1,1 +1,3 @@
 component_parser/**
+src/component_parser.d.ts
+src/component_parser.js

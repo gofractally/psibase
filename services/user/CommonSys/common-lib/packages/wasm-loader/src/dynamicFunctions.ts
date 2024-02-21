@@ -1,4 +1,4 @@
-interface Func {
+export interface Func {
   service: string;
   method: string;
 }
@@ -12,11 +12,19 @@ export const getImportedFunctions = (): Func[] => {
   ];
 };
 
+const argString = (count: number) =>
+  [...new Array(count)]
+    .map((_, index) => index + 1)
+    .map((num) => `arg${num}`)
+    .join(", ")
+    .trim();
+
 export const generateFulfilledFunction = (
   method: string,
-  result: string | number
+  result: string | number,
+  argCount = 3
 ): string =>
-  `export function ${method}(arg1, arg2, arg3) {
+  `export function ${method}(${argString(argCount)}) {
         return ${typeof result == "number" ? result : `'${result}'`}
       }`;
 
