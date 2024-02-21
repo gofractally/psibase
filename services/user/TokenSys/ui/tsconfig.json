@@ -6,7 +6,8 @@
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
         "paths": {
-            "/common": ["../../CommonSys/common"]
+            "/common": ["../../CommonSys/common"],
+            "@psibase/common-lib": ["../../CommonSys/common/packages/rpc/src"]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
@@ -20,11 +21,7 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": [
-        "src",
-        "../../CommonSys/common/rpc.d.ts",
-        "../../CommonSys/common/useGraphQLQuery.d.ts"
-    ],
+    "include": ["src", "../../CommonSys/common/useGraphQLQuery.d.ts"],
     "references": [
         {
             "path": "./tsconfig.node.json"
