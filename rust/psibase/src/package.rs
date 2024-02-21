@@ -43,6 +43,8 @@ custom_error! {
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
+    GraphQLError{message: String} = "{message}",
+    GraphQLWrongResponse = "Missing field `data` in graphql response",
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Pack, Unpack, Reflect)]
@@ -650,8 +652,14 @@ struct InstalledQuery {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct GQLError {
+    message: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct InstalledRoot {
-    data: InstalledQuery,
+    data: Option<InstalledQuery>,
+    errors: Option<GQLError>,
 }
 
 impl PackageList {
@@ -679,13 +687,21 @@ impl PackageList {
                                                      .header("Content-Type", "application/graphql")
                                                     .body(format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version }} }} }} }}", serde_json::to_string(&end_cursor)?)))
                 .await?;
-            for edge in page.data.installed.edges {
+            if let Some(error) = page.errors {
+                Err(Error::GraphQLError {
+                    message: error.message,
+                })?
+            }
+            let Some(data) = page.data else {
+                Err(Error::GraphQLWrongResponse)?
+            };
+            for edge in data.installed.edges {
                 result.insert(edge.node.name, edge.node.version);
             }
-            if !page.data.installed.pageInfo.hasNextPage {
+            if !data.installed.pageInfo.hasNextPage {
                 break;
             }
-            end_cursor = Some(page.data.installed.pageInfo.endCursor);
+            end_cursor = Some(data.installed.pageInfo.endCursor);
         }
         Ok(result)
     }

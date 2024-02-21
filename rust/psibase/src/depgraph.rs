@@ -81,7 +81,7 @@ fn topological_sort(
         found.insert(name.clone(), true);
     }
     let mut result = vec![];
-    topological_sort_impl(&mut by_name, input, &mut HashMap::new(), &mut result)?;
+    topological_sort_impl(&mut by_name, input, &mut found, &mut result)?;
     Ok(result)
 }
 
@@ -185,7 +185,7 @@ impl<'a> DepGraph<'a> {
         for packages in self.packages.values() {
             for (meta, var) in packages.values() {
                 for dep in &meta.depends {
-                    if let Some(matched) = self.matches_pinned(dep) {
+                    if let Some(matched) = self.matches_pinned(dep)? {
                         if !matched {
                             self.solver.add_clause(&[!*var]);
                         }
@@ -220,11 +220,11 @@ impl<'a> DepGraph<'a> {
             zero_or_one_of(&mut self.solver, group);
         }
     }
-    fn matches_pinned(&self, package: &PackageRef) -> Option<bool> {
+    fn matches_pinned(&self, package: &PackageRef) -> Result<Option<bool>, anyhow::Error> {
         if let Some(pinned_version) = self.pinned.get(&package.name) {
-            Some(&package.version == pinned_version)
+            Ok(Some(version_match(&package.version, pinned_version)?))
         } else {
-            None
+            Ok(None)
         }
     }
     fn add_pinned(&mut self) {

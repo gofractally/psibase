@@ -39,7 +39,7 @@ namespace UserService
 
       auto byName() const { return PackageKey(name, owner); }
    };
-   PSIO_REFLECT(InstalledPackage, name, description, depends, accounts, owner)
+   PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, owner)
 
    using InstalledPackageTable = psibase::Table<InstalledPackage, &InstalledPackage::byName>;
 
