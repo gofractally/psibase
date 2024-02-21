@@ -54,6 +54,7 @@ const psibase = (options: Options) => {
               external: [
                 "/common/rootdomain.mjs",
                 "/common/iframeResizer.js",
+                "/common/iframeResizer.contentWindow.js",
                 "/common/common-lib.js",
               ],
               makeAbsoluteExternalsRelative: false,
