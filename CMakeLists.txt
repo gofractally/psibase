@@ -288,20 +288,24 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
+set(PSIBASE_VERSION "0.6.0")
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactionSys.psi
     NAME TransactionSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm
     FLAGS allowSudo allowWriteNative
     DEPENDS wasm
-    PACKAGE_DEPENDS AccountSys CpuSys
+    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "CpuSys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AccountSys.psi
     NAME AccountSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE account-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm
@@ -312,12 +316,13 @@ psibase_package(
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist /
     DEPENDS ${AccountSys_js_dep}
     DEPENDS wasm
-    PACKAGE_DEPENDS AuthAnySys ProxySys
+    PACKAGE_DEPENDS "AuthAnySys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSys.psi
     NAME AuthSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service using Botan to verify signatures"
     SERVICE auth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
@@ -330,7 +335,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
         FLAGS isAuthService
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
@@ -349,6 +354,7 @@ set(THIRD_FILES
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CommonSys.psi
     NAME CommonSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Service that contains the common files and libraries used by apps on psibase"
     SERVICE common-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
@@ -360,12 +366,13 @@ psibase_package(
         DATA GLOB ${THIRD_FILES}                              common
     DEPENDS ${CommonSys_js_dep}
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthDelegateSys.psi
     NAME AuthDelegateSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-dlg-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegateSys.wasm
@@ -375,6 +382,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthEcSys.psi
     NAME AuthEcSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service using secp256k1 to verify signatures"
     SERVICE auth-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
@@ -387,12 +395,13 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
         FLAGS isAuthService
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthAnySys.psi
     NAME AuthAnySys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Insecure auth service that allows any access"
     SERVICE auth-any-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm
@@ -402,6 +411,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CpuSys.psi
     NAME CpuSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Service that manages CPU billing"
     SERVICE cpu-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuSys.wasm
@@ -412,16 +422,18 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/DocSys.psi
     NAME DocSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Psibase documentation"
     SERVICE doc-sys
     DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
-    PACKAGE_DEPENDS PsiSpaceSys AccountSys
+    PACKAGE_DEPENDS "PsiSpaceSys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/PsiSpaceSys.psi
     NAME PsiSpaceSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Provides web hosting to non-service accounts"
     SERVICE psispace-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
@@ -429,12 +441,13 @@ psibase_package(
     SERVER psispace-sys
     DEPENDS ${PsiSpaceSys_js_dep}
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/ProducerSys.psi
     NAME ProducerSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Manages the active producers"
     SERVICE producer-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
@@ -445,12 +458,13 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/ProducerSys/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys AccountSys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/ProxySys.psi
     NAME ProxySys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "The `proxy-sys` service routes HTTP requests to the appropriate service"
     SERVICE proxy-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
@@ -463,6 +477,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/SetCodeSys.psi
     NAME SetCodeSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All compiled code is uploaded to the chain through this service"
     SERVICE setcode-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm
@@ -473,6 +488,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/ExploreSys.psi
     NAME ExploreSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Block explorer"
     SERVICE explore-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm
@@ -480,14 +496,15 @@ psibase_package(
     DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist /
     DEPENDS ExploreSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist/index.html
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/InviteSys.psi
     NAME InviteSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS AccountSys ProxySys NftSys TokenSys
+    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})"
     SERVICE invite-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist /
@@ -502,8 +519,9 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/NftSys.psi
     NAME NftSys
+    VERSION ${PSIBASE_VERSION}
     SERVICE nft-sys
-    PACKAGE_DEPENDS AccountSys ProxySys
+    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
     WASM ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
     INIT
     DEPENDS wasm
@@ -512,8 +530,9 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenSys.psi
     NAME TokenSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Token service"
-    PACKAGE_DEPENDS NftSys ProxySys
+    PACKAGE_DEPENDS "NftSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
     SERVICE token-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
         SERVER r-tok-sys
@@ -528,8 +547,9 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/SymbolSys.psi
     NAME SymbolSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS TokenSys NftSys
+    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})"
     SERVICE symbol-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
         INIT
@@ -539,6 +559,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/FractalSys.psi
     NAME FractalSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Fractal service"
     SERVICE fractal-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
@@ -550,15 +571,17 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
-    PACKAGE_DEPENDS TokenSys SymbolSys AccountSys
+    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "SymbolSys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/src/TokenUsers.json
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/PackageSys.psi
     NAME PackageSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Package manager for psibase apps"
     SERVICE package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
@@ -566,12 +589,13 @@ psibase_package(
     SERVICE r-package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Default.psi
     NAME Default
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
                     ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
@@ -581,6 +605,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Minimal.psi
     NAME Minimal
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
     PACKAGE_DEPENDS AccountSys AuthDelegateSys AuthAnySys CpuSys CommonSys PackageSys ProducerSys ProxySys
                     SetCodeSys TransactionSys
