@@ -1,33 +1,30 @@
 {
-  "extends": "./.svelte-kit/tsconfig.json",
-  "compilerOptions": {
-    "target": "ESNext",
-    "useDefineForClassFields": true,
-    "lib": ["DOM", "DOM.Iterable", "ESNext"],
-    "allowJs": false,
-    "paths": {
-      "/common": ["../../CommonSys/common"],
-      "$lib":["./src/lib"],
-      "$lib/*":["./src/lib/*"]
+    "extends": "./.svelte-kit/tsconfig.json",
+    "compilerOptions": {
+        "target": "ESNext",
+        "useDefineForClassFields": true,
+        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "allowJs": false,
+        "paths": {
+            "/common": ["../../CommonSys/common"],
+            "$lib": ["./src/lib"],
+            "$lib/*": ["./src/lib/*"],
+            "@psibase/common-lib": ["../../CommonSys/common/packages/rpc/src"]
+        },
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "strict": true,
+        "forceConsistentCasingInFileNames": true,
+        "moduleResolution": "Node",
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true
     },
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "Node",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-  },
-  "include": [
-    "src",
-    "../../CommonSys/common/rpc.d.ts",
-    "../../CommonSys/common/useGraphQLQuery.d.ts"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ]
+    "include": ["src", "../../CommonSys/common/useGraphQLQuery.d.ts"],
+    "references": [
+        {
+            "path": "./tsconfig.node.json"
+        }
+    ]
 }

@@ -92,7 +92,8 @@ namespace SystemService
 
    void ProducerSys::checkAuthSys(uint32_t                    flags,
                                   psibase::AccountNumber      requester,
-                                  psibase::Action             action,
+                                  psibase::AccountNumber      sender,
+                                  ServiceMethod               action,
                                   std::vector<ServiceMethod>  allowedActions,
                                   std::vector<psibase::Claim> claims)
    {
@@ -129,11 +130,10 @@ namespace SystemService
           expectedClaims, [&](const auto& claim)
           { return claim == Claim{} || std::ranges::binary_search(claims, claim, compare_claim); });
 
-      auto threshold =
-          expectedClaims.empty()
-              ? 0
-              : std::visit([&](const auto& c) { return getThreshold(c, action.sender); },
-                           status->consensus);
+      auto threshold = expectedClaims.empty()
+                           ? 0
+                           : std::visit([&](const auto& c) { return getThreshold(c, sender); },
+                                        status->consensus);
       if (matching < threshold)
       {
          abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold) +

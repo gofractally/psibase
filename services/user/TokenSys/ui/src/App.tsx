@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
-import { initializeApplet, setOperations, setQueries } from "common/rpc.mjs";
+import {
+    initializeApplet,
+    setOperations,
+    setQueries,
+} from "@psibase/common-lib";
 
 import { TransferHistory, SharedBalances } from "./views";
 import { Button, Form, Heading, Icon, Text, Switch } from "./components";

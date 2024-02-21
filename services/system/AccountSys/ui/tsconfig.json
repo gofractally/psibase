@@ -2,15 +2,12 @@
     "compilerOptions": {
         "target": "ESNext",
         "useDefineForClassFields": true,
-        "lib": [
-            "DOM",
-            "DOM.Iterable",
-            "ESNext"
-        ],
+        "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
         "paths": {
-            "/common": [
-                "../../../user/CommonSys/common"
+            "/common": ["../../../user/CommonSys/common"],
+            "@psibase/common-lib": [
+                "../../../user/CommonSys/common/packages/rpc/src"
             ]
         },
         "skipLibCheck": true,
@@ -25,12 +22,7 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": [
-        "src",
-        "../../../user/CommonSys/common/rpc.d.ts",
-        "../../../user/CommonSys/common/keyConversions.d.ts",
-        "../../../user/CommonSys/common/useLocalStorage.d.ts"
-    ],
+    "include": ["src", "../../../user/CommonSys/common/useLocalStorage.d.ts"],
     "references": [
         {
             "path": "./tsconfig.node.json"

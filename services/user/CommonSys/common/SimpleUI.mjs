@@ -4,7 +4,7 @@ import {
     getTaposForHeadBlock,
     packAction,
     signAndPushTransaction,
-} from "./rpc.mjs";
+} from "/common/common-lib.js";
 
 await import("/common/react.production.min.js");
 await import("/common/react-dom.production.min.js");

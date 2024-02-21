@@ -1,4 +1,4 @@
-import { postGraphQLGetJson } from "./rpc.mjs";
+import { postGraphQLGetJson } from "/common/common-lib.js";
 
 // Returns: {
 //     isLoading,   // Is the query in progress?

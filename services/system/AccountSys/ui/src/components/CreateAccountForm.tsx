@@ -6,7 +6,7 @@ import {
     KeyType,
     privateStringToKeyPair,
     publicKeyPairToString,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
 
 import { AccountWithKey } from "../App";
 import Button from "./Button";
@@ -124,7 +124,7 @@ export const CreateAccountForm = forwardRef(
         };
 
         return (
-            <section className="-mx-2 mb-4 bg-gray-100 px-5 pt-4 pb-5 sm:mx-0 sm:rounded">
+            <section className="-mx-2 mb-4 bg-gray-100 px-5 pb-5 pt-4 sm:mx-0 sm:rounded">
                 <Heading
                     tag="h3"
                     className="select-none font-medium text-gray-600"

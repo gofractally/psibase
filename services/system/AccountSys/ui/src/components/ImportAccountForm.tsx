@@ -4,7 +4,7 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import {
     privateStringToKeyPair,
     publicKeyPairToString,
-} from "common/keyConversions.mjs";
+} from "@psibase/common-lib";
 import Button from "./Button";
 import Heading from "./Heading";
 import Form from "./Form";
@@ -98,7 +98,7 @@ export const ImportAccountForm = ({ addAccounts }: Props) => {
     // const isDisabled = isLoading || !isValidPrivateKey || privateKey === "";
 
     return (
-        <section className="-mx-2 mb-4 bg-gray-100 px-5 pt-4 pb-5 sm:mx-0 sm:rounded">
+        <section className="-mx-2 mb-4 bg-gray-100 px-5 pb-5 pt-4 sm:mx-0 sm:rounded">
             <Heading tag="h3" className="select-none font-medium text-gray-600">
                 Import an account
             </Heading>

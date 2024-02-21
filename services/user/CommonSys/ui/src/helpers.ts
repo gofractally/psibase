@@ -1,4 +1,4 @@
-import { AppletId, getTaposForHeadBlock } from "common/rpc.mjs";
+import { AppletId, getTaposForHeadBlock } from "@psibase/common-lib";
 
 import { appletPrefix } from "./config";
 

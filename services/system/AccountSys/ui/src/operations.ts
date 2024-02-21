@@ -1,4 +1,4 @@
-import { AppletId, getJson, operation } from "common/rpc.mjs";
+import { AppletId, getJson, operation } from "@psibase/common-lib";
 
 import { AccountWithAuth, AccountWithKey } from "./App";
 import { AccountPair } from "./components/CreateAccountForm";

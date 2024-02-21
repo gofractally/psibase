@@ -234,7 +234,7 @@ class API:
             mode = 'CftConsensus'
         elif algorithm == 'bft':
             mode = 'BftConsensus'
-        return self.push_action('producer-sys', 'producer-sys', 'setConsensus', {'consensus':[mode, {'producers': producers}]})
+        return self.push_action('producer-sys', 'producer-sys', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
 
     # Queries
     def graphql(self, service, query):

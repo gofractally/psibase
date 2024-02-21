@@ -4,7 +4,30 @@ import path from "path";
 import alias from "@rollup/plugin-alias";
 import svgr from "vite-plugin-svgr";
 
-const psibase = (appletContract: string) => {
+const psibase = (appletContract: string, isServing?: boolean) => {
+    const buildAliases = [
+        {
+            find: "/common/iframeResizer.contentWindow.js",
+            replacement: path.resolve(
+                "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
+            ),
+        },
+        {
+            // bundle non-external (above) common files except fonts (which should only be referenced)
+            find: /^\/common(?!\/(?:fonts))(.*)$/,
+            replacement: path.resolve("../../CommonSys/common$1"),
+        },
+    ];
+
+    if (isServing) {
+        buildAliases.push({
+            find: "@psibase/common-lib",
+            replacement: path.resolve(
+                "../../CommonSys/common/packages/rpc/src"
+            ),
+        });
+    }
+
     return [
         {
             name: "psibase",
@@ -16,7 +39,7 @@ const psibase = (appletContract: string) => {
                         rollupOptions: {
                             external: [
                                 // modules only; everthing in this list will have a module mime type in build mode
-                                "/common/rpc.mjs",
+                                "/common/common-lib.js",
                                 "/common/useGraphQLQuery.mjs",
                             ],
                             makeAbsoluteExternalsRelative: false,
@@ -50,28 +73,17 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: [
-                            {
-                                find: "/common/iframeResizer.contentWindow.js",
-                                replacement: path.resolve(
-                                    "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
-                                ),
-                            },
-                            {
-                                // bundle non-external (above) common files except fonts (which should only be referenced)
-                                find: /^\/common(?!\/(?:fonts))(.*)$/,
-                                replacement: path.resolve(
-                                    "../../CommonSys/common$1"
-                                ),
-                            },
-                        ],
+                        alias: buildAliases,
                     },
                 };
             },
         },
         alias({
             entries: [
-                { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
+                {
+                    find: "@psibase/common-lib",
+                    replacement: "/common/common-lib.js",
+                },
                 {
                     find: "common/useGraphQLQuery.mjs",
                     replacement: "/common/useGraphQLQuery.mjs",
@@ -82,7 +94,7 @@ const psibase = (appletContract: string) => {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
     plugins: [
         react({
             babel: {
@@ -92,6 +104,6 @@ export default defineConfig({
             },
         }),
         svgr({ exportAsDefault: true }),
-        psibase("token-sys"),
+        psibase("token-sys", command === "serve"),
     ],
-});
+}));
