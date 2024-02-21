@@ -51,7 +51,7 @@ const unixTime = () => Math.floor(Date.now() / 1000)
 
 export const fetchInvite = async (publicKey: string) => {
   const query = queryInviteKey(publicKey);
-  return postGraphQLGetJson("/graphql", query)
+  return postGraphQLGetJson<{ data: { getInvite: { actor: string, expiry: number, inviter: string, newAccountToken: boolean, pubkey: string, state: InviteStates }}}>("/graphql", query)
 };
 
 export const useInviteToken = (privateKey: string | null) => {

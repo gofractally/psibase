@@ -172,7 +172,10 @@ export async function postTextGetJson(url: string, text: string) {
     return res.json();
 }
 
-export async function postGraphQLGetJson(url: string, graphQL: string) {
+export async function postGraphQLGetJson<GqlResponse>(
+    url: string,
+    graphQL: string
+): Promise<GqlResponse> {
     const res = await postGraphQL(url, graphQL);
     return res.json();
 }
