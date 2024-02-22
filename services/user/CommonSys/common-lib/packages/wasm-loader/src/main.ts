@@ -1,17 +1,17 @@
 import { buildMessageLoaderInitialized } from "../../../../common/messaging/supervisor/LoaderInitialized";
 import { $init, provider } from "./component_parser";
 import {
-  Func,
-  generateFulfilledFunction,
-  generatePendingFunction,
+    Func,
+    generateFulfilledFunction,
+    generatePendingFunction
 } from "./dynamicFunctions";
 import importableCode from "./importables.js?raw";
 import {
-  PluginCallResponse,
-  isPluginCallRequest,
-  PluginCallRequest,
-  buildPluginCallResponse,
-  PluginCallPayload,
+    PluginCallResponse,
+    isPluginCallRequest,
+    PluginCallRequest,
+    buildPluginCallResponse,
+    PluginCallPayload
 } from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -22,152 +22,132 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 `;
 
 interface Importables {
-  [key: string]: string;
+    [key: string]: string;
 }
 
 const runWasm = async (
-  wasm: ArrayBuffer,
-  importables: Importables[],
-  method: string,
-  params: any[]
+    wasm: ArrayBuffer,
+    importables: Importables[],
+    method: string,
+    params: any[]
 ) => {
-  console.info("runWasm().top 2");
-  const { load } = await import("rollup-plugin-wit-component");
+    console.info("runWasm().top 2");
+    const { load } = await import("rollup-plugin-wit-component");
 
-  console.time("Load");
-  const mod = await load(
-    // @ts-expect-error fff
-    wasm,
-    importables
-  );
-  console.timeEnd("Load");
+    console.time("Load");
+    const mod = await load(
+        // @ts-expect-error fff
+        wasm,
+        importables
+    );
+    console.timeEnd("Load");
 
-  return mod[method](...params);
+    return mod[method](...params);
 };
 
 const functionCall = async ({
-  id,
-  args,
-  precomputedResults,
+    id,
+    args,
+    precomputedResults
 }: PluginCallPayload) => {
-  const url = "/plugin.wasm";
+    const url = "/plugin.wasm";
 
-  const [wasmBytes] = await Promise.all([
-    fetch(url).then((res) => res.arrayBuffer()),
-    $init,
-  ]);
-  const bytes = new Uint8Array(wasmBytes);
+    const [wasmBytes] = await Promise.all([
+        fetch(url).then((res) => res.arrayBuffer()),
+        $init
+    ]);
+    const bytes = new Uint8Array(wasmBytes);
 
-  const ComponentParser = new provider.ComponentParser();
+    const ComponentParser = new provider.ComponentParser();
 
-  const { wit } = ComponentParser.parse("hello", bytes);
-  const parsedFunctions = parseFunctions(wit);
+    const { wit } = ComponentParser.parse("hello", bytes);
+    const parsedFunctions = parseFunctions(wit);
 
-  const importedFunctionsFromWit: Func[] = parsedFunctions.map((x) => ({
-    method: x.functionName,
-    service: args.service,
-  }));
+    const importedFunctionsFromWit: Func[] = parsedFunctions.map((x) => ({
+        method: x.functionName,
+        service: args.service
+    }));
 
-  const fulfilledFunctions = precomputedResults.map((func) =>
-    generateFulfilledFunction(func.method, func.result)
-  );
-  const missingFunctions = importedFunctionsFromWit.filter(
-    (func) =>
-      !precomputedResults.some(
-        (f) => f.method == func.method && f.service == func.service
-      )
-  );
+    const fulfilledFunctions = precomputedResults.map((func) =>
+        generateFulfilledFunction(func.method, func.result)
+    );
+    const missingFunctions = importedFunctionsFromWit.filter(
+        (func) =>
+            !precomputedResults.some(
+                (f) => f.method == func.method && f.service == func.service
+            )
+    );
 
-  const str =
-    importableCode +
-    `\n ${missingFunctions.map((missingFunction) =>
-      generatePendingFunction(missingFunction, id)
-    )} \n ${fulfilledFunctions}`;
+    const str =
+        importableCode +
+        `\n ${missingFunctions.map((missingFunction) =>
+            generatePendingFunction(missingFunction, id)
+        )} \n ${fulfilledFunctions}`;
 
-  let importables: Importables[] = [
-    {
-      [`component:${args.service}/imports`]: str,
-    },
-  ];
+    let importables: Importables[] = [
+        {
+            [`component:${args.service}/imports`]: str
+        }
+    ];
 
-  try {
-    const res = await runWasm(wasmBytes, importables, args.method, args.params);
-    sendPluginCallResponse(buildPluginCallResponse(id, res));
-  } catch (e) {
-    console.warn(`runWasm threw.`);
-  }
+    try {
+        const res = await runWasm(
+            wasmBytes,
+            importables,
+            args.method,
+            args.params
+        );
+        sendPluginCallResponse(buildPluginCallResponse(id, res));
+    } catch (e) {
+        console.warn(`runWasm threw.`);
+    }
 };
 
 const sendPluginCallResponse = (response: PluginCallResponse) => {
-  window.parent.postMessage(response, "*");
+    window.parent.postMessage(response, "*");
 };
 
 const onPluginCallRequest = (request: PluginCallRequest) =>
-  functionCall(request.payload);
+    functionCall(request.payload);
 
-let ranOnce = false;
+// let ranOnce = false;
 
 interface ParsedFunction {
-  packageName: string;
-  functionName: string;
-  parameters: { name: string; type: string }[];
+    packageName: string;
+    functionName: string;
+    parameters: { name: string; type: string }[];
 }
 
 const parseFunctions = (data: string): ParsedFunction[] => {
-  const parsedFunctions: ParsedFunction[] = [];
-  const functionRegex = /export (\w+): func\(([^)]*)\) -> (\w+);/g;
-  let match;
+    const parsedFunctions: ParsedFunction[] = [];
+    const functionRegex = /export (\w+): func\(([^)]*)\) -> (\w+);/g;
+    let match;
 
-  while ((match = functionRegex.exec(data)) !== null) {
-    const [, functionName, parameters, packageName] = match;
-    const parameterArray = parameters
-      .split(",")
-      .map((param) => param.trim())
-      .map((paramAndType) => {
-        const [name, type] = paramAndType.split(":").map((x) => x.trim());
-        return { name, type };
-      });
-    parsedFunctions.push({
-      packageName,
-      functionName,
-      parameters: parameterArray,
-    });
-  }
-
-  return parsedFunctions;
-};
-
-const run = async () => {
-  if (ranOnce) return;
-  $init.then(async () => {
-    const ComponentParser = new provider.ComponentParser();
-
-    if (!process.env.NODE_ENV || process.env.NODE_ENV === "development") {
-      // @ts-ignore
-      globalThis.ComponentParser = ComponentParser;
+    while ((match = functionRegex.exec(data)) !== null) {
+        const [, functionName, parameters, packageName] = match;
+        const parameterArray = parameters
+            .split(",")
+            .map((param) => param.trim())
+            .map((paramAndType) => {
+                const [name, type] = paramAndType
+                    .split(":")
+                    .map((x) => x.trim());
+                return { name, type };
+            });
+        parsedFunctions.push({
+            packageName,
+            functionName,
+            parameters: parameterArray
+        });
     }
 
-    const url =
-      "https://account-sys.psibase.127.0.0.1.sslip.io:8080/loader/plugin.wasm";
-    const file = await fetch(url);
-    const arrayBuffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-
-    const { wit } = ComponentParser.parse("hello", bytes);
-
-    console.log("functions", wit.split("\n"));
-    console.log("raw", JSON.stringify(wit));
-
-    const parsedFunctions = parseFunctions(wit);
-    console.log(parsedFunctions);
-  });
+    return parsedFunctions;
 };
 
 const onRawEvent = (message: MessageEvent) => {
-  run();
-  if (isPluginCallRequest(message.data)) {
-    onPluginCallRequest(message.data);
-  }
+    if (isPluginCallRequest(message.data)) {
+        onPluginCallRequest(message.data);
+    }
 };
 
 window.addEventListener("message", onRawEvent);
