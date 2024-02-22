@@ -526,7 +526,7 @@ pub fn link_module(source : &Module, dest : &mut Module) -> Result<(), anyhow::E
 
     walrus::passes::gc::run(dest);
 
-    // TODO: support debugging
+    // TODO: enable debug builds
     // Prior version of this linker removed all custom sections because it was annoying to 
     // keep them updated while reordering and modifying functions. But now that we are using
     // walrus, dwarf data already in the dest module should be left intact.
@@ -535,17 +535,115 @@ pub fn link_module(source : &Module, dest : &mut Module) -> Result<(), anyhow::E
     Ok(())
 }
 
-/// Produce a module that links exported functions in the `source` module to 
-/// their corresponding imported functions in a `dest` module.
-/// 
-/// This also strips out unused functions from the final module.
-/// This function exposes a purely &[u8] interface. See `link_module` for an interface
-/// that accepts walrus modules directly.
-pub fn link(source: &[u8], dest: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    let source_module = Module::from_buffer(source)?;
-    let mut dest_module = Module::from_buffer(dest)?;
+#[cfg(test)]
+mod tests {
+    use core::fmt;
+    use std::{fs::read, path::PathBuf};
+    use anyhow::{Context, Error};
+    use wasmparser::Validator;
 
-    link_module(&source_module, &mut dest_module)?;
+    use super::*;
 
-    Ok(dest_module.emit_wasm())
+    const SERVICE_POLYFILL: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
+    const SIMPLE_WASM: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data/simple.wasm");
+    const INTERMEDIATE_WASM: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data/intermediate.wasm");
+
+    fn get_dest_module(filepath : &str) -> Result<Module, Error> {
+        let filename = &PathBuf::from(filepath);
+        let code = &read(filename)
+            .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
+        Ok(Module::from_buffer(code)?)
+    }
+
+    fn setup(filepath : &str) -> Result<(Module, Module, Module), Error> {
+        let original = get_dest_module(filepath)?;
+        let polyfill = Module::from_buffer(SERVICE_POLYFILL)?;
+        let mut filled = get_dest_module(filepath)?;
+
+        link_module(&polyfill, &mut filled)?;
+        Ok((original, polyfill, filled))
+    }
+
+    fn new_validator() -> Validator {
+        let validator = wasmparser::Validator::new_with_features(wasmparser::WasmFeatures{
+            sign_extension: true,
+            bulk_memory: true,
+            simd: true,
+            ..wasmparser::WasmFeatures::default()
+        });
+        return validator;
+    }
+
+    struct ImportFunction {
+        id : FunctionId,
+        name : String,
+        module : String,
+    }
+    impl fmt::Display for ImportFunction {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{}::{}", self.module, self.name)
+        }
+    }
+
+    fn get_import_funcs(module : &Module) -> Vec<ImportFunction> {
+        module.imports.iter().filter_map(|import| {
+            let dest_func = match import.kind {
+                walrus::ImportKind::Function(import_fid) => module.funcs.get(import_fid),
+                _ => return None,
+            };
+            
+            let import = module.imports.get_imported_func(dest_func.id()).unwrap();
+            
+
+            Some(ImportFunction {
+                    id : dest_func.id(),
+                    name: import.name.to_owned(),
+                    module: import.module.to_owned()
+                }
+            )
+        }).collect()
+    }
+
+    #[test]
+    fn imports_removed() -> Result<(), Error> {
+        let (original, polyfill, filled) = setup(SIMPLE_WASM)?;
+
+        let targets_before_fill: Option<Vec<PolyfillTarget>> = get_polyfill_targets(&polyfill, &original)?;
+        let _import_fids : Vec<FunctionId> = if let Some(targets) = targets_before_fill {
+            assert_eq!(targets.len(), 4, "Before fill, polyfill targets should be 4.");
+            targets.into_iter().map(|t| t.dest_fid).collect()
+        } else {
+            vec![]
+        };
+
+        let targets_after_fill: Option<Vec<PolyfillTarget>> = get_polyfill_targets(&polyfill, &filled)?;
+        if let Some(targets) = targets_after_fill {
+            assert_eq!(targets.len(), 0, "After fill, polyfill targets should be 0.");
+        }
+
+        let import_funcs = get_import_funcs(&filled);
+        for f in import_funcs {
+            println!("{}", f);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn valid_wasm_produced_1() -> Result<(), Error> {
+        let (mut original, _, mut filled) = setup(SIMPLE_WASM)?;
+
+        new_validator().validate_all(&original.emit_wasm()).map_err(|e|anyhow!("[Validating original, simple] {}", e))?;
+        new_validator().validate_all(&filled.emit_wasm()).map_err(|e|anyhow!("[Validating filled, simple] {}", e))?;
+        Ok(())
+    }
+
+    #[test]
+    fn valid_wasm_produced_2() -> Result<(), Error> {
+        let (mut original, _, mut filled) = setup(INTERMEDIATE_WASM)?;
+
+        new_validator().validate_all(&original.emit_wasm()).map_err(|e|anyhow!("[Validating original, intermediate] {}", e))?;
+        new_validator().validate_all(&filled.emit_wasm()).map_err(|e|anyhow!("[Validating filled, intermediate] {}", e))?;
+        Ok(())
+    }
 }
