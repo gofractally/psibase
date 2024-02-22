@@ -538,7 +538,7 @@ pub fn link_module(source : &Module, dest : &mut Module) -> Result<(), anyhow::E
 #[cfg(test)]
 mod tests {
     use core::fmt;
-    use std::{fs::read, path::PathBuf};
+    use std::{fs::{read, File}, io::Write, path::{Path, PathBuf}};
     use anyhow::{Context, Error};
     use wasmparser::Validator;
 
@@ -552,15 +552,29 @@ mod tests {
         let filename = &PathBuf::from(filepath);
         let code = &read(filename)
             .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
-        Ok(Module::from_buffer(code)?)
+
+        let mut config = walrus::ModuleConfig::new();
+        config.generate_name_section(false);
+        config.generate_producers_section(false);
+
+        Ok(config.parse(code)?)
     }
 
     fn setup(filepath : &str) -> Result<(Module, Module, Module), Error> {
-        let original = get_dest_module(filepath)?;
+        // Read wasms from disk into memory
+        let mut original = get_dest_module(filepath)?;
         let polyfill = Module::from_buffer(SERVICE_POLYFILL)?;
         let mut filled = get_dest_module(filepath)?;
 
+        // Do the polyfill
         link_module(&polyfill, &mut filled)?;
+
+        // Print both the original and polyfilled wasms in WebAssembly Text (WAT) format
+        // Print both the full WAT representation as well as the skeleton representation
+        let filled_path = with_suffix(&Path::new(filepath).to_path_buf(), "-filled");
+        print_wat(filepath, &original.emit_wasm())?;
+        print_wat(filled_path.to_str().unwrap(), &filled.emit_wasm())?;
+
         Ok((original, polyfill, filled))
     }
 
@@ -574,8 +588,36 @@ mod tests {
         return validator;
     }
 
+    fn wat_path(file_path: &str) -> PathBuf {
+        let mut p = Path::new(file_path).to_path_buf();
+        p.set_extension("wat");
+        p
+    }
+
+    fn with_suffix(file_path : &PathBuf, suffix : &str) -> PathBuf {
+        let stem = file_path.file_stem().unwrap_or_default().to_str().unwrap_or("");
+        let extension = file_path.extension().map_or_else(|| "", |e| e.to_str().unwrap_or(""));
+        let new_stem = format!("{}{}", stem, suffix);
+
+        file_path.with_file_name(new_stem).with_extension(extension)
+    }
+
+    fn print_wat(wasm_path: &str, wasm_data : &Vec<u8> ) -> Result<(), Error> {
+        let wat_path = wat_path(wasm_path);
+        let skele_path = with_suffix(&wat_path, "-skeleton");
+
+        let mut printer = wasmprinter::Printer::new();
+        let wat_data = printer.print(wasm_data)?;
+        printer.print_skeleton(true);
+        let wat_skele = printer.print(wasm_data)?;
+
+        File::create(&wat_path)?.write_all((&wat_data).as_bytes())?;
+        File::create(&skele_path)?.write_all((&wat_skele).as_bytes())?;
+        Ok(())
+    }
+
     struct ImportFunction {
-        id : FunctionId,
+        _id : FunctionId,
         name : String,
         module : String,
     }
@@ -596,7 +638,7 @@ mod tests {
             
 
             Some(ImportFunction {
-                    id : dest_func.id(),
+                    _id : dest_func.id(),
                     name: import.name.to_owned(),
                     module: import.module.to_owned()
                 }
@@ -633,8 +675,8 @@ mod tests {
     fn valid_wasm_produced_1() -> Result<(), Error> {
         let (mut original, _, mut filled) = setup(SIMPLE_WASM)?;
 
-        new_validator().validate_all(&original.emit_wasm()).map_err(|e|anyhow!("[Validating original, simple] {}", e))?;
-        new_validator().validate_all(&filled.emit_wasm()).map_err(|e|anyhow!("[Validating filled, simple] {}", e))?;
+        new_validator().validate_all(&original.emit_wasm()).map_err(|e|anyhow!("[simple.wasm] {}", e))?;
+        new_validator().validate_all(&filled.emit_wasm()).map_err(|e|anyhow!("[simple.filled.wasm] {}", e))?;
         Ok(())
     }
 
@@ -642,8 +684,8 @@ mod tests {
     fn valid_wasm_produced_2() -> Result<(), Error> {
         let (mut original, _, mut filled) = setup(INTERMEDIATE_WASM)?;
 
-        new_validator().validate_all(&original.emit_wasm()).map_err(|e|anyhow!("[Validating original, intermediate] {}", e))?;
-        new_validator().validate_all(&filled.emit_wasm()).map_err(|e|anyhow!("[Validating filled, intermediate] {}", e))?;
+        new_validator().validate_all(&original.emit_wasm()).map_err(|e|anyhow!("[intermediate.wasm] {}", e))?;
+        new_validator().validate_all(&filled.emit_wasm()).map_err(|e|anyhow!("[intermediate.filled.wasm] {}", e))?;
         Ok(())
     }
 }
