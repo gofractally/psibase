@@ -1,0 +1,6 @@
+package component:demoapp1;
+
+/// An example world for the component to target.
+world example {
+    export helloworld: func() -> string;
+}
