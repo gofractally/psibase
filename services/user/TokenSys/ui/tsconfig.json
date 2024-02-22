@@ -9,6 +9,9 @@
             "/common": ["../../CommonSys/common"],
             "@psibase/common-lib": [
                 "../../CommonSys/common/packages/common-lib/src"
+            ],
+            "@psibase/common-lib/*": [
+                "../../CommonSys/common/packages/common-lib/src/*"
             ]
         },
         "skipLibCheck": true,

@@ -4,7 +4,7 @@ import {
     AppletId,
     query,
     setOperations,
-} from "@psibase/common-lib";
+} from "@psibase/common-lib/rpc";
 
 import useEffectOnce from "./hooks/useEffectOnce";
 import { operations } from "./operations";

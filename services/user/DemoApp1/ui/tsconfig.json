@@ -19,7 +19,11 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@messaging": ["../../CommonSys/common/messaging"],
-      "/common": ["../../CommonSys/common"]
+      "/common": ["../../CommonSys/common"],
+      "@psibase/common-lib": ["../../CommonSys/common/packages/common-lib/src"],
+      "@psibase/common-lib/*": [
+        "../../CommonSys/common/packages/common-lib/src/*"
+      ]
     }
   },
   "include": ["./src"],

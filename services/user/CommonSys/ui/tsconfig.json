@@ -6,7 +6,8 @@
         "allowJs": false,
         "paths": {
             "/common": ["../common"],
-            "@psibase/common-lib": ["../common/packages/common-lib/src"]
+            "@psibase/common-lib": ["../common/packages/common-lib/src"],
+            "@psibase/common-lib/*": ["../common/packages/common-lib/src/*"]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
