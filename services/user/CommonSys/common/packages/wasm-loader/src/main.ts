@@ -1,17 +1,17 @@
-import { buildMessageLoaderInitialized } from "../../../../common/messaging/supervisor/LoaderInitialized";
 import {
-  generateFulfilledFunction,
-  generatePendingFunction,
-  getImportedFunctions,
+    generateFulfilledFunction,
+    generatePendingFunction,
+    getImportedFunctions
 } from "./dynamicFunctions";
 import importableCode from "./importables.js?raw";
 import {
-  PluginCallResponse,
-  isPluginCallRequest,
-  PluginCallRequest,
-  buildPluginCallResponse,
-  PluginCallPayload,
-} from "@messaging";
+    PluginCallResponse,
+    isPluginCallRequest,
+    PluginCallRequest,
+    buildPluginCallResponse,
+    PluginCallPayload,
+    buildMessageLoaderInitialized
+} from "@psibase/common-lib/messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -21,80 +21,85 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 `;
 
 interface Importables {
-  [key: string]: string;
+    [key: string]: string;
 }
 
 const runWasm = async (
-  wasm: ArrayBuffer,
-  importables: Importables[],
-  method: string,
-  params: any[]
+    wasm: ArrayBuffer,
+    importables: Importables[],
+    method: string,
+    params: any[]
 ) => {
-  console.info("runWasm().top 2");
-  const { load } = await import("rollup-plugin-wit-component");
+    console.info("runWasm().top 2");
+    const { load } = await import("rollup-plugin-wit-component");
 
-  console.time("Load");
-  const mod = await load(
-    // @ts-expect-error fff
-    wasm,
-    importables
-  );
-  console.timeEnd("Load");
+    console.time("Load");
+    const mod = await load(
+        // @ts-expect-error fff
+        wasm,
+        importables
+    );
+    console.timeEnd("Load");
 
-  return mod[method](...params);
+    return mod[method](...params);
 };
 
 const functionCall = async ({
-  id,
-  args,
-  precomputedResults,
+    id,
+    args,
+    precomputedResults
 }: PluginCallPayload) => {
-  const url = "/plugin.wasm";
+    const url = "/plugin.wasm";
 
-  const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
-  const importedFunctionsFromWit = getImportedFunctions();
+    const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
+    const importedFunctionsFromWit = getImportedFunctions();
 
-  const fulfilledFunctions = precomputedResults.map((func) =>
-    generateFulfilledFunction(func.method, func.result)
-  );
-  const missingFunctions = importedFunctionsFromWit.filter(
-    (func) =>
-      !precomputedResults.some(
-        (f) => f.method == func.method && f.service == func.service
-      )
-  );
+    const fulfilledFunctions = precomputedResults.map((func) =>
+        generateFulfilledFunction(func.method, func.result)
+    );
+    const missingFunctions = importedFunctionsFromWit.filter(
+        (func) =>
+            !precomputedResults.some(
+                (f) => f.method == func.method && f.service == func.service
+            )
+    );
 
-  const str =
-    importableCode +
-    `\n ${missingFunctions.map((missingFunction) =>
-      generatePendingFunction(missingFunction, id)
-    )} \n ${fulfilledFunctions}`;
+    const str =
+        importableCode +
+        `\n ${missingFunctions.map((missingFunction) =>
+            generatePendingFunction(missingFunction, id)
+        )} \n ${fulfilledFunctions}`;
 
-  let importables: Importables[] = [
-    {
-      [`component:${args.service}/imports`]: str,
-    },
-  ];
+    let importables: Importables[] = [
+        {
+            [`component:${args.service}/imports`]: str
+        }
+    ];
 
-  try {
-    const res = await runWasm(wasmBytes, importables, args.method, args.params);
-    sendPluginCallResponse(buildPluginCallResponse(id, res));
-  } catch (e) {
-    console.warn(`runWasm threw.`);
-  }
+    try {
+        const res = await runWasm(
+            wasmBytes,
+            importables,
+            args.method,
+            args.params
+        );
+        sendPluginCallResponse(buildPluginCallResponse(id, res));
+    } catch (e) {
+        console.warn(`runWasm threw.`);
+    }
 };
 
 const sendPluginCallResponse = (response: PluginCallResponse) => {
-  window.parent.postMessage(response, "*");
+    window.parent.postMessage(response, "*");
 };
 
 const onPluginCallRequest = (request: PluginCallRequest) =>
-  functionCall(request.payload);
+    functionCall(request.payload);
 
 const onRawEvent = (message: MessageEvent) => {
-  if (isPluginCallRequest(message.data)) {
-    onPluginCallRequest(message.data);
-  }
+    if (isPluginCallRequest(message.data)) {
+        onPluginCallRequest(message.data);
+    }
 };
 
 window.addEventListener("message", onRawEvent);

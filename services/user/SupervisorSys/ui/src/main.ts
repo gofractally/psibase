@@ -13,7 +13,7 @@ import {
   buildFunctionCallResponse,
   isPreLoadServicesRequest,
   PreLoadServicesRequest,
-} from "@messaging";
+} from "@psibase/common-lib/messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>

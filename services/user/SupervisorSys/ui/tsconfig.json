@@ -14,7 +14,6 @@
     "noEmit": true,
 
     "paths": {
-      "@messaging": ["../../CommonSys/common/messaging"],
       "@psibase/common-lib": ["../../CommonSys/common/packages/common-lib/src"],
       "@psibase/common-lib/*": [
         "../../CommonSys/common/packages/common-lib/src/*"

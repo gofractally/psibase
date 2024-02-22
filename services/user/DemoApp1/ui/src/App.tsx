@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
-
-import { Supervisor } from "@messaging";
-
 import "./App.css";
+import { Supervisor } from "@psibase/common-lib/messaging";
+import { useEffect, useState } from "react";
 
 const supervisor = new Supervisor();
 
