@@ -1,6 +1,7 @@
 #include <psibase/Actor.hpp>
 #include <psibase/check.hpp>
 #include <psibase/package.hpp>
+#include <psibase/semver.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/user/PackageSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
@@ -71,6 +72,14 @@ namespace psibase
          __builtin_unreachable();
       }
    }  // namespace
+
+   // puts higher priority packages first
+   std::weak_ordering operator<=>(const PackageInfo& lhs, const PackageInfo& rhs)
+   {
+      if (auto result = lhs.name <=> rhs.name; result != 0)
+         return result;
+      return versionCompare(rhs.version, lhs.version);
+   }
 
    PackagedService::PackagedService(std::vector<char> buf) : buf(std::move(buf)), archive(this->buf)
    {
@@ -223,22 +232,33 @@ namespace psibase
       actions.push_back(transactor<PackageSys>{sender, PackageSys::service}.postinstall(meta));
    }
 
-   void dfs(const auto&                       reg,
+   const PackageInfo& get(const std::vector<PackageInfo>& index, const PackageRef& ref)
+   {
+      auto byname = [](const auto& info) -> const auto& { return info.name; };
+      for (const PackageInfo& package : std::ranges::equal_range(index, ref.name, {}, byname))
+      {
+         if (versionMatch(ref.version, package.version))
+            return package;
+      }
+      abortMessage("No package matches " + ref.name + "(" + ref.version + ")");
+   }
+
+   void dfs(const std::vector<PackageInfo>&   index,
             std::span<const PackageRef>       names,
             std::map<std::string_view, bool>& found,
-            std::vector<PackagedService>&     result)
+            std::vector<const PackageInfo*>&  result)
    {
-      for (const auto& [name, version] : names)
+      for (const auto& ref : names)
       {
-         if (auto [pos, inserted] = found.try_emplace(name, false); !inserted)
+         if (auto [pos, inserted] = found.try_emplace(ref.name, false); !inserted)
          {
             check(pos->second, "Cycle in service dependencies");
          }
          else
          {
-            auto package = reg.get(name);
-            dfs(reg, package.meta.depends, found, result);
-            result.push_back(std::move(package));
+            auto& package = get(index, ref);
+            dfs(index, package.depends, found, result);
+            result.push_back(&package);
             pos->second = true;
          }
       }
@@ -255,16 +275,40 @@ namespace psibase
       return PackagedService(readWholeFile(filepath));
    }
 
+   PackagedService DirectoryRegistry::get(const PackageInfo& info) const
+   {
+      std::string filepath = path;
+      filepath += '/';
+      filepath += info.file;
+      return PackagedService(readWholeFile(filepath));
+   }
+
    std::vector<PackagedService> DirectoryRegistry::resolve(std::span<const std::string> packages)
    {
+      std::vector<PackageInfo> index;
+      {
+         auto index_json = readWholeFile(path + "/index.json");
+         index_json.push_back('\0');
+         psio::json_token_stream stream(index_json.data());
+         from_json(index, stream);
+      }
+
+      std::ranges::sort(index, std::less<>());
       std::vector<PackageRef> in;
       for (const auto& name : packages)
       {
          in.push_back({name, "*"});
       }
-      std::vector<PackagedService>     result;
-      std::map<std::string_view, bool> found;
-      dfs(*this, in, found, result);
+      std::vector<const PackageInfo*> selected;
+      {
+         std::map<std::string_view, bool> found;
+         dfs(index, in, found, selected);
+      }
+      std::vector<PackagedService> result;
+      for (const auto* package : selected)
+      {
+         result.push_back(get(*package));
+      }
       return result;
    }
 
