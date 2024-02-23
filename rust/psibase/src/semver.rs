@@ -23,7 +23,7 @@ const SEMVER: &str = formatcp!(
     build = SEMVER_BUILDID
 );
 const SEMVER_MATCH: &str = formatcp!(
-    r"^\*|({num})(?:\.\*|({num})(?:\.\*|({num})(?:-({pre}))?(?:\+({build}))?)?)?$",
+    r"^(?:\*|({num})(?:\.\*|\.({num})(?:\.\*|\.({num})(?:-({pre}))?(?:\+({build}))?)?)?)$",
     num = SEMVER_NUM,
     pre = SEMVER_PRERELEASE,
     build = SEMVER_BUILDID
@@ -551,124 +551,28 @@ pub fn version_match(pattern: &str, version: &str) -> Result<bool, anyhow::Error
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_version_parse() -> Result<(), anyhow::Error> {
-        assert_eq!(
-            Version::new("1.0.0")?,
-            Version {
-                maj: DecNum { value: "1" },
-                min: DecNum { value: "0" },
-                patch: DecNum { value: "0" },
-                pre: None
-            }
-        );
-        Ok(())
-    }
+    use serde::{Deserialize, Serialize};
 
-    #[test]
-    fn test_match_parse() -> Result<(), anyhow::Error> {
-        assert_eq!(
-            VersionMatch::new(VersionOp::EQ, "1.0.0")?,
-            VersionMatch {
-                op: VersionOp::EQ,
-                maj: Some(DecNum { value: "1" }),
-                min: Some(DecNum { value: "0" }),
-                patch: Some(DecNum { value: "0" }),
-                pre: None
-            }
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_tokens() -> Result<(), anyhow::Error> {
-        assert_eq!(Tokens { text: "1.0.0" }.collect::<Vec<_>>(), vec!["1.0.0"]);
-        assert_eq!(
-            Tokens {
-                text: ">=1.1.1, <2.1.1"
-            }
-            .collect::<Vec<_>>(),
-            vec![">=", "1.1.1", ",", "<", "2.1.1"]
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_compiled_parse() -> Result<(), anyhow::Error> {
-        assert_eq!(
-            CompiledVersion::new("1.0.0")?,
-            CompiledVersion::Terminal(VersionMatch {
-                op: VersionOp::Compat,
-                maj: Some(DecNum { value: "1" }),
-                min: Some(DecNum { value: "0" }),
-                patch: Some(DecNum { value: "0" }),
-                pre: None
-            })
-        );
-        Ok(())
+    #[derive(Serialize, Deserialize)]
+    struct SemverTest {
+        pattern: String,
+        version: String,
+        matches: bool,
     }
 
     #[test]
     fn test_version_match() -> Result<(), anyhow::Error> {
-        // plain (equivalent to ^)
-        assert!(version_match("1.1.1", "1.1.1")?);
-        assert!(version_match("1.1.1", "1.1.2")?);
-        assert!(!version_match("1.1.1", "1.1.0")?);
-        assert!(version_match("1.1.1", "1.2.0")?);
-        // ^
-        assert!(version_match("^1.1.1", "1.1.1")?);
-        assert!(version_match("^1.1.1", "1.1.2")?);
-        assert!(!version_match("^1.1.1", "1.1.0")?);
-        assert!(version_match("^1.1.1", "1.2.0")?);
-        // ~
-        assert!(version_match("~1.1.1", "1.1.1")?);
-        assert!(version_match("~1.1.1", "1.1.2")?);
-        assert!(!version_match("~1.1.1", "1.1.0")?);
-        assert!(!version_match("~1.1.1", "1.2.0")?);
-        // <
-        assert!(!version_match("<1.1.1", "1.1.1")?);
-        assert!(!version_match("<1.1.1", "1.1.2")?);
-        assert!(version_match("<1.1.1", "1.1.0")?);
-        assert!(!version_match("<1.1.1", "1.2.0")?);
-        // <=
-        assert!(version_match("<=1.1.1", "1.1.1")?);
-        assert!(!version_match("<=1.1.1", "1.1.2")?);
-        assert!(version_match("<=1.1.1", "1.1.0")?);
-        assert!(!version_match("<=1.1.1", "1.2.0")?);
-        // >
-        assert!(!version_match(">1.1.1", "1.1.1")?);
-        assert!(version_match(">1.1.1", "1.1.2")?);
-        assert!(!version_match(">1.1.1", "1.1.0")?);
-        assert!(version_match(">1.1.1", "1.2.0")?);
-        // >=
-        assert!(version_match(">=1.1.1", "1.1.1")?);
-        assert!(version_match(">=1.1.1", "1.1.2")?);
-        assert!(!version_match(">=1.1.1", "1.1.0")?);
-        assert!(version_match(">=1.1.1", "1.2.0")?);
-
-        // logical operators
-        assert!(version_match(">=1.1.1, <2.1.1", "1.1.1")?);
-        assert!(!version_match(">=1.1.1, <2.1.1", "1.1.0")?);
-        assert!(!version_match(">=1.1.1, <2.1.1", "2.1.1")?);
-        //
-        assert!(version_match(">=1.1.1 && <2.1.1", "1.1.1")?);
-        assert!(!version_match(">=1.1.1 && <2.1.1", "1.1.0")?);
-        assert!(!version_match(">=1.1.1 && <2.1.1", "2.1.1")?);
-        //
-        assert!(version_match("^1.1.1 || <=1.2.1", "1.1.1")?);
-        assert!(version_match("^1.1.1 || <=1.2.1", "1.3.1")?);
-        assert!(version_match("^1.1.1 || <=1.2.1", "1.0.0")?);
-        assert!(!version_match("^1.1.1 || <=1.2.1", "2.0.0")?);
-
-        // operator precedence
-        assert!(version_match("0 && 1 || 1", "1.0.0")?);
-        assert!(version_match("1 || 1 && 0", "1.0.0")?);
-        assert!(!version_match("0, 1 || 1", "1.0.0")?);
-        assert!(!version_match("1 || 1, 0", "1.0.0")?);
-
-        // parentheses
-        assert!(!version_match("0 && (1 || 1)", "1.0.0")?);
-
+        let tests: Vec<SemverTest> =
+            serde_json::from_str(include_str!("../../../services/psibase_tests/semver.json"))?;
+        for SemverTest {
+            pattern,
+            version,
+            matches,
+        } in tests
+        {
+            println!("{} {}", &pattern, &version);
+            assert!(version_match(&pattern, &version)? == matches);
+        }
         Ok(())
     }
 }

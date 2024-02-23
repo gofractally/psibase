@@ -48,7 +48,7 @@ custom_error! {
     GraphQLWrongResponse = "Missing field `data` in graphql response",
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Pack, Unpack, Reflect)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, Reflect)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 pub struct PackageRef {
@@ -70,7 +70,7 @@ pub struct Meta {
     pub accounts: Vec<AccountNumber>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PackageInfo {
     pub name: String,
     pub version: String,
