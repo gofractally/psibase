@@ -17,9 +17,9 @@
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true,
         "paths": {
-            "/common": ["../../"]
-            // "@psibase/common-lib": ["../common-lib/src"],
-            // "@psibase/common-lib/*": ["../common-lib/src/*"]
+            "/common": ["../../"],
+            "@psibase/common-lib": ["../common-lib/src"],
+            "@psibase/common-lib/*": ["../common-lib/src/*"]
         }
     },
     "include": ["src"]
