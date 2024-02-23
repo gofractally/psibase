@@ -6,16 +6,16 @@ import { defineConfig } from "vite";
 export default defineConfig({
     resolve: {
         alias: [
-            {
-                find: "/common/iframeResizer.contentWindow.js",
-                replacement: path.resolve(
-                    "../../thirdParty/src/iframeResizer.contentWindow.js"
-                )
-            },
-            {
-                find: /^@psibase\/common-lib.*$/,
-                replacement: path.resolve("../common-lib/src")
-            }
+            // {
+            //     find: "/common/iframeResizer.contentWindow.js",
+            //     replacement: path.resolve(
+            //         "../../thirdParty/src/iframeResizer.contentWindow.js"
+            //     )
+            // },
+            // {
+            //     find: /^@psibase\/common-lib.*$/,
+            //     replacement: path.resolve("../common-lib/src")
+            // }
         ]
     }
 });
