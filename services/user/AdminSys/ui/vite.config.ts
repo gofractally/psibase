@@ -23,7 +23,7 @@ const psibase = (_appletContract: string, isServing?: boolean) => {
     // if we're in dev mode, we need to alias the common-lib to the local source
     if (isServing) {
         buildAliases.push({
-            find: "@psibase/common-lib",
+            find: /^@psibase\/common-lib.*$/,
             replacement: path.resolve(
                 "../../CommonSys/common/packages/common-lib/src"
             ),
@@ -89,7 +89,7 @@ const psibase = (_appletContract: string, isServing?: boolean) => {
         alias({
             entries: [
                 {
-                    find: "@psibase/common-lib",
+                    find: /^@psibase\/common-lib.*$/,
                     replacement: "/common/common-lib.js",
                 },
             ],

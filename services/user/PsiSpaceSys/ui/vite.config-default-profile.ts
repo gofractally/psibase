@@ -21,7 +21,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
 
     if (isServing) {
         buildAliases.push({
-            find: "@psibase/common-lib",
+            find: /^@psibase\/common-lib.*$/,
             replacement: path.resolve(
                 "../../CommonSys/common/packages/common-lib/src"
             ),
@@ -54,7 +54,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                         port: 8081,
                         proxy: {
                             "/": {
-                                target: "http://psibase.127.0.0.1.sslip.io:8080/",
+                                target: "http://psibase.127.0.0.1.sslip.io:8079/",
                                 bypass: (req, _res, _opt) => {
                                     const host = req.headers.host || "";
                                     const subdomain = host.split(".")[0];
@@ -81,7 +81,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
         alias({
             entries: [
                 {
-                    find: "@psibase/common-lib",
+                    find: /^@psibase\/common-lib.*$/,
                     replacement: "/common/common-lib.js",
                 },
             ],

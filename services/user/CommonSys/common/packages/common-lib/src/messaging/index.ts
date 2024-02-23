@@ -2,31 +2,32 @@ export { Supervisor } from "./supervisor";
 export {
     type FunctionCallArgs,
     type FunctionCallRequest,
-    isFunctionCallRequest,
+    isFunctionCallRequest
 } from "./supervisor/FunctionCallRequest";
 export {
     isIFrameInitialized,
-    buildMessageIFrameInitialized,
+    buildMessageIFrameInitialized
 } from "./supervisor/SupervisorInitialized";
 export {
     type FunctionCallResult,
     type PluginCallPayload,
     type PluginCallRequest,
     isPluginCallRequest,
-    buildPluginCallRequest,
+    buildPluginCallRequest
 } from "./supervisor/PluginCallRequest";
 export {
     type PluginCallResponse,
     isPluginCallResponse,
-    buildPluginCallResponse,
+    buildPluginCallResponse
 } from "./supervisor/PluginCallResponse";
 export {
     isFunctionCallResponse,
-    buildFunctionCallResponse,
+    buildFunctionCallResponse
 } from "./supervisor/FunctionCallResponse";
 export { generateRandomString } from "./generateRandomString";
 export {
     type PreLoadServicesRequest,
     buildPreLoadServicesRequest,
-    isPreLoadServicesRequest,
+    isPreLoadServicesRequest
 } from "./supervisor/PreLoadServicesRequest";
+export { buildMessageLoaderInitialized } from "./supervisor/LoaderInitialized";
