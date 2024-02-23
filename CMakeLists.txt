@@ -237,7 +237,8 @@ file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/use
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
 
 # TODO: Can this be a dist folder, i.e., a build product?
-file(GLOB common-loader LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wasm-loader/dist/*)
+#file(GLOB common-loader LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wasm-loader/dist/*)
+set(common-loader ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wasm-loader/dist/index.html)
 
 # Builds the Common Sys files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
