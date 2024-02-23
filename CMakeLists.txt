@@ -360,12 +360,12 @@ psibase_package(
     SERVICE common-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
         SERVER common-sys
+        DATA GLOB ${THIRD_FILES}                                              common
         DATA GLOB ${COMMON_SYS}/common/packages/wasm-loader/dist/*            common/wasm-loader/
         DATA      ${COMMON_SYS}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
         DATA GLOB ${COMMON_SYS}/common/*.mjs                                  common/
         DATA      ${COMMON_SYS}/common/fonts                                  common/fonts
         DATA GLOB ${COMMON_SYS}/ui/dist/*                                     /
-        DATA GLOB ${THIRD_FILES}                                              common
     DEPENDS ${CommonSys_js_dep}
     DEPENDS ${CommonSysCommonLib_js_dep}
     DEPENDS ${CommonSysLoaderLib_js_dep}
