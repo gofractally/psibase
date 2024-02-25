@@ -479,19 +479,30 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
     
     let mut builder = walrus::FunctionBuilder::new(&mut dest.types, &params, &results);
     
+    // Make the new local function
+    let args = params
+        .iter()
+        .map(|val_type| dest.locals.add(*val_type))
+        .collect::<Vec<_>>();
 
     // Copy the sequence of instructions in a function from a `source` module into 
     // the new `dest` instruction sequence. 
     let instr_seq_id = source_local_func.entry_block();
     let dest_instr_builder = &mut builder.func_body();
     let mut id_maps: IdMaps = Default::default();
-    to_dest_seq(instr_seq_id, &source_local_func, source, dest_instr_builder, dest, &mut id_maps)?;
 
-    // Make the new local function
-    let args = params
-        .iter()
-        .map(|val_type| dest.locals.add(*val_type))
-        .collect::<Vec<_>>();
+    //Map parameters to locals
+    for (index, source_loc_id) in source_local_func.args.iter().enumerate() {
+        // Verify the arg type is the same
+        let dest_loc_id = args[index];
+        if source.locals.get(*source_loc_id).ty() != dest.locals.get(dest_loc_id).ty() {
+            return Err(anyhow!("Error mapping locals"));
+        }
+
+        id_maps.loc_id_map.insert(*source_loc_id, dest_loc_id);
+    }
+
+    to_dest_seq(instr_seq_id, &source_local_func, source, dest_instr_builder, dest, &mut id_maps)?;
 
     Ok(builder.local_func(args))
 }
