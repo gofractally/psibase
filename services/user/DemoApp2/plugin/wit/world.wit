@@ -19,5 +19,5 @@ interface imports {
 /// An example world for the component to target.
 world example {
     import imports;
-    export callintoplugin: func() -> string;
+    export derpy: func() -> string;
 }

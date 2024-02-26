@@ -61,49 +61,26 @@ const functionCall = async ({
     const ComponentParser = new provider.ComponentParser();
 
     const { wit } = ComponentParser.parse("hello", bytes);
+    console.log(wit, "is the wit");
 
     console.log(JSON.stringify(wit), "is the raw");
     const parsedFunctions = parseFunctions(wit);
 
     console.log(parsedFunctions, "are the parsed functions..");
-    // const importedFunctionsFromWit: Func[] = parsedFunctions
-    //     .filter(
-    //         (func) =>
-    //             func.packageName == "imports" ||
-    //             func.packageName.endsWith("service")
-    //     )
-    //     .map((x) => ({
-    //         method: x.functionName,
-    //         service: x.packageName.endsWith("service")
-    //             ? x.packageName.slice(0, -7)
-    //             : x.packageName
-    //     }));
-    const importedFunctionsFromWit: Func[] = [
-        {
-            method: "callintoplugin",
-            service: "demoapp2"
-        }
-    ];
-    console.log("are the output", importedFunctionsFromWit);
 
     const fulfilledFunctions = precomputedResults.map((func) =>
         generateFulfilledFunction(func.method, func.result)
     );
-    const missingFunctions = importedFunctionsFromWit
+    const missingFunctions = parsedFunctions
         .filter(
             (func) =>
                 !precomputedResults.some(
                     (f) => f.method == func.method && f.service == func.service
                 )
         )
-        .map((x) => {
-            if (x.method == "callintoplugin") {
-                return {
-                    ...x,
-                    service: "demoapp2"
-                };
-            } else return x;
-        });
+        .filter((x) => x.service !== "imports");
+
+    console.log({ missingFunctions, fulfilledFunctions, parsedFunctions });
 
     const str =
         importableCode +
@@ -113,11 +90,18 @@ const functionCall = async ({
             )
             .join("\n")} \n ${fulfilledFunctions}`;
 
-    console.log(str, "is the str");
+    console.log(str, "is the str", args.service);
     let importables: Importables[] = [
         {
             [`component:${args.service}/imports`]: str
-        }
+        },
+        ...(args.service == "demoapp1"
+            ? [
+                  {
+                      [`component:demoapp1/demoapp2`]: str
+                  }
+              ]
+            : [])
     ];
 
     try {
@@ -130,7 +114,7 @@ const functionCall = async ({
         console.log(res, "from runWASM!");
         sendPluginCallResponse(buildPluginCallResponse(id, res));
     } catch (e) {
-        console.warn(`runWasm threw.`);
+        console.warn(`runWasm threw.`, e);
     }
 };
 
@@ -141,49 +125,61 @@ const sendPluginCallResponse = (response: PluginCallResponse) => {
 const onPluginCallRequest = (request: PluginCallRequest) =>
     functionCall(request.payload);
 
-interface ParsedFunction {
-    packageName: string;
-    functionName: string;
-    parameters: { name: string; type: string }[];
-}
-const parseFunctions = (data: string): ParsedFunction[] => {
-    console.log({ data });
-    const parsedFunctions: ParsedFunction[] = [];
-    const lines = data.split("\n");
-    console.log({ lines });
+const stripGenerated = (lines: string[]) => {
+    let startingIndex = -1;
+    let endingIndex = -1;
 
-    let isInInterface = false;
-    let currentInterfaceName = "";
-
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-        console.log({ trimmedLine });
-
-        if (trimmedLine.startsWith("interface")) {
-            isInInterface = true;
-            const parts = trimmedLine.split(" ");
-            currentInterfaceName = parts[1];
-            console.log({ currentInterfaceName, parts });
-        } else if (isInInterface && trimmedLine.includes("func")) {
-            const parts = trimmedLine.split(":");
-            const functionName = parts[0].trim();
-            const parameters = parts[1].trim().replace(";", "");
-
-            parsedFunctions.push({
-                packageName: currentInterfaceName,
-                functionName,
-                parameters: parameters.split(",").map((param) => {
-                    const [name, type] = param.trim().split(":");
-                    return { name, type };
-                })
-            });
-        } else if (isInInterface && trimmedLine === "}") {
-            isInInterface = false;
-            currentInterfaceName = "";
+    lines.forEach((line, index) => {
+        if (line.startsWith("package component:")) {
+            startingIndex = index;
+        } else {
+            if (startingIndex != -1 && endingIndex == -1) {
+                if (line.startsWith("package ")) {
+                    endingIndex = index;
+                }
+            }
         }
-    }
+    });
+    return lines.slice(startingIndex, endingIndex);
+};
 
-    return parsedFunctions;
+const groupInterfaces = (lines: string[]) => {
+    let obj: { [key: string]: string[] } = {};
+    let isOpen = false;
+    let currentName = "";
+    lines.forEach((line) => {
+        if (line.startsWith("interface ")) {
+            isOpen = true;
+            currentName = line.split(" ")[1];
+        } else if (line == "}") {
+            isOpen = false;
+        } else if (isOpen) {
+            obj[currentName] = obj[currentName]
+                ? [...obj[currentName], line]
+                : [line];
+        }
+    });
+
+    return obj;
+};
+
+const parseFunctions = (data: string): Func[] => {
+    const lines = data.split("\n").map((x) => x.trim());
+    const newLines = stripGenerated(lines);
+
+    const interfaces = groupInterfaces(newLines);
+    const entries = Object.entries(interfaces)
+        .map(([key, value]): [string, string[]] => [
+            key,
+            value.map((v) => v.split(" ")[0].slice(0, -1))
+        ])
+        .flatMap(([key, value]): Func[] =>
+            (value as string[]).map((name) => ({ method: name, service: key }))
+        );
+
+    console.log({ interfaces, entries });
+
+    return entries;
 };
 
 const onRawEvent = (message: MessageEvent) => {

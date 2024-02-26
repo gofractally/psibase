@@ -1,14 +1,15 @@
 package component:demoapp1;
 
 
-interface imports {
-    callintoplugin: func() -> string;
-}
 
+
+interface demoapp2 {
+    derpy: func() -> string;
+}
 
 world example {
 
-    import imports;
+    import demoapp2;
 
     export helloworld: func() -> string;
 }
