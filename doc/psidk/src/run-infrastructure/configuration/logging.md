@@ -164,6 +164,7 @@ Examples:
 | `Escape`         | Formatters                        | N/A                             | Escapes a list of characters in a subformat.                                        |
 | `FrameDec`       | Formatters                        | N/A                             | Prefixes a nested format with a decimal octet count                                 |
 | `Host`           | All records                       | `=`, `!=`                       | The system's FQDN (not the HTTP server's virtual hostname)                          |
+| `Indent`         | Formatters                        | N/A                             | Formats an indented block                                                           |
 | `Json`           | Formatters                        | N/A                             | Formats the entire log record as JSON                                               |
 | `Message`        | Formatters                        | N/A                             | The log message                                                                     |
 | `PeerId`         | p2p connections                   | `=`, `!=`, `<`, `>`, `<=`, `>=` |                                                                                     |
@@ -179,6 +180,8 @@ Examples:
 | `Severity`       | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | The value is one of `debug`, `info`, `notice`, `warning`, `error`, or `critical`    |
 | `Syslog`         | Formatters                        | N/A                             | Formats a [syslog](#syslog) header.                                                 |
 | `TimeStamp`      | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                                            |
+| `Trace`          | transactions and HTTP requests    | None                            | The transaction trace formatted as JSON                                             |
+| `TraceConsole`   | transactions and HTTP requests    | None                            | The console output of the transation. Can be multiple lines.                        |
 | `TransactionId`  | transactions                      | `=`, `!=`                       |                                                                                     |
 
 ### Severity
@@ -203,6 +206,13 @@ Characters can be backslash-escaped using `{Escape:chars:subformat}`. *chars* sp
 Example:
 - Escape a JSON string: `{{{"message":"{Escape:\":{Message}}"}}}`
 - Escape a shell command: ``foo "{Escape:\"`$:{Message}}"``
+
+### Indent
+
+Every line of a multi-line format can be indented with `{Indent:width:subformat}`.
+
+Example:
+- `{Indent:4:{TraceConsole}}`
 
 ### Syslog
 
