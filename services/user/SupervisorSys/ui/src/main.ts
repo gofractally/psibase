@@ -5,8 +5,6 @@ import {
   isFunctionCallRequest,
   isPluginCallResponse,
   FunctionCallArgs,
-  isPluginCallRequest,
-  PluginCallRequest,
   PluginCallPayload,
   generateRandomString,
   buildPluginCallRequest,
@@ -195,37 +193,6 @@ const onPluginCallResponse = (message: PluginCallResponse) => {
   checkForResolution();
 };
 
-const onPluginCallRequest = (message: PluginCallRequest) => {
-  alert("this ran");
-  console.log({ message }, "onPluginCallRequest");
-  const parentId = message.payload.id;
-  const subId = generateRandomString();
-
-  const addToPendingFunctionCall = (pendingCall: PendingFunctionCall) => {
-    if (pendingCall.id == parentId) {
-      pendingCall.nestedCalls.push({
-        id: subId,
-        args: message.payload.args,
-        nestedCalls: [],
-      });
-
-      console.log(message.payload, pendingCall, "shouldnt be undefined");
-
-      sendPluginCallRequest(
-        {
-          id: subId,
-          args: message.payload.args,
-          precomputedResults: [],
-        },
-        "add to pending function call"
-      );
-    }
-    pendingCall.nestedCalls.forEach(addToPendingFunctionCall);
-  };
-
-  pendingFunctionCalls.forEach(addToPendingFunctionCall);
-};
-
 const updatePendingFunctionCall = <T>(
   array: PendingFunctionCall<T>[],
   targetId: string,
@@ -342,9 +309,6 @@ const onRawEvent = (message: MessageEvent<any>) => {
   } else if (isPluginCallResponse(message.data)) {
     // TODO Assert origin of plugin call
     onPluginCallResponse(message.data);
-  } else if (isPluginCallRequest(message.data)) {
-    // TODO Assert origin of plugin call request
-    onPluginCallRequest(message.data);
   } else if (isPreLoadServicesRequest(message.data)) {
     onPreloadServicesRequest(message.data);
   } else if (isPluginCallFailure(message.data)) {
