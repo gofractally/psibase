@@ -233,7 +233,7 @@ function(add_js_target ENTRY OUTPUT_FILE)
 endfunction()
 
 list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
-file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
+file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/*)
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
 
 # TODO: Can this be a dist folder, i.e., a build product?
@@ -362,7 +362,7 @@ psibase_package(
         SERVER common-sys
         DATA GLOB ${COMMON_SYS}/common/packages/wasm-loader/dist/*            common/wasm-loader/
         DATA      ${COMMON_SYS}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
-        DATA GLOB ${COMMON_SYS}/common/*.mjs                                  common/
+        DATA GLOB ${COMMON_SYS}/common/resources/*.mjs                        common/
         DATA      ${COMMON_SYS}/common/fonts                                  common/fonts
         DATA GLOB ${COMMON_SYS}/ui/dist/*                                     /
         DATA GLOB ${THIRD_FILES}                                              common
