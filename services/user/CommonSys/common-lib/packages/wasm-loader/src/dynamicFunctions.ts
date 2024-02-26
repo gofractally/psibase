@@ -38,21 +38,20 @@ export interface FunctionCallResult<T = any> extends FunctionCallArgs {
   result: T;
 }
 
-export const generatePendingFunction = (func: Func, id: string): string => {
-  return `export async function ${func.method}(...args) {
-      console.log('pendingFunctionRan');
+export const generatePendingFunction = ({ method, service }: Func, id: string): string => {
+  return `export async function ${method}(...args) {
+  console.log('pendingFunctionRan');
   
-      const payload = {
-          service: "${func.service}",
-          method: "${func.method}",
-          params: [...args],
-          id: "${id}",
-      };
+  const payload = {
+      id: "${id}",
+      service: "${service}",
+      method: "${method}",
+      params: [...args]
+  };
   
-      console.log('attempting to call plugin call ${id}', payload);
-      window.parent.postMessage({ type: 'PLUGIN_CALL_REQUEST', payload }, "*");
-      throw new Error("Pending function throw, this is by design.")
-      }
-      
-      `;
+  console.log('Attempting to call plugin call ${id}', payload);
+  window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload }, "*");
+  throw new Error("Pending function throw, this is by design.")
+  }
+`;
 };

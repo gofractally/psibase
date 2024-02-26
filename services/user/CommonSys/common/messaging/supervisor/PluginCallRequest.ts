@@ -18,10 +18,23 @@ export interface PluginCallRequest {
     payload: PluginCallPayload;
 }
 
-export const isPluginCallRequest = (data: any): data is PluginCallRequest =>
-    data &&
-    data.type == PLUGIN_CALL_REQUEST &&
-    typeof data.payload.id == "string";
+export const isPluginCallRequest = (data: any): data is PluginCallRequest => {
+    const isEventTypeSatisfied = data && data.type == PLUGIN_CALL_REQUEST;
+    if (!isEventTypeSatisfied) return false;
+    const { id, args } = data.payload;
+    const isSchemaSatisfied =
+        typeof id == "string" &&
+        typeof args == "object" &&
+        "service" in args &&
+        "method" in args;
+    if (!isSchemaSatisfied)
+        throw new Error(
+            `PluginCallRequest fails to meet schema. Received: ${JSON.stringify(
+                data
+            )}`
+        );
+    return isEventTypeSatisfied && isSchemaSatisfied;
+};
 
 export const buildPluginCallRequest = (
     payload: PluginCallPayload

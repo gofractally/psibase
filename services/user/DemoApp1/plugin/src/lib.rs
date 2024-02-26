@@ -1,5 +1,6 @@
 mod bindings;
 
+use bindings::component::demoapp1::imports;
 use bindings::Guest;
 
 struct Component;
@@ -7,6 +8,8 @@ struct Component;
 impl Guest for Component {
     /// Say hello!
     fn helloworld() -> String {
-        "Hello, World!".to_string()
+        // let derp = imports::transfer();
+        let mate = imports::callintoplugin();
+        format!("mate is... {}", mate)
     }
 }

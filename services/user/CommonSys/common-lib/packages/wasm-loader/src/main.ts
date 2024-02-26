@@ -61,29 +61,59 @@ const functionCall = async ({
     const ComponentParser = new provider.ComponentParser();
 
     const { wit } = ComponentParser.parse("hello", bytes);
+
+    console.log(JSON.stringify(wit), "is the raw");
     const parsedFunctions = parseFunctions(wit);
 
-    const importedFunctionsFromWit: Func[] = parsedFunctions.map((x) => ({
-        method: x.functionName,
-        service: args.service
-    }));
+    console.log(parsedFunctions, "are the parsed functions..");
+    // const importedFunctionsFromWit: Func[] = parsedFunctions
+    //     .filter(
+    //         (func) =>
+    //             func.packageName == "imports" ||
+    //             func.packageName.endsWith("service")
+    //     )
+    //     .map((x) => ({
+    //         method: x.functionName,
+    //         service: x.packageName.endsWith("service")
+    //             ? x.packageName.slice(0, -7)
+    //             : x.packageName
+    //     }));
+    const importedFunctionsFromWit: Func[] = [
+        {
+            method: "callintoplugin",
+            service: "demoapp2"
+        }
+    ];
+    console.log("are the output", importedFunctionsFromWit);
 
     const fulfilledFunctions = precomputedResults.map((func) =>
         generateFulfilledFunction(func.method, func.result)
     );
-    const missingFunctions = importedFunctionsFromWit.filter(
-        (func) =>
-            !precomputedResults.some(
-                (f) => f.method == func.method && f.service == func.service
-            )
-    );
+    const missingFunctions = importedFunctionsFromWit
+        .filter(
+            (func) =>
+                !precomputedResults.some(
+                    (f) => f.method == func.method && f.service == func.service
+                )
+        )
+        .map((x) => {
+            if (x.method == "callintoplugin") {
+                return {
+                    ...x,
+                    service: "demoapp2"
+                };
+            } else return x;
+        });
 
     const str =
         importableCode +
-        `\n ${missingFunctions.map((missingFunction) =>
-            generatePendingFunction(missingFunction, id)
-        )} \n ${fulfilledFunctions}`;
+        `\n ${missingFunctions
+            .map((missingFunction) =>
+                generatePendingFunction(missingFunction, id)
+            )
+            .join("\n")} \n ${fulfilledFunctions}`;
 
+    console.log(str, "is the str");
     let importables: Importables[] = [
         {
             [`component:${args.service}/imports`]: str
@@ -97,6 +127,7 @@ const functionCall = async ({
             args.method,
             args.params
         );
+        console.log(res, "from runWASM!");
         sendPluginCallResponse(buildPluginCallResponse(id, res));
     } catch (e) {
         console.warn(`runWasm threw.`);
@@ -110,35 +141,46 @@ const sendPluginCallResponse = (response: PluginCallResponse) => {
 const onPluginCallRequest = (request: PluginCallRequest) =>
     functionCall(request.payload);
 
-// let ranOnce = false;
-
 interface ParsedFunction {
     packageName: string;
     functionName: string;
     parameters: { name: string; type: string }[];
 }
-
 const parseFunctions = (data: string): ParsedFunction[] => {
+    console.log({ data });
     const parsedFunctions: ParsedFunction[] = [];
-    const functionRegex = /export (\w+): func\(([^)]*)\) -> (\w+);/g;
-    let match;
+    const lines = data.split("\n");
+    console.log({ lines });
 
-    while ((match = functionRegex.exec(data)) !== null) {
-        const [, functionName, parameters, packageName] = match;
-        const parameterArray = parameters
-            .split(",")
-            .map((param) => param.trim())
-            .map((paramAndType) => {
-                const [name, type] = paramAndType
-                    .split(":")
-                    .map((x) => x.trim());
-                return { name, type };
+    let isInInterface = false;
+    let currentInterfaceName = "";
+
+    for (const line of lines) {
+        const trimmedLine = line.trim();
+        console.log({ trimmedLine });
+
+        if (trimmedLine.startsWith("interface")) {
+            isInInterface = true;
+            const parts = trimmedLine.split(" ");
+            currentInterfaceName = parts[1];
+            console.log({ currentInterfaceName, parts });
+        } else if (isInInterface && trimmedLine.includes("func")) {
+            const parts = trimmedLine.split(":");
+            const functionName = parts[0].trim();
+            const parameters = parts[1].trim().replace(";", "");
+
+            parsedFunctions.push({
+                packageName: currentInterfaceName,
+                functionName,
+                parameters: parameters.split(",").map((param) => {
+                    const [name, type] = param.trim().split(":");
+                    return { name, type };
+                })
             });
-        parsedFunctions.push({
-            packageName,
-            functionName,
-            parameters: parameterArray
-        });
+        } else if (isInInterface && trimmedLine === "}") {
+            isInInterface = false;
+            currentInterfaceName = "";
+        }
     }
 
     return parsedFunctions;

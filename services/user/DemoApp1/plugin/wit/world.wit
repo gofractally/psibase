@@ -1,6 +1,14 @@
 package component:demoapp1;
 
-/// An example world for the component to target.
+
+interface imports {
+    callintoplugin: func() -> string;
+}
+
+
 world example {
+
+    import imports;
+
     export helloworld: func() -> string;
 }
