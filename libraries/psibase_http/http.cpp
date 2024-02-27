@@ -458,6 +458,11 @@ namespace psibase::http
       }
    }
 
+   std::vector<char> to_vector(std::string_view s)
+   {
+      return std::vector(s.begin(), s.end());
+   }
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -498,47 +503,20 @@ namespace psibase::http
          }
       };
 
-      // Returns a bad request response
-      const auto bad_request =
-          [&server, set_cors, req_version, set_keep_alive](beast::string_view why)
-      {
-         bhttp::response<bhttp::string_body> res{bhttp::status::bad_request, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::content_type, "text/html");
-         set_cors(res);
-         set_keep_alive(res);
-         res.body() = std::string(why);
-         res.prepare_payload();
-         return res;
-      };
-
       // Returns a method_not_allowed response
       const auto method_not_allowed = [&server, set_cors, req_version, set_keep_alive](
                                           beast::string_view target, beast::string_view method,
                                           beast::string_view allowed_methods)
       {
-         bhttp::response<bhttp::string_body> res{bhttp::status::method_not_allowed, req_version};
+         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::method_not_allowed,
+                                                       req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          res.set(bhttp::field::allow, allowed_methods);
          set_cors(res);
          set_keep_alive(res);
-         res.body() = "The resource '" + std::string(target) + "' does not accept the method " +
-                      std::string(method) + ".";
-         res.prepare_payload();
-         return res;
-      };
-
-      // Returns a not found response
-      const auto not_found =
-          [&server, set_cors, req_version, set_keep_alive](beast::string_view target)
-      {
-         bhttp::response<bhttp::string_body> res{bhttp::status::not_found, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::content_type, "text/html");
-         set_cors(res);
-         set_keep_alive(res);
-         res.body() = "The resource '" + std::string(target) + "' was not found.";
+         res.body() = to_vector("The resource '" + std::string(target) +
+                                "' does not accept the method " + std::string(method) + ".");
          res.prepare_payload();
          return res;
       };
@@ -558,17 +536,25 @@ namespace psibase::http
          return res;
       };
 
+      const auto not_found = [&error](beast::string_view target)
+      {
+         return error(bhttp::status::not_found,
+                      "The resource '" + std::string(target) + "' was not found.");
+      };
+      const auto bad_request = [&error](beast::string_view why)
+      { return error(bhttp::status::bad_request, why); };
+
       // Returns an error response with a WWW-Authenticate header
       const auto auth_error = [&server, set_cors, req_version, set_keep_alive](
                                   bhttp::status status, std::string&& www_auth)
       {
-         bhttp::response<bhttp::string_body> res{status, req_version};
+         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          res.set(bhttp::field::www_authenticate, std::move(www_auth));
          set_cors(res);
          set_keep_alive(res);
-         res.body() = "Not authorized";
+         res.body() = to_vector("Not authorized");
          res.prepare_payload();
          return res;
       };
@@ -872,9 +858,7 @@ namespace psibase::http
                 send.self.logger, "ResponseTime",
                 std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime));
             if (!result)
-               return send(
-                   error(bhttp::status::not_found,
-                         "The resource '" + std::string(req.target()) + "' was not found.\n"));
+               return send(not_found(req.target()));
             return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
          }  // !native
          else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
@@ -1318,8 +1302,7 @@ namespace psibase::http
          }
          else
          {
-            return send(error(bhttp::status::not_found,
-                              "The resource '" + std::string(req.target()) + "' was not found.\n"));
+            return send(not_found(req.target()));
          }
       }
       catch (const std::exception& e)
