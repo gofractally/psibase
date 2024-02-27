@@ -767,6 +767,9 @@ namespace psibase::http
             auto result  = psio::from_frac<std::optional<HttpReply>>(atrace.rawRetval);
             auto endTime = steady_clock::now();
 
+            trace.actionTraces.push_back(std::move(atrace));
+            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "Trace", std::move(trace));
+
             // TODO: consider bundling into a single attribute
             BOOST_LOG_SCOPED_LOGGER_TAG(
                 send.self.logger, "PackTime",
