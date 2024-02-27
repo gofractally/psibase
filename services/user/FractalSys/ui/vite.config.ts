@@ -120,7 +120,7 @@ const psibase = (options: Options) => {
                                 // bundle non-external (above) common files except fonts (which should only be referenced)
                                 find: /^\/common(?!\/(?:fonts))(.*)$/,
                                 replacement: path.resolve(
-                                    "../../CommonSys/common$1"
+                                    "../../CommonSys/common/resources$1"
                                 ),
                             },
                         ],

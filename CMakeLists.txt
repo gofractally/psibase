@@ -234,7 +234,7 @@ endfunction()
 
 list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
 file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/*)
-file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
+file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts/*)
 
 # TODO: Can this be a dist folder, i.e., a build product?
 file(GLOB common-loader LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wasm-loader/dist/*)
@@ -274,7 +274,7 @@ function(psinode_files target pfx)
     COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist ${pfx}/share/psibase/services/admin-sys
     COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/admin-sys/common/
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
     COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/admin-sys/packages
@@ -286,7 +286,7 @@ add_dependencies(AdminSys_js wasm-psibase CommonSysCommonLib_js)
 
 include(GNUInstallDirs)
 install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
-install(DIRECTORY services/user/CommonSys/common/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
+install(DIRECTORY services/user/CommonSys/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
 install(FILES services/user/CommonSys/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/admin-sys/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
 
@@ -363,7 +363,7 @@ psibase_package(
         DATA GLOB ${COMMON_SYS}/common/packages/wasm-loader/dist/*            common/wasm-loader/
         DATA      ${COMMON_SYS}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
         DATA GLOB ${COMMON_SYS}/common/resources/*.mjs                        common/
-        DATA      ${COMMON_SYS}/common/fonts                                  common/fonts
+        DATA      ${COMMON_SYS}/common/resources/fonts                        common/fonts
         DATA GLOB ${COMMON_SYS}/ui/dist/*                                     /
         DATA GLOB ${THIRD_FILES}                                              common
     DEPENDS ${CommonSys_js_dep}
