@@ -181,7 +181,7 @@ Examples:
 | `Syslog`         | Formatters                        | N/A                             | Formats a [syslog](#syslog) header.                                                 |
 | `TimeStamp`      | All records                       | `=`, `!=`, `<`, `>`, `<=`, `>=` | ISO 8601 extended format                                                            |
 | `Trace`          | transactions and HTTP requests    | None                            | The transaction trace formatted as JSON                                             |
-| `TraceConsole`   | transactions and HTTP requests    | None                            | The console output of the transation. Can be multiple lines.                        |
+| `TraceConsole`   | transactions and HTTP requests    | None                            | The console output of the transation. Can contain arbitrary bytes.                  |
 | `TransactionId`  | transactions                      | `=`, `!=`                       |                                                                                     |
 
 ### Severity
@@ -227,3 +227,7 @@ If both a format and facility are specified, they should be separated by a `;`.
 Examples:
 - `{Syslog:local1;rfc5424}`
 - `{Syslog:glibc}`: Suitable for writing to `/dev/log` on linux systems.
+
+### TraceConsole
+
+This is the raw console output of a transaction. It is fully controlled by the service author and is not sanitized in any way. It should be escaped or encoded in a way that prevents lines in the contents from being treated as separate log records by any downstream tools.
