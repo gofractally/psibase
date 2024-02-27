@@ -44,6 +44,8 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/external/rapidjson/include
     )
     target_link_libraries(psio${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/libraries/psio
+        -lpsio
         boost
         simdjson${suffix}
         wasm-base${suffix}
