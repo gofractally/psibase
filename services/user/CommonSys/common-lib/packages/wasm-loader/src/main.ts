@@ -74,6 +74,7 @@ const functionCall = async ({
     const fulfilledFunctions = precomputedResults.map((func) =>
         generateFulfilledFunction(func.method, func.result)
     );
+
     const missingFunctions = Object.entries(parsedFunctions).map(
         ([service, methods]) => [
             service,
@@ -86,13 +87,6 @@ const functionCall = async ({
             )
         ]
     );
-
-    //.filter(
-    //    (func) =>
-    //      !precomputedResults.some(
-    //           (f) => f.method == func.method && f.service == func.service
-    //     )
-    //);
 
     console.log({ missingFunctions, fulfilledFunctions, parsedFunctions });
 
