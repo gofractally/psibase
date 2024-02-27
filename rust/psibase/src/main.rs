@@ -13,7 +13,7 @@ use psibase::{
     set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
     AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
     PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
-    Transaction,
+    Transaction, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -53,6 +53,10 @@ struct Args {
     /// error, stack, full, or json
     #[clap(long, value_name = "FORMAT", default_value = "stack")]
     trace: TraceFormat,
+
+    /// Controls whether the transaction's console output is shown
+    #[clap(long, action=clap::ArgAction::Set, min_values=0, require_equals=true, default_value="true", default_missing_value="true")]
+    console: bool,
 
     #[clap(subcommand)]
     command: Command,
@@ -312,6 +316,8 @@ async fn create(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -354,6 +360,8 @@ async fn modify(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -413,6 +421,8 @@ async fn deploy(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -474,6 +484,8 @@ async fn upload(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -543,7 +555,15 @@ async fn monitor_trx(
     progress: ProgressBar,
     n: u64,
 ) -> Result<(), anyhow::Error> {
-    let result = push_transaction(&args.api, client.clone(), trx.packed(), args.trace).await;
+    let result = push_transaction(
+        &args.api,
+        client.clone(),
+        trx.packed(),
+        args.trace,
+        args.console,
+        Some(&progress),
+    )
+    .await;
     if let Err(err) = result {
         progress.suspend(|| {
             println!("=====\n{:?}", err);
@@ -619,10 +639,18 @@ async fn boot(
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
-    push_boot(args, &client, boot_transactions.packed()).await?;
+    push_boot(args, &client, boot_transactions.packed(), &progress).await?;
     progress.inc(1);
     for transaction in transactions {
-        push_transaction(&args.api, client.clone(), transaction.packed(), args.trace).await?;
+        push_transaction(
+            &args.api,
+            client.clone(),
+            transaction.packed(),
+            args.trace,
+            args.console,
+            Some(&progress),
+        )
+        .await?;
         progress.inc(1)
     }
     if !args.suppress_ok {
@@ -635,11 +663,15 @@ async fn push_boot(
     args: &Args,
     client: &reqwest::Client,
     packed: Vec<u8>,
+    progress: &ProgressBar,
 ) -> Result<(), anyhow::Error> {
+    let trace: TransactionTrace =
+        as_json(client.post(args.api.join("native/push_boot")?).body(packed)).await?;
+    if args.console {
+        progress.suspend(|| print!("{}", trace.console()));
+    }
     args.trace
-        .error_for_trace(
-            as_json(client.post(args.api.join("native/push_boot")?).body(packed)).await?,
-        )
+        .error_for_trace(trace, Some(progress))
         .context("Failed to boot")
 }
 
@@ -741,6 +773,8 @@ async fn monitor_install_trx(
         client.clone(),
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        Some(&progress),
     )
     .await;
 
