@@ -1,7 +1,6 @@
 import { buildMessageLoaderInitialized } from "../../../../common/messaging/supervisor/LoaderInitialized";
 import { $init, provider } from "./component_parser";
 import {
-    Func,
     generateFulfilledFunction,
     generatePendingFunction
 } from "./dynamicFunctions";
@@ -10,8 +9,9 @@ import {
     PluginCallResponse,
     isPluginCallRequest,
     PluginCallRequest,
-    buildPluginCallResponse,
-    PluginCallPayload
+    // buildPluginCallResponse,
+    PluginCallPayload,
+    buildPluginCallResponse
 } from "@messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -25,6 +25,7 @@ interface Importables {
     [key: string]: string;
 }
 
+// @ts-ignore
 const runWasm = async (
     wasm: ArrayBuffer,
     importables: Importables[],
@@ -61,24 +62,37 @@ const functionCall = async ({
     const ComponentParser = new provider.ComponentParser();
 
     const { wit } = ComponentParser.parse("hello", bytes);
-    console.log(wit, "is the wit");
 
-    console.log(JSON.stringify(wit), "is the raw");
     const parsedFunctions = parseFunctions(wit);
 
-    console.log(parsedFunctions, "are the parsed functions..");
+    console.log(parsedFunctions, "are the parsed functions..", {
+        id,
+        args,
+        precomputedResults
+    });
 
     const fulfilledFunctions = precomputedResults.map((func) =>
         generateFulfilledFunction(func.method, func.result)
     );
-    const missingFunctions = parsedFunctions
-        .filter(
-            (func) =>
-                !precomputedResults.some(
-                    (f) => f.method == func.method && f.service == func.service
-                )
-        )
-        .filter((x) => x.service !== "imports");
+    const missingFunctions = Object.entries(parsedFunctions).map(
+        ([service, methods]) => [
+            service,
+            methods.filter(
+                (method) =>
+                    !precomputedResults.some(
+                        (result) =>
+                            result.method == method && result.service == service
+                    )
+            )
+        ]
+    );
+
+    //.filter(
+    //    (func) =>
+    //      !precomputedResults.some(
+    //           (f) => f.method == func.method && f.service == func.service
+    //     )
+    //);
 
     console.log({ missingFunctions, fulfilledFunctions, parsedFunctions });
 
@@ -91,17 +105,23 @@ const functionCall = async ({
             .join("\n")} \n ${fulfilledFunctions}`;
 
     console.log(str, "is the str", args.service);
+
+    const baseImports = "";
+    // utilise an object to create the rest,
+    // take the object, and return an array to spread
+
+    const serviceImports = serviceMethodIndexToImportables(
+        parsedFunctions,
+        args.service,
+        id
+    );
+
+    // we want to achieve /imports for
     let importables: Importables[] = [
         {
             [`component:${args.service}/imports`]: str
         },
-        ...(args.service == "demoapp1"
-            ? [
-                  {
-                      [`component:demoapp1/demoapp2`]: str
-                  }
-              ]
-            : [])
+        ...serviceImports
     ];
 
     try {
@@ -118,6 +138,7 @@ const functionCall = async ({
     }
 };
 
+// @ts-ignore
 const sendPluginCallResponse = (response: PluginCallResponse) => {
     window.parent.postMessage(response, "*");
 };
@@ -163,23 +184,44 @@ const groupInterfaces = (lines: string[]) => {
     return obj;
 };
 
-const parseFunctions = (data: string): Func[] => {
+type ServiceMethodIndex = {
+    [k: string]: string[];
+};
+const parseFunctions = (data: string): ServiceMethodIndex => {
     const lines = data.split("\n").map((x) => x.trim());
     const newLines = stripGenerated(lines);
 
     const interfaces = groupInterfaces(newLines);
-    const entries = Object.entries(interfaces)
-        .map(([key, value]): [string, string[]] => [
+    const entries = Object.fromEntries(
+        Object.entries(interfaces).map(([key, value]): [string, string[]] => [
             key,
             value.map((v) => v.split(" ")[0].slice(0, -1))
         ])
-        .flatMap(([key, value]): Func[] =>
-            (value as string[]).map((name) => ({ method: name, service: key }))
-        );
+    );
 
     console.log({ interfaces, entries });
 
     return entries;
+};
+
+const serviceMethodIndexToImportables = (
+    serviceMethodIndex: ServiceMethodIndex,
+    service: string,
+    id: string
+): { [key: string]: string }[] => {
+    return Object.entries(serviceMethodIndex).map(([key, functions]) => {
+        return {
+            [`component:${service}}/${key}`]: functions
+                .map(
+                    (func) =>
+                        generatePendingFunction(
+                            { method: func, service: key },
+                            id
+                        ) + "\n"
+                )
+                .join("\n")
+        };
+    });
 };
 
 const onRawEvent = (message: MessageEvent) => {
