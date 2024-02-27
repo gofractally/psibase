@@ -18,10 +18,16 @@ type ServicesType = {
     [key: string]: boolean;
 };
 
+interface PackageRef {
+    name: string;
+    version: string;
+}
+
 interface PackageMeta {
     name: string;
+    version: string;
     description: string;
-    depends: string[];
+    depends: PackageRef[];
     accounts: string[];
 }
 
@@ -32,15 +38,15 @@ interface PackageInfo extends PackageMeta {
 
 type PackageIndex = PackageInfo[];
 
-type PackageMap = { [key: string]: PackageInfo };
-
 interface TypeFormProps {
+    setPackages: (names: string[]) => void;
     typeForm: UseFormReturn<InstallType>;
     setCurrentPage: (page: string) => void;
 }
 
 interface ServicesFormProps {
-    keys: string[];
+    setPackages: (names: string[]) => void;
+    serviceIndex: PackageInfo[];
     servicesForm: UseFormReturn<ServicesType>;
     setCurrentPage: (page: string) => void;
 }
@@ -88,7 +94,7 @@ type BootState =
     | TransactionTrace;
 
 interface InstallFormProps {
-    packages: string[];
+    packages: PackageInfo[];
     producerForm: UseFormReturn<ProducerType>;
     config?: PsinodeConfig;
     refetchConfig: () => void;
@@ -105,11 +111,16 @@ interface ProgressPageProps {
     state: BootState;
 }
 
-export const TypeForm = ({ typeForm, setCurrentPage }: TypeFormProps) => {
+export const TypeForm = ({
+    setPackages,
+    typeForm,
+    setCurrentPage,
+}: TypeFormProps) => {
     return (
         <form
             onSubmit={typeForm.handleSubmit((state) => {
                 if (state.installType == "full") {
+                    setPackages(["Default"]);
                     setCurrentPage("producer");
                 } else if (state.installType == "custom") {
                     setCurrentPage("services");
@@ -136,19 +147,65 @@ export const TypeForm = ({ typeForm, setCurrentPage }: TypeFormProps) => {
     );
 };
 
+type ParsedVersion = undefined | [number, number, number];
+
+function splitVersion(version: string): ParsedVersion {
+    let result = version.match(/^(\d+).(\d+).(\d+)(?:\+.*)?$/);
+    if (result) {
+        return [+result[0], +result[1], +result[2]];
+    }
+}
+
+function versionLess(lhs: ParsedVersion, rhs: ParsedVersion) {
+    if (lhs && rhs) {
+        for (let i = 0; i < 3; ++i) {
+            if (lhs[i] != rhs[i]) {
+                return lhs[i] < rhs[i];
+            }
+        }
+        return false;
+    }
+    if (rhs) {
+        return true;
+    }
+    return false;
+}
+
 export const ServicesForm = ({
-    keys,
+    setPackages,
+    serviceIndex,
     servicesForm,
     setCurrentPage,
 }: ServicesFormProps) => {
+    let byname = new Map();
+    for (let info of serviceIndex) {
+        let version = splitVersion(info.version);
+        if (version) {
+            let existing = byname.get(info.name);
+            if (
+                !existing ||
+                versionLess(splitVersion(existing.version), version)
+            ) {
+                byname.set(info.name, info);
+            }
+        }
+    }
     return (
         <form
-            onSubmit={servicesForm.handleSubmit((state) =>
-                setCurrentPage("producer")
-            )}
+            onSubmit={servicesForm.handleSubmit((state) => {
+                setPackages(
+                    serviceIndex
+                        .map((meta) => meta.name)
+                        .filter((name) => servicesForm.getValues(name))
+                );
+                setCurrentPage("producer");
+            })}
         >
-            {keys.map((name) => (
-                <Form.Checkbox label={name} {...servicesForm.register(name)} />
+            {[...byname.values()].map((info) => (
+                <Form.Checkbox
+                    label={`${info.name}-${info.version}`}
+                    {...servicesForm.register(info.name)}
+                />
             ))}
             <Button
                 className="mt-4"
@@ -240,7 +297,7 @@ const getStack = (trace: TransactionTrace) => {
 };
 
 async function runBoot(
-    packageNames: string[],
+    packageInfo: PackageInfo[],
     producer: string,
     config: PsinodeConfig | undefined,
     refetchConfig: () => void,
@@ -264,9 +321,9 @@ async function runBoot(
         // fetch packages
         let packages: ArrayBuffer[] = [];
         let i = 0;
-        for (let name of packageNames) {
-            setBootState(["fetch", i, packageNames.length]);
-            packages.push(await getArrayBuffer(`/packages/${name}.psi`));
+        for (let info of packageInfo) {
+            setBootState(["fetch", i, packageInfo.length]);
+            packages.push(await getArrayBuffer(`/packages/${info.file}`));
             i++;
         }
         // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
@@ -322,8 +379,10 @@ export const InstallForm = ({
         <>
             {nameChange && <h3>{nameChange}</h3>}
             <h2>The following packages will be installed:</h2>
-            {packages.map((name) => (
-                <p>{name}</p>
+            {packages.map((info) => (
+                <p>
+                    {info.name}-{info.version}
+                </p>
             ))}
             <form
                 onSubmit={() => {
@@ -396,44 +455,6 @@ function useGetJson<R>(url: string): [R | undefined, string | undefined] {
     return [value, error];
 }
 
-function dfs(
-    index: PackageMap,
-    names: string[],
-    found: { [key: string]: boolean },
-    result: string[]
-) {
-    for (let name of names) {
-        let complete = found[name];
-        if (complete === false) {
-            throw new Error(`package ${name} depends on itself`);
-        } else if (complete === undefined) {
-            found[name] = false;
-            let meta = index[name];
-            if (!meta) {
-                throw new Error(`package ${name} not found`);
-            }
-            dfs(index, meta.depends, found, result);
-            result.push(name);
-            found[name] = true;
-        }
-    }
-}
-
-function makePackageMap(index: PackageIndex): PackageMap {
-    let result: PackageMap = {};
-    for (let meta of index) {
-        result[meta.name] = meta;
-    }
-    return result;
-}
-
-function resolvePackages(index: PackageMap, names: string[]): string[] {
-    let found = {};
-    let result: string[] = [];
-    dfs(index, names, found, result);
-    return result;
-}
-
 export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
     const [bootState, setBootState] = useState<BootState>();
 
@@ -452,13 +473,27 @@ export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
 
     const [currentPage, setCurrentPage] = useState<string>("type");
 
+    let [packagesToInstall, setPackagesToInstall] = useState<PackageInfo[]>();
+
+    let resolvePackages = (names: string[]) => {
+        console.log(names);
+        setPackagesToInstall(wasm.js_resolve_packages(serviceIndex, names, []));
+    };
+
     let allServices = ["Default", "AuthSys", "AuthAnySys"];
     if (currentPage == "type") {
-        return <TypeForm typeForm={typeForm} setCurrentPage={setCurrentPage} />;
+        return (
+            <TypeForm
+                setPackages={resolvePackages}
+                typeForm={typeForm}
+                setCurrentPage={setCurrentPage}
+            />
+        );
     } else if (currentPage == "services") {
         return (
             <ServicesForm
-                keys={serviceIndex.map((meta) => meta.name)}
+                setPackages={resolvePackages}
+                serviceIndex={serviceIndex}
                 servicesForm={servicesForm}
                 setCurrentPage={setCurrentPage}
             />
@@ -480,10 +515,7 @@ export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
                       .filter((name) => servicesForm.getValues(name));
         return (
             <InstallForm
-                packages={resolvePackages(
-                    makePackageMap(serviceIndex),
-                    namedPackages
-                )}
+                packages={packagesToInstall || []}
                 config={config}
                 refetchConfig={refetchConfig}
                 producerForm={producerForm}

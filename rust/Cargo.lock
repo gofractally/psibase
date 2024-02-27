@@ -222,17 +222,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-recursion"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fd55a5ba1179988837d24ab4c7cc8ed6efdeff578ede0416b4225a5fca35bd0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.48",
-]
-
-[[package]]
 name = "async-stream"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -657,6 +646,26 @@ name = "const-oid"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28c122c3980598d243d63d9a704629a2d748d101f278052ff068be5a4423ab6f"
+
+[[package]]
+name = "const_format"
+version = "0.2.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a214c7af3d04997541b18d432afaff4c455e79e2029079647e72fc2bd27673"
+dependencies = [
+ "const_format_proc_macros",
+]
+
+[[package]]
+name = "const_format_proc_macros"
+version = "0.2.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7f6ff08fd20f4f299298a28e2dfa8a8ba1036e6cd2460ac1de7b425d76f2500"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-xid",
+]
 
 [[package]]
 name = "core-foundation-sys"
@@ -1310,7 +1319,7 @@ checksum = "bd6effc99afb63425aff9b05836f029929e345a6148a14b7ecd5ab67af944482"
 dependencies = [
  "bytes",
  "fnv",
- "itoa",
+ "itoa 1.0.9",
 ]
 
 [[package]]
@@ -1357,7 +1366,7 @@ dependencies = [
  "http-body",
  "httparse",
  "httpdate",
- "itoa",
+ "itoa 1.0.9",
  "pin-project-lite",
  "socket2 0.4.9",
  "tokio",
@@ -1557,6 +1566,12 @@ dependencies = [
 
 [[package]]
 name = "itoa"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
+
+[[package]]
+name = "itoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af150ab688ff2122fcef229be89cb50dd66af9e01a4ff320cc137eecc9bacc38"
@@ -1628,6 +1643,12 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "leb128"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 
 [[package]]
 name = "libc"
@@ -2001,6 +2022,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordered-float"
+version = "2.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "os_str_bytes"
 version = "6.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2053,6 +2083,26 @@ dependencies = [
  "simba",
  "slab",
  "smallvec",
+]
+
+[[package]]
+name = "partial_ref"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f728bc9b1479656e40cba507034904a8c44027c0efdbbaf6a4bdc5f2d3a910c"
+dependencies = [
+ "partial_ref_derive",
+]
+
+[[package]]
+name = "partial_ref_derive"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "300e1d2cb5b898b5a5342e994e0d0c367dbfe69cbf717cd307045ec9fb057581"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2299,10 +2349,10 @@ version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-graphql",
- "async-recursion",
  "async-trait",
  "chrono",
  "clap 3.2.25",
+ "const_format",
  "cryptoki",
  "cryptoki-sys",
  "custom_error",
@@ -2336,6 +2386,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "url",
+ "varisat",
  "wasm-bindgen",
  "zip",
 ]
@@ -2821,7 +2872,7 @@ version = "1.0.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "693151e1ac27563d6dbcec9dee9fbd5da8539b20fa14ad3752b2e6d363ace360"
 dependencies = [
- "itoa",
+ "itoa 1.0.9",
  "ryu",
  "serde",
 ]
@@ -2833,7 +2884,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3491c14715ca2294c4d6a88f15e84739788c1d030eed8c110436aafdaa2f3fd"
 dependencies = [
  "form_urlencoded",
- "itoa",
+ "itoa 1.0.9",
  "ryu",
  "serde",
 ]
@@ -3041,6 +3092,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "synstructure"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -3384,6 +3447,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0edd1e5b14653f783770bce4a4dabb4a5108a5370a5f5d8cfe8710c361f6c8b"
 
 [[package]]
+name = "unicode-xid"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
+
+[[package]]
 name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3411,6 +3480,93 @@ name = "utf8parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
+
+[[package]]
+name = "varisat"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebe609851d1e9196674ac295f656bd8601200a1077343d22b345013497807caf"
+dependencies = [
+ "anyhow",
+ "itoa 0.4.8",
+ "leb128",
+ "log",
+ "ordered-float",
+ "partial_ref",
+ "rustc-hash",
+ "serde",
+ "thiserror",
+ "varisat-checker",
+ "varisat-dimacs",
+ "varisat-formula",
+ "varisat-internal-macros",
+ "varisat-internal-proof",
+ "vec_mut_scan",
+]
+
+[[package]]
+name = "varisat-checker"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135c977c5913ed6e98f6b81b8e4d322211303b7d40dae773caef7ad1de6c763b"
+dependencies = [
+ "anyhow",
+ "log",
+ "partial_ref",
+ "rustc-hash",
+ "smallvec",
+ "thiserror",
+ "varisat-dimacs",
+ "varisat-formula",
+ "varisat-internal-proof",
+]
+
+[[package]]
+name = "varisat-dimacs"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d1dee4e21be1f04c0a939f7ae710cced47233a578de08a1b3c7d50848402636"
+dependencies = [
+ "anyhow",
+ "itoa 0.4.8",
+ "thiserror",
+ "varisat-formula",
+]
+
+[[package]]
+name = "varisat-formula"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "395c5543b9bfd9076d6d3af49d6c34a4b91b0b355998c0a5ec6ed7265d364520"
+
+[[package]]
+name = "varisat-internal-macros"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "602ece773543d066aa7848455486c6c0422a3f214da7a2b899100f3c4f12408d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 1.0.109",
+ "synstructure",
+]
+
+[[package]]
+name = "varisat-internal-proof"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6163bb7bc9018af077b76d64f976803d141c36a27d640f1437dddc4fd527d207"
+dependencies = [
+ "anyhow",
+ "varisat-formula",
+]
+
+[[package]]
+name = "vec_mut_scan"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68ed610a8d5e63d9c0e31300e8fdb55104c5f21e422743a9dc74848fa8317fd2"
 
 [[package]]
 name = "version_check"

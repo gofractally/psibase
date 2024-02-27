@@ -115,6 +115,7 @@ function(add suffix)
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
             tester/src/package.cpp
+            tester/src/semver.cpp
             tester/src/zip.cpp
             tester/src/testUtils.cpp
             service/src/intrinsic.cpp
