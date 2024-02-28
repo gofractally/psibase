@@ -540,7 +540,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/SupervisorSys.psi
     NAME SupervisorSys
-    DESCRIPTION "Token service"
+    VERSION ${PSIBASE_VERSION}
     PACKAGE_DEPENDS NftSys ProxySys AccountSys
     SERVICE supervisor-sys
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
