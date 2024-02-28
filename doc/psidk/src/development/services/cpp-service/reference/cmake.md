@@ -22,8 +22,8 @@ Target variants:
 The `psibase_package` command builds an [app package](../../../../specifications/data-formats/package.md).
 
 ```cmake
-psibase_package(NAME <name> [DESCRIPTION <text>] [OUTPUT <filename>]
-                [ACCOUNTS <name>...] [DEPENDS <targets>...]
+psibase_package(NAME <name> VERSION <version> [DESCRIPTION <text>]
+                [OUTPUT <filename>] [ACCOUNTS <name>...] [DEPENDS <targets>...]
                 [PACKAGE_DEPENDS <package>...] [POSTINSTALL <filename>]
                 [SERVICE <name> [TARGET <target> | WASM <filename>]
                  [FLAGS <flags...>] [SERVER <name>] [DATA <path> <dest>]
@@ -33,6 +33,10 @@ psibase_package(NAME <name> [DESCRIPTION <text>] [OUTPUT <filename>]
 ### NAME
 
 The name of the package
+
+### VERSION
+
+The package version. Must conform to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ### DESCRIPTION
 
@@ -52,7 +56,7 @@ Other CMake targets that the package depends on. This is a build-time dependency
 
 ### PACKAGE_DEPENDS
 
-Other packages that this package depends on. This dependency is recorded in the package and is processed by the package manager. For build-time dependencies use `DEPENDS` instead.
+Other packages that this package depends on. This dependency is recorded in the package and is processed by the package manager. For build-time dependencies use `DEPENDS` instead. The dependency may include a [version expression](../../../../specifications/data-formats/package.md#semantic-version-matching) wrapped in parenthesis, e.g. `foo(^2.1.3)`. If a version is not provided, any version will match.
 
 ### POSTINSTALL
 

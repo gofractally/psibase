@@ -2,6 +2,7 @@ use crate::TransactionTrace;
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
+use indicatif::ProgressBar;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::str::FromStr;
@@ -64,7 +65,11 @@ pub enum TraceFormat {
 }
 
 impl TraceFormat {
-    pub fn error_for_trace(&self, trace: TransactionTrace) -> Result<(), anyhow::Error> {
+    pub fn error_for_trace(
+        &self,
+        trace: TransactionTrace,
+        progress: Option<&ProgressBar>,
+    ) -> Result<(), anyhow::Error> {
         if let Some(e) = &trace.error {
             if !e.is_empty() {
                 let message = match self {
@@ -77,10 +82,9 @@ impl TraceFormat {
             }
         }
         match self {
-            TraceFormat::Full => {
-                print!("{}", trace.to_string())
-            }
-            TraceFormat::Json => serde_json::to_writer_pretty(std::io::stdout().lock(), &trace)?,
+            TraceFormat::Full => progress.suspend(|| print!("{}", trace.to_string())),
+            TraceFormat::Json => progress
+                .suspend(|| serde_json::to_writer_pretty(std::io::stdout().lock(), &trace))?,
             _ => {}
         }
         Ok(())
@@ -100,11 +104,27 @@ impl FromStr for TraceFormat {
     }
 }
 
+trait OptionProgressBar {
+    fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R;
+}
+
+impl OptionProgressBar for Option<&ProgressBar> {
+    fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R {
+        if let Some(progress) = self {
+            progress.suspend(f)
+        } else {
+            f()
+        }
+    }
+}
+
 async fn push_transaction_impl(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
     fmt: TraceFormat,
+    console: bool,
+    progress: Option<&ProgressBar>,
 ) -> Result<(), anyhow::Error> {
     let trace: TransactionTrace = as_json(
         client
@@ -112,7 +132,10 @@ async fn push_transaction_impl(
             .body(packed),
     )
     .await?;
-    fmt.error_for_trace(trace)
+    if console {
+        progress.suspend(|| print!("{}", trace.console()));
+    }
+    fmt.error_for_trace(trace, progress)
 }
 
 pub async fn push_transaction(
@@ -120,8 +143,10 @@ pub async fn push_transaction(
     client: reqwest::Client,
     packed: Vec<u8>,
     fmt: TraceFormat,
+    console: bool,
+    progress: Option<&ProgressBar>,
 ) -> Result<(), anyhow::Error> {
-    push_transaction_impl(base_url, client, packed, fmt)
+    push_transaction_impl(base_url, client, packed, fmt, console, progress)
         .await
         .context("Failed to push transaction")?;
     Ok(())
