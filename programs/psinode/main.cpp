@@ -2076,7 +2076,7 @@ void run(const std::string&              db_path,
 #endif
                 loggers::configure(config.loggers);
                 {
-                   std::shared_lock l{http_config->mutex};
+                   std::lock_guard l{http_config->mutex};
                    http_config->host                = host;
                    http_config->listen              = config.listen;
                    http_config->admin               = admin;

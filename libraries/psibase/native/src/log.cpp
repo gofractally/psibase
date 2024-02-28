@@ -1,6 +1,7 @@
 #include <psibase/ConfigFile.hpp>
 #include <psibase/LogQueue.hpp>
 #include <psibase/log.hpp>
+#include <psibase/trace.hpp>
 
 #include <psio/json/any.hpp>
 #include <psio/to_json.hpp>
@@ -1054,8 +1055,8 @@ namespace psibase::loggers
                if (iter != args.end())
                {
                   std::uint64_t result;
-                  const auto&    s   = as_string(iter->second);
-                  auto           err = std::from_chars(s.data(), s.data() + s.size(), result);
+                  const auto&   s   = as_string(iter->second);
+                  auto          err = std::from_chars(s.data(), s.data() + s.size(), result);
                   if (err.ptr != s.data() + s.size() || err.ec != std::errc())
                   {
                      throw std::runtime_error("Expected an integer");
@@ -1141,9 +1142,9 @@ namespace psibase::loggers
          std::filesystem::path          targetDirectory;
          std::filesystem::path          filename;
          std::filesystem::path          target;
-         std::uint64_t                 maxFiles;
-         std::uint64_t                 maxSize;
-         std::uint64_t                 rotationSize;
+         std::uint64_t                  maxFiles;
+         std::uint64_t                  maxSize;
+         std::uint64_t                  rotationSize;
          std::string                    rotationTime;
          bool                           flush = false;
          std::shared_ptr<time_rotation> rotationTimeFunc;
@@ -1469,7 +1470,7 @@ namespace psibase::loggers
       std::string translate_size(std::string_view s)
       {
          std::uint64_t v;
-         auto           err = std::from_chars(s.begin(), s.end(), v);
+         auto          err = std::from_chars(s.begin(), s.end(), v);
          if (err.ec != std::errc())
          {
             throw std::runtime_error("Expected number");
@@ -1622,15 +1623,18 @@ namespace psibase::loggers
           boost::log::filter(boost::log::attribute_name, std::string_view, std::string_view)>;
       using formatter_generator =
           std::function<boost::log::formatter(boost::log::attribute_name, std::string_view)>;
+      using filter_generator_ext =
+          std::function<boost::log::filter(boost::log::attribute_name, std::string_view&)>;
 
       struct filter_parser
       {
-         const char*                                                      begin;
-         const char*                                                      end;
-         std::vector<boost::log::filter>                                  result;
-         std::vector<char>                                                states;
-         bool                                                             not_ = false;
-         static std::map<std::string_view, filter_generator, std::less<>> global_filters;
+         const char*                                                          begin;
+         const char*                                                          end;
+         std::vector<boost::log::filter>                                      result;
+         std::vector<char>                                                    states;
+         bool                                                                 not_ = false;
+         static std::map<std::string_view, filter_generator, std::less<>>     global_filters;
+         static std::map<std::string_view, filter_generator_ext, std::less<>> global_filters_ext;
          bool parse(bool in_format = false)
          {
             while (true)
@@ -1784,6 +1788,23 @@ namespace psibase::loggers
                apply_andor(not_);
             }
          }
+         bool push_ext(std::string_view name)
+         {
+            if (auto iter = global_filters_ext.find(name); iter != global_filters_ext.end())
+            {
+               std::string_view trailing{begin, end};
+               auto f = iter->second(boost::log::attribute_name{std::string(name)}, trailing);
+               assert(trailing.data() + trailing.size() == end);
+               begin = trailing.data();
+               if (not_)
+               {
+                  f = [f = std::move(f)](auto& attrs) mutable { return !f(attrs); };
+               }
+               result.push_back(std::move(f));
+               return true;
+            }
+            return false;
+         }
          bool push_exists(std::string_view name)
          {
             if (global_filters.find(name) != global_filters.end())
@@ -1888,6 +1909,10 @@ namespace psibase::loggers
             parse_ws();
             parse_attribute_name(name);
             parse_ws();
+            if (push_ext(name))
+            {
+               return true;
+            }
             std::string_view op;
             if (parse_operator(op))
             {
@@ -2188,6 +2213,8 @@ namespace psibase::loggers
       };
 
       std::map<std::string_view, filter_generator, std::less<>> filter_parser::global_filters;
+      std::map<std::string_view, filter_generator_ext, std::less<>>
+          filter_parser::global_filters_ext;
       std::map<std::string_view,
                std::pair<boost::log::attribute_name, formatter_generator>,
                std::less<>>
@@ -2304,6 +2331,14 @@ namespace psibase::loggers
       };
 
       template <>
+      auto make_simple_filter_factory<TransactionTrace>()
+      {
+         return [](boost::log::attribute_name name, std::string_view op,
+                   std::string_view value) -> boost::log::filter
+         { throw std::runtime_error(name.string() + " does not support " + std::string(op)); };
+      };
+
+      template <>
       auto make_simple_filter_factory<boost::log::process_id>()
       {
          return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
@@ -2330,6 +2365,12 @@ namespace psibase::loggers
                                     ">=", std::greater_equal<>());
          };
       };
+
+      auto make_alias_filter_factory(boost::log::attribute_name name)
+      {
+         return [name](boost::log::attribute_name /*name*/, std::string_view& trailing)
+         { return [name](const auto& attrs) { return attrs.count(name) != 0; }; };
+      }
 
       template <typename T>
       auto make_simple_formatter_factory()
@@ -2438,6 +2479,25 @@ namespace psibase::loggers
       }
 
       template <>
+      auto make_simple_formatter_factory<TransactionTrace>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("Unexpected format spec for " + name.string());
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<TransactionTrace>(name, rec))
+               {
+                  stream << psio::convert_to_json(*attr);
+               }
+            };
+         };
+      }
+
+      template <>
       auto make_simple_formatter_factory<boost::log::process_id>()
       {
          return [](boost::log::attribute_name name, std::string_view spec)
@@ -2483,6 +2543,15 @@ namespace psibase::loggers
          formatter_parser::global_formatters.try_emplace(
              name, boost::log::attribute_name{std::string(name)},
              make_simple_formatter_factory<T>());
+      }
+
+      // An attribute whose value is derived from another attribute
+      template <typename F>
+      void add_derived_attribute(std::string_view name, std::string_view ref, F&& f)
+      {
+         boost::log::attribute_name attr{std::string(ref)};
+         filter_parser::global_filters_ext.try_emplace(name, make_alias_filter_factory(attr));
+         formatter_parser::global_formatters.try_emplace(name, attr, std::forward<F>(f));
       }
 
       template <typename F>
@@ -2533,6 +2602,82 @@ namespace psibase::loggers
          };
       };
 
+      auto make_indent_formatter = [](auto name, std::string_view spec)
+      {
+         auto pos = spec.find(':');
+         if (pos == std::string_view::npos)
+         {
+            throw std::runtime_error("Indent: missing format");
+         }
+         unsigned    indent = 0;
+         const char* p      = spec.data();
+         const char* end    = spec.data() + pos;
+         auto        res    = std::from_chars(p, end, indent);
+         if (res.ec != std::errc{} || res.ptr != end)
+            throw std::runtime_error("Indent: invalid width");
+         auto nested = parse_formatter(spec.substr(pos + 1), true);
+         return [indent, nested = std::move(nested)](const boost::log::record_view&  rec,
+                                                     boost::log::formatting_ostream& os) mutable
+         {
+            std::string data;
+            {
+               boost::log::formatting_ostream nested_os{data};
+               nested(rec, nested_os);
+            }
+            if (!data.empty() && !os.str().empty() && !os.str().back() != '\n')
+               os << '\n';
+            bool indenting = true;
+            for (auto ch : data)
+            {
+               if (ch == '\n')
+                  indenting = true;
+               else
+               {
+                  if (indenting)
+                     for (unsigned i = 0; i < indent; ++i)
+                        os << ' ';
+                  indenting = false;
+               }
+               os << ch;
+            }
+            if (!data.empty() && data.back() != '\n')
+               os << '\n';
+         };
+      };
+
+      void print_trace_console(boost::log::formatting_ostream& os, const EventTrace& trace) {}
+      void print_trace_console(boost::log::formatting_ostream& os, const ConsoleTrace& trace)
+      {
+         os << trace.console;
+      }
+      void print_trace_console(boost::log::formatting_ostream& os, const ActionTrace& trace)
+      {
+         for (const auto& inner : trace.innerTraces)
+         {
+            std::visit([&os](const auto& x) { print_trace_console(os, x); }, inner.inner);
+         }
+      }
+
+      auto make_trace_console_formatter = [](auto name, std::string_view spec)
+      {
+         if (!spec.empty())
+         {
+            throw std::runtime_error("No formats defined for TraceConsole");
+         }
+         return
+             [name](const boost::log::record_view& rec, boost::log::formatting_ostream& os) mutable
+         {
+            // possible formats: raw, escaped string, quoted string
+            if (auto attr = boost::log::extract<psibase::TransactionTrace>(name, rec))
+            {
+               for (const auto& action : attr->actionTraces)
+               {
+                  print_trace_console(os, action);
+               }
+            }
+         };
+      };
+
       void do_init()
       {
          auto core = boost::log::core::get();
@@ -2541,7 +2686,7 @@ namespace psibase::loggers
                               []() { return std::chrono::system_clock::now(); }));
 
 #ifndef HOST_NAME_MAX
-#define HOST_NAME_MAX 255 // not defined on mac
+#define HOST_NAME_MAX 255  // not defined on mac
 #endif
          char hostname[HOST_NAME_MAX + 1];
          if (gethostname(hostname, sizeof(hostname)))
@@ -2566,6 +2711,7 @@ namespace psibase::loggers
          add_attribute<int>("PeerId");
          add_attribute<boost::log::process_id>("ProcessId");
          add_attribute<BlockHeader>("BlockHeader");
+         add_attribute<TransactionTrace>("Trace");
          add_attribute<std::string>("RequestMethod");
          add_attribute<std::string>("RequestTarget");
          add_attribute<std::string>("RequestHost");
@@ -2576,6 +2722,8 @@ namespace psibase::loggers
          add_attribute<std::chrono::microseconds>("DatabaseTime");
          add_attribute<std::chrono::microseconds>("WasmExecTime");
          add_attribute<std::chrono::microseconds>("ResponseTime");
+
+         add_derived_attribute("TraceConsole", "Trace", make_trace_console_formatter);
 
          add_compound_format("Json",
                              [](auto name, std::string_view spec)
@@ -2588,6 +2736,7 @@ namespace psibase::loggers
                              });
          add_compound_format("Syslog", make_syslog_formatter);
          add_compound_format("Escape", make_escape_formatter);
+         add_compound_format("Indent", make_indent_formatter);
          add_compound_format("FrameDec", make_frame_dec_formatter);
       }
 

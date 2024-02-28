@@ -93,12 +93,39 @@ impl TransactionTrace {
             ))
         }
     }
+    pub fn console(&self) -> TraceConsole {
+        return TraceConsole { trace: self };
+    }
 }
 
 impl fmt::Display for TransactionTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         format_transaction_trace(self, 0, f)
     }
+}
+
+pub struct TraceConsole<'a> {
+    trace: &'a TransactionTrace,
+}
+
+impl fmt::Display for TraceConsole<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for atrace in &self.trace.action_traces {
+            write_action_console(atrace, f)?;
+        }
+        Ok(())
+    }
+}
+
+fn write_action_console(atrace: &ActionTrace, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    for inner in &atrace.inner_traces {
+        match &inner.inner {
+            InnerTraceEnum::ConsoleTrace(c) => write!(f, "{}", &c.console)?,
+            InnerTraceEnum::EventTrace(_) => {}
+            InnerTraceEnum::ActionTrace(a) => write_action_console(a, f)?,
+        }
+    }
+    Ok(())
 }
 
 fn format_string(mut s: &str, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
