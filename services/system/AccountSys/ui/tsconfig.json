@@ -25,7 +25,10 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": ["src", "../../../user/CommonSys/common/useLocalStorage.d.ts"],
+    "include": [
+        "src",
+        "../../../user/CommonSys/common/resources/useLocalStorage.d.ts"
+    ],
     "references": [
         {
             "path": "./tsconfig.node.json"

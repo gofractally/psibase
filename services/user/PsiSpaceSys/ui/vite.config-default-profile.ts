@@ -15,7 +15,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
         {
             // bundle non-external (above) common files except fonts (which should only be referenced)
             find: /^\/common(?!\/(?:fonts))(.*)$/,
-            replacement: path.resolve("../../CommonSys/common$1"),
+            replacement: path.resolve("../../CommonSys/common/resources$1"),
         },
     ];
 
