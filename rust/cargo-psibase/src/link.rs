@@ -226,22 +226,23 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
             // Sequence reference updates
             Instr::Block(seq_ref) => {
                 let mut i = seq_ref.clone();
-                let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
+                let mut new_dest_sequence = dest_seq.dangling_instr_seq(source_function.block(i.seq).ty);
                 i.seq = to_dest_seq(i.seq, source_function, source, &mut new_dest_sequence, dest, id_maps)?;
                 dest_seq.instr(i);
             }
             Instr::Loop(seq_ref) => {
                 let mut i = seq_ref.clone();
-                let mut new_dest_sequence = dest_seq.dangling_instr_seq(None);
+                let mut new_dest_sequence = dest_seq.dangling_instr_seq(source_function.block(i.seq).ty);
                 i.seq = to_dest_seq( i.seq, source_function, source, &mut new_dest_sequence, dest, id_maps)?;
                 dest_seq.instr(i);
             }
             Instr::IfElse(if_else) => {
                 let mut i = if_else.clone();
-                let mut new_dest_seq_1 = dest_seq.dangling_instr_seq(None);
+
+                let mut new_dest_seq_1 = dest_seq.dangling_instr_seq(source_function.block(i.consequent).ty);
                 i.consequent = to_dest_seq(i.consequent, source_function, source, &mut new_dest_seq_1, dest, id_maps)?;
 
-                let mut new_dest_seq_2 = dest_seq.dangling_instr_seq(None);
+                let mut new_dest_seq_2 = dest_seq.dangling_instr_seq(source_function.block(i.alternative).ty);
                 i.alternative = to_dest_seq(i.alternative, source_function, source, &mut new_dest_seq_2, dest, id_maps)?;
 
                 dest_seq.instr(i);
@@ -475,9 +476,11 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
     let tid = source_local_func.ty();
     let ty = source.types.get(tid);
     let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
-
     
     let mut builder = walrus::FunctionBuilder::new(&mut dest.types, &params, &results);
+    if source_func.name.is_some() {
+        builder.name(source_func.name.to_owned().unwrap());
+    }
     
     // Make the new local function
     let args = params
@@ -618,6 +621,7 @@ mod tests {
         let skele_path = with_suffix(&wat_path, "-skeleton");
 
         let mut printer = wasmprinter::Printer::new();
+        printer.print_offsets(false);
         let wat_data = printer.print(wasm_data)?;
         printer.print_skeleton(true);
         let wat_skele = printer.print(wasm_data)?;
