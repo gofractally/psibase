@@ -458,6 +458,11 @@ namespace psibase::http
       }
    }
 
+   std::vector<char> to_vector(std::string_view s)
+   {
+      return std::vector(s.begin(), s.end());
+   }
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -498,47 +503,20 @@ namespace psibase::http
          }
       };
 
-      // Returns a bad request response
-      const auto bad_request =
-          [&server, set_cors, req_version, set_keep_alive](beast::string_view why)
-      {
-         bhttp::response<bhttp::string_body> res{bhttp::status::bad_request, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::content_type, "text/html");
-         set_cors(res);
-         set_keep_alive(res);
-         res.body() = std::string(why);
-         res.prepare_payload();
-         return res;
-      };
-
       // Returns a method_not_allowed response
       const auto method_not_allowed = [&server, set_cors, req_version, set_keep_alive](
                                           beast::string_view target, beast::string_view method,
                                           beast::string_view allowed_methods)
       {
-         bhttp::response<bhttp::string_body> res{bhttp::status::method_not_allowed, req_version};
+         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::method_not_allowed,
+                                                       req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          res.set(bhttp::field::allow, allowed_methods);
          set_cors(res);
          set_keep_alive(res);
-         res.body() = "The resource '" + std::string(target) + "' does not accept the method " +
-                      std::string(method) + ".";
-         res.prepare_payload();
-         return res;
-      };
-
-      // Returns a not found response
-      const auto not_found =
-          [&server, set_cors, req_version, set_keep_alive](beast::string_view target)
-      {
-         bhttp::response<bhttp::string_body> res{bhttp::status::not_found, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::content_type, "text/html");
-         set_cors(res);
-         set_keep_alive(res);
-         res.body() = "The resource '" + std::string(target) + "' was not found.";
+         res.body() = to_vector("The resource '" + std::string(target) +
+                                "' does not accept the method " + std::string(method) + ".");
          res.prepare_payload();
          return res;
       };
@@ -548,27 +526,35 @@ namespace psibase::http
           [&server, set_cors, req_version, set_keep_alive](
               bhttp::status status, beast::string_view why, const char* content_type = "text/html")
       {
-         bhttp::response<bhttp::string_body> res{status, req_version};
+         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, content_type);
          set_cors(res);
          set_keep_alive(res);
-         res.body() = std::string(why);
+         res.body() = std::vector(why.begin(), why.end());
          res.prepare_payload();
          return res;
       };
+
+      const auto not_found = [&error](beast::string_view target)
+      {
+         return error(bhttp::status::not_found,
+                      "The resource '" + std::string(target) + "' was not found.");
+      };
+      const auto bad_request = [&error](beast::string_view why)
+      { return error(bhttp::status::bad_request, why); };
 
       // Returns an error response with a WWW-Authenticate header
       const auto auth_error = [&server, set_cors, req_version, set_keep_alive](
                                   bhttp::status status, std::string&& www_auth)
       {
-         bhttp::response<bhttp::string_body> res{status, req_version};
+         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          res.set(bhttp::field::www_authenticate, std::move(www_auth));
          set_cors(res);
          set_keep_alive(res);
-         res.body() = "Not authorized";
+         res.body() = to_vector("Not authorized");
          res.prepare_payload();
          return res;
       };
@@ -659,7 +645,7 @@ namespace psibase::http
                        result = static_cast<decltype(result)>(result)]() mutable
                       {
                          session->queue_.pause_read = false;
-                         callback(std::move(result));
+                         session->queue_(callback(std::move(result)));
                          if (session->queue_.can_read())
                             session->do_read();
                       });
@@ -672,6 +658,91 @@ namespace psibase::http
          {
             request_handler(std::move(post_back_to_http));
          }
+      };
+
+      // The result should be a variant with a std::string representing an error
+      const auto& run_native_handler_json = [&](auto&& request_handler)
+      {
+         run_native_handler(
+             request_handler,
+             [error, ok](auto&& result)
+             {
+                return std::visit(
+                    [&](auto& body)
+                    {
+                       if constexpr (!std::is_same_v<std::decay_t<decltype(body)>, std::string>)
+                       {
+                          std::vector<char>   data;
+                          psio::vector_stream stream{data};
+                          psio::to_json(body, stream);
+                          return ok(std::move(data), "application/json");
+                       }
+                       else
+                       {
+                          return error(bhttp::status::internal_server_error, body);
+                       }
+                    },
+                    result);
+             });
+      };
+
+      // Anything that can serialized as json
+      const auto& run_native_handler_json_nofail = [&](auto&& request_handler)
+      {
+         run_native_handler(request_handler,
+                            [ok](auto&& result)
+                            {
+                               std::vector<char>   data;
+                               psio::vector_stream stream{data};
+                               psio::to_json(result, stream);
+                               return ok(std::move(data), "application/json");
+                            });
+      };
+
+      // optional<string>
+      auto run_native_handler_no_content = [&](auto&& request_handler)
+      {
+         run_native_handler(request_handler,
+                            [ok_no_content, error](auto&& result)
+                            {
+                               if (result)
+                               {
+                                  return error(bhttp::status::internal_server_error, *result);
+                               }
+                               else
+                               {
+                                  return ok_no_content();
+                               }
+                            });
+      };
+
+      // variant<string, function<vector<char>()>>
+      auto run_native_handler_generic = [&](auto& request_handler, const char* content_type)
+      {
+         run_native_handler(
+             request_handler,
+             [error, ok, content_type](auto&& result)
+             {
+                return std::visit(
+                    [&](auto& body)
+                    {
+                       if constexpr (!std::is_same_v<std::decay_t<decltype(body)>, std::string>)
+                       {
+                          return ok(body(), content_type);
+                       }
+                       else
+                       {
+                          return error(bhttp::status::internal_server_error, body);
+                       }
+                    },
+                    result);
+             });
+      };
+
+      auto run_native_handler_generic_nofail = [&](auto& request_handler, const char* content_type)
+      {
+         run_native_handler(request_handler, [ok, content_type](auto&& result)
+                            { return ok(result(), content_type); });
       };
 
       try
@@ -787,9 +858,7 @@ namespace psibase::http
                 send.self.logger, "ResponseTime",
                 std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime));
             if (!result)
-               return send(
-                   error(bhttp::status::not_found,
-                         "The resource '" + std::string(req.target()) + "' was not found.\n"));
+               return send(not_found(req.target()));
             return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
          }  // !native
          else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
@@ -816,24 +885,7 @@ namespace psibase::http
                return;
             }
 
-            run_native_handler(
-                server.http_config->push_boot_async,
-                [error, ok, session = send.self.derived_session().shared_from_this()](
-                    push_transaction_result&& result)
-                {
-                   if (auto* trace = std::get_if<TransactionTrace>(&result))
-                   {
-                      std::vector<char>   data;
-                      psio::vector_stream stream{data};
-                      psio::to_json(*trace, stream);
-                      session->queue_(ok(std::move(data), "application/json"));
-                   }
-                   else
-                   {
-                      session->queue_(error(bhttp::status::internal_server_error,
-                                            std::get<std::string>(result)));
-                   }
-                });
+            run_native_handler_json(server.http_config->push_boot_async);
          }  // push_boot
          else if (req_target == "/native/push_transaction" &&
                   server.http_config->push_transaction_async)
@@ -860,43 +912,7 @@ namespace psibase::http
                return;
             }
 
-            // TODO: prevent an http timeout from disconnecting or reporting a failure when the transaction was successful
-            //       but... that could open up a vulnerability (resource starvation) where the client intentionally doesn't
-            //       read and doesn't close the socket.
-            server.http_config->push_transaction_async(
-                std::move(req.body()),
-                [error, ok, session = send.self.derived_session().shared_from_this()](
-                    push_transaction_result result)
-                {
-                   net::post(session->stream.get_executor(),
-                             [error, ok, session = std::move(session), result = std::move(result)]
-                             {
-                                try
-                                {
-                                   session->queue_.pause_read = false;
-                                   if (auto* trace = std::get_if<TransactionTrace>(&result))
-                                   {
-                                      std::vector<char>   data;
-                                      psio::vector_stream stream{data};
-                                      psio::to_json(*trace, stream);
-                                      session->queue_(ok(std::move(data), "application/json"));
-                                   }
-                                   else
-                                   {
-                                      session->queue_(error(bhttp::status::internal_server_error,
-                                                            std::get<std::string>(result)));
-                                   }
-                                   if (session->queue_.can_read())
-                                      session->do_read();
-                                }
-                                catch (...)
-                                {
-                                   session->do_close();
-                                }
-                             });
-                });
-            send.pause_read = true;
-            return;
+            run_native_handler_json(server.http_config->push_transaction_async);
          }  // push_transaction
          else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
                   !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
@@ -976,10 +992,7 @@ namespace psibase::http
             {
                return;
             }
-            run_native_handler(
-                server.http_config->get_perf,
-                [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
-                { session->queue_(ok(make_result(), "application/json")); });
+            run_native_handler_generic_nofail(server.http_config->get_perf, "application/json");
          }
          else if (req_target == "/native/admin/metrics" && server.http_config->get_metrics)
          {
@@ -995,14 +1008,9 @@ namespace psibase::http
             {
                return;
             }
-            run_native_handler(
+            run_native_handler_generic_nofail(
                 server.http_config->get_metrics,
-                [ok, session = send.self.derived_session().shared_from_this()](auto&& make_result)
-                {
-                   session->queue_(
-                       ok(make_result(),
-                          "application/openmetrics-text; version=1.0.0; charset=utf-8"));
-                });
+                "application/openmetrics-text; version=1.0.0; charset=utf-8");
          }
          else if (req_target == "/native/admin/peers" && server.http_config->get_peers)
          {
@@ -1020,24 +1028,7 @@ namespace psibase::http
             }
 
             // returns json list of {id:int,endpoint:string}
-            send.pause_read = true;
-            server.http_config->get_peers(
-                [ok,
-                 session = send.self.derived_session().shared_from_this()](get_peers_result result)
-                {
-                   net::post(session->stream.get_executor(),
-                             [ok, session = std::move(session), result = std::move(result)]()
-                             {
-                                session->queue_.pause_read = false;
-                                std::vector<char>   data;
-                                psio::vector_stream stream{data};
-                                psio::to_json(result, stream);
-                                session->queue_(ok(std::move(data), "application/json"));
-                                if (session->queue_.can_read())
-                                   session->do_read();
-                             });
-                });
-            return;
+            run_native_handler_json_nofail(server.http_config->get_peers);
          }
          else if (req_target == "/native/admin/connect" && server.http_config->connect)
          {
@@ -1061,31 +1052,7 @@ namespace psibase::http
                return;
             }
 
-            send.pause_read = true;
-            server.http_config->connect(
-                req.body(),
-                [ok_no_content, error,
-                 session = send.self.derived_session().shared_from_this()](connect_result result)
-                {
-                   net::post(
-                       session->stream.get_executor(),
-                       [ok_no_content, error, session = std::move(session),
-                        result = std::move(result)]()
-                       {
-                          session->queue_.pause_read = false;
-                          if (result)
-                          {
-                             session->queue_(error(bhttp::status::internal_server_error, *result));
-                          }
-                          else
-                          {
-                             session->queue_(ok_no_content());
-                          }
-                          if (session->queue_.can_read())
-                             session->do_read();
-                       });
-                });
-            return;
+            run_native_handler_no_content(server.http_config->connect);
          }
          else if (req_target == "/native/admin/disconnect" && server.http_config->disconnect)
          {
@@ -1109,31 +1076,7 @@ namespace psibase::http
                return;
             }
 
-            send.pause_read = true;
-            server.http_config->disconnect(
-                req.body(),
-                [ok_no_content, error,
-                 session = send.self.derived_session().shared_from_this()](connect_result result)
-                {
-                   net::post(
-                       session->stream.get_executor(),
-                       [ok_no_content, error, session = std::move(session),
-                        result = std::move(result)]()
-                       {
-                          session->queue_.pause_read = false;
-                          if (result)
-                          {
-                             session->queue_(error(bhttp::status::internal_server_error, *result));
-                          }
-                          else
-                          {
-                             session->queue_(ok_no_content());
-                          }
-                          if (session->queue_.can_read())
-                             session->do_read();
-                       });
-                });
-            return;
+            run_native_handler_no_content(server.http_config->disconnect);
          }
          else if (req_target == "/native/admin/log" && websocket::is_upgrade(req))
          {
@@ -1168,10 +1111,8 @@ namespace psibase::http
                {
                   return;
                }
-               run_native_handler(server.http_config->get_config,
-                                  [ok, session = send.self.derived_session().shared_from_this()](
-                                      auto&& make_result)
-                                  { session->queue_(ok(make_result(), "application/json")); });
+               run_native_handler_generic_nofail(server.http_config->get_config,
+                                                 "application/json");
             }
             else if (req.method() == bhttp::verb::put)
             {
@@ -1184,20 +1125,7 @@ namespace psibase::http
                   return send(error(bhttp::status::unsupported_media_type,
                                     "Content-Type must be application/json\n"));
                }
-               run_native_handler(
-                   server.http_config->set_config,
-                   [error, ok_no_content,
-                    session = send.self.derived_session().shared_from_this()](auto&& result)
-                   {
-                      if (result)
-                      {
-                         session->queue_(error(bhttp::status::internal_server_error, *result));
-                      }
-                      else
-                      {
-                         session->queue_(ok_no_content());
-                      }
-                   });
+               run_native_handler_no_content(server.http_config->set_config);
             }
             else
             {
@@ -1217,10 +1145,7 @@ namespace psibase::http
                {
                   return;
                }
-               run_native_handler(server.http_config->get_keys,
-                                  [ok, session = send.self.derived_session().shared_from_this()](
-                                      auto&& make_result)
-                                  { session->queue_(ok(make_result(), "application/json")); });
+               run_native_handler_generic_nofail(server.http_config->get_keys, "application/json");
             }
             else if (req.method() == bhttp::verb::post)
             {
@@ -1234,20 +1159,7 @@ namespace psibase::http
                                     "Content-Type must be application/json\n"));
                }
 
-               run_native_handler(
-                   server.http_config->new_key,
-                   [error, ok,
-                    session = send.self.derived_session().shared_from_this()](auto&& result)
-                   {
-                      if (auto err = std::get_if<std::string>(&result))
-                      {
-                         session->queue_(error(bhttp::status::internal_server_error, *err));
-                      }
-                      else
-                      {
-                         session->queue_(ok(std::get<1>(result)(), "application/json"));
-                      }
-                   });
+               run_native_handler_generic(server.http_config->new_key, "application/json");
             }
             else
             {
@@ -1269,19 +1181,7 @@ namespace psibase::http
             {
                return;
             }
-            run_native_handler(
-                server.http_config->get_pkcs11_tokens,
-                [error, ok, session = send.self.derived_session().shared_from_this()](auto&& result)
-                {
-                   if (auto err = std::get_if<std::string>(&result))
-                   {
-                      session->queue_(error(bhttp::status::internal_server_error, *err));
-                   }
-                   else
-                   {
-                      session->queue_(ok(std::get<1>(result)(), "application/json"));
-                   }
-                });
+            run_native_handler_generic(server.http_config->get_pkcs11_tokens, "application/json");
          }
          else if (req_target == "/native/admin/keys/unlock")
          {
@@ -1302,20 +1202,7 @@ namespace psibase::http
                return send(error(bhttp::status::unsupported_media_type,
                                  "Content-Type must be application/json\n"));
             }
-            run_native_handler(
-                server.http_config->unlock_keyring,
-                [error, ok_no_content,
-                 session = send.self.derived_session().shared_from_this()](auto&& err)
-                {
-                   if (err)
-                   {
-                      session->queue_(error(bhttp::status::internal_server_error, *err));
-                   }
-                   else
-                   {
-                      session->queue_(ok_no_content());
-                   }
-                });
+            run_native_handler_no_content(server.http_config->unlock_keyring);
          }
          else if (req_target == "/native/admin/keys/lock")
          {
@@ -1336,20 +1223,7 @@ namespace psibase::http
                return send(error(bhttp::status::unsupported_media_type,
                                  "Content-Type must be application/json\n"));
             }
-            run_native_handler(
-                server.http_config->lock_keyring,
-                [error, ok_no_content,
-                 session = send.self.derived_session().shared_from_this()](auto&& err)
-                {
-                   if (err)
-                   {
-                      session->queue_(error(bhttp::status::internal_server_error, *err));
-                   }
-                   else
-                   {
-                      session->queue_(ok_no_content());
-                   }
-                });
+            run_native_handler_no_content(server.http_config->lock_keyring);
          }
          else if (req_target == "/native/admin/login")
          {
@@ -1428,8 +1302,7 @@ namespace psibase::http
          }
          else
          {
-            return send(error(bhttp::status::not_found,
-                              "The resource '" + std::string(req.target()) + "' was not found.\n"));
+            return send(not_found(req.target()));
          }
       }
       catch (const std::exception& e)
