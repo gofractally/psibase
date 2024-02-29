@@ -89,7 +89,7 @@ namespace psio
                case from_json_error::expected_end_array:                  return "Expected ]";
                case from_json_error::expected_positive_uint:              return "Expected positive integer";
                case from_json_error::expected_field:                      return "Expected field";
-               case from_json_error::expected_variant:                    return R"(Expected variant: ["type", value])";
+               case from_json_error::expected_variant:                    return R"(Expected variant: {"type": value})";
                case from_json_error::expected_public_key:                 return "Expected public key";
                case from_json_error::expected_private_key:                return "Expected private key";
                case from_json_error::expected_signature:                  return "Expected signature";
@@ -593,16 +593,15 @@ namespace psio
    template <typename... T, typename S>
    void from_json(std::variant<T...>& result, S& stream)
    {
-      stream.get_start_array();
-      std::string_view type;
-      from_json(type, stream);
+      stream.get_start_object();
+      std::string_view  type         = stream.get_key();
       const char* const type_names[] = {get_type_name((T*)nullptr)...};
       uint32_t type_idx = std::find(type_names, type_names + sizeof...(T), type) - type_names;
       if (type_idx >= sizeof...(T))
          abort_error(from_json_error::invalid_type_for_variant);
       set_variant_impl(result, type_idx);
       std::visit([&](auto& x) { from_json(x, stream); }, result);
-      stream.get_end_array();
+      stream.get_end_object();
    }
 
    /**
@@ -671,6 +670,36 @@ namespace psio
 
    template <typename S>
    void from_json(std::vector<signed char>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
+   template <typename T, std::size_t N, typename S>
+      requires std::same_as<T, char> || std::same_as<T, unsigned char> ||
+               std::same_as<T, signed char>
+   void from_json_hex(std::array<T, N>& result, S& stream)
+   {
+      auto s = stream.get_string();
+      if (s.size() != 2 * N)
+         abort_error(from_json_error::expected_hex_string);
+      if (!unhex(result.data(), s.begin(), s.end()))
+         abort_error(from_json_error::expected_hex_string);
+   }
+
+   template <std::size_t N, typename S>
+   void from_json(std::array<char, N>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
+   template <std::size_t N, typename S>
+   void from_json(std::array<unsigned char, N>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
+   template <std::size_t N, typename S>
+   void from_json(std::array<signed char, N>& obj, S& stream)
    {
       from_json_hex(obj, stream);
    }

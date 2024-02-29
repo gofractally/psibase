@@ -40,6 +40,8 @@ function(add_libs suffix)
     add_library(psio${suffix} INTERFACE)
     target_include_directories(psio${suffix} INTERFACE ${root}/include)
     target_link_libraries(psio${suffix} INTERFACE
+        -L${root}/lib
+        -lpsio
         boost
         simdjson${suffix}
         wasm-base${suffix}
@@ -52,6 +54,7 @@ function(add_libs suffix)
         -L${root}/lib
         wasm-base${suffix}
         -lpsibase${lib-suffix}
+        -lcrypto
         psio${suffix}
         boost
     )
@@ -109,6 +112,8 @@ function(add_libs suffix)
         psibase${suffix}
         catch2
         boost
+        -lz
+        -lsecp256k1
         -lc++
         -lc++abi
         -lc
@@ -124,3 +129,5 @@ endfunction()
 
 add_libs("")
 add_libs("-debug")
+
+include(${CMAKE_CURRENT_LIST_DIR}/pack_service.cmake)

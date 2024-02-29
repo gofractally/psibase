@@ -13,7 +13,8 @@ namespace SystemService
 {
    void AuthEcSys::checkAuthSys(uint32_t                    flags,
                                 psibase::AccountNumber      requester,
-                                psibase::Action             action,
+                                psibase::AccountNumber      sender,
+                                ServiceMethod               action,
                                 std::vector<ServiceMethod>  allowedActions,
                                 std::vector<psibase::Claim> claims)
    {
@@ -32,7 +33,7 @@ namespace SystemService
       else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
-      auto row = db.open<AuthTable>().getIndex<0>().get(action.sender);
+      auto row = db.open<AuthTable>().getIndex<0>().get(sender);
 
       check(row.has_value(), "sender does not have a public key");
 
@@ -54,9 +55,10 @@ namespace SystemService
             return;
          }
       }
-      abortMessage("transaction does not include a claim for the key " + publicKeyToString(row->pubkey) +
-                   " needed to authenticate sender " + action.sender.str() + " for action " +
-                   action.service.str() + "::" + action.method.str());
+      abortMessage("transaction does not include a claim for the key " +
+                   publicKeyToString(row->pubkey) + " needed to authenticate sender " +
+                   sender.str() + " for action " + action.service.str() +
+                   "::" + action.method.str());
    }
 
    void AuthEcSys::canAuthUserSys(psibase::AccountNumber user)

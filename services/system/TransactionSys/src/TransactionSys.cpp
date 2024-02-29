@@ -152,7 +152,9 @@ namespace SystemService
             }
 
             Actor<AuthInterface> auth(TransactionSys::service, account->authService);
-            auth.checkAuthSys(flags, requester, action, allowedActions, std::vector<Claim>{});
+            auth.checkAuthSys(flags, requester, action.sender,
+                              ServiceMethod{action.service, action.method}, allowedActions,
+                              std::vector<Claim>{});
          }  // if (requester != account->authService)
       }     // if(enforceAuth)
 
@@ -322,7 +324,8 @@ namespace SystemService
             if (args.checkFirstAuthAndExit)
                flags |= AuthInterface::readOnlyFlag;
             // This can execute user defined code, so we must set the timer first
-            auth.checkAuthSys(flags, psibase::AccountNumber{}, act, std::vector<ServiceMethod>{},
+            auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender,
+                              ServiceMethod{act.service, act.method}, std::vector<ServiceMethod>{},
                               trx.claims);
          }
          if (args.checkFirstAuthAndExit)

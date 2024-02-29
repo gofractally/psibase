@@ -1,13 +1,16 @@
+use crate::TransactionTrace;
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
+use indicatif::ProgressBar;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Value;
+use std::str::FromStr;
 
 custom_error! { Error
     Message{message:String}                         = "{message}",
-    ExecutionFailed{message:String, trace:Value}    = "{message}",
+    ExecutionFailed{message:String}    = "{message}",
+    UnknownTraceFormat = "Unknown trace format"
 }
 
 async fn as_text(builder: reqwest::RequestBuilder) -> Result<String, anyhow::Error> {
@@ -23,7 +26,7 @@ async fn as_text(builder: reqwest::RequestBuilder) -> Result<String, anyhow::Err
     Ok(response.text().await?)
 }
 
-async fn as_json<T: DeserializeOwned>(
+pub async fn as_json<T: DeserializeOwned>(
     builder: reqwest::RequestBuilder,
 ) -> Result<T, anyhow::Error> {
     Ok(serde_json::de::from_str(&as_text(builder).await?)?)
@@ -53,37 +56,97 @@ pub async fn get_tapos_for_head(
         .context("Failed to get tapos for head block")
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum TraceFormat {
+    Error,
+    Stack,
+    Full,
+    Json,
+}
+
+impl TraceFormat {
+    pub fn error_for_trace(
+        &self,
+        trace: TransactionTrace,
+        progress: Option<&ProgressBar>,
+    ) -> Result<(), anyhow::Error> {
+        if let Some(e) = &trace.error {
+            if !e.is_empty() {
+                let message = match self {
+                    TraceFormat::Error => e.to_string(),
+                    TraceFormat::Stack => trace.fmt_stack(),
+                    TraceFormat::Full => trace.to_string(),
+                    TraceFormat::Json => serde_json::to_string(&trace)?,
+                };
+                Err(Error::ExecutionFailed { message })?;
+            }
+        }
+        match self {
+            TraceFormat::Full => progress.suspend(|| print!("{}", trace.to_string())),
+            TraceFormat::Json => progress
+                .suspend(|| serde_json::to_writer_pretty(std::io::stdout().lock(), &trace))?,
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+impl FromStr for TraceFormat {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
+        match s {
+            "error" => Ok(TraceFormat::Error),
+            "stack" => Ok(TraceFormat::Stack),
+            "full" => Ok(TraceFormat::Full),
+            "json" => Ok(TraceFormat::Json),
+            _ => Err(Error::UnknownTraceFormat)?,
+        }
+    }
+}
+
+trait OptionProgressBar {
+    fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R;
+}
+
+impl OptionProgressBar for Option<&ProgressBar> {
+    fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R {
+        if let Some(progress) = self {
+            progress.suspend(f)
+        } else {
+            f()
+        }
+    }
+}
+
 async fn push_transaction_impl(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
+    fmt: TraceFormat,
+    console: bool,
+    progress: Option<&ProgressBar>,
 ) -> Result<(), anyhow::Error> {
-    let trace: Value = as_json(
+    let trace: TransactionTrace = as_json(
         client
             .post(base_url.join("native/push_transaction")?)
             .body(packed),
     )
     .await?;
-    // println!("{:#?}", trace);
-    let err = trace.get("error").and_then(|v| v.as_str());
-    if let Some(e) = err {
-        if !e.is_empty() {
-            return Err(Error::ExecutionFailed {
-                message: e.to_string(),
-                trace,
-            }
-            .into());
-        }
+    if console {
+        progress.suspend(|| print!("{}", trace.console()));
     }
-    Ok(())
+    fmt.error_for_trace(trace, progress)
 }
 
 pub async fn push_transaction(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
+    fmt: TraceFormat,
+    console: bool,
+    progress: Option<&ProgressBar>,
 ) -> Result<(), anyhow::Error> {
-    push_transaction_impl(base_url, client, packed)
+    push_transaction_impl(base_url, client, packed, fmt, console, progress)
         .await
         .context("Failed to push transaction")?;
     Ok(())

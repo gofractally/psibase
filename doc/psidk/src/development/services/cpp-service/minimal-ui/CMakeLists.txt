@@ -11,3 +11,11 @@ find_package(psibase REQUIRED)
 # Build example.wasm service
 add_executable(example example.cpp)
 target_link_libraries(example Psibase::service)
+
+psibase_package(
+    NAME MinimalUI
+    VERSION 1.0.0
+    DESCRIPTION "An example service with the minimal UI"
+    SERVICE example
+    TARGET example
+)

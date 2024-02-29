@@ -12,10 +12,12 @@ service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
 service  = admin-sys.:$PSIBASE_DATADIR/services/admin-sys
 admin    = static:*
 
+http-timeout = 4s
+
 admin-authz = r:any
 admin-authz = rw:loopback
 
 [logger.stderr]
 type   = console
 filter = Severity >= info
-format = [{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}
+format = [{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}

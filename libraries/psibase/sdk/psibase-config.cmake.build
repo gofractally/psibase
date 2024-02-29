@@ -44,6 +44,8 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/external/rapidjson/include
     )
     target_link_libraries(psio${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/libraries/psio
+        -lpsio
         boost
         simdjson${suffix}
         wasm-base${suffix}
@@ -72,8 +74,10 @@ function(add_libs suffix)
     )
     target_link_libraries(psibase${suffix} INTERFACE
         -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
+        -L@ROOT_BINARY_DIR@/wasm/deps/lib
         wasm-base${suffix}
         -lpsibase${lib-suffix}
+        -lcrypto
         psio${suffix}
         boost
     )
@@ -127,9 +131,12 @@ function(add_libs suffix)
     target_compile_options(Psibase::test${suffix} INTERFACE -DCOMPILING_TESTS)
     target_link_libraries(Psibase::test${suffix} INTERFACE
         -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
+        -L@ROOT_BINARY_DIR@/wasm/deps/lib
         psibase${suffix}
         catch2
         boost
+        -lz
+        -lsecp256k1
         -lc++
         -lc++abi
         -lc
@@ -148,3 +155,5 @@ endfunction()
 
 add_libs("")
 add_libs("-debug")
+
+include(${CMAKE_CURRENT_LIST_DIR}/pack_service.cmake)

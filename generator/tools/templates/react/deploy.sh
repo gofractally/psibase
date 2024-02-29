@@ -7,4 +7,4 @@ echo Deploying __contract__Service to account $accname ...
 
 yarn
 yarn run build
-psibase -s $privkey upload-tree -S $accname $accname / dist/
+psibase -s $privkey upload -r -S $accname $accname dist/ /

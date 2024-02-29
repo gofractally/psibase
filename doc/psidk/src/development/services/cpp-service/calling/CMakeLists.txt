@@ -15,3 +15,13 @@ target_link_libraries(arithmetic Psibase::service)
 # Build caller.wasm service
 add_executable(caller caller.cpp)
 target_link_libraries(caller Psibase::service)
+
+psibase_package(
+    NAME Calling
+    VERSION 1.0.0
+    DESCRIPTION "Calling services"
+    SERVICE arithmetic
+        TARGET arithmetic
+    SERVICE caller
+        TARGET caller
+)
