@@ -1,45 +1,41 @@
-export interface Func {
-  service: string;
-  method: string;
+import { ServiceMethodIndex } from "./witParsing";
+
+interface Func {
+    service: string;
+    method: string;
 }
 
-export const getImportedFunctions = (): Func[] => {
-  return [
-    {
-      service: "token-sys",
-      method: "transfer",
-    },
-  ];
-};
-
 const argString = (count: number) =>
-  [...new Array(count)]
-    .map((_, index) => index + 1)
-    .map((num) => `arg${num}`)
-    .join(", ")
-    .trim();
+    [...new Array(count)]
+        .map((_, index) => index + 1)
+        .map((num) => `arg${num}`)
+        .join(", ")
+        .trim();
 
-export const generateFulfilledFunction = (
-  method: string,
-  result: string | number,
-  argCount = 3
+const generateFulfilledFunction = (
+    method: string,
+    result: string | number,
+    argCount = 3
 ): string =>
-  `export function ${method}(${argString(argCount)}) {
+    `export function ${method}(${argString(argCount)}) {
         return ${typeof result == "number" ? result : `'${result}'`}
       }`;
 
 export interface FunctionCallArgs {
-  service: string;
-  method: string;
-  params: any[];
+    service: string;
+    method: string;
+    params: any[];
 }
 export interface FunctionCallResult<T = any> extends FunctionCallArgs {
-  id: string;
-  result: T;
+    id: string;
+    result: T;
 }
 
-export const generatePendingFunction = ({ method, service }: Func, id: string): string => {
-  return `export async function ${method}(...args) {
+const generatePendingFunction = (
+    { method, service }: Func,
+    id: string
+): string => {
+    return `export async function ${method}(...args) {
   console.log('pendingFunctionRan');
   
   const payload = {
@@ -55,3 +51,35 @@ export const generatePendingFunction = ({ method, service }: Func, id: string): 
   }
 `;
 };
+
+interface FunctionResult<T = any> {
+    method: string;
+    result: T;
+}
+
+export const serviceMethodIndexToImportables = (
+    serviceMethodIndex: ServiceMethodIndex,
+    service: string,
+    id: string,
+    functionsResult: FunctionResult[]
+): { [key: string]: string }[] =>
+    Object.entries(serviceMethodIndex).map(([key, methodNames]) => ({
+        [`component:${service}/${key}`]: methodNames
+            .map((methodName) => {
+                const functionResult = functionsResult.find(
+                    (funcResult) => funcResult.method == methodName
+                );
+                return (
+                    (functionResult
+                        ? generateFulfilledFunction(
+                              functionResult.method,
+                              functionResult.result
+                          )
+                        : generatePendingFunction(
+                              { method: methodName, service: key },
+                              id
+                          )) + "\n"
+                );
+            })
+            .join("\n")
+    }));
