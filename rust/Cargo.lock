@@ -991,6 +991,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "example"
+version = "0.3.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase_macros",
+ "serde",
+]
+
+[[package]]
 name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3250,16 +3260,6 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "test_contract_2"
-version = "0.3.0"
-dependencies = [
- "async-graphql",
- "psibase",
- "psibase_macros",
- "serde",
 ]
 
 [[package]]
