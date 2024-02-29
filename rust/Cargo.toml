@@ -17,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
