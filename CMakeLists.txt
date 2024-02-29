@@ -204,7 +204,6 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT
 set(JS_DIRS
     services/user/CommonSys/ui:CommonSys_js
     services/user/SupervisorSys/ui:SupervisorSys_js
-    services/user/TokenSys/ui:TokenSys_js
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
 set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
@@ -547,8 +546,6 @@ psibase_package(
         INIT
     SERVICE r-tok-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist /
-    DEPENDS TokenSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist/index.html
     DEPENDS wasm
 )
 
