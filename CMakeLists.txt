@@ -202,7 +202,6 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT
 
 # Run yarn to build service UIs
 set(JS_DIRS
-    services/system/AccountSys/ui:AccountSys_js
     services/user/PsiSpaceSys/ui:PsiSpaceSys_js
     services/user/CommonSys/ui:CommonSys_js
     services/user/SupervisorSys/ui:SupervisorSys_js
@@ -320,8 +319,6 @@ psibase_package(
         INIT
     SERVICE r-account-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist /
-    DEPENDS ${AccountSys_js_dep}
     DEPENDS wasm
     PACKAGE_DEPENDS "AuthAnySys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
 )
