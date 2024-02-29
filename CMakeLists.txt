@@ -206,7 +206,6 @@ set(JS_DIRS
     services/user/CommonSys/ui:CommonSys_js
     services/user/SupervisorSys/ui:SupervisorSys_js
     services/user/TokenSys/ui:TokenSys_js
-    services/user/InviteSys/ui:InviteSys_js
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
 set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
@@ -511,12 +510,10 @@ psibase_package(
     PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})"
     SERVICE invite-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist /
         SERVER invite-sys
         INIT
     SERVICE auth-inv-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
-    DEPENDS InviteSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist/index.html
     DEPENDS wasm
 )
 
