@@ -78,14 +78,12 @@ fn validate_fill_target(module: &walrus::Module) -> Result<(), anyhow::Error> {
 /// * No types
 /// * No imports
 /// * No functions
-/// * No function bodies
 /// * No exports
 /// * No function exports
 fn should_polyfill(module : &walrus::Module) -> bool {
     if module.types.iter().next().is_none()
         || module.imports.iter().next().is_none()
         || module.funcs.iter().next().is_none()
-        || module.funcs.iter_local().all(|f| f.1.size() == 0) 
         || module.exports.iter().next().is_none()
         || !module.funcs.iter().any(|f| module.exports.get_exported_func(f.id()).is_some()) {
         return false;
