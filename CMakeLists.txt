@@ -202,7 +202,6 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT
 
 # Run yarn to build service UIs
 set(JS_DIRS
-    services/user/PsiSpaceSys/ui:PsiSpaceSys_js
     services/user/CommonSys/ui:CommonSys_js
     services/user/SupervisorSys/ui:SupervisorSys_js
     services/user/TokenSys/ui:TokenSys_js
@@ -442,9 +441,7 @@ psibase_package(
     DESCRIPTION "Provides web hosting to non-service accounts"
     SERVICE psispace-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
-    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui/dist /
     SERVER psispace-sys
-    DEPENDS ${PsiSpaceSys_js_dep}
     DEPENDS wasm
     PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
