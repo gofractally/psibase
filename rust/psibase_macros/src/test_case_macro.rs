@@ -104,7 +104,7 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
 
     if !inputs.is_empty() {
         let name = func.sig.ident.to_string();
-        let deploy_services = load_services.requests.iter().fold(quote! {}, |acc, s| {
+        let deploy_services: TokenStream = load_services.requests.iter().fold(quote! {}, |acc: TokenStream, s: &LitStr| {
             let ss = s.value().replace('_', "-");
             quote! {
                 #acc
@@ -115,16 +115,23 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
             fn with_chain(#inputs) #output #block
             fn create_chain() -> Result<psibase::Chain, psibase::Error> {
                 let mut chain = psibase::Chain::new();
-                for trx in psibase::create_boot_transactions(
+
+                let (boot_tx, subsequent_tx) = in psibase::create_boot_transactions(
                     &None,
                     psibase::account!("prod"),
                     false,
                     false,
-                    false,
                     psibase::TimePointSec { seconds: 10 },
-                ) {
+                );
+                
+                for trx in boot_tx {
                     chain.push(&trx).ok()?;
                 }
+                
+                for trx in subsequent_tx {
+                    chain.push(&trx).ok()?;
+                }
+
                 #deploy_services
                 Ok(chain)
             }
