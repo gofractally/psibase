@@ -28,6 +28,7 @@ extern "C" {
         fs_rights_base: *mut u64,
         fs_rights_inheriting: *mut u64,
     ) -> Errno;
+    fn testerFdFilestatGet(fd: Fd, stat: *mut u8, stat_size: Size) -> Errno;
     fn testerReadFile(fd: u32, data: *mut u8, size: Size, bytes_read: *mut Size) -> Errno;
     fn testerWriteFile(fd: u32, content: *const u8, content_len: Size) -> Errno;
     fn testerCloseFile(fd: Fd) -> Errno;
@@ -148,8 +149,8 @@ pub unsafe extern "C" fn path_open(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fd_filestat_get(fd: Fd, retptr0: *mut Filestat) -> Errno {
-    ERRNO_INVAL.raw()
+pub unsafe extern "C" fn fd_filestat_get(fd: Fd, stat: *mut Filestat) -> Errno {
+    testerFdFilestatGet(fd, stat as *mut u8, std::mem::size_of::<Filestat>())
 }
 
 #[no_mangle]
