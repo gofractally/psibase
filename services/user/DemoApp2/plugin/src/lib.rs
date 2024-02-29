@@ -9,6 +9,6 @@ struct Component;
 
 impl Guest for Component {
     fn derpy() -> String {
-        "derpy".to_string()
+        format!("derpy return from demoapp2")
     }
 }

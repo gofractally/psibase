@@ -9,7 +9,6 @@ import {
     PluginCallResponse,
     isPluginCallRequest,
     PluginCallRequest,
-    // buildPluginCallResponse,
     PluginCallPayload,
     buildPluginCallResponse
 } from "@messaging";
@@ -25,7 +24,6 @@ interface Importables {
     [key: string]: string;
 }
 
-// @ts-ignore
 const runWasm = async (
     wasm: ArrayBuffer,
     importables: Importables[],
@@ -65,55 +63,19 @@ const functionCall = async ({
 
     const parsedFunctions = parseFunctions(wit);
 
-    console.log(parsedFunctions, "are the parsed functions..", {
-        id,
-        args,
-        precomputedResults
-    });
-
-    const fulfilledFunctions = precomputedResults.map((func) =>
-        generateFulfilledFunction(func.method, func.result)
-    );
-
-    const missingFunctions = Object.entries(parsedFunctions).map(
-        ([service, methods]) => [
-            service,
-            methods.filter(
-                (method) =>
-                    !precomputedResults.some(
-                        (result) =>
-                            result.method == method && result.service == service
-                    )
-            )
-        ]
-    );
-
-    console.log({ missingFunctions, fulfilledFunctions, parsedFunctions });
-
-    const str =
-        importableCode +
-        `\n ${missingFunctions
-            .map((missingFunction) =>
-                generatePendingFunction(missingFunction, id)
-            )
-            .join("\n")} \n ${fulfilledFunctions}`;
-
-    console.log(str, "is the str", args.service);
-
-    const baseImports = "";
-    // utilise an object to create the rest,
-    // take the object, and return an array to spread
-
     const serviceImports = serviceMethodIndexToImportables(
         parsedFunctions,
         args.service,
-        id
+        id,
+        precomputedResults.map((res) => ({
+            method: res.method,
+            result: res.result
+        }))
     );
 
-    // we want to achieve /imports for
     let importables: Importables[] = [
         {
-            [`component:${args.service}/imports`]: str
+            [`component:${args.service}/imports`]: importableCode
         },
         ...serviceImports
     ];
@@ -125,14 +87,14 @@ const functionCall = async ({
             args.method,
             args.params
         );
-        console.log(res, "from runWASM!");
+        console.log(`Plugin call ${args.service} Success: ${res}`);
         sendPluginCallResponse(buildPluginCallResponse(id, res));
     } catch (e) {
-        console.warn(`runWasm threw.`, e);
+        console.warn(`Plugin call ${args.service} Failure: ${e}`);
+        // TODO Do not assume error is only caused from lack of fulfilled function
     }
 };
 
-// @ts-ignore
 const sendPluginCallResponse = (response: PluginCallResponse) => {
     window.parent.postMessage(response, "*");
 };
@@ -198,25 +160,37 @@ const parseFunctions = (data: string): ServiceMethodIndex => {
     return entries;
 };
 
+interface FunctionResult<T = any> {
+    method: string;
+    result: T;
+}
+
 const serviceMethodIndexToImportables = (
     serviceMethodIndex: ServiceMethodIndex,
     service: string,
-    id: string
-): { [key: string]: string }[] => {
-    return Object.entries(serviceMethodIndex).map(([key, functions]) => {
-        return {
-            [`component:${service}}/${key}`]: functions
-                .map(
-                    (func) =>
-                        generatePendingFunction(
-                            { method: func, service: key },
-                            id
-                        ) + "\n"
-                )
-                .join("\n")
-        };
-    });
-};
+    id: string,
+    functionsResult: FunctionResult[]
+): { [key: string]: string }[] =>
+    Object.entries(serviceMethodIndex).map(([key, methodNames]) => ({
+        [`component:${service}/${key}`]: methodNames
+            .map((methodName) => {
+                const functionResult = functionsResult.find(
+                    (funcResult) => funcResult.method == methodName
+                );
+                return (
+                    (functionResult
+                        ? generateFulfilledFunction(
+                              functionResult.method,
+                              functionResult.result
+                          )
+                        : generatePendingFunction(
+                              { method: methodName, service: key },
+                              id
+                          )) + "\n"
+                );
+            })
+            .join("\n")
+    }));
 
 const onRawEvent = (message: MessageEvent) => {
     if (isPluginCallRequest(message.data)) {
