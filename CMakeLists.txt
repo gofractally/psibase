@@ -206,7 +206,6 @@ set(JS_DIRS
     services/user/CommonSys/ui:CommonSys_js
     services/user/SupervisorSys/ui:SupervisorSys_js
     services/user/TokenSys/ui:TokenSys_js
-    services/user/ExploreSys/ui:ExploreSys_js
     services/user/InviteSys/ui:InviteSys_js
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
@@ -500,8 +499,6 @@ psibase_package(
     SERVICE explore-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm
     SERVER explore-sys
-    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist /
-    DEPENDS ExploreSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist/index.html
     DEPENDS wasm
     PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
