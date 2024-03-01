@@ -212,7 +212,7 @@ set(COMMON_LOADER_DIR services/user/CommonSys/common/packages/wasm-loader/:Commo
 
 function(add_js_target ROW OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ROW})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TargetName ${ROW})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${ROW})
     set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
     file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
 
@@ -222,10 +222,10 @@ function(add_js_target ROW OUTPUT_FILE)
         DEPENDS ${SOURCES} ${ARGN}
         COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
     )
-    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TargetName}`
-    add_custom_target(${TargetName} DEPENDS ${OUTPUT_FILEPATH})
-    # Expose `${TargetName}` and its dependency to the parent scope for further use
-    set(${TargetName}_DEP ${TargetName} ${OUTPUT_FILEPATH} PARENT_SCOPE)
+    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
+    add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
+    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
 endfunction()
 
 # Static (not built) resource dependencies
