@@ -5,14 +5,15 @@ import {
   isFunctionCallRequest,
   isPluginCallResponse,
   FunctionCallArgs,
-  isPluginCallRequest,
-  PluginCallRequest,
   PluginCallPayload,
   generateRandomString,
   buildPluginCallRequest,
   buildFunctionCallResponse,
   isPreLoadServicesRequest,
   PreLoadServicesRequest,
+  isPluginCallFailure,
+  PluginCallFailure,
+  FunctionCallResult,
 } from "@psibase/common-lib/messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -119,6 +120,9 @@ const sendPluginCallRequest = async (
   param: PluginCallPayload,
   from: string
 ) => {
+  if (param.args == undefined) {
+    throw new Error(`No args received on sendPluginCallRequest`);
+  }
   console.log(param, "was plugin call request to send x from", from);
   const iframe = await getLoader(param.args.service);
   iframe.contentWindow?.postMessage(buildPluginCallRequest(param), "*");
@@ -189,33 +193,107 @@ const onPluginCallResponse = (message: PluginCallResponse) => {
   checkForResolution();
 };
 
-const onPluginCallRequest = (message: PluginCallRequest) => {
-  const parentId = message.payload.id;
+const updatePendingFunctionCall = <T>(
+  array: PendingFunctionCall<T>[],
+  targetId: string,
+  updateFunction: (call: PendingFunctionCall<T>) => PendingFunctionCall<T>
+): PendingFunctionCall<T>[] => {
+  let idFound = false;
+  const updatedArray = array.map((call) =>
+    call.id === targetId
+      ? ((idFound = true), updateFunction(call))
+      : {
+          ...call,
+          nestedCalls: updatePendingFunctionCall(
+            call.nestedCalls,
+            targetId,
+            updateFunction
+          ),
+        }
+  );
+
+  if (!idFound) {
+    throw new Error(`ID '${targetId}' not found in the array.`);
+  }
+
+  return updatedArray;
+};
+
+const findFunctionCallById = <T>(
+  calls: PendingFunctionCall<T>[],
+  targetId: string
+): PendingFunctionCall<T> | undefined => {
+  const foundCall = calls.find(
+    (call: PendingFunctionCall<T>) => call.id === targetId
+  );
+
+  if (foundCall) {
+    return foundCall;
+  }
+
+  for (const call of calls) {
+    const nestedResult = findFunctionCallById(call.nestedCalls, targetId);
+    if (nestedResult) {
+      return nestedResult;
+    }
+  }
+};
+
+const executeCall = (id: string) => {
+  const toExecute = findFunctionCallById(pendingFunctionCalls, id);
+  if (!toExecute) throw new Error(`Failed to find function call ID: ${id}`);
+  console.log("i should execute", toExecute);
+
+  sendPluginCallRequest(
+    {
+      args: toExecute.args,
+      id,
+      precomputedResults: toExecute.nestedCalls
+        .filter((x) => !!x.result)
+        .map(
+          (x): FunctionCallResult => ({
+            id: x.id,
+            method: x.args.method,
+            service: x.args.service,
+            params: x.args.params,
+            result: undefined,
+          })
+        ),
+    },
+    "execute call"
+  );
+};
+
+const onPluginCallFailure = (message: PluginCallFailure) => {
+  const { id, method, params, service } = message.payload;
   const subId = generateRandomString();
 
-  const addToPendingFunctionCall = (pendingCall: PendingFunctionCall) => {
-    if (pendingCall.id == parentId) {
-      pendingCall.nestedCalls.push({
-        id: subId,
-        args: message.payload.args,
-        nestedCalls: [],
-      });
-
-      console.log(message.payload, pendingCall, "shouldnt be undefined");
-
-      sendPluginCallRequest(
+  pendingFunctionCalls = updatePendingFunctionCall(
+    pendingFunctionCalls,
+    id,
+    (pending): PendingFunctionCall => {
+      const nestedCalls: PendingFunctionCall[] = [
+        ...pending.nestedCalls,
         {
+          args: {
+            method,
+            params,
+            service,
+          },
           id: subId,
-          args: message.payload.args,
-          precomputedResults: [],
+          nestedCalls: [],
+          result: undefined,
         },
-        "add to pending function call"
-      );
-    }
-    pendingCall.nestedCalls.forEach(addToPendingFunctionCall);
-  };
+      ];
 
-  pendingFunctionCalls.forEach(addToPendingFunctionCall);
+      return {
+        ...pending,
+        nestedCalls,
+      };
+    }
+  );
+
+  executeCall(subId);
 };
 
 const onPreloadServicesRequest = ({
@@ -231,11 +309,10 @@ const onRawEvent = (message: MessageEvent<any>) => {
   } else if (isPluginCallResponse(message.data)) {
     // TODO Assert origin of plugin call
     onPluginCallResponse(message.data);
-  } else if (isPluginCallRequest(message.data)) {
-    // TODO Assert origin of plugin call request
-    onPluginCallRequest(message.data);
   } else if (isPreLoadServicesRequest(message.data)) {
     onPreloadServicesRequest(message.data);
+  } else if (isPluginCallFailure(message.data)) {
+    onPluginCallFailure(message.data);
   }
 };
 
