@@ -154,7 +154,7 @@ fn get_import_fid(function_module : &str, name : &str, wasm_module : &Module) ->
 
 /// Get the corresponding FunctionID in the `dest` module for a given FunctionID from the `source`
 /// module. If the function does not exist in the `dest` module, it will be added.
-fn to_dest_func(source_fid : FunctionId, source : &Module, dest : &mut Module ) -> Result<FunctionId, anyhow::Error> {
+fn to_dest_func(source_fid : FunctionId, source : &Module, dest : &mut Module, id_maps : &mut IdMaps ) -> Result<FunctionId, anyhow::Error> {
 
     let f = source.funcs.get(source_fid);
     let (source_func_kind, source_func_ty) = (&f.kind, f.ty());
@@ -180,8 +180,14 @@ fn to_dest_func(source_fid : FunctionId, source : &Module, dest : &mut Module ) 
             }
         },
         Local(_) => {
-            let new_local_func = copy_func(source_fid, source, dest)?;
-            dest.funcs.add_local(new_local_func)
+            if let Some(local_fid) = id_maps.loc_fid_map.get(&source_fid) {
+                *local_fid
+            } else {
+                let new_local_func = copy_func(source_fid, source, dest, id_maps)?;
+                let new_local_fid = dest.funcs.add_local(new_local_func);
+                id_maps.loc_fid_map.insert(source_fid, new_local_fid);
+                new_local_fid
+            }
         },
         Uninitialized(_) => {
             return Err(anyhow!("Error: Source function uninitialized."));
@@ -211,12 +217,12 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
             // Function reference updates
             Instr::RefFunc(func_ref ) => {
                 let mut i = func_ref.clone();
-                i.func = to_dest_func(i.func, source, dest)?;
+                i.func = to_dest_func(i.func, source, dest, id_maps)?;
                 dest_seq.instr(i);
             }
             Instr::Call(func_ref) => {
                 let mut i = func_ref.clone();
-                i.func = to_dest_func(i.func, source, dest)?;
+                i.func = to_dest_func(i.func, source, dest, id_maps)?;
                 dest_seq.instr(i);
             }
             
@@ -423,6 +429,7 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
 struct IdMaps {
     seq_id_map : HashMap<InstrSeqId, InstrSeqId>,
     loc_id_map : HashMap<LocalId, LocalId>,
+    loc_fid_map : HashMap<FunctionId, FunctionId>,
 }
 
 impl IdMaps {
@@ -454,13 +461,14 @@ impl Default for IdMaps {
         IdMaps {
             seq_id_map: HashMap::new(),
             loc_id_map: HashMap::new(),
+            loc_fid_map: HashMap::new(),
         }
     }
 }
 
 /// Copy all instructions from a function in a `source` module to a new function 
 /// in a `dest` module.
-fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> Result<LocalFunction, anyhow::Error>
+fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module, id_maps : &mut IdMaps) -> Result<LocalFunction, anyhow::Error>
 {
     // Get source local function
     let source_func = source.funcs.get(source_fid);
@@ -489,9 +497,8 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
     // the new `dest` instruction sequence. 
     let instr_seq_id = source_local_func.entry_block();
     let dest_instr_builder = &mut builder.func_body();
-    let mut id_maps: IdMaps = Default::default();
 
-    //Map parameters to locals
+    // Map parameters to locals
     for (index, source_loc_id) in source_local_func.args.iter().enumerate() {
         // Verify the arg type is the same
         let dest_loc_id = args[index];
@@ -502,7 +509,7 @@ fn copy_func(source_fid : FunctionId, source : &Module, dest : &mut Module) -> R
         id_maps.loc_id_map.insert(*source_loc_id, dest_loc_id);
     }
 
-    to_dest_seq(instr_seq_id, &source_local_func, source, dest_instr_builder, dest, &mut id_maps)?;
+    to_dest_seq(instr_seq_id, &source_local_func, source, dest_instr_builder, dest, id_maps)?;
 
     Ok(builder.local_func(args))
 }
@@ -515,6 +522,7 @@ pub fn link_module(source : &Module, dest : &mut Module) -> Result<(), anyhow::E
     validate_polyfill(&source)?;
     validate_fill_target(dest)?;
 
+    let mut id_maps: IdMaps = Default::default();
     if should_polyfill(dest) {
         if let Some(targets) = get_polyfill_targets(&source, &dest)? 
         {
@@ -523,9 +531,9 @@ pub fn link_module(source : &Module, dest : &mut Module) -> Result<(), anyhow::E
 
                 // Get import ID
                 let import_id = dest.imports.get_imported_func(dest_fid).map(|i| i.id()).unwrap();
-                
+
                 // Copy the function into a new local function in the `dest`
-                let new_func = copy_func(source_fid, &source, dest)?;
+                let new_func = copy_func(source_fid, &source, dest, &mut id_maps)?;
 
                 // Replace the old imported function with the new local function and delete the old import.
                 let dest_func = dest.funcs.get_mut(dest_fid);
@@ -541,7 +549,7 @@ pub fn link_module(source : &Module, dest : &mut Module) -> Result<(), anyhow::E
     // Prior version of this linker removed all custom sections because it was annoying to 
     // keep them updated while reordering and modifying functions. But now that we are using
     // walrus, dwarf data already in the dest module should be left intact.
-    // To support debugging, don't delete the custom sections, might also need to skip binaryen.
+    // To support debugging, don't delete the custom sections, might also need to skip wasm-opt.
 
     Ok(())
 }
