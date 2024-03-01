@@ -1,21 +1,18 @@
-import {
-    generateFulfilledFunction,
-    generatePendingFunction,
-    getImportedFunctions
-} from "./dynamicFunctions";
+import { serviceMethodIndexToImportables } from "./dynamicFunctions";
 import importableCode from "./importables.js?raw";
+import { parseFunctions } from "./witParsing";
 import {
     PluginCallResponse,
     isPluginCallRequest,
     PluginCallRequest,
-    buildPluginCallResponse,
     PluginCallPayload,
+    buildPluginCallResponse,
     buildMessageLoaderInitialized
 } from "@psibase/common-lib/messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
-    <h1>Loader</h1>
+    <h1>WASM Loader</h1>
     <p>This is a generated SPA designed to act as the loader, its sole purpose is to be rendered in an iframe and run a WASM Component, then execute functions in the WASM component and send the results back to its parent iframe.</p>
   </div>
 `;
@@ -24,68 +21,53 @@ interface Importables {
     [key: string]: string;
 }
 
-const runWasm = async (
-    wasm: ArrayBuffer,
-    importables: Importables[],
-    method: string,
-    params: any[]
-) => {
-    console.info("runWasm().top 2");
-    const { load } = await import("rollup-plugin-wit-component");
-
-    console.time("Load");
-    const mod = await load(
-        // @ts-expect-error fff
-        wasm,
-        importables
-    );
-    console.timeEnd("Load");
-
-    return mod[method](...params);
-};
+const wasmUrlToIntArray = (url: string) =>
+    fetch(url)
+        .then((res) => res.arrayBuffer())
+        .then((buffer) => new Uint8Array(buffer));
 
 const functionCall = async ({
     id,
     args,
     precomputedResults
 }: PluginCallPayload) => {
-    const url = "/plugin.wasm";
+    const [pluginBytes, parserBytes, wasmComponent] = await Promise.all([
+        wasmUrlToIntArray("/plugin.wasm"),
+        wasmUrlToIntArray("/common/wasm-loader/component_parser.wasm"),
+        import("rollup-plugin-wit-component")
+    ]);
 
-    const wasmBytes = await fetch(url).then((res) => res.arrayBuffer());
-    const importedFunctionsFromWit = getImportedFunctions();
+    const { provider } = await wasmComponent.load(parserBytes);
+    const ComponentParser = new provider.ComponentParser();
+    const { wit } = ComponentParser.parse("hello", pluginBytes);
+    const parsedFunctions = parseFunctions(wit);
 
-    const fulfilledFunctions = precomputedResults.map((func) =>
-        generateFulfilledFunction(func.method, func.result)
+    const serviceImports = serviceMethodIndexToImportables(
+        parsedFunctions,
+        args.service,
+        id,
+        precomputedResults.map((res) => ({
+            method: res.method,
+            result: res.result
+        }))
     );
-    const missingFunctions = importedFunctionsFromWit.filter(
-        (func) =>
-            !precomputedResults.some(
-                (f) => f.method == func.method && f.service == func.service
-            )
-    );
-
-    const str =
-        importableCode +
-        `\n ${missingFunctions.map((missingFunction) =>
-            generatePendingFunction(missingFunction, id)
-        )} \n ${fulfilledFunctions}`;
 
     let importables: Importables[] = [
         {
-            [`component:${args.service}/imports`]: str
-        }
+            [`component:${args.service}/imports`]: importableCode
+        },
+        ...serviceImports
     ];
 
     try {
-        const res = await runWasm(
-            wasmBytes,
-            importables,
-            args.method,
-            args.params
-        );
+        // @ts-ignore
+        const pluginModule = await wasmComponent.load(pluginBytes, importables);
+        const res = pluginModule[args.method](...args.params);
+        console.log(`Plugin call ${args.service} Success: ${res}`);
         sendPluginCallResponse(buildPluginCallResponse(id, res));
     } catch (e) {
-        console.warn(`runWasm threw.`);
+        console.warn(`Plugin call ${args.service} Failure: ${e}`);
+        // TODO Do not assume error is only caused from lack of fulfilled function
     }
 };
 
