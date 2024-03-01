@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "account_sys"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "fracpack",
  "psibase",
@@ -386,7 +386,7 @@ checksum = "8ea184aa71bb362a1157c896979544cc23974e08fd265f29ea96b59f0b4a555b"
 
 [[package]]
 name = "burst-transfer"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "binaryen",
@@ -929,7 +929,7 @@ dependencies = [
 
 [[package]]
 name = "elections"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "fracpack",
  "psibase",
@@ -1060,7 +1060,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "custom_error",
  "psibase_macros",
@@ -1176,7 +1176,7 @@ dependencies = [
 
 [[package]]
 name = "gen-cpp-doc"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "clang",
@@ -1797,7 +1797,7 @@ dependencies = [
 
 [[package]]
 name = "md2man"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "clap 3.2.25",
  "pulldown-cmark 0.9.6",
@@ -2396,7 +2396,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2444,7 +2444,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "darling",
  "proc-macro-error",
@@ -2456,14 +2456,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "seahash",
 ]
 
 [[package]]
 name = "psispace-sys"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-graphql",
  "fracpack",
@@ -3255,7 +3255,7 @@ dependencies = [
 
 [[package]]
 name = "test_contract"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3264,7 +3264,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "cxx",
  "cxx-build",
