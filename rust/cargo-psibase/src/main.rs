@@ -14,8 +14,8 @@ use std::process::{exit, Stdio};
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
 use url::Url;
-use wasm_opt::OptimizationOptions;
 use walrus::Module;
+use wasm_opt::OptimizationOptions;
 
 mod link;
 use link::link_module;
@@ -121,11 +121,11 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     let debug_build = false;
     let mut size_opt = OptimizationOptions::new_optimize_for_size();
     let mut _speed_opt = OptimizationOptions::new_opt_level_2();
-    // Old binaryen config: 
+    // Old binaryen config:
     // shrink_level: 1,
     // optimization_level: 2,
     // debug_info: false,
-    let do_optimize = |opt : &mut OptimizationOptions| -> Result<(), Error> {
+    let do_optimize = |opt: &mut OptimizationOptions| -> Result<(), Error> {
         opt.enable_feature(wasm_opt::Feature::BulkMemory);
         opt.enable_feature(wasm_opt::Feature::SignExt);
         opt.enable_feature(wasm_opt::Feature::Simd);
