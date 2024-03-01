@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use walrus::ir::{Instr, InstrSeqId};
 use walrus::FunctionKind::{Import, Local, Uninitialized};
 use walrus::{FunctionId, FunctionKind, InstrSeqBuilder, LocalFunction, LocalId, Module, ValType};
+use wasmparser::Validator;
 
 // Helper traits
 trait TypeFromFid {
@@ -670,6 +671,16 @@ fn copy_func(
     Ok(builder.local_func(args))
 }
 
+fn new_validator() -> Validator {
+    let validator = wasmparser::Validator::new_with_features(wasmparser::WasmFeatures {
+        sign_extension: true,
+        bulk_memory: true,
+        simd: true,
+        ..wasmparser::WasmFeatures::default()
+    });
+    return validator;
+}
+
 /// Produce a module that links exported functions in the `source` module to
 /// their corresponding imported functions in a `dest` module.
 ///
@@ -707,6 +718,11 @@ pub fn link_module(source: &Module, dest: &mut Module) -> Result<(), anyhow::Err
 
     walrus::passes::gc::run(dest);
 
+    // To be safe, run the validator on every wasm produced by this linker
+    new_validator()
+        .validate_all(&dest.emit_wasm())
+        .map_err(|e| anyhow!("[Wasm linker error] {}", e))?;
+
     // TODO: enable debug builds
     // Prior version of this linker removed all custom sections because it was annoying to
     // keep them updated while reordering and modifying functions. But now that we are using
@@ -725,7 +741,6 @@ mod tests {
         io::Write,
         path::{Path, PathBuf},
     };
-    use wasmparser::Validator;
 
     use super::*;
 
@@ -763,16 +778,6 @@ mod tests {
         print_wat(filled_path.to_str().unwrap(), &filled.emit_wasm())?;
 
         Ok((original, polyfill, filled))
-    }
-
-    fn new_validator() -> Validator {
-        let validator = wasmparser::Validator::new_with_features(wasmparser::WasmFeatures {
-            sign_extension: true,
-            bulk_memory: true,
-            simd: true,
-            ..wasmparser::WasmFeatures::default()
-        });
-        return validator;
     }
 
     fn wat_path(file_path: &str) -> PathBuf {
@@ -887,19 +892,6 @@ mod tests {
         new_validator()
             .validate_all(&filled.emit_wasm())
             .map_err(|e| anyhow!("[simple.filled.wasm] {}", e))?;
-        Ok(())
-    }
-
-    #[test]
-    fn valid_wasm_produced_2() -> Result<(), Error> {
-        let (mut original, _, mut filled) = setup(INTERMEDIATE_WASM)?;
-
-        new_validator()
-            .validate_all(&original.emit_wasm())
-            .map_err(|e| anyhow!("[intermediate.wasm] {}", e))?;
-        new_validator()
-            .validate_all(&filled.emit_wasm())
-            .map_err(|e| anyhow!("[intermediate.filled.wasm] {}", e))?;
         Ok(())
     }
 }
