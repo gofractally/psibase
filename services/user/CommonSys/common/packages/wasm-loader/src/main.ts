@@ -39,7 +39,7 @@ const functionCall = async ({
 
     const { provider } = await wasmComponent.load(parserBytes);
     const ComponentParser = new provider.ComponentParser();
-    const { wit } = ComponentParser.parse("hello", pluginBytes);
+    const { wit } = ComponentParser.parse("component", pluginBytes);
     const parsedFunctions = parseFunctions(wit);
 
     const serviceImports = serviceMethodIndexToImportables(
