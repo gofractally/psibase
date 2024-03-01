@@ -36,7 +36,6 @@ const generatePendingFunction = (
     id: string
 ): string => {
     return `export async function ${method}(...args) {
-  console.log('pendingFunctionRan');
   
   const payload = {
       id: "${id}",
