@@ -331,73 +331,73 @@ fn to_dest_seq(source_block_id : InstrSeqId, source_function : &LocalFunction, s
             // https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions
             Instr::Br(block_ref) => {
                 let mut i = block_ref.clone();
-                i.block = id_maps.get_mapped_seq(&block_ref.block, "Br instruction references untracked sequence ID")?;
+                i.block = id_maps.get_mapped_seq(&block_ref.block, "`br` instruction references untracked sequence ID")?;
                 dest_seq.instr(i);
             }
             Instr::BrIf(block_ref) => {
                 let mut i = block_ref.clone();
-                i.block = id_maps.get_mapped_seq(&block_ref.block, "BrIf instruction references untracked sequence ID")?;
+                i.block = id_maps.get_mapped_seq(&block_ref.block, "`br_if` instruction references untracked sequence ID")?;
                 dest_seq.instr(i);
             }
             Instr::BrTable(block_table_ref) => {
                 let mut i = block_table_ref.clone();
                 let mut blocks : Vec<InstrSeqId> = vec![];
                 for b in i.blocks.into_vec().iter() {
-                    blocks.push(id_maps.get_mapped_seq(&b, "BrTable instruction references untracked sequence ID")?);
+                    blocks.push(id_maps.get_mapped_seq(&b, "`br_table` instruction references untracked sequence ID")?);
                 }
                 i.blocks = blocks.into();
-                i.default = id_maps.get_mapped_seq(&i.default, "BrTable instruction references untracked sequence ID")?;
+                i.default = id_maps.get_mapped_seq(&i.default, "`br_table` instruction references untracked sequence ID")?;
                 dest_seq.instr(i);
             }
 
             // Invalid instructions
             Instr::CallIndirect(_) => {
                 // Polyfill shouldn't be using indirect calls
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: Indirect call"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `call_indirect`"));
             }
             Instr::GlobalGet(_) => {
                 // Polyfill shouldn't be referencing globals
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: Get global"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `global.get`"));
             }
             Instr::GlobalSet(_) => {
                 // Polyfill shouldn't be referencing globals
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: Set global"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `global.set`"));
             }
             Instr::MemoryCopy(_) => {
                 // Unsure how to handle copying memory
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: Memory copy"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `memory.copy`"));
             }
             Instr::TableGet(_) => {
                 // Polyfill not allowed to have a tables section
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableGet"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `table.get`"));
             }
             Instr::TableSet(_) => {
                 // Polyfill not allowed to have a tables section
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableSet"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `table.set`"));
             }
             Instr::TableGrow(_) => {
                 // Polyfill not allowed to have a tables section
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableGrow"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `table.grow`"));
             }
             Instr::TableSize(_) => {
                 // Polyfill not allowed to have a tables section
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableSize"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `table.size`"));
             }
             Instr::TableFill(_) => {
                 // Polyfill not allowed to have a tables section
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableFill"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `table.fill`"));
             }
             Instr::TableInit(_) => {
                 // Polyfill not allowed to have a tables section
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableInit"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `table.init`"));
             }
             Instr::TableCopy(_) => {
                 // Polyfill not allowed to have a tables section
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: TableCopy"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `table.copy`"));
             }
             Instr::ElemDrop(_) => {
                 // Polyfill not allowed to have an elements section
-                return Err(anyhow!("Error: Polyfill module has unsupported instruction: ElemDrop"));
+                return Err(anyhow!("Error: Polyfill module has unsupported instruction: `elem.drop`"));
             }
 
             // List every other instruction type, to enforce that new types are properly handled
