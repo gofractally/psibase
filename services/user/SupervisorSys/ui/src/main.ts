@@ -118,12 +118,10 @@ const addRootFunctionCall = (message: FunctionCallRequest) => {
 
 const sendPluginCallRequest = async (
   param: PluginCallPayload,
-  from: string
 ) => {
   if (param.args == undefined) {
     throw new Error(`No args received on sendPluginCallRequest`);
   }
-  console.log(param, "was plugin call request to send x from", from);
   const iframe = await getLoader(param.args.service);
   iframe.contentWindow?.postMessage(buildPluginCallRequest(param), "*");
 };
@@ -135,8 +133,7 @@ const onFunctionCallRequest = (message: FunctionCallRequest) => {
       id: message.payload.id,
       args: message.payload.args,
       precomputedResults: [],
-    },
-    "fun"
+    }
   );
 };
 
@@ -162,7 +159,7 @@ const checkForResolution = () => {
         })),
       };
 
-      sendPluginCallRequest(message, "checkfortrigger");
+      sendPluginCallRequest(message);
     }
     funCall.nestedCalls.forEach(checkForTrigger);
   };
@@ -242,7 +239,6 @@ const findFunctionCallById = <T>(
 const executeCall = (id: string) => {
   const toExecute = findFunctionCallById(pendingFunctionCalls, id);
   if (!toExecute) throw new Error(`Failed to find function call ID: ${id}`);
-  console.log("i should execute", toExecute);
 
   sendPluginCallRequest(
     {
@@ -259,8 +255,7 @@ const executeCall = (id: string) => {
             result: undefined,
           })
         ),
-    },
-    "execute call"
+    }
   );
 };
 
