@@ -202,13 +202,9 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT
 
 # Run yarn to build service UIs
 set(JS_DIRS
-    services/system/AccountSys/ui:AccountSys_js
-    services/user/PsiSpaceSys/ui:PsiSpaceSys_js
     services/user/CommonSys/ui:CommonSys_js
     services/user/SupervisorSys/ui:SupervisorSys_js
-    services/user/TokenSys/ui:TokenSys_js
     services/user/ExploreSys/ui:ExploreSys_js
-    services/user/InviteSys/ui:InviteSys_js
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
 set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
@@ -336,8 +332,6 @@ psibase_package(
         INIT
     SERVICE r-account-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist /
-    DEPENDS ${AccountSys_js_dep}
     DEPENDS wasm
     PACKAGE_DEPENDS "AuthAnySys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
 )
@@ -463,9 +457,7 @@ psibase_package(
     DESCRIPTION "Provides web hosting to non-service accounts"
     SERVICE psispace-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
-    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui/dist /
     SERVER psispace-sys
-    DEPENDS ${PsiSpaceSys_js_dep}
     DEPENDS wasm
     PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
@@ -533,12 +525,10 @@ psibase_package(
     PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})"
     SERVICE invite-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist /
         SERVER invite-sys
         INIT
     SERVICE auth-inv-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
-    DEPENDS InviteSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist/index.html
     DEPENDS wasm
 )
 
@@ -575,8 +565,6 @@ psibase_package(
         INIT
     SERVICE r-tok-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist /
-    DEPENDS TokenSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist/index.html
     DEPENDS wasm
 )
 

@@ -51,7 +51,11 @@ export const Dashboard = ({ currentUser }: { currentUser: string }) => {
                     <AppletIcon
                         applet={a}
                         href={hrefs[a.service]}
-                        disabled={false}
+                        disabled={[
+                            "account-sys",
+                            "token-sys",
+                            "psispace-sys",
+                        ].includes(a.service)}
                         key={a.service}
                     />
                 ))}
