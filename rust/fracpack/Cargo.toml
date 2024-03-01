@@ -1,6 +1,6 @@
 [package]
 name = "fracpack"
-version = "0.3.0"
+version = "0.6.0"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -13,4 +13,4 @@ path = "src/fracpack.rs"
 
 [dependencies]
 custom_error = "1.9.2"
-psibase_macros = { version = "0.3.0", path = "../psibase_macros" }
+psibase_macros = { version = "0.6.0", path = "../psibase_macros" }
