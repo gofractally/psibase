@@ -265,6 +265,22 @@ add_custom_command(
 add_custom_target(wasm-psibase ALL DEPENDS ${WASM_PSIBASE_BYPRODUCTS})
 add_dependencies(wasm-psibase rust)
 
+set(PARSER_COMPONENT_OUTPUT
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/dist/component_parser.wasm
+)
+add_custom_command(
+    OUTPUT ${PARSER_COMPONENT_OUTPUT}
+    COMMAND cargo component build 
+        --release 
+        --target wasm32-unknown-unknown
+        --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/Cargo.toml 
+        --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/target
+    COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/target/wasm32-unknown-unknown/release/component_parser.wasm ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common-lib/packages/wasm-loader/dist/component_parser.wasm
+)
+add_custom_target(GenComponentParser ALL DEPENDS ${PARSER_COMPONENT_OUTPUT})
+add_dependencies(CommonSysLoaderLib_js GenComponentParser)
+
+
 function(psinode_files target pfx)
     add_custom_target(
     ${target}
