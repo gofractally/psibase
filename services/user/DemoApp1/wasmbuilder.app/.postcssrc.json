@@ -1,7 +1,0 @@
-{
-  "parser": "sugarss",
-  "map": false,
-  "plugins": {
-    "tailwindcss": {}
-  }
-}

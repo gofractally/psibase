@@ -1,6 +1,0 @@
-[workspace]
-resolver = "2"
-members = [
-    "crates/graph",
-    "crates/fastly-static-site",
-]

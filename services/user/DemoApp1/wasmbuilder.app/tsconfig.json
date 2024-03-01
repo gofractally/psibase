@@ -1,8 +1,0 @@
-{
-  "target": "es6",
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "lib": ["es2021", "dom"],
-    "esModuleInterop": true,
-  },
-}
