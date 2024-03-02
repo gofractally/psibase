@@ -200,7 +200,7 @@ add_custom_command(
 add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
 
-# Run yarn to build service UIs
+# UIs built with yarn
 set(JS_DIRS
     services/user/CommonSys/ui:CommonSys_js
     services/user/SupervisorSys/ui:SupervisorSys_js
@@ -210,39 +210,36 @@ set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
 set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
 set(COMMON_LOADER_DIR services/user/CommonSys/common/packages/wasm-loader/:CommonSysLoaderLib_js)
 
-function(add_js_target ENTRY OUTPUT_FILE)
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
+function(add_js_target ROW OUTPUT_FILE)
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ROW})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${ROW})
+    set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
+    file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
 
-    file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
-    set(DEPENDENCIES ${sources} ${ARGN})
+    # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE}
-        DEPENDS ${DEPENDENCIES}
+        OUTPUT ${OUTPUT_FILEPATH}
+        DEPENDS ${SOURCES} ${ARGN}
         COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
     )
-    add_custom_target(
-        ${DEP}
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE}
-    )
-    set(${DEP}_dep ${DEP} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE} PARENT_SCOPE)
+    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
+    add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
+    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
 endfunction()
 
-list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
-file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/*)
+# Static (not built) resource dependencies
+file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/*)
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts/*)
-
-# TODO: Can this be a dist folder, i.e., a build product?
-file(GLOB common-loader LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wasm-loader/dist/*)
 
 # Builds the Common Sys files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${COMMON_LOADER_DIR} index.html)
+add_js_target(${COMMON_LOADER_DIR} index.html ${CommonSysCommonLib_js_DEP})
 
 # Build each UI
 # Each of these UIs receives the build output of CommonSys, so CommonSys files are listed as dependencies
-foreach(ENTRY ${JS_DIRS})
-    add_js_target(${ENTRY} index.html ${common} ${common-fonts} ${common-loader} CommonSysCommonLib_js CommonSysLoaderLib_js)
+foreach(ROW ${JS_DIRS})
+    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonSysCommonLib_js_DEP} ${CommonSysLoaderLib_js_DEP})
 endforeach()
 
 set(WASM_PSIBASE_BYPRODUCTS
@@ -366,9 +363,9 @@ psibase_package(
         DATA      ${COMMON_SYS}/common/resources/fonts                        common/fonts
         DATA GLOB ${COMMON_SYS}/ui/dist/*                                     /
         DATA GLOB ${THIRD_FILES}                                              common
-    DEPENDS ${CommonSys_js_dep}
-    DEPENDS ${CommonSysCommonLib_js_dep}
-    DEPENDS ${CommonSysLoaderLib_js_dep}
+    DEPENDS ${CommonSys_js_DEP}
+    DEPENDS ${CommonSysCommonLib_js_DEP}
+    DEPENDS ${CommonSysLoaderLib_js_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
