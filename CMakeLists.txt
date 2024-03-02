@@ -234,7 +234,7 @@ file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/servic
 
 # Builds the Common Sys files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${COMMON_LOADER_DIR} index.html)
+add_js_target(${COMMON_LOADER_DIR} index.html ${CommonSysCommonLib_js_DEP})
 
 # Build each UI
 # Each of these UIs receives the build output of CommonSys, so CommonSys files are listed as dependencies
