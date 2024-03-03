@@ -119,21 +119,13 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     code.emit_wasm_file(file.path())?;
 
     let debug_build = false;
-    let mut size_opt = OptimizationOptions::new_optimize_for_size();
-    let mut _speed_opt = OptimizationOptions::new_opt_level_2();
-    // Old binaryen config:
-    // shrink_level: 1,
-    // optimization_level: 2,
-    // debug_info: false,
-    let do_optimize = |opt: &mut OptimizationOptions| -> Result<(), Error> {
-        opt.enable_feature(wasm_opt::Feature::BulkMemory);
-        opt.enable_feature(wasm_opt::Feature::SignExt);
-        opt.enable_feature(wasm_opt::Feature::Simd);
-        opt.debug_info(debug_build);
-        opt.run(file.path(), file.path())?;
-        Ok(())
-    };
-    do_optimize(&mut size_opt)?;
+    OptimizationOptions::new_opt_level_2()
+        .shrink_level(wasm_opt::ShrinkLevel::Level1)
+        .enable_feature(wasm_opt::Feature::BulkMemory)
+        .enable_feature(wasm_opt::Feature::SignExt)
+        .enable_feature(wasm_opt::Feature::Simd)
+        .debug_info(debug_build)
+        .run(file.path(), file.path())?;
 
     let mut config = walrus::ModuleConfig::new();
     config.generate_name_section(false);
