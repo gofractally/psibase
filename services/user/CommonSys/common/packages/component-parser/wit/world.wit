@@ -1,0 +1,62 @@
+package psibase:component-parser;
+
+interface provider {
+
+    /// Represents a kind of import or export in a WebAssembly component.
+    enum item-kind {
+        /// The item is a core module.
+        module,
+        /// The item is a function.
+        function,
+        /// The item is a value.
+        value,
+        /// The item is a type.
+        %type,
+        /// The item is an instance.
+        instance,
+        /// The item is a component.
+        component,
+    }
+
+    /// Represents an import in a WebAssembly component.
+    record %import {
+        /// The import name.
+        name: string,
+        /// The import kind.
+        kind: item-kind,
+    }
+
+    /// Represents an export in a WebAssembly component.
+    record %export {
+        /// The export name.
+        name: string,
+        /// The export kind.
+        kind: item-kind,
+    }
+
+    /// Represents a WebAssembly component.
+    record component {
+        /// The name of the component.
+        name: string,
+        /// The imports of the component.
+        imports: list<%import>,
+        /// The exports of the component.
+        exports: list<%export>,
+        // The WIT definition of the component's world.
+        wit: string
+    }
+
+    resource component-parser {
+        /// Constructs a new component-parser.
+        constructor();
+
+        /// Parses wasm component bytes into a component object
+        parse: func(name: string, bytes: list<u8>) -> result<component, string>;
+    }
+
+}
+
+
+world component {
+    export provider;
+}
