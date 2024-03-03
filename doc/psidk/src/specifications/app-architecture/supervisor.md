@@ -11,6 +11,7 @@ Supervisor is responsible for:
 * [Communication with plugins](./plugins.md#communication-with-plugins) - For modularizing app functionality
 * Transaction signing and authorization ([Smart authorization](../blockchain/smart-authorization.md))
 * Packing transactions into the [`fracpack`](../data-formats/fracpack.md) binary format
+* Facilitating client-controlled storage from plugins on behalf of the user
 
 ### Client-side peering
 
@@ -31,18 +32,20 @@ The supervisor will poll the root domain to watch for events that have been subs
 | 🔒 app1.psibase                           |
 |-------------------------------------------|
 |                                           |
+|   Visible UI                              |
+|                                           |
 |   .----------------------------------.    |
 |   | </> supervisor.psibase  [hidden] |    |
 |   |----------------------------------|    |
 |  <-->                                |    |
 |   |   .--------------------------.   |    |
-|   |   | </> app1.plugin.psibase  |   |    |
+|   |   | </> app1.psibase/plugin  |   |    |
 |   |   |--------------------------|   |    |
 |   |  <-->                        |   |    |
 |   |   |                          |   |    |
 |   |   '--------------------------'   |    |
 |   |   .--------------------------.   |    |
-|   |   | </> app2.plugin.psibase  |   |    |
+|   |   | </> app2.psibase/plugin  |   |    |
 |   |   |--------------------------|   |    |
 |   |  <-->                        |   |    |
 |   |   |                          |   |    |
@@ -54,14 +57,17 @@ The supervisor will poll the root domain to watch for events that have been subs
 
 The supervisor is instantiated in an iframe by a psibase app, and is responsible for instantiating plugins in their own subdomains using hidden iframes.
 
-For example, if `app.psibase` is requested from a psibase infrastructure provider, then the element stored at the root path in that service is returned to the client. That UI element is the root page of the psibase app, which will then request the supervisor from its domain on the server. After the supervisor loads, the psibase app can call into the supervisor in order to execute functionality defined in plugins.
+For example, if `app.psibase` is requested from a psibase infrastructure provider, then the document stored at the root path in that service is returned to the client. Should that document require resources or code defined in a plugin, then it will will request the supervisor from the server. After the supervisor loads, the psibase app can call into the supervisor to execute the desired plugin functionality.
 
 > ⚠️ For security, plugins should only listen for messages from the supervisor. Otherwise, an attacker app could instantiate the victim app within its own iframe and impersonate the supervisor.
 
 #### Supervisor initialization
 
-1. An app instantiates the supervisor inside a hidden iframe and gives the supervisor an ID for identifying the window/session (to help distinguish messages if the app is open in multiple browser tabs).
-2. The app also tells the supervisor the address of its own plugin.
+An app instantiates the supervisor inside a hidden iframe and gives the supervisor the following information:
+1. A window ID
+2. The plugins required by the app
+
+The window ID is always included in all messages between the app, the supervisor, and any plugins managed by the supervisor. If the application is open in multiple browser tabs, the window ID disambiguates the recipient of messages between the different app contexts.
 
 ```mermaid
 sequenceDiagram
