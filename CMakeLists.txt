@@ -208,6 +208,7 @@ ExternalProject_Add(
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
+    BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
 )
 add_test(
