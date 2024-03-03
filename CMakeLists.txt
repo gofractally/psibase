@@ -256,11 +256,10 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
         DEPENDS ${SOURCES} ${ARGN}
         COMMAND cargo component build 
             --release 
-            --target wasm32-unknown-unknown
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
             --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
         COMMAND ${CMAKE_COMMAND} -E make_directory ${COMPONENT_BIN_DIR}
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-unknown-unknown/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-wasi/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
     )
     # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
     add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
@@ -273,6 +272,13 @@ endfunction()
 set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parser:ComponentParser)
 add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
 add_dependencies(CommonSysCommonLib_js ComponentParser)
+
+set(SYSTEM_PLUGIN_DIRS
+    services/system/AccountSys/plugin:AccountsPlugin
+)
+foreach(ROW ${SYSTEM_PLUGIN_DIRS})
+    add_rs_component(${ROW} accounts.wasm)
+endforeach()
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
@@ -345,7 +351,9 @@ psibase_package(
         INIT
     SERVICE r-account-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
+        DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
+    DEPENDS ${AccountsPlugin_DEP}
     PACKAGE_DEPENDS "AuthAnySys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
 )
 
@@ -381,7 +389,6 @@ set(THIRD_FILES
     ${THIRD_SRC}/react.production.min.js
     ${THIRD_SRC}/semantic-ui-react.min.js
     ${THIRD_SRC}/useLocalStorageState.js)
-message(STATUS "Component parser output file: ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}")
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CommonSys.psi
     NAME CommonSys

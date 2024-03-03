@@ -1,0 +1,19 @@
+package accounts:plugin;
+
+interface accounts {
+
+    /// Gets the name of the currently logged in user
+    get-logged-in-user: func() -> result<string, string>;
+
+    /// Retrieves a list of accounts to which the user can log in.
+    get-available-accounts: func() -> result<list<string>, string>;
+
+    /// Adds a new auth service locally that can be used to authenticate
+    /// a user.
+    add-auth-service: func(service-name: string) -> result<_, string>;
+}
+
+world psibase-plugin {
+    export accounts;
+}
+
