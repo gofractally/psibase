@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16.3)
 cmake_policy(VERSION 3.16.3...3.25.1)
 project(psibase)
+enable_testing()
 include(ExternalProject)
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -199,6 +200,21 @@ add_custom_command(
 )
 add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
+
+# Cargo psibase
+ExternalProject_Add(
+    cargo-psibase
+    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
+    CONFIGURE_COMMAND   ""
+    BUILD_COMMAND       cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
+    INSTALL_COMMAND     ""
+)
+add_test(
+    NAME CargoTestCargoPsibase
+    COMMAND cargo test --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/cargo-psibase/Cargo.toml
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust/cargo-psibase/
+)
 
 # Run yarn to build service UIs
 set(JS_DIRS
