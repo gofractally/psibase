@@ -210,9 +210,9 @@ set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
 set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
 set(COMMON_LOADER_DIR services/user/CommonSys/common/packages/wasm-loader/:CommonSysLoaderLib_js)
 
-function(add_js_target ROW OUTPUT_FILE)
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ROW})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${ROW})
+function(add_js_target TARGET_TUPLE OUTPUT_FILE)
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
     file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
 
@@ -241,6 +241,38 @@ add_js_target(${COMMON_LOADER_DIR} index.html ${CommonSysCommonLib_js_DEP})
 foreach(ROW ${JS_DIRS})
     add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonSysCommonLib_js_DEP} ${CommonSysLoaderLib_js_DEP})
 endforeach()
+
+# A function that can be used to add a new target that builds a wasm component from rust
+set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/components)
+function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
+    set(OUTPUT_FILEPATH ${COMPONENT_BIN_DIR}/${OUTPUT_FILE})
+    file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
+
+    # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
+    add_custom_command(
+        OUTPUT ${OUTPUT_FILEPATH}
+        DEPENDS ${SOURCES} ${ARGN}
+        COMMAND cargo component build 
+            --release 
+            --target wasm32-unknown-unknown
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
+            --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${COMPONENT_BIN_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-unknown-unknown/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+    )
+    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
+    add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
+    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} PARENT_SCOPE)
+    set(${TARGET_NAME}_OUTPUT_FILE ${OUTPUT_FILE} PARENT_SCOPE)
+endfunction()
+
+# Build each component
+set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parser:ComponentParser)
+add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
+add_dependencies(CommonSysCommonLib_js ComponentParser)
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
@@ -365,6 +397,7 @@ set(THIRD_FILES
     ${THIRD_SRC}/react.production.min.js
     ${THIRD_SRC}/semantic-ui-react.min.js
     ${THIRD_SRC}/useLocalStorageState.js)
+message(STATUS "Component parser output file: ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}")
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CommonSys.psi
     NAME CommonSys
@@ -379,9 +412,11 @@ psibase_package(
         DATA      ${COMMON_SYS}/common/resources/fonts                        common/fonts
         DATA GLOB ${COMMON_SYS}/ui/dist/*                                     /
         DATA GLOB ${THIRD_FILES}                                              common
+        DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
     DEPENDS ${CommonSys_js_DEP}
     DEPENDS ${CommonSysCommonLib_js_DEP}
     DEPENDS ${CommonSysLoaderLib_js_DEP}
+    DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
