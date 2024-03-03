@@ -129,15 +129,7 @@ fn get_polyfill_targets(
 
             // Check if there's a corresponding export in the `source` module
             let source_func = match source.exports.get_func(name) {
-                // This match guard ensures the export function has a local definition
-                Ok(exp_fid)
-                    if matches!(
-                        source.funcs.get(exp_fid).kind,
-                        walrus::FunctionKind::Local(_)
-                    ) =>
-                {
-                    source.funcs.get(exp_fid)
-                }
+                Ok(exp_fid) => source.funcs.get(exp_fid),
                 _ => return None,
             };
 
@@ -211,11 +203,11 @@ fn to_dest_func(
                 dest.add_import_func(module, name, dest_type).0
             }
         }
-        Local(_) => {
+        Local(loc) => {
             if let Some(local_fid) = id_maps.loc_fid_map.get(&source_fid) {
                 *local_fid
             } else {
-                let new_local_func = copy_func(source_fid, source, dest, id_maps)?;
+                let new_local_func = copy_func(loc, &f.name, source, dest, id_maps)?;
                 let new_local_fid = dest.funcs.add_local(new_local_func);
                 id_maps.loc_fid_map.insert(source_fid, new_local_fid);
                 new_local_fid
@@ -615,26 +607,21 @@ impl Default for IdMaps {
 /// Copy all instructions from a function in a `source` module to a new function
 /// in a `dest` module.
 fn copy_func(
-    source_fid: FunctionId,
+    source_local_func: &LocalFunction,
+    source_local_func_name: &Option<String>,
     source: &Module,
     dest: &mut Module,
     id_maps: &mut IdMaps,
 ) -> Result<LocalFunction, anyhow::Error> {
-    // Get source local function
-    let source_func = source.funcs.get(source_fid);
-    let source_local_func = match &source_func.kind {
-        walrus::FunctionKind::Local(loc) => loc,
-        _ => return Err(anyhow!("Requested local function not found")),
-    };
-
     // Build the new local function in `dest` with the correct signature
     let tid = source_local_func.ty();
     let ty = source.types.get(tid);
     let (params, results) = (ty.params().to_vec(), ty.results().to_vec());
 
     let mut builder = walrus::FunctionBuilder::new(&mut dest.types, &params, &results);
-    if source_func.name.is_some() {
-        builder.name(source_func.name.to_owned().unwrap());
+
+    if source_local_func_name.is_some() {
+        builder.name(source_local_func_name.to_owned().unwrap());
     }
 
     // Make the new local function
@@ -705,13 +692,28 @@ pub fn link_module(source: &Module, dest: &mut Module) -> Result<(), anyhow::Err
                     .map(|i| i.id())
                     .unwrap();
 
-                // Copy the function into a new local function in the `dest`
-                let new_func = copy_func(source_fid, &source, dest, &mut id_maps)?;
+                // Get source local function
+                let source_func = source.funcs.get(source_fid);
+                match &source_func.kind {
+                    walrus::FunctionKind::Local(loc) => {
+                        // Copy the function into a new local function in the `dest`
+                        let new_func =
+                            copy_func(loc, &source_func.name, &source, dest, &mut id_maps)?;
 
-                // Replace the old imported function with the new local function and delete the old import.
-                let dest_func = dest.funcs.get_mut(dest_fid);
-                dest_func.kind = FunctionKind::Local(new_func);
-                dest.imports.delete(import_id);
+                        // Replace the old imported function with the new local function and delete the old import.
+                        let dest_func = dest.funcs.get_mut(dest_fid);
+                        dest_func.kind = FunctionKind::Local(new_func);
+                        dest.imports.delete(import_id);
+                    }
+                    walrus::FunctionKind::Import(_) => {
+                        // Rewrite the dest import to the source import
+                        let source_import = source.imports.get_imported_func(source_fid).unwrap();
+                        let dest_import = dest.imports.get_mut(import_id);
+                        dest_import.module = source_import.module.to_owned();
+                        dest_import.name = source_import.name.to_owned();
+                    }
+                    _ => return Err(anyhow!("Requested local function not found")),
+                }
             }
         }
     }
@@ -734,50 +736,41 @@ pub fn link_module(source: &Module, dest: &mut Module) -> Result<(), anyhow::Err
 
 #[cfg(test)]
 mod tests {
-    use anyhow::{Context, Error};
+    use anyhow::Error;
     use core::fmt;
     use std::{
-        fs::{read, File},
+        fs::File,
         io::Write,
         path::{Path, PathBuf},
     };
 
     use super::*;
 
-    const SERVICE_POLYFILL: &[u8] =
-        include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
-    const SIMPLE_WASM: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/test-data/simple.wasm");
-    const INTERMEDIATE_WASM: &str =
-        concat!(env!("CARGO_MANIFEST_DIR"), "/test-data/intermediate.wasm");
+    const SERVICE_POLYFILL: &str = concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm");
+    const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
-    fn get_dest_module(filepath: &str) -> Result<Module, Error> {
-        let filename = &PathBuf::from(filepath);
-        let code = &read(filename)
-            .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
+    // Config params
+    const GEN_NAME_SECTION: bool = false;
+    const GEN_PRODUCERS_SECTION: bool = false;
+    const PRINT_OFFSETS: bool = false;
 
-        let mut config = walrus::ModuleConfig::new();
-        config.generate_name_section(false);
-        config.generate_producers_section(false);
-
-        Ok(config.parse(code)?)
+    fn rel_to_manifest(filepath: &str) -> String {
+        format!("{}{}", CARGO_MANIFEST_DIR, filepath)
     }
 
-    fn setup(filepath: &str) -> Result<(Module, Module, Module), Error> {
-        // Read wasms from disk into memory
-        let mut original = get_dest_module(filepath)?;
-        let polyfill = Module::from_buffer(SERVICE_POLYFILL)?;
-        let mut filled = get_dest_module(filepath)?;
+    fn walrus_config() -> walrus::ModuleConfig {
+        let mut config = walrus::ModuleConfig::new();
+        config.generate_name_section(GEN_NAME_SECTION);
+        config.generate_producers_section(GEN_PRODUCERS_SECTION);
+        config
+    }
 
-        // Do the polyfill
-        link_module(&polyfill, &mut filled)?;
+    fn wasm(filepath: &str) -> Result<Module, Error> {
+        walrus_config().parse_file(filepath)
+    }
 
-        // Print both the original and polyfilled wasms in WebAssembly Text (WAT) format
-        // Print both the full WAT representation as well as the skeleton representation
-        let filled_path = with_suffix(&Path::new(filepath).to_path_buf(), "-filled");
-        print_wat(filepath, &original.emit_wasm())?;
-        print_wat(filled_path.to_str().unwrap(), &filled.emit_wasm())?;
-
-        Ok((original, polyfill, filled))
+    fn wat(filepath: &str) -> Result<Module, Error> {
+        walrus_config().parse(&wat::parse_file(filepath)?)
     }
 
     fn wat_path(file_path: &str) -> PathBuf {
@@ -786,7 +779,7 @@ mod tests {
         p
     }
 
-    fn with_suffix(file_path: &PathBuf, suffix: &str) -> PathBuf {
+    fn suffix_pb(file_path: &PathBuf, suffix: &str) -> PathBuf {
         let stem = file_path
             .file_stem()
             .unwrap_or_default()
@@ -800,12 +793,17 @@ mod tests {
         file_path.with_file_name(new_stem).with_extension(extension)
     }
 
+    fn suffix(filepath: &str, suffix: &str) -> String {
+        let filepath_pb = &Path::new(filepath).to_path_buf();
+        suffix_pb(filepath_pb, suffix).to_str().unwrap().to_string()
+    }
+
     fn print_wat(wasm_path: &str, wasm_data: &Vec<u8>) -> Result<(), Error> {
         let wat_path = wat_path(wasm_path);
-        let skele_path = with_suffix(&wat_path, "-skeleton");
+        let skele_path = suffix_pb(&wat_path, "-skeleton");
 
         let mut printer = wasmprinter::Printer::new();
-        printer.print_offsets(false);
+        printer.print_offsets(PRINT_OFFSETS);
         let wat_data = printer.print(wasm_data)?;
         printer.print_skeleton(true);
         let wat_skele = printer.print(wasm_data)?;
@@ -849,7 +847,15 @@ mod tests {
 
     #[test]
     fn imports_removed() -> Result<(), Error> {
-        let (original, polyfill, filled) = setup(SIMPLE_WASM)?;
+        let simple_wasm = &rel_to_manifest("/test-data/simple.wasm");
+        let mut original = wasm(simple_wasm)?;
+        let mut destination = wasm(simple_wasm)?;
+        let polyfill = wasm(SERVICE_POLYFILL)?;
+
+        link_module(&polyfill, &mut destination)?;
+
+        print_wat(simple_wasm, &original.emit_wasm())?;
+        print_wat(&suffix(simple_wasm, "-filled"), &destination.emit_wasm())?;
 
         let targets_before_fill: Option<Vec<PolyfillTarget>> =
             get_polyfill_targets(&polyfill, &original)?;
@@ -865,7 +871,7 @@ mod tests {
         };
 
         let targets_after_fill: Option<Vec<PolyfillTarget>> =
-            get_polyfill_targets(&polyfill, &filled)?;
+            get_polyfill_targets(&polyfill, &destination)?;
         if let Some(targets) = targets_after_fill {
             assert_eq!(
                 targets.len(),
@@ -874,7 +880,7 @@ mod tests {
             );
         }
 
-        let import_funcs = get_import_funcs(&filled);
+        let import_funcs = get_import_funcs(&destination);
         for f in import_funcs {
             println!("{}", f);
         }
@@ -883,15 +889,43 @@ mod tests {
     }
 
     #[test]
-    fn valid_wasm_produced_1() -> Result<(), Error> {
-        let (mut original, _, mut filled) = setup(SIMPLE_WASM)?;
+    fn fill_reexport() -> Result<(), Error> {
+        let import_path = &rel_to_manifest("/test-data/import.wat");
+        let mut destination = wat(import_path)?;
+        let mut polyfill = wat(&rel_to_manifest("/test-data/reexport.wat"))?;
 
         new_validator()
-            .validate_all(&original.emit_wasm())
-            .map_err(|e| anyhow!("[simple.wasm] {}", e))?;
+            .validate_all(&destination.emit_wasm())
+            .map_err(|e| anyhow!("[import.wat not valid] {}", e))?;
         new_validator()
-            .validate_all(&filled.emit_wasm())
-            .map_err(|e| anyhow!("[simple.filled.wasm] {}", e))?;
+            .validate_all(&polyfill.emit_wasm())
+            .map_err(|e| anyhow!("[reexport.wat not valid] {}", e))?;
+
+        let imports = get_import_funcs(&destination);
+        assert!(imports.len() == 1, "Unexpected import");
+        assert!(
+            imports[0].module == "wasi_snapshot_preview1",
+            "Prefill import module incorrect"
+        );
+        assert!(
+            imports[0].name == "fd_close",
+            "Prefill import name incorrect"
+        );
+
+        link_module(&polyfill, &mut destination)?;
+        print_wat(&suffix(import_path, "-filled"), &destination.emit_wasm())?;
+
+        let post_imports = get_import_funcs(&destination);
+        assert!(post_imports.len() == 1, "Unexpected import");
+        assert!(
+            post_imports[0].module == "env",
+            "Postfill import module incorrect"
+        );
+        assert!(
+            post_imports[0].name == "testerClose",
+            "Postfill import name incorrect"
+        );
+
         Ok(())
     }
 }
