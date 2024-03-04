@@ -10,6 +10,7 @@ members = [
     "psibase_macros",
     "psibase",
     "test_contract",
+    "test_contract_2",
     "test_service_elections",
     "test_service_psispace",
     "test_fracpack",
