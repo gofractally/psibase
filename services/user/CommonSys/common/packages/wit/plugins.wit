@@ -1,0 +1,19 @@
+package common:plugins;
+
+interface types {
+    record plugin-id {
+        /// The name of a service (e.g. account-sys)
+        service: string,
+        /// The name of the plugin (e.g. plugin.wasm)
+        plugin: string,
+    }
+}
+
+interface transactions {
+    add-action-to-transaction: func(service: string, action: string) -> result<_, string>;
+}
+
+world plugin-capabilities {
+    export transactions;
+    export types;
+}
