@@ -1,9 +1,12 @@
 #[allow(warnings)]
 mod bindings;
 
-use crate::bindings::exports::invites::plugin::admin;
-use crate::bindings::exports::invites::plugin::invitee;
-use crate::bindings::exports::invites::plugin::inviter;
+use bindings::common::plugins::transactions::*;
+use bindings::exports::invites::plugin::{admin, invitee, inviter};
+use psibase::{PublicKey, PublicKeyEnum};
+use serde_json::to_string;
+
+use invites::action_structs::*;
 
 struct Component;
 
@@ -48,6 +51,15 @@ impl inviter::Guest for Component {
         app_plugin: inviter::PluginId,
         callback_path: String,
     ) -> Result<String, String> {
+        add_action_to_transaction(
+            "invite-sys",
+            "createInvite",
+            &to_string(&create_invite {
+                inviteKey: "invalid_key".parse().unwrap(),
+            })
+            .unwrap(),
+        )?;
+
         Err("Not yet implemented".to_string())
     }
 
