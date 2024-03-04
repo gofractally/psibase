@@ -33,7 +33,7 @@ const functionCall = async ({
 }: PluginCallPayload) => {
     const [pluginBytes, parserBytes, wasmComponent] = await Promise.all([
         wasmUrlToIntArray("/plugin.wasm"),
-        wasmUrlToIntArray("/common/wasm-loader/component_parser.wasm"),
+        wasmUrlToIntArray("/common/component_parser.wasm"),
         import("rollup-plugin-wit-component")
     ]);
 
