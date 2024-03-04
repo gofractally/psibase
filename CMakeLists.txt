@@ -363,8 +363,6 @@ psibase_package(
         SERVER r-auth-sys
     SERVICE r-auth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSys/ui/index.html index.html
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSys/ui/index.js   index.js
     SERVICE verify-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
         FLAGS isAuthService
