@@ -311,27 +311,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
-name = "binaryen"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "783bea139d75b6a565b13fab54d12ec4d58724a9458598ad7283d578f4f8777a"
-dependencies = [
- "binaryen-sys",
-]
-
-[[package]]
-name = "binaryen-sys"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86e9636d01b92f2df45dce29c35a9e3724687c1055bb4472fb4b829cc4a5a561"
-dependencies = [
- "cc",
- "cmake",
- "heck 0.3.3",
- "regex",
-]
-
-[[package]]
 name = "bitcoin-private"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -445,7 +424,6 @@ name = "cargo-psibase"
 version = "0.7.0"
 dependencies = [
  "anyhow",
- "binaryen",
  "cargo_metadata",
  "clap 4.5.1",
  "console",
@@ -619,15 +597,6 @@ name = "clap_lex"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
-
-[[package]]
-name = "cmake"
-version = "0.1.50"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a31c789563b815f77f4250caee12365734369f942439b7defd71e18a48197130"
-dependencies = [
- "cc",
-]
 
 [[package]]
 name = "codespan-reporting"
