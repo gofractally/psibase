@@ -11,3 +11,5 @@ impl Guest for Component {
         format!("barry is {}", barry)
     }
 }
+
+bindings::export!(Component with_types_in bindings);
