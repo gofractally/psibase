@@ -277,8 +277,9 @@ add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
 add_dependencies(CommonSysCommonLib_js ComponentParser)
 
 add_rs_component(services/system/AccountSys/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
-add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invites.wasm ${plugin-wit})
-add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invites.wasm ${plugin-wit})
+add_rs_component(services/system/AuthSys/plugin:AuthPlugin auth.wasm ${plugin-wit})
+add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invites.wasm ${plugin-wit} ${AuthPlugin_DEP})
+
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm

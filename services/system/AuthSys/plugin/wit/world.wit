@@ -1,0 +1,38 @@
+package auth-sys:plugin;
+
+/// Common types used when dealing with auth service plugins
+interface types {
+
+    /// A list of `claim` objects is added to every submitted transaction.
+    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
+    record claim {
+        /// The name of the service used to verify the claim is valid
+        verify-service: string,
+        /// The raw claim data
+        raw-data: list<u8>,
+    }
+}
+
+/// The methods exposed by this plugin
+interface auth-sys {
+    use types.{claim};
+
+    /// Gets the claim needed for this user to satisfy the authorization check
+    get-claim: func() -> result<claim, string>;
+
+    /// Generates a new keypair, stores the private key, returns the public key.
+    generate-keypair: func() -> result<string, string>;
+}
+
+world psibase-plugin {
+    
+    // Needed for getting the currently logged in user, which is 
+    // necessary to generate the correct claim
+    import accounts:plugin/accounts;
+
+    // Needed for access to query functionality
+    import common:plugins/server;
+
+    export auth-sys;
+    export types;
+}
