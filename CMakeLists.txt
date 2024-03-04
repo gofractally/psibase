@@ -273,12 +273,8 @@ set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parse
 add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
 add_dependencies(CommonSysCommonLib_js ComponentParser)
 
-set(SYSTEM_PLUGIN_DIRS
-    services/system/AccountSys/plugin:AccountsPlugin
-)
-foreach(ROW ${SYSTEM_PLUGIN_DIRS})
-    add_rs_component(${ROW} accounts.wasm)
-endforeach()
+add_rs_component(services/system/AccountSys/plugin:AccountsPlugin accounts.wasm)
+add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invites.wasm)
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
@@ -545,14 +541,16 @@ psibase_package(
     NAME InviteSys
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthEcSys(^${PSIBASE_VERSION})"
     SERVICE invite-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
         SERVER invite-sys
         INIT
+        DATA ${COMPONENT_BIN_DIR}/${InvitesPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE auth-inv-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
     DEPENDS wasm
+    DEPENDS ${InvitesPlugin_DEP}
 )
 
 psibase_package(

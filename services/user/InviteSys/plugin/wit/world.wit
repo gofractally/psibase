@@ -1,0 +1,101 @@
+package invites:plugin;
+
+// Todo - move to common/types.wit
+interface types {
+    record plugin-id {
+        /// The name of a service (e.g. account-sys)
+        service: string,
+        /// The name of the plugin (e.g. plugin.wasm)
+        plugin: string,
+    }
+}
+
+interface admin {
+    /// Restricts the accounts that are able to create invites to those 
+    /// that exist in the whitelist.
+    /// 
+    /// This method may only be called by the service account on which the 
+    /// invite service is deployed.
+    set-whitelist: func(accounts: list<string>) -> result<_, string>;
+
+    /// Prevents accounts that are in the blacklist from creating accounts.
+    /// 
+    /// This method may only be called by the service account on which the 
+    /// invite service is deployed.
+    set-blacklist: func(accounts: list<string>) -> result<_, string>;
+}
+
+interface inviter {
+    use types.{plugin-id};
+
+    /// Allows a user to generate an invite link that can be used to 
+    /// invite someone (with or without a preexisting account) to use 
+    /// an app.
+    /// 
+    /// Parameters
+    /// * `generating-user`: This is the account name of the user responsible for
+    ///   generating the invite
+    /// * `app-plugin`: This is the `plugin-id` of the app to which the reciever
+    ///   of the invite is being invited
+    /// * `callback-path`: This the subpath of the app to which the invited user
+    ///   is redirected if they accept the invite
+    /// 
+    /// A successful return value from this function will return a URL that can be
+    /// sent to a user to invite them to an app. This URL embeds a private key which
+    /// is used to authenticate the receiver of the invite on their first transaction
+    /// to the chain (used to create their own account).
+    generate-invite: func(generating-user: string, app-plugin: plugin-id, callback-path: string) -> result<string, string>;
+
+    /// Used by the creator of an invite to delete it. Deleted invites are removed
+    /// from the database. An invite can be deleted regardless of whether it has been
+    /// accepted, rejected, or is still pending.
+    /// 
+    /// Parameters
+    /// * `invite-public-key`: The key that is publicly associated with the private key 
+    ///   embedded in the invite link. This public key should also exist on chain in a table
+    ///   in the invite service.
+    delete-invite: func(invite-public-key: list<u8>) -> result<_, string>;
+}
+
+interface invitee {
+    /// Called by existing accounts to accept an invite to an app without creating
+    /// a new account.
+    /// 
+    /// Parameters
+    /// * `invite-public-key`: The key that is publicly associated with the private key 
+    ///   embedded in the invite link. This public key should also exist on chain in a table
+    ///   in the invite service.
+    accept-with-existing-account: func(invite-public-key: list<u8>) -> result<_, string>;
+
+    /// Called by users without an account (using the system account "invited-sys") to accept 
+    /// an invite to an app and simultaneously create their new account.
+    /// 
+    /// Parameters
+    /// * `new-account-name`: The name of the account that will be created. Must be a valid 
+    ///   account name that does not yet already exist.
+    /// * `invite-public-key`: The key that is publicly associated with the private key 
+    ///   embedded in the invite link. This public key should also exist on chain in a table
+    ///   in the invite service.
+    /// 
+    /// A signing key will automatically be generated and stored on behalf of the user in the 
+    /// default auth service plugin.
+    accept-with-new-account: func(new-account-name: string, invite-public-key: list<u8>) -> result<_, string>;
+
+    /// Called by existing accounts or the system account "invited-sys" to reject
+    /// an invite. Once an invite is rejected, it cannot be accepted or used to
+    /// create a new account.
+    /// 
+    /// Parameters
+    /// * `invite-public-key`: The key that is publicly associated with the private key 
+    ///   embedded in the invite link. This public key should also exist on chain in a table
+    ///   in the invite service.
+    reject: func(invite-public-key: list<u8>) -> result<_, string>;
+
+
+}
+
+world psibase-plugin {
+    export admin;
+    export inviter;
+    export invitee;
+}
