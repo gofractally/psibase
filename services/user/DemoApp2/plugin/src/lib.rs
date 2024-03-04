@@ -12,3 +12,5 @@ impl Guest for Component {
         format!("callintoplugin return from demoapp2")
     }
 }
+
+bindings::export!(Component with_types_in bindings);
