@@ -5,6 +5,7 @@
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
 
+#include <psibase/serveSimpleUI.hpp>
 #include "services/user/NftSys.hpp"
 #include "services/user/TokenSys.hpp"
 
@@ -325,7 +326,7 @@ PSIO_REFLECT(SymbolQuery,
 
 optional<HttpReply> SymbolSys::serveSys(HttpRequest request)
 {
-   if (auto result = servePackAction<SymbolSys>(request))
+   if (auto result = serveSimpleUI<SymbolSys, true>(request))
       return result;
    if (auto result = serveGraphQL(request, SymbolQuery{}))
       return result;

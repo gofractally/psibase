@@ -5,6 +5,8 @@
 #include <services/system/ProxySys.hpp>
 #include <services/system/commonErrors.hpp>
 
+#include <psibase/serveSimpleUI.hpp>
+
 using namespace psibase;
 using namespace UserService;
 using namespace Errors;
@@ -307,7 +309,7 @@ PSIO_REFLECT(NftQuery,
 
 std::optional<psibase::HttpReply> NftSys::serveSys(psibase::HttpRequest request)
 {
-   if (auto result = servePackAction<NftSys>(request))
+   if (auto result = serveSimpleUI<NftSys, true>(request))
       return result;
    if (auto result = serveGraphQL(request, NftQuery{}))
       return result;

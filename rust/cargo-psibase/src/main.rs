@@ -1,8 +1,5 @@
-mod link;
-
 use anyhow::Error;
 use anyhow::{anyhow, Context};
-use binaryen::{CodegenConfig, Module};
 use cargo_metadata::Message;
 use cargo_metadata::Metadata;
 use clap::{Parser, Subcommand};
@@ -17,8 +14,14 @@ use std::process::{exit, Stdio};
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
 use url::Url;
+use walrus::Module;
+use wasm_opt::OptimizationOptions;
+
+mod link;
+use link::link_module;
 
 const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
+const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"];
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
@@ -111,16 +114,25 @@ fn pretty_path(label: &str, filename: &Path) {
     pretty(label, &filename.file_name().unwrap().to_string_lossy());
 }
 
-fn optimize(filename: &Path, code: &[u8]) -> Result<Vec<u8>, Error> {
-    pretty_path("Reoptimizing", filename);
-    let mut module = Module::read(code)
-        .map_err(|_| anyhow!("Binaryen failed to parse {}", filename.to_string_lossy()))?;
-    module.optimize(&CodegenConfig {
-        shrink_level: 1,
-        optimization_level: 2,
-        debug_info: false,
-    });
-    Ok(module.write())
+fn optimize(code: &mut Module) -> Result<(), Error> {
+    let file = tempfile::NamedTempFile::new()?;
+    code.emit_wasm_file(file.path())?;
+
+    let debug_build = false;
+    OptimizationOptions::new_opt_level_2()
+        .shrink_level(wasm_opt::ShrinkLevel::Level1)
+        .enable_feature(wasm_opt::Feature::BulkMemory)
+        .enable_feature(wasm_opt::Feature::SignExt)
+        .enable_feature(wasm_opt::Feature::Simd)
+        .debug_info(debug_build)
+        .run(file.path(), file.path())?;
+
+    let mut config = walrus::ModuleConfig::new();
+    config.generate_name_section(false);
+    config.generate_producers_section(false);
+    *code = config.parse_file(file.path().to_path_buf())?;
+
+    Ok(())
 }
 
 fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), Error> {
@@ -135,16 +147,29 @@ fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), Error> {
 
     let code = &read(filename)
         .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
+
+    let debug_build = false;
+    let mut config = walrus::ModuleConfig::new();
+    config.generate_name_section(debug_build);
+    config.generate_producers_section(false);
+    let source_module = config.parse(polyfill)?;
+    let mut dest_module = config.parse(code)?;
+
     pretty_path("Polyfilling", filename);
-    let code = link::link(filename, code, polyfill)?;
-    let code = optimize(filename, &code)?;
-    write(filename, code)
+    link_module(&source_module, &mut dest_module)?;
+
+    pretty_path("Reoptimizing", filename);
+    optimize(&mut dest_module)?;
+
+    write(filename, dest_module.emit_wasm())
         .with_context(|| format!("Failed to write {}", filename.to_string_lossy()))?;
+
     OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
         .open(timestamp_file)?;
+
     Ok(())
 }
 
@@ -215,6 +240,7 @@ async fn build(
         .arg("--target=wasm32-wasi")
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .arg("--color=always")
+        .args(SERVICE_ARGS_RUSTC)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -239,7 +265,7 @@ async fn build(
 }
 
 async fn get_test_services() -> Result<Vec<(String, String)>, Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
+    let mut command: tokio::process::Child = tokio::process::Command::new(get_cargo())
         .arg("test")
         .arg("--color=always")
         .arg("--")
