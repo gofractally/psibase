@@ -85,7 +85,7 @@ interface invitee {
 }
 
 world psibase-plugin {
-    import common:plugins/transactions;
+    import common:plugins/server;
     export admin;
     export inviter;
     export invitee;

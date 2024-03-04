@@ -1,7 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::common::plugins::transactions::*;
+use bindings::common::plugins::server::*;
 use bindings::exports::invites::plugin::{admin, invitee, inviter};
 use psibase::{PublicKey, PublicKeyEnum};
 use serde_json::to_string;

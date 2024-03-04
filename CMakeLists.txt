@@ -268,14 +268,17 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
     set(${TARGET_NAME}_OUTPUT_FILE ${OUTPUT_FILE} PARENT_SCOPE)
 endfunction()
 
+# Static (not built) resource dependencies
+file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wit/*)
+
 # Build each component
 set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parser:ComponentParser)
 add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
 add_dependencies(CommonSysCommonLib_js ComponentParser)
 
-add_rs_component(services/system/AccountSys/plugin:AccountsPlugin accounts.wasm)
-add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invites.wasm)
-
+add_rs_component(services/system/AccountSys/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
+add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invites.wasm ${plugin-wit})
+add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invites.wasm ${plugin-wit})
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm

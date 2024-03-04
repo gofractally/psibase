@@ -1,19 +1,60 @@
 package common:plugins;
 
+/// Common types used by plugins
 interface types {
+    /// An object that uniquely identifies a plugin
     record plugin-id {
         /// The name of a service (e.g. account-sys)
         service: string,
         /// The name of the plugin (e.g. plugin.wasm)
         plugin: string,
     }
+
+    /// Data related to the origination of the current call
+    record origination-data {
+
+        /// The account name of the psibase app responsible for the call.
+        /// May be empty if the call comes from an external web app.
+        app: option<string>,
+
+        /// The root domain responsible for the call.
+        /// May be empty if the execution environment is not web-based.
+        root-domain: option<string>
+    }
 }
 
-interface transactions {
-    add-action-to-transaction: func(service: string, action: string, params-json: string) -> result<_, string>;
+/// Common calls related to interactions with the server
+interface server {
+
+    /// Adds the specified service action to the current transaction.
+    /// 
+    /// Parameters
+    /// * `service`: The account name holding the service that defines the specified action
+    /// * `action`: The name of the action being called
+    /// * `args-json`: The arguments for the action, packed into a JSON string
+    add-action-to-transaction: func(service: string, action: string, args-json: string) -> result<_, string>;
+
+    /// Used to post graphql to the server and get a JSON response back
+    /// 
+    /// Parameters
+    /// * `url`: The url for the request
+    /// * `data`: The data for the request
+    post-graphql-get-json: func(url: string, data: string) -> result<string, string>;
+
+    // Todo: Probably will need to implement most/all js library functionality:
+    // https://doc-sys.psibase.io/development/front-ends/reference/js-libraries.html
+}
+
+/// Common calls related to client interactions
+interface client {
+    use types.{origination-data};
+
+    /// Gets details about the app responsible for the call
+    get-sender-app: func() -> result<origination-data, string>;
 }
 
 world plugin-capabilities {
-    export transactions;
     export types;
+    export server;
+    export client;
 }

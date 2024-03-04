@@ -6,7 +6,6 @@ mod service {
     fn create_invite(inviteKey : psibase::PublicKey)
     {
         // NOP
-        
     }
 
 }
