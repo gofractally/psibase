@@ -10,7 +10,7 @@ interface types {
 }
 
 interface transactions {
-    add-action-to-transaction: func(service: string, action: string) -> result<_, string>;
+    add-action-to-transaction: func(service: string, action: string, params-json: string) -> result<_, string>;
 }
 
 world plugin-capabilities {
