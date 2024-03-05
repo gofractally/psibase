@@ -1,0 +1,23 @@
+package root:component;
+
+world root {
+  
+  import wasi:cli/environment@0.2.0;
+  import wasi:cli/exit@0.2.0;
+  import wasi:io/error@0.2.0;
+  import wasi:io/streams@0.2.0;
+  import wasi:cli/stdin@0.2.0;
+  import wasi:cli/stdout@0.2.0;
+  import wasi:cli/stderr@0.2.0;
+  import wasi:clocks/wall-clock@0.2.0;
+  import wasi:filesystem/types@0.2.0;
+  import wasi:filesystem/preopens@0.2.0;
+
+  import common:plugin/server;
+  import auth:plugin/keyvault;
+  import common:plugin/types;
+
+  export invites:plugin/admin;
+  export invites:plugin/inviter;
+  export invites:plugin/invitee;
+}

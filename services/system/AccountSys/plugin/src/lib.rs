@@ -6,8 +6,8 @@ use bindings::exports::accounts::plugin::accounts::Guest;
 struct Component;
 
 impl Guest for Component {
-    fn get_logged_in_user() -> Result<String, String> { 
-        Ok("alice".to_string())
+    fn get_logged_in_user() -> Result<Option<String>, String> { 
+        Ok(Some("alice".to_string()))
     }
 
     fn get_available_accounts() -> Result<Vec<String>, String> { 

@@ -2,8 +2,9 @@ package accounts:plugin;
 
 interface accounts {
 
-    /// Gets the name of the currently logged in user
-    get-logged-in-user: func() -> result<string, string>;
+    /// Gets the name of the currently logged in user, if there is one.
+    /// Returned option can be empty if there is no currently logged in user.
+    get-logged-in-user: func() -> result<option<string>, string>;
 
     /// Retrieves a list of accounts to which the user can log in.
     get-available-accounts: func() -> result<list<string>, string>;

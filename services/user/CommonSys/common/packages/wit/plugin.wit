@@ -1,4 +1,4 @@
-package common:plugins;
+package common:plugin;
 
 /// Common types used by plugins
 interface types {
@@ -51,6 +51,9 @@ interface client {
 
     /// Gets details about the app responsible for the call
     get-sender-app: func() -> result<origination-data, string>;
+
+    /// Gets the currently running plugin's rootdomain
+    get-root-domain: func() -> result<string, string>;
 }
 
 world plugin-capabilities {

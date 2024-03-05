@@ -1,11 +1,14 @@
-#[allow(warnings)]
-mod bindings;
-
-use bindings::common::plugins::server::*;
-use bindings::exports::invites::plugin::{admin, invitee, inviter};
-use psibase::{PublicKey, PublicKeyEnum};
 use serde_json::to_string;
 
+// From other plugins
+#[allow(warnings)]
+mod bindings;
+use bindings::accounts::plugin::accounts;
+use bindings::auth::plugin::keyvault;
+use bindings::common::plugin::{client, server};
+use bindings::exports::invites::plugin::{admin, invitee, inviter};
+
+// From the service
 use invites::action_structs::*;
 
 struct Component;
@@ -19,51 +22,79 @@ struct Component;
 */
 
 impl admin::Guest for Component {
-    fn set_whitelist(accounts: Vec<String>) -> Result<(), String> {
+    fn set_whitelist(_accounts: Vec<String>) -> Result<(), String> {
         Err("Not yet implemented".to_string())
     }
 
-    fn set_blacklist(accounts: Vec<String>) -> Result<(), String> {
+    fn set_blacklist(_accounts: Vec<String>) -> Result<(), String> {
         Err("Not yet implemented".to_string())
     }
 }
 
 impl invitee::Guest for Component {
-    fn accept_with_existing_account(invite_public_key: Vec<u8>) -> Result<(), String> {
+    fn accept_with_existing_account(_invite_public_key: Vec<u8>) -> Result<(), String> {
         Err("Not yet implemented".to_string())
     }
 
     fn accept_with_new_account(
-        new_account_name: String,
-        invite_public_key: Vec<u8>,
+        _new_account_name: String,
+        _invite_public_key: Vec<u8>,
     ) -> Result<(), String> {
         Err("Not yet implemented".to_string())
     }
 
-    fn reject(invite_public_key: Vec<u8>) -> Result<(), String> {
+    fn reject(_invite_public_key: Vec<u8>) -> Result<(), String> {
         Err("Not yet implemented".to_string())
     }
 }
 
 impl inviter::Guest for Component {
-    fn generate_invite(
-        generating_user: String,
-        app_plugin: inviter::PluginId,
-        callback_path: String,
-    ) -> Result<String, String> {
-        add_action_to_transaction(
+    fn generate_invite(callback_subpath: String) -> Result<String, String> {
+        let inviter = accounts::get_logged_in_user()?;
+        let inviter = match inviter {
+            Some(i) => i,
+            None => {
+                return Err("Only existing accounts can create invites".to_string());
+            }
+        };
+
+        let pubkey: psibase::PublicKey = keyvault::generate_keypair()?.parse().unwrap();
+
+        server::add_action_to_transaction(
             "invite-sys",
             "createInvite",
             &to_string(&create_invite {
-                inviteKey: "invalid_key".parse().unwrap(),
+                inviteKey: pubkey.to_owned(),
             })
             .unwrap(),
         )?;
 
-        Err("Not yet implemented".to_string())
+        let invite_domain = client::get_root_domain().unwrap();
+        let invited_page: String = "/invited".to_string();
+        let link_root = format!("{}{}", invite_domain, invited_page);
+
+        let origination = client::get_sender_app()?;
+        let originator = match origination.app {
+            Some(o) => o,
+            None => {
+                // Todo - revisit this later, can we open it to external apps?
+                return Err("Only hosted apps can generate invites".to_string());
+            }
+        };
+        let callback_url = format!("{}{}", origination.root_domain.unwrap(), callback_subpath);
+        let invite_key = pubkey.to_string();
+        let query_string = format!(
+            "inviter={}&app={}&pk={}&cb={}",
+            inviter, originator, invite_key, callback_url
+        );
+
+        // Todo - For ergonomics, consider base64 encoding the querystring
+        //   and provide a function to easily decode it
+
+        Ok(urlencoding::encode(&format!("{}?{}", link_root, query_string)).into_owned())
     }
 
-    fn delete_invite(invite_public_key: Vec<u8>) -> Result<(), String> {
+    fn delete_invite(_invite_public_key: Vec<u8>) -> Result<(), String> {
         Err("Not yet implemented".to_string())
     }
 }

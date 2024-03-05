@@ -1,7 +1,15 @@
-package auth-sys:plugin;
+package auth:plugin;
 
 /// Common types used when dealing with auth service plugins
 interface types {
+
+    /// Supported key types
+    enum key-type {
+        /// An secp256k1 key
+        k1,
+        /// An secp256r1 key
+        r1
+    }
 
     /// A list of `claim` objects is added to every submitted transaction.
     /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
@@ -11,28 +19,45 @@ interface types {
         /// The raw claim data
         raw-data: list<u8>,
     }
+
+    /// A list of `proof` is attached
+    record proof {
+        %type: key-type,
+        signature: list<u8>,
+    }
 }
 
-/// The methods exposed by this plugin
-interface auth-sys {
-    use types.{claim};
+/// Methods related to psibase smart authorization
+/// Every auth service must export this interface
+interface smart-auth {
+    use types.{claim, proof};
 
     /// Gets the claim needed for this user to satisfy the authorization check
     get-claim: func() -> result<claim, string>;
 
+    /// Provides proof of the claim. 
+    /// 
+    /// Parameters
+    /// * `message`: A message that usually needs to be signed as
+    ///   proof of the claim.
+    get-proof: func(message: list<u8>) -> result<proof, string>;
+}
+
+/// Methods related to key management
+interface keyvault {
     /// Generates a new keypair, stores the private key, returns the public key.
     generate-keypair: func() -> result<string, string>;
 }
 
 world psibase-plugin {
-    
+
     // Needed for getting the currently logged in user, which is 
     // necessary to generate the correct claim
     import accounts:plugin/accounts;
 
     // Needed for access to query functionality
-    import common:plugins/server;
+    import common:plugin/server;
 
-    export auth-sys;
-    export types;
+    export smart-auth;
+    export keyvault;
 }

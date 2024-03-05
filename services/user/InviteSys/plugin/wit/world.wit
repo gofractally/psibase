@@ -15,26 +15,23 @@ interface admin {
     set-blacklist: func(accounts: list<string>) -> result<_, string>;
 }
 
+/// Functionality exposed for the inviter
 interface inviter {
-    use common:plugins/types.{plugin-id};
+    use common:plugin/types.{plugin-id};
 
     /// Allows a user to generate an invite link that can be used to 
     /// invite someone (with or without a preexisting account) to use 
     /// an app.
     /// 
     /// Parameters
-    /// * `inviter`: This is the account name of the user responsible for
-    ///   generating the invite
-    /// * `app-plugin`: This is the `plugin-id` of the app to which the reciever
-    ///   of the invite is being invited
-    /// * `callback-path`: This the subpath of the app to which the invited user
-    ///   is redirected if they accept the invite
+    /// * `callback-subpath`: This the subpath of the app to which the invited user
+    ///   is redirected if they accept the invite (e.g. "/welcome-page")
     /// 
     /// A successful return value from this function will return a URL that can be
     /// sent to a user to invite them to an app. This URL embeds a private key which
     /// is used to authenticate the receiver of the invite on their first transaction
     /// to the chain (used to create their own account).
-    generate-invite: func(inviter: string, app-plugin: plugin-id, callback-path: string) -> result<string, string>;
+    generate-invite: func(callback-subpath: string) -> result<string, string>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
     /// from the database. An invite can be deleted regardless of whether it has been
@@ -47,6 +44,8 @@ interface inviter {
     delete-invite: func(invite-public-key: list<u8>) -> result<_, string>;
 }
 
+
+/// Functionality exposed for the recipient of an invite (the invitee)
 interface invitee {
     /// Called by existing accounts to accept an invite to an app without creating
     /// a new account.
@@ -80,12 +79,18 @@ interface invitee {
     ///   embedded in the invite link. This public key should also exist on chain in a table
     ///   in the invite service.
     reject: func(invite-public-key: list<u8>) -> result<_, string>;
-
-
 }
 
 world psibase-plugin {
-    import common:plugins/server;
+    import common:plugin/server;
+    import common:plugin/client;
+
+    // For getting logged-in-user, for example to generate an invite
+    import accounts:plugin/accounts;
+
+    // For generating a keypair for the invite
+    import auth:plugin/keyvault;
+
     export admin;
     export inviter;
     export invitee;

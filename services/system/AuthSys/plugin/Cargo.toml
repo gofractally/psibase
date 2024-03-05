@@ -1,9 +1,7 @@
 [package]
-name = "auth"
+name = "auth-plugin"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bitflags = "2.4.2"
@@ -13,10 +11,10 @@ wit-bindgen-rt = "0.21.0"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "component:auth-sys"
+package = "auth:plugin"
 
 [package.metadata.component.dependencies]
 
 [package.metadata.component.target.dependencies]
-"common:plugins" = { path = "../../../user/CommonSys/common/packages/wit/plugins.wit" }
-"accounts:plugins" = { path = "../../AccountSys/plugin/wit/world.wit" }
+"common:plugin" = { path = "../../../user/CommonSys/common/packages/wit/plugin.wit" }
+"accounts:plugin" = { path = "../../AccountSys/plugin/wit/world.wit" }
