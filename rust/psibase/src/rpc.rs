@@ -1,4 +1,4 @@
-use crate::{Action, SignedTransaction, TransactionTrace};
+use crate::{AccountNumber, Action, SignedTransaction, TransactionTrace};
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
@@ -11,7 +11,10 @@ use std::str::FromStr;
 custom_error! { Error
     Message{message:String}                         = "{message}",
     ExecutionFailed{message:String}    = "{message}",
-    UnknownTraceFormat = "Unknown trace format"
+    UnknownTraceFormat = "Unknown trace format",
+    NoDomain = "Virtual hosting requires a URL with a domain name",
+    GraphQLError{message: String} = "{message}",
+    GraphQLWrongResponse = "Missing field `data` in graphql response",
 }
 
 async fn as_text(builder: reqwest::RequestBuilder) -> Result<String, anyhow::Error> {
@@ -256,4 +259,44 @@ pub async fn push_transactions(
         n += 1;
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct GQLError {
+    message: String,
+}
+
+#[derive(Deserialize)]
+struct QueryRoot<T> {
+    data: Option<T>,
+    errors: Option<GQLError>,
+}
+
+pub async fn gql_query<T: DeserializeOwned>(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    account: AccountNumber,
+    body: String,
+) -> Result<T, anyhow::Error> {
+    let Some(url::Host::Domain(host)) = base_url.host() else {
+        Err(Error::NoDomain)?
+    };
+    let mut url = base_url.join("graphql")?;
+    url.set_host(Some(&(account.to_string() + "." + host)))?;
+    let result: QueryRoot<T> = as_json(
+        client
+            .post(url)
+            .header("Content-Type", "application/graphql")
+            .body(body),
+    )
+    .await?;
+    if let Some(error) = result.errors {
+        Err(Error::GraphQLError {
+            message: error.message,
+        })?
+    }
+    let Some(data) = result.data else {
+        Err(Error::GraphQLWrongResponse)?
+    };
+    Ok(data)
 }

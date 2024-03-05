@@ -256,7 +256,7 @@ impl<'a> DepGraph<'a> {
             .packages
             .get(&meta.name)
             .map_or(false, |packages| packages.contains_key(&meta.version));
-        if is_known_package {
+        if !is_known_package {
             self.add(PackageInfo {
                 name: meta.name.clone(),
                 version: meta.version.clone(),

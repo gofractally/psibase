@@ -38,14 +38,11 @@ custom_error! {
     AccountConflict{name: AccountNumber, old: String, new: String} = "The account {name} is defined by more than one package: {old}, {new}",
     MissingDepAccount{name: AccountNumber, package: String} = "The account {name} required by {package} is not defined by any package",
     MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
-    NoDomain = "Virtual hosting requires a URL with a domain name",
     PackageNotFound{package: String} = "The package {package} was not found",
     DuplicatePackage{package: String} = "The package {package} was declared multiple times in the package index",
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
-    GraphQLError{message: String} = "{message}",
-    GraphQLWrongResponse = "Missing field `data` in graphql response",
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, Reflect)]
@@ -648,15 +645,31 @@ struct InstalledQuery {
     installed: InstalledConnection,
 }
 
+#[allow(non_snake_case)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct GQLError {
-    message: String,
+struct NewAccountsQuery {
+    newAccounts: Vec<AccountNumber>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct InstalledRoot {
-    data: Option<InstalledQuery>,
-    errors: Option<GQLError>,
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_accounts_to_create(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    accounts: &[AccountNumber],
+    sender: AccountNumber,
+) -> Result<Vec<AccountNumber>, anyhow::Error> {
+    let result: NewAccountsQuery = crate::gql_query(
+        base_url,
+        client,
+        package_sys::SERVICE,
+        format!(
+            "query {{ newAccounts(accounts: {}, owner: {}) }}",
+            serde_json::to_string(accounts)?,
+            serde_json::to_string(&sender)?,
+        ),
+    )
+    .await?;
+    Ok(result.newAccounts)
 }
 
 impl PackageList {
@@ -670,28 +683,12 @@ impl PackageList {
         base_url: &reqwest::Url,
         client: &mut reqwest::Client,
     ) -> Result<Self, anyhow::Error> {
-        let Some(url::Host::Domain(host)) = base_url.host() else {
-            Err(Error::NoDomain)?
-        };
-        let mut url = base_url.join("graphql")?;
-        url.set_host(Some(&("package-sys.".to_string() + host)))?;
-        //
         let mut end_cursor: Option<String> = None;
         let mut result = PackageList::new();
         loop {
-            let page: InstalledRoot = crate::as_json(client
-                                                     .post(url.clone())
-                                                     .header("Content-Type", "application/graphql")
-                                                     .body(format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts }} }} }} }}", serde_json::to_string(&end_cursor)?)))
+            let data: InstalledQuery = crate::gql_query(base_url, client, package_sys::SERVICE,
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await?;
-            if let Some(error) = page.errors {
-                Err(Error::GraphQLError {
-                    message: error.message,
-                })?
-            }
-            let Some(data) = page.data else {
-                Err(Error::GraphQLWrongResponse)?
-            };
             for edge in data.installed.edges {
                 result.insert(edge.node);
             }

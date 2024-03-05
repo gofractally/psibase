@@ -6,21 +6,22 @@ use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::psispace_sys;
+use psibase::services::{account_sys, auth_delegate_sys, psispace_sys};
 use psibase::{
-    account, apply_proxy, as_json, create_boot_transactions, get_tapos_for_head, method,
-    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry,
-    PackageList, PackageOp, PackageRegistry, PackagedService, SignedTransaction, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
+    get_tapos_for_head, method, new_account_action, push_transaction, push_transactions,
+    reg_server, set_auth_service_action, set_code_action, set_key_action, sign_transaction,
+    AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, DirectoryRegistry,
+    ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList, PackageOp, PackageRegistry,
+    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::fs::{metadata, read_dir, File};
-use std::io::{BufReader, Read, Seek};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 /// Interact with a running psinode
@@ -758,19 +759,18 @@ async fn upload_tree(
     Ok(())
 }
 
-fn create_accounts<
-    R: Read + Seek,
-    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
->(
-    package: &mut PackagedService<R>,
+fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>>(
+    accounts: Vec<AccountNumber>,
     out: &mut TransactionBuilder<F>,
     sender: AccountNumber,
-    key: &Option<AnyPublicKey>,
 ) -> Result<(), anyhow::Error> {
-    for account in package.get_accounts() {
+    for account in accounts {
         out.set_label(format!("Creating {}", account));
-        let mut group = vec![];
-        package.create_account(*account, key, sender, &mut group)?;
+        let group = vec![
+            account_sys::Wrapper::pack().newAccount(account, account!("auth-any-sys"), true),
+            auth_delegate_sys::Wrapper::pack_from(account).setOwner(sender),
+            set_auth_service_action(account, auth_delegate_sys::SERVICE),
+        ];
         out.push(group)?;
     }
     Ok(())
@@ -782,7 +782,7 @@ async fn apply_packages<
 >(
     reg: &R,
     ops: Vec<PackageOp>,
-    accounts: &mut TransactionBuilder<F>,
+    accounts: &mut Vec<AccountNumber>,
     out: &mut TransactionBuilder<F>,
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
@@ -792,7 +792,7 @@ async fn apply_packages<
             PackageOp::Install(info) => {
                 // TODO: verify ownership of existing accounts
                 let mut package = reg.get_by_info(&info).await?;
-                create_accounts(&mut package, accounts, sender, key)?;
+                accounts.extend_from_slice(package.get_accounts());
                 out.set_label(format!("Installing {}-{}", &info.name, &info.version));
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, sender, key)?;
@@ -803,14 +803,13 @@ async fn apply_packages<
             }
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
+                accounts.extend_from_slice(package.get_accounts());
                 // TODO: remove outdated files
                 // TODO: skip unmodified files
-                // TODO: skip existing accounts
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
                     &meta.name, &meta.version, &info.name, &info.version
                 ));
-                create_accounts(&mut package, accounts, sender, key)?;
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, sender, key)?;
                 out.push_all(account_actions)?;
@@ -863,17 +862,21 @@ async fn install(
     let action_limit: usize = 64 * 1024;
 
     let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
+    let mut new_accounts = vec![];
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     apply_packages(
         &package_registry,
         to_install,
-        &mut account_builder,
+        &mut new_accounts,
         &mut trx_builder,
         sender,
         key,
     )
     .await?;
+
+    new_accounts = get_accounts_to_create(&args.api, &mut client, &new_accounts, sender).await?;
+    create_accounts(new_accounts, &mut account_builder, sender)?;
 
     let account_transactions = account_builder.finish()?;
     let transactions = trx_builder.finish()?;
