@@ -14,3 +14,5 @@ impl Guest for Component {
         return logged_in_user + " is logged in";
     }
 }
+
+bindings::export!(Component with_types_in bindings);
