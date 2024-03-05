@@ -1,7 +1,8 @@
-use crate::TransactionTrace;
+use crate::{Action, SignedTransaction, TransactionTrace};
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
+use fracpack::Pack;
 use indicatif::ProgressBar;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -149,5 +150,110 @@ pub async fn push_transaction(
     push_transaction_impl(base_url, client, packed, fmt, console, progress)
         .await
         .context("Failed to push transaction")?;
+    Ok(())
+}
+
+pub struct TransactionBuilder<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> {
+    size: usize,
+    action_limit: usize,
+    actions: Vec<Action>,
+    transactions: Vec<(String, Vec<SignedTransaction>, bool)>,
+    f: F,
+}
+
+impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> TransactionBuilder<F> {
+    pub fn new(action_limit: usize, f: F) -> Self {
+        TransactionBuilder {
+            size: 0,
+            action_limit,
+            actions: vec![],
+            transactions: vec![],
+            f,
+        }
+    }
+    pub fn set_label(&mut self, label: String) {
+        self.transactions
+            .push((label, vec![], !self.actions.is_empty()))
+    }
+    pub fn push<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
+        act.append_to_tx(&mut self.actions, &mut self.size);
+        if self.size >= self.action_limit {
+            self.transactions
+                .last_mut()
+                .unwrap()
+                .1
+                .push((self.f)(std::mem::take(&mut self.actions))?);
+        }
+        Ok(())
+    }
+    pub fn push_all<T: ActionGroup>(&mut self, actions: Vec<T>) -> Result<(), anyhow::Error> {
+        for act in actions {
+            self.push(act)?;
+        }
+        Ok(())
+    }
+    pub fn finish(self) -> Result<Vec<(String, Vec<SignedTransaction>, bool)>, anyhow::Error> {
+        let mut result = self.transactions;
+        if !self.actions.is_empty() {
+            result.last_mut().unwrap().1.push((self.f)(self.actions)?);
+        }
+        Ok(result)
+    }
+}
+
+pub trait ActionGroup {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize);
+}
+
+impl ActionGroup for Action {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize) {
+        *size += self.rawData.len();
+        trx_actions.push(self);
+    }
+}
+
+impl ActionGroup for Vec<Action> {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize) {
+        for act in self {
+            act.append_to_tx(trx_actions, size);
+        }
+    }
+}
+
+pub async fn push_transactions(
+    base_url: &Url,
+    client: reqwest::Client,
+    transaction_groups: Vec<(String, Vec<SignedTransaction>, bool)>,
+    fmt: TraceFormat,
+    console: bool,
+    progress: &ProgressBar,
+) -> Result<(), anyhow::Error> {
+    let mut n = 0;
+    for (label, transactions, carry) in transaction_groups {
+        progress.set_message(label);
+        if !carry {
+            progress.inc(n);
+            n = 0;
+        }
+        for trx in transactions {
+            let result = push_transaction(
+                base_url,
+                client.clone(),
+                trx.packed(),
+                fmt,
+                console,
+                Some(progress),
+            )
+            .await;
+
+            if let Err(err) = result {
+                progress.abandon();
+                return Err(err);
+            }
+            progress.inc(n);
+            n = 0;
+        }
+        n += 1;
+    }
     Ok(())
 }

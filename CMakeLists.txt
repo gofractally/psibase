@@ -112,6 +112,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
@@ -431,6 +432,15 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/NopSys.psi
+    NAME NopSys
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Service that does nothing"
+    SERVICE nop-sys
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/PsiSpaceSys.psi
     NAME PsiSpaceSys
     VERSION ${PSIBASE_VERSION}
@@ -589,7 +599,7 @@ psibase_package(
     SERVICE r-package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
     DEPENDS wasm
-    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})" "NopSys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(

@@ -4,13 +4,13 @@ use crate::services::{
 use crate::{
     new_account_action, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, AccountNumber, Action, AnyPublicKey, Checksum256, GenesisService, Pack,
-    Reflect, Unpack,
+    PackageDisposition, PackageOp, Reflect, Unpack,
 };
 use anyhow::Context;
 use custom_error::custom_error;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map, HashMap, HashSet};
+use std::collections::{hash_map, HashMap};
 use std::io::{Read, Seek};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
@@ -86,7 +86,6 @@ pub struct PackageInfo {
     pub file: String,
 }
 
-#[cfg(not(target_family = "wasm"))]
 impl PackageInfo {
     fn meta(&self) -> Meta {
         Meta {
@@ -449,7 +448,10 @@ pub trait PackageRegistry {
         packages: &[String],
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let mut result = vec![];
-        for info in solve_dependencies(self.index()?, make_refs(packages)?, vec![])? {
+        for op in solve_dependencies(self.index()?, make_refs(packages)?, vec![])? {
+            let PackageOp::Install(info) = op else {
+                panic!("Only install is expected when there are no existing packages");
+            };
             result.push(self.get_by_info(&info).await?);
         }
 
@@ -596,7 +598,7 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
         for (_, reg) in &self.sources {
             for entry in reg.index()? {
                 if !found.contains_version(&entry.name, &entry.version) {
-                    found.insert(entry.name.clone(), entry.version.clone());
+                    found.insert(entry.meta());
                     result.push(entry);
                 }
             }
@@ -619,18 +621,12 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
 }
 
 pub struct PackageList {
-    packages: HashMap<String, HashSet<String>>,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct InstalledNode {
-    name: String,
-    version: String,
+    packages: HashMap<String, HashMap<String, Meta>>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct InstalledEdge {
-    node: InstalledNode,
+    node: Meta,
 }
 
 #[allow(non_snake_case)]
@@ -686,7 +682,7 @@ impl PackageList {
             let page: InstalledRoot = crate::as_json(client
                                                      .post(url.clone())
                                                      .header("Content-Type", "application/graphql")
-                                                    .body(format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version }} }} }} }}", serde_json::to_string(&end_cursor)?)))
+                                                     .body(format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts }} }} }} }}", serde_json::to_string(&end_cursor)?)))
                 .await?;
             if let Some(error) = page.errors {
                 Err(Error::GraphQLError {
@@ -697,7 +693,7 @@ impl PackageList {
                 Err(Error::GraphQLWrongResponse)?
             };
             for edge in data.installed.edges {
-                result.insert(edge.node.name, edge.node.version);
+                result.insert(edge.node);
             }
             if !data.installed.pageInfo.hasNextPage {
                 break;
@@ -709,44 +705,40 @@ impl PackageList {
     pub fn from_registry<T: PackageRegistry + ?Sized>(reg: &T) -> Result<Self, anyhow::Error> {
         let mut result = PackageList::new();
         for package in reg.index()? {
-            result.insert(package.name, package.version);
+            result.insert(package.meta());
         }
         Ok(result)
     }
-    pub fn insert(&mut self, name: String, version: String) {
+    pub fn insert(&mut self, meta: Meta) {
+        let name = meta.name.clone();
+        let version = meta.version.clone();
         self.packages
             .entry(name)
-            .or_insert(HashSet::new())
-            .insert(version);
+            .or_insert(HashMap::new())
+            .insert(version, meta);
     }
+
     fn contains_version(&self, name: &str, version: &str) -> bool {
         if let Some(packages) = self.packages.get(name) {
-            return packages.contains(version);
+            return packages.contains_key(version);
         }
         return false;
     }
-    fn package_refs(&self) -> Vec<PackageRef> {
+    fn as_upgradable(&self) -> Vec<(Meta, PackageDisposition)> {
         let mut result = vec![];
-        for (package, versions) in &self.packages {
-            for version in versions {
-                result.push(PackageRef {
-                    name: package.clone(),
-                    version: version.clone(),
-                });
+        for (_, versions) in &self.packages {
+            for (version, meta) in versions {
+                result.push((meta.clone(), PackageDisposition::upgradable(version)));
             }
         }
         result
     }
-    pub async fn resolve_new<T: PackageRegistry + ?Sized>(
+    pub async fn resolve_changes<T: PackageRegistry + ?Sized>(
         &self,
         reg: &T,
         packages: &[String],
-    ) -> Result<Vec<PackagedService<<T as PackageRegistry>::R>>, anyhow::Error> {
-        let mut result = vec![];
-        for info in solve_dependencies(reg.index()?, make_refs(packages)?, self.package_refs())? {
-            result.push(reg.get_by_info(&info).await?);
-        }
-        Ok(result)
+    ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        solve_dependencies(reg.index()?, make_refs(packages)?, self.as_upgradable())
     }
     pub fn into_vec(mut self) -> Vec<String> {
         let mut result: Vec<String> = self.packages.drain().map(|(k, _)| k).collect();
@@ -779,7 +771,8 @@ pub fn js_resolve_packages(
 ) -> Result<JsValue, JsValue> {
     let index: Vec<PackageInfo> = js_err(serde_wasm_bindgen::from_value(js_index))?;
     let packages: Vec<String> = js_err(serde_wasm_bindgen::from_value(js_packages))?;
-    let pinned: Vec<PackageRef> = js_err(serde_wasm_bindgen::from_value(js_pinned))?;
+    let pinned: Vec<(Meta, PackageDisposition)> =
+        js_err(serde_wasm_bindgen::from_value(js_pinned))?;
 
     Ok(serde_wasm_bindgen::to_value(&js_err(solve_dependencies(
         index,

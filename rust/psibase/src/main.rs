@@ -8,19 +8,19 @@ use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
 use psibase::services::psispace_sys;
 use psibase::{
-    account, apply_proxy, as_json, create_boot_transactions, get_tapos_for_head,
-    new_account_action, push_transaction, reg_server, set_auth_service_action, set_code_action,
-    set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
-    AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
-    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
-    Transaction, TransactionTrace,
+    account, apply_proxy, as_json, create_boot_transactions, get_tapos_for_head, method,
+    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
+    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
+    AnyPublicKey, AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry,
+    PackageList, PackageOp, PackageRegistry, PackagedService, SignedTransaction, Tapos,
+    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::fs::{metadata, read_dir, File};
-use std::io::BufReader;
+use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 
 /// Interact with a running psinode
@@ -758,31 +758,74 @@ async fn upload_tree(
     Ok(())
 }
 
-async fn monitor_install_trx(
-    args: &Args,
-    client: &reqwest::Client,
-    tapos: &TaposRefBlock,
-    actions: Vec<Action>,
-    progress: ProgressBar,
-    n: u64,
+fn create_accounts<
+    R: Read + Seek,
+    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+>(
+    package: &mut PackagedService<R>,
+    out: &mut TransactionBuilder<F>,
+    sender: AccountNumber,
+    key: &Option<AnyPublicKey>,
 ) -> Result<(), anyhow::Error> {
-    let trx = with_tapos(tapos, actions);
-
-    let result = push_transaction(
-        &args.api,
-        client.clone(),
-        sign_transaction(trx, &args.sign)?.packed(),
-        args.trace,
-        args.console,
-        Some(&progress),
-    )
-    .await;
-
-    if let Err(err) = result {
-        progress.abandon_with_message(format!("{}: {:?}", progress.message(), err));
-        return Err(err);
+    for account in package.get_accounts() {
+        out.set_label(format!("Creating {}", account));
+        let mut group = vec![];
+        package.create_account(*account, key, sender, &mut group)?;
+        out.push(group)?;
     }
-    progress.inc(n);
+    Ok(())
+}
+
+async fn apply_packages<
+    R: PackageRegistry,
+    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+>(
+    reg: &R,
+    ops: Vec<PackageOp>,
+    accounts: &mut TransactionBuilder<F>,
+    out: &mut TransactionBuilder<F>,
+    sender: AccountNumber,
+    key: &Option<AnyPublicKey>,
+) -> Result<(), anyhow::Error> {
+    for op in ops {
+        match op {
+            PackageOp::Install(info) => {
+                // TODO: verify ownership of existing accounts
+                let mut package = reg.get_by_info(&info).await?;
+                create_accounts(&mut package, accounts, sender, key)?;
+                out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                let mut account_actions = vec![];
+                package.install_accounts(&mut account_actions, sender, key)?;
+                out.push_all(account_actions)?;
+                let mut actions = vec![];
+                package.install(&mut actions, sender, true)?;
+                out.push_all(actions)?;
+            }
+            PackageOp::Replace(meta, info) => {
+                let mut package = reg.get_by_info(&info).await?;
+                // TODO: remove outdated files
+                // TODO: skip unmodified files
+                // TODO: skip existing accounts
+                out.set_label(format!(
+                    "Updating {}-{} -> {}-{}",
+                    &meta.name, &meta.version, &info.name, &info.version
+                ));
+                create_accounts(&mut package, accounts, sender, key)?;
+                let mut account_actions = vec![];
+                package.install_accounts(&mut account_actions, sender, key)?;
+                out.push_all(account_actions)?;
+                let mut actions = vec![];
+                package.install(&mut actions, sender, true)?;
+                out.push_all(actions)?;
+            }
+            PackageOp::Remove(meta) => {
+                out.set_label(format!("Removing {}", &meta.name));
+                // first run pre-rm
+                // then delete files
+                // then remove services
+            }
+        }
+    }
     Ok(())
 }
 
@@ -796,94 +839,75 @@ async fn install(
 ) -> Result<(), anyhow::Error> {
     let installed = PackageList::installed(&args.api, &mut client).await?;
     let package_registry = get_package_registry(sources, client.clone()).await?;
-    let to_install = installed.resolve_new(&package_registry, packages).await?;
-
-    let mut all_account_actions = vec![];
-    let mut all_init_actions = vec![];
-    for mut package in to_install {
-        let mut account_actions = vec![];
-        package.install_accounts(&mut account_actions, sender, key)?;
-        all_account_actions.push((account_actions, package.name().to_string()));
-        let mut actions = vec![];
-        package.install(&mut actions, sender, true)?;
-        all_init_actions.push((actions, package.name().to_string()));
-    }
+    let to_install = installed
+        .resolve_changes(&package_registry, packages)
+        .await?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
-    let progress = ProgressBar::new(all_account_actions.len() as u64).with_style(
-        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
-    );
+
+    let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+        if actions.first().unwrap().sender != sender {
+            actions.insert(
+                0,
+                Action {
+                    sender,
+                    service: account!("nop-sys"),
+                    method: method!("nop"),
+                    rawData: Default::default(),
+                },
+            );
+        }
+        Ok(sign_transaction(with_tapos(&tapos, actions), &args.sign)?)
+    };
 
     let action_limit: usize = 64 * 1024;
 
-    // create all accounts
-    {
-        let mut n: u64 = 0;
-        let mut size: usize = 0;
-        let mut trx_actions = vec![];
-        for (actions, name) in all_account_actions {
-            progress.set_message("Deploying ".to_string() + &name);
-            for group in actions {
-                if size >= action_limit {
-                    monitor_install_trx(
-                        args,
-                        &client,
-                        &tapos,
-                        trx_actions.drain(..).collect(),
-                        progress.clone(),
-                        n,
-                    )
-                    .await?;
-                    n = 0;
-                    size = 0;
-                }
-                for act in group {
-                    size += act.rawData.len();
-                    trx_actions.push(act);
-                }
-            }
-            n += 1;
-        }
-        if !trx_actions.is_empty() {
-            monitor_install_trx(args, &client, &tapos, trx_actions, progress.clone(), n).await?;
-        }
-    }
+    let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
 
-    // Wait for a new block after the accounts are created, so the
-    // first auth check doesn't fail
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    progress.set_position(0);
+    let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
+    apply_packages(
+        &package_registry,
+        to_install,
+        &mut account_builder,
+        &mut trx_builder,
+        sender,
+        key,
+    )
+    .await?;
+
+    let account_transactions = account_builder.finish()?;
+    let transactions = trx_builder.finish()?;
 
     {
-        let mut n: u64 = 0;
-        let mut size: usize = 0;
-        let mut trx_actions = vec![];
-        for (actions, name) in all_init_actions {
-            progress.set_message("Initializing ".to_string() + &name);
-            for act in actions {
-                if size >= action_limit {
-                    monitor_install_trx(
-                        args,
-                        &client,
-                        &tapos,
-                        trx_actions.drain(..).collect(),
-                        progress.clone(),
-                        n,
-                    )
-                    .await?;
-                    n = 0;
-                    size = 0;
-                }
-
-                size += act.rawData.len();
-                trx_actions.push(act);
-            }
-            n += 1;
-        }
-        if !trx_actions.is_empty() {
-            monitor_install_trx(args, &client, &tapos, trx_actions, progress.clone(), n).await?;
-        }
+        let progress = ProgressBar::new(account_transactions.len() as u64).with_style(
+            ProgressStyle::with_template("{wide_bar} {pos}/{len} accounts\n{msg}")?,
+        );
+        push_transactions(
+            &args.api,
+            client.clone(),
+            account_transactions,
+            args.trace,
+            args.console,
+            &progress,
+        )
+        .await?;
+        progress.finish_and_clear();
     }
+
+    let progress = ProgressBar::new(transactions.len() as u64).with_style(
+        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
+    );
+
+    push_transactions(
+        &args.api,
+        client.clone(),
+        transactions,
+        args.trace,
+        args.console,
+        &progress,
+    )
+    .await?;
+
     if !args.suppress_ok {
         progress.finish_with_message("Ok");
     } else {
