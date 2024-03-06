@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "skipLibCheck": true,
     /* Bundler mode */
@@ -18,14 +22,20 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "/common": ["../../CommonSys/common"],
-      "@psibase/common-lib": ["../../CommonSys/common/packages/common-lib/src"],
+      "/common": [
+        "../../../services/user/CommonSys/common"
+      ],
+      "@psibase/common-lib": [
+        "../../../services/user/CommonSys/common/packages/common-lib/src"
+      ],
       "@psibase/common-lib/*": [
-        "../../CommonSys/common/packages/common-lib/src/*"
+        "../../../services/user/CommonSys/common/packages/common-lib/src/*"
       ]
     }
   },
-  "include": ["./src"],
+  "include": [
+    "./src"
+  ],
   "references": [
     {
       "path": "./tsconfig.node.json"
