@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16.3)
 cmake_policy(VERSION 3.16.3...3.25.1)
 project(psibase)
+enable_testing()
 include(ExternalProject)
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -200,6 +201,22 @@ add_custom_command(
 add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
 
+# Cargo psibase
+ExternalProject_Add(
+    cargo-psibase
+    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
+    CONFIGURE_COMMAND   ""
+    BUILD_COMMAND       cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
+    BUILD_ALWAYS        1
+    INSTALL_COMMAND     ""
+)
+add_test(
+    NAME CargoTestCargoPsibase
+    COMMAND cargo test --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/cargo-psibase/Cargo.toml
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust/cargo-psibase/
+)
+
 # UIs built with yarn
 set(JS_DIRS
     services/user/CommonSys/ui:CommonSys_js
@@ -320,7 +337,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.6.0")
+set(PSIBASE_VERSION "0.7.0")
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactionSys.psi
@@ -369,7 +386,7 @@ psibase_package(
 )
 
 set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
-set(THIRD_SRC ${COMMON_SYS}/common/thirdParty/src)
+set(THIRD_SRC ${COMMON_SYS}/common/resources/thirdParty/src)
 set(THIRD_FILES
     ${THIRD_SRC}/htm.module.js
     ${THIRD_SRC}/iframeResizer.contentWindow.js

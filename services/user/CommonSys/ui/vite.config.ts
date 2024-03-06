@@ -9,7 +9,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
         {
             find: "/common/iframeResizer.contentWindow.js",
             replacement: path.resolve(
-                "../common/thirdParty/src/iframeResizer.contentWindow.js"
+                "../common/resources/thirdParty/src/iframeResizer.contentWindow.js"
             ),
         },
         {
