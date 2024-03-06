@@ -16,7 +16,7 @@ export default defineConfig({
       {
         find: /^@psibase\/common-lib.*$/,
         replacement: path.resolve(
-          "../../CommonSys/common/packages/common-lib/src"
+          "../../../services/user/CommonSys/common/packages/common-lib/src"
         ),
       },
     ],
