@@ -3,7 +3,6 @@ function(add_user_service suffix name)
     target_include_directories(${name}${suffix} PUBLIC
         include
         ../CommonSys/include
-        ../FractalSys/include
         ../InviteSys/include
         ../NftSys/include
         ../PsiSpaceSys/include
@@ -26,7 +25,6 @@ function(add_user_test_impl suffix name)
     target_include_directories(${TARGET} PUBLIC
       ../include
       ../../CommonSys/include
-      ../../FractalSys/include
       ../../InviteSys/include
       ../../NftSys/include
       ../../PsiSpaceSys/include
@@ -75,7 +73,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(CommonSys)
     add_subdirectory(InviteSys)
     add_subdirectory(ExploreSys)
-    add_subdirectory(FractalSys)
     add_subdirectory(launchTestChain)
     add_subdirectory(mincon)
     add_subdirectory(NftSys)

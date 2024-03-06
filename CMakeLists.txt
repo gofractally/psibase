@@ -107,10 +107,8 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CpuSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
@@ -614,18 +612,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/FractalSys.psi
-    NAME FractalSys
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Fractal service"
-    SERVICE fractal-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
-    SERVICE core-frac-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
-    DEPENDS wasm
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}
@@ -655,7 +641,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
-                    ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
+                    ExploreSys InviteSys NftSys PackageSys ProducerSys ProxySys
                     PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys
 )
 
@@ -683,7 +669,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
-    DocSys ExploreSys FractalSys InviteSys NftSys Minimal PackageSys ProducerSys ProxySys
+    DocSys ExploreSys InviteSys NftSys Minimal PackageSys ProducerSys ProxySys
     PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
@@ -698,7 +684,6 @@ install(
           ${SERVICE_DIR}/CpuSys.psi
           ${SERVICE_DIR}/DocSys.psi
           ${SERVICE_DIR}/ExploreSys.psi
-          ${SERVICE_DIR}/FractalSys.psi
           ${SERVICE_DIR}/InviteSys.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/NftSys.psi

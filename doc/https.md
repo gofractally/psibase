@@ -1,6 +1,6 @@
 # HTTPS
 
-Some web technologies require a secure context when not operating over `localhost`. This includes things like clipboard access and WebRTC--two technologies used within the `FractalSys` app. For this reason, we need a means of running psinode with an SSL.
+Some web technologies require a secure context when not operating over `localhost`. This includes things like clipboard access and WebRTC--two technologies that will be in common usage in apps. For this reason, we need a means of running psinode with an SSL.
 
 ## Generating certs on local machine
 
@@ -60,8 +60,6 @@ If you're running `psinode` within a container, commands sent to psinode via the
   2. Use the `psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload` command to upload updated app build artifacts.
 
 ## Running an app server in dev mode for faster iteration
-
-This uses the existing `FractalSys` app at `services/user/FractalSys/ui` as the example.
 
 1. Create a copy of `.env.sample` named `.env` in the `ui` directory with `VITE_SECURE_LOCAL_DEV=true`
 2. Verify that the `vite.config.ts` file points at the proper location for the SSL cert and key.
