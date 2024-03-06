@@ -6,6 +6,8 @@
 #include <services/user/PackageSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
 
+#include <zlib.h>
+
 using namespace SystemService;
 using namespace UserService;
 
@@ -227,10 +229,70 @@ namespace psibase
       }
    }
 
+   std::vector<char> gzip(std::vector<char> in)
+   {
+      z_stream stream = {};
+      if (int err = deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8,
+                                 Z_DEFAULT_STRATEGY);
+          err != Z_OK)
+      {
+         abortMessage(zError(err));
+      }
+      std::vector<char> result(deflateBound(&stream, in.size()));
+      stream.next_in   = reinterpret_cast<unsigned char*>(in.data());
+      stream.avail_in  = in.size();
+      stream.next_out  = reinterpret_cast<unsigned char*>(result.data());
+      stream.avail_out = result.size();
+      int err          = deflate(&stream, Z_FINISH);
+      if (err != Z_STREAM_END)
+      {
+         abortMessage(std::string("deflate: ") + zError(err));
+      }
+      result.resize(stream.total_out);
+      deflateEnd(&stream);
+      return result;
+   }
+
    void PackagedService::commitInstall(std::vector<Action>& actions, AccountNumber sender)
    {
-      // TODO: build manifest
-      std::vector<char> manifest;
+      std::vector<char>   manifest;
+      psio::vector_stream stream{manifest};
+      stream.write('[');
+      bool first = true;
+      for (const auto& [sender, index] : data)
+      {
+         AccountNumber service = PsiSpaceSys::service;
+         if (hasService(sender))
+         {
+            service = sender;
+         }
+         auto path = index.filename.substr(5);
+         auto pos  = path.find('/');
+         assert(pos != std::string::npos);
+         path = path.substr(pos);
+         //
+         if (first)
+            first = false;
+         else
+            stream.write(',');
+         stream.write('{');
+         to_json("account", stream);
+         stream.write(':');
+         to_json(sender, stream);
+         stream.write(',');
+
+         to_json("service", stream);
+         stream.write(':');
+         to_json(service, stream);
+         stream.write(',');
+
+         to_json("filename", stream);
+         stream.write(':');
+         to_json(path, stream);
+         stream.write('}');
+      }
+      stream.write(']');
+      manifest = gzip(std::move(manifest));
       actions.push_back(
           transactor<PackageSys>{sender, PackageSys::service}.postinstall(meta, manifest));
    }
