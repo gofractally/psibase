@@ -30,4 +30,8 @@ export {
     buildPreLoadServicesRequest,
     isPreLoadServicesRequest
 } from "./supervisor/PreLoadServicesRequest";
+export {
+    isPluginCallFailure,
+    type PluginCallFailure
+} from "./supervisor/PluginCallFailure";
 export { buildMessageLoaderInitialized } from "./supervisor/LoaderInitialized";

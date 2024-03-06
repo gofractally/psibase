@@ -392,7 +392,7 @@ psibase_package(
 )
 
 set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
-set(THIRD_SRC ${COMMON_SYS}/common/thirdParty/src)
+set(THIRD_SRC ${COMMON_SYS}/common/resources/thirdParty/src)
 set(THIRD_FILES
     ${THIRD_SRC}/htm.module.js
     ${THIRD_SRC}/iframeResizer.contentWindow.js
