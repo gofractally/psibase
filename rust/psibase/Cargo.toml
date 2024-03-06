@@ -19,6 +19,7 @@ chrono = "0.4"
 const_format = "0.2"
 custom_error = "1.9"
 fracpack = { path = "../fracpack" }
+flate2 = "1.0"
 futures = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
 include_dir = "0.7.3"
@@ -47,7 +48,7 @@ clap = {version = "3.1", features = ["derive", "env"]}
 hmac = "0.12"
 indicatif = "0.17"
 jwt = "0.16"
-reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls","gzip"] }
 rpassword = "7.2"
 secp256k1 = { version="0.27", features = ["global-context", "bitcoin_hashes"] }
 sha2 = "0.10"

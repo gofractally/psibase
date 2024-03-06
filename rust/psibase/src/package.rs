@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::Context;
 use custom_error::custom_error;
+use flate2::write::GzEncoder;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -21,6 +22,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
+#[cfg(not(target_family = "wasm"))]
+use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
 use sha2::{Digest, Sha256};
 #[cfg(not(target_family = "wasm"))]
@@ -94,6 +97,37 @@ impl PackageInfo {
         }
     }
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledPackageInfo {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub depends: Vec<PackageRef>,
+    pub accounts: Vec<AccountNumber>,
+    pub owner: AccountNumber,
+}
+
+impl InstalledPackageInfo {
+    pub fn meta(&self) -> Meta {
+        Meta {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            description: self.description.clone(),
+            depends: self.depends.clone(),
+            accounts: self.accounts.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct PackageDataFile {
+    pub account: AccountNumber,
+    pub service: AccountNumber,
+    pub filename: String,
+}
+
+pub type PackageManifest = Vec<PackageDataFile>;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct ServiceInfo {
@@ -265,12 +299,43 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
+    pub fn manifest(&mut self) -> PackageManifest {
+        let mut manifest = vec![];
+        let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
+        for (sender, index) in &self.data {
+            let service = if self.has_service(*sender) {
+                *sender
+            } else {
+                psispace_sys::SERVICE
+            };
+            let file = self.archive.by_index(*index).unwrap();
+            let path = data_re
+                .captures(file.name())
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str();
+            manifest.push(PackageDataFile {
+                account: *sender,
+                service,
+                filename: path.to_string(),
+            });
+        }
+        manifest
+    }
+
     pub fn commit_install(
         &mut self,
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        actions.push(package_sys::Wrapper::pack_from(sender).postinstall(self.meta.clone()));
+        let manifest = self.manifest();
+        let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+        serde_json::to_writer(&mut manifest_encoder, &manifest)?;
+        actions.push(
+            package_sys::Wrapper::pack_from(sender)
+                .postinstall(self.meta.clone(), manifest_encoder.finish()?.into()),
+        );
         Ok(())
     }
 
@@ -623,7 +688,7 @@ pub struct PackageList {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct InstalledEdge {
-    node: Meta,
+    node: InstalledPackageInfo,
 }
 
 #[allow(non_snake_case)]
@@ -672,6 +737,19 @@ pub async fn get_accounts_to_create(
     Ok(result.newAccounts)
 }
 
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_installed_manifest(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    package: &str,
+    owner: AccountNumber,
+) -> Result<PackageManifest, anyhow::Error> {
+    let url = package_sys::SERVICE
+        .url(base_url)?
+        .join(&format!("/manifest?package={}&owner={}", package, owner))?;
+    crate::as_json(client.get(url)).await
+}
+
 impl PackageList {
     pub fn new() -> PackageList {
         PackageList {
@@ -687,10 +765,10 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data: InstalledQuery = crate::gql_query(base_url, client, package_sys::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await?;
             for edge in data.installed.edges {
-                result.insert(edge.node);
+                result.insert(edge.node.meta());
             }
             if !data.installed.pageInfo.hasNextPage {
                 break;

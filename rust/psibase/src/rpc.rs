@@ -272,17 +272,28 @@ struct QueryRoot<T> {
     errors: Option<GQLError>,
 }
 
+pub trait ChainUrl {
+    fn url(self, base_url: &reqwest::Url) -> Result<reqwest::Url, anyhow::Error>;
+}
+
+impl ChainUrl for AccountNumber {
+    fn url(self, base_url: &reqwest::Url) -> Result<reqwest::Url, anyhow::Error> {
+        let Some(url::Host::Domain(host)) = base_url.host() else {
+            Err(Error::NoDomain)?
+        };
+        let mut url = base_url.clone();
+        url.set_host(Some(&(format!("{}.{}", self, host))))?;
+        Ok(url)
+    }
+}
+
 pub async fn gql_query<T: DeserializeOwned>(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
     account: AccountNumber,
     body: String,
 ) -> Result<T, anyhow::Error> {
-    let Some(url::Host::Domain(host)) = base_url.host() else {
-        Err(Error::NoDomain)?
-    };
-    let mut url = base_url.join("graphql")?;
-    url.set_host(Some(&(account.to_string() + "." + host)))?;
+    let url = account.url(base_url)?.join("graphql")?;
     let result: QueryRoot<T> = as_json(
         client
             .post(url)

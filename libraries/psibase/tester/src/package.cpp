@@ -229,7 +229,10 @@ namespace psibase
 
    void PackagedService::commitInstall(std::vector<Action>& actions, AccountNumber sender)
    {
-      actions.push_back(transactor<PackageSys>{sender, PackageSys::service}.postinstall(meta));
+      // TODO: build manifest
+      std::vector<char> manifest;
+      actions.push_back(
+          transactor<PackageSys>{sender, PackageSys::service}.postinstall(meta, manifest));
    }
 
    const PackageInfo& get(const std::vector<PackageInfo>& index, const PackageRef& ref)

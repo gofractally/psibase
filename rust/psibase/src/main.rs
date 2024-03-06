@@ -9,17 +9,18 @@ use jwt::SignWithKey;
 use psibase::services::{account_sys, auth_delegate_sys, psispace_sys};
 use psibase::{
     account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
-    get_tapos_for_head, method, new_account_action, push_transaction, push_transactions,
-    reg_server, set_auth_service_action, set_code_action, set_key_action, sign_transaction,
-    AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, DirectoryRegistry,
-    ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList, PackageOp, PackageRegistry,
-    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
-    TransactionBuilder, TransactionTrace,
+    get_installed_manifest, get_tapos_for_head, method, new_account_action, push_transaction,
+    push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
+    sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
+    DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList, PackageOp,
+    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
+    Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::collections::HashSet;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -224,6 +225,16 @@ enum Command {
     Search {
         /// Regular expressions to search for in package names and descriptions
         patterns: Vec<String>,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
+    },
+
+    /// Shows package contents
+    Info {
+        /// Packages to show
+        packages: Vec<String>,
 
         /// A URL or path to a package repository (repeatable)
         #[clap(long, value_name = "URL")]
@@ -780,6 +791,8 @@ async fn apply_packages<
     R: PackageRegistry,
     F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
 >(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
     reg: &R,
     ops: Vec<PackageOp>,
     accounts: &mut Vec<AccountNumber>,
@@ -804,7 +817,6 @@ async fn apply_packages<
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
                 accounts.extend_from_slice(package.get_accounts());
-                // TODO: remove outdated files
                 // TODO: skip unmodified files
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -816,6 +828,18 @@ async fn apply_packages<
                 let mut actions = vec![];
                 package.install(&mut actions, sender, true)?;
                 out.push_all(actions)?;
+                // Remove out-dated files
+                let old_manifest =
+                    get_installed_manifest(base_url, client, package.name(), sender).await?;
+                let new_manifest: HashSet<_> = package.manifest().into_iter().collect();
+                for file in old_manifest {
+                    if !new_manifest.contains(&file) {
+                        out.push(
+                            psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                                .removeSys(file.filename),
+                        )?;
+                    }
+                }
             }
             PackageOp::Remove(meta) => {
                 out.set_label(format!("Removing {}", &meta.name));
@@ -866,6 +890,8 @@ async fn install(
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     apply_packages(
+        &args.api,
+        &mut client,
         &package_registry,
         to_install,
         &mut new_accounts,
@@ -994,6 +1020,22 @@ async fn search(
     Ok(())
 }
 
+async fn package_info(
+    args: &Args,
+    mut client: reqwest::Client,
+    packages: &Vec<String>,
+    _sources: &Vec<String>,
+) -> Result<(), anyhow::Error> {
+    for package in packages {
+        let manifest =
+            get_installed_manifest(&args.api, &mut client, package, account!("root")).await?;
+        for file in manifest {
+            println!("{}:{}", &file.account, &file.filename);
+        }
+    }
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize)]
 struct TokenData<'a> {
     exp: i64,
@@ -1014,7 +1056,7 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
 
 async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
     let (builder, result) = apply_proxy(reqwest::Client::builder(), &args.proxy).await?;
-    Ok((builder.build()?, result))
+    Ok((builder.gzip(true).build()?, result))
 }
 
 #[tokio::main]
@@ -1121,6 +1163,10 @@ async fn main() -> Result<(), anyhow::Error> {
             patterns,
             package_source,
         } => search(&args, client, patterns, package_source).await?,
+        Command::Info {
+            packages,
+            package_source,
+        } => package_info(&args, client, packages, package_source).await?,
         Command::CreateToken {
             expires_after,
             mode,

@@ -94,18 +94,21 @@ class TestPsibase(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'ExploreSys', 'PsiSpaceSys'])
 
-        foo10 = TestPackage('foo', '1.0.0').depends('PsiSpaceSys').service('foo', data={'file1.txt': 'original'})
-        foo11 = TestPackage('foo', '1.1.0').depends('PsiSpaceSys').service('foo', data={'file1.txt': 'updated'})
+        foo10 = TestPackage('foo', '1.0.0').depends('PsiSpaceSys').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
+        foo11 = TestPackage('foo', '1.1.0').depends('PsiSpaceSys').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
 
         with tempfile.TemporaryDirectory() as dir:
             make_package_repository(dir, [foo10])
             a.run_psibase(['install', 'foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
+            self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
             make_package_repository(dir, [foo10, foo11])
             a.run_psibase(['install', 'foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
+            self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
+            self.assertResponse(a.get('/file3.txt', 'foo'), 'added')
 
     def assertResponse(self, response, expected):
         response.raise_for_status()
