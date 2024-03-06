@@ -9,9 +9,7 @@ struct Component;
 
 impl Guest for Component {
     fn callintoplugin() -> String {
-        let logged_in_user = imports::get_logged_in_user();
-        println!("logged_in_user x, 'is a thing.. {:?}", logged_in_user);
-        return logged_in_user + " is logged in";
+        format!("callintoplugin return from demoapp2")
     }
 }
 

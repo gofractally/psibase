@@ -21,8 +21,8 @@ function App() {
 
     console.log("calling demoapp2.callintoplugin");
     const res = await supervisor.functionCall({
-      service: "demoapp2",
-      method: "callintoplugin",
+      service: "demoapp1",
+      method: "helloworld",
       params: [],
     });
     setRes(res as string);

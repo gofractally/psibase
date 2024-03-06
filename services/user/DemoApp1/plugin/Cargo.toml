@@ -1,5 +1,5 @@
 [package]
-name = "demoapp2"
+name = "demoapp1"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 bitflags = "2.4.2"
-wit-bindgen-rt = "0.21.0"
+wit-bindgen-rt = "0.20.0"
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "component:demoapp2"
+package = "component:demoapp1"
 
 [package.metadata.component.dependencies]
