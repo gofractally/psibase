@@ -9,7 +9,7 @@ use bindings::common::plugin::{client, server};
 use bindings::exports::invites::plugin::{admin, invitee, inviter};
 
 // From the service
-use invites::action_structs::*;
+use invite_sys::action_structs::*;
 
 struct Component;
 

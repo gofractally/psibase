@@ -3,9 +3,9 @@ mod bindings;
 
 use bindings::exports::accounts::plugin::accounts::Guest;
 
-struct Component;
+struct AccountsPlugin;
 
-impl Guest for Component {
+impl Guest for AccountsPlugin {
     fn get_logged_in_user() -> Result<Option<String>, String> { 
         Ok(Some("alice".to_string()))
     }
@@ -19,4 +19,4 @@ impl Guest for Component {
     }
 }
 
-bindings::export!(Component with_types_in bindings);
+bindings::export!(AccountsPlugin with_types_in bindings);
