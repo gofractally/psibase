@@ -6,7 +6,9 @@ mod bindings;
 use bindings::accounts::plugin::accounts;
 use bindings::auth::plugin::keyvault;
 use bindings::common::plugin::{client, server};
-use bindings::exports::invites::plugin::{admin:::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter};
+use bindings::exports::invites::plugin::{
+    admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
+};
 
 // From the service
 use invite_sys::action_structs::*;
