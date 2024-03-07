@@ -15,4 +15,8 @@ crate-type = ["cdylib"]
 [package.metadata.component]
 package = "component:demoapp1"
 
-[package.metadata.component.dependencies]
+[package.metadata.component.target.dependencies]
+"common:plugin" = { path = "../../CommonSys/common/packages/wit/plugin.wit" }
+"invites:plugin" = { path = "../../InviteSys/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/AccountSys/plugin/wit/world.wit" }
+"auth:plugin" = { path = "../../../system/AuthSys/plugin/wit/world.wit" }

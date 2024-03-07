@@ -9,7 +9,7 @@ function App() {
 
   const init = async () => {
     await supervisor.onLoaded();
-    supervisor.preLoadServices(["demoapp2"]);
+    supervisor.preLoadServices(["invite-sys", "account-sys", "auth-sys"]);
   };
 
   useEffect(() => {
@@ -17,13 +17,21 @@ function App() {
   }, []);
 
   const run = async () => {
-    console.info("DemoApp1 connected to Supervisor");
-
-    console.log("calling demoapp2.callintoplugin");
+    console.log("calling demoapp1.helloworld");
     const res = await supervisor.functionCall({
       service: "demoapp1",
       method: "helloworld",
       params: [],
+    });
+    setRes(res as string);
+  };
+
+  const run2 = async () => {
+    console.log("calling demoapp1.generateinvite");
+    const res = await supervisor.functionCall({
+      service: "demoapp1",
+      method: "generateInvite",
+      params: ["/welcome-page.html"],
     });
     setRes(res as string);
   };
@@ -34,6 +42,10 @@ function App() {
       <h3>{res}</h3>
       <div className="card">
         <button onClick={() => run()}>Say Hello</button>
+      </div>
+
+      <div className="card">
+        <button onClick={() => run2()}>Say Hello 2</button>
       </div>
     </>
   );

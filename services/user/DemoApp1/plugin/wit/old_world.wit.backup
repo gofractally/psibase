@@ -7,15 +7,9 @@ interface demoapp2 {
     callintoplugin: func() -> string;
 }
 
-interface inv {
-    generate-invite: func(subpath: string) -> result<string, string>;
-}
-
 world example {
 
     import demoapp2;
-    import invites:plugin/inviter;
 
     export helloworld: func() -> string;
-    export inv;
 }
