@@ -20,7 +20,6 @@ use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use std::collections::HashSet;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -817,35 +816,31 @@ async fn apply_packages<
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
                 accounts.extend_from_slice(package.get_accounts());
-                // TODO: skip unmodified files
+                // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
                     &meta.name, &meta.version, &info.name, &info.version
                 ));
+                // Remove out-dated files. This needs to happen before installing
+                // new files, to handle the case where a service that stores
+                // data files is replaced by a service that does not provide
+                // removeSys.
+                let old_manifest =
+                    get_installed_manifest(base_url, client, &meta.name, sender).await?;
+                old_manifest.upgrade(package.manifest(), out)?;
+                // Install the new package
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
                 package.install(&mut actions, sender, true)?;
                 out.push_all(actions)?;
-                // Remove out-dated files
-                let old_manifest =
-                    get_installed_manifest(base_url, client, package.name(), sender).await?;
-                let new_manifest: HashSet<_> = package.manifest().into_iter().collect();
-                for file in old_manifest {
-                    if !new_manifest.contains(&file) {
-                        out.push(
-                            psispace_sys::Wrapper::pack_from_to(file.account, file.service)
-                                .removeSys(file.filename),
-                        )?;
-                    }
-                }
             }
             PackageOp::Remove(meta) => {
                 out.set_label(format!("Removing {}", &meta.name));
-                // first run pre-rm
-                // then delete files
-                // then remove services
+                let old_manifest =
+                    get_installed_manifest(base_url, client, &meta.name, sender).await?;
+                old_manifest.remove(out)?;
             }
         }
     }
@@ -1029,7 +1024,7 @@ async fn package_info(
     for package in packages {
         let manifest =
             get_installed_manifest(&args.api, &mut client, package, account!("root")).await?;
-        for file in manifest {
+        for file in &manifest.data {
             println!("{}:{}", &file.account, &file.filename);
         }
     }

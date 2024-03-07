@@ -1,4 +1,4 @@
-use crate::{AccountNumber, Action, SignedTransaction, TransactionTrace};
+use crate::{AccountNumber, Action, ActionGroup, ActionSink, SignedTransaction, TransactionTrace};
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
@@ -204,22 +204,11 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
     }
 }
 
-pub trait ActionGroup {
-    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize);
-}
-
-impl ActionGroup for Action {
-    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize) {
-        *size += self.rawData.len();
-        trx_actions.push(self);
-    }
-}
-
-impl ActionGroup for Vec<Action> {
-    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize) {
-        for act in self {
-            act.append_to_tx(trx_actions, size);
-        }
+impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> ActionSink
+    for TransactionBuilder<F>
+{
+    fn push_action<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
+        self.push(act)
     }
 }
 

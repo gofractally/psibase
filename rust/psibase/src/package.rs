@@ -2,7 +2,7 @@ use crate::services::{
     account_sys, auth_delegate_sys, package_sys, proxy_sys, psispace_sys, setcode_sys,
 };
 use crate::{
-    new_account_action, set_auth_service_action, set_code_action, set_key_action,
+    new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, AccountNumber, Action, AnyPublicKey, Checksum256, GenesisService, Pack,
     PackageDisposition, PackageOp, Reflect, Unpack,
 };
@@ -11,7 +11,7 @@ use custom_error::custom_error;
 use flate2::write::GzEncoder;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map, HashMap};
+use std::collections::{hash_map, HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
@@ -127,10 +127,14 @@ pub struct PackageDataFile {
     pub filename: String,
 }
 
-pub type PackageManifest = Vec<PackageDataFile>;
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PackageManifest {
+    pub services: HashMap<AccountNumber, ServiceInfo>,
+    pub data: Vec<PackageDataFile>,
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct ServiceInfo {
+pub struct ServiceInfo {
     flags: Vec<String>,
     server: Option<AccountNumber>,
 }
@@ -299,7 +303,15 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
-    pub fn manifest(&mut self) -> PackageManifest {
+    fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
+        let mut result = HashMap::new();
+        for (service, _, info) in &self.services {
+            result.insert(*service, info.clone());
+        }
+        result
+    }
+
+    fn manifest_data(&mut self) -> Vec<PackageDataFile> {
         let mut manifest = vec![];
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         for (sender, index) in &self.data {
@@ -322,6 +334,12 @@ impl<R: Read + Seek> PackagedService<R> {
             });
         }
         manifest
+    }
+
+    pub fn manifest(&mut self) -> PackageManifest {
+        let services = self.manifest_services();
+        let data = self.manifest_data();
+        PackageManifest { services, data }
     }
 
     pub fn commit_install(
@@ -434,6 +452,87 @@ impl<R: Read + Seek> PackagedService<R> {
         result.dedup();
 
         Ok(result)
+    }
+}
+
+pub trait ActionGroup {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize);
+}
+
+impl ActionGroup for Action {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize) {
+        *size += self.rawData.len();
+        trx_actions.push(self);
+    }
+}
+
+impl ActionGroup for Vec<Action> {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize) {
+        for act in self {
+            act.append_to_tx(trx_actions, size);
+        }
+    }
+}
+
+pub trait ActionSink {
+    fn push_action<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error>;
+}
+
+impl ActionSink for Vec<Action> {
+    fn push_action<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
+        let mut size = 0;
+        act.append_to_tx(self, &mut size);
+        Ok(())
+    }
+}
+
+impl PackageManifest {
+    // This removes every part of self that is not overwritten by other
+    pub fn upgrade<T: ActionSink>(
+        &self,
+        other: PackageManifest,
+        out: &mut T,
+    ) -> Result<(), anyhow::Error> {
+        let new_files: HashSet<_> = other.data.into_iter().collect();
+        for file in &self.data {
+            if !new_files.contains(file) {
+                out.push_action(
+                    psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                        .removeSys(file.filename.clone()),
+                )?;
+            }
+        }
+        for (service, info) in &self.services {
+            let other_info = other.services.get(service);
+            if info.server.is_some() && other_info.map_or(true, |i| i.server.is_none()) {
+                out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
+            }
+            if !info.flags.is_empty() && other_info.map_or(true, |i| i.flags.is_empty()) {
+                out.push_action(setcode_sys::Wrapper::pack().setFlags(*service, 0))?;
+            }
+            if other_info.is_none() {
+                out.push_action(set_code_action(*service, vec![]))?;
+            }
+        }
+        Ok(())
+    }
+    pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
+        for file in &self.data {
+            out.push_action(
+                psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                    .removeSys(file.filename.clone()),
+            )?;
+        }
+        for (service, info) in &self.services {
+            if info.server.is_some() {
+                out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
+            }
+            if !info.flags.is_empty() {
+                out.push_action(setcode_sys::Wrapper::pack().setFlags(*service, 0))?;
+            }
+            out.push_action(set_code_action(*service, vec![]))?;
+        }
+        Ok(())
     }
 }
 

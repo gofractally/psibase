@@ -27,9 +27,11 @@ class TestPackage:
     def depends(self, name, version='*'):
         self._depends.append({'name': name, 'version': version})
         return self
-    def service(self, name, wasm=None, data=[]):
+    def service(self, name, wasm=None, flags=[], server=None, data=[]):
         if wasm is not None:
-            add_file(name, wasm)
+            self.add_file('service/' + name + '.wasm', wasm)
+            if len(flags) != 0 or server is not None:
+                self.add_file('service/' + name + '.json', json.dumps({'flags': flags, 'server': server}))
         def make_data(filename):
             if not filename.startswith('/'):
                 filename = '/' + filename
@@ -97,6 +99,18 @@ class TestPsibase(unittest.TestCase):
         foo10 = TestPackage('foo', '1.0.0').depends('PsiSpaceSys').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
         foo11 = TestPackage('foo', '1.1.0').depends('PsiSpaceSys').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
 
+        # These just need to be valid and distinct
+        original_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071d0305737461727400000663616c6c65640001086f726967696e616c00000a070202000b02000b');
+        updated_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c65640001077570646174656400000a070202000b02000b')
+        deleted_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c656400010764656c6574656400000a070202000b02000b')
+        added_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071a0305737461727400000663616c6c6564000105616464656400000a070202000b02000b')
+
+        foo10.service('bar1', wasm=original_wasm, flags=['allowWriteNative'])
+        foo10.service('bar2', wasm=deleted_wasm, flags=['allowSudo'], server='bar1')
+        foo11.service('bar1', wasm=updated_wasm)
+        foo11.service('bar2', data={'file4.txt': 'cancel server'})
+        foo11.service('bar3', wasm=added_wasm)
+
         with tempfile.TemporaryDirectory() as dir:
             make_package_repository(dir, [foo10])
             a.run_psibase(['install', 'foo', '--package-source', dir])
@@ -109,6 +123,7 @@ class TestPsibase(unittest.TestCase):
             self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
             self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
             self.assertResponse(a.get('/file3.txt', 'foo'), 'added')
+            self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
 
     def assertResponse(self, response, expected):
         response.raise_for_status()
