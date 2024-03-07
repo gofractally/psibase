@@ -1,0 +1,29 @@
+package nft-sys:plugin;
+
+// interface service-settings {
+//     setServiceSetting(manualDebit: bool)
+// }
+
+// interface user-settings {
+//     getUserSetting(account: AccountNumber)
+// }
+
+interface nfts {
+    mint: func() -> result<_, string>;
+    // mint: func() -> result<_, NID>;
+    // burn: func(nftId: NID) -> void;
+    // credit: func(nftId: NID, receiver: psibase::AccountNumber, memo: string) -> ;
+    // uncredit: func(nftId: NID, memo: string) -> void;
+    // debit: func(nftId: NID, memo: string) -> void;
+    // getNft: func(nftId: NID) -> result<_, NftRecord>;
+    // getNftHolder: func(account: AccountNumber) -> result<_, NftHolderRecord>;
+    // getCredRecord: func(nftId: NID) -> result<_, CreditRecord>;
+    // exists: func(nftId: NID) -> result<_, bool>;
+}
+
+/// An example world for the component to target.
+world psibase-plugin {
+    // export service-settings;
+    // export user-settings;
+    export nfts;
+}

@@ -290,6 +290,7 @@ add_dependencies(CommonSysCommonLib_js ComponentParser)
 add_rs_component(services/system/AccountSys/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
 add_rs_component(services/system/AuthSys/plugin:AuthPlugin auth.wasm ${plugin-wit})
 add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invites.wasm ${plugin-wit} ${AuthPlugin_DEP})
+add_rs_component(services/user/NftSys/plugin:NftsPlugin nfts.wasm ${plugin-wit})
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
@@ -575,6 +576,7 @@ psibase_package(
     SERVICE nft-sys
     PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
     WASM ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
+    DATA ${COMPONENT_BIN_DIR}/${NftsPlugin_OUTPUT_FILE} /plugin.wasm
     INIT
     DEPENDS wasm
 )
