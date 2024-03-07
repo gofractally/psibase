@@ -384,6 +384,7 @@ psibase_package(
         SERVER r-auth-sys
     SERVICE r-auth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
+        DATA ${COMPONENT_BIN_DIR}/${AuthPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE verify-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
         FLAGS isAuthService
