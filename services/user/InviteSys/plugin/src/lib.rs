@@ -6,7 +6,7 @@ mod bindings;
 use bindings::accounts::plugin::accounts;
 use bindings::auth::plugin::keyvault;
 use bindings::common::plugin::{client, server};
-use bindings::exports::invites::plugin::{admin, invitee, inviter};
+use bindings::exports::invites::plugin::{admin:::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter};
 
 // From the service
 use invite_sys::action_structs::*;
@@ -21,7 +21,7 @@ struct Component;
     void delExpired(uint32_t maxDeleted);
 */
 
-impl admin::Guest for Component {
+impl Admin for Component {
     fn set_whitelist(_accounts: Vec<String>) -> Result<(), String> {
         Err("Not yet implemented".to_string())
     }
@@ -31,7 +31,7 @@ impl admin::Guest for Component {
     }
 }
 
-impl invitee::Guest for Component {
+impl Invitee for Component {
     fn accept_with_existing_account(_invite_public_key: Vec<u8>) -> Result<(), String> {
         Err("Not yet implemented".to_string())
     }
@@ -48,7 +48,7 @@ impl invitee::Guest for Component {
     }
 }
 
-impl inviter::Guest for Component {
+impl Inviter for Component {
     fn generate_invite(callback_subpath: String) -> Result<String, String> {
         let inviter = accounts::get_logged_in_user()?;
         let inviter = match inviter {
