@@ -262,9 +262,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.15.3"
+version = "3.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ea184aa71bb362a1157c896979544cc23974e08fd265f29ea96b59f0b4a555b"
+checksum = "7ff69b9dd49fd426c69a0db9fc04dd934cdb6645ff000864d98f7e2af8830eaa"
 
 [[package]]
 name = "byteorder"
@@ -1113,18 +1113,6 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "nfts"
-version = "0.0.0"
-dependencies = [
- "bitflags 2.4.2",
- "nft-sys",
- "psibase",
- "serde",
- "serde_json",
- "wit-bindgen-rt",
 ]
 
 [[package]]
@@ -2497,12 +2485,6 @@ dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
 ]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "026d24a27f6712541fa534f2954bd9e0eb66172f033c2157c0f31d106255c497"
 
 [[package]]
 name = "zeroize"
