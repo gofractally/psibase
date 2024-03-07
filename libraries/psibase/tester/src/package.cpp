@@ -257,8 +257,27 @@ namespace psibase
    {
       std::vector<char>   manifest;
       psio::vector_stream stream{manifest};
+      bool                first = true;
+      stream.write('{');
+      to_json("services", stream);
+      stream.write(':');
+      stream.write('{');
+      for (const auto& [account, header, info] : services)
+      {
+         if (first)
+            first = false;
+         else
+            stream.write(',');
+         to_json(account, stream);
+         stream.write(':');
+         to_json(info, stream);
+      }
+      stream.write('}');
+      stream.write(',');
+      to_json("data", stream);
+      stream.write(':');
       stream.write('[');
-      bool first = true;
+      first = true;
       for (const auto& [sender, index] : data)
       {
          AccountNumber service = PsiSpaceSys::service;
@@ -292,6 +311,7 @@ namespace psibase
          stream.write('}');
       }
       stream.write(']');
+      stream.write('}');
       manifest = gzip(std::move(manifest));
       actions.push_back(
           transactor<PackageSys>{sender, PackageSys::service}.postinstall(meta, manifest));
