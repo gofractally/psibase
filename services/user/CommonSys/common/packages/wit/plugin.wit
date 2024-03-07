@@ -54,6 +54,9 @@ interface client {
 
     /// Gets the currently running plugin's rootdomain
     get-root-domain: func() -> result<string, string>;
+
+    /// Gets the currently running plugin's service name
+    get-service-name: func() -> result<string, string>;
 }
 
 world plugin-capabilities {
