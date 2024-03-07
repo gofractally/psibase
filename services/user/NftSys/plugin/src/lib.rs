@@ -13,31 +13,35 @@ struct Nfts;
 impl nfts::Guest for Nfts {
     fn mint(_nft_label: String) -> Result<(), String> {
         // Err("Not implemented".to_string())
-        // struct MintArgs {};
-        // let mintArgs: MintArgs = MingArgs {};
-        // plugin::server::add_action_to_transaction("nft-sys", "mint", minArgs.to_json_string());
-        let _ = plugin::server::add_action_to_transaction("nft-sys", "mint", "{}");
+        #[derive(Serialize)]
+        struct MintArgs {}
+        let mint_args = MintArgs {};
+
+        let _ = plugin::server::add_action_to_transaction(
+            "nft-sys",
+            "mint",
+            serde_json::to_string(&mint_args)
+                .expect("Failed to serialize struct into JSON")
+                .as_str(),
+        );
         // NftQuery.userEvents(minter: AccountNumber, first: ??);
         Ok(())
     }
 
     fn burn(nft_id: NID) -> Result<(), String> {
-        // Err("Not implemented".to_string())
         #[derive(Serialize)]
         struct BurnArgs {
             nft_id: NID,
         }
-
         let burn_args = BurnArgs { nft_id: nft_id };
+
         let _ = plugin::server::add_action_to_transaction(
             "nft-sys",
-            "mint",
+            "burn",
             serde_json::to_string(&burn_args)
                 .expect("Failed to serialize struct into JSON")
                 .as_str(),
         );
-        // let _ = plugin::server::add_action_to_transaction("nft-sys", "burn", "{}");
-        // NftQuery.userEvents(minter: AccountNumber, first: ??);
         Ok(())
     }
 
