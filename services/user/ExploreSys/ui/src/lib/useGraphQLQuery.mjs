@@ -1,4 +1,4 @@
-import { postGraphQLGetJson } from '/common/rpc.mjs?client';
+import { postGraphQLGetJson } from "@psibase/common-lib";
 
 // Returns: {
 //     isLoading,   // Is the query in progress?
@@ -36,7 +36,7 @@ interface PageInfo {
 export async function useGraphQLPagedQuery(
     url,
     query,
-    opts,
+    opts
     // opts = {
     // pageSize,
     // getPageInfo, // useGraphQLQuery's result => PageInfo or null

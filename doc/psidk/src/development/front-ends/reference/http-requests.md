@@ -132,18 +132,15 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 `common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). 
 Booting the network with either the psibase CLI tool or with the admin-sys app will automatically install this default set of files:
 
-| Path                          | Description                                                                                                                                                           |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/common/SimpleUI.mjs`        | Default UI for services under development ([Learn more](../../services/cpp-service/minimal-ui/))                                                                      |
-| `/common/rpc.mjs`             | [Simple RPC wrappers (js)](#simple-rpc-wrappers-js)<br/>[Conversions (js)](#conversions-js)<br/>[Transactions (js)](#transactions-js)<br/>[Signing (js)](#signing-js) |
-| `/common/keyConversions.mjs`  | [Key Conversions (js)](#key-conversions-js)                                                                                                                           |
-| `/common/useGraphQLQuery.mjs` | [React GraphQL hooks (js)](#react-graphql-hooks-js)                                                                                                                   |
+| Path                          | Description                                                                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/common/SimpleUI.mjs`        | Default UI for services under development ([Learn more](../../services/cpp-service/minimal-ui/))                                                                                                                      |
+| `/common/common-lib.js`       | [Simple RPC wrappers (js)](#simple-rpc-wrappers-js)<br/>[Conversions (js)](#conversions-js)<br/>[Transactions (js)](#transactions-js)<br/>[Signing (js)](#signing-js)<br/>[Key Conversions (js)](#key-conversions-js) |
+| `/common/useGraphQLQuery.mjs` | [React GraphQL hooks (js)](#react-graphql-hooks-js)                                                                                                                                                                   |
 
 ## Root endpoints
 
-The root domain always serves the code for the [supervisor](../../../specifications/app-architecture/supervisor.md). If a subpage of the root domain is accessed, the supervisor client-code is what evaluates the subpage and determines how to react.
-
-Currently, the supervisor uses the `/applet/` prefix to trigger loading a psibase app within a managed iframe according to the supervisor specification.
+The root document at `/` is the homepage of the network.
 
 ## Service-provided endpoints
 

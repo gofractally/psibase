@@ -17,17 +17,12 @@ namespace SystemService
       /// This is a standard action that allows common-sys to serve http requests.
       ///
       /// common-sys responds to GET requests:
-      /// - /applet/APPLET_NAME
       /// - /common/thisservice
       /// - /common/rootdomain
       /// - /common/tapos/head
       /// and to POST requests:
       /// - /common/pack/Transaction
       /// - /common/pack/SignedTransaction
-      ///
-      /// When responding to the `/applet/APPLET_NAME` GET request, then common-sys returns
-      /// the file stored at the root index. That file reads the URL bar, detects that an
-      /// applet is being loaded, and request the applet to load inside an iframe.
       ///
       /// Additionally, common-sys will serve content at any path stored using `storeSys`
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;

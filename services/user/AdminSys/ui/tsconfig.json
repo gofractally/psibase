@@ -5,7 +5,12 @@
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
         "paths": {
-            "/common": ["../../CommonSys/common"]
+            "@psibase/common-lib": [
+                "../../CommonSys/common/packages/common-lib/src"
+            ],
+            "@psibase/common-lib/*": [
+                "../../CommonSys/common/packages/common-lib/src/*"
+            ]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
@@ -19,7 +24,7 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": ["src", "../../CommonSys/common/rpc.d.ts", "./wasm-psibase/*.d.ts", "wasm-psibase"],
+    "include": ["src", "./wasm-psibase/*.d.ts", "wasm-psibase"],
     "references": [
         {
             "path": "./tsconfig.node.json"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { getJson } from "common/rpc.mjs";
+import { getJson } from "@psibase/common-lib";
 
 export const usePollJson = <R>(
     url: string

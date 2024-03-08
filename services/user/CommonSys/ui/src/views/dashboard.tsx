@@ -1,16 +1,34 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-import { AppletEntry, appletPrefix, applets } from "../config";
-import { Heading, Text } from "../components";
+import { siblingUrl } from "@psibase/common-lib";
+import { AppletEntry, applets } from "../config";
+import { Heading } from "../components";
 
 export const Dashboard = ({ currentUser }: { currentUser: string }) => {
+    const [hrefs, setHrefs] = useState<{ [key: string]: string }>({});
+
     useEffect(() => {
         window.document.title = "Psibase Dashboard";
+
+        const fetchHrefs = async () => {
+            const newHrefs: { [key: string]: string } = {};
+
+            for (const applet of applets) {
+                newHrefs[applet.service] = await siblingUrl(
+                    null,
+                    applet.service
+                );
+            }
+
+            setHrefs(newHrefs);
+        };
+
+        fetchHrefs();
     }, []);
 
     return (
         <div className="mx-auto max-w-screen-xl p-2 sm:px-8">
-            <section className="mb-4 select-none rounded bg-gray-100 px-5 pt-4 pb-5">
+            <section className="mb-4 select-none rounded bg-gray-100 px-5 pb-5 pt-4">
                 <Heading tag="h2" styledAs="h5" className="text-gray-600">
                     <span className="hidden md:inline">Welcome to the </span>
                     Psibase Technical Preview
@@ -32,8 +50,13 @@ export const Dashboard = ({ currentUser }: { currentUser: string }) => {
                 {applets.map((a) => (
                     <AppletIcon
                         applet={a}
+                        href={hrefs[a.service]}
+                        disabled={[
+                            "account-sys",
+                            "token-sys",
+                            "psispace-sys",
+                        ].includes(a.service)}
                         key={a.service}
-                        disabled={a.requiresUser && !currentUser}
                     />
                 ))}
             </div>
@@ -45,16 +68,17 @@ export default Dashboard;
 
 const AppletIcon = ({
     applet,
+    href,
     disabled,
 }: {
     applet: AppletEntry;
+    href: string | undefined;
     disabled: boolean;
 }) => {
     const { MobileIcon, DesktopIcon } = applet;
     const opacity = disabled ? "opacity-50" : "";
     const cursor = disabled ? "cursor-not-allowed" : "";
 
-    let href: string | undefined = `${appletPrefix}${applet.service}`;
     let target = "_self";
     if (disabled) {
         href = undefined;
