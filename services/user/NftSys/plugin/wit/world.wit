@@ -8,14 +8,17 @@ package nft-sys:plugin;
 //     getUserSetting(account: AccountNumber)
 // }
 
-
-interface nfts {
+interface types {
     type NID = u32;
     type account-number = u64;
+}
+
+interface nfts {
+    use types.{NID, account-number};
 
     mint: func(nft-label: string) -> result<_, string>;
     burn: func(nft-id: NID) -> result<_, string>;
-    // credit: func(nft-id: NID, receiver: account-number, memo: string) -> result<_, string>;
+    credit: func(nft-id: NID, receiver: account-number, memo: string) -> result<_, string>;
     uncredit: func(nft-id: NID, memo: string) -> result<_, string>;
     debit: func(nft-id: NID, memo: string) -> result<_, string>;
     // getNft: func(nftId: NID) -> result<_, NftRecord>;
@@ -28,6 +31,7 @@ interface nfts {
 world psibase-plugin {
     // export service-settings;
     // export user-settings;
+    export types;
     export nfts;
 
     import common:plugin/server;

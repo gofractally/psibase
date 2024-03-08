@@ -5,7 +5,7 @@ use bindings::common::plugin;
 use bindings::exports::nft_sys::plugin::nfts;
 // use nft_sys::*;
 use psibase::services::nft_sys::NID;
-// use psibase::*;
+use psibase::AccountNumber;
 use serde::Serialize;
 
 struct Nfts;
@@ -45,9 +45,10 @@ impl nfts::Guest for Nfts {
         Ok(())
     }
 
-    // fn credit(nft_id: NID, receiver: psibase::AccountNumber, memo: String) -> Result<(), String> {
-    //     Ok(())
-    // }
+    fn credit(_nft_id: NID, receiver: nfts::AccountNumber, _memo: String) -> Result<(), String> {
+        let _receiver = AccountNumber::new(receiver);
+        Ok(())
+    }
 
     fn uncredit(_nft_id: NID, _memo: String) -> Result<(), String> {
         Ok(())

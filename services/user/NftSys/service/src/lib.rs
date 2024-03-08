@@ -18,9 +18,10 @@ mod service {
         // NOP
     }
 
-    // fn credit(nft_id: NID, receiver: psibase::AccountNumber, memo: String) -> Result<(), String> {
-    //     Ok(())
-    // }
+    #[action]
+    fn credit(_nft_id: NID, _receiver: psibase::AccountNumber, _memo: String) {
+        // NOP
+    }
 
     #[action]
     fn uncredit(_nft_id: NID, _memo: String) {
