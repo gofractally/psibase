@@ -580,7 +580,7 @@ psibase_package(
     PACKAGE_DEPENDS NftSys ProxySys AccountSys
     SERVICE supervisor-sys
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
-    DEPENDS ${SupervisorSys_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist/index.html
+    DEPENDS ${SupervisorSys_js_DEP}
 )
 
 psibase_package(
