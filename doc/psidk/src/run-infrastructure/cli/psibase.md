@@ -9,6 +9,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
 `psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
+`psibase` [`-a` *url*] `info` *packages*\.\.\.  
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
@@ -122,6 +123,20 @@ Deploy a service
 - `-S`, `--sender` *sender*
 
   Sender to use when creating the account [default: account-sys]
+
+### info
+
+`psibase` [`-a` *url*] `info` *packages*\.\.\.  
+
+Displays the contents of packages
+
+- *packages*
+
+  Packages to show
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
 ### install
 
