@@ -178,6 +178,12 @@ const checkForResolution = () => {
 
 const onPluginCallResponse = (message: PluginCallResponse) => {
   const id = message.payload.id;
+  const isIdTracked = !!findFunctionCallById(pendingFunctionCalls, id)
+  if (!isIdTracked) {
+    console.warn(`Ignored onPluginCallResponse message ID "${id}": Not tracked on supervisor, possibly tracked in another tab.`);
+    return;
+  }
+
   const updateFunctionCall = (funCall: PendingFunctionCall): void => {
     if (funCall.id == id) {
       funCall.result = message.payload.result;
@@ -261,6 +267,13 @@ const executeCall = (id: string) => {
 
 const onPluginCallFailure = (message: PluginCallFailure) => {
   const { id, method, params, service } = message.payload;
+
+  const isIdTracked = !!findFunctionCallById(pendingFunctionCalls, id)
+  if (!isIdTracked) {
+    console.warn(`Ignored onPluginCallFailure message ID "${id}": Not tracked on supervisor, possibly tracked in another tab.`);
+    return;
+  }
+
   const subId = generateRandomString();
 
   pendingFunctionCalls = updatePendingFunctionCall(
