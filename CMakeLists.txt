@@ -265,24 +265,21 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${COMPONENT_BIN_DIR}/${OUTPUT_FILE})
-    file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
 
-    # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
-    add_custom_command(
-        OUTPUT ${OUTPUT_FILEPATH}
-        DEPENDS ${SOURCES} ${ARGN}
-        COMMAND cargo component build 
-            --release 
+    ExternalProject_Add(${TARGET_NAME}
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
+        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND cargo component build -r
             --target wasm32-unknown-unknown
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
             --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${COMPONENT_BIN_DIR}
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-unknown-unknown/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+        BUILD_ALWAYS 1
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-unknown-unknown/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
     )
-    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
-    add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
+
     # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
-    set(${TARGET_NAME}_DEP ${TARGET_NAME} PARENT_SCOPE)
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
     set(${TARGET_NAME}_OUTPUT_FILE ${OUTPUT_FILE} PARENT_SCOPE)
 endfunction()
 
@@ -398,7 +395,7 @@ set(THIRD_FILES
     ${THIRD_SRC}/react.production.min.js
     ${THIRD_SRC}/semantic-ui-react.min.js
     ${THIRD_SRC}/useLocalStorageState.js)
-message(STATUS "Component parser output file: ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}")
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CommonSys.psi
     NAME CommonSys
@@ -583,7 +580,7 @@ psibase_package(
     PACKAGE_DEPENDS NftSys ProxySys AccountSys
     SERVICE supervisor-sys
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
-    DEPENDS SupervisorSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist/index.html
+    DEPENDS ${SupervisorSys_js_DEP}
 )
 
 psibase_package(
