@@ -14,12 +14,12 @@ const argString = (count: number) =>
 
 const generateFulfilledFunction = (
     method: string,
-    result: string | number,
+    result: string | number | object,
     argCount = 3
 ): string =>
     `export function ${method}(${argString(argCount)}) {
-        return ${typeof result == "number" ? result : `'${result}'`}
-      }`;
+        return ${typeof result == "number" ? result : typeof result == "object" ? JSON.stringify(result) : `'${result}'`}
+    }`;
 
 export interface FunctionCallArgs {
     service: string;
