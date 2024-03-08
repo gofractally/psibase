@@ -3,8 +3,8 @@ use crate::services::{
 };
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
-    solve_dependencies, AccountNumber, Action, AnyPublicKey, Checksum256, GenesisService, Pack,
-    PackageDisposition, PackageOp, Reflect, Unpack,
+    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
+    GenesisService, Pack, PackageDisposition, PackageOp, Reflect, Unpack, Version,
 };
 use anyhow::Context;
 use custom_error::custom_error;
@@ -68,6 +68,20 @@ pub struct Meta {
     pub depends: Vec<PackageRef>,
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
+}
+
+impl Meta {
+    pub fn info(&self, sha256: Checksum256, file: String) -> PackageInfo {
+        return PackageInfo {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            description: self.description.clone(),
+            depends: self.depends.clone(),
+            accounts: self.accounts.clone(),
+            sha256,
+            file,
+        };
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -135,8 +149,8 @@ pub struct PackageManifest {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ServiceInfo {
-    flags: Vec<String>,
-    server: Option<AccountNumber>,
+    pub flags: Vec<String>,
+    pub server: Option<AccountNumber>,
 }
 
 pub struct PackagedService<R: Read + Seek> {
@@ -759,7 +773,7 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
         for (_, reg) in &self.sources {
             for entry in reg.index()? {
                 if !found.contains_version(&entry.name, &entry.version) {
-                    found.insert(entry.meta());
+                    found.insert_info(entry.clone());
                     result.push(entry);
                 }
             }
@@ -781,8 +795,13 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
     }
 }
 
+pub enum PackageOrigin {
+    Installed { owner: AccountNumber },
+    Repo { sha256: Checksum256, file: String },
+}
+
 pub struct PackageList {
-    packages: HashMap<String, HashMap<String, Meta>>,
+    packages: HashMap<String, HashMap<String, (Meta, PackageOrigin)>>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -849,6 +868,27 @@ pub async fn get_installed_manifest(
     crate::as_json(client.get(url)).await
 }
 
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_manifest<T: PackageRegistry + ?Sized>(
+    reg: &T,
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    package: &Meta,
+    origin: &PackageOrigin,
+) -> Result<PackageManifest, anyhow::Error> {
+    match origin {
+        PackageOrigin::Installed { owner } => {
+            get_installed_manifest(base_url, client, &package.name, *owner).await
+        }
+        PackageOrigin::Repo { sha256, file } => {
+            let mut package = reg
+                .get_by_info(&package.info(sha256.clone(), file.clone()))
+                .await?;
+            Ok(package.manifest())
+        }
+    }
+}
+
 impl PackageList {
     pub fn new() -> PackageList {
         PackageList {
@@ -867,7 +907,7 @@ impl PackageList {
                                         format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await?;
             for edge in data.installed.edges {
-                result.insert(edge.node.meta());
+                result.insert_installed(edge.node);
             }
             if !data.installed.pageInfo.hasNextPage {
                 break;
@@ -879,17 +919,29 @@ impl PackageList {
     pub fn from_registry<T: PackageRegistry + ?Sized>(reg: &T) -> Result<Self, anyhow::Error> {
         let mut result = PackageList::new();
         for package in reg.index()? {
-            result.insert(package.meta());
+            result.insert_info(package);
         }
         Ok(result)
     }
-    pub fn insert(&mut self, meta: Meta) {
+    pub fn insert(&mut self, meta: Meta, origin: PackageOrigin) {
         let name = meta.name.clone();
         let version = meta.version.clone();
         self.packages
             .entry(name)
             .or_insert(HashMap::new())
-            .insert(version, meta);
+            .insert(version, (meta, origin));
+    }
+    pub fn insert_info(&mut self, info: PackageInfo) {
+        self.insert(
+            info.meta(),
+            PackageOrigin::Repo {
+                sha256: info.sha256.clone(),
+                file: info.file.clone(),
+            },
+        );
+    }
+    pub fn insert_installed(&mut self, info: InstalledPackageInfo) {
+        self.insert(info.meta(), PackageOrigin::Installed { owner: info.owner });
     }
 
     fn contains_version(&self, name: &str, version: &str) -> bool {
@@ -901,7 +953,7 @@ impl PackageList {
     fn as_upgradable(&self) -> Vec<(Meta, PackageDisposition)> {
         let mut result = vec![];
         for (_, versions) in &self.packages {
-            for (version, meta) in versions {
+            for (version, (meta, _)) in versions {
                 result.push((meta.clone(), PackageDisposition::upgradable(version)));
             }
         }
@@ -913,6 +965,39 @@ impl PackageList {
         packages: &[String],
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         solve_dependencies(reg.index()?, make_refs(packages)?, self.as_upgradable())
+    }
+    pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {
+        let mut result = vec![];
+        for (_, versions) in self.packages {
+            for (_, item) in versions {
+                result.push(item);
+            }
+        }
+        result.sort_unstable_by(|lhs, rhs| {
+            (&lhs.0.name, &lhs.0.version).cmp(&(&rhs.0.name, &rhs.0.version))
+        });
+        result
+    }
+    pub fn get_by_name(
+        &self,
+        packages: &str,
+    ) -> Result<Option<&(Meta, PackageOrigin)>, anyhow::Error> {
+        for package in make_refs(&[packages.to_string()])? {
+            if let Some(versions) = self.packages.get(&package.name) {
+                let mut found: Option<&(Meta, PackageOrigin)> = None;
+                for (version, item) in versions {
+                    if version_match(&package.version, version)? {
+                        if found.map_or(Ok::<bool, anyhow::Error>(true), |prev| {
+                            Ok(Version::new(&prev.0.version)? < Version::new(version)?)
+                        })? {
+                            found = Some(item)
+                        }
+                    }
+                }
+                return Ok(found);
+            }
+        }
+        Ok(None)
     }
     pub fn into_vec(mut self) -> Vec<String> {
         let mut result: Vec<String> = self.packages.drain().map(|(k, _)| k).collect();

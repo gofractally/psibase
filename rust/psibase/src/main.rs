@@ -9,17 +9,19 @@ use jwt::SignWithKey;
 use psibase::services::{account_sys, auth_delegate_sys, psispace_sys};
 use psibase::{
     account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
-    get_installed_manifest, get_tapos_for_head, method, new_account_action, push_transaction,
-    push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
-    sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort,
-    DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList, PackageOp,
-    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
-    Transaction, TransactionBuilder, TransactionTrace,
+    get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,
+    push_transaction, push_transactions, reg_server, set_auth_service_action, set_code_action,
+    set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
+    AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, Meta,
+    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry, ServiceInfo,
+    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::fmt;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -1015,19 +1017,105 @@ async fn search(
     Ok(())
 }
 
+struct ServicePrinter<'a> {
+    service: AccountNumber,
+    info: Option<&'a ServiceInfo>,
+    data: &'a [PackageDataFile],
+}
+
+impl fmt::Display for ServicePrinter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(info) = &self.info {
+            writeln!(f, "service: {}", self.service)?;
+            if !info.flags.is_empty() {
+                write!(f, "  flags:")?;
+                for flag in &info.flags {
+                    write!(f, " {}", flag)?;
+                }
+                writeln!(f, "")?;
+            }
+            if let Some(server) = &info.server {
+                writeln!(f, "  server: {}", server)?;
+            }
+        } else {
+            writeln!(f, "account: {}", self.service)?;
+        }
+        if !self.data.is_empty() {
+            writeln!(f, "  files:")?;
+            for file in self.data {
+                writeln!(f, "    {}", &file.filename)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn get_service_data(s: &[PackageDataFile], account: AccountNumber) -> &[PackageDataFile] {
+    let key = account.to_string();
+    let lower = s.partition_point(|file| &file.account.to_string() < &key);
+    let upper = s.partition_point(|file| &file.account.to_string() <= &key);
+    &s[lower..upper]
+}
+
+async fn show_package<T: PackageRegistry + ?Sized>(
+    reg: &T,
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    package: &Meta,
+    origin: &PackageOrigin,
+) -> Result<(), anyhow::Error> {
+    let mut manifest = get_manifest(reg, base_url, client, package, origin).await?;
+    println!("name: {}-{}", &package.name, &package.version);
+    println!("description: {}", &package.description);
+    let mut services: Vec<_> = manifest.services.into_iter().collect();
+    services.sort_by(|lhs, rhs| lhs.0.to_string().cmp(&rhs.0.to_string()));
+    manifest.data.sort_by(|lhs, rhs| {
+        (
+            lhs.account.to_string(),
+            lhs.service.to_string(),
+            &lhs.filename,
+        )
+            .cmp(&(
+                rhs.account.to_string(),
+                rhs.service.to_string(),
+                &rhs.filename,
+            ))
+    });
+
+    for account in &package.accounts {
+        let info = services
+            .binary_search_by(|service| service.0.to_string().cmp(&account.to_string()))
+            .map_or(None, |idx| Some(&services[idx].1));
+        print!(
+            "{}",
+            &ServicePrinter {
+                service: *account,
+                info,
+                data: get_service_data(&manifest.data, *account)
+            }
+        );
+    }
+    Ok(())
+}
+
 async fn package_info(
     args: &Args,
     mut client: reqwest::Client,
     packages: &Vec<String>,
-    _sources: &Vec<String>,
+    sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
+    let installed = PackageList::installed(&args.api, &mut client).await?;
+    let package_registry = get_package_registry(sources, client.clone()).await?;
+    let reglist = PackageList::from_registry(&package_registry)?;
+
     for package in packages {
-        let manifest =
-            get_installed_manifest(&args.api, &mut client, package, account!("root")).await?;
-        for file in &manifest.data {
-            println!("{}:{}", &file.account, &file.filename);
+        if let Some((meta, origin)) = installed.get_by_name(package)? {
+            show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
+        } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
+            show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
         }
     }
+
     Ok(())
 }
 
