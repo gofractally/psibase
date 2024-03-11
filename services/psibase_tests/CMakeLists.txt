@@ -24,7 +24,7 @@ endfunction(add)
 if(DEFINED IS_WASM)
     conditional_add()
     add_wasm_test_release(psibase-tests)
-    configure_file(semver.json ${ROOT_BINARY_DIR}/semver.json COPY_ONLY)
+    configure_file(semver.json ${ROOT_BINARY_DIR}/semver.json COPYONLY)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
