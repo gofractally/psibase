@@ -483,6 +483,7 @@ psibase_package(
     DESCRIPTION "Service that does nothing"
     SERVICE nop-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
+    DEPENDS wasm
 )
 
 psibase_package(
