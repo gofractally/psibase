@@ -152,6 +152,7 @@ ExternalProject_Add(
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
 )
 
