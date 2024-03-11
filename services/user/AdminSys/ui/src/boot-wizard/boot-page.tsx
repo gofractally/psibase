@@ -8,7 +8,7 @@ import {
     getArrayBuffer,
     postArrayBuffer,
     postArrayBufferGetJson,
-} from "common/rpc.mjs";
+} from "@psibase/common-lib";
 import * as wasm from "wasm-psibase";
 
 type InstallType = {

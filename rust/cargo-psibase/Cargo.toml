@@ -10,16 +10,22 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0"
-binaryen = "0.12"
-cargo_metadata = "0.15.0"
-clap = {version = "3.1", features = ["derive"]}
+wasm-opt = "0.116.0"
+cargo_metadata = "0.18.1"
+clap = { version = "4.4", features = ["derive"]}
 console = "0.15.2"
-parity-wasm = "0.45"
-psibase = { path = "../psibase" }
+psibase = { version = "0.7.0", path = "../psibase" }
 regex = "1"
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 url = "2.3"
+walrus = "0.20.3"
+wasmparser = { version = "0.201.0"}
+tempfile = { version = "3.10" }
+
+[dev-dependencies]
+wasmprinter = { version = "0.201.0"}
+wat = { version = "1.201.0" }
 
 [build-dependencies]
-binaryen = "0.12"
+wasm-opt = "0.116.0"

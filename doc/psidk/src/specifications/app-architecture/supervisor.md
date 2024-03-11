@@ -1,16 +1,16 @@
 # Supervisor
 
-The supervisor is the name of the client-side code that is run by a psibase app and acts as the parent context for every plugin. All plugins run within the supervisor, and can interact with each other via message passing through the supervisor. The supervisor also provides core functionality to each psibase app, such as transaction packing, transaction submission, acquiring user authorization, resource management, and more.
+The supervisor is the name of the client-side code that is run by a psibase app to mediate communication between apps and provide certain services to apps. All plugins run within the supervisor, and can interact with each other via message passing through the supervisor. The supervisor also provides core functionality to each psibase app, such as transaction packing, transaction submission, acquiring user authorization, resource management, and more.
 
 ## Capabilities
 
 Supervisor is responsible for:
 
-* [Client side peering](#client-side-peering) - For exchange of data using WebRTC
-* [Event subscription feeds](#event-subscription-feeds) - Allowing UIs to respond to server-side [events](./events.md)
-* [Communication with plugins](./plugins.md#communication-with-plugins) - For modularizing app functionality
-* Transaction signing and authorization ([Smart authorization](../blockchain/smart-authorization.md))
-* Packing transactions into the [`fracpack`](../data-formats/fracpack.md) binary format
+- [Client side peering](#client-side-peering) - For exchange of data using WebRTC
+- [Event subscription feeds](#event-subscription-feeds) - Allowing UIs to respond to server-side [events](./events.md)
+- [Communication with plugins](./plugins.md#communication-with-plugins) - For modularizing app functionality
+- Transaction signing and authorization ([Smart authorization](../blockchain/smart-authorization.md))
+- Packing transactions into the [`fracpack`](../data-formats/fracpack.md) binary format
 
 ### Client-side peering
 
@@ -20,48 +20,123 @@ Supervisor is responsible for:
 
 Psibase apps may be interested in reacting to the emission of an [events](./events.md) from a service. In psibase networks, it is the supervisor that is responsible for providing an interface that allows a psibase app to subscribe to notifications for certain events.
 
-The supervisor will poll the root domain to watch for events that have been subscribed to by any psibase apps. When an event occurs, it will notify the psibase app using an `"Event"` message. 
+The supervisor will poll the root domain to watch for events that have been subscribed to by any psibase apps. When an event occurs, it will notify the psibase app using an `"Event"` message.
 
 > Note: These events are polled at a particular frequency, such as once per second. This notification system is therefore not designed to benefit apps which have hard real time event notification requirements. For such requirements it is recommended to run your own infrastructure provider node.
 
 ### Communication with plugins
 
+#### Inter-app communication via plugins at 3 levels of detail.
+
+First, here's what the frontend code looks like for an app to call method `method_name` on app `app2`:
+
+```
+const supervisor = new Supervisor();
+const res = await supervisor.call({
+    app: "app2",
+    method: "method_name",
+    params: { ... },
+})
+```
+
+##### Proposed Supervisor API
+
+```
+const services = [{
+    service: "sample_srvc_name",
+}, {
+    service: "srvc_name2",
+    plugin: "plugin2" // optional; assumed to be simply "plugin" by default
+}
+];
+
+// Supervisor.connect(...) will internally create a uuid to represent the client session
+const supervisor = await Supervisor.connect(options: {
+    services   // optional: for, e.g., preloading. the <wasm filename>.wasm
+    // if not provided, Supervisor will load the wasm specified in supervisor.call()
+});
+
+const res = await supervisor.call({
+    service: "service_name",
+    plugin: "plugin_name", // optional
+    method: "method_name",
+    params: {
+        arg1: "arg value 1"
+    }
+});
+```
+
+App1's call is routed through the Supervisor, which then routes the call to the intended app.
+This hierarchy of apps ensures all apps can verify the source/destination of their function calls is the Supervisor, which provides a security guaranty.
+
 ```svgbob
 .-------------------------------------------.
-| 🔒 app1.psibase                           |
+| 🔒 app1.psibase.tld                       |
 |-------------------------------------------|
 |                                           |
-|   .----------------------------------.    |
-|   | </> supervisor.psibase  [hidden] |    |
-|   |----------------------------------|    |
-|  <-->                                |    |
-|   |   .--------------------------.   |    |
-|   |   | </> app1.plugin.psibase  |   |    |
-|   |   |--------------------------|   |    |
-|   |  <-->                        |   |    |
-|   |   |                          |   |    |
-|   |   '--------------------------'   |    |
-|   |   .--------------------------.   |    |
-|   |   | </> app2.plugin.psibase  |   |    |
-|   |   |--------------------------|   |    |
-|   |  <-->                        |   |    |
-|   |   |                          |   |    |
-|   |   '--------------------------'   |    |
-|   '----------------------------------'    |
+|   .-------------------------------------. |
+|   | supervisor.psibase.tld [hidden]     | |
+|  <-->                                   | |
+|   |   .-----------------------------.   | |
+|   |   | app1.psibase.tld/plugin     |   | |
+|   |  <-->                           |   | |
+|   |   |                             |   | |
+|   |   '-----------------------------'   | |
+|   |   .-----------------------------.   | |
+|   |   | app2.psibase.tld/plugin     |   | |
+|   |  <-->                           |   | |
+|   |   |                             |   | |
+|   |   '-----------------------------'   | |
+|   '-------------------------------------' |
 |                                           |
 '-------------------------------------------'
 ```
 
-The supervisor is instantiated in an iframe by a psibase app, and is responsible for instantiating plugins in their own subdomains using hidden iframes.
+When App1 instantiates the Supervisor, Supervisor is embedded in a hidden iframe.
+The Supervisor, in turn, embeds another iframe that contains `app2`'s plugin.
+Finally, Supervisor mediates the call from app1 to app2's plugin (as well as a return value).
 
-For example, if `app.psibase` is requested from a psibase infrastructure provider, then the element stored at the root path in that service is returned to the client. That UI element is the root page of the psibase app, which will then request the supervisor from its domain on the server. After the supervisor loads, the psibase app can call into the supervisor in order to execute functionality defined in plugins.
+```svgbob
+.------------------------------------------------------------------------------------.
+| 🔒 html at _top https://app1.psibase.tld                                           |
+|------------------------------------------------------------------------------------|
+|                                                                                    |
+|   .-----------------------------------------------------------------------------.  |
+|   | [hidden] iframe.src = https://supervisor.psibase.tld                        |  |
+|   |-----------------------------------------------------------------------------|  |
+|  <-->                                                                           |  |
+|   |   .----------------------------------------------------------------------.  |  |
+|   |   | [hidden] iframe.src = https://app2.psibase.tld/common/wasm-loader    |  |  |
+|   |   |----------------------------------------------------------------------|  |  |
+|   |  <-->                                                                    |  |  |
+|   |   |    wasm-loader loads plugin for the requested app                    |  |  |
+|   |   |    Plugin: https://app2.psibase.tld/plugin.wasm                      |  |  |
+|   |   |                                                                      |  |  |
+|   |   '----------------------------------------------------------------------'  |  |
+|   |                                                                             |  |
+|   |   .----------------------------------------------------------------------.  |  |
+|   |   | [hidden] iframe.src = https://app3.psibase.tld/common/wasm-loader    |  |  |
+|   |   |----------------------------------------------------------------------|  |  |
+|   |  <-->                                                                    |  |  |
+|   |   |    wasm-loader loads plugin for the requested app                    |  |  |
+|   |   |    Plugin: https://app3.psibase.io/plugin.wasm                       |  |  |
+|   |   |                                                                      |  |  |
+|   |   '----------------------------------------------------------------------'  |  |
+|   |                                                                             |  |
+|   '-----------------------------------------------------------------------------'  |
+|                                                                                    |
+'------------------------------------------------------------------------------------'
+```
 
-> ⚠️ For security, plugins should only listen for messages from the supervisor. Otherwise, an attacker app could instantiate the victim app within its own iframe and impersonate the supervisor.
+For example, if `app1.psibase` is requested from a psibase infrastructure provider, then the element stored at the root path in that service is returned to the client. That UI element is the root page of the psibase app, which will then request the supervisor from its domain on the server. After the supervisor loads, the psibase app can call into the supervisor in order to execute functionality defined in app2's plugin.
+
+> ⚠️ For security, plugins should only listen for messages from the supervisor (identified by its domain). Otherwise, an attacker app could instantiate the victim app within its own iframe and impersonate the supervisor.
 
 #### Supervisor initialization
 
-1. An app instantiates the supervisor inside a hidden iframe and gives the supervisor an ID for identifying the window/session (to help distinguish messages if the app is open in multiple browser tabs).
-2. The app also tells the supervisor the address of its own plugin.
+Internally, instantiation of the supervisor creates an ID for identifying the window/session (to help distinguish messages to handle the case where the app is open in multiple browser tabs).
+
+TASK: Update below if/as Supervisor API changes
 
 ```mermaid
 sequenceDiagram
@@ -79,7 +154,7 @@ box rgb(85,85,85) server-side
 participant server
 end
 
-app1->>server: fetch supervisor.psibase
+app1->>server: new Supervisor() [fetch supervisor.psibase]
 server-->>app1: <return>
 note over app1: generate session ID
 app1->>supervisor: create(sessionID, myplugin: "plugin1.psibase")
@@ -88,11 +163,13 @@ plugin1-->>supervisor: <return>
 supervisor-->>app1: <return>
 ```
 
+NOTE: plugin location will be assumed to be the default of <app subdomain>/plugin.wasm unless otherwise specified during initialization.
+
 #### Adding actions
 
 A psibase app can both read from and write to its server side state. The process of writing to server-side state is called "submitting a transaction". A transaction is a structured payload that is authorized to execute an action on one or more services on behalf of a user. An action in a service is a callable function that updates the server-side state.
 
-A psibase app must wrap its client-side logic for calling actions into a [plugin](./plugins.md). On the client-side, apps may reach across the domain boundary using the [`Window.PostMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) API. This functionality is used to allow communication between the app, the supervisor, and all plugins. Plugins only need to listen to messages from the supervisor. The supervisor itself listens both to messages from its parent window and also to any of the child windows it creates. 
+A psibase app must wrap its client-side logic for calling actions into a [plugin](./plugins.md). On the client-side, apps may reach across the domain boundary using the [`Window.PostMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) API. This functionality is used to allow communication between the app, the supervisor, and all plugins. Plugins only need to listen to messages from the supervisor. The supervisor itself listens both to messages from its parent window and also to any of the child windows it creates.
 
 A transaction context is started when an app first calls into a plugin, meaning that actions can now be added into a transaction object by plugins sending action requests to the supervisor. When the initial call into the plugin is complete, the transaction context is closed and the transaction object will not accept any more actions. The transaction object is then authorized and submitted to the server.
 
@@ -165,7 +242,7 @@ activate plugin1
 plugin1->>supervisor: add action1<br>to transaction
 activate supervisor
 note over supervisor: transaction {<br>action1<br>}
-supervisor->>plugin1: 
+supervisor->>plugin1: <return>
 deactivate supervisor
 
 plugin1->>supervisor: action@plugin2
@@ -184,11 +261,11 @@ activate plugin2
 
 plugin2->>supervisor: add action2<br>to transaction
 note over supervisor: transaction {<br>action1<br>action2<br>}
-supervisor-->>plugin2: 
+supervisor-->>plugin2: <return>
 deactivate plugin2
-plugin2-->>supervisor: 
+plugin2-->>supervisor: <return>
 deactivate supervisor
-supervisor-->>plugin1: 
+supervisor-->>plugin1: deactivate plugin1
 deactivate plugin1
 supervisor->>server: submits transaction
 
@@ -202,21 +279,22 @@ The supervisor listens for messages posted to its window messages with the follo
 
 ```json
 {
-    "message": {
-        "session": "number", // A number identifying the session/window on which the supervisor was instantiated
-        "type": "...", // Where the type is one of the supported supervisor message types
-        "payload": "..." // Contents depends on the message type
-    }
+  "message": {
+    "session": "number", // A number identifying the session/window on which the supervisor was instantiated
+    "type": "...", // Where the type is one of the supported supervisor message types
+    "payload": "..." // Contents depends on the message type
+  }
 }
 ```
 
 Supported supervisor message types:
-* `"Action"` - Used when requesting the supervisor add an action to the pending transaction
-* `"IAC"` - Used when calling a function defined in a plugin of another application
-* `"IACResponse"` - A response to a prior IAC
-* `"Event"` - A notification from the supervisor that an event to which your app subscribed has been emitted
-* `"TransactionReceipt"` - A response with the payload returned by the node to whom a transaction was submitted
-* `"ChangeHistory"` - A notification fired by a psibase app when its history changes, used for synchronizing the URL
+
+- `"Action"` - Used when requesting the supervisor add an action to the pending transaction
+- `"IAC"` - Used when calling a function defined in a plugin of another application
+- `"IACResponse"` - A response to a prior IAC
+- `"Event"` - A notification from the supervisor that an event to which your app subscribed has been emitted
+- `"TransactionReceipt"` - A response with the payload returned by the node to whom a transaction was submitted
+- `"ChangeHistory"` - A notification fired by a psibase app when its history changes, used for synchronizing the URL
 
 Depending on the type of message, the payload is required to contain different parameters and the supervisor will behave differently.
 
@@ -226,7 +304,7 @@ Depending on the type of message, the payload is required to contain different p
 
 ### Transaction construction
 
-An app's user interface may call an `"IAC"` message on a supervisor, which lets plugins reqest actions to be added to a transaction. A transaction may be packed with multiple actions, which eases the authentication burden on the infrastructure providers who only need to run the authorization code once for the entire set of actions in the transaction, rather than once for each independent transaction.
+An app's user interface may call an `"IAC"` message on a supervisor, which lets plugins request actions to be added to a transaction. A transaction may be packed with multiple actions, which eases the authentication burden on the infrastructure providers who only need to run the authorization code once for the entire set of actions in the transaction, rather than once for each independent transaction.
 
 The supervisor will open a transaction at the start of a call to a plugin. Plugins may send the `"Action"` message to the supervisor to attempt to add the action into the transaction. Furthermore, plugins may themselves use the `"IAC"` message to call into other plugins. The supervisor will handle packing all the transactions (depth-first) that were requested by each plugin accessed by the entire interaction.
 
@@ -245,4 +323,3 @@ Authorizing a transaction is a multi-step process that requires aggregating one 
 Transactions need to be packed into the [`fracpack`](../data-formats/fracpack.md) format before they are submitted. To do this, first, actions must be packed. To pack an action, supervisor will expect that the service on whom an action is being called handles requests made to `POST /pack_action/x`, wher `x` is the name of the action. The message body will include the action arguments, and the service is responsible for returning the packed `application/octet-stream` back to the supervisor, which can then include the packed actions in its transaction.
 
 Supervisor must then use endpoints that are exposed by psibase infrastructure provider nodes: `POST /common/pack/Transaction` and `POST /common/pack/SignedTransaction`. These endpoints are used to pack the transaction, which can then be sent to the node.
-

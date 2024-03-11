@@ -6,12 +6,9 @@ import {
   setQueries,
   postGraphQLGetJson,
   uint8ArrayToHex,
-} from "/common/rpc.mjs";
-
-import {
   publicStringToKeyPair,
   publicKeyPairToFracpack,
-} from "/common/keyConversions.mjs";
+} from "/common/common-lib.js";
 
 const html = htm.bind(React.createElement);
 

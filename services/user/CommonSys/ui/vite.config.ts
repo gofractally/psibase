@@ -4,7 +4,28 @@ import path from "path";
 import alias from "@rollup/plugin-alias";
 import svgr from "vite-plugin-svgr";
 
-const psibase = (appletContract: string) => {
+const psibase = (appletContract: string, isServing?: boolean) => {
+    const buildAliases = [
+        {
+            find: "/common/iframeResizer.contentWindow.js",
+            replacement: path.resolve(
+                "../common/resources/thirdParty/src/iframeResizer.contentWindow.js"
+            ),
+        },
+        {
+            // bundle non-external (above) common files except fonts (which should only be referenced)
+            find: /^\/common(?!\/(?:fonts))(.*)$/,
+            replacement: path.resolve("../common/resources$1"),
+        },
+    ];
+
+    if (isServing) {
+        buildAliases.push({
+            find: /^@psibase\/common-lib.*$/,
+            replacement: path.resolve("../common/packages/common-lib/src"),
+        });
+    }
+
     return [
         {
             name: "psibase",
@@ -16,8 +37,8 @@ const psibase = (appletContract: string) => {
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
-                                "/common/rpc.mjs",
                                 "/common/iframeResizer.js",
+                                "/common/common-lib.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
                             output: {
@@ -31,7 +52,7 @@ const psibase = (appletContract: string) => {
                         port: 8081,
                         proxy: {
                             "/": {
-                                target: "http://psibase.127.0.0.1.sslip.io:8080/",
+                                target: "http://psibase.127.0.0.1.sslip.io:8079/",
                                 bypass: (req, _res, _opt) => {
                                     const host = req.headers.host || "";
                                     const subdomain = host.split(".")[0];
@@ -50,32 +71,27 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: [
-                            {
-                                find: "/common/iframeResizer.contentWindow.js",
-                                replacement: path.resolve(
-                                    "../common/thirdParty/src/iframeResizer.contentWindow.js"
-                                ),
-                            },
-                            {
-                                // bundle non-external (above) common files except fonts (which should only be referenced)
-                                find: /^\/common(?!\/(?:fonts))(.*)$/,
-                                replacement: path.resolve("../common$1"),
-                            },
-                        ],
+                        alias: buildAliases,
                     },
                 };
             },
         },
         alias({
             entries: [
-                { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
+                {
+                    find: /^@psibase\/common-lib.*$/,
+                    replacement: "/common/common-lib.js",
+                },
             ],
         }),
     ];
 };
 
 // https://vitejs.dev/config/
-export default defineConfig({
-    plugins: [react(), svgr({ exportAsDefault: true }), psibase("psibase")],
-});
+export default defineConfig(({ command }) => ({
+    plugins: [
+        react(),
+        svgr({ exportAsDefault: true }),
+        psibase("psibase", command === "serve"),
+    ],
+}));

@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "account_sys",
     "burst-transfer",
     "cargo-psibase",
     "fracpack",
@@ -10,13 +9,14 @@ members = [
     "psibase_macros",
     "psibase",
     "test_contract",
+    "test_contract_2",
     "test_service_elections",
     "test_service_psispace",
     "test_fracpack",
 ]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
