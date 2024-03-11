@@ -185,6 +185,7 @@ function(psibase_package)
         set(_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${_NAME}.psi)
     endif()
     set(outdir ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_NAME}.psi.tmp)
+    set(copy-contents)
     set(contents meta.json)
     set(zip-deps)
     set(init-services)
@@ -205,11 +206,7 @@ function(psibase_package)
                 set(wasm ${_WASM_${service}})
                 set(deps ${wasm})
             endif()
-            add_custom_command(
-                OUTPUT ${outdir}/service/${service}.wasm
-                DEPENDS ${deps}
-                COMMAND cmake -E create_symlink ${wasm} ${outdir}/service/${service}.wasm
-            )
+            list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service}.wasm)
             list(APPEND contents service/${service}.wasm service/${service}.json)
         endif()
         if(_DATA_${service})
@@ -218,6 +215,11 @@ function(psibase_package)
             set(last)
             set(current_group)
             set(is_glob)
+            if (APPLE)
+                set(hardlink-opt)
+            else()
+                set(hardlink-opt -l)
+            endif()
             foreach(item IN ITEMS ${_DATA_${service}} DATA)
                 if(item STREQUAL "DATA")
                     if (last MATCHES "^/")
@@ -229,11 +231,11 @@ function(psibase_package)
                     if(n GREATER 0)
                         string(JOIN " " current_group ${current_group})
                         if(is_glob)
-                            list(APPEND commands COMMAND bash -c "ln -fs ${current_group} ${dest}")
+                            list(APPEND commands COMMAND bash -c "cp -r ${hardlink-opt} ${current_group} ${dest}")
                             list(APPEND dirs ${dest})
                         else()
                             string(REGEX REPLACE "/$" "" dest ${dest})
-                            list(APPEND commands COMMAND ${CMAKE_COMMAND} -E create_symlink ${current_group} ${dest})
+                            list(APPEND commands COMMAND cp -r ${hardlink-opt} ${current_group} ${dest})
                             list(APPEND zip-deps ${current_group})
                             string(REGEX REPLACE "/[^/]+$" "" parent ${dest})
                             list(APPEND dirs ${parent})
@@ -249,12 +251,9 @@ function(psibase_package)
                     set(last ${item})
                 endif()
             endforeach()
-            add_custom_command(
-                OUTPUT ${outdir}/data/${service}
-                DEPENDS ${_DEPENDS}
+            list(APPEND copy-contents
                 COMMAND ${CMAKE_COMMAND} -E make_directory ${dirs}
-                ${commands}
-            )
+                ${commands})
             list(APPEND contents data/${service})
         endif()
     endforeach()
@@ -277,12 +276,9 @@ function(psibase_package)
         file(GENERATE OUTPUT ${outdir}/script/postinstall.json CONTENT ${postinstall})
         list(APPEND contents script/postinstall.json)
     elseif(_POSTINSTALL)
-        add_custom_command(
-            OUTPUT ${outdir}/script/postinstall.json
-            DEPENDS ${_POSTINSTALL}
+        list(APPEND copy-contents
             COMMAND ${CMAKE_COMMAND} -E make_directory ${outdir}/script
-            COMMAND ${CMAKE_COMMAND} -E create_symlink ${_POSTINSTALL} ${outdir}/script/postinstall.json
-        )
+            COMMAND ln -f ${_POSTINSTALL} ${outdir}/script/postinstall.json)
         list(APPEND contents script/postinstall.json)
     endif()
 
@@ -300,16 +296,15 @@ function(psibase_package)
         DEPENDS ${_PACKAGE_DEPENDS}
     )
     string(REGEX REPLACE "/[^/]+/?$" "" output-dir ${_OUTPUT})
-    set(tempdir ${outdir}.tmp)
     add_custom_command(
         OUTPUT ${_OUTPUT}
         DEPENDS ${zip-deps} ${deps} ${_DEPENDS}
         WORKING_DIRECTORY ${outdir}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${output-dir}
         COMMAND ${CMAKE_COMMAND} -E remove -f ${_OUTPUT}
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${outdir} ${tempdir}
-        COMMAND cd ${tempdir} && ${CMAKE_COMMAND} -E tar cf ${_OUTPUT} --format=zip ${contents}
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${tempdir}
+        COMMAND ${CMAKE_COMMAND} -E remove_directory ${outdir}/data
+        ${copy-contents}
+        COMMAND cd ${outdir} && ${CMAKE_COMMAND} -E tar cf ${_OUTPUT} --format=zip ${contents}
     )
     add_custom_target(${_NAME} ALL DEPENDS ${_OUTPUT})
 endfunction()
