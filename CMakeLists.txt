@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.16.3)
 cmake_policy(VERSION 3.16.3...3.25.1)
 project(psibase)
-enable_testing()
 include(ExternalProject)
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -32,7 +31,8 @@ option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
 
 add_subdirectory(native)
-file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\")\n")
+add_subdirectory(rust)
+file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\", \"rust\")\n")
 
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
@@ -210,11 +210,6 @@ ExternalProject_Add(
     BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
-)
-add_test(
-    NAME CargoTestCargoPsibase
-    COMMAND cargo test --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/cargo-psibase/Cargo.toml
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust/cargo-psibase/
 )
 
 # UIs built with yarn
