@@ -187,7 +187,7 @@ function(psibase_package)
     set(outdir ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_NAME}.psi.tmp)
     set(copy-contents)
     set(contents meta.json)
-    set(zip-deps)
+    set(zip-deps ${outdir}/meta.json)
     set(init-services)
     foreach(service IN LISTS _SERVICES)
         if(_WASM_${service} OR _TARGET_${service})
@@ -196,15 +196,16 @@ function(psibase_package)
                 FLAGS ${_FLAGS_${service}}
                 SERVER ${_SERVER_${service}}
             )
+            list(APPEND zip-deps ${outdir}/service/${service}.json)
             if(_INIT_${service})
                 list(APPEND init-services ${service})
             endif()
             if (_TARGET_${service})
                 set(wasm $<TARGET_FILE:${_TARGET_${service}}>)
-                set(deps ${_TARGET_${service}})
+                list(APPEND zip-deps ${_TARGET_${service}})
             else()
                 set(wasm ${_WASM_${service}})
-                set(deps ${wasm})
+                list(APPEND zip-deps ${wasm})
             endif()
             list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service}.wasm)
             list(APPEND contents service/${service}.wasm service/${service}.json)
@@ -275,18 +276,15 @@ function(psibase_package)
         string(APPEND postinstall "]")
         file(GENERATE OUTPUT ${outdir}/script/postinstall.json CONTENT ${postinstall})
         list(APPEND contents script/postinstall.json)
+        list(APPEND zip-deps ${outdir}/script/postinstall.json)
     elseif(_POSTINSTALL)
         list(APPEND copy-contents
             COMMAND ${CMAKE_COMMAND} -E make_directory ${outdir}/script
             COMMAND ln -f ${_POSTINSTALL} ${outdir}/script/postinstall.json)
         list(APPEND contents script/postinstall.json)
+        list(APPEND zip-deps ${_POSTINSTALL})
     endif()
 
-    set(deps)
-    foreach(file IN LISTS contents)
-        list(APPEND deps ${outdir}/${file})
-    endforeach()
-    
     write_meta(
         OUTPUT ${outdir}/meta.json
         NAME ${_NAME}
@@ -298,7 +296,7 @@ function(psibase_package)
     string(REGEX REPLACE "/[^/]+/?$" "" output-dir ${_OUTPUT})
     add_custom_command(
         OUTPUT ${_OUTPUT}
-        DEPENDS ${zip-deps} ${deps} ${_DEPENDS}
+        DEPENDS ${zip-deps} ${_DEPENDS}
         WORKING_DIRECTORY ${outdir}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${output-dir}
         COMMAND ${CMAKE_COMMAND} -E remove -f ${_OUTPUT}
