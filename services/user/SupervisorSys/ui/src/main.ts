@@ -147,8 +147,18 @@ const onFunctionCallRequest = (message: FunctionCallRequest) => {
   );
 };
 
+let rootApplicationOrigin: string;
+
+const setApplicationOrigin = (origin: string) => {
+  if (origin && !rootApplicationOrigin) {
+    console.log(`Setting root application origin to ${origin}`);
+    rootApplicationOrigin = origin;
+  }
+}
+
 const sendFunctionCallResponse = (id: string, response: any) => {
-  window.parent.postMessage(buildFunctionCallResponse(id, response), "*");
+  if (!rootApplicationOrigin) throw new Error(`Cannot send function call response when root application origin is not yet tracked.`)
+  window.parent.postMessage(buildFunctionCallResponse(id, response), rootApplicationOrigin);
 };
 
 const checkForResolution = () => {
@@ -341,6 +351,7 @@ const isMessageFromChild = (message: MessageEvent): boolean => {
 
 const onRawEvent = (message: MessageEvent<any>) => {
   if (isMessageFromApplication(message)) {
+      setApplicationOrigin(message.origin);
       if (isFunctionCallRequest(message.data)) {
           onFunctionCallRequest(message.data);
       } else if (isPreLoadServicesRequest(message.data)) {
