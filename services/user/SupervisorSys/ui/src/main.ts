@@ -100,17 +100,17 @@ const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
   });
 };
 
-interface PendingFunctionCall<T = any> {
+interface CallStack<T = any> {
   id: string;
   args: FunctionCallArgs;
   result?: T;
-  nestedCalls: PendingFunctionCall[];
+  nestedCalls: CallStack[];
 }
 
-let pendingFunctionCalls: PendingFunctionCall[] = [];
+let callStack: CallStack[] = [];
 
 const addRootFunctionCall = (message: FunctionCallRequest) => {
-  const idAlreadyExists = pendingFunctionCalls.some(
+  const idAlreadyExists = callStack.some(
     (call) => call.id == message.payload.id
   );
   if (idAlreadyExists)
@@ -118,7 +118,7 @@ const addRootFunctionCall = (message: FunctionCallRequest) => {
       `Cannot create new pending function call, ID ${message.payload.id} already exists`
     );
 
-  pendingFunctionCalls.push({
+  callStack.push({
     id: message.payload.id,
     args: message.payload.args,
     nestedCalls: [],
@@ -162,7 +162,7 @@ const sendFunctionCallResponse = (id: string, response: any) => {
 };
 
 const checkForResolution = () => {
-  const checkForTrigger = (funCall: PendingFunctionCall): void => {
+  const checkForTrigger = (funCall: CallStack): void => {
     const isAllSettledWithNoResult =
       funCall.nestedCalls.every((call) => typeof call.result !== undefined) &&
       !funCall.result;
@@ -183,22 +183,22 @@ const checkForResolution = () => {
     }
     funCall.nestedCalls.forEach(checkForTrigger);
   };
-  pendingFunctionCalls
+  callStack
     .filter((x) => typeof x.result !== undefined)
     .forEach(checkForTrigger);
 
-  const toSend = pendingFunctionCalls.filter((call) => !!call.result);
+  const toSend = callStack.filter((call) => !!call.result);
   toSend.forEach(({ id, result }) => {
     sendFunctionCallResponse(id, result);
   });
-  pendingFunctionCalls = pendingFunctionCalls.filter(
+  callStack = callStack.filter(
     (funcCall) => !toSend.some((x) => x.id == funcCall.id)
   );
 };
 
 const onPluginCallResponse = (message: PluginCallResponse) => {
   const id = message.payload.id;
-  const updateFunctionCall = (funCall: PendingFunctionCall): void => {
+  const updateFunctionCall = (funCall: CallStack): void => {
     if (funCall.id == id) {
       funCall.result = message.payload.result;
     } else {
@@ -206,15 +206,15 @@ const onPluginCallResponse = (message: PluginCallResponse) => {
     }
   };
 
-  pendingFunctionCalls.forEach(updateFunctionCall);
+  callStack.forEach(updateFunctionCall);
   checkForResolution();
 };
 
 const updatePendingFunctionCall = <T>(
-  array: PendingFunctionCall<T>[],
+  array: CallStack<T>[],
   targetId: string,
-  updateFunction: (call: PendingFunctionCall<T>) => PendingFunctionCall<T>
-): PendingFunctionCall<T>[] => {
+  updateFunction: (call: CallStack<T>) => CallStack<T>
+): CallStack<T>[] => {
   let idFound = false;
   const updatedArray = array.map((call) =>
     call.id === targetId
@@ -237,11 +237,11 @@ const updatePendingFunctionCall = <T>(
 };
 
 const findFunctionCallById = <T>(
-  calls: PendingFunctionCall<T>[],
+  calls: CallStack<T>[],
   targetId: string
-): PendingFunctionCall<T> | undefined => {
+): CallStack<T> | undefined => {
   const foundCall = calls.find(
-    (call: PendingFunctionCall<T>) => call.id === targetId
+    (call: CallStack<T>) => call.id === targetId
   );
 
   if (foundCall) {
@@ -257,7 +257,7 @@ const findFunctionCallById = <T>(
 };
 
 const executeCall = (id: string) => {
-  const toExecute = findFunctionCallById(pendingFunctionCalls, id);
+  const toExecute = findFunctionCallById(callStack, id);
   if (!toExecute) throw new Error(`Failed to find function call ID: ${id}`);
 
   sendPluginCallRequest(
@@ -283,11 +283,11 @@ const onPluginCallFailure = (message: PluginCallFailure) => {
   const { id, method, params, service } = message.payload;
   const subId = generateRandomString();
 
-  pendingFunctionCalls = updatePendingFunctionCall(
-    pendingFunctionCalls,
+  callStack = updatePendingFunctionCall(
+    callStack,
     id,
-    (pending): PendingFunctionCall => {
-      const nestedCalls: PendingFunctionCall[] = [
+    (pending): CallStack => {
+      const nestedCalls: CallStack[] = [
         ...pending.nestedCalls,
         {
           args: {
