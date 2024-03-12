@@ -4,7 +4,6 @@ import { parseFunctions } from "./witParsing";
 import {
     PluginCallResponse,
     isPluginCallRequest,
-    PluginCallRequest,
     PluginCallPayload,
     buildPluginCallResponse,
     buildMessageLoaderInitialized
