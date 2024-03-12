@@ -57,7 +57,17 @@ const createLoaderDomain = (subDomain = "supervisor-sys") =>
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
 
+
+const loadedServices: string[] = [];
+
+const upsertLoadedService = (service: string) => {
+  if (loadedServices.includes(service)) return;
+  loadedServices.push(service);
+};
+
+
 const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
+  upsertLoadedService(service);
   const iFrameId = buildIFrameId(service);
   const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
   if (loader) return loader;
@@ -292,22 +302,56 @@ const onPluginCallFailure = (message: PluginCallFailure) => {
 };
 
 const onPreloadServicesRequest = ({
-  payload,
+  payload
 }: PreLoadServicesRequest): void => {
   payload.services.forEach(getLoader);
+    payload.services.forEach(getLoader);
+};
+
+const generateSubdomain = (subDomain?: string): string => {
+  const currentUrl = new URL(window.location.href);
+  const hostnameParts = currentUrl.hostname.split(".");
+
+  hostnameParts.shift();
+  if (subDomain) {
+      hostnameParts.unshift(subDomain);
+  }
+  currentUrl.hostname = hostnameParts.join(".");
+
+  return currentUrl.origin;
+};
+
+const isMessageFromApplication = (message: MessageEvent) => {
+  const isTop = message.source == window.top;
+  const isParent = message.source == window.parent;
+  const isSameRootDomain =
+      message.origin.endsWith(generateSubdomain().slice("https://".length)) &&
+      message.origin.startsWith("https://");
+  return isTop && isParent && isSameRootDomain;
+};
+
+const isMessageFromChild = (message: MessageEvent): boolean => {
+  const originIsChild = loadedServices
+      .map(generateSubdomain)
+      .includes(message.origin);
+  const isTop = message.source == window.top;
+  const isParent = message.source == window.parent;
+  return originIsChild && !isTop && !isParent;
 };
 
 const onRawEvent = (message: MessageEvent<any>) => {
-  if (isFunctionCallRequest(message.data)) {
-    // TODO Assert origin of supervisor-sys
-    onFunctionCallRequest(message.data);
-  } else if (isPluginCallResponse(message.data)) {
-    // TODO Assert origin of plugin call
-    onPluginCallResponse(message.data);
-  } else if (isPreLoadServicesRequest(message.data)) {
-    onPreloadServicesRequest(message.data);
-  } else if (isPluginCallFailure(message.data)) {
-    onPluginCallFailure(message.data);
+  if (isMessageFromApplication(message)) {
+      if (isFunctionCallRequest(message.data)) {
+          onFunctionCallRequest(message.data);
+      } else if (isPreLoadServicesRequest(message.data)) {
+          onPreloadServicesRequest(message.data);
+      }
+  } else if (isMessageFromChild(message)) {
+      if (isPluginCallResponse(message.data)) {
+          onPluginCallResponse(message.data);
+      } else if (isPluginCallFailure(message.data)) {
+          onPluginCallFailure(message.data);
+      }
   }
 };
 

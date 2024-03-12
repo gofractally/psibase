@@ -26,7 +26,7 @@ const wasmUrlToIntArray = (url: string) =>
         .then((res) => res.arrayBuffer())
         .then((buffer) => new Uint8Array(buffer));
 
-const functionCall = async ({
+const onPluginCallRequest = async ({
     id,
     args,
     precomputedResults
@@ -75,14 +75,33 @@ const sendPluginCallResponse = (response: PluginCallResponse) => {
     window.parent.postMessage(response, "*");
 };
 
-const onPluginCallRequest = (request: PluginCallRequest) =>
-    functionCall(request.payload);
+const generateSubdomain = (subDomain?: string): string => {
+    const currentUrl = new URL(window.location.href);
+    const hostnameParts = currentUrl.hostname.split(".");
+
+    hostnameParts.shift();
+    if (subDomain) {
+        hostnameParts.unshift(subDomain);
+    }
+    currentUrl.hostname = hostnameParts.join(".");
+
+    return currentUrl.origin;
+};
+
+const supervisorDomain = generateSubdomain("supervisor-sys");
+
+const isMessageFromSupervisor = (message: MessageEvent) => {
+    const isTop = message.source == window.top;
+    const isParent = message.source == window.parent;
+    const isSupervisorDomain = message.origin == supervisorDomain;
+    return !isTop && isParent && isSupervisorDomain;
+};
 
 const onRawEvent = (message: MessageEvent) => {
-    if (isPluginCallRequest(message.data)) {
-        onPluginCallRequest(message.data);
+    if (isMessageFromSupervisor(message) && isPluginCallRequest(message.data)) {
+        onPluginCallRequest(message.data.payload);
     }
 };
 
 window.addEventListener("message", onRawEvent);
-window.parent.postMessage(buildMessageLoaderInitialized(), "*");
+window.parent.postMessage(buildMessageLoaderInitialized(), supervisorDomain);
