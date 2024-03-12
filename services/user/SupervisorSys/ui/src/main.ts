@@ -57,7 +57,15 @@ const createLoaderDomain = (subDomain = "supervisor-sys") =>
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
 
+const loadedServices: string[] = [];
+
+const upsertLoadedService = (service: string) => {
+    if (loadedServices.includes(service)) return;
+    loadedServices.push(service);
+};
+
 const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
+    upsertLoadedService(service);
     const iFrameId = buildIFrameId(service);
     const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
     if (loader) return loader;
@@ -317,33 +325,31 @@ const isMessageFromApplication = (message: MessageEvent) => {
     const isSameRootDomain =
         message.origin.endsWith(generateSubdomain().slice("https://".length)) &&
         message.origin.startsWith("https://");
-    console.log({
-        isTop,
-        isParent,
-        isSameRootDomain,
-        origin: message.origin,
-        subdomain: generateSubdomain()
-    });
     return isTop && isParent && isSameRootDomain;
 };
 
-const onRawEvent = (message: MessageEvent<any>) => {
-    const x = isMessageFromApplication(message);
-    console.log({ x });
+const isMessageFromChild = (message: MessageEvent): boolean => {
+    const originIsChild = loadedServices
+        .map(generateSubdomain)
+        .includes(message.origin);
+    const isTop = message.source == window.top;
+    const isParent = message.source == window.parent;
+    return originIsChild && !isTop && !isParent;
+};
 
+const onRawEvent = (message: MessageEvent<any>) => {
     if (isMessageFromApplication(message)) {
         if (isFunctionCallRequest(message.data)) {
             onFunctionCallRequest(message.data);
+        } else if (isPreLoadServicesRequest(message.data)) {
+            onPreloadServicesRequest(message.data);
         }
-    }
-
-    if (isPluginCallResponse(message.data)) {
-        // TODO Assert origin of plugin call
-        onPluginCallResponse(message.data);
-    } else if (isPreLoadServicesRequest(message.data)) {
-        onPreloadServicesRequest(message.data);
-    } else if (isPluginCallFailure(message.data)) {
-        onPluginCallFailure(message.data);
+    } else if (isMessageFromChild(message)) {
+        if (isPluginCallResponse(message.data)) {
+            onPluginCallResponse(message.data);
+        } else if (isPluginCallFailure(message.data)) {
+            onPluginCallFailure(message.data);
+        }
     }
 };
 
