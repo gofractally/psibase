@@ -196,11 +196,7 @@ pub fn put_sequential<Type: Pack, V: Pack>(
     ty: &Type,
     value: &V,
 ) -> u64 {
-    let mut packed = Vec::new();
-    service.pack(&mut packed);
-    ty.pack(&mut packed);
-    value.pack(&mut packed);
-    put_sequential_bytes(db, &packed)
+    put_sequential_bytes(db, &(service, ty, value).packed())
 }
 
 /// Remove a key-value pair if it exists

@@ -1,12 +1,12 @@
 use darling::FromMeta;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use proc_macro_error::abort;
+use proc_macro_error::{abort, emit_error};
 use quote::{quote, ToTokens};
 use std::{collections::HashMap, str::FromStr};
 use syn::{
     parse_macro_input, parse_quote, AttrStyle, Attribute, Field, FnArg, ImplItem, Item, ItemFn,
-    ItemImpl, ItemMod, ItemStruct, Pat, ReturnType, Type,
+    ItemImpl, ItemMod, ItemStruct, Meta, NestedMeta, Pat, ReturnType, Type,
 };
 
 #[derive(Debug, FromMeta)]
@@ -36,6 +36,10 @@ pub struct Options {
     actions: String,
     wrapper: String,
     structs: String,
+    history_events: String,
+    ui_events: String,
+    merkle_events: String,
+    event_structs: String,
     dispatch: Option<bool>,
     pub_constant: bool,
     psibase_mod: String,
@@ -50,6 +54,10 @@ impl Default for Options {
             actions: "Actions".into(),
             wrapper: "Wrapper".into(),
             structs: "action_structs".into(),
+            history_events: "HistoryEvents".into(),
+            ui_events: "UiEvents".into(),
+            merkle_events: "MerkleEvents".into(),
+            event_structs: "event_structs".into(),
             dispatch: None,
             pub_constant: true,
             psibase_mod: "psibase".into(),
@@ -102,6 +110,45 @@ fn is_table_attr(attr: &Attribute) -> bool {
     false
 }
 
+#[derive(PartialEq, Eq, Hash)]
+enum EventType {
+    History,
+    Ui,
+    Merkle,
+}
+
+fn parse_event_attr(attr: &Attribute) -> Option<EventType> {
+    if let AttrStyle::Outer = attr.style {
+        if attr.path.is_ident("event") {
+            match attr.parse_meta() {
+                Ok(Meta::List(list)) => {
+                    if list.nested.len() == 1 {
+                        if let Some(NestedMeta::Meta(Meta::Path(inner))) = list.nested.first() {
+                            if inner.is_ident("history") {
+                                return Some(EventType::History);
+                            } else if inner.is_ident("ui") {
+                                return Some(EventType::Ui);
+                            } else if inner.is_ident("merkle") {
+                                return Some(EventType::Merkle);
+                            } else {
+                                emit_error!(inner, "expected history, ui, or merkle");
+                                return None;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+            emit_error!(attr, "invalid event attribute");
+        }
+    }
+    None
+}
+
+fn is_event_attr(attr: &Attribute) -> bool {
+    matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("event")
+}
+
 fn process_mod(
     options: &Options,
     psibase_mod: &proc_macro2::TokenStream,
@@ -112,6 +159,10 @@ fn process_mod(
     let service_account_str = service_account.to_string();
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
+    let history_events = proc_macro2::TokenStream::from_str(&options.history_events).unwrap();
+    let ui_events = proc_macro2::TokenStream::from_str(&options.ui_events).unwrap();
+    let merkle_events = proc_macro2::TokenStream::from_str(&options.merkle_events).unwrap();
+    let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
     let psibase_mod_str = psibase_mod.to_string();
@@ -119,6 +170,7 @@ fn process_mod(
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
         let mut action_fns: Vec<usize> = Vec::new();
+        let mut event_fns: HashMap<EventType, Vec<usize>> = HashMap::new();
         for (item_index, item) in items.iter_mut().enumerate() {
             if let Item::Struct(s) = item {
                 if s.attrs.iter().any(is_table_attr) {
@@ -130,6 +182,11 @@ fn process_mod(
                 if f.attrs.iter().any(is_action_attr) {
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
+                }
+                for attr in &f.attrs {
+                    if let Some(kind) = parse_event_attr(attr) {
+                        event_fns.entry(kind).or_insert(Vec::new()).push(item_index);
+                    }
                 }
             }
         }
@@ -354,6 +411,16 @@ fn process_mod(
             "{} This method defaults `service` to \"{}\".",
             pack_from_to_doc, options.name
         );
+        let emit_from_doc = format!(
+            "
+            Emit events from a service.
+
+            "
+        );
+        let emit_doc = format!(
+            "{} This method defaults `service` to \"{}\".",
+            emit_from_doc, options.name
+        );
 
         items.push(parse_quote! {
             #[automatically_derived]
@@ -483,8 +550,116 @@ fn process_mod(
                 {
                     #psibase_mod::ActionPacker { sender, service }.into()
                 }
+
+                #[doc = #emit_from_doc]
+                pub fn emit() -> EmitEvent {
+                    EmitEvent { sender: Self::#constant }
+                }
+
+                #[doc = #emit_doc]
+                pub fn emit_from(sender: #psibase_mod::AccountNumber) -> EmitEvent {
+                    EmitEvent { sender }
+                }
             }
         });
+
+        items.push(parse_quote! {
+            #[automatically_derived]
+            pub struct #history_events {
+                event_log: #psibase_mod::DbId,
+                sender: #psibase_mod::AccountNumber,
+            }
+        });
+
+        items.push(parse_quote! {
+            #[automatically_derived]
+            pub struct #ui_events {
+                event_log: #psibase_mod::DbId,
+                sender: #psibase_mod::AccountNumber,
+            }
+        });
+
+        items.push(parse_quote! {
+            #[automatically_derived]
+            pub struct #merkle_events {
+                event_log: #psibase_mod::DbId,
+                sender: #psibase_mod::AccountNumber,
+            }
+        });
+
+        items.push(parse_quote! {
+            pub struct EmitEvent {
+                sender: #psibase_mod::AccountNumber,
+            }
+        });
+
+        items.push(parse_quote! {
+            impl EmitEvent {
+                pub fn history(&self) -> #history_events {
+                    #history_events { event_log: #psibase_mod::DbId::HistoryEvent, sender: self.sender }
+                }
+                pub fn ui(&self) -> #ui_events {
+                    #ui_events { event_log: #psibase_mod::DbId::UiEvent, sender: self.sender }
+                }
+                pub fn merkle(&self) -> #merkle_events {
+                    #merkle_events { event_log: #psibase_mod::DbId::MerkleEvent, sender: self.sender }
+                }
+            }
+        });
+
+        for (kind, fns) in event_fns {
+            let mut event_callers = proc_macro2::TokenStream::new();
+            let mut event_structs = quote! {};
+            for fn_index in fns {
+                if let Item::Fn(f) = &items[fn_index] {
+                    let mut invoke_args = quote! {};
+                    let mut invoke_struct_args = quote! {};
+                    let mut reflect_args = quote! {};
+                    process_action_args(
+                        options,
+                        psibase_mod,
+                        f,
+                        &mut event_structs,
+                        &mut invoke_args,
+                        &mut invoke_struct_args,
+                        &mut reflect_args,
+                    );
+                    process_event_callers(psibase_mod, f, &mut event_callers, &invoke_args);
+                }
+            }
+            let event_name = match kind {
+                EventType::History => &history_events,
+                EventType::Ui => &ui_events,
+                EventType::Merkle => &merkle_events,
+            };
+            items.push(parse_quote! {
+                #[automatically_derived]
+                #[allow(non_snake_case)]
+                #[allow(non_camel_case_types)]
+                #[allow(non_upper_case_globals)]
+                impl #event_name {
+                    #event_callers
+                }
+            });
+            let event_module_name = match kind {
+                EventType::History => quote!(history),
+                EventType::Ui => quote!(ui),
+                EventType::Merkle => quote!(merkle),
+            };
+            items.push(parse_quote! {
+                #[automatically_derived]
+                #[allow(non_snake_case)]
+                #[allow(non_camel_case_types)]
+                #[allow(non_upper_case_globals)]
+                mod #event_structs_mod {
+                    mod #event_module_name {
+                        use super::super::*;
+                        #event_structs
+                    }
+                }
+            });
+        }
+
         let num_actions = action_fns.len();
         items.push(parse_quote! {
             #[automatically_derived]
@@ -565,6 +740,13 @@ fn process_mod(
                 }
             });
         }
+        // Remove all event functions
+        items.retain(|item| {
+            if let Item::Fn(f) = item {
+                return !f.attrs.iter().any(|attr| is_event_attr(attr));
+            }
+            return true;
+        });
     } else {
         abort!(
             impl_mod,
@@ -1098,4 +1280,38 @@ fn add_unknown_action_check_to_dispatch_body(
             }
         };
     }
+}
+
+fn process_event_callers(
+    psibase_mod: &proc_macro2::TokenStream,
+    f: &ItemFn,
+    event_callers: &mut proc_macro2::TokenStream,
+    invoke_args: &proc_macro2::TokenStream,
+) {
+    let name = &f.sig.ident;
+    let name_str = name.to_string();
+    let method_number =
+        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
+    let inputs = &f.sig.inputs;
+
+    let inner_doc = f
+        .attrs
+        .iter()
+        .filter(|attr| matches!(attr.style, AttrStyle::Inner(_)) && attr.path.is_ident("doc"))
+        .fold(quote! {}, |a, b| quote! {#a #b});
+    let outer_doc = f
+        .attrs
+        .iter()
+        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
+        .fold(quote! {}, |a, b| quote! {#a #b});
+
+    *event_callers = quote! {
+        #event_callers
+
+        #outer_doc
+        pub fn #name(&self, #inputs) -> u64 {
+            #inner_doc
+            #psibase_mod::put_sequential(self.event_log, self.sender, &#method_number, &(#invoke_args))
+        }
+    };
 }
