@@ -133,7 +133,7 @@ const sendPluginCallRequest = async (
     throw new Error(`No args received on sendPluginCallRequest`);
   }
   const iframe = await getLoader(param.args.service);
-  iframe.contentWindow?.postMessage(buildPluginCallRequest(param), "*");
+  iframe.contentWindow?.postMessage(buildPluginCallRequest(param), generateSubdomain(param.args.service));
 };
 
 const onFunctionCallRequest = (message: FunctionCallRequest) => {

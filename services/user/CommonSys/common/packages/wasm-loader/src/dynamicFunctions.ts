@@ -1,3 +1,4 @@
+import { generateSubdomain } from "./main";
 import { ServiceMethodIndex } from "./witParsing";
 
 interface Func {
@@ -33,7 +34,8 @@ export interface FunctionCallResult<T = any> extends FunctionCallArgs {
 
 const generatePendingFunction = (
     { method, service }: Func,
-    id: string
+    id: string,
+    origin: string
 ): string => {
     return `export async function ${method}(...args) {
   
@@ -45,7 +47,7 @@ const generatePendingFunction = (
   };
   
   console.log('Attempting to call plugin call ${id}', payload);
-  window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload }, "*");
+  window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload }, "${origin}");
   throw new Error("Pending function throw, this is by design.")
   }
 `;
@@ -76,7 +78,8 @@ export const serviceMethodIndexToImportables = (
                           )
                         : generatePendingFunction(
                               { method: methodName, service: key },
-                              id
+                              id,
+                              generateSubdomain("supervisor-sys")
                           )) + "\n"
                 );
             })

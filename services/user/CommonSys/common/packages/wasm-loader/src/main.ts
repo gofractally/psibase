@@ -74,7 +74,7 @@ const sendPluginCallResponse = (response: PluginCallResponse) => {
     window.parent.postMessage(response, "*");
 };
 
-const generateSubdomain = (subDomain?: string): string => {
+export const generateSubdomain = (subDomain?: string): string => {
     const currentUrl = new URL(window.location.href);
     const hostnameParts = currentUrl.hostname.split(".");
 
