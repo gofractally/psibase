@@ -573,11 +573,11 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/NftSys.psi
     NAME NftSys
     VERSION ${PSIBASE_VERSION}
-    SERVICE nft-sys
     PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
+    SERVICE nft-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
-    DATA ${COMPONENT_BIN_DIR}/${NftsPlugin_OUTPUT_FILE} /plugin.wasm
     INIT
+    DATA ${COMPONENT_BIN_DIR}/${NftsPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
 )
 

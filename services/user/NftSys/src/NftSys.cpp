@@ -1,9 +1,11 @@
 #include <services/user/NftSys.hpp>
 
 #include <psibase/Bitset.hpp>
+#include <psibase/serveContent.hpp>
 #include <services/system/AccountSys.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/commonErrors.hpp>
+#include <vector>
 
 #include <psibase/serveSimpleUI.hpp>
 
@@ -14,6 +16,7 @@ using psio::view;
 using std::nullopt;
 using std::optional;
 using std::string;
+using std::vector;
 using SystemService::AccountSys;
 
 namespace
@@ -27,7 +30,7 @@ namespace
 NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
 {
    MethodNumber m{action->method()};
-   if (m != MethodNumber{"init"})
+   if (m != MethodNumber{"init"} && m != MethodNumber{"storeSys"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
@@ -275,6 +278,12 @@ bool NftSys::getUserConf(psibase::AccountNumber account, psibase::EnumElement fl
       auto bit = NftHolderRecord::Configurations::value(flag);
       return (*hodler).config.get(bit);
    }
+}
+
+void NftSys::storeSys(string path, string contentType, vector<char> content)
+{
+   check(getSender() == getReceiver(), "wrong sender");
+   storeContent(move(path), move(contentType), move(content), Tables());
 }
 
 auto nftSys = QueryableService<NftSys::Tables, NftSys::Events>{NftSys::service};
