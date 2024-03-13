@@ -7,6 +7,7 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "paths": {
+            "@psibase/components": ["../../components/src/ui"],
             "@psibase/common-lib": [
                 "../../CommonSys/common/packages/common-lib/src"
             ],
@@ -29,8 +30,13 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true,
-        "forceConsistentCasingInFileNames": true
+        "forceConsistentCasingInFileNames": true,
+        "types": ["vite-plugin-svgr/client"]
     },
-    "include": ["src", "../../CommonSys/common/resources/useGraphQLQuery.d.ts"],
+    "include": [
+        "src",
+        "../../components/src/ui",
+        "../../CommonSys/common/resources/useGraphQLQuery.d.ts"
+    ],
     "references": [{ "path": "./tsconfig.node.json" }]
 }

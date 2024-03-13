@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import "./App.css";
+
 import { Supervisor } from "@psibase/common-lib/messaging";
+import { Heading } from "@psibase/components";
+
+import WalletIcon from "./assets/icon-wallet.svg?react";
 
 function App() {
-    const [count, setCount] = useState(0);
     const [res, setRes] = useState("Empty");
 
     const init = async () => {
@@ -32,15 +34,19 @@ function App() {
 
     return (
         <>
-            <h1>Vite + React</h1>
-            <div className="card">
-                <button onClick={() => setCount((count) => count + 1)}>
-                    count is {count}
+            <div className="mx-auto max-w-screen-xl space-y-6 p-2 sm:px-8">
+                <div className="flex items-center gap-2">
+                    <WalletIcon />
+                    <Heading tag="h1" className="select-none text-gray-600">
+                        NFT
+                    </Heading>
+                </div>
+                <button
+                    onClick={mintNft}
+                    className="rounded-md border-2 border-blue-500 bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-600"
+                >
+                    mint
                 </button>
-                <p>
-                    Edit <code>src/App.tsx</code> and save to test HMR
-                </p>
-                <button onClick={mintNft}>mint</button>
                 <pre>{JSON.stringify(res, null, 2)}</pre>
             </div>
         </>

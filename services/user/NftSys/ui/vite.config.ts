@@ -20,12 +20,18 @@ const psibase = (appletContract: string, isServing?: boolean) => {
     ];
 
     if (isServing) {
-        buildAliases.push({
-            find: /^@psibase\/common-lib.*$/,
-            replacement: path.resolve(
-                "../../CommonSys/common/packages/common-lib/src",
-            ),
-        });
+        buildAliases.push(
+            {
+                find: /^@psibase\/common-lib.*$/,
+                replacement: path.resolve(
+                    "../../CommonSys/common/packages/common-lib/src",
+                ),
+            },
+            {
+                find: "@psibase/components",
+                replacement: path.resolve("../../components/src/ui"),
+            },
+        );
     }
 
     return [
