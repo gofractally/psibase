@@ -5,11 +5,12 @@ import alias from "@rollup/plugin-alias";
 import svgr from "vite-plugin-svgr";
 
 const psibase = (appletContract: string, isServing?: boolean) => {
+    // TODO: iframeResizer should go away entirely! From rpc.ts too.
     const buildAliases = [
         {
             find: "/common/iframeResizer.contentWindow.js",
             replacement: path.resolve(
-                "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js",
+                "../../CommonSys/common/resources/thirdParty/src/iframeResizer.contentWindow.js",
             ),
         },
         {

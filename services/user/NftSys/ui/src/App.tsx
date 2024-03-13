@@ -4,6 +4,7 @@ import { Supervisor } from "@psibase/common-lib/messaging";
 import { Heading } from "@psibase/components";
 
 import WalletIcon from "./assets/icon-wallet.svg?react";
+import { NftTable } from "./components";
 
 function App() {
     const [res, setRes] = useState("Empty");
@@ -41,6 +42,7 @@ function App() {
                         NFT
                     </Heading>
                 </div>
+                <NftTable />
                 <button
                     onClick={mintNft}
                     className="rounded-md border-2 border-blue-500 bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-600"
