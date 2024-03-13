@@ -10,7 +10,7 @@ wit-bindgen-rt = "0.21.0"
 psibase = "0.6.0"
 serde = "1.0.197"
 serde_json = "1.0.114"
-nft-sys = { path = "../service" }
+# nft-sys = { path = "../service" }
 
 [lib]
 crate-type = ["cdylib"]

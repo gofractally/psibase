@@ -9,22 +9,36 @@ package nft-sys:plugin;
 // }
 
 interface types {
-    type NID = u32;
-    type account-number = u64;
+    type nid = u32;
+    type account-number = string;
+    record nft-record {
+        id: nid,
+        issuer: account-number,
+        owner: account-number,
+    }
+    type bitset = u8;
+    record nft-holder-record {
+        account: account-number,
+        config: bitset
+    }
+    record credit-record {
+        id: nid,
+        debitor: account-number
+    }
 }
 
 interface nfts {
-    use types.{NID, account-number};
+    use types.{nid, account-number, nft-record, nft-holder-record, credit-record};
 
     mint: func(nft-label: string) -> result<_, string>;
-    burn: func(nft-id: NID) -> result<_, string>;
-    credit: func(nft-id: NID, receiver: account-number, memo: string) -> result<_, string>;
-    uncredit: func(nft-id: NID, memo: string) -> result<_, string>;
-    debit: func(nft-id: NID, memo: string) -> result<_, string>;
-    // getNft: func(nftId: NID) -> result<_, NftRecord>;
-    // getNftHolder: func(account: AccountNumber) -> result<_, NftHolderRecord>;
-    // getCredRecord: func(nftId: NID) -> result<_, CreditRecord>;
-    // exists: func(nftId: NID) -> result<_, bool>;
+    burn: func(id: nid) -> result<_, string>;
+    credit: func(nft-id: nid, receiver: account-number, memo: string) -> result<_, string>;
+    uncredit: func(nft-id: nid, memo: string) -> result<_, string>;
+    debit: func(nft-id: nid, memo: string) -> result<_, string>;
+    get-nft: func(nft-id: nid) -> result<_, nft-record>;
+    get-nft-holder: func(account: account-number) -> result<_, nft-holder-record>;
+    get-cred-record: func(nft-id: nid) -> result<_, credit-record>;
+    exists: func(nft-id: nid) -> result<_, bool>;
 }
 
 /// An example world for the component to target.

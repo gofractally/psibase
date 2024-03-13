@@ -1107,20 +1107,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "nft-sys"
-version = "0.1.0"
-dependencies = [
- "psibase",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "nfts"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.4.2",
- "nft-sys",
  "psibase",
  "serde",
  "serde_json",
