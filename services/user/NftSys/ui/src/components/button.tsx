@@ -1,6 +1,7 @@
 import React from "react";
 
-import { Loader, Text, TextSize } from "@psibase/components";
+import Loader from "./loader";
+import { Text, TextSize } from "./text";
 
 export interface ButtonProps {
     children: React.ReactNode;

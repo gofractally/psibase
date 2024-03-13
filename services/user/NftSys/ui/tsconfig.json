@@ -7,7 +7,7 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "paths": {
-            "@psibase/components": ["../../components/src/ui"],
+            // "@psibase/components": ["../../components/src/ui"],
             "@psibase/common-lib": [
                 "../../CommonSys/common/packages/common-lib/src"
             ],
@@ -35,7 +35,7 @@
     },
     "include": [
         "src",
-        "../../components/src/ui",
+        // "../../components/src/ui",
         "../../CommonSys/common/resources/useGraphQLQuery.d.ts"
     ],
     "references": [{ "path": "./tsconfig.node.json" }]

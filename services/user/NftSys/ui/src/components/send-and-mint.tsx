@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
-import { Text } from "@psibase/components";
 
 import Button from "./button";
 import Form from "./form";
+import Icon from "./icon";
+import Text from "./text";
 import { Nft } from "../App";
 import { twJoin } from "tailwind-merge";
 
@@ -53,7 +54,7 @@ export const SendMintNft = ({ nfts, mintNft, resMint }: Props) => {
     });
 
     const onSubmit: SubmitHandler<TransferInputs> = async (
-        data: TransferInputs,
+        _data: TransferInputs,
     ) => {
         setTransferError("");
         setFormSubmitted(true);
@@ -105,7 +106,7 @@ export const SendMintNft = ({ nfts, mintNft, resMint }: Props) => {
                         activeTab === "send" && "border-b",
                     )}
                 >
-                    {/* <Icon type="arrow-up" size="xs" /> */}
+                    <Icon type="arrow-up" size="xs" />
                     <Text span className="font-semibold" size="base">
                         Send
                     </Text>
@@ -120,7 +121,7 @@ export const SendMintNft = ({ nfts, mintNft, resMint }: Props) => {
                         activeTab === "mint" && "border-b",
                     )}
                 >
-                    {/* <Icon type="arrow-up" size="xs" /> */}
+                    <Icon type="loading" size="xs" />
                     <Text span className="font-semibold" size="base">
                         Mint
                     </Text>

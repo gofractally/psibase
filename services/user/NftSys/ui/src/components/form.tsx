@@ -4,10 +4,11 @@
 // features we want.
 
 import React, { forwardRef, HTMLProps } from "react";
-import { Icon, IconType, Text } from "@psibase/components";
 
-import "../styles/inputs.css";
 import Button from "./button";
+import Text from "./text";
+import { Icon, IconType } from "./icon";
+import "../styles/inputs.css";
 
 export const Label: React.FC<{
     htmlFor: string;

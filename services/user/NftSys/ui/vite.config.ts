@@ -28,10 +28,10 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                     "../../CommonSys/common/packages/common-lib/src",
                 ),
             },
-            {
-                find: "@psibase/components",
-                replacement: path.resolve("../../components/src/ui"),
-            },
+            // {
+            //     find: "@psibase/components",
+            //     replacement: path.resolve("../../components/src/ui"),
+            // },
         );
     }
 

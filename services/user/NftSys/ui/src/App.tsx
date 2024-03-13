@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { Supervisor } from "@psibase/common-lib/messaging";
-import { Heading } from "@psibase/components";
 
+import { Heading, NftTable, SendMintNft } from "./components";
 import WalletIcon from "./assets/icon-wallet.svg?react";
-import { NftTable, SendMintNft } from "./components";
 
 export type Nft = {
     id: string;
