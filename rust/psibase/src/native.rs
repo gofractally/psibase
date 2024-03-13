@@ -291,3 +291,8 @@ pub fn kv_max<K: ToKey, V: UnpackOwned>(db_id: DbId, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db_id, &key.to_key());
     bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
 }
+
+pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {
+    let size = unsafe { native_raw::getSequential(db_id, id) };
+    get_optional_result_bytes(size)
+}

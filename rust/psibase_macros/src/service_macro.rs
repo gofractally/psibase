@@ -43,6 +43,7 @@ pub struct Options {
     dispatch: Option<bool>,
     pub_constant: bool,
     psibase_mod: String,
+    gql: bool,
 }
 
 impl Default for Options {
@@ -61,6 +62,7 @@ impl Default for Options {
             dispatch: None,
             pub_constant: true,
             psibase_mod: "psibase".into(),
+            gql: true,
         }
     }
 }
@@ -233,6 +235,8 @@ fn process_mod(
                 let mut reflect_args = quote! {};
                 process_action_args(
                     options,
+                    false,
+                    None,
                     psibase_mod,
                     f,
                     &mut action_structs,
@@ -608,8 +612,20 @@ fn process_mod(
         });
 
         for (kind, fns) in event_fns {
+            let event_name = match kind {
+                EventType::History => &history_events,
+                EventType::Ui => &ui_events,
+                EventType::Merkle => &merkle_events,
+            };
+            let db = match kind {
+                EventType::History => quote! {HistoryEvent},
+                EventType::Ui => quote! {UiEvent},
+                EventType::Merkle => quote! {MerkleEvent},
+            };
             let mut event_callers = proc_macro2::TokenStream::new();
             let mut event_structs = quote! {};
+            let mut gql_members = proc_macro2::TokenStream::new();
+            let mut gql_dispatch = proc_macro2::TokenStream::new();
             for fn_index in fns {
                 if let Item::Fn(f) = &items[fn_index] {
                     let mut invoke_args = quote! {};
@@ -617,6 +633,8 @@ fn process_mod(
                     let mut reflect_args = quote! {};
                     process_action_args(
                         options,
+                        options.gql,
+                        Some(&db),
                         psibase_mod,
                         f,
                         &mut event_structs,
@@ -625,13 +643,18 @@ fn process_mod(
                         &mut reflect_args,
                     );
                     process_event_callers(psibase_mod, f, &mut event_callers, &invoke_args);
+                    process_event_name(psibase_mod, f, &mut event_structs);
+                    if options.gql {
+                        process_gql_union_member(
+                            psibase_mod,
+                            event_name,
+                            f,
+                            &mut gql_members,
+                            &mut gql_dispatch,
+                        );
+                    }
                 }
             }
-            let event_name = match kind {
-                EventType::History => &history_events,
-                EventType::Ui => &ui_events,
-                EventType::Merkle => &merkle_events,
-            };
             items.push(parse_quote! {
                 #[automatically_derived]
                 #[allow(non_snake_case)]
@@ -646,16 +669,27 @@ fn process_mod(
                 EventType::Ui => quote!(ui),
                 EventType::Merkle => quote!(merkle),
             };
+            if options.gql {
+                process_gql_union(
+                    psibase_mod,
+                    event_name,
+                    &gql_members,
+                    &gql_dispatch,
+                    &db,
+                    &mut event_structs,
+                )
+            }
             items.push(parse_quote! {
                 #[automatically_derived]
                 #[allow(non_snake_case)]
                 #[allow(non_camel_case_types)]
                 #[allow(non_upper_case_globals)]
-                mod #event_structs_mod {
-                    mod #event_module_name {
+                pub mod #event_structs_mod {
+                    pub mod #event_module_name {
                         use super::super::*;
                         #event_structs
                     }
+                    pub use #event_module_name::#event_name;
                 }
             });
         }
@@ -1116,6 +1150,8 @@ fn process_table_pk_field(pk_data: &mut Option<PkIdentData>, field: &Field) {
 
 fn process_action_args(
     options: &Options,
+    gql: bool,
+    event_db: Option<&proc_macro2::TokenStream>,
     psibase_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     new_items: &mut proc_macro2::TokenStream,
@@ -1160,9 +1196,15 @@ fn process_action_args(
         "This structure has the same JSON and Fracpack format as the arguments to [{actions}::{fn_name}]({actions}::{fn_name}).",
         actions=options.actions, fn_name=fn_name.to_string());
 
+    let gql_object_attr = if gql && !f.sig.inputs.is_empty() {
+        quote! { , async_graphql::SimpleObject }
+    } else {
+        quote! {}
+    };
+
     *new_items = quote! {
         #new_items
-        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::Reflect, serde::Deserialize, serde::Serialize)]
+        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::Reflect, serde::Deserialize, serde::Serialize #gql_object_attr)]
         #[fracpack(fracpack_mod = #fracpack_mod)]
         #[reflect(psibase_mod = #psibase_mod_str)]
         #[doc = #doc]
@@ -1170,6 +1212,17 @@ fn process_action_args(
             #struct_members
         }
     };
+
+    if let Some(db) = event_db {
+        *new_items = quote! {
+            #new_items
+            impl #psibase_mod::EventDb for #fn_name {
+                fn db() -> #psibase_mod::DbId {
+                    #psibase_mod::DbId::#db
+                }
+            }
+        }
+    }
 }
 
 fn process_action_callers(
@@ -1312,6 +1365,79 @@ fn process_event_callers(
         pub fn #name(&self, #inputs) -> u64 {
             #inner_doc
             #psibase_mod::put_sequential(self.event_log, self.sender, &#method_number, &(#invoke_args))
+        }
+    };
+}
+
+fn process_event_name(
+    psibase_mod: &proc_macro2::TokenStream,
+    f: &ItemFn,
+    structs: &mut proc_macro2::TokenStream,
+) {
+    let name = &f.sig.ident;
+    let name_str = name.to_string();
+    let method_number =
+        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
+
+    *structs = quote! {
+        #structs
+
+        impl #psibase_mod::NamedEvent for #name {
+            fn name() -> #psibase_mod::MethodNumber { #method_number }
+        }
+    }
+}
+
+fn process_gql_union_member(
+    psibase_mod: &proc_macro2::TokenStream,
+    event_struct: &proc_macro2::TokenStream,
+    f: &ItemFn,
+    enumerators: &mut proc_macro2::TokenStream,
+    dispatch: &mut proc_macro2::TokenStream,
+) {
+    let name = &f.sig.ident;
+    let name_str = name.to_string();
+
+    *enumerators = quote! {
+        #enumerators
+        #name(#name),
+    };
+    *dispatch = quote! {
+        #dispatch
+
+        #psibase_mod::method_raw!(#name_str) => {
+            let (_, _, gql_imp_content) = <(#psibase_mod::AccountNumber, #psibase_mod::MethodNumber, #name) as #psibase_mod::fracpack::Unpack>::unpacked(gql_imp_data)?;
+            Ok(#event_struct::#name(gql_imp_content))
+        },
+    };
+}
+
+fn process_gql_union(
+    psibase_mod: &proc_macro2::TokenStream,
+    event_struct: &proc_macro2::TokenStream,
+    enumerators: &proc_macro2::TokenStream,
+    dispatch: &proc_macro2::TokenStream,
+    db: &proc_macro2::TokenStream,
+    out: &mut proc_macro2::TokenStream,
+) {
+    *out = quote! {
+        #out
+        #[derive(async_graphql::Union)]
+        pub enum #event_struct {
+            #enumerators
+        }
+        impl #psibase_mod::DecodeEvent for #event_struct {
+            fn decode(gql_imp_type: #psibase_mod::MethodNumber, gql_imp_data: &[u8]) -> Result<#event_struct, anyhow::Error> {
+                match gql_imp_type.value {
+                    #dispatch
+                    _ => { Err(anyhow::anyhow!("Unknown event type")) }
+                }
+            }
+        }
+        impl #psibase_mod::EventDb for #event_struct {
+            fn db() -> #psibase_mod::DbId {
+                #psibase_mod::DbId::#db
+            }
         }
     };
 }
