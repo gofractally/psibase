@@ -30,7 +30,7 @@ const nfts: Nft[] = [
 ];
 
 function App() {
-    const [res, setRes] = useState("Empty");
+    const [resMint, setResMint] = useState("Empty");
 
     const init = async () => {
         const supervisor = new Supervisor();
@@ -53,8 +53,46 @@ function App() {
             method: "mint",
             params: [],
         });
-        setRes(res as string);
+        setResMint(res as string);
     };
+
+    const burnNft = async (nftId: number) => {
+        if (!supervisor.onLoaded()) return;
+
+        console.log("calling nft-sys.callintoplugin");
+        const res = await supervisor.functionCall({
+            service: "nft-sys",
+            method: "burn",
+            params: [nftId],
+        });
+        setResMint(res as string);
+    };
+
+    const uncreditNft = async (nftId: number) => {
+        if (!supervisor.onLoaded()) return;
+
+        console.log("calling nft-sys.callintoplugin");
+        const res = await supervisor.functionCall({
+            service: "nft-sys",
+            method: "uncredit",
+            params: [nftId],
+        });
+        setResMint(res as string);
+    };
+
+    const debitNft = async (nftId: number) => {
+        if (!supervisor.onLoaded()) return;
+
+        console.log("calling nft-sys.callintoplugin");
+        const res = await supervisor.functionCall({
+            service: "nft-sys",
+            method: "debit",
+            params: [nftId],
+        });
+        setResMint(res as string);
+    };
+
+    const actionHandlers = { burnNft, uncreditNft, debitNft };
 
     return (
         <>
@@ -65,7 +103,7 @@ function App() {
                         NFT
                     </Heading>
                 </div>
-                <NftTable nfts={nfts} />
+                <NftTable nfts={nfts} actionHandlers={actionHandlers} />
                 <SendNftSection nfts={nfts} />
                 <button
                     onClick={mintNft}
@@ -73,7 +111,7 @@ function App() {
                 >
                     mint
                 </button>
-                <pre>{JSON.stringify(res, null, 2)}</pre>
+                <pre>{JSON.stringify(resMint, null, 2)}</pre>
             </div>
         </>
     );
