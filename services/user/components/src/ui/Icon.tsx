@@ -1,4 +1,33 @@
 import React, { FC, SVGProps } from "react";
+
+import {
+    ArrowCircleLeftIcon as ArrowCircleLeftIconOutline,
+    ArrowCircleUpIcon,
+    ArrowSmUpIcon,
+    BellIcon as BellIconOutline,
+    ChartSquareBarIcon as ChartSquareBarIconOutline,
+    CheckIcon,
+    ChevronDownIcon,
+    ChevronRightIcon,
+    ChevronUpIcon,
+    ClipboardIcon as ClipboardIconOutline,
+    CogIcon as CogIconOutline,
+    ExclamationIcon,
+    HomeIcon as HomeIconOutline,
+    InformationCircleIcon,
+    LoginIcon,
+    LogoutIcon,
+    MenuAlt4Icon,
+    MicrophoneIcon,
+    PencilAltIcon,
+    RefreshIcon,
+    SearchIcon,
+    SwitchVerticalIcon,
+    TrashIcon,
+    UserAddIcon,
+    XCircleIcon as XCircleIconOutline,
+    XIcon,
+} from "@heroicons/react/outline";
 import {
     ArrowCircleLeftIcon as ArrowCircleLeftIconSolid,
     BellIcon as BellIconSolid,
@@ -9,57 +38,29 @@ import {
     FireIcon,
     HomeIcon as HomeIconSolid,
     MenuIcon,
+    PlusIcon,
+    PresentationChartBarIcon,
     ServerIcon,
     SparklesIcon,
     XCircleIcon as XCircleIconSolid,
-    PlusIcon,
-    PresentationChartBarIcon,
 } from "@heroicons/react/solid";
-import {
-    ArrowCircleLeftIcon as ArrowCircleLeftIconOutline,
-    ArrowSmUpIcon,
-    BellIcon as BellIconOutline,
-    ChartSquareBarIcon as ChartSquareBarIconOutline,
-    CheckIcon,
-    ClipboardIcon as ClipboardIconOutline,
-    CogIcon as CogIconOutline,
-    HomeIcon as HomeIconOutline,
-    LogoutIcon,
-    MenuAlt4Icon,
-    PencilAltIcon,
-    SearchIcon,
-    SwitchVerticalIcon,
-    TrashIcon,
-    XCircleIcon as XCircleIconOutline,
-    XIcon,
-    RefreshIcon,
-    UserAddIcon,
-    LoginIcon,
-    ChevronDownIcon,
-    ChevronUpIcon,
-    ChevronRightIcon,
-    MicrophoneIcon,
-    InformationCircleIcon,
-    ExclamationIcon,
-    ArrowCircleUpIcon,
-} from "@heroicons/react/outline";
 
 import {
+    ArrowUpSolid,
     BTC,
+    Camera,
+    CameraOff,
+    ConsensusFull,
+    ConsensusWithoutMe,
     EOS,
     F,
     Hexagon,
     Loader,
-    UserHex,
     MicOff,
-    ConsensusFull,
-    ConsensusWithoutMe,
     NoConsensus,
-    Camera,
-    CameraOff,
     Respect,
+    UserHex,
 } from "./assets/icons";
-import Generic from "@toolbox/components/ui/assets/icons/generic";
 
 export type IconProps = {
     type: IconType;
@@ -93,6 +94,7 @@ const SIZES: { [key in IconSize]: string } = {
 };
 
 export type IconType =
+    | "arrow-up"
     | "back"
     | "btc"
     | "camera"
@@ -150,6 +152,7 @@ type Icon = {
 };
 
 const ICONS: Icon = {
+    "arrow-up": ArrowUpSolid,
     back: {
         solid: ArrowCircleLeftIconSolid,
         outline: ArrowCircleLeftIconOutline,

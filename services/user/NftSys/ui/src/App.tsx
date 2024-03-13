@@ -4,7 +4,30 @@ import { Supervisor } from "@psibase/common-lib/messaging";
 import { Heading } from "@psibase/components";
 
 import WalletIcon from "./assets/icon-wallet.svg?react";
-import { NftTable } from "./components";
+import { NftTable, SendNftSection } from "./components";
+
+export type Nft = {
+    id: string;
+    status: "owned" | "burned" | "pending-debit" | "pending-credit";
+    counterParty?: string;
+};
+
+const nfts: Nft[] = [
+    {
+        id: "1",
+        status: "owned",
+    },
+    {
+        id: "2",
+        status: "pending-debit",
+        counterParty: "brandon",
+    },
+    {
+        id: "3",
+        status: "pending-credit",
+        counterParty: "james",
+    },
+];
 
 function App() {
     const [res, setRes] = useState("Empty");
@@ -42,7 +65,8 @@ function App() {
                         NFT
                     </Heading>
                 </div>
-                <NftTable />
+                <NftTable nfts={nfts} />
+                <SendNftSection nfts={nfts} />
                 <button
                     onClick={mintNft}
                     className="rounded-md border-2 border-blue-500 bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-600"

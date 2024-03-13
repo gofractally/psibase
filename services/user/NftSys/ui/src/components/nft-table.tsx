@@ -1,7 +1,8 @@
 import { Heading, Loader, Text } from "@psibase/components";
+import { QueryResult } from "common/useGraphQLQuery.mjs";
 
 import Button from "./button";
-import { QueryResult } from "common/useGraphQLQuery.mjs";
+import { Nft } from "../App";
 
 const TransferHistoryTableHeader = () => (
     <div className="flex select-none border-b border-gray-900 py-1 font-bold">
@@ -18,34 +19,13 @@ const TransferHistoryTableHeader = () => (
     </div>
 );
 
-type Nft = {
-    id: string;
-    status: "owned" | "burned" | "pending-debit" | "pending-credit";
-    counterParty?: string;
-};
-
-const nfts: Nft[] = [
-    {
-        id: "1",
-        status: "owned",
-    },
-    {
-        id: "2",
-        status: "pending-debit",
-        counterParty: "brandon",
-    },
-    {
-        id: "3",
-        status: "pending-credit",
-        counterParty: "james",
-    },
-];
-
 interface Props {
+    nfts: Nft[];
     queryResult?: QueryResult;
 }
 
 export const NftTable = ({
+    nfts,
     queryResult: result = { isLoading: false, isError: false },
 }: Props) => {
     if (result.isLoading) {
