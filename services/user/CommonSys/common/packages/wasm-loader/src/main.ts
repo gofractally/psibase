@@ -70,10 +70,6 @@ const onPluginCallRequest = async ({
     }
 };
 
-const sendPluginCallResponse = (response: PluginCallResponse) => {
-    window.parent.postMessage(response, "*");
-};
-
 export const generateSubdomain = (subDomain?: string): string => {
     const currentUrl = new URL(window.location.href);
     const hostnameParts = currentUrl.hostname.split(".");
@@ -88,6 +84,12 @@ export const generateSubdomain = (subDomain?: string): string => {
 };
 
 const supervisorDomain = generateSubdomain("supervisor-sys");
+
+
+const sendPluginCallResponse = (response: PluginCallResponse) => {
+    window.parent.postMessage(response, supervisorDomain);
+};    
+
 
 const isMessageFromSupervisor = (message: MessageEvent) => {
     const isTop = message.source == window.top;
