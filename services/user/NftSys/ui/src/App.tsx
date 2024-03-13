@@ -4,7 +4,7 @@ import { Supervisor } from "@psibase/common-lib/messaging";
 import { Heading } from "@psibase/components";
 
 import WalletIcon from "./assets/icon-wallet.svg?react";
-import { NftTable, SendNftSection } from "./components";
+import { NftTable, SendMintNft } from "./components";
 
 export type Nft = {
     id: string;
@@ -104,14 +104,7 @@ function App() {
                     </Heading>
                 </div>
                 <NftTable nfts={nfts} actionHandlers={actionHandlers} />
-                <SendNftSection nfts={nfts} />
-                <button
-                    onClick={mintNft}
-                    className="rounded-md border-2 border-blue-500 bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-600"
-                >
-                    mint
-                </button>
-                <pre>{JSON.stringify(resMint, null, 2)}</pre>
+                <SendMintNft nfts={nfts} mintNft={mintNft} resMint={resMint} />
             </div>
         </>
     );
