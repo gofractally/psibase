@@ -12,7 +12,8 @@ namespace UserService
    class NftSys : public psibase::Service<NftSys>
    {
      public:
-      using Tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;
+      using Tables = psibase::
+          ServiceTables<NftTable, NftHolderTable, CreditTable, psibase::WebContentTable, InitTable>;
 
       static constexpr auto service = psibase::AccountNumber("nft-sys");
 
@@ -26,7 +27,12 @@ namespace UserService
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
       void setUserConf(psibase::EnumElement flag, bool enable);
 
+      /// Called by the proxy-sys system service when an HttpRequest
+      /// is directed at this invite service
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
+
+      /// Used to store UI files and other `content` at the specified `path`.
+      void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
       // Read-only:
       NftRecord       getNft(NID nftId);
@@ -73,6 +79,7 @@ namespace UserService
       method(debit, nftId, memo),
       method(setUserConf, flag, enable),
       method(serveSys, request),
+      method(storeSys, path, contentType, content),
 
       method(getNft, nftId),
       method(getNftHolder, account),
