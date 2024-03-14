@@ -15,7 +15,11 @@ export default defineConfig({
             {
                 find: /^@psibase\/common-lib.*$/,
                 replacement: path.resolve("../common-lib/src")
-            }
+            },
+            {
+                find: 'rollup-plugin-wit-component',
+                replacement: path.resolve("./rollup-plugin-wit-component")
+            },
         ]
     }
 });
