@@ -82,8 +82,10 @@ pub fn solve_dependencies(
     packages: Vec<PackageInfo>,
     input: Vec<PackageRef>,
     existing: Vec<(Meta, PackageDisposition)>,
+    reinstall: bool,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let mut graph = DepGraph::new();
+    graph.reinstall = reinstall;
     for package in packages {
         graph.add(package);
     }
@@ -102,6 +104,7 @@ pub struct DepGraph<'a> {
     existing: HashMap<String, (Meta, PackageDisposition, bool)>,
     solver: Solver<'a>,
     upgrade_all: bool,
+    reinstall: bool,
 }
 
 trait PackageDep {
@@ -146,6 +149,7 @@ fn get_removed_impl(
 
 fn get_installed_impl(
     reg: &mut HashMap<String, PackageInfo>,
+    reinstall: &HashMap<String, String>,
     names: &[PackageRef],
     existing: &mut HashMap<String, (Meta, PackageDisposition, bool)>,
     found: &mut HashMap<String, bool>,
@@ -159,9 +163,9 @@ fn get_installed_impl(
         } else {
             let (nm, package) = reg.remove_entry(&name.name).unwrap();
             found.insert(nm, false);
-            get_installed_impl(reg, &package.depends, existing, found, result)?;
+            get_installed_impl(reg, reinstall, &package.depends, existing, found, result)?;
             if let Some((meta, _, _)) = existing.remove(&name.name) {
-                if meta.version != package.version {
+                if meta.version != package.version || reinstall.contains_key(&name.name) {
                     result.push(PackageOp::Replace(meta, package));
                 }
             } else {
@@ -181,6 +185,8 @@ fn get_installed_impl(
 fn evaluate_changes(
     mut packages: HashMap<String, PackageInfo>,
     mut existing: HashMap<String, (Meta, PackageDisposition, bool)>,
+    request: HashMap<String, String>,
+    reinstall: bool,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let existing_refs: Vec<_> = existing
         .keys()
@@ -208,6 +214,7 @@ fn evaluate_changes(
         .collect();
     get_installed_impl(
         &mut packages,
+        &if reinstall { request } else { HashMap::new() },
         &installed_refs,
         &mut existing,
         &mut HashMap::new(),
@@ -236,6 +243,7 @@ impl<'a> DepGraph<'a> {
             existing: HashMap::new(),
             solver: Solver::new(),
             upgrade_all: false,
+            reinstall: false,
         }
     }
     pub fn add(&mut self, meta: PackageInfo) {
@@ -297,7 +305,7 @@ impl<'a> DepGraph<'a> {
                             }
                         }
                     }
-                    return evaluate_changes(result, self.existing);
+                    return evaluate_changes(result, self.existing, self.request, self.reinstall);
                 }
             }
         }

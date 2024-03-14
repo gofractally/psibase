@@ -623,7 +623,7 @@ pub trait PackageRegistry {
         packages: &[String],
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let mut result = vec![];
-        for op in solve_dependencies(self.index()?, make_refs(packages)?, vec![])? {
+        for op in solve_dependencies(self.index()?, make_refs(packages)?, vec![], false)? {
             let PackageOp::Install(info) = op else {
                 panic!("Only install is expected when there are no existing packages");
             };
@@ -963,8 +963,14 @@ impl PackageList {
         &self,
         reg: &T,
         packages: &[String],
+        reinstall: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
-        solve_dependencies(reg.index()?, make_refs(packages)?, self.as_upgradable())
+        solve_dependencies(
+            reg.index()?,
+            make_refs(packages)?,
+            self.as_upgradable(),
+            reinstall,
+        )
     }
     pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {
         let mut result = vec![];
@@ -1037,5 +1043,6 @@ pub fn js_resolve_packages(
         index,
         js_err(make_refs(&packages))?,
         pinned,
+        false,
     ))?)?)
 }

@@ -204,6 +204,10 @@ enum Command {
         /// that they create will be owned by this account.
         #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
         sender: ExactAccountNumber,
+
+        /// Install the package even if it is already installed
+        #[clap(long)]
+        reinstall: bool,
     },
 
     /// Prints a list of apps
@@ -859,11 +863,12 @@ async fn install(
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     sources: &Vec<String>,
+    reinstall: bool,
 ) -> Result<(), anyhow::Error> {
     let installed = PackageList::installed(&args.api, &mut client).await?;
     let package_registry = get_package_registry(sources, client.clone()).await?;
     let to_install = installed
-        .resolve_changes(&package_registry, packages)
+        .resolve_changes(&package_registry, packages, reinstall)
         .await?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
@@ -1243,6 +1248,7 @@ async fn main() -> Result<(), anyhow::Error> {
             key,
             package_source,
             sender,
+            reinstall,
         } => {
             install(
                 &args,
@@ -1251,6 +1257,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 (*sender).into(),
                 key,
                 package_source,
+                *reinstall,
             )
             .await?
         }
