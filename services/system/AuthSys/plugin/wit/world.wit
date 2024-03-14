@@ -1,4 +1,4 @@
-package auth:plugin;
+package auth-sys:plugin;
 
 /// Common types used when dealing with auth service plugins
 interface types {
@@ -53,7 +53,7 @@ world psibase-plugin {
 
     // Needed for getting the currently logged in user, which is 
     // necessary to generate the correct claim
-    import accounts:plugin/accounts;
+    import account-sys:plugin/accounts;
 
     // Needed for access to query functionality
     import common:plugin/server;

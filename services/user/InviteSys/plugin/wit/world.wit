@@ -1,4 +1,4 @@
-package invites:plugin;
+package invite-sys:plugin;
 
 interface admin {
     /// Restricts the accounts that are able to create invites to those 
@@ -86,10 +86,10 @@ world psibase-plugin {
     import common:plugin/client;
 
     // For getting logged-in-user, for example to generate an invite
-    import accounts:plugin/accounts;
+    import account-sys:plugin/accounts;
 
     // For generating a keypair for the invite
-    import auth:plugin/keyvault;
+    import auth-sys:plugin/keyvault;
 
     export admin;
     export inviter;

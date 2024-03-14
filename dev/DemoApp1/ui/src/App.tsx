@@ -30,8 +30,9 @@ function App() {
     console.log("calling demoapp1.generateinvite");
     const res = await supervisor.functionCall({
       service: "demoapp1",
-      method: "generateInvite",
-      params: ["/welcome-page.html"],
+      intf: "intf",
+      method: "helloworld2",
+      params: [],
     });
     setRes(res as string);
   };

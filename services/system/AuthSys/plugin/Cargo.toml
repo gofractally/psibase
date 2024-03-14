@@ -1,5 +1,5 @@
 [package]
-name = "auth"
+name = "auth-sys"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,10 +11,10 @@ wit-bindgen-rt = "0.21.0"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "auth:plugin"
+package = "auth-sys:plugin"
 
 [package.metadata.component.dependencies]
 
 [package.metadata.component.target.dependencies]
 "common:plugin" = { path = "../../../user/CommonSys/common/packages/wit/plugin.wit" }
-"accounts:plugin" = { path = "../../AccountSys/plugin/wit/world.wit" }
+"account-sys:plugin" = { path = "../../AccountSys/plugin/wit/world.wit" }

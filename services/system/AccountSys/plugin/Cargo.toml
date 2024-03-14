@@ -1,5 +1,5 @@
 [package]
-name = "accounts"
+name = "account-sys"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,6 +11,6 @@ wit-bindgen-rt = "0.21.0"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "accounts:plugin"
+package = "account-sys:plugin"
 
 [package.metadata.component.dependencies]

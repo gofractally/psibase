@@ -3,15 +3,12 @@ use serde_json::to_string;
 // From other plugins
 #[allow(warnings)]
 mod bindings;
-use bindings::accounts::plugin::accounts;
-use bindings::auth::plugin::keyvault;
+use bindings::account_sys::plugin::accounts;
+use bindings::auth_sys::plugin::keyvault;
 use bindings::common::plugin::{client, server};
-use bindings::exports::invites::plugin::{
+use bindings::exports::invite_sys::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
 };
-
-// From the service
-use invite_sys::action_structs::*;
 
 struct Component;
 
@@ -62,14 +59,16 @@ impl Inviter for Component {
 
         let pubkey: psibase::PublicKey = keyvault::generate_keypair()?.parse().unwrap();
 
-        server::add_action_to_transaction(
-            "invite-sys",
-            "createInvite",
-            &to_string(&create_invite {
-                inviteKey: pubkey.to_owned(),
-            })
-            .unwrap(),
-        )?;
+        // Todo - link to the psibase crate to get the invite-sys service wrapper for the
+        //   create_invite action struct.
+        // server::add_action_to_transaction(
+        //     "invite-sys",
+        //     "createInvite",
+        //     &to_string(&action_structs::create_invite {
+        //         inviteKey: pubkey.to_owned(),
+        //     })
+        //     .unwrap(),
+        // )?;
 
         let invite_domain = client::get_root_domain().unwrap();
         let invited_page: String = "/invited".to_string();

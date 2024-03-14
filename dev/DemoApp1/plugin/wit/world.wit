@@ -1,21 +1,13 @@
-package component:demoapp1;
+package demoapp1:example;
 
-
-
-
-interface demoapp2 {
-    callintoplugin: func() -> string;
-}
-
-interface inv {
-    generate-invite: func(subpath: string) -> result<string, string>;
+interface intf {
+    helloworld2: func() -> string;
 }
 
 world example {
 
-    import demoapp2;
-    import invites:plugin/inviter;
+    import invite-sys:plugin/inviter;
 
     export helloworld: func() -> string;
-    export inv;
+    export intf;
 }

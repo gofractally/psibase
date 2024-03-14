@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "accounts"
+name = "account-sys"
 version = "0.1.0"
 dependencies = [
  "bitflags",

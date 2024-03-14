@@ -1,24 +1,22 @@
+#[allow(warnings)]
 mod bindings;
 
-use bindings::component::demoapp1::demoapp2;
-use bindings::Guest;
-
-use bindings::exports::component::demoapp1::inv::Guest as InviteInterface;
-use bindings::invites;
-
+use bindings::exports::demoapp1::example::intf::Guest as Intf;
+use bindings::invite_sys;
+use bindings::Guest as MainInterface;
 
 struct Component;
 
-impl Guest for Component {
+impl MainInterface for Component {
     fn helloworld() -> String {
-        let barry = demoapp2::callintoplugin();
-        format!("barry is {}", barry)
+        println!("This is a debug message!");
+        "returnval".to_string()
     }
 }
 
-impl InviteInterface for Component {
-    fn generate_invite(subpath: String) -> Result<String, String> {
-        Ok(invites::plugin::inviter::generate_invite(&subpath)?)
+impl Intf for Component {
+    fn helloworld2() -> String {
+        invite_sys::plugin::inviter::generate_invite("/subpath").unwrap()
     }
 }
 

@@ -1,4 +1,4 @@
-package accounts:plugin;
+package account-sys:plugin;
 
 interface accounts {
 
