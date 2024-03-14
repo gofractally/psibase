@@ -62,34 +62,23 @@ function debugPrint(...args: any[]): void {
     if (debug) console.debug(...args);
 }
 
-export async function getRootDomain() {
-    if (rootDomain) {
-        return rootDomain;
-    } else {
-        rootDomain = await getJson("/common/rootdomain");
-        return rootDomain;
-    }
-}
-
-export async function siblingUrl(
+export function siblingUrl(
     baseUrl?: string | null,
-    service?: string,
-    path?: string
-): Promise<string> {
-    const rootDomain = await getRootDomain();
-
-    const loc = !baseUrl ? location : new URL(baseUrl);
-
-    return (
-        loc.protocol +
-        "//" +
-        (service ? service + "." : "") +
-        rootDomain +
-        ":" +
-        loc.port +
-        "/" +
-        (path || "").replace(/^\/+/, "")
-    );
+    subDomain?: string | null,
+    path?: string | null,
+    baseUrlIncludesSibling = true
+): string {
+    const currentUrl = new URL(baseUrl || window.location.href);
+    const hostnameParts = currentUrl.hostname.split(".");
+    if (baseUrlIncludesSibling) {
+        hostnameParts.shift();
+    }
+    if (subDomain) {
+        hostnameParts.unshift(subDomain);
+    }
+    currentUrl.hostname = hostnameParts.join(".");
+    const computedPath =  path ? `/${path.replace(/^\/+/, "")}` : ``
+    return currentUrl.origin + computedPath;
 }
 
 export async function throwIfError(response: Response) {
