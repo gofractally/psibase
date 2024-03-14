@@ -142,7 +142,7 @@ Displays the contents of packages
 
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
 
-Install apps to the chain along with all dependencies. Packages that are already installed will not be modified.
+Install packages to the chain along with all dependencies. If any of the requested packages are already installed, they will be updated if a newer version is available.
 
 - *packages*
 
@@ -155,6 +155,10 @@ Install apps to the chain along with all dependencies. Packages that are already
   - A PKCS #11 URI
   - An EOS style base58-encoded public key beginning `PUB_K1_`
 
+- `--reinstall`
+
+  Packages that are requested directly (not dependencies) will be installed even if they are already installed and up-to-date.
+
 - `--package-source` *url*
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
@@ -163,7 +167,7 @@ Install apps to the chain along with all dependencies. Packages that are already
 
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 
-Prints a list of apps from the chain and/or package repositories
+Prints a list of packages from the chain and/or package repositories
 
 - `--all`
 
