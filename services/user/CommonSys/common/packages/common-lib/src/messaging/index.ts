@@ -1,6 +1,7 @@
 export { Supervisor } from "./supervisor";
 export {
     type FunctionCallArgs,
+    type QualifiedFunctionCallArgs,
     type FunctionCallRequest,
     isFunctionCallRequest
 } from "./supervisor/FunctionCallRequest";
@@ -26,10 +27,10 @@ export {
 } from "./supervisor/FunctionCallResponse";
 export { generateRandomString } from "./generateRandomString";
 export {
-    type PreLoadServicesRequest,
-    buildPreLoadServicesRequest,
-    isPreLoadServicesRequest
-} from "./supervisor/PreLoadServicesRequest";
+    type PreLoadPluginsRequest,
+    buildPreLoadPluginsRequest,
+    isPreLoadPluginsRequest
+} from "./supervisor/PreLoadPluginsRequest";
 export {
     isPluginCallFailure,
     type PluginCallFailure

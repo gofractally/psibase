@@ -1,5 +1,6 @@
 import { generateRandomString } from "./generateRandomString";
-import { buildPreLoadServicesRequest } from "./supervisor/PreLoadServicesRequest";
+import { QualifiedFunctionCallArgs } from "./supervisor/FunctionCallRequest";
+import { buildPreLoadPluginsRequest } from "./supervisor/PreLoadPluginsRequest";
 import {
     isIFrameInitialized,
     isFunctionCallResponse,
@@ -115,13 +116,18 @@ export class Supervisor {
         const id = generateId();
         const iframe = this.getSupervisorIframe();
 
+        const fqArgs: QualifiedFunctionCallArgs = {
+            ...args,
+            plugin: args.plugin || "plugin",
+        };
+
         return new Promise((resolve, reject) => {
             this.pendingRequests.push({ id, resolve, reject });
             const message: FunctionCallRequest = {
                 type: "FUNCTION_CALL_REQUEST",
                 payload: {
                     id,
-                    args,
+                    args: fqArgs,
                 },
             };
             if (iframe.contentWindow) {
@@ -139,8 +145,10 @@ export class Supervisor {
         });
     }
 
-    preLoadServices(services: string[]) {
-        const message = buildPreLoadServicesRequest(services);
+    preLoadPlugins(services: string[]) {
+        // TODO: Allow specifying plugin names, otherwise only default 
+        //       "plugin.wasm" plugins can be preloaded
+        const message = buildPreLoadPluginsRequest(services);
         const iframe = this.getSupervisorIframe();
         if (!iframe.contentWindow)
             throw new Error(

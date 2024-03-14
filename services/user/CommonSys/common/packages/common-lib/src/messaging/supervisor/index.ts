@@ -11,7 +11,8 @@ export interface Message<T = string, P = any> {
 export { type FunctionCallResponse } from "./FunctionCallResponse";
 export {
     type FunctionCallRequest,
-    type FunctionCallArgs
+    type FunctionCallArgs,
+    type QualifiedFunctionCallArgs
 } from "./FunctionCallRequest";
 export { isIFrameInitialized } from "./SupervisorInitialized";
 export { isFunctionCallResponse } from "./FunctionCallResponse";

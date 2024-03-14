@@ -4,13 +4,13 @@ import {
   PluginCallResponse,
   isFunctionCallRequest,
   isPluginCallResponse,
-  FunctionCallArgs,
+  QualifiedFunctionCallArgs,
   PluginCallPayload,
   generateRandomString,
   buildPluginCallRequest,
   buildFunctionCallResponse,
-  isPreLoadServicesRequest,
-  PreLoadServicesRequest,
+  isPreLoadPluginsRequest,
+  PreLoadPluginsRequest,
   isPluginCallFailure,
   PluginCallFailure,
   FunctionCallResult,
@@ -74,6 +74,7 @@ const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
         console.log(`✨ Successfully booted loader for service "${service}"`);
         const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
         resolve(loader);
+        // TODO: send the loader the list of preloaded plugins so it can prepare them
       }
     });
 
@@ -92,7 +93,7 @@ const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
 
 interface PendingFunctionCall<T = any> {
   id: string;
-  args: FunctionCallArgs;
+  args: QualifiedFunctionCallArgs;
   result?: T;
   nestedCalls: PendingFunctionCall[];
 }
@@ -153,6 +154,7 @@ const checkForResolution = () => {
         precomputedResults: funCall.nestedCalls.map(({ id, args, result }) => ({
           id,
           service: args.service,
+          plugin: args.plugin,
           method: args.method,
           params: args.params,
           result,
@@ -249,8 +251,9 @@ const executeCall = (id: string) => {
         .map(
           (x): FunctionCallResult => ({
             id: x.id,
-            method: x.args.method,
             service: x.args.service,
+            plugin: x.args.plugin,
+            method: x.args.method,
             params: x.args.params,
             result: undefined,
           })
@@ -260,7 +263,7 @@ const executeCall = (id: string) => {
 };
 
 const onPluginCallFailure = (message: PluginCallFailure) => {
-  const { id, method, params, service } = message.payload;
+  const { id, service, plugin, method, params } = message.payload;
   const subId = generateRandomString();
 
   pendingFunctionCalls = updatePendingFunctionCall(
@@ -271,9 +274,10 @@ const onPluginCallFailure = (message: PluginCallFailure) => {
         ...pending.nestedCalls,
         {
           args: {
+            service,
+            plugin,
             method,
             params,
-            service,
           },
           id: subId,
           nestedCalls: [],
@@ -291,9 +295,9 @@ const onPluginCallFailure = (message: PluginCallFailure) => {
   executeCall(subId);
 };
 
-const onPreloadServicesRequest = ({
+const onPreloadPluginsRequest = ({
   payload,
-}: PreLoadServicesRequest): void => {
+}: PreLoadPluginsRequest): void => {
   payload.services.forEach(getLoader);
 };
 
@@ -304,8 +308,8 @@ const onRawEvent = (message: MessageEvent<any>) => {
   } else if (isPluginCallResponse(message.data)) {
     // TODO Assert origin of plugin call
     onPluginCallResponse(message.data);
-  } else if (isPreLoadServicesRequest(message.data)) {
-    onPreloadServicesRequest(message.data);
+  } else if (isPreLoadPluginsRequest(message.data)) {
+    onPreloadPluginsRequest(message.data);
   } else if (isPluginCallFailure(message.data)) {
     onPluginCallFailure(message.data);
   }

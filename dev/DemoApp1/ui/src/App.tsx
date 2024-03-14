@@ -9,7 +9,7 @@ function App() {
 
   const init = async () => {
     await supervisor.onLoaded();
-    supervisor.preLoadServices(["invite-sys", "account-sys", "auth-sys"]);
+    supervisor.preLoadPlugins(["invite-sys", "account-sys", "auth-sys", "demoapp1"]);
   };
 
   useEffect(() => {

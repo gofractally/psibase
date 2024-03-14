@@ -1,7 +1,7 @@
-import { FunctionCallArgs } from "./FunctionCallRequest";
+import { QualifiedFunctionCallArgs } from "./FunctionCallRequest";
 import { PLUGIN_CALL_FAILURE } from "./index";
 
-interface PluginCallFailureArgs extends FunctionCallArgs {
+interface PluginCallFailureArgs extends QualifiedFunctionCallArgs {
     id: string;
 }
 

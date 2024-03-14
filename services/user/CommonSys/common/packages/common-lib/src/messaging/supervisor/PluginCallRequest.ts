@@ -1,15 +1,15 @@
-import { FunctionCallArgs } from "./FunctionCallRequest";
+import { QualifiedFunctionCallArgs } from "./FunctionCallRequest";
 
 const PLUGIN_CALL_REQUEST = "PLUGIN_CALL_REQUEST" as const;
 
-export interface FunctionCallResult<T = any> extends FunctionCallArgs {
+export interface FunctionCallResult<T = any> extends QualifiedFunctionCallArgs {
     id: string;
     result: T;
 }
 
 export interface PluginCallPayload {
     id: string;
-    args: FunctionCallArgs;
+    args: QualifiedFunctionCallArgs;
     precomputedResults: FunctionCallResult[];
 }
 
@@ -26,6 +26,7 @@ export const isPluginCallRequest = (data: any): data is PluginCallRequest => {
         typeof id == "string" &&
         typeof args == "object" &&
         "service" in args &&
+        "plugin" in args &&
         "method" in args;
     if (!isSchemaSatisfied)
         throw new Error(

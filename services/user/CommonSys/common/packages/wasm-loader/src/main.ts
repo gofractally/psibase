@@ -1,6 +1,5 @@
-import { serviceMethodIndexToImportables } from "./dynamicFunctions";
-import importableCode from "./importables.js?raw";
-import { parseFunctions } from "./witParsing";
+import { adaptImports } from "./dynamicFunctions";
+//import importableCode from "./importables.js?raw";
 import {
     PluginCallResponse,
     isPluginCallRequest,
@@ -26,43 +25,36 @@ const wasmUrlToIntArray = (url: string) =>
         .then((res) => res.arrayBuffer())
         .then((buffer) => new Uint8Array(buffer));
 
+
+// TODO - Add caller app to the arguments passed to the functionCall
 const functionCall = async ({
     id,
     args,
-    precomputedResults
+    precomputedResults // Todo <-- plugin should not be optional field in precomputedResults
 }: PluginCallPayload) => {
-    const [pluginBytes, parserBytes, wasmComponent] = await Promise.all([
-        wasmUrlToIntArray("/plugin.wasm"),
+
+    // TODO - Check args.service = this service
+
+    const [pluginBytes, parserBytes, { load }] = await Promise.all([
+        wasmUrlToIntArray(`/${args.plugin}.wasm`),
         wasmUrlToIntArray("/common/component_parser.wasm"),
         import("rollup-plugin-wit-component")
     ]);
 
-    const { provider } = await wasmComponent.load(parserBytes);
-    const ComponentParser = new provider.ComponentParser();
-    const { wit } = ComponentParser.parse("component", pluginBytes);
-    const parsedFunctions = parseFunctions(wit);
+    const parser = await load(parserBytes);
+    const parsed = parser.intf.parse("component", pluginBytes);
 
-    const serviceImports = serviceMethodIndexToImportables(
-        parsedFunctions,
-        args.service,
-        id,
-        precomputedResults.map((res) => ({
-            method: res.method,
-            result: res.result
-        }))
-    );
+    // TODO - Early terminate with helpful error if the function being called 
+    //        is not exported by the plugin.
 
-    let importables: Importables[] = [
-        {
-            [`component:${args.service}/imports`]: importableCode
-        },
-        ...serviceImports
-    ];
+    let importables: Importables[] = adaptImports(parsed.importedFuncs, id, precomputedResults);
 
     try {
         // @ts-ignore
-        const pluginModule = await wasmComponent.load(pluginBytes, importables);
-        const res = pluginModule[args.method](...args.params);
+        const pluginModule = await load(pluginBytes, importables);
+        let func = (typeof args.intf === 'undefined' || args.intf === "") ? pluginModule[args.method] 
+            : pluginModule[args.intf][args.method];
+        const res = func(...args.params);
         console.log(`Plugin call ${args.service} Success: ${res}`);
         sendPluginCallResponse(buildPluginCallResponse(id, res));
     } catch (e) {

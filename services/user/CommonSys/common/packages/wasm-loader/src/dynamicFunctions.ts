@@ -1,7 +1,11 @@
-import { ServiceMethodIndex } from "./witParsing";
+import {
+    FunctionCallResult,
+  } from "@psibase/common-lib/messaging";
 
-interface Func {
+interface PluginFunc {
     service: string;
+    plugin: string;
+    intf?: string;
     method: string;
 }
 
@@ -21,64 +25,58 @@ const generateFulfilledFunction = (
         return ${typeof result == "number" ? result : typeof result == "object" ? JSON.stringify(result) : `'${result}'`}
     }`;
 
-export interface FunctionCallArgs {
-    service: string;
-    method: string;
-    params: any[];
-}
-export interface FunctionCallResult<T = any> extends FunctionCallArgs {
-    id: string;
-    result: T;
-}
-
 const generatePendingFunction = (
-    { method, service }: Func,
+    { service, plugin, intf, method }: PluginFunc,
     id: string
 ): string => {
-    return `export async function ${method}(...args) {
-  
-  const payload = {
-      id: "${id}",
-      service: "${service}",
-      method: "${method}",
-      params: [...args]
-  };
-  
-  console.log('Attempting to call plugin call ${id}', payload);
-  window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload }, "*");
-  throw new Error("Pending function throw, this is by design.")
-  }
-`;
+    const functionBody = `
+        const payload = {
+            id: "${id}",
+            service: "${service}",
+            plugin: "${plugin}",
+            method: "${method}",
+            params: [...args]
+        };
+
+        console.log('Attempting to call plugin call ${id}', payload);
+        window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload }, "*");
+        throw new Error("Pending function throw, this is by design.");
+    `;
+
+    return (typeof intf === 'undefined' || intf === "") ? `
+        export async function ${method}(...args) {
+            ${functionBody}
+        }
+    ` : `
+        export const ${intf} = {
+            async ${method}(...args) {
+                ${functionBody}
+            }
+        };`;
 };
 
-interface FunctionResult<T = any> {
-    method: string;
-    result: T;
-}
+type ImportedFunc = {
+    'compIntf': string;
+    'funcName': string;
+};
 
-export const serviceMethodIndexToImportables = (
-    serviceMethodIndex: ServiceMethodIndex,
-    service: string,
+type ImportedFuncs = ImportedFunc[];
+
+export const adaptImports = (
+    importedFuncs: ImportedFuncs,
     id: string,
-    functionsResult: FunctionResult[]
-): { [key: string]: string }[] =>
-    Object.entries(serviceMethodIndex).map(([key, methodNames]) => ({
-        [`component:${service}/${key}`]: methodNames
-            .map((methodName) => {
-                const functionResult = functionsResult.find(
-                    (funcResult) => funcResult.method == methodName
-                );
-                return (
-                    (functionResult
-                        ? generateFulfilledFunction(
-                              functionResult.method,
-                              functionResult.result
-                          )
-                        : generatePendingFunction(
-                              { method: methodName, service: key },
-                              id
-                          )) + "\n"
-                );
-            })
-            .join("\n")
-    }));
+    functionsResult: FunctionCallResult[]
+): { [key: string]: string }[] => 
+    importedFuncs.reduce((accumulator, { compIntf, funcName }) => {
+        const functionResult = functionsResult.find(funcResult => funcResult.method == funcName);
+        const [service, rest] = compIntf.split(':');
+        const [plugin, intf] = rest.split('/');
+
+        const value = functionResult
+            ? generateFulfilledFunction(functionResult.method, functionResult.result)
+            : generatePendingFunction({ service, plugin, intf, method: funcName }, id);
+    
+        accumulator.push({ [`${service}:${plugin}/*`]: value + "\n" });
+    
+        return accumulator;
+    }, [] as { [key: string]: string }[]);
