@@ -189,6 +189,7 @@ enum Command {
     /// Install apps to the chain
     Install {
         /// Packages to install
+        #[clap(required = true)]
         packages: Vec<String>,
 
         /// Set all accounts to authenticate using this key
@@ -225,6 +226,7 @@ enum Command {
     /// Find packages
     Search {
         /// Regular expressions to search for in package names and descriptions
+        #[clap(required = true)]
         patterns: Vec<String>,
 
         /// A URL or path to a package repository (repeatable)
@@ -235,6 +237,7 @@ enum Command {
     /// Shows package contents
     Info {
         /// Packages to show
+        #[clap(required = true)]
         packages: Vec<String>,
 
         /// A URL or path to a package repository (repeatable)
@@ -1113,6 +1116,8 @@ async fn package_info(
             show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
         } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
             show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
+        } else {
+            eprintln!("Package {} not found", package);
         }
     }
 
