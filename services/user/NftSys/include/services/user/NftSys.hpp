@@ -79,6 +79,7 @@ namespace UserService
       method(debit, nftId, memo),
       method(setUserConf, flag, enable),
       method(serveSys, request),
+      method(storeSys, path, contentType, content),
 
       method(getNft, nftId),
       method(getNftHolder, account),

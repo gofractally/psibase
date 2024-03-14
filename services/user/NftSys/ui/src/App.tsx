@@ -6,23 +6,23 @@ import { Heading, NftTable, SendMintNft } from "./components";
 import WalletIcon from "./assets/icon-wallet.svg?react";
 
 export type Nft = {
-    id: string;
+    id: number;
     status: "owned" | "burned" | "pending-debit" | "pending-credit";
     counterParty?: string;
 };
 
 const nfts: Nft[] = [
     {
-        id: "1",
+        id: 1,
         status: "owned",
     },
     {
-        id: "2",
+        id: 2,
         status: "pending-debit",
         counterParty: "brandon",
     },
     {
-        id: "3",
+        id: 3,
         status: "pending-credit",
         counterParty: "james",
     },
@@ -30,23 +30,29 @@ const nfts: Nft[] = [
 
 function App() {
     const [resMint, setResMint] = useState("Empty");
+    const [supervisor, setSupervisor] = useState<Supervisor>();
 
     const init = async () => {
-        const supervisor = new Supervisor();
+        console.info("nft finding supervisor==null");
+        if (!supervisor) return;
+        console.info("nft waiting for supervisor loaded");
         await supervisor.onLoaded();
         supervisor.preLoadServices(["nft-sys"]);
+        console.info("nft-sys connected to Supervisor and plugins preloaded");
     };
 
     useEffect(() => {
         init();
-        console.info("nft-sys connected to Supervisor");
+    }, [supervisor]);
+
+    useEffect(() => {
+        console.info("nft-sys -> new Supervisor()");
+        setSupervisor(new Supervisor());
     }, []);
-
-    const supervisor = new Supervisor();
     const mintNft = async () => {
-        if (!supervisor.onLoaded()) return;
+        if (!supervisor?.onLoaded()) return;
 
-        console.log("calling nft-sys.callintoplugin");
+        console.log("calling nft-sys.call(mintNft())");
         const res = await supervisor.functionCall({
             service: "nft-sys",
             method: "mint",
@@ -56,9 +62,9 @@ function App() {
     };
 
     const burnNft = async (nftId: number) => {
-        if (!supervisor.onLoaded()) return;
+        if (!supervisor?.onLoaded()) return;
 
-        console.log("calling nft-sys.callintoplugin");
+        console.log("calling nft-sys.call(burnNft())");
         const res = await supervisor.functionCall({
             service: "nft-sys",
             method: "burn",
@@ -68,9 +74,9 @@ function App() {
     };
 
     const uncreditNft = async (nftId: number) => {
-        if (!supervisor.onLoaded()) return;
+        if (!supervisor?.onLoaded()) return;
 
-        console.log("calling nft-sys.callintoplugin");
+        console.log("calling nft-sys.call(uncreditNft))");
         const res = await supervisor.functionCall({
             service: "nft-sys",
             method: "uncredit",
@@ -80,9 +86,9 @@ function App() {
     };
 
     const debitNft = async (nftId: number) => {
-        if (!supervisor.onLoaded()) return;
+        if (!supervisor?.onLoaded()) return;
 
-        console.log("calling nft-sys.callintoplugin");
+        console.log("calling nft-sys.call(debitNft())");
         const res = await supervisor.functionCall({
             service: "nft-sys",
             method: "debit",

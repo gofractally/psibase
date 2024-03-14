@@ -31,7 +31,7 @@ interface Props {
 
 export const NftTable = ({
     nfts,
-    actionHandlers: _actionHandlers,
+    actionHandlers,
     queryResult: result = { isLoading: false, isError: false },
 }: Props) => {
     if (result.isLoading) {
@@ -52,7 +52,7 @@ export const NftTable = ({
         );
     }
 
-    // const { burnNft, uncreditNft, debitNft } = actionHandlers;
+    const { burnNft, uncreditNft, debitNft } = actionHandlers;
     return (
         <section className="mt-3 space-y-3">
             <Heading tag="h2" className="select-none font-medium text-gray-600">
@@ -93,7 +93,7 @@ export const NftTable = ({
                                         size="xs"
                                         fullWidth
                                         className="text-red-500"
-                                        // onClick={() => burnNft(nft.id)}
+                                        onClick={() => burnNft(nft.id)}
                                     >
                                         Burn
                                     </Button>
@@ -102,7 +102,7 @@ export const NftTable = ({
                                         size="xs"
                                         fullWidth
                                         className="text-green-500"
-                                        // onClick={() => debitNft(nft.id)}
+                                        onClick={() => debitNft(nft.id)}
                                     >
                                         Claim
                                     </Button>
@@ -111,7 +111,7 @@ export const NftTable = ({
                                         size="xs"
                                         fullWidth
                                         className="w-24"
-                                        // onClick={() => uncreditNft(nft.id)}
+                                        onClick={() => uncreditNft(nft.id)}
                                     >
                                         Uncredit
                                     </Button>
