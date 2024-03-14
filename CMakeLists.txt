@@ -686,7 +686,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
-    DocSys ExploreSys FractalSys InviteSys NftSys Minimal PackageSys ProducerSys ProxySys
+    DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys ProducerSys ProxySys
     PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
@@ -705,6 +705,7 @@ install(
           ${SERVICE_DIR}/InviteSys.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/NftSys.psi
+          ${SERVICE_DIR}/NopSys.psi
           ${SERVICE_DIR}/PackageSys.psi
           ${SERVICE_DIR}/ProducerSys.psi
           ${SERVICE_DIR}/ProxySys.psi
