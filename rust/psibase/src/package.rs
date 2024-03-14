@@ -903,9 +903,9 @@ impl PackageList {
         let mut end_cursor: Option<String> = None;
         let mut result = PackageList::new();
         loop {
-            let data: InstalledQuery = crate::gql_query(base_url, client, package_sys::SERVICE,
+            let data = crate::gql_query::<InstalledQuery>(base_url, client, package_sys::SERVICE,
                                         format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
-                .await?;
+                .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_installed(edge.node);
             }

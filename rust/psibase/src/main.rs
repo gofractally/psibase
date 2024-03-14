@@ -955,19 +955,19 @@ async fn list(
     sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     if all || (installed && available) || (!all & !installed && !available) {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
         }
     } else if installed {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         for name in installed.into_vec() {
             println!("{}", name);
         }
     } else if available {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
@@ -1101,13 +1101,26 @@ async fn show_package<T: PackageRegistry + ?Sized>(
     Ok(())
 }
 
+// an unbooted chain has no packages installed
+fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageList, anyhow::Error> {
+    if let Err(e) = &list {
+        if e.root_cause()
+            .to_string()
+            .contains("Need genesis block; use 'psibase boot' to boot chain")
+        {
+            return Ok(PackageList::new());
+        }
+    }
+    list
+}
+
 async fn package_info(
     args: &Args,
     mut client: reqwest::Client,
     packages: &Vec<String>,
     sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
-    let installed = PackageList::installed(&args.api, &mut client).await?;
+    let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
     let package_registry = get_package_registry(sources, client.clone()).await?;
     let reglist = PackageList::from_registry(&package_registry)?;
 
