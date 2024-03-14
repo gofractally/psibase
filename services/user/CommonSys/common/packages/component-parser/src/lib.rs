@@ -1,88 +1,120 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::psibase::component_parser::provider::{GuestComponentParser, Component, Export, Import, ItemKind};
-use wit_component::WitPrinter;
-use wasmparser::{ComponentExternalKind, ComponentTypeRef};
+use bindings::exports::psibase::component_parser::intf;
+use intf::{ComponentExtraction, ImportedFunc};
+use wit_component::{decode, WitPrinter};
+use wit_parser::Package;
 
 pub struct ComponentParser;
 
-impl bindings::exports::psibase::component_parser::provider::Guest for ComponentParser {
-    type ComponentParser = ComponentParser;
+fn split_import(imp: &String) -> (String, String, String) {
+    let parts: Vec<&str> = imp.split(':').collect();
+    assert!(parts.len() == 2);
+    let namespace = parts[0];
+
+    let parts: Vec<&str> = parts[1].split('/').collect();
+    assert!(parts.len() == 2);
+
+    let comp = parts[0];
+    let interf = parts[1];
+
+    (namespace.to_string(), comp.to_string(), interf.to_string())
 }
 
-impl GuestComponentParser for ComponentParser {
+fn kebab_to_camel(s: &str) -> String {
+    s.split('-')
+        .enumerate()
+        .map(|(i, part)| {
+            if i == 0 {
+                part.to_string()
+            } else {
+                part[..1].to_uppercase() + &part[1..]
+            }
+        })
+        .collect()
+}
 
-    fn new() -> Self {
-        Self {}
-    }
-
-    fn parse(&self, name: String, bytes: Vec::<u8>) -> Result<Component, String>
-    {
+impl intf::Guest for ComponentParser {
+    fn parse(name: String, bytes: Vec<u8>) -> Result<ComponentExtraction, String> {
+        // Todo - What should name be here?
         let component = wasm_compose::graph::Component::from_bytes(name, bytes)
             .map_err(|e| format!("{e:#}"))?;
 
-            // Extract a wit file from the component.
-            let wit = match wit_component::decode(component.bytes()) {
-                Ok(decoded) => {
-                    // Print the wit for the component
-                    let resolve = decoded.resolve();
-                    let mut printer = WitPrinter::default();
-                    let mut wit = String::new();
-                    for (i, (id, _)) in resolve.packages.iter().enumerate() {
-                        if i > 0 {
-                            wit.push_str("\n\n");
-                        }
-                        match printer.print(resolve, id) {
-                            Ok(s) => wit.push_str(&s),
-                            Err(e) => {
-                                // If we can't print the document, just use the error text
-                                wit = format!("{e:#}");
-                                break;
-                            }
-                        }
-                    }
-                    wit
-                }
-                Err(e) => {
-                    // If we can't decode the component, just use the error text
-                    format!("{e:#}")
-                }
-            };
+        let named_imports: Vec<(String, String, String)> = component
+            .imports()
+            .map(|(_, name, _)| split_import(&name.to_string()))
+            .collect();
 
-            Ok(
-                Component {
-                name: component.name().to_string(),
-                imports: component
-                    .imports()
-                    .map(|(_, name, ty)| Import {
-                        name: name.to_string(),
-                        kind: match ty {
-                            ComponentTypeRef::Module(_) => ItemKind::Module,
-                            ComponentTypeRef::Func(_) => ItemKind::Function,
-                            ComponentTypeRef::Value(_) => ItemKind::Value,
-                            ComponentTypeRef::Type(_) => ItemKind::Type,
-                            ComponentTypeRef::Instance(_) => ItemKind::Instance,
-                            ComponentTypeRef::Component(_) => ItemKind::Component,
-                        },
-                    })
-                    .collect(),
-                exports: component
-                    .exports()
-                    .map(|(_, name, kind, _)| Export {
-                        name: name.to_string(),
-                        kind: match kind {
-                            ComponentExternalKind::Module => ItemKind::Module,
-                            ComponentExternalKind::Func => ItemKind::Function,
-                            ComponentExternalKind::Value => ItemKind::Value,
-                            ComponentExternalKind::Type => ItemKind::Type,
-                            ComponentExternalKind::Instance => ItemKind::Instance,
-                            ComponentExternalKind::Component => ItemKind::Component,
-                        },
-                    })
-                    .collect(),
-                wit,
-            })
+        let is_import =
+            |i: &(String, String, String)| named_imports.iter().any(|import| import == i);
+
+        let decoded = decode(component.bytes()).map_err(|e| format!("{e:#}"))?;
+        let resolve = decoded.resolve();
+
+        // Get all packages referenced by the component
+        let packages: Vec<&Package> = resolve
+            .packages
+            .iter()
+            .map(|(_, package)| package)
+            .collect();
+
+        // Get all import functions from the packages
+        let mut imported_funcs: Vec<ImportedFunc> = Vec::new();
+        for package in packages {
+            let mut package_imported_funcs: Vec<ImportedFunc> = package
+                .interfaces
+                .iter()
+                .filter(|&(intf_name, _)| {
+                    is_import(&(
+                        package.name.namespace.to_owned(),
+                        package.name.name.to_owned(),
+                        intf_name.to_owned(),
+                    ))
+                })
+                .map(|(_, id)| {
+                    let interface = resolve.interfaces.get(*id).unwrap();
+                    let func_names: Vec<ImportedFunc> = interface
+                        .functions
+                        .iter()
+                        .map(|(_, func)| ImportedFunc {
+                            comp_intf: format!(
+                                "{}:{}/{}",
+                                package.name.namespace,
+                                package.name.name,
+                                interface.name.to_owned().unwrap(),
+                            ),
+                            func_name: kebab_to_camel(&func.name.to_owned()),
+                        })
+                        .collect();
+                    func_names
+                })
+                .flatten()
+                .collect();
+            imported_funcs.append(&mut package_imported_funcs);
+        }
+
+        // Extract a wit file from the component for debugging purposes
+        let mut printer = WitPrinter::default();
+        let mut wit = String::new();
+        for (i, (id, _)) in resolve.packages.iter().enumerate() {
+            if i > 0 {
+                wit.push_str("\n\n");
+            }
+            match printer.print(resolve, id) {
+                Ok(s) => wit.push_str(&s),
+                Err(e) => {
+                    // If we can't print the document, just use the error text
+                    wit = format!("{e:#}");
+                    break;
+                }
+            }
+        }
+
+        Ok(ComponentExtraction {
+            imported_funcs: imported_funcs,
+            wit: wit,
+        })
     }
 }
 
