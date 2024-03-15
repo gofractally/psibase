@@ -42,7 +42,6 @@ export type MessageMetadata = {
 };
 
 /** Global Values */
-let rootDomain = "";
 let contractName = "";
 
 // Operations and Queries defined by an applet

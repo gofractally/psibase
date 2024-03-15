@@ -1,5 +1,5 @@
+import { siblingUrl } from "../rpc";
 import { generateRandomString } from "./generateRandomString";
-import { generateSubdomain } from "./generateSubdomain";
 import { buildPreLoadServicesRequest } from "./supervisor/PreLoadServicesRequest";
 import {
     isIFrameInitialized,
@@ -47,7 +47,7 @@ const setupSupervisorIFrame = (src: string) => {
     }
 };
 
-const supervisorOrigin = generateSubdomain('supervisor-sys');
+const supervisorOrigin = siblingUrl(null, 'supervisor-sys');
 
 export class Supervisor {
     public isSupervisorInitialized = false;

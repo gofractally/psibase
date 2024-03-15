@@ -8,6 +8,7 @@ import {
     buildPluginCallResponse,
     buildMessageLoaderInitialized
 } from "@psibase/common-lib/messaging";
+import { siblingUrl } from "@psibase/common-lib";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -70,20 +71,8 @@ const onPluginCallRequest = async ({
     }
 };
 
-export const generateSubdomain = (subDomain?: string): string => {
-    const currentUrl = new URL(window.location.href);
-    const hostnameParts = currentUrl.hostname.split(".");
 
-    hostnameParts.shift();
-    if (subDomain) {
-        hostnameParts.unshift(subDomain);
-    }
-    currentUrl.hostname = hostnameParts.join(".");
-
-    return currentUrl.origin;
-};
-
-const supervisorDomain = generateSubdomain("supervisor-sys");
+const supervisorDomain = siblingUrl(null, "supervisor-sys");
 
 
 const sendPluginCallResponse = (response: PluginCallResponse) => {

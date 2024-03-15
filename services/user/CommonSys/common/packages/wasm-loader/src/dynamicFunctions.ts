@@ -1,4 +1,4 @@
-import { generateSubdomain } from "./main";
+import { siblingUrl } from '@psibase/common-lib'
 import { ServiceMethodIndex } from "./witParsing";
 
 interface Func {
@@ -79,7 +79,7 @@ export const serviceMethodIndexToImportables = (
                         : generatePendingFunction(
                               { method: methodName, service: key },
                               id,
-                              generateSubdomain("supervisor-sys")
+                              siblingUrl(null, "supervisor-sys")
                           )) + "\n"
                 );
             })

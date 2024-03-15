@@ -15,6 +15,7 @@ import {
   PluginCallFailure,
   FunctionCallResult,
 } from "@psibase/common-lib/messaging";
+import { siblingUrl } from '@psibase/common-lib'
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -133,7 +134,7 @@ const sendPluginCallRequest = async (
     throw new Error(`No args received on sendPluginCallRequest`);
   }
   const iframe = await getLoader(param.args.service);
-  iframe.contentWindow?.postMessage(buildPluginCallRequest(param), generateSubdomain(param.args.service));
+  iframe.contentWindow?.postMessage(buildPluginCallRequest(param), siblingUrl(null, param.args.service));
 };
 
 const onFunctionCallRequest = (message: FunctionCallRequest) => {
@@ -318,31 +319,19 @@ const onPreloadServicesRequest = ({
     payload.services.forEach(getLoader);
 };
 
-const generateSubdomain = (subDomain?: string): string => {
-  const currentUrl = new URL(window.location.href);
-  const hostnameParts = currentUrl.hostname.split(".");
-
-  hostnameParts.shift();
-  if (subDomain) {
-      hostnameParts.unshift(subDomain);
-  }
-  currentUrl.hostname = hostnameParts.join(".");
-
-  return currentUrl.origin;
-};
 
 const isMessageFromApplication = (message: MessageEvent) => {
   const isTop = message.source == window.top;
   const isParent = message.source == window.parent;
   const isSameRootDomain =
-      message.origin.endsWith(generateSubdomain().slice("https://".length)) &&
+      message.origin.endsWith(siblingUrl().slice("https://".length)) &&
       message.origin.startsWith("https://");
   return isTop && isParent && isSameRootDomain;
 };
 
 const isMessageFromChild = (message: MessageEvent): boolean => {
   const originIsChild = loadedServices
-      .map(generateSubdomain)
+      .map(service => siblingUrl(null, service))
       .includes(message.origin);
   const isTop = message.source == window.top;
   const isParent = message.source == window.parent;
