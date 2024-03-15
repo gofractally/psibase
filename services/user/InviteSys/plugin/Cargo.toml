@@ -7,11 +7,10 @@ edition = "2021"
 
 [dependencies]
 bitflags = "2.4.2"
-serde = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.114"
 wit-bindgen-rt = "0.21.0"
-psibase = "0.6.0"
+psibase = {version="0.7.0", path="../../../../rust/psibase/"}
 urlencoding = "2.1.3"
+fracpack =  {version="0.7.0", path="../../../../rust/fracpack"}
 
 [lib]
 crate-type = ["cdylib"]
@@ -23,6 +22,3 @@ package = "invite-sys:plugin"
 "common:plugin" = { path = "../../CommonSys/common/packages/wit/plugin.wit" }
 "auth-sys:plugin" = { path = "../../../system/AuthSys/plugin/wit/world.wit" }
 "account-sys:plugin" = { path = "../../../system/AccountSys/plugin/wit/world.wit" }
-
-[package.metadata.component.bindings]
-derives = ["serde::Serialize", "serde::Deserialize"]

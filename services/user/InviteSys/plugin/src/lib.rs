@@ -1,6 +1,3 @@
-use serde_json::to_string;
-
-// From other plugins
 #[allow(warnings)]
 mod bindings;
 use bindings::account_sys::plugin::accounts;
@@ -10,7 +7,8 @@ use bindings::exports::invite_sys::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
 };
 
-struct Component;
+use fracpack::Pack;
+use psibase::services::invite_sys as invite_service;
 
 /*
     /// This doesn't need to be exposed, it can just be jammed into various plugin functions
@@ -19,6 +17,8 @@ struct Component;
     /// can be deleted by calling this action
     void delExpired(uint32_t maxDeleted);
 */
+
+struct Component;
 
 impl Admin for Component {
     fn set_whitelist(_accounts: Vec<String>) -> Result<(), String> {
@@ -59,37 +59,34 @@ impl Inviter for Component {
 
         let pubkey: psibase::PublicKey = keyvault::generate_keypair()?.parse().unwrap();
 
-        // Todo - link to the psibase crate to get the invite-sys service wrapper for the
-        //   create_invite action struct.
-        // server::add_action_to_transaction(
-        //     "invite-sys",
-        //     "createInvite",
-        //     &to_string(&action_structs::create_invite {
-        //         inviteKey: pubkey.to_owned(),
-        //     })
-        //     .unwrap(),
-        // )?;
+        server::add_action_to_transaction(
+            "createInvite",
+            &invite_service::action_structs::createInvite {
+                inviteKey: pubkey.to_owned(),
+            }
+            .packed(),
+        )?;
 
-        let invite_domain = client::get_root_domain().unwrap();
-        let invited_page: String = "/invited".to_string();
+        let invite_domain = client::my_service_domain();
+        let invited_page = "/invited".to_string();
         let link_root = format!("{}{}", invite_domain, invited_page);
 
-        let origination = client::get_sender_app()?;
-        let originator = match origination.app {
-            Some(o) => o,
-            None => {
-                // Todo - revisit this later, can we open it to external apps?
-                return Err("Only hosted apps can generate invites".to_string());
-            }
+        let origination_domain = client::sender_app_domain();
+        let originator_service = client::sender_app_service_account();
+        let originator = if !originator_service.is_empty() {
+            originator_service
+        } else {
+            origination_domain.clone()
         };
-        let callback_url = format!("{}{}", origination.root_domain.unwrap(), callback_subpath);
+
+        let callback_url = format!("{}{}", origination_domain, callback_subpath);
         let invite_key = pubkey.to_string();
         let query_string = format!(
             "inviter={}&app={}&pk={}&cb={}",
             inviter, originator, invite_key, callback_url
         );
 
-        // Todo - For ergonomics, consider base64 encoding the querystring
+        // Todo - For ergonomics, consider encoding the querystring
         //   and provide a function to easily decode it
 
         Ok(urlencoding::encode(&format!("{}?{}", link_root, query_string)).into_owned())

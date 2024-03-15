@@ -594,9 +594,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df0045df510fc49b9fdda65bd0b6bf2ace0506987f17b798535d995487f81676"
+version = "0.7.0"
 dependencies = [
  "custom_error",
  "psibase_macros",
@@ -959,9 +957,8 @@ name = "invite-sys"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.4.2",
+ "fracpack",
  "psibase",
- "serde",
- "serde_json",
  "urlencoding",
  "wit-bindgen-rt",
 ]
@@ -1321,9 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3605548cc02b0af104f02b8051ed6058f1cb30a1dfbdcaa61e954a422bc964a"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1371,9 +1366,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bee57a4b5afca9cd28f9e87dbed65d4fa453544cbc923e0845b00ddc42030448"
+version = "0.7.0"
 dependencies = [
  "darling",
  "proc-macro-error",
@@ -1385,9 +1378,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ba8be0c220b565ed9928f4da5c7d8dcb6d798680adc5663af44a0558b5bc77d"
+version = "0.7.0"
 dependencies = [
  "seahash",
 ]
