@@ -30,7 +30,7 @@ const wasmUrlToIntArray = (url: string) =>
 const functionCall = async ({
     id,
     args,
-    precomputedResults // Todo <-- plugin should not be optional field in precomputedResults
+    precomputedResults
 }: PluginCallPayload) => {
 
     // TODO - Check args.service = this service
@@ -58,8 +58,12 @@ const functionCall = async ({
         console.log(`Plugin call ${args.service} Success: ${res}`);
         sendPluginCallResponse(buildPluginCallResponse(id, res));
     } catch (e) {
-        console.warn(`Plugin call ${args.service} Failure: ${e}`);
-        // TODO Do not assume error is only caused from lack of fulfilled function
+        if (e instanceof Error && typeof e.message === 'string' && e.message.includes("synchronous_call")) {
+            let contents = JSON.parse(e.message);
+            window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload: contents.target }, "*");
+          } else {
+            console.warn(`${args.service} plugin call failed with: ${e}`);
+          }
     }
 };
 

@@ -30,26 +30,25 @@ const generatePendingFunction = (
     id: string
 ): string => {
     const functionBody = `
-        const payload = {
-            id: "${id}",
-            service: "${service}",
-            plugin: "${plugin}",
-            method: "${method}",
-            params: [...args]
-        };
-
-        console.log('Attempting to call plugin call ${id}', payload);
-        window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload }, "*");
-        throw new Error("Pending function throw, this is by design.");
+        throw JSON.stringify({
+            type: 'synchronous_call',
+            target: {
+                id: '${id}',
+                service: '${service}',
+                plugin: '${plugin}',
+                method: '${method}',
+                params: [...args]
+            }
+        });
     `;
 
     return (typeof intf === 'undefined' || intf === "") ? `
-        export async function ${method}(...args) {
+        export function ${method}(...args) {
             ${functionBody}
         }
     ` : `
         export const ${intf} = {
-            async ${method}(...args) {
+            ${method}(...args) {
                 ${functionBody}
             }
         };`;
