@@ -15,8 +15,8 @@ impl MainInterface for Component {
 }
 
 impl Intf for Component {
-    fn helloworld2() -> String {
-        invite_sys::plugin::inviter::generate_invite("/subpath").unwrap()
+    fn helloworld2() -> Result<String, String> {
+        Ok(invite_sys::plugin::inviter::generate_invite("/subpath")?)
     }
 }
 
