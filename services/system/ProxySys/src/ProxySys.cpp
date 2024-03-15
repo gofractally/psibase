@@ -49,6 +49,8 @@ namespace SystemService
       kvPut(row.key(getReceiver()), row);
    }
 
+   constexpr std::string_view allowedHeaders[] = {"Content-Encoding"};
+
    extern "C" [[clang::export_name("serve")]] void serve()
    {
       auto act = getCurrentAction();
@@ -80,8 +82,17 @@ namespace SystemService
       psibase::Actor<ServerInterface> iface(act.service, service);
 
       auto result = iface.serveSys(std::move(req));
-      if (result && !result->headers.empty() && serviceName != "common-sys")
-         abortMessage("service " + service.str() + " attempted to set an http header");
+      if (result && serviceName != "common-sys")
+      {
+         for (const auto& header : result->headers)
+         {
+            if (!std::ranges::binary_search(allowedHeaders, header.name))
+            {
+               abortMessage("service " + service.str() + " attempted to set http header " +
+                            header.name);
+            }
+         }
+      }
 
       setRetval(result);
    }  // serve()

@@ -15,6 +15,7 @@ import {
   PluginCallFailure,
   FunctionCallResult,
 } from "@psibase/common-lib/messaging";
+import { siblingUrl } from '@psibase/common-lib'
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -57,7 +58,17 @@ const createLoaderDomain = (subDomain = "supervisor-sys") =>
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
 
+
+const loadedServices: string[] = [];
+
+const upsertLoadedService = (service: string) => {
+  if (loadedServices.includes(service)) return;
+  loadedServices.push(service);
+};
+
+
 const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
+  upsertLoadedService(service);
   const iFrameId = buildIFrameId(service);
   const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
   if (loader) return loader;
@@ -91,17 +102,17 @@ const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
   });
 };
 
-interface PendingFunctionCall<T = any> {
+interface CallStack<T = any> {
   id: string;
   args: QualifiedFunctionCallArgs;
   result?: T;
-  nestedCalls: PendingFunctionCall[];
+  nestedCalls: CallStack[];
 }
 
-let pendingFunctionCalls: PendingFunctionCall[] = [];
+let callStack: CallStack[] = [];
 
 const addRootFunctionCall = (message: FunctionCallRequest) => {
-  const idAlreadyExists = pendingFunctionCalls.some(
+  const idAlreadyExists = callStack.some(
     (call) => call.id == message.payload.id
   );
   if (idAlreadyExists)
@@ -109,7 +120,7 @@ const addRootFunctionCall = (message: FunctionCallRequest) => {
       `Cannot create new pending function call, ID ${message.payload.id} already exists`
     );
 
-  pendingFunctionCalls.push({
+  callStack.push({
     id: message.payload.id,
     args: message.payload.args,
     nestedCalls: [],
@@ -124,7 +135,7 @@ const sendPluginCallRequest = async (
     throw new Error(`No args received on sendPluginCallRequest`);
   }
   const iframe = await getLoader(param.args.service);
-  iframe.contentWindow?.postMessage(buildPluginCallRequest(param), "*");
+  iframe.contentWindow?.postMessage(buildPluginCallRequest(param), siblingUrl(null, param.args.service));
 };
 
 const onFunctionCallRequest = (message: FunctionCallRequest) => {
@@ -138,12 +149,21 @@ const onFunctionCallRequest = (message: FunctionCallRequest) => {
   );
 };
 
+let rootApplicationOrigin: string;
+
+const setApplicationOrigin = (origin: string) => {
+  if (origin && !rootApplicationOrigin) {
+    rootApplicationOrigin = origin;
+  }
+}
+
 const sendFunctionCallResponse = (id: string, response: any) => {
-  window.parent.postMessage(buildFunctionCallResponse(id, response), "*");
+  if (!rootApplicationOrigin) throw new Error(`Cannot send function call response when root application origin is not yet tracked.`)
+  window.parent.postMessage(buildFunctionCallResponse(id, response), rootApplicationOrigin);
 };
 
 const checkForResolution = () => {
-  const checkForTrigger = (funCall: PendingFunctionCall): void => {
+  const checkForTrigger = (funCall: CallStack): void => {
     const isAllSettledWithNoResult =
       funCall.nestedCalls.every((call) => typeof call.result !== undefined) &&
       !funCall.result;
@@ -165,22 +185,22 @@ const checkForResolution = () => {
     }
     funCall.nestedCalls.forEach(checkForTrigger);
   };
-  pendingFunctionCalls
+  callStack
     .filter((x) => typeof x.result !== undefined)
     .forEach(checkForTrigger);
 
-  const toSend = pendingFunctionCalls.filter((call) => !!call.result);
+  const toSend = callStack.filter((call) => !!call.result);
   toSend.forEach(({ id, result }) => {
     sendFunctionCallResponse(id, result);
   });
-  pendingFunctionCalls = pendingFunctionCalls.filter(
+  callStack = callStack.filter(
     (funcCall) => !toSend.some((x) => x.id == funcCall.id)
   );
 };
 
 const onPluginCallResponse = (message: PluginCallResponse) => {
   const id = message.payload.id;
-  const updateFunctionCall = (funCall: PendingFunctionCall): void => {
+  const updateFunctionCall = (funCall: CallStack): void => {
     if (funCall.id == id) {
       funCall.result = message.payload.result;
     } else {
@@ -188,15 +208,15 @@ const onPluginCallResponse = (message: PluginCallResponse) => {
     }
   };
 
-  pendingFunctionCalls.forEach(updateFunctionCall);
+  callStack.forEach(updateFunctionCall);
   checkForResolution();
 };
 
 const updatePendingFunctionCall = <T>(
-  array: PendingFunctionCall<T>[],
+  array: CallStack<T>[],
   targetId: string,
-  updateFunction: (call: PendingFunctionCall<T>) => PendingFunctionCall<T>
-): PendingFunctionCall<T>[] => {
+  updateFunction: (call: CallStack<T>) => CallStack<T>
+): CallStack<T>[] => {
   let idFound = false;
   const updatedArray = array.map((call) =>
     call.id === targetId
@@ -219,11 +239,11 @@ const updatePendingFunctionCall = <T>(
 };
 
 const findFunctionCallById = <T>(
-  calls: PendingFunctionCall<T>[],
+  calls: CallStack<T>[],
   targetId: string
-): PendingFunctionCall<T> | undefined => {
+): CallStack<T> | undefined => {
   const foundCall = calls.find(
-    (call: PendingFunctionCall<T>) => call.id === targetId
+    (call: CallStack<T>) => call.id === targetId
   );
 
   if (foundCall) {
@@ -239,7 +259,7 @@ const findFunctionCallById = <T>(
 };
 
 const executeCall = (id: string) => {
-  const toExecute = findFunctionCallById(pendingFunctionCalls, id);
+  const toExecute = findFunctionCallById(callStack, id);
   if (!toExecute) throw new Error(`Failed to find function call ID: ${id}`);
 
   sendPluginCallRequest(
@@ -266,11 +286,11 @@ const onPluginCallFailure = (message: PluginCallFailure) => {
   const { id, service, plugin, method, params } = message.payload;
   const subId = generateRandomString();
 
-  pendingFunctionCalls = updatePendingFunctionCall(
-    pendingFunctionCalls,
+  callStack = updatePendingFunctionCall(
+    callStack,
     id,
-    (pending): PendingFunctionCall => {
-      const nestedCalls: PendingFunctionCall[] = [
+    (pending): CallStack => {
+      const nestedCalls: CallStack[] = [
         ...pending.nestedCalls,
         {
           args: {
@@ -299,19 +319,42 @@ const onPreloadPluginsRequest = ({
   payload,
 }: PreLoadPluginsRequest): void => {
   payload.services.forEach(getLoader);
+    payload.services.forEach(getLoader);
+};
+
+
+const isMessageFromApplication = (message: MessageEvent) => {
+  const isTop = message.source == window.top;
+  const isParent = message.source == window.parent;
+  const isSameRootDomain =
+      message.origin.endsWith(siblingUrl().slice("https://".length)) &&
+      message.origin.startsWith("https://");
+  return isTop && isParent && isSameRootDomain;
+};
+
+const isMessageFromChild = (message: MessageEvent): boolean => {
+  const originIsChild = loadedServices
+      .map(service => siblingUrl(null, service))
+      .includes(message.origin);
+  const isTop = message.source == window.top;
+  const isParent = message.source == window.parent;
+  return originIsChild && !isTop && !isParent;
 };
 
 const onRawEvent = (message: MessageEvent<any>) => {
-  if (isFunctionCallRequest(message.data)) {
-    // TODO Assert origin of supervisor-sys
-    onFunctionCallRequest(message.data);
-  } else if (isPluginCallResponse(message.data)) {
-    // TODO Assert origin of plugin call
-    onPluginCallResponse(message.data);
-  } else if (isPreLoadPluginsRequest(message.data)) {
-    onPreloadPluginsRequest(message.data);
-  } else if (isPluginCallFailure(message.data)) {
-    onPluginCallFailure(message.data);
+  if (isMessageFromApplication(message)) {
+      setApplicationOrigin(message.origin);
+      if (isFunctionCallRequest(message.data)) {
+          onFunctionCallRequest(message.data);
+      } else if (isPreLoadPluginsRequest(message.data)) {
+          onPreloadPluginsRequest(message.data);
+      }
+  } else if (isMessageFromChild(message)) {
+      if (isPluginCallResponse(message.data)) {
+          onPluginCallResponse(message.data);
+      } else if (isPluginCallFailure(message.data)) {
+          onPluginCallFailure(message.data);
+      }
   }
 };
 

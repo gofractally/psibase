@@ -3,11 +3,11 @@ import { adaptImports } from "./dynamicFunctions";
 import {
     PluginCallResponse,
     isPluginCallRequest,
-    PluginCallRequest,
     PluginCallPayload,
     buildPluginCallResponse,
     buildMessageLoaderInitialized
 } from "@psibase/common-lib/messaging";
+import { siblingUrl } from "@psibase/common-lib";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -25,9 +25,8 @@ const wasmUrlToIntArray = (url: string) =>
         .then((res) => res.arrayBuffer())
         .then((buffer) => new Uint8Array(buffer));
 
-
 // TODO - Add caller app to the arguments passed to the functionCall
-const functionCall = async ({
+const onPluginCallRequest = async ({
     id,
     args,
     precomputedResults
@@ -60,25 +59,34 @@ const functionCall = async ({
     } catch (e) {
         if (e instanceof Error && typeof e.message === 'string' && e.message.includes("synchronous_call")) {
             let contents = JSON.parse(e.message);
-            window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload: contents.target }, "*");
+            window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload: contents.target }, siblingUrl(null, "supervisor-sys"));
           } else {
             console.warn(`${args.service} plugin call failed with: ${e}`);
           }
     }
 };
 
+
+const supervisorDomain = siblingUrl(null, "supervisor-sys");
+
+
 const sendPluginCallResponse = (response: PluginCallResponse) => {
-    window.parent.postMessage(response, "*");
+    window.parent.postMessage(response, supervisorDomain);
+};    
+
+
+const isMessageFromSupervisor = (message: MessageEvent) => {
+    const isTop = message.source == window.top;
+    const isParent = message.source == window.parent;
+    const isSupervisorDomain = message.origin == supervisorDomain;
+    return !isTop && isParent && isSupervisorDomain;
 };
 
-const onPluginCallRequest = (request: PluginCallRequest) =>
-    functionCall(request.payload);
-
 const onRawEvent = (message: MessageEvent) => {
-    if (isPluginCallRequest(message.data)) {
-        onPluginCallRequest(message.data);
+    if (isMessageFromSupervisor(message) && isPluginCallRequest(message.data)) {
+        onPluginCallRequest(message.data.payload);
     }
 };
 
 window.addEventListener("message", onRawEvent);
-window.parent.postMessage(buildMessageLoaderInitialized(), "*");
+window.parent.postMessage(buildMessageLoaderInitialized(), supervisorDomain);

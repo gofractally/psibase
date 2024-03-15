@@ -2,12 +2,13 @@ use crate::services::{
     account_sys, auth_delegate_sys, package_sys, proxy_sys, psispace_sys, setcode_sys,
 };
 use crate::{
-    new_account_action, set_auth_service_action, set_code_action, set_key_action,
-    solve_dependencies, AccountNumber, Action, AnyPublicKey, Checksum256, GenesisService, Pack,
-    Reflect, Unpack,
+    new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
+    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
+    GenesisService, Pack, PackageDisposition, PackageOp, Reflect, Unpack, Version,
 };
 use anyhow::Context;
 use custom_error::custom_error;
+use flate2::write::GzEncoder;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap, HashSet};
@@ -21,6 +22,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
+#[cfg(not(target_family = "wasm"))]
+use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
 use sha2::{Digest, Sha256};
 #[cfg(not(target_family = "wasm"))]
@@ -38,14 +41,11 @@ custom_error! {
     AccountConflict{name: AccountNumber, old: String, new: String} = "The account {name} is defined by more than one package: {old}, {new}",
     MissingDepAccount{name: AccountNumber, package: String} = "The account {name} required by {package} is not defined by any package",
     MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
-    NoDomain = "Virtual hosting requires a URL with a domain name",
     PackageNotFound{package: String} = "The package {package} was not found",
     DuplicatePackage{package: String} = "The package {package} was declared multiple times in the package index",
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
-    GraphQLError{message: String} = "{message}",
-    GraphQLWrongResponse = "Missing field `data` in graphql response",
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, Reflect)]
@@ -70,6 +70,20 @@ pub struct Meta {
     pub accounts: Vec<AccountNumber>,
 }
 
+impl Meta {
+    pub fn info(&self, sha256: Checksum256, file: String) -> PackageInfo {
+        return PackageInfo {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            description: self.description.clone(),
+            depends: self.depends.clone(),
+            accounts: self.accounts.clone(),
+            sha256,
+            file,
+        };
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PackageInfo {
     pub name: String,
@@ -86,7 +100,6 @@ pub struct PackageInfo {
     pub file: String,
 }
 
-#[cfg(not(target_family = "wasm"))]
 impl PackageInfo {
     fn meta(&self) -> Meta {
         Meta {
@@ -99,10 +112,45 @@ impl PackageInfo {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledPackageInfo {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub depends: Vec<PackageRef>,
+    pub accounts: Vec<AccountNumber>,
+    pub owner: AccountNumber,
+}
+
+impl InstalledPackageInfo {
+    pub fn meta(&self) -> Meta {
+        Meta {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            description: self.description.clone(),
+            depends: self.depends.clone(),
+            accounts: self.accounts.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct PackageDataFile {
+    pub account: AccountNumber,
+    pub service: AccountNumber,
+    pub filename: String,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct ServiceInfo {
-    flags: Vec<String>,
-    server: Option<AccountNumber>,
+pub struct PackageManifest {
+    pub services: HashMap<AccountNumber, ServiceInfo>,
+    pub data: Vec<PackageDataFile>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ServiceInfo {
+    pub flags: Vec<String>,
+    pub server: Option<AccountNumber>,
 }
 
 pub struct PackagedService<R: Read + Seek> {
@@ -269,12 +317,57 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
+    fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
+        let mut result = HashMap::new();
+        for (service, _, info) in &self.services {
+            result.insert(*service, info.clone());
+        }
+        result
+    }
+
+    fn manifest_data(&mut self) -> Vec<PackageDataFile> {
+        let mut manifest = vec![];
+        let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
+        for (sender, index) in &self.data {
+            let service = if self.has_service(*sender) {
+                *sender
+            } else {
+                psispace_sys::SERVICE
+            };
+            let file = self.archive.by_index(*index).unwrap();
+            let path = data_re
+                .captures(file.name())
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str();
+            manifest.push(PackageDataFile {
+                account: *sender,
+                service,
+                filename: path.to_string(),
+            });
+        }
+        manifest
+    }
+
+    pub fn manifest(&mut self) -> PackageManifest {
+        let services = self.manifest_services();
+        let data = self.manifest_data();
+        PackageManifest { services, data }
+    }
+
     pub fn commit_install(
         &mut self,
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        actions.push(package_sys::Wrapper::pack_from(sender).postinstall(self.meta.clone()));
+        let manifest = self.manifest();
+        let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+        serde_json::to_writer(&mut manifest_encoder, &manifest)?;
+        actions.push(
+            package_sys::Wrapper::pack_from(sender)
+                .postinstall(self.meta.clone(), manifest_encoder.finish()?.into()),
+        );
         Ok(())
     }
 
@@ -376,6 +469,87 @@ impl<R: Read + Seek> PackagedService<R> {
     }
 }
 
+pub trait ActionGroup {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize);
+}
+
+impl ActionGroup for Action {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize) {
+        *size += self.rawData.len();
+        trx_actions.push(self);
+    }
+}
+
+impl ActionGroup for Vec<Action> {
+    fn append_to_tx(self, trx_actions: &mut Vec<Action>, size: &mut usize) {
+        for act in self {
+            act.append_to_tx(trx_actions, size);
+        }
+    }
+}
+
+pub trait ActionSink {
+    fn push_action<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error>;
+}
+
+impl ActionSink for Vec<Action> {
+    fn push_action<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
+        let mut size = 0;
+        act.append_to_tx(self, &mut size);
+        Ok(())
+    }
+}
+
+impl PackageManifest {
+    // This removes every part of self that is not overwritten by other
+    pub fn upgrade<T: ActionSink>(
+        &self,
+        other: PackageManifest,
+        out: &mut T,
+    ) -> Result<(), anyhow::Error> {
+        let new_files: HashSet<_> = other.data.into_iter().collect();
+        for file in &self.data {
+            if !new_files.contains(file) {
+                out.push_action(
+                    psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                        .removeSys(file.filename.clone()),
+                )?;
+            }
+        }
+        for (service, info) in &self.services {
+            let other_info = other.services.get(service);
+            if info.server.is_some() && other_info.map_or(true, |i| i.server.is_none()) {
+                out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
+            }
+            if !info.flags.is_empty() && other_info.map_or(true, |i| i.flags.is_empty()) {
+                out.push_action(setcode_sys::Wrapper::pack().setFlags(*service, 0))?;
+            }
+            if other_info.is_none() {
+                out.push_action(set_code_action(*service, vec![]))?;
+            }
+        }
+        Ok(())
+    }
+    pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
+        for file in &self.data {
+            out.push_action(
+                psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                    .removeSys(file.filename.clone()),
+            )?;
+        }
+        for (service, info) in &self.services {
+            if info.server.is_some() {
+                out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
+            }
+            if !info.flags.is_empty() {
+                out.push_action(setcode_sys::Wrapper::pack().setFlags(*service, 0))?;
+            }
+            out.push_action(set_code_action(*service, vec![]))?;
+        }
+        Ok(())
+    }
+}
+
 // Two packages shall not create the same account
 // Accounts used in any way during installation must be part of the package or
 // its direct dependencies
@@ -449,7 +623,10 @@ pub trait PackageRegistry {
         packages: &[String],
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let mut result = vec![];
-        for info in solve_dependencies(self.index()?, make_refs(packages)?, vec![])? {
+        for op in solve_dependencies(self.index()?, make_refs(packages)?, vec![], false)? {
+            let PackageOp::Install(info) = op else {
+                panic!("Only install is expected when there are no existing packages");
+            };
             result.push(self.get_by_info(&info).await?);
         }
 
@@ -596,7 +773,7 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
         for (_, reg) in &self.sources {
             for entry in reg.index()? {
                 if !found.contains_version(&entry.name, &entry.version) {
-                    found.insert(entry.name.clone(), entry.version.clone());
+                    found.insert_info(entry.clone());
                     result.push(entry);
                 }
             }
@@ -618,19 +795,18 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
     }
 }
 
-pub struct PackageList {
-    packages: HashMap<String, HashSet<String>>,
+pub enum PackageOrigin {
+    Installed { owner: AccountNumber },
+    Repo { sha256: Checksum256, file: String },
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct InstalledNode {
-    name: String,
-    version: String,
+pub struct PackageList {
+    packages: HashMap<String, HashMap<String, (Meta, PackageOrigin)>>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct InstalledEdge {
-    node: InstalledNode,
+    node: InstalledPackageInfo,
 }
 
 #[allow(non_snake_case)]
@@ -652,15 +828,65 @@ struct InstalledQuery {
     installed: InstalledConnection,
 }
 
+#[allow(non_snake_case)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct GQLError {
-    message: String,
+struct NewAccountsQuery {
+    newAccounts: Vec<AccountNumber>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct InstalledRoot {
-    data: Option<InstalledQuery>,
-    errors: Option<GQLError>,
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_accounts_to_create(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    accounts: &[AccountNumber],
+    sender: AccountNumber,
+) -> Result<Vec<AccountNumber>, anyhow::Error> {
+    let result: NewAccountsQuery = crate::gql_query(
+        base_url,
+        client,
+        package_sys::SERVICE,
+        format!(
+            "query {{ newAccounts(accounts: {}, owner: {}) }}",
+            serde_json::to_string(accounts)?,
+            serde_json::to_string(&sender)?,
+        ),
+    )
+    .await?;
+    Ok(result.newAccounts)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_installed_manifest(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    package: &str,
+    owner: AccountNumber,
+) -> Result<PackageManifest, anyhow::Error> {
+    let url = package_sys::SERVICE
+        .url(base_url)?
+        .join(&format!("/manifest?package={}&owner={}", package, owner))?;
+    crate::as_json(client.get(url)).await
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_manifest<T: PackageRegistry + ?Sized>(
+    reg: &T,
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    package: &Meta,
+    origin: &PackageOrigin,
+) -> Result<PackageManifest, anyhow::Error> {
+    match origin {
+        PackageOrigin::Installed { owner } => {
+            get_installed_manifest(base_url, client, &package.name, *owner).await
+        }
+        PackageOrigin::Repo { sha256, file } => {
+            let mut package = reg
+                .get_by_info(&package.info(sha256.clone(), file.clone()))
+                .await?;
+            Ok(package.manifest())
+        }
+    }
 }
 
 impl PackageList {
@@ -674,30 +900,14 @@ impl PackageList {
         base_url: &reqwest::Url,
         client: &mut reqwest::Client,
     ) -> Result<Self, anyhow::Error> {
-        let Some(url::Host::Domain(host)) = base_url.host() else {
-            Err(Error::NoDomain)?
-        };
-        let mut url = base_url.join("graphql")?;
-        url.set_host(Some(&("package-sys.".to_string() + host)))?;
-        //
         let mut end_cursor: Option<String> = None;
         let mut result = PackageList::new();
         loop {
-            let page: InstalledRoot = crate::as_json(client
-                                                     .post(url.clone())
-                                                     .header("Content-Type", "application/graphql")
-                                                    .body(format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version }} }} }} }}", serde_json::to_string(&end_cursor)?)))
-                .await?;
-            if let Some(error) = page.errors {
-                Err(Error::GraphQLError {
-                    message: error.message,
-                })?
-            }
-            let Some(data) = page.data else {
-                Err(Error::GraphQLWrongResponse)?
-            };
+            let data = crate::gql_query::<InstalledQuery>(base_url, client, package_sys::SERVICE,
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
-                result.insert(edge.node.name, edge.node.version);
+                result.insert_installed(edge.node);
             }
             if !data.installed.pageInfo.hasNextPage {
                 break;
@@ -709,44 +919,91 @@ impl PackageList {
     pub fn from_registry<T: PackageRegistry + ?Sized>(reg: &T) -> Result<Self, anyhow::Error> {
         let mut result = PackageList::new();
         for package in reg.index()? {
-            result.insert(package.name, package.version);
+            result.insert_info(package);
         }
         Ok(result)
     }
-    pub fn insert(&mut self, name: String, version: String) {
+    pub fn insert(&mut self, meta: Meta, origin: PackageOrigin) {
+        let name = meta.name.clone();
+        let version = meta.version.clone();
         self.packages
             .entry(name)
-            .or_insert(HashSet::new())
-            .insert(version);
+            .or_insert(HashMap::new())
+            .insert(version, (meta, origin));
     }
+    pub fn insert_info(&mut self, info: PackageInfo) {
+        self.insert(
+            info.meta(),
+            PackageOrigin::Repo {
+                sha256: info.sha256.clone(),
+                file: info.file.clone(),
+            },
+        );
+    }
+    pub fn insert_installed(&mut self, info: InstalledPackageInfo) {
+        self.insert(info.meta(), PackageOrigin::Installed { owner: info.owner });
+    }
+
     fn contains_version(&self, name: &str, version: &str) -> bool {
         if let Some(packages) = self.packages.get(name) {
-            return packages.contains(version);
+            return packages.contains_key(version);
         }
         return false;
     }
-    fn package_refs(&self) -> Vec<PackageRef> {
+    fn as_upgradable(&self) -> Vec<(Meta, PackageDisposition)> {
         let mut result = vec![];
-        for (package, versions) in &self.packages {
-            for version in versions {
-                result.push(PackageRef {
-                    name: package.clone(),
-                    version: version.clone(),
-                });
+        for (_, versions) in &self.packages {
+            for (version, (meta, _)) in versions {
+                result.push((meta.clone(), PackageDisposition::upgradable(version)));
             }
         }
         result
     }
-    pub async fn resolve_new<T: PackageRegistry + ?Sized>(
+    pub async fn resolve_changes<T: PackageRegistry + ?Sized>(
         &self,
         reg: &T,
         packages: &[String],
-    ) -> Result<Vec<PackagedService<<T as PackageRegistry>::R>>, anyhow::Error> {
+        reinstall: bool,
+    ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        solve_dependencies(
+            reg.index()?,
+            make_refs(packages)?,
+            self.as_upgradable(),
+            reinstall,
+        )
+    }
+    pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {
         let mut result = vec![];
-        for info in solve_dependencies(reg.index()?, make_refs(packages)?, self.package_refs())? {
-            result.push(reg.get_by_info(&info).await?);
+        for (_, versions) in self.packages {
+            for (_, item) in versions {
+                result.push(item);
+            }
         }
-        Ok(result)
+        result.sort_unstable_by(|lhs, rhs| {
+            (&lhs.0.name, &lhs.0.version).cmp(&(&rhs.0.name, &rhs.0.version))
+        });
+        result
+    }
+    pub fn get_by_name(
+        &self,
+        packages: &str,
+    ) -> Result<Option<&(Meta, PackageOrigin)>, anyhow::Error> {
+        for package in make_refs(&[packages.to_string()])? {
+            if let Some(versions) = self.packages.get(&package.name) {
+                let mut found: Option<&(Meta, PackageOrigin)> = None;
+                for (version, item) in versions {
+                    if version_match(&package.version, version)? {
+                        if found.map_or(Ok::<bool, anyhow::Error>(true), |prev| {
+                            Ok(Version::new(&prev.0.version)? < Version::new(version)?)
+                        })? {
+                            found = Some(item)
+                        }
+                    }
+                }
+                return Ok(found);
+            }
+        }
+        Ok(None)
     }
     pub fn into_vec(mut self) -> Vec<String> {
         let mut result: Vec<String> = self.packages.drain().map(|(k, _)| k).collect();
@@ -779,11 +1036,13 @@ pub fn js_resolve_packages(
 ) -> Result<JsValue, JsValue> {
     let index: Vec<PackageInfo> = js_err(serde_wasm_bindgen::from_value(js_index))?;
     let packages: Vec<String> = js_err(serde_wasm_bindgen::from_value(js_packages))?;
-    let pinned: Vec<PackageRef> = js_err(serde_wasm_bindgen::from_value(js_pinned))?;
+    let pinned: Vec<(Meta, PackageDisposition)> =
+        js_err(serde_wasm_bindgen::from_value(js_pinned))?;
 
     Ok(serde_wasm_bindgen::to_value(&js_err(solve_dependencies(
         index,
         js_err(make_refs(&packages))?,
         pinned,
+        false,
     ))?)?)
 }

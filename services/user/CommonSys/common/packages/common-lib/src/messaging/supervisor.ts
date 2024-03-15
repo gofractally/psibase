@@ -1,3 +1,4 @@
+import { siblingUrl } from "../rpc";
 import { generateRandomString } from "./generateRandomString";
 import { QualifiedFunctionCallArgs } from "./supervisor/FunctionCallRequest";
 import { buildPreLoadPluginsRequest } from "./supervisor/PreLoadPluginsRequest";
@@ -46,6 +47,8 @@ const setupSupervisorIFrame = (src: string) => {
         });
     }
 };
+
+const supervisorOrigin = siblingUrl(null, 'supervisor-sys');
 
 export class Supervisor {
     public isSupervisorInitialized = false;
@@ -131,7 +134,7 @@ export class Supervisor {
                 },
             };
             if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage(message, "*");
+                iframe.contentWindow.postMessage(message, supervisorOrigin);
             } else {
                 reject("Failed to get supervisor iframe");
             }
@@ -154,6 +157,6 @@ export class Supervisor {
             throw new Error(
                 `Failed to get content window from supervisor iframe`
             );
-        iframe.contentWindow.postMessage(message, "*");
+        iframe.contentWindow.postMessage(message, supervisorOrigin);
     }
 }

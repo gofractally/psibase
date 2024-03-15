@@ -29,7 +29,7 @@ namespace UserService
       }
    }  // namespace
 
-   void PackageSys::postinstall(PackageMeta package)
+   void PackageSys::postinstall(PackageMeta package, std::vector<char> manifest)
    {
       auto sender = getSender();
       for (AccountNumber account : package.accounts)
@@ -50,6 +50,10 @@ namespace UserService
                             " is not owned by " + sender.str());
          }
       }
+
+      auto mtable = Tables(psibase::getReceiver()).open<PackageManifestTable>();
+      mtable.put({.name = package.name, .owner = sender, .data = std::move(manifest)});
+
       auto table = Tables(psibase::getReceiver()).open<InstalledPackageTable>();
       table.put({.name        = std::move(package.name),
                  .version     = std::move(package.version),
