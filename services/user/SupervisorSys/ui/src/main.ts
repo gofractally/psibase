@@ -152,7 +152,6 @@ let rootApplicationOrigin: string;
 
 const setApplicationOrigin = (origin: string) => {
   if (origin && !rootApplicationOrigin) {
-    console.log(`Setting root application origin to ${origin}`);
     rootApplicationOrigin = origin;
   }
 }
