@@ -6,8 +6,10 @@
 #include <services/system/commonErrors.hpp>
 
 #include <psibase/serveSimpleUI.hpp>
+#include <psibase/serveContent.hpp>
 #include "services/user/NftSys.hpp"
 #include "services/user/TokenSys.hpp"
+#include <vector>
 
 using namespace UserService;
 using namespace psibase;
@@ -17,6 +19,7 @@ using std::nullopt;
 using std::optional;
 using std::string;
 using Quantity_t = typename Quantity::Quantity_t;
+using std::vector;
 
 namespace
 {
@@ -41,12 +44,20 @@ namespace PricingDefaults
 SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
 {
    MethodNumber m{action->method()};
-   if (m != MethodNumber{"init"})
+   if (m != MethodNumber{"init"} && m != MethodNumber{"storeSys"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
       check(initRecord.has_value(), uninitialized);
    }
 }
+
+
+void SymbolSys::storeSys(string path, string contentType, vector<char> content)
+{
+   check(getSender() == getReceiver(), "wrong sender");
+   storeContent(move(path), move(contentType), move(content), Tables());
+}
+
 
 void SymbolSys::init()
 {
