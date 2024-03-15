@@ -334,7 +334,9 @@ pub fn get_event_in_db<T: DecodeEvent>(db: DbId, event_id: u64) -> Result<T, any
     let Some(data) = get_sequential_bytes(db, event_id) else {
         return Err(anyhow!("Event not found"));
     };
-    let (_, type_) = <(AccountNumber, MethodNumber)>::unpacked(&data)?;
+    let (_, Some(type_)) = <(AccountNumber, Option<MethodNumber>)>::unpacked(&data)? else {
+        return Err(anyhow!("Missing event type"));
+    };
     T::decode(type_, &data)
 }
 
@@ -348,13 +350,20 @@ pub trait DecodeEvent {
         Self: Sized;
 }
 
+pub fn decode_event_data<T: UnpackOwned>(data: &[u8]) -> Result<T, anyhow::Error> {
+    let (_, _, Some(content)) = <(AccountNumber, Option<MethodNumber>, Option<T>)>::unpacked(data)?
+    else {
+        return Err(anyhow!("Missing event data"));
+    };
+    Ok(content)
+}
+
 impl<T: UnpackOwned + NamedEvent> DecodeEvent for T {
     fn decode(type_: MethodNumber, data: &[u8]) -> Result<T, anyhow::Error> {
         if type_ != <T as NamedEvent>::name() {
             return Err(anyhow!("Wrong event type"));
         }
-        let (_, _, content) = <(AccountNumber, MethodNumber, T)>::unpacked(data)?;
-        Ok(content)
+        decode_event_data::<T>(data)
     }
 }
 

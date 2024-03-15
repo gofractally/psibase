@@ -1406,8 +1406,7 @@ fn process_gql_union_member(
         #dispatch
 
         #psibase_mod::method_raw!(#name_str) => {
-            let (_, _, gql_imp_content) = <(#psibase_mod::AccountNumber, #psibase_mod::MethodNumber, #name) as #psibase_mod::fracpack::Unpack>::unpacked(gql_imp_data)?;
-            Ok(#event_struct::#name(gql_imp_content))
+            Ok(#event_struct::#name(#psibase_mod::decode_event_data::<#name>(gql_imp_data)?))
         },
     };
 }

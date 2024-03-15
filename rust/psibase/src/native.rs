@@ -196,7 +196,7 @@ pub fn put_sequential<Type: Pack, V: Pack>(
     ty: &Type,
     value: &V,
 ) -> u64 {
-    put_sequential_bytes(db, &(service, ty, value).packed())
+    put_sequential_bytes(db, &(service, Some(ty), Some(value)).packed())
 }
 
 /// Remove a key-value pair if it exists
