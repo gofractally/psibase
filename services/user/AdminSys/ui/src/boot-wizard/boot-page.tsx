@@ -38,6 +38,12 @@ interface PackageInfo extends PackageMeta {
 
 type PackageIndex = PackageInfo[];
 
+interface PackageOp {
+    Install?: PackageInfo;
+    Replace?: [PackageMeta, PackageInfo];
+    Remove?: PackageMeta;
+}
+
 interface TypeFormProps {
     setPackages: (names: string[]) => void;
     typeForm: UseFormReturn<InstallType>;
@@ -169,6 +175,16 @@ function versionLess(lhs: ParsedVersion, rhs: ParsedVersion) {
         return true;
     }
     return false;
+}
+
+function installedOnly(ops: PackageOp[]): PackageInfo[] {
+    return ops.map((op) => {
+        if (op.Install) {
+            return op.Install;
+        } else {
+            throw Error(`Expected install: ${op}`);
+        }
+    });
 }
 
 export const ServicesForm = ({
@@ -477,7 +493,9 @@ export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
 
     let resolvePackages = (names: string[]) => {
         console.log(names);
-        setPackagesToInstall(wasm.js_resolve_packages(serviceIndex, names, []));
+        setPackagesToInstall(
+            installedOnly(wasm.js_resolve_packages(serviceIndex, names, []))
+        );
     };
 
     let allServices = ["Default", "AuthSys", "AuthAnySys"];
