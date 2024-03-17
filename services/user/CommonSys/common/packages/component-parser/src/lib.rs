@@ -1,26 +1,14 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::psibase::component_parser::intf;
-use intf::{ComponentExtraction, ImportedFunc};
+use bindings::psibase::component_parser::types::{ComponentExtraction, QualifiedFunc};
+use bindings::Guest as Parser;
+use indexmap::IndexMap;
+use wasm_compose::graph::Component;
 use wit_component::{decode, WitPrinter};
-use wit_parser::Package;
+use wit_parser::{World, WorldItem, WorldKey};
 
 pub struct ComponentParser;
-
-fn split_import(imp: &String) -> (String, String, String) {
-    let parts: Vec<&str> = imp.split(':').collect();
-    assert!(parts.len() == 2);
-    let namespace = parts[0];
-
-    let parts: Vec<&str> = parts[1].split('/').collect();
-    assert!(parts.len() == 2);
-
-    let comp = parts[0];
-    let interf = parts[1];
-
-    (namespace.to_string(), comp.to_string(), interf.to_string())
-}
 
 fn kebab_to_camel(s: &str) -> String {
     s.split('-')
@@ -35,85 +23,81 @@ fn kebab_to_camel(s: &str) -> String {
         .collect()
 }
 
-impl intf::Guest for ComponentParser {
-    fn parse(name: String, bytes: Vec<u8>) -> Result<ComponentExtraction, String> {
-        // Todo - What should name be here?
-        let component = wasm_compose::graph::Component::from_bytes(name, bytes)
-            .map_err(|e| format!("{e:#}"))?;
-
-        let named_imports: Vec<(String, String, String)> = component
-            .imports()
-            .map(|(_, name, _)| split_import(&name.to_string()))
-            .collect();
-
-        let is_import =
-            |i: &(String, String, String)| named_imports.iter().any(|import| import == i);
-
-        let decoded = decode(component.bytes()).map_err(|e| format!("{e:#}"))?;
-        let resolve = decoded.resolve();
-
-        // Get all packages referenced by the component
-        let packages: Vec<&Package> = resolve
-            .packages
-            .iter()
-            .map(|(_, package)| package)
-            .collect();
-
-        // Get all import functions from the packages
-        let mut imported_funcs: Vec<ImportedFunc> = Vec::new();
-        for package in packages {
-            let mut package_imported_funcs: Vec<ImportedFunc> = package
-                .interfaces
-                .iter()
-                .filter(|&(intf_name, _)| {
-                    is_import(&(
-                        package.name.namespace.to_owned(),
-                        package.name.name.to_owned(),
-                        intf_name.to_owned(),
-                    ))
-                })
-                .map(|(_, id)| {
-                    let interface = resolve.interfaces.get(*id).unwrap();
-                    let func_names: Vec<ImportedFunc> = interface
-                        .functions
-                        .iter()
-                        .map(|(_, func)| ImportedFunc {
-                            comp_intf: format!(
-                                "{}:{}/{}",
-                                package.name.namespace,
-                                package.name.name,
-                                interface.name.to_owned().unwrap(),
-                            ),
-                            func_name: kebab_to_camel(&func.name.to_owned()),
-                        })
-                        .collect();
-                    func_names
-                })
-                .flatten()
-                .collect();
-            imported_funcs.append(&mut package_imported_funcs);
+fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
+    let mut printer = WitPrinter::default();
+    let mut wit = String::new();
+    for (i, (id, _)) in resolved_wit.packages.iter().enumerate() {
+        if i > 0 {
+            wit.push_str("\n\n");
         }
-
-        // Extract a wit file from the component for debugging purposes
-        let mut printer = WitPrinter::default();
-        let mut wit = String::new();
-        for (i, (id, _)) in resolve.packages.iter().enumerate() {
-            if i > 0 {
-                wit.push_str("\n\n");
+        match printer.print(resolved_wit, id) {
+            Ok(s) => wit.push_str(&s),
+            Err(e) => {
+                // If we can't print the document, just use the error text
+                wit = format!("{e:#}");
+                break;
             }
-            match printer.print(resolve, id) {
-                Ok(s) => wit.push_str(&s),
-                Err(e) => {
-                    // If we can't print the document, just use the error text
-                    wit = format!("{e:#}");
-                    break;
+        }
+    }
+    Ok(wit)
+}
+
+fn extract_functions<F>(resolved_wit: &wit_parser::Resolve, get_world_item: F) -> Vec<QualifiedFunc>
+where
+    F: Fn(&World) -> &IndexMap<WorldKey, WorldItem>,
+{
+    let worlds = &resolved_wit.worlds;
+    assert_eq!(
+        worlds.iter().count(),
+        1,
+        "Only 1 world allowed in merge wit"
+    );
+
+    let mut funcs: Vec<QualifiedFunc> = vec![];
+    let (_, world) = worlds.iter().next().unwrap();
+    for (_, item) in get_world_item(world) {
+        match item {
+            WorldItem::Interface(i) => {
+                let intf = resolved_wit.interfaces.get(*i).unwrap();
+                let pkg = resolved_wit.packages.get(intf.package.unwrap()).unwrap();
+                for (func_name, _) in &intf.functions {
+                    funcs.push(QualifiedFunc {
+                        namespace: pkg.name.namespace.to_owned(),
+                        package: pkg.name.name.to_owned(),
+                        intf: intf.name.to_owned(),
+                        func_name: kebab_to_camel(&func_name.to_owned()),
+                    });
                 }
             }
-        }
+            WorldItem::Function(func) => {
+                funcs.push(QualifiedFunc {
+                    // It is not important to know what the component self-reports its identity to be.
+                    // It's true namespace/package name are equal to the registry domain at which
+                    //   the component was retrieved.
+                    namespace: "root".to_string(),
+                    package: "component".to_string(),
+                    intf: None,
+                    func_name: kebab_to_camel(&func.name.to_owned()),
+                });
+            }
+            WorldItem::Type(_) => {}
+        };
+    }
+
+    funcs
+}
+
+impl Parser for ComponentParser {
+    fn parse(name: String, bytes: Vec<u8>) -> Result<ComponentExtraction, String> {
+        let component = Component::from_bytes(name, bytes).map_err(|e| format!("{e:#}"))?;
+        let decoded = decode(component.bytes()).map_err(|e| format!("{e:#}"))?;
+        let resolved_wit = decoded.resolve();
 
         Ok(ComponentExtraction {
-            imported_funcs: imported_funcs,
-            wit: wit,
+            imported_funcs: extract_functions(resolved_wit, |w: &World| &w.imports),
+            exported_funcs: extract_functions(resolved_wit, |w: &World| &w.exports),
+            wit: extract_wit(resolved_wit)?,
+            debug: serde_json::to_string(&resolved_wit).unwrap(),
         })
     }
 }

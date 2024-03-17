@@ -1,6 +1,4 @@
-import {
-    FunctionCallResult,
-  } from "@psibase/common-lib/messaging";
+import { FunctionCallResult } from "@psibase/common-lib/messaging";
 
 interface PluginFunc {
     service: string;
@@ -36,17 +34,19 @@ const generatePendingFunction = (
                 id: '${id}',
                 service: '${service}',
                 plugin: '${plugin}',
+                intf: '${intf}',
                 method: '${method}',
                 params: [...args]
             }
         });
     `;
 
-    return (typeof intf === 'undefined' || intf === "") ? `
+    return typeof intf === "undefined" || intf === ""
+        ? `
         export function ${method}(...args) {
             ${functionBody}
-        }
-    ` : `
+        } `
+        : `
         export const ${intf} = {
             ${method}(...args) {
                 ${functionBody}
@@ -55,27 +55,46 @@ const generatePendingFunction = (
 };
 
 type ImportedFunc = {
-    'compIntf': string;
-    'funcName': string;
+    namespace: string;
+    package: string;
+    intf?: string;
+    funcName: string;
 };
 
 type ImportedFuncs = ImportedFunc[];
+
+const hostImport = (imported: ImportedFunc): boolean => {
+    return imported.namespace === "wasi" || imported.namespace === "common";
+};
 
 export const adaptImports = (
     importedFuncs: ImportedFuncs,
     id: string,
     functionsResult: FunctionCallResult[]
-): { [key: string]: string }[] => 
-    importedFuncs.reduce((accumulator, { compIntf, funcName }) => {
-        const functionResult = functionsResult.find(funcResult => funcResult.method == funcName);
-        const [service, rest] = compIntf.split(':');
-        const [plugin, intf] = rest.split('/');
+): { [key: string]: string }[] =>
+    importedFuncs.reduce(
+        (accumulator, imported) => {
+            if (hostImport(imported)) return accumulator;
 
-        const value = functionResult
-            ? generateFulfilledFunction(functionResult.method, functionResult.result)
-            : generatePendingFunction({ service, plugin, intf, method: funcName }, id);
-    
-        accumulator.push({ [`${service}:${plugin}/*`]: value + "\n" });
-    
-        return accumulator;
-    }, [] as { [key: string]: string }[]);
+            const res = functionsResult.find(
+                (funcResult) =>
+                    funcResult.intf === imported.intf &&
+                    funcResult.method === imported.funcName
+            );
+
+            let service = imported.namespace;
+            let plugin = imported.package;
+            const { intf, funcName: method } = imported;
+            const code = res
+                ? generateFulfilledFunction(res.method, res.result)
+                : generatePendingFunction(
+                      { service, plugin, intf, method },
+                      id
+                  );
+
+            accumulator.push({ [`${service}:${plugin}/*`]: code + "\n" });
+
+            return accumulator;
+        },
+        [] as { [key: string]: string }[]
+    );

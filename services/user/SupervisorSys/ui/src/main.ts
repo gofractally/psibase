@@ -175,6 +175,7 @@ const checkForResolution = () => {
           id,
           service: args.service,
           plugin: args.plugin,
+          intf: args.intf,
           method: args.method,
           params: args.params,
           result,
@@ -273,6 +274,7 @@ const executeCall = (id: string) => {
             id: x.id,
             service: x.args.service,
             plugin: x.args.plugin,
+            intf: x.args.intf,
             method: x.args.method,
             params: x.args.params,
             result: undefined,
@@ -283,7 +285,10 @@ const executeCall = (id: string) => {
 };
 
 const onPluginCallFailure = (message: PluginCallFailure) => {
-  const { id, service, plugin, method, params } = message.payload;
+  const { id, service, plugin, intf, method, params } = message.payload;
+
+  console.log(`Synchronous call detected: ${service}:${plugin}/${intf}->${method}`);
+
   const subId = generateRandomString();
 
   callStack = updatePendingFunctionCall(
@@ -296,6 +301,7 @@ const onPluginCallFailure = (message: PluginCallFailure) => {
           args: {
             service,
             plugin,
+            intf,
             method,
             params,
           },
@@ -318,7 +324,6 @@ const onPluginCallFailure = (message: PluginCallFailure) => {
 const onPreloadPluginsRequest = ({
   payload,
 }: PreLoadPluginsRequest): void => {
-  payload.services.forEach(getLoader);
     payload.services.forEach(getLoader);
 };
 

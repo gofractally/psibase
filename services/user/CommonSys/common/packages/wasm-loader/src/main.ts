@@ -16,6 +16,8 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   </div>
 `;
 
+const supervisorDomain = siblingUrl(null, "supervisor-sys");
+
 interface Importables {
     [key: string]: string;
 }
@@ -25,6 +27,20 @@ const wasmUrlToIntArray = (url: string) =>
         .then((res) => res.arrayBuffer())
         .then((buffer) => new Uint8Array(buffer));
 
+
+const getServiceName = () => {
+    const currentUrl = new URL(window.location.href);
+    const hostnameParts = currentUrl.hostname.split(".");
+    let serviceName = hostnameParts.shift();
+    return serviceName !== undefined ? serviceName : "";
+};
+
+const serviceName: string = getServiceName();
+
+const hasTargetFunc = (exportedFuncs: any, intf: string | undefined, method: string) => {
+    return exportedFuncs.some((f: any)=>{return f.intf === intf && f.funcName === method;});
+}
+
 // TODO - Add caller app to the arguments passed to the functionCall
 const onPluginCallRequest = async ({
     id,
@@ -32,48 +48,45 @@ const onPluginCallRequest = async ({
     precomputedResults
 }: PluginCallPayload) => {
 
-    // TODO - Check args.service = this service
+    console.log(`Loader @${serviceName} received a call for ${args.plugin}/${args.intf}->${args.method}`);
 
+    // Early terminate if this is the wrong loader to handle the request
+    if (args.service != serviceName) {
+        throw Error(`${serviceName} received a call meant for ${args.service}`);
+    }
+
+    // Todo - cache these in sessionstorage, or perhaps localstorage?
     const [pluginBytes, parserBytes, { load }] = await Promise.all([
         wasmUrlToIntArray(`/${args.plugin}.wasm`),
         wasmUrlToIntArray("/common/component_parser.wasm"),
+        // Todo - use custom transpiler so we can customize options, cache shims, etc.
         import("rollup-plugin-wit-component")
     ]);
 
-    const parser = await load(parserBytes);
-    const parsed = parser.intf.parse("component", pluginBytes);
+    const parsed = (await load(parserBytes)).parse("component", pluginBytes);
 
-    // TODO - Early terminate with helpful error if the function being called 
-    //        is not exported by the plugin.
+    // Early terminate if the function being called is not exported by the plugin.
+    if (!hasTargetFunc(parsed.exportedFuncs, args.intf, args.method)) {
+        // Todo - replace "Caller" with ${caller}
+        const fid: string = (args.intf === undefined) ? `${args.method}` : `${args.method} in ${args.intf}`;
+        throw Error(`Caller->${args.service}:${args.plugin} error: No export named ${fid}`);
+    }
 
     let importables: Importables[] = adaptImports(parsed.importedFuncs, id, precomputedResults);
 
-    try {
-        // @ts-ignore
-        const pluginModule = await load(pluginBytes, importables);
-        let func = (typeof args.intf === 'undefined' || args.intf === "") ? pluginModule[args.method] 
+    // @ts-ignore
+    const pluginModule = await load(pluginBytes, importables);
+    let func =
+        typeof args.intf === "undefined" || args.intf === ""
+            ? pluginModule[args.method]
             : pluginModule[args.intf][args.method];
-        const res = func(...args.params);
-        console.log(`Plugin call ${args.service} Success: ${res}`);
-        sendPluginCallResponse(buildPluginCallResponse(id, res));
-    } catch (e) {
-        if (e instanceof Error && typeof e.message === 'string' && e.message.includes("synchronous_call")) {
-            let contents = JSON.parse(e.message);
-            window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload: contents.target }, siblingUrl(null, "supervisor-sys"));
-          } else {
-            console.warn(`${args.service} plugin call failed with: ${e}`);
-          }
-    }
+    const res = func(...args.params);
+    sendPluginCallResponse(buildPluginCallResponse(id, res));
 };
-
-
-const supervisorDomain = siblingUrl(null, "supervisor-sys");
-
 
 const sendPluginCallResponse = (response: PluginCallResponse) => {
     window.parent.postMessage(response, supervisorDomain);
-};    
-
+};
 
 const isMessageFromSupervisor = (message: MessageEvent) => {
     const isTop = message.source == window.top;
@@ -82,9 +95,32 @@ const isMessageFromSupervisor = (message: MessageEvent) => {
     return !isTop && isParent && isSupervisorDomain;
 };
 
-const onRawEvent = (message: MessageEvent) => {
-    if (isMessageFromSupervisor(message) && isPluginCallRequest(message.data)) {
-        onPluginCallRequest(message.data.payload);
+const onRawEvent = async (message: MessageEvent) => {
+    if (!isMessageFromSupervisor(message)) {
+        console.warn("Loader recieved a postmessage from an unknown origin.");
+        return;
+    }
+    if (isPluginCallRequest(message.data)) {
+        try {
+            await onPluginCallRequest(message.data.payload);
+        } catch (e) {
+            if (
+                e instanceof Error &&
+                typeof e.message === "string" &&
+                e.message.includes("synchronous_call")
+            ) {
+                let contents = JSON.parse(e.message);
+                window.parent.postMessage(
+                    { type: "PLUGIN_CALL_FAILURE", payload: contents.target },
+                    supervisorDomain
+                );
+            } else {
+                // This should just forward the error to the supervisor for triage.
+                console.warn(
+                    `${message.data.payload.args.service} plugin call failed with: ${e}`
+                );
+            }
+        }
     }
 };
 
