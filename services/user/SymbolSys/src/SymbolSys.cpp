@@ -335,8 +335,12 @@ PSIO_REFLECT(SymbolQuery,
              method(symbolTypes),
              method(symbols));
 
+
 optional<HttpReply> SymbolSys::serveSys(HttpRequest request)
 {
+  if (auto result = serveContent(request, Tables{}))
+      return result;
+
    if (auto result = serveSimpleUI<SymbolSys, true>(request))
       return result;
    if (auto result = serveGraphQL(request, SymbolQuery{}))

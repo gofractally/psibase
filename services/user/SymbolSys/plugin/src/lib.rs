@@ -6,8 +6,8 @@ struct Component;
 use bindings::exports::symbol_sys::plugin as SymbolSysPlugin;
 
 impl SymbolSysPlugin::symbol_sys::Guest for Component {
-    fn create(symbol_name: String) -> Result<(), String> {
-        Ok(())
+    fn create() -> String {
+        "derp".to_string()
     }
 
     fn list_symbol(
@@ -23,6 +23,10 @@ impl SymbolSysPlugin::symbol_sys::Guest for Component {
 
     fn buy_symbol(symbol_id: String) -> Result<(), String> {
         Ok(())
+    }
+
+    fn derp() -> String {
+        "mate".to_string()
     }
 }
 

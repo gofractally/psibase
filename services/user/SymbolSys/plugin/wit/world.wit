@@ -9,10 +9,12 @@ interface types {
 interface symbol-sys {
     use types.{sym-id, quantity};
 
-    create: func(symbol-name: string) -> result<_, string>;
+    create: func() -> string;
     list-symbol: func(symbol-id: sym-id, price: quantity) -> result<_, string>;
     unlist-symbol: func(symbol-id: sym-id) -> result<_, string>;
     buy-symbol: func(symbol-id: sym-id) -> result<_, string>;
+
+    derp: func() -> string;
 }
 
 

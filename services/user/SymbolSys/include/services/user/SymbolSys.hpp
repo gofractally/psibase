@@ -15,6 +15,7 @@ namespace UserService
       using Tables = psibase::ServiceTables<SymbolTable,
                                             SymbolLengthTable,
                                             PriceAdjustmentSingleton,
+                                            psibase::WebContentTable,
                                             InitTable,
                                             UserEventTable>;
 
@@ -34,6 +35,8 @@ namespace UserService
       void unlistSymbol(SID symbol);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
+      void storeSys(std::string path, std::string contentType, std::vector<char> content);
+
 
       SymbolRecord       getSymbol(SID symbol);
       bool               exists(SID symbol);
@@ -70,6 +73,7 @@ namespace UserService
       method(buySymbol, symbol),
       method(unlistSymbol, symbol),
       method(serveSys, request),
+      method(storeSys, path, contentType, content),
 
       method(getSymbol, symbol),
       method(exists, symbol),
