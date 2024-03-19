@@ -1,3 +1,11 @@
+/*
+ * File: jwt.cpp
+ *
+ * Provides functions for encoding and decoding JSON Web Tokens (JWT).
+ * This includes base64 URL encoding and decoding methods, and methods
+ * to create and verify JWTs using HMAC signatures.
+ */
+
 #include <psibase/jwt.hpp>
 
 #include <psio/from_json.hpp>
@@ -9,6 +17,8 @@
 
 namespace psibase::http
 {
+   // Anonymous namespace to contain internal details of the JWT implementation.
+   // This includes base64 URL encoding/decoding tables and a transcode template function.
    namespace
    {
       constexpr std::array<char, 64> make_base64url_tab()
@@ -74,6 +84,12 @@ namespace psibase::http
          }
       }
    }  // namespace
+      /**
+    * Convert a string to its base64 URL encoded representation.
+    *
+    * @param s The input string to encode.
+    * @return A base64 URL encoded string.
+    */
    std::string to_base64url(std::string_view s)
    {
       std::string result;
@@ -86,6 +102,13 @@ namespace psibase::http
       return to_base64url(std::string_view{reinterpret_cast<char*>(data), size});
    }
    std::string from_base64url(std::string_view s)
+   /**
+    * Convert a base64 URL encoded string to its original representation.
+    *
+    * @param s The base64 URL encoded string to decode.
+    * @return The original string that was encoded.
+    * @throws std::runtime_error If the input is not a valid base64 URL encoded string.
+    */
    {
       std::string result;
       result.reserve(s.size() * 3 / 4);
@@ -106,6 +129,12 @@ namespace psibase::http
           [&](unsigned ch) { result.push_back(static_cast<char>(ch)); });
       return result;
    }
+   /**
+    * Structure representing the header of a JWT token.
+    *
+    * The 'typ' member represents the type of the token, which is always 'JWT'.
+    * The 'alg' member represents the signing algorithm used, which defaults to 'HS256' (HMAC using SHA-256).
+    */
    struct token_header
    {
       std::string typ{"JWT"};
@@ -113,6 +142,14 @@ namespace psibase::http
       friend bool operator==(const token_header&, const token_header&) = default;
    };
    PSIO_REFLECT(token_header, typ, alg);
+   /**
+    * Decode a JWT token and verify its signature with the provided key.
+    *
+    * @param key The key used for HMAC signature verification.
+    * @param token The JWT token to decode and verify.
+    * @return The decoded token payload as a token_data structure.
+    * @throws std::runtime_error If the token is invalid or the signature does not match.
+    */
    token_data decode_jwt(const token_key& key, std::string_view token)
    {
       auto end_header = token.find('.');
@@ -124,7 +161,9 @@ namespace psibase::http
       std::string_view encoded_signature = token.substr(end_payload + 1, std::string::npos);
       std::string_view signing_input     = token.substr(0, end_payload);
 
+      // MAC storage for HMAC calculation
       unsigned char mac[EVP_MAX_MD_SIZE];
+      // The size of the calculated MAC
       unsigned      mac_size;
       HMAC(EVP_sha256(), key.data(), key.size(),
            reinterpret_cast<const unsigned char*>(signing_input.data()), signing_input.size(), mac,
@@ -139,12 +178,23 @@ namespace psibase::http
 
       return psio::convert_from_json<token_data>(from_base64url(encoded_payload));
    }
+   /**
+    * Encode a JWT token and sign it with the provided key.
+    *
+    * @param key The key used for HMAC signature generation.
+    * @param token The token payload to encode.
+    * @return The JWT token as a string, including the base64 URL encoded header, payload, and signature.
+    */
    std::string encode_jwt(const token_key& key, const token_data& token)
    {
       std::string result = to_base64url(psio::convert_to_json(token_header{})) + "." +
                            to_base64url(psio::convert_to_json(token));
+      // MAC storage for HMAC calculation
       unsigned char mac[EVP_MAX_MD_SIZE];
+      // The size of the calculated MAC
       unsigned      mac_size;
+
+      // Calculating HMAC signature and appending it to the encoded header and payload to form the complete JWT
       HMAC(EVP_sha256(), key.data(), key.size(),
            reinterpret_cast<const unsigned char*>(result.data()), result.size(), mac, &mac_size);
       return result + "." + to_base64url(mac, mac_size);
