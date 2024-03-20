@@ -9,7 +9,6 @@
 #include <fstream>
 #include <psio/bytes.hpp>
 #include <psio/to_json/map.hpp>
-#include <psio/translator.hpp>
 
 #include <chrono>
 
