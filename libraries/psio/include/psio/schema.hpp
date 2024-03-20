@@ -73,8 +73,19 @@ namespace psio
 
       struct List
       {
-         std::unique_ptr<any_type> type;
+         List(AnyType t);
+         List(List&&) = default;
+         List(const List&);
+         List&                    operator=(List&&) = default;
+         std::unique_ptr<AnyType> type;
+         const AnyType*           resolve(const Schema& schema) const { return nullptr; }
       };
+      PSIO_REFLECT_TYPENAME(List)
+
+      void to_json(const List& type, auto& stream)
+      {
+         to_json(*type.type, stream);
+      }
 
       struct Option
       {
@@ -141,6 +152,7 @@ namespace psio
          AnyType(Int type) : value(std::move(type)) {}
          AnyType(Object type) : value(std::move(type)) {}
          AnyType(Option type) : value(std::move(type)) {}
+         AnyType(List type) : value(std::move(type)) {}
          AnyType(Type type) : value(std::move(type)) {}
          AnyType(std::string name) : value(Type{std::move(name)}) {}
          AnyType(const char* name) : value(Type{std::move(name)}) {}
@@ -148,7 +160,7 @@ namespace psio
              //Struct,
              Object,
              //Array,
-             //List,
+             List,
              Option,
              //Variant,
              //Tuple,
@@ -194,8 +206,10 @@ namespace psio
       PSIO_REFLECT(Member, name, type)
 
       Option::Option(AnyType t) : type(new AnyType(std::move(t))) {}
-
       Option::Option(const Option& other) : type(new AnyType(*other.type)) {}
+
+      List::List(AnyType t) : type(new AnyType(std::move(t))) {}
+      List::List(const List& other) : type(new AnyType(*other.type)) {}
 
       struct CommaList
       {
@@ -309,6 +323,22 @@ namespace psio
                   break;
             }
          }
+         void add_impl(const AnyType* type, const List& t, std::vector<const AnyType*>& stack)
+         {
+            auto [ctype, state] = dfs_discover(type, CompiledType::container, stack);
+            switch (state)
+            {
+               case start:
+                  ctype->is_variable_size = true;
+                  stack.push_back(t.type.get());
+                  break;
+               case finish:
+                  ctype->children.push_back({.type = get(t.type->resolve(schema))});
+                  break;
+               default:
+                  break;
+            }
+         }
          void add_impl(const AnyType* type, const Type& t, std::vector<const AnyType*>& stack)
          {
             if (const AnyType* next = schema.get(t.type))
@@ -409,7 +439,7 @@ namespace psio
       struct OptionReader;
       struct FixedStructReader;
       struct VariableStructReader;
-      struct SequenceReader;
+      struct ListReader;
 
       struct FracParser
       {
@@ -441,7 +471,46 @@ namespace psio
          //
          std::span<const char> read(const CompiledType* type, std::uint32_t offset);
          std::span<const char> read_fixed(const CompiledType* type, std::uint32_t offset);
-         using StackItem = std::variant<Item, ObjectReader, OptionReader>;
+
+         void deref(std::uint32_t       fixed_pos,
+                    std::uint32_t       end_fixed_pos,
+                    const CompiledType* type,
+                    bool                is_optional,
+                    Item&               result)
+         {
+            std::uint32_t offset;
+            auto          tmp_pos = fixed_pos;
+            if (!unpack_numeric<true>(&offset, in.src, tmp_pos, end_fixed_pos))
+               check(false, "Cannot read pointer");
+            // If the type is an optional
+            if (is_optional && offset == 1)
+            {
+               result.kind = FracParser::empty;
+            }
+            else
+            {
+               // validate offset
+               std::uint32_t pos = fixed_pos + offset;
+               if (pos < offset)
+                  check(false, "integer overflow");
+               if (type->kind != CompiledType::container || offset != 0)
+               {
+                  check_heap_pos(pos);
+               }
+               if (type->kind == CompiledType::scalar)
+               {
+                  result.data = read(type, pos);
+                  result.kind = FracParser::scalar;
+               }
+               else
+               {
+                  push(type, pos);
+                  result.kind = FracParser::start;
+               }
+            }
+         }
+
+         using StackItem = std::variant<Item, ObjectReader, OptionReader, ListReader>;
          FracStream             in;
          std::vector<StackItem> stack;
       };
@@ -493,36 +562,7 @@ namespace psio
             }
             else
             {
-               std::uint32_t offset;
-               auto          tmp_pos = fixed_pos;
-               if (!unpack_numeric<true>(&offset, parser.in.src, tmp_pos, fixed_end))
-                  check(false, "Invalid member");
-               // If the type is an optional
-               if (member.is_optional && offset == 1)
-               {
-                  result.kind = FracParser::empty;
-               }
-               else
-               {
-                  // validate offset
-                  std::uint32_t pos = fixed_pos + offset;
-                  if (pos < offset)
-                     check(false, "integer overflow");
-                  if (member.type->kind != CompiledType::container || offset != 0)
-                  {
-                     parser.check_heap_pos(pos);
-                  }
-                  if (member.type->kind == CompiledType::scalar)
-                  {
-                     result.data = parser.read(member.type, pos);
-                     result.kind = FracParser::scalar;
-                  }
-                  else
-                  {
-                     parser.push(member.type, pos);
-                     result.kind = FracParser::start;
-                  }
-               }
+               parser.deref(fixed_pos, fixed_end, member.type, member.is_optional, result);
             }
             return result;
          }
@@ -538,38 +578,68 @@ namespace psio
                return {.kind = FracParser::end, .type = type->original_type};
             else
                completed = true;
-            std::uint32_t offset;
-            auto          original_pos = parser.in.pos;
-            if (!unpack_numeric<true>(&offset, parser.in.src, parser.in.pos, parser.in.end_pos))
-               check(false, "Failed to read offset");
             const CompiledType* nested = type->children[0].type;
             FracParser::Item result{.type = nested->original_type, .parent = type->original_type};
-            if (offset == 1)
+            auto             start_pos = parser.in.pos;
+            parser.in.pos += 4;
+            parser.deref(start_pos, parser.in.end_pos, nested, true, result);
+            return result;
+         }
+      };
+
+      struct ListReader
+      {
+         const CompiledType* type;
+         std::uint32_t       start_pos;
+         std::uint32_t       index = 0;
+         FracParser::Item    next(FracParser& parser)
+         {
+            std::uint32_t len;
+            auto          tmp_pos = start_pos;
+            (void)unpack_numeric<false>(&len, parser.in.src, tmp_pos, parser.in.end_pos);
+            const CompiledMember& member = type->children[0];
+            if (!member.is_optional && !member.type->is_variable_size)
             {
-               result.kind = FracParser::empty;
-            }
-            else
-            {
-               // TODO: this is the same as the member reading code
-               auto pos = original_pos + offset;
-               if (pos < offset)
-                  check(false, "integer overflow");
-               if (nested->kind != CompiledType::container || offset != 0)
+               auto offset = index * member.type->fixed_size;
+               if (offset == len)
                {
-                  parser.check_heap_pos(pos);
-               }
-               if (nested->kind == CompiledType::scalar)
-               {
-                  result.data = parser.read(nested, pos);
-                  result.kind = FracParser::scalar;
+                  return {.kind = FracParser::end, .type = type->original_type};
                }
                else
                {
-                  parser.push(nested, pos);
-                  result.kind = FracParser::start;
+                  FracParser::Item result{.type   = member.type->original_type,
+                                          .parent = type->original_type};
+                  if (member.type->kind == CompiledType::scalar)
+                  {
+                     result.data = parser.read_fixed(member.type, start_pos + 4 + offset);
+                     result.kind = FracParser::scalar;
+                  }
+                  else
+                  {
+                     parser.push_fixed(member.type, start_pos + 4 + offset);
+                     result.kind = FracParser::start;
+                  }
+                  ++index;
+                  return result;
                }
             }
-            return result;
+            else
+            {
+               auto offset = index * 4;
+               if (offset == len)
+               {
+                  return {.kind = FracParser::end, .type = type->original_type};
+               }
+               else
+               {
+                  FracParser::Item result{.type   = member.type->original_type,
+                                          .parent = type->original_type};
+                  parser.deref(start_pos + 4 + offset, start_pos + 4 + len, member.type,
+                               member.is_optional, result);
+                  ++index;
+                  return result;
+               }
+            }
          }
       };
 
@@ -629,6 +699,30 @@ namespace psio
                   check(false, "Object fixed data out-of-bounds");
                in.pos = heap_start;
                stack.push_back(ObjectReader{.start_pos = offset, .index = 0, .type = type});
+               in.known_end = true;
+               break;
+            }
+            case CompiledType::container:
+            {
+               // get size
+               std::uint32_t size;
+               if (!unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
+                  check(false, "Failed to read container size");
+               auto heap_start = in.pos + size;
+               if (heap_start < in.pos || heap_start > in.end_pos)
+                  check(false, "Container size out-of-bounds");
+               const CompiledMember& member = type->children[0];
+               if (member.is_optional || member.type->is_variable_size)
+               {
+                  check(size % 4 == 0, "Container size is not an exact number of pointers");
+               }
+               else
+               {
+                  check(size % member.type->fixed_size == 0,
+                        "Container size is not an exact number of elements");
+               }
+               in.pos = heap_start;
+               stack.push_back(ListReader{.type = type, .start_pos = offset});
                in.known_end = true;
                break;
             }
@@ -823,6 +917,10 @@ namespace psio
             else if constexpr (std::is_integral_v<T>)
             {
                pos->second = Int{.bits = 8 * sizeof(T), .isSigned = std::is_signed_v<T>};
+            }
+            else if constexpr (is_std_vector_v<T>)
+            {
+               pos->second = List{insert<typename is_std_vector<T>::value_type>()};
             }
             else if constexpr (reflect<T>::is_struct)
             {

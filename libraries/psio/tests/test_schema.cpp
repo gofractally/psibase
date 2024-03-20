@@ -92,14 +92,20 @@ struct MyType
 };
 PSIO_REFLECT(MyType, i)
 
+#include <iostream>
+
 TEST_CASE("schema generated")
 {
    Schema schema;
    schema.insert<std::uint8_t>("u8");
    schema.insert<std::optional<std::uint8_t>>("o");
    schema.insert<MyType>("s");
+   schema.insert<std::vector<std::int32_t>>("v");
+   std::cout << psio::format_json(schema) << std::endl;
    CompiledSchema cschema{schema};
    CHECK(to_json(cschema, "u8", "2A") == "42");
    CHECK(to_json(cschema, "o", "040000002A") == "42");
    CHECK(to_json(cschema, "s", "04002A000000") == R"({"i":42})");
+   CHECK(to_json(cschema, "v", "00000000") == "[]");
+   CHECK(to_json(cschema, "v", "040000002A00000000") == "[42]");
 }
