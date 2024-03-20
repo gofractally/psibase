@@ -3,6 +3,7 @@
 #include <map>
 #include <psio/fracpack.hpp>
 #include <psio/to_json.hpp>
+#include <psio/to_json/map.hpp>
 #include <variant>
 
 namespace psio
@@ -40,14 +41,24 @@ namespace psio
          template <typename T>
          void insert(std::string name);
       };
+      PSIO_REFLECT(Schema, types)
 
       struct Member;
+
+      void to_json_members(const std::vector<Member>&, auto& stream);
 
       struct Object
       {
          std::vector<Member> members;
          const AnyType*      resolve(const Schema& schema) const { return nullptr; }
       };
+
+      PSIO_REFLECT_TYPENAME(Object)
+
+      void to_json(const Object& type, auto& stream)
+      {
+         to_json_members(type.members, stream);
+      }
 
       struct Struct
       {
@@ -74,6 +85,12 @@ namespace psio
          std::unique_ptr<AnyType> type;
          const AnyType*           resolve(const Schema& schema) const { return nullptr; }
       };
+      PSIO_REFLECT_TYPENAME(Option)
+
+      void to_json(const Option& type, auto& stream)
+      {
+         to_json(*type.type, stream);
+      }
 
       struct Custom
       {
@@ -89,6 +106,7 @@ namespace psio
          bool           isSigned;
          const AnyType* resolve(const Schema& schema) const { return nullptr; }
       };
+      PSIO_REFLECT(Int, bits, isSigned)
 
       struct Float
       {
@@ -111,6 +129,12 @@ namespace psio
          std::string    type;
          const AnyType* resolve(const Schema& schema) const { return schema.get(type); }
       };
+      PSIO_REFLECT_TYPENAME(Type)
+
+      void to_json(const Type& type, auto& stream)
+      {
+         to_json(type.type, stream);
+      }
 
       struct AnyType
       {
@@ -149,12 +173,25 @@ namespace psio
             return resolved;
          }
       };
+      PSIO_REFLECT_TYPENAME(AnyType)
+      void to_json(const AnyType& type, auto& stream)
+      {
+         if (auto* alias = std::get_if<Type>(&type.value))
+         {
+            to_json(*alias, stream);
+         }
+         else
+         {
+            to_json(type.value, stream);
+         }
+      }
 
       struct Member
       {
          std::string name;
          AnyType     type;
       };
+      PSIO_REFLECT(Member, name, type)
 
       Option::Option(AnyType t) : type(new AnyType(std::move(t))) {}
 
@@ -716,7 +753,7 @@ namespace psio
                if (auto* name = std::visit(MemberName{item.index}, item.parent->value))
                {
                   to_json(*name, stream);
-                  stream.write(':');
+                  write_colon(stream);
                }
             }
          };
@@ -774,7 +811,8 @@ namespace psio
       template <typename T>
       AnyType Schema::insert()
       {
-         std::string name     = std::string("@") + get_type_name<T>();
+         using psio::get_type_name;
+         std::string name     = std::string("@") + get_type_name((T*)nullptr);
          auto [pos, inserted] = types.try_emplace(name, Type{});
          if (inserted)
          {
@@ -815,6 +853,26 @@ namespace psio
             }
          }
          return Type{std::move(name)};
+      }
+
+      void to_json(const Schema& schema, auto& stream)
+      {
+         to_json(schema.types, stream);
+      }
+
+      void to_json_members(const std::vector<Member>& members, auto& stream)
+      {
+         CommaList comma;
+         stream.write('{');
+         for (const auto& member : members)
+         {
+            comma.next(stream);
+            to_json(member.name, stream);
+            write_colon(stream);
+            to_json(member.type, stream);
+         }
+         comma.end(stream);
+         stream.write('}');
       }
 
       // - If an auto generated type has an explicit name, use the defined name

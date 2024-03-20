@@ -234,8 +234,7 @@ template <typename S> void to_json(float value, S& stream)              { return
       write_newline(stream);
       std::visit(
           [&](const auto& t) { to_json(get_type_name<std::decay_t<decltype(t)>>(), stream); }, obj);
-      stream.write(':');
-      write_newline(stream);
+      write_colon(stream);
       std::visit([&](auto& x) { return to_json(x, stream); }, obj);
       decrease_indent(stream);
       write_newline(stream);
