@@ -31,22 +31,24 @@ interface types {
 /// Every auth service must export this interface
 interface smart-auth {
     use types.{claim, proof};
+    use common:plugin/types.{error};
 
     /// Gets the claim needed for this user to satisfy the authorization check
-    get-claim: func() -> result<claim, string>;
+    get-claim: func() -> result<claim, error>;
 
     /// Provides proof of the claim. 
     /// 
     /// Parameters
     /// * `message`: A message that usually needs to be signed as
     ///   proof of the claim.
-    get-proof: func(message: list<u8>) -> result<proof, string>;
+    get-proof: func(message: list<u8>) -> result<proof, error>;
 }
 
 /// Methods related to key management
 interface keyvault {
+    use common:plugin/types.{error};
     /// Generates a new keypair, stores the private key, returns the public key.
-    generate-keypair: func() -> result<string, string>;
+    generate-keypair: func() -> result<string, error>;
 }
 
 world psibase-plugin {

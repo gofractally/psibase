@@ -2,23 +2,30 @@ package psibase:component-parser;
 
 interface types {
 
-    record qualified-func {
+    record intf {
         namespace: string,
         %package: string,
-        intf: option<string>,
-        func-name: string,
+        name: string,
+        funcs: list<string>
+    }
+
+    record functions {
+        namespace: string,
+        %package: string,
+        interfaces: list<intf>,
+        funcs: list<string>
     }
     
     record component-extraction {
-        /// A list of imported functions
-        imported-funcs : list<qualified-func>,
+        /// A representation of all imported functions
+        imported-funcs : functions,
 
-        /// A list of exported functions
+        /// A respresentation of all exported functions
         /// Self-reported namespaces for functions parsed from this component should not be trusted,
         /// since a component could declare itself in whatever namespace it wants. Instead, the namespace
         /// is always equal to the domain of the component within the registry from which it was 
         /// retrieved.
-        exported-funcs: list<qualified-func>,
+        exported-funcs: functions,
 
         // The WIT definition of the component's world.
         wit: string,

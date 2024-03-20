@@ -17,7 +17,6 @@ function App() {
   }, []);
 
   const run = async () => {
-    console.log("calling demoapp1.helloworld");
     const res = await supervisor.functionCall({
       service: "demoapp1",
       method: "helloworld",
@@ -27,14 +26,18 @@ function App() {
   };
 
   const run2 = async () => {
-    console.log("calling demoapp1.generateinvite");
-    const res = await supervisor.functionCall({
-      service: "demoapp1",
-      intf: "intf",
-      method: "helloworld2",
-      params: [],
-    });
-    setRes(res as string);
+    try {
+      const res = await supervisor.functionCall({
+        service: "demoapp1",
+        intf: "intf",
+        method: "helloworld2",
+        params: [],
+      });
+      setRes(res as string);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+    
   };
 
   return (

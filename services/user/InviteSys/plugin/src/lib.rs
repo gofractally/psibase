@@ -2,6 +2,7 @@
 mod bindings;
 use bindings::account_sys::plugin::accounts;
 use bindings::auth_sys::plugin::keyvault;
+use bindings::common::plugin::types as CommonTypes;
 use bindings::common::plugin::{client, server};
 use bindings::exports::invite_sys::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
@@ -9,6 +10,9 @@ use bindings::exports::invite_sys::plugin::{
 
 use fracpack::Pack;
 use psibase::services::invite_sys as invite_service;
+
+mod errors;
+use errors::ErrorType::*;
 
 /*
     /// This doesn't need to be exposed, it can just be jammed into various plugin functions
@@ -48,16 +52,23 @@ impl Invitee for Component {
 }
 
 impl Inviter for Component {
-    fn generate_invite(callback_subpath: String) -> Result<String, String> {
+    fn generate_invite(callback_subpath: String) -> Result<String, CommonTypes::Error> {
         let inviter = accounts::get_logged_in_user()?;
+
         let inviter = match inviter {
             Some(i) => i,
             None => {
-                return Err("Only existing accounts can create invites".to_string());
+                return Err(InviterLoggedIn.err());
             }
         };
 
-        let pubkey: psibase::PublicKey = keyvault::generate_keypair()?.parse().unwrap();
+        let pubkey = keyvault::generate_keypair()?;
+        let pubkey: psibase::PublicKey = match pubkey.parse() {
+            Ok(key) => key,
+            Err(_) => {
+                return Err(PubKeyParse.err());
+            }
+        };
 
         server::add_action_to_transaction(
             "createInvite",
@@ -67,23 +78,16 @@ impl Inviter for Component {
             .packed(),
         )?;
 
-        let invite_domain = client::my_service_domain();
-        let invited_page = "/invited".to_string();
-        let link_root = format!("{}{}", invite_domain, invited_page);
+        let link_root = format!("{}{}", client::my_service_domain()?, "/invited");
 
-        let origination_domain = client::sender_app_domain();
-        let originator_service = client::sender_app_service_account();
-        let originator = if !originator_service.is_empty() {
-            originator_service
-        } else {
-            origination_domain.clone()
-        };
+        let orig_data = client::get_sender_app()?;
+        let orig_domain = orig_data.origination_domain;
+        let originator = orig_data.app.unwrap_or(orig_domain.clone());
 
-        let callback_url = format!("{}{}", origination_domain, callback_subpath);
-        let invite_key = pubkey.to_string();
+        let callback_url = format!("{}{}", orig_domain, callback_subpath);
         let query_string = format!(
             "inviter={}&app={}&pk={}&cb={}",
-            inviter, originator, invite_key, callback_url
+            inviter, originator, pubkey, callback_url
         );
 
         // Todo - For ergonomics, consider encoding the querystring

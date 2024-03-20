@@ -1,16 +1,16 @@
 import { QualifiedFunctionCallArgs } from "./FunctionCallRequest";
+import { ResultCache } from "./CallContext";
 
 const PLUGIN_CALL_REQUEST = "PLUGIN_CALL_REQUEST" as const;
 
 export interface FunctionCallResult<T = any> extends QualifiedFunctionCallArgs {
-    id: string;
     result: T;
 }
 
 export interface PluginCallPayload {
-    id: string;
+    caller: string;
     args: QualifiedFunctionCallArgs;
-    precomputedResults: FunctionCallResult[];
+    resultCache: ResultCache[];
 }
 
 export interface PluginCallRequest {
@@ -21,9 +21,8 @@ export interface PluginCallRequest {
 export const isPluginCallRequest = (data: any): data is PluginCallRequest => {
     const isEventTypeSatisfied = data && data.type == PLUGIN_CALL_REQUEST;
     if (!isEventTypeSatisfied) return false;
-    const { id, args } = data.payload;
+    const { args } = data.payload;
     const isSchemaSatisfied =
-        typeof id == "string" &&
         typeof args == "object" &&
         "service" in args &&
         "plugin" in args &&

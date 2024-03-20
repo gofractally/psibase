@@ -1,7 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::psibase::component_parser::types::{ComponentExtraction, QualifiedFunc};
+use bindings::psibase::component_parser::types::{ComponentExtraction, Functions, Intf};
 use bindings::Guest as Parser;
 use indexmap::IndexMap;
 use wasm_compose::graph::Component;
@@ -9,6 +9,17 @@ use wit_component::{decode, WitPrinter};
 use wit_parser::{World, WorldItem, WorldKey};
 
 pub struct ComponentParser;
+
+impl Default for Functions {
+    fn default() -> Self {
+        Functions {
+            namespace: "root".to_string(),
+            package: "component".to_string(),
+            interfaces: Vec::new(),
+            funcs: Vec::new(),
+        }
+    }
+}
 
 fn kebab_to_camel(s: &str) -> String {
     s.split('-')
@@ -42,7 +53,7 @@ fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
     Ok(wit)
 }
 
-fn extract_functions<F>(resolved_wit: &wit_parser::Resolve, get_world_item: F) -> Vec<QualifiedFunc>
+fn extract_functions<F>(resolved_wit: &wit_parser::Resolve, get_world_item: F) -> Functions
 where
     F: Fn(&World) -> &IndexMap<WorldKey, WorldItem>,
 {
@@ -53,32 +64,26 @@ where
         "Only 1 world allowed in merge wit"
     );
 
-    let mut funcs: Vec<QualifiedFunc> = vec![];
+    let mut funcs = Functions::default();
     let (_, world) = worlds.iter().next().unwrap();
     for (_, item) in get_world_item(world) {
         match item {
             WorldItem::Interface(i) => {
                 let intf = resolved_wit.interfaces.get(*i).unwrap();
                 let pkg = resolved_wit.packages.get(intf.package.unwrap()).unwrap();
+                let mut new_intf = Intf {
+                    namespace: pkg.name.namespace.to_owned(),
+                    package: pkg.name.name.to_owned(),
+                    name: intf.name.to_owned().unwrap(),
+                    funcs: vec![],
+                };
                 for (func_name, _) in &intf.functions {
-                    funcs.push(QualifiedFunc {
-                        namespace: pkg.name.namespace.to_owned(),
-                        package: pkg.name.name.to_owned(),
-                        intf: intf.name.to_owned(),
-                        func_name: kebab_to_camel(&func_name.to_owned()),
-                    });
+                    new_intf.funcs.push(kebab_to_camel(&func_name.to_owned()));
                 }
+                funcs.interfaces.push(new_intf);
             }
             WorldItem::Function(func) => {
-                funcs.push(QualifiedFunc {
-                    // It is not important to know what the component self-reports its identity to be.
-                    // It's true namespace/package name are equal to the registry domain at which
-                    //   the component was retrieved.
-                    namespace: "root".to_string(),
-                    package: "component".to_string(),
-                    intf: None,
-                    func_name: kebab_to_camel(&func.name.to_owned()),
-                });
+                funcs.funcs.push(kebab_to_camel(&func.name.to_owned()));
             }
             WorldItem::Type(_) => {}
         };

@@ -17,7 +17,7 @@ interface admin {
 
 /// Functionality exposed for the inviter
 interface inviter {
-    use common:plugin/types.{plugin-id};
+    use common:plugin/types.{error};
 
     /// Allows a user to generate an invite link that can be used to 
     /// invite someone (with or without a preexisting account) to use 
@@ -31,7 +31,7 @@ interface inviter {
     /// sent to a user to invite them to an app. This URL embeds a private key which
     /// is used to authenticate the receiver of the invite on their first transaction
     /// to the chain (used to create their own account).
-    generate-invite: func(callback-subpath: string) -> result<string, string>;
+    generate-invite: func(callback-subpath: string) -> result<string, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
     /// from the database. An invite can be deleted regardless of whether it has been

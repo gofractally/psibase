@@ -1,11 +1,11 @@
 package demoapp1:example;
 
 interface intf {
-    helloworld2: func() -> result<string, string>;
+    use common:plugin/types.{error};
+    helloworld2: func() -> result<string, error>;
 }
 
 world example {
-
     import invite-sys:plugin/inviter;
 
     export helloworld: func() -> string;

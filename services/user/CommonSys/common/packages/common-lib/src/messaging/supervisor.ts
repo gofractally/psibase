@@ -1,16 +1,17 @@
 import { siblingUrl } from "../rpc";
-import { generateRandomString } from "./generateRandomString";
-import { QualifiedFunctionCallArgs } from "./supervisor/FunctionCallRequest";
+import {
+    QualifiedFunctionCallArgs,
+    toString
+} from "./supervisor/FunctionCallRequest";
+import { isErrorResponse } from "./supervisor/FunctionCallResponse";
 import { buildPreLoadPluginsRequest } from "./supervisor/PreLoadPluginsRequest";
 import {
     isIFrameInitialized,
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
-    FunctionCallRequest,
+    FunctionCallRequest
 } from "./supervisor/index";
-
-const generateId = () => generateRandomString();
 
 const SupervisorIFrameId = "iframe-supervisor-sys" as const;
 
@@ -48,16 +49,20 @@ const setupSupervisorIFrame = (src: string) => {
     }
 };
 
-const supervisorOrigin = siblingUrl(null, 'supervisor-sys');
+const supervisorOrigin = siblingUrl(null, "supervisor-sys");
 
+const my = new URL(window.location.href);
+const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`;
+
+// Convenient library for users to interact with the supervisor.
 export class Supervisor {
     public isSupervisorInitialized = false;
 
-    private pendingRequests: {
-        id: string;
+    private pendingRequest: {
+        call: FunctionCallArgs;
         resolve: (result: unknown) => void;
         reject: (result: unknown) => void;
-    }[] = [];
+    } | null = null;
 
     private onLoadPromise?: (value?: unknown) => void;
 
@@ -74,16 +79,27 @@ export class Supervisor {
     }
 
     handleRawEvent(messageEvent: MessageEvent) {
-        // TODO check the sources of these events, e.g. the origin, what iframe did it come from?;
-        if (isIFrameInitialized(messageEvent.data)) {
-            this.onSupervisorInitialized();
-        } else if (isFunctionCallResponse(messageEvent.data)) {
-            this.onFunctionCallResponse(messageEvent.data);
+        try {
+            if (messageEvent.origin === supervisorOrigin) {
+                if (isIFrameInitialized(messageEvent.data)) {
+                    this.onSupervisorInitialized();
+                } else if (isFunctionCallResponse(messageEvent.data)) {
+                    this.onFunctionCallResponse(messageEvent.data);
+                }
+            } else if (messageEvent.origin !== myOrigin) {
+                console.log("Received unauthorized message. Ignoring.");
+            }
+        }
+        catch(e) {
+            if (e instanceof Error) {
+                console.error(e.message);
+            } else {
+                console.error(`Unrecognized error: ${JSON.stringify(e, null, 2)}`);
+            }
         }
     }
 
     onSupervisorInitialized() {
-        console.log("Supervisor successfully initialized. 🔥");
         this.isSupervisorInitialized = true;
         if (this.onLoadPromise) {
             this.onLoadPromise();
@@ -91,15 +107,24 @@ export class Supervisor {
     }
 
     onFunctionCallResponse(response: FunctionCallResponse) {
-        const request = this.pendingRequests.find(
-            (req) => req.id == response.payload.id
-        );
-        if (request) {
-            request.resolve(response.payload.result);
+        if (!this.pendingRequest) {
+            throw Error(`Received unexpected response from supervisor.`);
+        }
+        const expected = this.pendingRequest!.call;
+        const received = response.call;
+        const unexpected: boolean = expected.method != received.method || expected.service != received.service;
+
+        if (isErrorResponse(response)) {
+            this.pendingRequest!.reject(response.result.val);
         } else {
-            console.error(
-                `Received request response but is not a pending request on app.`
-            );
+            if (unexpected) {
+                // Could be infra error rather than plugin error, printing to console to increase probability 
+                // that it gets reported.
+                console.warn(`Expected reply to ${toString(expected)} but received reply to ${toString(received)}`);
+                this.pendingRequest!.reject(`Expected reply to ${toString(expected)} but received reply to ${toString(received)}`);
+            }
+
+            this.pendingRequest!.resolve(response.result);
         }
     }
 
@@ -116,22 +141,18 @@ export class Supervisor {
     }
 
     functionCall(args: FunctionCallArgs) {
-        const id = generateId();
         const iframe = this.getSupervisorIframe();
 
         const fqArgs: QualifiedFunctionCallArgs = {
             ...args,
-            plugin: args.plugin || "plugin",
+            plugin: args.plugin || "plugin"
         };
 
         return new Promise((resolve, reject) => {
-            this.pendingRequests.push({ id, resolve, reject });
+            this.pendingRequest = { call: args, resolve, reject };
             const message: FunctionCallRequest = {
                 type: "FUNCTION_CALL_REQUEST",
-                payload: {
-                    id,
-                    args: fqArgs,
-                },
+                args: fqArgs
             };
             if (iframe.contentWindow) {
                 iframe.contentWindow.postMessage(message, supervisorOrigin);
@@ -149,7 +170,7 @@ export class Supervisor {
     }
 
     preLoadPlugins(services: string[]) {
-        // TODO: Allow specifying plugin names, otherwise only default 
+        // TODO: Allow specifying plugin names, otherwise only default
         //       "plugin.wasm" plugins can be preloaded
         const message = buildPreLoadPluginsRequest(services);
         const iframe = this.getSupervisorIframe();

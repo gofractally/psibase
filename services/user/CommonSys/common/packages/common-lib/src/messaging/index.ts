@@ -3,8 +3,15 @@ export {
     type FunctionCallArgs,
     type QualifiedFunctionCallArgs,
     type FunctionCallRequest,
-    isFunctionCallRequest
+    isFunctionCallRequest,
+    toString
 } from "./supervisor/FunctionCallRequest";
+export {
+    type Call,
+    CallContext,
+    type ResultCache,
+    CallStack,
+} from "./supervisor/CallContext";
 export {
     isIFrameInitialized,
     buildMessageIFrameInitialized
@@ -23,7 +30,9 @@ export {
 } from "./supervisor/PluginCallResponse";
 export {
     isFunctionCallResponse,
-    buildFunctionCallResponse
+    buildFunctionCallResponse,
+    isErrorResponse,
+    isErrorResult
 } from "./supervisor/FunctionCallResponse";
 export { generateRandomString } from "./generateRandomString";
 export {
@@ -32,7 +41,8 @@ export {
     isPreLoadPluginsRequest
 } from "./supervisor/PreLoadPluginsRequest";
 export {
-    isPluginCallFailure,
-    type PluginCallFailure
-} from "./supervisor/PluginCallFailure";
+    isPluginSyncCall,
+    buildPluginSyncCall,
+    type PluginSyncCall
+} from "./supervisor/PluginSyncCall";
 export { buildMessageLoaderInitialized } from "./supervisor/LoaderInitialized";

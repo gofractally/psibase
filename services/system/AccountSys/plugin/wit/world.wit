@@ -1,17 +1,18 @@
 package account-sys:plugin;
 
 interface accounts {
+    use common:plugin/types.{error};
 
     /// Gets the name of the currently logged in user, if there is one.
     /// Returned option can be empty if there is no currently logged in user.
-    get-logged-in-user: func() -> result<option<string>, string>;
+    get-logged-in-user: func() -> result<option<string>, error>;
 
     /// Retrieves a list of accounts to which the user can log in.
-    get-available-accounts: func() -> result<list<string>, string>;
+    get-available-accounts: func() -> result<list<string>, error>;
 
     /// Adds a new auth service locally that can be used to authenticate
     /// a user.
-    add-auth-service: func(service-name: string) -> result<_, string>;
+    add-auth-service: func(service-name: string) -> result<_, error>;
 }
 
 world psibase-plugin {

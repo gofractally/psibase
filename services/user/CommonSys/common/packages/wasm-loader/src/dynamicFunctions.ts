@@ -1,4 +1,4 @@
-import { FunctionCallResult } from "@psibase/common-lib/messaging";
+import { ResultCache, isErrorResult } from "@psibase/common-lib/messaging";
 
 interface PluginFunc {
     service: string;
@@ -7,94 +7,108 @@ interface PluginFunc {
     method: string;
 }
 
-const argString = (count: number) =>
-    [...new Array(count)]
-        .map((_, index) => index + 1)
-        .map((num) => `arg${num}`)
-        .join(", ")
-        .trim();
+type FunctionInterface = {
+    namespace: string,
+    package: string,
+    name: string,
+    funcs: string[]
+}
 
-const generateFulfilledFunction = (
-    method: string,
-    result: string | number | object,
-    argCount = 3
-): string =>
-    `export function ${method}(${argString(argCount)}) {
-        return ${typeof result == "number" ? result : typeof result == "object" ? JSON.stringify(result) : `'${result}'`}
-    }`;
+type ImportedFunctions = {
+    namespace: string,
+    package: string,
+    interfaces: FunctionInterface[],
+    funcs: string[]
+}
 
-const generatePendingFunction = (
-    { service, plugin, intf, method }: PluginFunc,
-    id: string
-): string => {
-    const functionBody = `
-        throw JSON.stringify({
-            type: 'synchronous_call',
-            target: {
-                id: '${id}',
-                service: '${service}',
-                plugin: '${plugin}',
-                intf: '${intf}',
-                method: '${method}',
-                params: [...args]
-            }
-        });
-    `;
-
-    return typeof intf === "undefined" || intf === ""
-        ? `
-        export function ${method}(...args) {
-            ${functionBody}
-        } `
-        : `
-        export const ${intf} = {
-            ${method}(...args) {
-                ${functionBody}
-            }
-        };`;
+const hostIntf = (intf: FunctionInterface): boolean => {
+    return intf.namespace === "wasi" || intf.namespace === "common";
 };
 
-type ImportedFunc = {
-    namespace: string;
-    package: string;
-    intf?: string;
-    funcName: string;
-};
-
-type ImportedFuncs = ImportedFunc[];
-
-const hostImport = (imported: ImportedFunc): boolean => {
-    return imported.namespace === "wasi" || imported.namespace === "common";
-};
-
-export const adaptImports = (
-    importedFuncs: ImportedFuncs,
-    id: string,
-    functionsResult: FunctionCallResult[]
-): { [key: string]: string }[] =>
-    importedFuncs.reduce(
-        (accumulator, imported) => {
-            if (hostImport(imported)) return accumulator;
-
-            const res = functionsResult.find(
-                (funcResult) =>
-                    funcResult.intf === imported.intf &&
-                    funcResult.method === imported.funcName
+const getFunctionBody = (pluginFunc: PluginFunc, resultCache: ResultCache[]): string => {
+    let {service, plugin, intf, method} = pluginFunc;
+    const found = resultCache.find((f: ResultCache)=>{
+        return f.callService == service
+            && f.callPlugin == plugin
+            && f.callIntf == intf
+            && f.callMethod == method;
+    });
+    if (!found) {
+        /*
+        I uncovered this JCO issue: https://github.com/bytecodealliance/jco/issues/405
+        Once fixed, I can just throw the following object:
+            throw {
+                type: 'synchronous_call',
+                target: {
+                    service: '${service}',
+                    plugin: '${plugin}',
+                    intf: '${intf}',
+                    method: '${method}',
+                    params: [...args]
+                }
+            };
+        And catch / postMessage from the normal loader catch handler (and use buildPluginSyncCall).
+        */
+       
+        return `
+            window.parent.postMessage({
+                    type: "SYNC_CALL_REQUEST",
+                    payload: {
+                        service: '${service}',
+                        plugin: '${plugin}',
+                        intf: '${intf}',
+                        method: '${method}',
+                        params: [...args],
+                    },
+                },
+                window.location.origin.replace(/\\/\\/([^.]*)/, '//supervisor-sys')
             );
+            throw {type: "sync_call"};
+        `
+    } else {
+        if (found.result !== undefined) {
+            if (isErrorResult(found.result)) {
+                return `throw ${JSON.stringify(found.result.val)};`
+            }
+            else {
+                return `return ${JSON.stringify(found.result)};`
+            }
+            
+        } else {
+            return ""; // No-op if the sync call has no return value.
+        }
+    }
+};
 
-            let service = imported.namespace;
-            let plugin = imported.package;
-            const { intf, funcName: method } = imported;
-            const code = res
-                ? generateFulfilledFunction(res.method, res.result)
-                : generatePendingFunction(
-                      { service, plugin, intf, method },
-                      id
-                  );
+export const getImportFills = (
+    importedFuncs: ImportedFunctions,
+    resultCache: ResultCache[]
+): { [key: string]: string }[] => 
+{
+    const {interfaces, funcs: freeFunctions} = importedFuncs;
+    if (freeFunctions.length !== 0) {
+        // TODO: Check how this behaves if a plugin exports a freestanding function and
+        //       another plugin imports it.
+        throw Error(`Plugins may not import freestanding functions.`);
+    }
 
-            accumulator.push({ [`${service}:${plugin}/*`]: code + "\n" });
+    let importables: { [key: string]: string }[] = [];
+    interfaces.forEach((intf: FunctionInterface) => {
+        if (hostIntf(intf)) return;
+        let imp : string[] = [];
+        imp.push(`export const ${intf.name} = {
+        `);
+        intf.funcs.forEach((f: string)=>{
+            // Todo - I can explicitly count args to generate args for
+            //   the fulfilled function. Is it necessary?
+            imp.push(`${f}(...args) {
+            `);
+            imp.push(getFunctionBody({service: intf.namespace, plugin: intf.package, intf: intf.name, method: f}, resultCache));
+            imp.push(`},`);
+        });
+        imp.push(`}`);
 
-            return accumulator;
-        },
-        [] as { [key: string]: string }[]
-    );
+        importables.push({ [`${intf.namespace}:${intf.package}/*`]: `${imp.join("")}` });
+    });
+    return importables;
+}

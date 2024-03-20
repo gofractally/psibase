@@ -1,85 +1,109 @@
-export async function funccall(params) {
-  return "funcCall";
-}
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//        NOT FUNCTIONAL YET
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-export function getLoggedInUser() {
-  return "alice";
-}
+const currentActions = [];
+let callerService = "uninitialized";
+let callerDomain = "uninitialized";
+let myDomain = "uninitialized";
+let myService = "uninitialized";
 
-export async function prnt(string) {
-  console.log(`from imported code:`, string);
-
-  const toCall = {
-    service: "idunno",
-    method: "stilldontknow",
-    params: "yesbuddeh",
-  };
-}
-
-export async function addToTx(params) {
-  console.log("addedToTx", params);
-}
-
-/* Below is a sample shim from wasi random.
-   The wasi random wit files are here:
-   https://github.com/WebAssembly/WASI/blob/main/preview2/random/insecure.wit
-
-const MAX_BYTES = 65536;
-
-let insecureRandomValue1, insecureRandomValue2;
-
-export const insecure = {
-  getInsecureRandomBytes (len) {
-    return random.getRandomBytes(len);
-  },
-  getInsecureRandomU64 () {
-    return random.getRandomU64();
+function isEqualUint8Array(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
   }
+  return true;
 };
 
-let insecureSeedValue1, insecureSeedValue2;
+function actionExists(service, action, args) {
+  return currentActions.some(item => 
+    item.service === service && 
+    item.action === action && 
+    isEqualUint8Array(item.args, args)
+  );
+}
 
-export const insecureSeed = {
-  insecureSeed () {
-    if (insecureSeedValue1 === undefined) {
-      insecureSeedValue1 = random.getRandomU64();
-      insecureSeedValue2 = random.getRandomU64();
-    }
-    return [insecureSeedValue1, insecureSeedValue2];
-  }
-};
-
-export const random = {
-  getRandomBytes(len) {
-    const bytes = new Uint8Array(Number(len));
-
-    if (len > MAX_BYTES) {
-      // this is the max bytes crypto.getRandomValues
-      // can do at once see https://developer.mozilla.org/en-US/docs/Web/API/window.crypto.getRandomValues
-      for (var generated = 0; generated < len; generated += MAX_BYTES) {
-        // buffer.slice automatically checks if the end is past the end of
-        // the buffer so we don't have to here
-        crypto.getRandomValues(bytes.subarray(generated, generated + MAX_BYTES));
+function send(req) {
+  console.log(`[http] Send (browser) ${req.uri}`);
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open(req.method.toString(), req.uri, false);
+    const requestHeaders = new Headers(req.headers);
+    for (let [name, value] of requestHeaders.entries()) {
+      if (name !== "user-agent" && name !== "host") {
+        xhr.setRequestHeader(name, value);
       }
-    } else {
-      crypto.getRandomValues(bytes);
     }
-
-    return bytes;
-  },
-
-  getRandomU64 () {
-    return crypto.getRandomValues(new BigUint64Array(1))[0];
-  },
-
-  insecureRandom () {
-    if (insecureRandomValue1 === undefined) {
-      insecureRandomValue1 = random.getRandomU64();
-      insecureRandomValue2 = random.getRandomU64();
-    }
-    return [insecureRandomValue1, insecureRandomValue2];
+    xhr.send(req.body && req.body.length > 0 ? req.body : null);
+    const body = xhr.response ? new TextEncoder().encode(xhr.response) : undefined;
+    const headers = [];
+    xhr.getAllResponseHeaders().trim().split(/[\r\n]+/).forEach((line) => {
+      var parts = line.split(': ');
+      var key = parts.shift();
+      var value = parts.join(': ');
+      headers.push([key, value]);
+    });
+    return {
+      status: xhr.status,
+      headers,
+      body,
+    };
+  } catch (err) {
+    throw new Error(err.message);
   }
-};
+}
+
+function postGraphQL(url, graphql) {
+  send({
+    uri: url,
+    method: "POST",
+    headers: {
+        "Content-Type": "application/graphql",
+    },
+    body: graphql,
+  });
+}
 
 
-*/
+export const server = {
+  // add-action-to-transaction: func(service: string, action: string, args: list<u8>) -> result<_, string>;
+  addActionToTransaction(service, action, args) {
+    // Todo - figure out how to return stuff
+    // if (actionExists(service, action, args)) {
+    //   return "action already exists";
+    // } else {
+      currentActions.push({service, action, args});
+    //return;
+    //}
+  },
+
+  // post-graphql-get-json: func(url: string, data: string) -> result<string, string>;
+  postGraphqlGetJson(url, graphQL)
+  {
+    const res = postGraphQL(url, graphQL);
+    return res.json();
+  }
+}
+
+export const client = {
+  senderAppServiceAccount() {
+    return callerService;
+  },
+  senderAppDomain() {
+    return callerDomain;
+  },
+  myServiceAccount() {
+    return myService;
+  },
+  myServiceDomain() {
+    return myDomain;
+  }
+}
+
+// interface client {
+//   use types.{origination-data};
+//   get-sender-app: func() -> result<origination-data, string>;
+//   get-root-domain: func() -> result<string, string>;
+//   get-service-name: func() -> result<string, string>;
+// }
