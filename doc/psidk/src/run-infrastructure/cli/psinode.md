@@ -101,20 +101,6 @@ Options can also be specified in a configuration file loaded from *database*`/co
 
 The configuration file also controls [logging](../configuration/logging.md).
 
-Example:
-```ini
-producer = prod
-host     = psibase.127.0.0.1.sslip.io
-listen   = 8080
-service  = localhost:$PSIBASE_DATADIR/services/admin-sys
-admin    = static:*
-
-[logger.stderr]
-type   = console
-filter = Severity >= info
-format = [{TimeStamp}] {Message}
-```
-
 Environmental variables, double quotes, and backslash escapes can be used in the value of most options. `psinode` adds some variables to its environment:
 - `PSIBASE_DATADIR`
 
