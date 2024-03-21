@@ -8,7 +8,7 @@ cd $root_dir
 
 # build Plugin
 pushd ./plugin
-cargo component build --release && mkdir -p $root_dir/ui/public && cp target/wasm32-wasi/release/$rust_name.wasm $root_dir/ui/public/symbol-sys.wasm
+cargo component build --release && mkdir -p $root_dir/ui/public && cp target/wasm32-wasi/release/$rust_name.wasm $root_dir/ui/public/plugin.wasm
 popd
 
 cd ./ui

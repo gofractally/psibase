@@ -2,17 +2,24 @@ import "./App.css";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import { Supervisor } from "@psibase/common-lib";
-import { useState } from "react";
 
 const supervisor = new Supervisor();
 
 function App() {
-  const [count] = useState(0);
-
   const x = async () => {
     const res = await supervisor.functionCall({
       service: "symbol-sys",
-      method: "derp",
+      method: "buySymbol",
+      intf: "symbolSys",
+      params: ["derp"],
+    });
+    console.log({ res });
+  };
+
+  const y = async () => {
+    const res = await supervisor.functionCall({
+      service: "symbol-sys",
+      method: "create",
       intf: "symbolSys",
       params: [],
     });
@@ -31,7 +38,8 @@ function App() {
       </div>
       <h1>Vite + React</h1>
       <div className="card">
-        <button onClick={() => x()}>count is {count}</button>
+        <button onClick={() => x()}>buySymbol</button>
+        <button onClick={() => y()}>Create</button>
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>
