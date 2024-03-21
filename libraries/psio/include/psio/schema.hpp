@@ -50,7 +50,6 @@ namespace psio
       struct Object
       {
          std::vector<Member> members;
-         const AnyType*      resolve(const Schema& schema) const { return nullptr; }
       };
 
       PSIO_REFLECT_TYPENAME(Object)
@@ -78,7 +77,6 @@ namespace psio
          List(const List&);
          List&                    operator=(List&&) = default;
          std::unique_ptr<AnyType> type;
-         const AnyType*           resolve(const Schema& schema) const { return nullptr; }
       };
       PSIO_REFLECT_TYPENAME(List)
 
@@ -94,7 +92,6 @@ namespace psio
          Option(const Option&);
          Option&                  operator=(Option&&) = default;
          std::unique_ptr<AnyType> type;
-         const AnyType*           resolve(const Schema& schema) const { return nullptr; }
       };
       PSIO_REFLECT_TYPENAME(Option)
 
@@ -113,9 +110,8 @@ namespace psio
 
       struct Int
       {
-         std::uint32_t  bits;
-         bool           isSigned;
-         const AnyType* resolve(const Schema& schema) const { return nullptr; }
+         std::uint32_t bits;
+         bool          isSigned;
       };
       PSIO_REFLECT(Int, bits, isSigned)
 
@@ -137,8 +133,7 @@ namespace psio
 
       struct Type
       {
-         std::string    type;
-         const AnyType* resolve(const Schema& schema) const { return schema.get(type); }
+         std::string type;
       };
       PSIO_REFLECT_TYPENAME(Type)
 
@@ -175,10 +170,12 @@ namespace psio
             if (!resolved)
             {
                const AnyType* result = this;
-               while (auto* next = std::visit([&](const auto& t) { return t.resolve(schema); },
-                                              result->value))
+               while (auto* alias = std::get_if<Type>(&result->value))
                {
-                  result = next;
+                  if (auto* next = schema.get(alias->type))
+                  {
+                     result = next;
+                  }
                }
                resolved = result;
             }
@@ -886,7 +883,7 @@ namespace psio
       {
          if (auto pos = types.find(name); pos != types.end())
          {
-            return pos->second.resolve(*this);
+            return &pos->second;
          }
          return nullptr;
       }
