@@ -125,6 +125,12 @@ namespace psio
       {
          std::vector<Member> members;
       };
+      PSIO_REFLECT_TYPENAME(Variant)
+
+      void to_json(const Variant& type, auto& stream)
+      {
+         to_json_members(type.members, stream);
+      }
 
       struct Tuple
       {
@@ -148,6 +154,7 @@ namespace psio
          AnyType(Object type) : value(std::move(type)) {}
          AnyType(Option type) : value(std::move(type)) {}
          AnyType(List type) : value(std::move(type)) {}
+         AnyType(Variant type) : value(std::move(type)) {}
          AnyType(Type type) : value(std::move(type)) {}
          AnyType(std::string name) : value(Type{std::move(name)}) {}
          AnyType(const char* name) : value(Type{std::move(name)}) {}
@@ -157,7 +164,7 @@ namespace psio
              //Array,
              List,
              Option,
-             //Variant,
+             Variant,
              //Tuple,
              Int,
              //Float,
@@ -290,7 +297,7 @@ namespace psio
                   }
                   break;
                case finish:
-                  link_impl(t, ctype);
+                  link_impl(t.members, ctype);
                   break;
                default:
                   break;
@@ -336,6 +343,28 @@ namespace psio
                   break;
             }
          }
+         void add_impl(const AnyType* type, const Variant& t, std::vector<const AnyType*>& stack)
+         {
+            auto [ctype, state] = dfs_discover(type, CompiledType::variant, stack);
+            switch (state)
+            {
+               case start:
+                  ctype->is_variable_size = true;
+                  for (const auto& member : t.members)
+                  {
+                     stack.push_back(&member.type);
+                  }
+                  break;
+               case finish:
+                  for (const auto& member : t.members)
+                  {
+                     ctype->children.push_back({.type = get(member.type.resolve(schema))});
+                  }
+                  break;
+               default:
+                  break;
+            }
+         }
          void add_impl(const AnyType* type, const Type& t, std::vector<const AnyType*>& stack)
          {
             if (const AnyType* next = schema.get(t.type))
@@ -347,10 +376,10 @@ namespace psio
                check(false, "undefined type: " + t.type);
             }
          }
-         void link_impl(const Object& t, CompiledType* type)
+         void link_impl(const std::vector<Member>& members, CompiledType* type)
          {
             std::uint32_t fixed_size = 0;
-            for (const auto& member : t.members)
+            for (const auto& member : members)
             {
                if (const CompiledType* mtype = get(member.type.resolve(schema)))
                {
@@ -437,6 +466,7 @@ namespace psio
       struct FixedStructReader;
       struct VariableStructReader;
       struct ListReader;
+      struct VariantReader;
 
       struct FracParser
       {
@@ -462,6 +492,8 @@ namespace psio
             Item                  next(FracParser&) { return *this; }
          };
          Item next();
+         // Starts parsing the given type at the current pos
+         Item parse(const CompiledType* ctype);
          void push(const CompiledType* type, std::uint32_t offset);
          void push_fixed(const CompiledType* type, std::uint32_t offset);
          void check_heap_pos(std::uint32_t pos);
@@ -507,7 +539,8 @@ namespace psio
             }
          }
 
-         using StackItem = std::variant<Item, ObjectReader, OptionReader, ListReader>;
+         using StackItem =
+             std::variant<Item, ObjectReader, OptionReader, ListReader, VariantReader>;
          FracStream             in;
          std::vector<StackItem> stack;
       };
@@ -640,6 +673,38 @@ namespace psio
          }
       };
 
+      struct VariantReader
+      {
+         const CompiledType* type;
+         std::uint32_t       old_end_pos = 0;
+         FracParser::Item    next(FracParser& parser)
+         {
+            if (old_end_pos != 0)
+            {
+               parser.check_heap_pos(old_end_pos);
+               parser.in.known_end = true;
+               parser.in.end_pos   = old_end_pos;
+               return {.kind = FracParser::end, .type = type->original_type};
+            }
+            uint8_t tag;
+            if (!unpack_numeric<true>(&tag, parser.in.src, parser.in.pos, parser.in.end_pos))
+               check(false, "Cannot unpack variant tag");
+            if (tag & 0x80)
+               check(false, "Variant tag cannot be greater than 127");
+            uint32_t size;
+            if (!unpack_numeric<true>(&size, parser.in.src, parser.in.pos, parser.in.end_pos))
+               check(false, "Cannot read variant tag");
+            auto new_end      = parser.in.pos + size;
+            old_end_pos       = parser.in.end_pos;
+            parser.in.end_pos = new_end;
+            if (tag >= type->children.size())
+               check(false, "Variant tag out-of-range");
+            auto result   = parser.parse(type->children[tag].type);
+            result.parent = type->original_type;
+            return result;
+         }
+      };
+
       FracParser::FracParser(std::span<const char> data,
                              const CompiledSchema& schema,
                              const std::string&    type)
@@ -650,23 +715,29 @@ namespace psio
             auto ctype = schema.get(xtype->resolve(schema.schema));
             check(ctype != 0, "could not find type");
 
-            Item result{.type = ctype->original_type};
-            if (ctype->kind == CompiledType::scalar)
-            {
-               result.data = read(ctype, 0);
-               result.kind = FracParser::scalar;
-            }
-            else if (ctype->kind == CompiledType::optional)
-            {
-               result = OptionReader{ctype}.next(*this);
-            }
-            else
-            {
-               push(ctype, 0);
-               result.kind = FracParser::start;
-            }
-            stack.push_back(result);
+            stack.push_back(parse(ctype));
          }
+      }
+
+      FracParser::Item FracParser::parse(const CompiledType* ctype)
+      {
+         Item result{.type = ctype->original_type};
+         if (ctype->kind == CompiledType::scalar)
+         {
+            result.data = read(ctype, in.pos);
+            result.kind = FracParser::scalar;
+         }
+         else if (ctype->kind == CompiledType::optional)
+         {
+            result        = OptionReader{ctype}.next(*this);
+            result.parent = nullptr;
+         }
+         else
+         {
+            push(ctype, in.pos);
+            result.kind = FracParser::start;
+         }
+         return result;
       }
 
       FracParser::Item FracParser::next()
@@ -729,6 +800,12 @@ namespace psio
                in.known_end = true;
                break;
             }
+            case CompiledType::variant:
+            {
+               stack.push_back(VariantReader{type});
+               in.known_end = true;
+               break;
+            }
             default:
                assert(!"Not implemented");
          }
@@ -761,18 +838,24 @@ namespace psio
       struct OpenToken
       {
          char operator()(const Object&) const { return '{'; }
+         char operator()(const Variant&) const { return '{'; }
          char operator()(const auto&) const { return '['; }
       };
 
       struct CloseToken
       {
          char operator()(const Object&) const { return '}'; }
+         char operator()(const Variant&) const { return '}'; }
          char operator()(const auto&) const { return ']'; }
       };
 
       struct MemberName
       {
          const std::string* operator()(const Object& type) const
+         {
+            return &type.members[index].name;
+         }
+         const std::string* operator()(const Variant& type) const
          {
             return &type.members[index].name;
          }
@@ -899,6 +982,13 @@ namespace psio
          types.try_emplace(name, insert<T>());
       }
 
+      template <typename... T>
+      std::vector<Member> insert_variant_alternatives(Schema& schema, std::variant<T...>*)
+      {
+         using psio::get_type_name;
+         return {Member{.name = get_type_name((T*)nullptr), .type = schema.insert<T>()}...};
+      }
+
       template <typename T>
       AnyType Schema::insert()
       {
@@ -918,6 +1008,10 @@ namespace psio
             else if constexpr (is_std_vector_v<T>)
             {
                pos->second = List{insert<typename is_std_vector<T>::value_type>()};
+            }
+            else if constexpr (is_std_variant_v<T>)
+            {
+               pos->second = Variant{insert_variant_alternatives(*this, (T*)nullptr)};
             }
             else if constexpr (reflect<T>::is_struct)
             {
