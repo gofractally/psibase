@@ -1,5 +1,6 @@
 #pragma once
 
+#include <concepts>
 #include <map>
 #include <psio/fracpack.hpp>
 #include <psio/to_json.hpp>
@@ -26,6 +27,42 @@ namespace psio
       bool          known_end   = true;
    };
 
+   class StreamBase
+   {
+     public:
+      void        write(const void* data, std::size_t size) { do_write(data, size); }
+      void        write(char ch) { do_write(&ch, 1); }
+      friend void increase_indent(StreamBase& self) { self.do_increase_indent(); }
+      friend void decrease_indent(StreamBase& self) { self.do_decrease_indent(); }
+      friend void write_colon(StreamBase& self) { self.do_write_colon(); }
+      friend void write_newline(StreamBase& self) { self.do_write_newline(); }
+
+     protected:
+      virtual void do_write(const void* data, std::size_t size) = 0;
+      virtual void do_increase_indent()                         = 0;
+      virtual void do_decrease_indent()                         = 0;
+      virtual void do_write_colon()                             = 0;
+      virtual void do_write_newline()                           = 0;
+      ~StreamBase()                                             = default;
+   };
+
+   template <typename T>
+   class StreamRef : public StreamBase
+   {
+     public:
+      StreamRef(T& stream) : stream(stream) {}
+
+     protected:
+      void do_write(const void* data, std::size_t size) override { stream.write(data, size); }
+      void do_increase_indent() override { increase_indent(stream); }
+      void do_decrease_indent() override { decrease_indent(stream); }
+      void do_write_colon() override { write_colon(stream); }
+      void do_write_newline() override { write_newline(stream); }
+
+     private:
+      T& stream;
+   };
+
    namespace schema_types
    {
 
@@ -34,6 +71,10 @@ namespace psio
       template <typename T>
       struct Box
       {
+         template <std::convertible_to<T> U>
+         Box(U&& value) : value(new T(std::forward<U>(value)))
+         {
+         }
          Box(T&& value) : value(new T(value)) {}
          Box(const Box& other) : value(new T(*value)) {}
          Box(Box&&)                          = default;
@@ -131,11 +172,10 @@ namespace psio
 
       struct Custom
       {
-         std::unique_ptr<any_type> type;
-         std::string               id;
-         std::optional<bool>       validate;
-         std::optional<bool>       json;
+         Box<AnyType> type;
+         std::string  id;
       };
+      PSIO_REFLECT(Custom, type, id)
 
       struct Int
       {
@@ -193,6 +233,7 @@ namespace psio
          AnyType(Array type) : value(std::move(type)) {}
          AnyType(Variant type) : value(std::move(type)) {}
          AnyType(Tuple type) : value(std::move(type)) {}
+         AnyType(Custom type) : value(std::move(type)) {}
          AnyType(Type type) : value(std::move(type)) {}
          AnyType(std::string name) : value(Type{std::move(name)}) {}
          AnyType(const char* name) : value(Type{std::move(name)}) {}
@@ -205,7 +246,7 @@ namespace psio
                       Tuple,
                       Int,
                       //Float,
-                      //Custom,
+                      Custom,
                       Type>
                                 value;
          mutable const AnyType* resolved = nullptr;
@@ -274,6 +315,76 @@ namespace psio
          }
       };
 
+      struct CustomHandlerBase
+      {
+         virtual ~CustomHandlerBase()                            = default;
+         virtual void frac2json(FracStream& in, StreamBase& out) = 0;
+      };
+
+      template <typename T>
+      struct CustomHandlerImpl : CustomHandlerBase
+      {
+         CustomHandlerImpl(const T& t) : impl(t) {}
+         CustomHandlerImpl(T&& t) : impl(std::move(t)) {}
+         void frac2json(FracStream& in, StreamBase& out) override { impl.frac2json(in, out); }
+         T    impl;
+      };
+
+      template <typename T>
+      struct DefaultCustomHandler
+      {
+         bool frac2json(FracStream& in, auto& out)
+         {
+            T value;
+            if (!is_packable<T>::template unpack<true, true>(&value, in.has_unknown, in.known_end,
+                                                             in.src, in.pos, in.end_pos))
+               return false;
+            to_json(value, out);
+            return true;
+         }
+      };
+
+      class CustomTypes
+      {
+        public:
+         template <typename T>
+         void insert(std::string name)
+         {
+            insert(std::move(name), DefaultCustomHandler<T>());
+         }
+         template <typename T>
+         void insert(std::string name, T&& t)
+         {
+            std::size_t index = impl.size();
+            impl.push_back(
+                std::make_unique<CustomHandlerImpl<std::remove_cvref_t<T>>>(std::forward<T>(t)));
+            names.insert({std::move(name), index});
+         }
+         std::size_t* find(const std::string& name)
+         {
+            if (auto pos = names.find(name); pos != names.end())
+               return &pos->second;
+            return nullptr;
+         }
+         void frac2json(std::size_t index, FracStream& in, auto& out) const
+         {
+            StreamRef stream{out};
+            impl[index]->frac2json(in, stream);
+         }
+
+        private:
+         std::map<std::string, std::size_t>              names;
+         std::vector<std::unique_ptr<CustomHandlerBase>> impl;
+      };
+
+      inline CustomTypes standard_types()
+      {
+         CustomTypes result;
+         result.insert<bool>("bool");
+         result.insert<std::string>("string");
+         return result;
+      }
+
       struct CompiledType;
 
       struct CompiledMember
@@ -285,7 +396,7 @@ namespace psio
 
       struct CompiledType
       {
-         enum Kind
+         enum Kind : std::uint16_t
          {
             scalar,
             struct_,
@@ -294,6 +405,7 @@ namespace psio
             array,
             variant,
             optional,
+            custom_start,
          };
          Kind                        kind;
          bool                        is_variable_size;
@@ -304,7 +416,8 @@ namespace psio
 
       struct CompiledSchema
       {
-         CompiledSchema(const Schema& schema) : schema(schema)
+         CompiledSchema(const Schema& schema, CustomTypes builtin = standard_types())
+             : schema(schema), builtin(std::move(builtin))
          {
             // collect root types
             std::vector<const AnyType*> stack;
@@ -466,6 +579,36 @@ namespace psio
                   break;
             }
          }
+         void add_impl(const AnyType* type, const Custom& t, std::vector<const AnyType*>& stack)
+         {
+            auto index = builtin.find(t.id);
+            if (!index)
+               // TODO: fallback
+               check(false, "Unknown custom type");
+            // TODO: check that t.type is structurally equivalent to the
+            // builtin.
+            auto kind = static_cast<CompiledType::Kind>(CompiledType::custom_start + *index);
+            auto [ctype, state] = dfs_discover(type, kind, stack);
+            switch (state)
+            {
+               case start:
+                  ctype->is_variable_size = true;
+                  stack.push_back(t.type.get());
+                  break;
+               case finish:
+               {
+                  CompiledType* child = get(t.type->resolve(schema));
+                  // TODO: This is sufficient to prevent crashes, but not to detect all errors
+                  if (!child->original_type)
+                     check(false, "A Custom type may not depend on itself");
+                  ctype->is_variable_size = child->is_variable_size;
+                  ctype->fixed_size       = child->fixed_size;
+                  ctype->children         = child->children;
+               }
+               default:
+                  break;
+            }
+         }
          void add_impl(const AnyType* type, const Type& t, std::vector<const AnyType*>& stack)
          {
             if (const AnyType* next = schema.get(t.type))
@@ -559,6 +702,7 @@ namespace psio
             }
          }
          const Schema&                          schema;
+         CustomTypes                            builtin;
          std::map<const AnyType*, CompiledType> types;
       };
 
@@ -574,12 +718,13 @@ namespace psio
                     const CompiledSchema& schema,
                     const std::string&    type);
          // returns a start token, an end token or a primitive
-         enum ItemKind
+         enum ItemKind : std::uint16_t
          {
             start,
             end,
             scalar,
-            empty
+            empty,
+            custom_start,
          };
          struct Item
          {
@@ -594,6 +739,7 @@ namespace psio
          Item next();
          // Starts parsing the given type at the current pos
          Item parse(const CompiledType* ctype);
+         void parse_fixed(Item& result, const CompiledType* ctype, std::uint32_t offset);
          void push(const CompiledType* type, std::uint32_t offset);
          void push_fixed(const CompiledType* type, std::uint32_t offset);
          void check_heap_pos(std::uint32_t pos);
@@ -631,6 +777,11 @@ namespace psio
                   result.data = read(type, pos);
                   result.kind = FracParser::scalar;
                }
+               else if (type->kind >= CompiledType::custom_start)
+               {
+                  result.kind = static_cast<ItemKind>(custom_start +
+                                                      (type->kind - CompiledType::custom_start));
+               }
                else
                {
                   push(type, pos);
@@ -642,6 +793,7 @@ namespace psio
          using StackItem =
              std::variant<Item, ObjectReader, OptionReader, ListReader, ArrayReader, VariantReader>;
          FracStream             in;
+         const CustomTypes&     builtin;
          std::vector<StackItem> stack;
       };
 
@@ -679,16 +831,7 @@ namespace psio
                if (member.type->fixed_size >
                    static_cast<std::uint16_t>(fixed_size - member.fixed_offset))
                   check(false, "Fixed data too small");
-               if (member.type->kind == CompiledType::scalar)
-               {
-                  result.data = parser.read_fixed(member.type, fixed_pos);
-                  result.kind = FracParser::scalar;
-               }
-               else
-               {
-                  parser.push_fixed(member.type, fixed_pos);
-                  result.kind = FracParser::start;
-               }
+               parser.parse_fixed(result, member.type, fixed_pos);
             }
             else if (member.is_optional && member.fixed_offset >= fixed_size)
             {
@@ -743,16 +886,7 @@ namespace psio
                {
                   FracParser::Item result{.type   = member.type->original_type,
                                           .parent = type->original_type};
-                  if (member.type->kind == CompiledType::scalar)
-                  {
-                     result.data = parser.read_fixed(member.type, start_pos + 4 + offset);
-                     result.kind = FracParser::scalar;
-                  }
-                  else
-                  {
-                     parser.push_fixed(member.type, start_pos + 4 + offset);
-                     result.kind = FracParser::start;
-                  }
+                  parser.parse_fixed(result, member.type, start_pos + 4 + offset);
                   ++index;
                   return result;
                }
@@ -793,16 +927,7 @@ namespace psio
                                          .parent = type->original_type};
             if (!member.is_optional && !member.type->is_variable_size)
             {
-               if (member.type->kind == CompiledType::scalar)
-               {
-                  result.data = parser.read_fixed(member.type, pos);
-                  result.kind = FracParser::scalar;
-               }
-               else
-               {
-                  parser.push_fixed(member.type, pos);
-                  result.kind = FracParser::start;
-               }
+               parser.parse_fixed(result, member.type, pos);
                pos += member.type->fixed_size;
             }
             else
@@ -849,7 +974,7 @@ namespace psio
       FracParser::FracParser(std::span<const char> data,
                              const CompiledSchema& schema,
                              const std::string&    type)
-          : in(data)
+          : in(data), builtin(schema.builtin)
       {
          if (auto xtype = schema.schema.get(type))
          {
@@ -873,12 +998,37 @@ namespace psio
             result        = OptionReader{ctype}.next(*this);
             result.parent = nullptr;
          }
+         else if (ctype->kind >= CompiledType::custom_start)
+         {
+            result.kind =
+                static_cast<ItemKind>(custom_start + (ctype->kind - CompiledType::custom_start));
+         }
          else
          {
             push(ctype, in.pos);
             result.kind = FracParser::start;
          }
          return result;
+      }
+
+      void FracParser::parse_fixed(Item& result, const CompiledType* ctype, std::uint32_t fixed_pos)
+      {
+         if (ctype->kind == CompiledType::scalar)
+         {
+            result.data = read_fixed(ctype, fixed_pos);
+            result.kind = FracParser::scalar;
+         }
+         else if (ctype->kind >= CompiledType::custom_start)
+         {
+            result.data = read_fixed(ctype, fixed_pos);
+            result.kind =
+                static_cast<ItemKind>(custom_start + (ctype->kind - CompiledType::custom_start));
+         }
+         else
+         {
+            push_fixed(ctype, fixed_pos);
+            result.kind = FracParser::start;
+         }
       }
 
       FracParser::Item FracParser::next()
@@ -1118,6 +1268,19 @@ namespace psio
                      stream.write("null", 4);
                   }
                   break;
+               default:
+                  start_member(item);
+                  if (item.data.empty())
+                  {
+                     parser.builtin.frac2json(item.kind - FracParser::custom_start, parser.in,
+                                              stream);
+                  }
+                  else
+                  {
+                     FracStream tmpin{item.data};
+                     parser.builtin.frac2json(item.kind - FracParser::custom_start, tmpin, stream);
+                  }
+                  break;
             }
          }
       }
@@ -1166,6 +1329,10 @@ namespace psio
             if constexpr (is_std_optional_v<T>)
             {
                pos->second = Option{insert<typename is_std_optional<T>::value_type>()};
+            }
+            else if constexpr (std::is_same_v<T, bool>)
+            {
+               pos->second = Custom{.type = Int{.bits = 1}, .id = "bool"};
             }
             else if constexpr (std::is_integral_v<T>)
             {
