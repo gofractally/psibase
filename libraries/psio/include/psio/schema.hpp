@@ -140,8 +140,14 @@ namespace psio
 
       struct Tuple
       {
-         std::vector<any_type> members;
+         std::vector<AnyType> members;
       };
+      PSIO_REFLECT_TYPENAME(Tuple)
+
+      void to_json(const Tuple& type, auto& stream)
+      {
+         to_json(type.members, stream);
+      }
 
       struct Type
       {
@@ -162,6 +168,7 @@ namespace psio
          AnyType(Option type) : value(std::move(type)) {}
          AnyType(List type) : value(std::move(type)) {}
          AnyType(Variant type) : value(std::move(type)) {}
+         AnyType(Tuple type) : value(std::move(type)) {}
          AnyType(Type type) : value(std::move(type)) {}
          AnyType(std::string name) : value(Type{std::move(name)}) {}
          AnyType(const char* name) : value(Type{std::move(name)}) {}
@@ -171,7 +178,7 @@ namespace psio
                       List,
                       Option,
                       Variant,
-                      //Tuple,
+                      Tuple,
                       Int,
                       //Float,
                       //Custom,
@@ -323,6 +330,29 @@ namespace psio
                case finish:
                   ctype->is_variable_size = false;
                   link_impl(t.members, ctype);
+                  break;
+               default:
+                  break;
+            }
+         }
+         void add_impl(const AnyType* type, const Tuple& t, std::vector<const AnyType*>& stack)
+         {
+            auto [ctype, state] = dfs_discover(type, CompiledType::object, stack);
+            switch (state)
+            {
+               case start:
+                  ctype->is_variable_size = true;
+                  for (const auto& member : t.members)
+                  {
+                     stack.push_back(&member);
+                  }
+                  break;
+               case finish:
+                  for (const auto& member : t.members)
+                  {
+                     ctype->children.push_back(make_member(
+                         get(member.resolve(schema)), ctype->fixed_size, ctype->is_variable_size));
+                  }
                   break;
                default:
                   break;
@@ -1027,6 +1057,12 @@ namespace psio
          return {Member{.name = get_type_name((T*)nullptr), .type = schema.insert<T>()}...};
       }
 
+      template <typename T, std::size_t... I>
+      std::vector<AnyType> insert_tuple_elements(Schema& schema, std::index_sequence<I...>)
+      {
+         return {schema.insert<std::remove_cvref_t<std::tuple_element_t<I, T>>>()...};
+      }
+
       template <typename T>
       AnyType Schema::insert()
       {
@@ -1073,6 +1109,11 @@ namespace psio
                {
                   pos->second = Object{std::move(members)};
                }
+            }
+            else if constexpr (requires { std::tuple_size_v<T>; })
+            {
+               pos->second = Tuple{insert_tuple_elements<T>(
+                   *this, std::make_index_sequence<std::tuple_size_v<T>>())};
             }
             else
             {

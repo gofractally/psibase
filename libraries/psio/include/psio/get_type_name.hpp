@@ -162,10 +162,14 @@ namespace psio
    {
       return variant_type_name<T...>.data();
    }
+
+   template <typename... T>
+   constexpr auto tuple_type_name = get_tuple_type_name<T...>();
+
    template <typename... T>
    constexpr const char* get_type_name(const std::tuple<T...>*)
    {
-      return get_tuple_type_name<T...>().data();
+      return tuple_type_name<T...>.data();
    }
 
    template <typename T>
