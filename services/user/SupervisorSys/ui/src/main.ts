@@ -14,8 +14,10 @@ import {
     PluginSyncCall,
     CallContext,
     toString,
-    isErrorResult
+    isErrorResult,
+    QualifiedPluginId
 } from "@psibase/common-lib/messaging";
+import { LoaderPreloadComplete, buildPreloadStartMessage, isLoaderInitMessage, isPreloadCompleteMessage } from "@psibase/common-lib/messaging/supervisor/LoaderInitialized";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -26,66 +28,102 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 const context = new CallContext();
 const callStack = context.callStack;
 
-const createBaseDomain = (subDomain = "supervisor-sys"): string => {
-    const currentUrl = window.location.href;
-    const url = new URL(currentUrl);
-    const hostnameParts = url.hostname.split(".");
-
-    hostnameParts.shift();
-    hostnameParts.unshift(subDomain);
-    url.hostname = hostnameParts.join(".");
-
-    return url.origin;
-};
-
 const createLoaderDomain = (subDomain = "supervisor-sys") =>
-    createBaseDomain(subDomain) + "/common/wasm-loader";
+    siblingUrl(null, subDomain) + "/common/wasm-loader";
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
 
-const loadedServices: string[] = [];
-
-const upsertLoadedService = (service: string) => {
-    if (loadedServices.includes(service)) return;
-    loadedServices.push(service);
+interface PluginManagers {
+    [service: string]: string[];
+}
+const autoArrayInit = {
+    get: (target: PluginManagers, service: string): string[] => {
+        if (!target[service]) {
+            target[service] = [];
+        }
+        return target[service];
+    }
 };
 
-const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
-    upsertLoadedService(service);
+const pluginManagers: PluginManagers = new Proxy({}, autoArrayInit);
+
+const addPluginManager = (pluginId: QualifiedPluginId): boolean => {
+    const {service, plugin} = pluginId;
+    if (!pluginManagers[service].includes(plugin))
+    {
+        pluginManagers[service].push(plugin);
+        return true;
+    }
+    return false;
+};
+
+const getOnLoaderInit = (frameInfo: FrameInfo, resolve: (value: HTMLIFrameElement | PromiseLike<HTMLIFrameElement>) => void) => {
+    return (message: MessageEvent<any>) => {
+        if (isLoaderInitMessage(message.data)) {
+            // Is message from the right child?
+            if (message.origin !== new URL(frameInfo.src).origin) return;
+
+            const loader = document.getElementById(frameInfo.id) as HTMLIFrameElement;
+            if (!(loader && loader.contentWindow)) {
+                console.error(`${frameInfo.service} sent LOADER_INITIALIZED, but the loader is not ready to receive messages.`);
+                return;
+            }
+
+            resolve(loader);
+        }
+    };
+}
+
+interface FrameInfo {
+    id: string,
+    service: string,
+    src: string
+}
+
+const addIframe = (service: string) => {
+    const iframe = document.createElement("iframe");
+    iframe.id = buildIFrameId(service);
+    iframe.src = createLoaderDomain(service);
+    iframe.style.display = "none";
+
+    let {readyState} = document;
+    if (readyState === "complete" || readyState === "interactive") {
+        document.body.appendChild(iframe);
+    } else {
+        document.addEventListener("DOMContentLoaded", () => {
+            document.body.appendChild(iframe);
+        });
+    }
+
+    return {id: iframe.id, service, src: iframe.src};
+}
+
+const getLoader = async (
+    service: string
+): Promise<HTMLIFrameElement> => {
+
+    // Get loader if it exists
     const iFrameId = buildIFrameId(service);
     const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
     if (loader) return loader;
 
-    const iframe = document.createElement("iframe");
-    iframe.id = iFrameId;
-    iframe.src = createLoaderDomain(service);
-    iframe.style.display = "none";
+    // Otherwise, create it
+    let frameInfo = addIframe(service);
 
     return new Promise((resolve) => {
-        window.addEventListener("message", (event) => {
-            // TODO: Check that the origin of this message is from a subdomain for which
-            //   a loader request was made.
-            if (event.data.type == "LOADER_INITIALIZED") {
-                const loader = document.getElementById(
-                    iFrameId
-                ) as HTMLIFrameElement;
-                resolve(loader);
-                // TODO: send the loader the list of preloaded plugins so it can prepare them
-            }
-        });
-
-        if (
-            document.readyState === "complete" ||
-            document.readyState === "interactive"
-        ) {
-            document.body.appendChild(iframe);
-        } else {
-            document.addEventListener("DOMContentLoaded", () => {
-                document.body.appendChild(iframe);
-            });
-        }
+        // Only resolve this promise when we receive the LOADER_INITIALIZED message back
+        window.addEventListener("message", getOnLoaderInit(frameInfo, resolve));
     });
 };
+
+const prepareServicePlugins = async (service: string, plugins: string[]) => {
+    let loader = await getLoader(service);
+
+    loader.contentWindow!.postMessage(
+        buildPreloadStartMessage(plugins),
+        siblingUrl(null, service)
+    );
+}
 
 const sendPluginCallRequest = async (param: PluginCallPayload) => {
     const iframe = await getLoader(param.args.service);
@@ -114,7 +152,9 @@ const onFunctionCallRequest = (
 ) => {
     if (!callStack.isEmpty()) {
         throw Error(
-            `Plugin call resolution already in progress: ${toString(callStack.peekBottom()!.args)}`
+            `Plugin call resolution already in progress: ${toString(
+                callStack.peekBottom()!.args
+            )}`
         );
     }
 
@@ -125,13 +165,12 @@ const onFunctionCallRequest = (
     });
     processTop();
 
-    // TODO: Consider if an unhandled exception happens in the loader,
-    //   or if a plugin runs an infinite loop. We need a way to terminate the current callstack,
-    //   and report the faulty plugin that never returned.
-    // And also if there's a request for IO, then the timer needs to be paused. IO has no timeout.
-    // If the popup is blocked, this is considered an error, but a special error code is returned to the
-    //   application so it can instruct the user to enable popups. But since it's an error, cache is
-    //   cleared and stack emptied.
+    // TODO: Consider if a plugin runs an infinite loop. We need a way to terminate the
+    //   current callstack, and report the faulty plugin that never returned.
+    //   And also if there's a request for IO, then the timer needs to be paused. IO has no timeout.
+    //   If the popup is blocked, this is considered an error, but a special error code is returned to the
+    //     application so it can instruct the user to enable popups. But since it's an error, cache is
+    //     cleared and stack emptied.
 };
 
 // TODO - move callstack management into the context class, then the root app origin can be
@@ -146,9 +185,11 @@ const verifyOriginOnTopOfStack = (origin: string) => {
     if (!callStack.isEmpty()) {
         let expectedHost = siblingUrl(null, callStack.peek()!.args.service);
         if (expectedHost != origin) {
-            if (callStack.peek()!.caller == origin) 
-            {   // This is the error that follows most sync calls. Swallow.
-                console.log("TODO: remove me. Swallowing error following sync call.");
+            if (callStack.peek()!.caller == origin) {
+                // If this happens, it's the secondary sync call notification that can happen.
+                // It can be safely ignored. This check can be removed once this issue is 
+                //   resolved: https://github.com/bytecodealliance/jco/issues/405 and the sync 
+                //   call throw in the loader is moved from within the import to the catch handler.
             }
             throw Error(
                 `Plugins may only send messages when they are on top of the call stack.`
@@ -213,9 +254,24 @@ const onPluginSyncCall = (origin: string, message: PluginSyncCall) => {
     processTop();
 };
 
-const onPreloadPluginsRequest = ({ payload }: PreLoadPluginsRequest): void => {
-    payload.services.forEach(getLoader);
+const onPreloadPluginsRequest = async ({ payload }: PreLoadPluginsRequest): Promise<void> => {
+    let {plugins} = payload;
+    // Get all loaders
+    await Promise.all(plugins.map((pluginId: QualifiedPluginId) => {
+        return getLoader(pluginId.service);
+    }));
+
+    // Load plugins
+    plugins.forEach(addPluginManager);
+
+    for (const [service, plugins] of Object.entries(pluginManagers)) {
+        prepareServicePlugins(service, plugins);
+    }
 };
+
+const onPreloadComplete = async ({ payload: _payload }: LoaderPreloadComplete) => {
+    // TODO: Use dependencies from the payload to DFS load other plugins
+}
 
 const isMessageFromApplication = (message: MessageEvent) => {
     const isTop = message.source == window.top;
@@ -227,8 +283,8 @@ const isMessageFromApplication = (message: MessageEvent) => {
 };
 
 const isMessageFromChild = (message: MessageEvent): boolean => {
-    const originIsChild = loadedServices
-        .map((service) => siblingUrl(null, service))
+    const originIsChild = Object.entries(pluginManagers)
+        .map(([service, _]) => siblingUrl(null, service))
         .includes(message.origin);
     const isTop = message.source == window.top;
     const isParent = message.source == window.parent;
@@ -249,7 +305,9 @@ const onRawEvent = (message: MessageEvent<any>) => {
                 onPluginCallResponse(message.origin, message.data);
             } else if (isPluginSyncCall(message.data)) {
                 onPluginSyncCall(message.origin, message.data);
-            } 
+            } else if (isPreloadCompleteMessage(message.data)) {
+                onPreloadComplete(message.data);
+            }
         }
     } catch (e) {
         console.error(`Error in supervisor: ${e}`);

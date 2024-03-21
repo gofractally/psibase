@@ -4,6 +4,7 @@ import {
     toString
 } from "./supervisor/FunctionCallRequest";
 import { isErrorResponse } from "./supervisor/FunctionCallResponse";
+import { PluginId, QualifiedPluginId } from "./supervisor/PluginId";
 import { buildPreLoadPluginsRequest } from "./supervisor/PreLoadPluginsRequest";
 import {
     isIFrameInitialized,
@@ -169,10 +170,15 @@ export class Supervisor {
         });
     }
 
-    preLoadPlugins(services: string[]) {
-        // TODO: Allow specifying plugin names, otherwise only default
-        //       "plugin.wasm" plugins can be preloaded
-        const message = buildPreLoadPluginsRequest(services);
+    preLoadPlugins(plugins: PluginId[]) {
+        // Fully qualify any plugins with default values
+        let fqPlugins: QualifiedPluginId[] = plugins.map(plugin => ({
+            ...plugin,
+            plugin: plugin.plugin || "plugin",
+        }));
+
+        const message = buildPreLoadPluginsRequest(fqPlugins);
+
         const iframe = this.getSupervisorIframe();
         if (!iframe.contentWindow)
             throw new Error(

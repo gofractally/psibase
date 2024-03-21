@@ -1,9 +1,11 @@
+import { QualifiedPluginId } from "./PluginId";
+
 const PRE_LOAD_PLUGINS_REQUEST = "PRE_LOAD_PLUGINS_REQUEST" as const;
 
 export interface PreLoadPluginsRequest {
     type: typeof PRE_LOAD_PLUGINS_REQUEST;
     payload: {
-        services: string[];
+        plugins: QualifiedPluginId[];
     };
 }
 
@@ -13,10 +15,10 @@ export const isPreLoadPluginsRequest = (
     data && data.type == PRE_LOAD_PLUGINS_REQUEST;
 
 export const buildPreLoadPluginsRequest = (
-    services: string[]
+    plugins: QualifiedPluginId[]
 ): PreLoadPluginsRequest => ({
     type: PRE_LOAD_PLUGINS_REQUEST,
     payload: {
-        services,
+        plugins,
     },
 });

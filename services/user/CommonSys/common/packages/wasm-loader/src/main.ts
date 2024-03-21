@@ -1,16 +1,20 @@
 import { getImportFills } from "./dynamicFunctions";
 import importableCode from "./importables.js?raw";
 import {
-    PluginCallResponse,
     isPluginCallRequest,
     PluginCallPayload,
     buildPluginCallResponse,
     buildMessageLoaderInitialized,
     QualifiedFunctionCallArgs,
+    isPreloadStartMessage,
+    LoaderPreloadStart,
+    buildPreloadCompleteMessage,
     toString
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib";
 import { CallCache } from "./callCache";
+import { load } from "rollup-plugin-wit-component";
+import { DownloadFailed, ParserDownloadFailed, ParsingFailed, PluginDownloadFailed, handleErrors } from "./errorHandling";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -27,8 +31,61 @@ interface Importables {
 
 const wasmUrlToIntArray = (url: string) =>
     fetch(url)
-        .then((res) => res.arrayBuffer())
+        .then((res) => {
+            if (!res.ok)
+                throw new DownloadFailed(url);
+            return res.arrayBuffer()
+        })
         .then((buffer) => new Uint8Array(buffer));
+
+const parserCacheKey: string = "component-parser";
+const componentParser = async () => {
+    if (!cache.exists(parserCacheKey)) {
+        let parserBytes: Uint8Array;
+        try {
+            parserBytes = await wasmUrlToIntArray(
+                "/common/component_parser.wasm"
+            );
+        } catch (e) {
+            console.error("Loader: component_parser download failed");
+            throw new ParserDownloadFailed();
+        }
+        // Performance improvement: Target wasm32-unknown-unknown when compiling
+        //   parser instead of wasm32-wasi, then loading can be simplified without wasi
+        //   shims.
+        cache.cacheData(parserCacheKey, await load(parserBytes));
+        return cache.getCachedData(parserCacheKey);
+    } else return cache.getCachedData(parserCacheKey);
+};
+
+const getParsed = async(plugin: string) => {
+    if (!cache.exists(`${plugin}-parsed`)) {
+        const pBytes: Uint8Array = await pluginBytes(plugin); //Await?
+        try {
+            cache.cacheData(`${plugin}-parsed`, (await componentParser()).parse("component", pBytes));
+        } catch(e) {
+            throw new ParsingFailed(`${serviceName}:${plugin} was able to be loaded but not parsed`);
+        }
+        cache.getCachedData(`${plugin}-parsed`);
+    } else {
+        return cache.getCachedData(`${plugin}-parsed`);
+    }
+}
+
+const pluginBytes = async (plugin: string): Promise<Uint8Array> => {
+    if (!cache.exists(plugin)) {
+        try {
+            cache.cacheData(plugin, await wasmUrlToIntArray(`/${plugin}.wasm`));
+        } catch (e) {
+            if (e instanceof DownloadFailed)
+                throw new PluginDownloadFailed({service: serviceName, plugin})
+        }
+        await getParsed(plugin);
+        return cache.getCachedData(plugin);
+    } else {
+        return cache.getCachedData(plugin);
+    }
+};
 
 let callerService = "initialized";
 let callerDomain = "initialized";
@@ -85,57 +142,27 @@ const hasTargetFunc = (
 
 const cache = new CallCache();
 
-const retrieveNetworkItems = async (
-    args: QualifiedFunctionCallArgs,
-    caller: string
-) => {
-    let { plugin, intf, method, service } = args;
-    let [pluginBytes, parserBytes, { load }] = await Promise.all([
-        wasmUrlToIntArray(`/${plugin}.wasm`),
-        wasmUrlToIntArray("/common/component_parser.wasm"),
-        // Todo - use custom transpiler so we can customize options, cache shims, etc.
-        import("rollup-plugin-wit-component")
-    ]);
-
-    let parsed: any;
-    if (cache.exists("parsed")) {
-        parsed = cache.getCachedData("parsed");
-    } else {
-        parsed = (await load(parserBytes)).parse("component", pluginBytes);
-        cache.cacheData("parsed", parsed);
-
-        // Early terminate if the function being called is not exported by the plugin.
-        if (!hasTargetFunc(parsed.exportedFuncs, intf, method)) {
-            const fid: string =
-                intf === undefined ? `${method}` : `${method} in ${intf}`;
-            throw Error(
-                `${caller}->${service}:${plugin} error: No export named ${fid}`
-            );
-        }
-    }
-
-    return {
-        plugin: pluginBytes,
-        parsed,
-        load
-    };
-};
-
-let activeArgs : QualifiedFunctionCallArgs;
+let activeArgs: QualifiedFunctionCallArgs;
 
 const onPluginCallRequest = async ({
-    caller, // TODO: Make sure this caller hostname gets parsed properly into the origination-data object
+    caller: _caller, // TODO: Make sure this caller hostname gets parsed properly into the origination-data object
     args,
     resultCache
 }: PluginCallPayload) => {
     activeArgs = args;
+    let { service, plugin, intf, method } = args;
 
     // Early terminate if this is the wrong loader to handle the request
-    if (args.service != serviceName) {
-        throw Error(`${serviceName} received a call meant for ${args.service}`);
+    if (service != serviceName) {
+        throw Error(`${serviceName} received a call meant for ${service}`);
     }
 
-    let { plugin, parsed, load } = await retrieveNetworkItems(args, caller);
+    const pBytes = await pluginBytes(plugin);
+    let parsed = await getParsed(plugin);
+    // Early terminate if the function being called is not exported by the plugin.
+    if (!hasTargetFunc(parsed.exportedFuncs, intf, method)) {
+        throw Error(`${toString(args)}: Named function is not an export.`);
+    }
 
     let importables: Importables[] = [
         { [`common:plugin/*`]: initStaticImports(importableCode) },
@@ -145,18 +172,18 @@ const onPluginCallRequest = async ({
     // TODO: Once we replace instead of using the rollup plugin, we can have a much better
     //   caching strategy. Transpilation only needs to happen once.
     // @ts-ignore
-    const pluginModule = await load(plugin, importables);
+    const pluginModule = await load(pBytes, importables);
+
     let func =
         typeof args.intf === "undefined" || args.intf === ""
             ? pluginModule[args.method]
             : pluginModule[args.intf][args.method];
     const res = func(...args.params);
-    sendPluginCallResponse(buildPluginCallResponse(res));
-};
 
-const sendPluginCallResponse = (response: PluginCallResponse) => {
-    cache.clearCache();
-    window.parent.postMessage(response, supervisorDomain);
+    window.parent.postMessage(
+        buildPluginCallResponse(res),
+        siblingUrl(null, "supervisor-sys")
+    );
 };
 
 const isMessageFromSupervisor = (message: MessageEvent) => {
@@ -166,103 +193,55 @@ const isMessageFromSupervisor = (message: MessageEvent) => {
     return !isTop && isParent && isSupervisorDomain;
 };
 
-interface ComponentError extends Error {
-    payload: object;
-}
-
-interface CommonPluginId {
-    plugin: string;
-    service: string;
-}
-interface CommonError {
-    code: number;
-    message: string;
-    producer: CommonPluginId;
-}
-
-function isCommonPluginId(pluginId: any): pluginId is CommonPluginId {
-    return (
-        typeof pluginId === "object" &&
-        "plugin" in pluginId &&
-        typeof pluginId.plugin === "string" &&
-        "service" in pluginId &&
-        typeof pluginId.service === "string"
-    );
-}
-
-function isCommonError(error: any): error is CommonError {
-    return (
-        typeof error === "object" &&
-        "code" in error &&
-        typeof error.code === "number" &&
-        "message" in error &&
-        typeof error.message === "string" &&
-        "producer" in error &&
-        typeof error.producer === "object" &&
-        isCommonPluginId(error.producer)
-    );
-}
-
-const isSyncCall = (e: any): e is Error => {
-    return (
-        e instanceof Error &&
-        typeof e.message === "string" &&
-        e.message.includes("Cannot destructure property")
-    );
-};
-
 const onRawEvent = async (message: MessageEvent) => {
     if (!isMessageFromSupervisor(message)) {
         console.warn("Loader recieved a postmessage from an unknown origin.");
         return;
     }
-    if (isPluginCallRequest(message.data)) {
+    if (isPreloadStartMessage(message.data)) {
+        try {
+            onPreloadStart(message.data);
+        } catch (e: unknown) {
+            console.error(`Preload failed with: ${JSON.stringify(e, null, 2)}`);
+        }
+    } else if (isPluginCallRequest(message.data)) {
         try {
             await onPluginCallRequest(message.data.payload);
         } catch (e: unknown) {
-            if (isSyncCall(e)) {
-                /* Swallow sync call detection */
-            } else if (
-                e instanceof Error &&
-                typeof (e as ComponentError).payload === "object" &&
-                isCommonError((e as ComponentError).payload)
-            ) {
-                let ret = {
-                    errorType: "recoverable",
-                    val: (e as ComponentError).payload
-                };
-                sendPluginCallResponse(buildPluginCallResponse(ret));
-            } else if (e instanceof Error && e.message === "unreachable") {
-                let ret = {
-                    errorType: "unrecoverable",
-                    val: { message: `${toString(activeArgs)}: Runtime error (panic)` }
-                };
-                sendPluginCallResponse(buildPluginCallResponse(ret));
-            } else if (
-                e !== null &&
-                typeof e === "object" &&
-                "code" in e &&
-                typeof e.code === "string" &&
-                e.code === "PARSE_ERROR"
-            ) {
-                let ret = {
-                    errorType: "unrecoverable",
-                    val: {
-                        message: `${toString(activeArgs)}: Possible plugin import code gen error`
-                    }
-                };
-                sendPluginCallResponse(buildPluginCallResponse(ret));
-            } else {
-                // Unrecognized error
-                let ret = {
-                    errorType: "unrecoverable",
-                    val: { error: e, message: `${toString(activeArgs)}`},
-                };
-                sendPluginCallResponse(buildPluginCallResponse(ret));
-            }
+            handleErrors(activeArgs, e);
         }
     }
 };
 
+const onPreloadStart = async (message: LoaderPreloadStart) => {
+    const { plugins } = message.payload;
+        for (const p of plugins) {
+            try {
+                await pluginBytes(p);
+            }
+            catch (e) {
+                console.error(`Preload failed: ${serviceName}:${p}\nError: ${JSON.stringify(e, null, 2)}`);
+            }
+            cache.getCachedData(`${p}-parsed`);
+        }
+
+    // TODO: add dependencies to preloadComplete so they can be loaded
+    window.parent.postMessage(
+        buildPreloadCompleteMessage([]),
+        siblingUrl(null, "supervisor-sys")
+    );
+};
+
 window.addEventListener("message", onRawEvent);
 window.parent.postMessage(buildMessageLoaderInitialized(), supervisorDomain);
+
+/* On Caching the static imports
+These could be cached and then cleared on each non-sync call. Non-sync calls signify completion, 
+    and therefore this cache item should be deleted on completion so it gets recreated for the 
+    next invocation (which will presumably have a new caller, etc.).
+However, if there is an external error and we aren't notified, it could cause us to leave stale
+    static imports cached, which could be a security risk (Evaluating requests for action as 
+    though they are from a sender with higher permissions than the actual sender, for example). For 
+    this reason, and because caching static imports is likely low impact, it is better to simply 
+    rebuild them on every re-entry for now.
+*/

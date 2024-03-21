@@ -45,4 +45,18 @@ export {
     buildPluginSyncCall,
     type PluginSyncCall
 } from "./supervisor/PluginSyncCall";
-export { buildMessageLoaderInitialized } from "./supervisor/LoaderInitialized";
+export { 
+    type LoaderInitialized,
+    buildMessageLoaderInitialized, 
+    isLoaderInitMessage,
+    type LoaderPreloadStart,
+    buildPreloadStartMessage,
+    isPreloadStartMessage,
+    type LoaderPreloadComplete,
+    buildPreloadCompleteMessage,
+    isPreloadCompleteMessage,
+} from "./supervisor/LoaderInitialized";
+export {
+    type PluginId,
+    type QualifiedPluginId,
+} from "./supervisor/PluginId";

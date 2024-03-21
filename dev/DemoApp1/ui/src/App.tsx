@@ -9,7 +9,12 @@ function App() {
 
   const init = async () => {
     await supervisor.onLoaded();
-    supervisor.preLoadPlugins(["invite-sys", "account-sys", "auth-sys", "demoapp1"]);
+    supervisor.preLoadPlugins([
+      { service: "invite-sys" },
+      { service: "account-sys" },
+      { service: "auth-sys" },
+      { service: "demoapp1" },
+    ]);
   };
 
   useEffect(() => {
@@ -37,7 +42,6 @@ function App() {
     } catch (e) {
       console.error(`${JSON.stringify(e, null, 2)}`);
     }
-    
   };
 
   return (
