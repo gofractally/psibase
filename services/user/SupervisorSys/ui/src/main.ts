@@ -131,6 +131,9 @@ const sendPluginCallRequest = async (param: PluginCallPayload) => {
         buildPluginCallRequest(param),
         siblingUrl(null, param.args.service)
     );
+
+    let {service, plugin} = param.args;
+    addPluginManager({service, plugin});
 };
 
 const processTop = () => {
