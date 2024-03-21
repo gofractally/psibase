@@ -63,6 +63,12 @@ namespace psio
       {
          std::vector<Member> members;
       };
+      PSIO_REFLECT_TYPENAME(Struct)
+
+      void to_json(const Struct& type, auto& stream)
+      {
+         to_json_members(type.members, stream);
+      }
 
       struct Array
       {
@@ -152,24 +158,24 @@ namespace psio
       {
          AnyType(Int type) : value(std::move(type)) {}
          AnyType(Object type) : value(std::move(type)) {}
+         AnyType(Struct type) : value(std::move(type)) {}
          AnyType(Option type) : value(std::move(type)) {}
          AnyType(List type) : value(std::move(type)) {}
          AnyType(Variant type) : value(std::move(type)) {}
          AnyType(Type type) : value(std::move(type)) {}
          AnyType(std::string name) : value(Type{std::move(name)}) {}
          AnyType(const char* name) : value(Type{std::move(name)}) {}
-         std::variant<
-             //Struct,
-             Object,
-             //Array,
-             List,
-             Option,
-             Variant,
-             //Tuple,
-             Int,
-             //Float,
-             //Custom,
-             Type>
+         std::variant<Struct,
+                      Object,
+                      //Array,
+                      List,
+                      Option,
+                      Variant,
+                      //Tuple,
+                      Int,
+                      //Float,
+                      //Custom,
+                      Type>
                                 value;
          mutable const AnyType* resolved = nullptr;
          const AnyType*         resolve(const Schema& schema) const
@@ -251,8 +257,7 @@ namespace psio
          enum Kind
          {
             scalar,
-            fixed_struct,
-            variable_struct,
+            struct_,
             object,
             container,
             array,
@@ -297,6 +302,26 @@ namespace psio
                   }
                   break;
                case finish:
+                  link_impl(t.members, ctype);
+                  break;
+               default:
+                  break;
+            }
+         }
+         void add_impl(const AnyType* type, const Struct& t, std::vector<const AnyType*>& stack)
+         {
+            auto [ctype, state] = dfs_discover(type, CompiledType::struct_, stack);
+            switch (state)
+            {
+               case start:
+                  ctype->is_variable_size = true;
+                  for (const auto& member : t.members)
+                  {
+                     stack.push_back(&member.type);
+                  }
+                  break;
+               case finish:
+                  ctype->is_variable_size = false;
                   link_impl(t.members, ctype);
                   break;
                default:
@@ -376,35 +401,34 @@ namespace psio
                check(false, "undefined type: " + t.type);
             }
          }
+         CompiledMember make_member(const CompiledType* mtype,
+                                    std::uint32_t&      fixed_size,
+                                    bool&               is_variable_size)
+         {
+            is_variable_size |= mtype->is_variable_size;
+            bool is_optional = false;
+            if (mtype->kind == CompiledType::optional)
+            {
+               is_optional = true;
+               mtype       = mtype->children[0].type;
+            }
+            check(fixed_size <= std::numeric_limits<std::uint16_t>::max(), "fixed data too large");
+            CompiledMember result{.fixed_offset = static_cast<std::uint16_t>(fixed_size),
+                                  .is_optional  = is_optional,
+                                  .type         = mtype};
+            if (mtype->is_variable_size)
+               fixed_size += 4;
+            else
+               fixed_size += mtype->fixed_size;
+            return result;
+         }
          void link_impl(const std::vector<Member>& members, CompiledType* type)
          {
-            std::uint32_t fixed_size = 0;
             for (const auto& member : members)
             {
-               if (const CompiledType* mtype = get(member.type.resolve(schema)))
-               {
-                  bool is_optional = false;
-                  if (mtype->kind == CompiledType::optional)
-                  {
-                     is_optional = true;
-                     mtype       = mtype->children[0].type;
-                  }
-                  check(fixed_size <= std::numeric_limits<std::uint16_t>::max(),
-                        "fixed data too large");
-                  type->children.push_back({.fixed_offset = static_cast<std::uint16_t>(fixed_size),
-                                            .is_optional  = is_optional,
-                                            .type         = mtype});
-                  if (mtype->is_variable_size)
-                     fixed_size += 4;
-                  else
-                     fixed_size += mtype->fixed_size;
-               }
-               else
-               {
-                  check(false, "unresolved type");
-               }
+               type->children.push_back(make_member(get(member.type.resolve(schema)),
+                                                    type->fixed_size, type->is_variable_size));
             }
-            type->fixed_size = fixed_size;
          }
          CompiledType* get(const AnyType* type)
          {
@@ -449,6 +473,7 @@ namespace psio
                if (pos->second.original_type == nullptr && pos->second.fixed_size == stack.size())
                {
                   pos->second.original_type = type;
+                  pos->second.fixed_size    = 0;
                   return {&pos->second, finish};
                }
                else
@@ -550,15 +575,19 @@ namespace psio
          std::uint32_t       start_pos;
          std::uint32_t       index;
          const CompiledType* type;
-         // get next has several possible outcomes:
-         // - end: known_end
-         // - empty optional: (name)
-         // - regular member: (name) + push
-         FracParser::Item next(FracParser& parser)
+         FracParser::Item    next(FracParser& parser)
          {
             std::uint16_t fixed_size;
-            auto          tmp_pos = start_pos;
-            (void)unpack_numeric<false>(&fixed_size, parser.in.src, tmp_pos, parser.in.end_pos);
+            auto          fixed_pos = start_pos;
+            if (type->kind == CompiledType::struct_)
+            {
+               fixed_size = type->fixed_size;
+            }
+            else
+            {
+               (void)unpack_numeric<false>(&fixed_size, parser.in.src, fixed_pos,
+                                           parser.in.end_pos);
+            }
             if (index == type->children.size())
                // TODO: validate extensions
                return {.kind = FracParser::end, .type = type->original_type};
@@ -566,8 +595,8 @@ namespace psio
             FracParser::Item result{
                 .type = member.type->original_type, .parent = type->original_type, .index = index};
             ++index;
-            auto fixed_pos = start_pos + 2 + member.fixed_offset;
-            auto fixed_end = start_pos + 2 + fixed_size;
+            auto fixed_end = fixed_pos + fixed_size;
+            fixed_pos += member.fixed_offset;
             if (!member.is_optional && !member.type->is_variable_size)
             {
                if (member.fixed_offset > fixed_size)
@@ -758,9 +787,12 @@ namespace psio
          switch (type->kind)
          {
             case CompiledType::object:
+            case CompiledType::struct_:
             {
                std::uint16_t fixed_size;
-               if (!unpack_numeric<true>(&fixed_size, in.src, in.pos, in.end_pos))
+               if (type->kind == CompiledType::struct_)
+                  fixed_size = type->fixed_size;
+               else if (!unpack_numeric<true>(&fixed_size, in.src, in.pos, in.end_pos))
                   check(false, "Failed to read object size");
                auto heap_start = in.pos + fixed_size;
                if (heap_start < in.pos || heap_start > in.end_pos)
@@ -839,6 +871,7 @@ namespace psio
       {
          char operator()(const Object&) const { return '{'; }
          char operator()(const Variant&) const { return '{'; }
+         char operator()(const Struct&) const { return '{'; }
          char operator()(const auto&) const { return '['; }
       };
 
@@ -846,6 +879,7 @@ namespace psio
       {
          char operator()(const Object&) const { return '}'; }
          char operator()(const Variant&) const { return '}'; }
+         char operator()(const Struct&) const { return '}'; }
          char operator()(const auto&) const { return ']'; }
       };
 
@@ -856,6 +890,10 @@ namespace psio
             return &type.members[index].name;
          }
          const std::string* operator()(const Variant& type) const
+         {
+            return &type.members[index].name;
+         }
+         const std::string* operator()(const Struct& type) const
          {
             return &type.members[index].name;
          }
@@ -1029,7 +1067,7 @@ namespace psio
                    });
                if constexpr (reflect<T>::definitionWillNotChange)
                {
-                  assert(!"unimplemented");
+                  pos->second = Struct{std::move(members)};
                }
                else
                {
