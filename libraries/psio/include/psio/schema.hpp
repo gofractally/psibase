@@ -31,6 +31,28 @@ namespace psio
 
       struct AnyType;
 
+      template <typename T>
+      struct Box
+      {
+         Box(T&& value) : value(new T(value)) {}
+         Box(const Box& other) : value(new T(*value)) {}
+         Box(Box&&)                          = default;
+         Box&               operator=(Box&&) = default;
+         T&                 operator*() { return *value; }
+         const T&           operator*() const { return *value; }
+         T*                 operator->() { return value.get(); }
+         const T*           operator->() const { return value.get(); }
+         T*                 get() { return value.get(); }
+         const T*           get() const { return value.get(); }
+         std::unique_ptr<T> value;
+      };
+
+      template <typename T, typename Stream>
+      void to_json(const Box<T>& wrapper, Stream& stream)
+      {
+         to_json(*wrapper.value, stream);
+      }
+
       struct Schema
       {
          std::map<std::string, AnyType> types;
@@ -72,9 +94,10 @@ namespace psio
 
       struct Array
       {
-         std::unique_ptr<any_type> type;
-         std::uint64_t             len;
+         Box<AnyType>  type;
+         std::uint64_t len;
       };
+      PSIO_REFLECT(Array, type, len)
 
       struct List
       {
@@ -167,6 +190,7 @@ namespace psio
          AnyType(Struct type) : value(std::move(type)) {}
          AnyType(Option type) : value(std::move(type)) {}
          AnyType(List type) : value(std::move(type)) {}
+         AnyType(Array type) : value(std::move(type)) {}
          AnyType(Variant type) : value(std::move(type)) {}
          AnyType(Tuple type) : value(std::move(type)) {}
          AnyType(Type type) : value(std::move(type)) {}
@@ -174,7 +198,7 @@ namespace psio
          AnyType(const char* name) : value(Type{std::move(name)}) {}
          std::variant<Struct,
                       Object,
-                      //Array,
+                      Array,
                       List,
                       Option,
                       Variant,
@@ -366,6 +390,28 @@ namespace psio
                            .fixed_size       = (t.bits + 7) / 8,
                            .original_type    = type}});
          }
+         void add_impl(const AnyType* type, const Array& t, std::vector<const AnyType*>& stack)
+         {
+            auto [ctype, state] = dfs_discover(type, CompiledType::array, stack);
+            switch (state)
+            {
+               case start:
+                  ctype->is_variable_size = true;
+                  stack.push_back(t.type.get());
+                  break;
+               case finish:
+               {
+                  const CompiledType* nested = get(t.type->resolve(schema));
+                  ctype->is_variable_size    = nested->is_variable_size;
+                  // TODO: handle array of zero-size elements
+                  ctype->fixed_size = nested->fixed_size * t.len;
+                  ctype->children.push_back({.type = nested});
+               }
+               break;
+               default:
+                  break;
+            }
+         }
          void add_impl(const AnyType* type, const Option& t, std::vector<const AnyType*>& stack)
          {
             auto [ctype, state] = dfs_discover(type, CompiledType::optional, stack);
@@ -518,8 +564,7 @@ namespace psio
 
       struct ObjectReader;
       struct OptionReader;
-      struct FixedStructReader;
-      struct VariableStructReader;
+      struct ArrayReader;
       struct ListReader;
       struct VariantReader;
 
@@ -595,7 +640,7 @@ namespace psio
          }
 
          using StackItem =
-             std::variant<Item, ObjectReader, OptionReader, ListReader, VariantReader>;
+             std::variant<Item, ObjectReader, OptionReader, ListReader, ArrayReader, VariantReader>;
          FracStream             in;
          std::vector<StackItem> stack;
       };
@@ -732,6 +777,43 @@ namespace psio
          }
       };
 
+      struct ArrayReader
+      {
+         const CompiledType* type;
+         std::uint32_t       pos;
+         std::uint32_t       end;
+         FracParser::Item    next(FracParser& parser)
+         {
+            if (pos == end)
+            {
+               return {.kind = FracParser::end, .type = type->original_type};
+            }
+            const CompiledMember& member = type->children[0];
+            FracParser::Item      result{.type   = member.type->original_type,
+                                         .parent = type->original_type};
+            if (!member.is_optional && !member.type->is_variable_size)
+            {
+               if (member.type->kind == CompiledType::scalar)
+               {
+                  result.data = parser.read_fixed(member.type, pos);
+                  result.kind = FracParser::scalar;
+               }
+               else
+               {
+                  parser.push_fixed(member.type, pos);
+                  result.kind = FracParser::start;
+               }
+               pos += member.type->fixed_size;
+            }
+            else
+            {
+               parser.deref(pos, end, member.type, member.is_optional, result);
+               pos += 4;
+            }
+            return result;
+         }
+      };
+
       struct VariantReader
       {
          const CompiledType* type;
@@ -854,6 +936,16 @@ namespace psio
                in.pos = heap_start;
                stack.push_back(ListReader{.type = type, .start_pos = offset});
                in.known_end = true;
+               break;
+            }
+            case CompiledType::array:
+            {
+               auto start = offset;
+               auto end   = offset + type->fixed_size;
+               if (end > in.end_pos || end < offset)
+                  check(false, "Array data too large");
+               in.pos = end;
+               stack.push_back(ArrayReader{.type = type, .pos = start, .end = end});
                break;
             }
             case CompiledType::optional:
@@ -1086,6 +1178,17 @@ namespace psio
             else if constexpr (is_std_variant_v<T>)
             {
                pos->second = Variant{insert_variant_alternatives(*this, (T*)nullptr)};
+            }
+            else if constexpr (is_std_array_v<T>)
+            {
+               pos->second =
+                   Array{.type = insert<std::remove_cv_t<typename is_std_array<T>::value_type>>(),
+                         .len  = is_std_array<T>::size};
+            }
+            else if constexpr (std::is_array_v<T>)
+            {
+               pos->second = Array{.type = insert<std::remove_cv_t<std::remove_extent_t<T>>>(),
+                                   .len  = std::extent_v<T>};
             }
             else if constexpr (reflect<T>::is_struct)
             {

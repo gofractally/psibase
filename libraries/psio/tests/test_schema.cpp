@@ -110,6 +110,7 @@ TEST_CASE("schema generated")
    schema.insert<std::variant<std::uint32_t>>("var");
    schema.insert<MyType2>("x");
    schema.insert<std::tuple<std::int8_t>>("tup");
+   schema.insert<std::array<std::int16_t, 1>>("a");
    std::cout << psio::format_json(schema) << std::endl;
    CompiledSchema cschema{schema};
    CHECK(to_json(cschema, "u8", "2A") == "42");
@@ -120,4 +121,5 @@ TEST_CASE("schema generated")
    CHECK(to_json(cschema, "var", "00040000002A000000") == R"({"uint32":42})");
    CHECK(to_json(cschema, "x", "2A") == R"({"value":42})");
    CHECK(to_json(cschema, "tup", "01002A") == "[42]");
+   CHECK(to_json(cschema, "a", "2A00") == "[42]");
 }

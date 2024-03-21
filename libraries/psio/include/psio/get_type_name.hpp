@@ -36,6 +36,8 @@ namespace psio
    constexpr const char* get_type_name(const std::vector<T>*);
    template <typename T, size_t S>
    constexpr const char* get_type_name(const std::array<T, S>*);
+   template <typename T, size_t S>
+   constexpr const char* get_type_name(const T (*)[S]);
    template <typename... T>
    constexpr const char* get_type_name(const std::tuple<T...>*);
    template <typename... T>
@@ -95,9 +97,6 @@ namespace psio
    template <typename T>
    constexpr auto vector_type_name = append_type_name<T>("[]");
 
-   template <typename T, size_t S>
-   constexpr auto array_type_name = append_type_name<T>("[#]");
-
    template <typename T>
    constexpr auto optional_type_name = append_type_name<T>("?");
 
@@ -106,10 +105,44 @@ namespace psio
    {
       return vector_type_name<T>.data();
    }
+
+   constexpr std::size_t const_log10(std::size_t n)
+   {
+      std::size_t result = 0;
+      do
+      {
+         n /= 10;
+         ++result;
+      } while (n > 0);
+      return result;
+   }
+
+   template <typename T, std::size_t S>
+   constexpr auto get_array_type_name()
+   {
+      constexpr std::string_view               name   = get_type_name((T*)nullptr);
+      std::array<char, 2 + const_log10(S) + 1> bounds = {};
+      bounds[0]                                       = '[';
+      bounds[bounds.size() - 2]                       = ']';
+      for (std::size_t N = S, i = bounds.size() - 3; i > 0; --i, N /= 10)
+      {
+         bounds[i] = '0' + N % 10;
+      }
+      return array_cat(to_array<name.size()>(name), bounds);
+   }
+
+   template <typename T, size_t S>
+   constexpr auto array_type_name = get_array_type_name<T, S>();
+
    template <typename T, size_t S>
    constexpr const char* get_type_name(const std::array<T, S>*)
    {
-      return "array";  //array_type_name<T,S>.data();
+      return array_type_name<T, S>.data();
+   }
+   template <typename T, size_t S>
+   constexpr const char* get_type_name(const T (*)[S])
+   {
+      return array_type_name<T, S>.data();
    }
 
    template <typename T>
