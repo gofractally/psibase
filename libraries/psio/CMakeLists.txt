@@ -12,7 +12,6 @@ target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/check.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/reflect.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/schema.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/translator.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/stream.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_key.hpp
