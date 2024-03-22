@@ -836,53 +836,6 @@ namespace psio
          }
       };
 
-      struct ListReader
-      {
-         const CompiledType* type;
-         std::uint32_t       start_pos;
-         std::uint32_t       index = 0;
-         FracParser::Item    next(FracParser& parser)
-         {
-            std::uint32_t len;
-            auto          tmp_pos = start_pos;
-            (void)unpack_numeric<false>(&len, parser.in.src, tmp_pos, parser.in.end_pos);
-            const CompiledMember& member = type->children[0];
-            if (!member.is_optional && !member.type->is_variable_size)
-            {
-               auto offset = index * member.type->fixed_size;
-               if (offset == len)
-               {
-                  return {.kind = FracParser::end, .type = type->original_type};
-               }
-               else
-               {
-                  FracParser::Item result{.type   = member.type->original_type,
-                                          .parent = type->original_type};
-                  parser.parse_fixed(result, member.type, start_pos + 4 + offset);
-                  ++index;
-                  return result;
-               }
-            }
-            else
-            {
-               auto offset = index * 4;
-               if (offset == len)
-               {
-                  return {.kind = FracParser::end, .type = type->original_type};
-               }
-               else
-               {
-                  FracParser::Item result{.type   = member.type->original_type,
-                                          .parent = type->original_type};
-                  parser.deref(start_pos + 4 + offset, start_pos + 4 + len, member.type,
-                               member.is_optional, result);
-                  ++index;
-                  return result;
-               }
-            }
-         }
-      };
-
       struct ArrayReader
       {
          const CompiledType* type;
@@ -1055,8 +1008,9 @@ namespace psio
                   check(size % member.type->fixed_size == 0,
                         "Container size is not an exact number of elements");
                }
-               in.pos = heap_start;
-               stack.push_back(ListReader{.type = type, .start_pos = offset});
+               auto pos = in.pos;
+               in.pos   = heap_start;
+               stack.push_back(ArrayReader{.type = type, .pos = pos, .end = heap_start});
                in.known_end = true;
                break;
             }
