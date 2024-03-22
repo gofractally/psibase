@@ -139,11 +139,7 @@ namespace psio
 
       struct List
       {
-         List(AnyType t);
-         List(List&&) = default;
-         List(const List&);
-         List&                    operator=(List&&) = default;
-         std::unique_ptr<AnyType> type;
+         Box<AnyType> type;
       };
       PSIO_REFLECT_TYPENAME(List)
 
@@ -154,11 +150,7 @@ namespace psio
 
       struct Option
       {
-         Option(AnyType t);
-         Option(Option&&) = default;
-         Option(const Option&);
-         Option&                  operator=(Option&&) = default;
-         std::unique_ptr<AnyType> type;
+         Box<AnyType> type;
       };
       PSIO_REFLECT_TYPENAME(Option)
 
@@ -283,12 +275,6 @@ namespace psio
          AnyType     type;
       };
       PSIO_REFLECT(Member, name, type)
-
-      Option::Option(AnyType t) : type(new AnyType(std::move(t))) {}
-      Option::Option(const Option& other) : type(new AnyType(*other.type)) {}
-
-      List::List(AnyType t) : type(new AnyType(std::move(t))) {}
-      List::List(const List& other) : type(new AnyType(*other.type)) {}
 
       struct CommaList
       {
