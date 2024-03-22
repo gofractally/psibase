@@ -298,25 +298,16 @@ namespace psio
          }
       };
 
-      struct CustomHandlerBase
+      struct CustomHandler
       {
-         virtual ~CustomHandlerBase()                            = default;
-         virtual void frac2json(FracStream& in, StreamBase& out) = 0;
-      };
-
-      template <typename T>
-      struct CustomHandlerImpl : CustomHandlerBase
-      {
-         CustomHandlerImpl(const T& t) : impl(t) {}
-         CustomHandlerImpl(T&& t) : impl(std::move(t)) {}
-         void frac2json(FracStream& in, StreamBase& out) override { impl.frac2json(in, out); }
-         T    impl;
+         bool (*frac2json)(FracStream& in, StreamBase& out);
       };
 
       template <typename T>
       struct DefaultCustomHandler
       {
-         bool frac2json(FracStream& in, auto& out)
+         static CustomHandler get() { return {.frac2json = &frac2json}; }
+         static bool          frac2json(FracStream& in, auto& out)
          {
             T value;
             if (!is_packable<T>::template unpack<true, true>(&value, in.has_unknown, in.known_end,
@@ -333,14 +324,12 @@ namespace psio
          template <typename T>
          void insert(std::string name)
          {
-            insert(std::move(name), DefaultCustomHandler<T>());
+            insert(std::move(name), DefaultCustomHandler<T>::get());
          }
-         template <typename T>
-         void insert(std::string name, T&& t)
+         void insert(std::string name, const CustomHandler& t)
          {
             std::size_t index = impl.size();
-            impl.push_back(
-                std::make_unique<CustomHandlerImpl<std::remove_cvref_t<T>>>(std::forward<T>(t)));
+            impl.push_back(t);
             names.insert({std::move(name), index});
          }
          std::size_t* find(const std::string& name)
@@ -352,12 +341,12 @@ namespace psio
          void frac2json(std::size_t index, FracStream& in, auto& out) const
          {
             StreamRef stream{out};
-            impl[index]->frac2json(in, stream);
+            impl[index].frac2json(in, stream);
          }
 
         private:
-         std::map<std::string, std::size_t>              names;
-         std::vector<std::unique_ptr<CustomHandlerBase>> impl;
+         std::map<std::string, std::size_t> names;
+         std::vector<CustomHandler>         impl;
       };
 
       inline CustomTypes standard_types()
