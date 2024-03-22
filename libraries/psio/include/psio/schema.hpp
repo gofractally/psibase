@@ -9,9 +9,6 @@
 
 namespace psio
 {
-
-   struct any_type;
-
    struct FracStream
    {
       FracStream(std::span<const char> buf) : src(buf.data())
