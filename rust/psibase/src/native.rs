@@ -196,11 +196,7 @@ pub fn put_sequential<Type: Pack, V: Pack>(
     ty: &Type,
     value: &V,
 ) -> u64 {
-    let mut packed = Vec::new();
-    service.pack(&mut packed);
-    ty.pack(&mut packed);
-    value.pack(&mut packed);
-    put_sequential_bytes(db, &packed)
+    put_sequential_bytes(db, &(service, Some(ty), Some(value)).packed())
 }
 
 /// Remove a key-value pair if it exists
@@ -294,4 +290,9 @@ pub fn kv_max_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
 pub fn kv_max<K: ToKey, V: UnpackOwned>(db_id: DbId, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db_id, &key.to_key());
     bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
+}
+
+pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {
+    let size = unsafe { native_raw::getSequential(db_id, id) };
+    get_optional_result_bytes(size)
 }
