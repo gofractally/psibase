@@ -177,7 +177,9 @@ namespace psio
       {
          std::uint32_t exp;
          std::uint32_t mantissa;
+         friend bool   operator==(const Float&, const Float&) = default;
       };
+      PSIO_REFLECT(Float, exp, mantissa)
 
       struct Variant
       {
@@ -215,6 +217,7 @@ namespace psio
       struct AnyType
       {
          AnyType(Int type) : value(std::move(type)) {}
+         AnyType(Float type) : value(std::move(type)) {}
          AnyType(Object type) : value(std::move(type)) {}
          AnyType(Struct type) : value(std::move(type)) {}
          AnyType(Option type) : value(std::move(type)) {}
@@ -226,17 +229,7 @@ namespace psio
          AnyType(Type type) : value(std::move(type)) {}
          AnyType(std::string name) : value(Type{std::move(name)}) {}
          AnyType(const char* name) : value(Type{std::move(name)}) {}
-         std::variant<Struct,
-                      Object,
-                      Array,
-                      List,
-                      Option,
-                      Variant,
-                      Tuple,
-                      Int,
-                      //Float,
-                      Custom,
-                      Type>
+         std::variant<Struct, Object, Array, List, Option, Variant, Tuple, Int, Float, Custom, Type>
                                 value;
          mutable const AnyType* resolved = nullptr;
          const AnyType*         resolve(const Schema& schema) const
@@ -475,6 +468,14 @@ namespace psio
                            .fixed_size       = (t.bits + 7) / 8,
                            .original_type    = type}});
          }
+         void add_impl(const AnyType* type, const Float& t, std::vector<const AnyType*>& stack)
+         {
+            types.insert({type,
+                          {.kind             = CompiledType::scalar,
+                           .is_variable_size = false,
+                           .fixed_size       = (t.exp + t.mantissa + 7) / 8,
+                           .original_type    = type}});
+         }
          void add_impl(const AnyType* type, const Array& t, std::vector<const AnyType*>& stack)
          {
             auto [ctype, state] = dfs_discover(type, CompiledType::array, stack);
@@ -681,7 +682,6 @@ namespace psio
       struct ObjectReader;
       struct OptionReader;
       struct ArrayReader;
-      struct ListReader;
       struct VariantReader;
 
       struct FracParser
@@ -763,7 +763,7 @@ namespace psio
          }
 
          using StackItem =
-             std::variant<Item, ObjectReader, OptionReader, ListReader, ArrayReader, VariantReader>;
+             std::variant<Item, ObjectReader, OptionReader, ArrayReader, VariantReader>;
          FracStream             in;
          const CustomTypes&     builtin;
          std::vector<StackItem> stack;
@@ -1147,6 +1147,32 @@ namespace psio
                return int2json<std::int32_t, std::uint32_t>(type, in, out);
             case 64:
                return int2json<std::int64_t, std::uint64_t>(type, in, out);
+            default:
+               to_json("<<<Unsupported integer width>>>", out);
+         }
+      }
+
+      void scalar_to_json(const Float& type, std::span<const char> in, auto& out)
+      {
+         const char*   src     = in.data();
+         std::uint32_t pos     = 0;
+         std::uint32_t end_pos = static_cast<uint32_t>(in.size());
+         if (type == Float{.exp = 11, .mantissa = 53})
+         {
+            double value;
+            (void)unpack_numeric<false>(&value, src, pos, end_pos);
+            to_json(value, out);
+         }
+         else if (type == Float{.exp = 8, .mantissa = 24})
+         {
+            float value;
+            (void)unpack_numeric<false>(&value, src, pos, end_pos);
+            to_json(value, out);
+         }
+         else
+         {
+            to_json("<<<Only single and double precision floating point numbers are supported>>>",
+                    out);
          }
       }
 
@@ -1244,6 +1270,17 @@ namespace psio
          return {schema.insert<std::remove_cvref_t<std::tuple_element_t<I, T>>>()...};
       }
 
+      constexpr std::uint32_t float_exp_bits(int max_exponent)
+      {
+         std::uint32_t result = 0;
+         while (max_exponent > 0)
+         {
+            max_exponent /= 2;
+            ++result;
+         }
+         return result;
+      }
+
       template <typename T>
       AnyType Schema::insert()
       {
@@ -1263,6 +1300,11 @@ namespace psio
             else if constexpr (std::is_integral_v<T>)
             {
                pos->second = Int{.bits = 8 * sizeof(T), .isSigned = std::is_signed_v<T>};
+            }
+            else if constexpr (std::numeric_limits<T>::is_iec559)
+            {
+               pos->second = Float{.exp      = float_exp_bits(std::numeric_limits<T>::max_exponent),
+                                   .mantissa = std::numeric_limits<T>::digits};
             }
             else if constexpr (is_std_vector_v<T>)
             {

@@ -112,6 +112,8 @@ TEST_CASE("schema generated")
    schema.insert<std::tuple<std::int8_t>>("tup");
    schema.insert<std::array<std::int16_t, 1>>("a");
    schema.insert<bool>("bool");
+   schema.insert<float>("f32");
+   schema.insert<double>("f64");
    std::cout << psio::format_json(schema) << std::endl;
    CompiledSchema cschema{schema};
    CHECK(to_json(cschema, "u8", "2A") == "42");
@@ -124,4 +126,6 @@ TEST_CASE("schema generated")
    CHECK(to_json(cschema, "tup", "01002A") == "[42]");
    CHECK(to_json(cschema, "a", "2A00") == "[42]");
    CHECK(to_json(cschema, "bool", "01") == "true");
+   CHECK(to_json(cschema, "f32", "0000803F") == "1");
+   CHECK(to_json(cschema, "f64", "000000000000F03F") == "1");
 }
