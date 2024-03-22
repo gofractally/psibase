@@ -80,6 +80,23 @@ const getFunctionBody = (pluginFunc: PluginFunc, resultCache: ResultCache[]): st
     }
 };
 
+interface PkgId {
+    ns: string, 
+    pkg: string,
+}
+const serializePkgId = (pkgId: PkgId): string => `${pkgId.ns}:${pkgId.pkg}`;
+interface FunctionIntfs {
+    [pkgId: string]: FunctionInterface[];
+}
+const autoArrayInit = {
+    get: (target: FunctionIntfs, pkgId: string): FunctionInterface[] => {
+        if (!target[pkgId]) {
+            target[pkgId] = [];
+        }
+        return target[pkgId];
+    }
+};
+
 export const getImportFills = (
     importedFuncs: ImportedFunctions,
     resultCache: ResultCache[]
@@ -89,26 +106,34 @@ export const getImportFills = (
     if (freeFunctions.length !== 0) {
         // TODO: Check how this behaves if a plugin exports a freestanding function and
         //       another plugin imports it.
-        throw Error(`Plugins may not import freestanding functions.`);
+        throw Error(`TODO: Plugins may not import freestanding functions.`);
     }
 
     let importables: { [key: string]: string }[] = [];
-    interfaces.forEach((intf: FunctionInterface) => {
-        if (hostIntf(intf)) return;
-        let imp : string[] = [];
-        imp.push(`export const ${intf.name} = {
-        `);
-        intf.funcs.forEach((f: string)=>{
-            // Todo - I can explicitly count args to generate args for
-            //   the fulfilled function. Is it necessary?
-            imp.push(`${f}(...args) {
-            `);
-            imp.push(getFunctionBody({service: intf.namespace, plugin: intf.package, intf: intf.name, method: f}, resultCache));
-            imp.push(`},`);
-        });
-        imp.push(`}`);
-
-        importables.push({ [`${intf.namespace}:${intf.package}/*`]: `${imp.join("")}` });
+    let subset = interfaces.filter(i=>{
+        return !hostIntf(i) && !(i.funcs.length === 0);
     });
+
+    let namespaced: FunctionIntfs = new Proxy({}, autoArrayInit);
+    subset.forEach((intf: FunctionInterface) => {
+        let key: PkgId = {ns: intf.namespace, pkg: intf.package};
+        namespaced[serializePkgId(key)].push(intf);
+    });
+
+    for (const [pkgId, intfs] of Object.entries(namespaced)) {
+        let imp : string[] = [];
+        intfs.forEach((intf: FunctionInterface) => {
+            imp.push(`export const ${intf.name} = {
+            `);
+            intf.funcs.forEach((f: string)=>{
+                imp.push(`${f}(...args) {
+                `);
+                imp.push(getFunctionBody({service: intf.namespace, plugin: intf.package, intf: intf.name, method: f}, resultCache));
+                imp.push(`},`);
+            });
+            imp.push(`}`);
+        });
+        importables.push({ [`${pkgId}/*`]: `${imp.join("")}` });
+    }
     return importables;
 }

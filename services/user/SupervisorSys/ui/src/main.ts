@@ -161,9 +161,8 @@ const onFunctionCallRequest = (
         );
     }
 
-    let caller = new URL(origin).hostname;
     callStack.push({
-        caller,
+        caller: new URL(origin).origin,
         args: message.args
     });
     processTop();
@@ -250,7 +249,7 @@ const onPluginSyncCall = (origin: string, message: PluginSyncCall) => {
     verifyOriginOnTopOfStack(origin);
 
     callStack.push({
-        caller: new URL(origin).hostname,
+        caller: new URL(origin).origin,
         args: message.payload
     });
 

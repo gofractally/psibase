@@ -14,7 +14,7 @@ import {
 import { siblingUrl } from "@psibase/common-lib";
 import { CallCache } from "./callCache";
 import { load } from "rollup-plugin-wit-component";
-import { DownloadFailed, ParserDownloadFailed, ParsingFailed, PluginDownloadFailed, handleErrors } from "./errorHandling";
+import { DownloadFailed, InvalidPlugin, ParserDownloadFailed, ParsingFailed, PluginDownloadFailed, handleErrors } from "./errorHandling";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -62,7 +62,11 @@ const getParsed = async(plugin: string) => {
     if (!cache.exists(`${plugin}-parsed`)) {
         const pBytes: Uint8Array = await pluginBytes(plugin); //Await?
         try {
-            cache.cacheData(`${plugin}-parsed`, (await componentParser()).parse("component", pBytes));
+            cache.cacheData(`${plugin}-parsed`, await (await componentParser()).parse("component", pBytes));
+            if (cache.getCachedData(`${plugin}-parsed`).exportedFuncs === undefined)
+            {
+                throw new InvalidPlugin(`${serviceName}:${plugin} does not export any functions.`);
+            }
         } catch(e) {
             throw new ParsingFailed(`${serviceName}:${plugin} was able to be loaded but not parsed`);
         }
@@ -87,28 +91,33 @@ const pluginBytes = async (plugin: string): Promise<Uint8Array> => {
     }
 };
 
-let callerService = "initialized";
-let callerDomain = "initialized";
-let myDomain = "initialized";
-let myService = "initialized";
-const initStaticImports = (staticImports: string) => {
+interface StaticImportFills {
+    callerService: string | null;
+    callerOrigin: string;
+    myOrigin: string;
+    myService: string;
+}
+
+const initStaticImports = (staticImports: string, importFills: StaticImportFills) => {
+    let {callerService, callerOrigin, myOrigin, myService} = importFills;
     return staticImports
         .replace(
-            'let callerService = "uninitialized";',
-            `let callerService = "${callerService}";`
+            'let callerService = UNINITIALIZED;',
+            `let callerService = ${callerService === null? "null" : JSON.stringify(callerService)};`
         )
         .replace(
-            'let callerDomain = "uninitialized";',
-            `let callerDomain = "${callerDomain}";`
+            'let callerOrigin = UNINITIALIZED;',
+            `let callerOrigin = "${callerOrigin}";`
         )
         .replace(
-            'let myDomain = "uninitialized";',
-            `let myDomain = "${myDomain}";`
-        )
-        .replace(
-            'let myService = "uninitialized";',
+            'let myService = UNINITIALIZED;',
             `let myService = "${myService}";`
+        )
+        .replace(
+            'let myOrigin = UNINITIALIZED;',
+            `let myOrigin = "${myOrigin}";`
         );
+        
 };
 
 const getServiceName = () => {
@@ -140,12 +149,26 @@ const hasTargetFunc = (
     return found !== undefined;
 };
 
+const extractService = (callerOrigin: string, myOrigin: string): string | null => {
+    const extractRootDomain = (origin: string): string => {
+        const url = new URL(origin);
+        const parts = url.hostname.split('.');
+        parts.shift();
+        return `${parts.join('.')}${url.port ? ':' + url.port : ''}`;
+    };
+
+    const callerRoot = extractRootDomain(callerOrigin);
+    const myRoot = extractRootDomain(myOrigin);
+
+    return callerRoot === myRoot ? new URL(callerOrigin).hostname.split('.')[0] : null;
+};
+
 const cache = new CallCache();
 
 let activeArgs: QualifiedFunctionCallArgs;
 
 const onPluginCallRequest = async ({
-    caller: _caller, // TODO: Make sure this caller hostname gets parsed properly into the origination-data object
+    caller,
     args,
     resultCache
 }: PluginCallPayload) => {
@@ -164,8 +187,14 @@ const onPluginCallRequest = async ({
         throw Error(`${toString(args)}: Named function is not an export.`);
     }
 
+    let importFills: StaticImportFills = {
+        callerService: extractService(caller, window.origin),
+        callerOrigin: caller,
+        myService: serviceName,
+        myOrigin: `${window.origin}`,
+    };
     let importables: Importables[] = [
-        { [`common:plugin/*`]: initStaticImports(importableCode) },
+        { [`common:plugin/*`]: initStaticImports(importableCode, importFills)},
         ...getImportFills(parsed.importedFuncs, resultCache)
     ];
 

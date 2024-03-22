@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 
 const supervisor = new Supervisor();
 
+interface Invite {
+    inviter: string,
+    app: string,
+    callback: string,
+}
+
 function App() {
   const [res, setRes] = useState("Empty");
 
@@ -22,12 +28,18 @@ function App() {
   }, []);
 
   const run = async () => {
-    const res = await supervisor.functionCall({
-      service: "demoapp1",
-      method: "helloworld",
-      params: [],
-    });
-    setRes(res as string);
+    try {
+      const res = await supervisor.functionCall({
+        service: "auth-sys",
+        intf: "keyvault",
+        method: "generateKeypair",
+        params: [],
+      });
+      setRes(res as string);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+    
   };
 
   const run2 = async () => {
@@ -44,19 +56,52 @@ function App() {
     }
   };
 
-  return (
-    <>
-      <h1>Psibase Demo App 1</h1>
-      <h3>{res}</h3>
-      <div className="card">
-        <button onClick={() => run()}>Say Hello</button>
-      </div>
+  const run3 = async() => {
+    try {
+      const inviteUrl: string = await supervisor.functionCall({
+        service: "invite-sys",
+        intf: "inviter",
+        method: "generateInvite",
+        params: ["/subpath"],
+      }) as string;
+      console.log(`Got invite URL: ${inviteUrl}`);
+      const id: string | null = (new URL(inviteUrl)).searchParams.get('id');
+      if (id !== null)
+      {
+        const inviteObject: Invite = await supervisor.functionCall({
+          service: "invite-sys",
+          intf: "invitee",
+          method: "decodeInvite",
+          params: [id as string],
+        }) as Invite;
+        console.log(`Decoded invite object: ${JSON.stringify(inviteObject, null, 2)}`);
+        setRes(`Invited by: ${inviteObject.inviter}`);
+      } else {
+        setRes("id in URL was null");
+      }
+      
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+  };
 
-      <div className="card">
-        <button onClick={() => run2()}>Say Hello 2</button>
-      </div>
-    </>
-  );
-}
+    return (
+      <>
+        <h1>Psibase Demo App 1</h1>
+        <h3>{res}</h3>
+        <div className="card">
+          <button onClick={() => run()}>{"auth-sys:plugin->generateKeypair"}</button>
+        </div>
+
+        <div className="card">
+          <button onClick={() => run2()}>{"demoapp1:plugin->helloworld2"}</button>
+        </div>
+
+        <div className="card">
+          <button onClick={() => run3()}>{"Generate and decode invite"}</button>
+        </div>
+      </>
+    );
+  }
 
 export default App;

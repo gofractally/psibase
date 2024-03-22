@@ -30,8 +30,8 @@ interface types {
         /// May be empty if the call comes from an external web app.
         app: option<string>,
 
-        /// The domain responsible for the call.
-        origination-domain: string
+        /// The domain origin responsible for the call.
+        origin: string
     }
 }
 
@@ -69,17 +69,13 @@ interface client {
     /// Gets details about the app responsible for the call
     get-sender-app: func() -> result<origination-data, error>;
 
-    // Todo: delete sender-app-domain once get-sender-app can return
-    //       an origination-data object
-    //sender-app-domain: func() -> string;
-
     /// Gets the account name of the service from which the currently running
     /// plugin was fetched.
     my-service-account: func() -> result<string, error>;
 
-    /// Gets the full domain (including sub-domain) of the service from which the
+    /// Gets the full domain origin of the service from which the
     /// currently running plugin was fetched.
-    my-service-domain: func() -> result<string, error>;
+    my-service-origin: func() -> result<string, error>;
 }
 
 world plugin-capabilities {

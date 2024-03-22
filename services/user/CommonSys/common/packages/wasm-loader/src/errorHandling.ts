@@ -36,6 +36,13 @@ export class ParsingFailed extends Error {
     }
 }
 
+export class InvalidPlugin extends Error {
+    constructor(message: any) {
+        super(message);
+        this.name = "InvalidPlugin";
+    }
+}
+
 interface ComponentError extends Error {
     payload: object;
 }
@@ -90,7 +97,7 @@ const reply = (payload: any) => {
 
 export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
     if (isSyncCall(e)) {
-        /* Swallow sync call detection */
+        console.warn("Import return value not deserializable. Likely either sync call, or import code gen error.");
     } else if (
         e instanceof Error &&
         typeof (e as ComponentError).payload === "object" &&
@@ -140,11 +147,28 @@ export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
                 message: `${toString(args)}: Parsing plugin failed. Possible invalid wit syntax.`
             }
         });
-    } else {
-        // Unrecognized error
+    } else if (e instanceof InvalidPlugin ) {
         reply({
             errorType: "unrecoverable",
-            val: { error: e, message: `${toString(args)}` }
+            val: {
+                message: `${toString(args)}: [InvalidPlugin] ${e.message}`
+            }
         });
+    } else {
+        // Unrecognized error
+        if (e instanceof Error)
+        {
+            reply({
+                errorType: "unrecoverable",
+                val: { error: e.name, message: `${toString(args)}: ${e.message}` }
+            });
+        }
+        else 
+        {
+            reply({
+                errorType: "unrecoverable",
+                val: { error: "unknown", message: `${toString(args)}: ${JSON.stringify(e, null, 2)}` }
+            });
+        }
     }
 };

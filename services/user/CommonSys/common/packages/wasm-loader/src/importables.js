@@ -1,12 +1,10 @@
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//        NOT FUNCTIONAL YET
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+const UNINITIALIZED = "uninitialized";
 
 const currentActions = [];
-let callerService = "uninitialized";
-let callerDomain = "uninitialized";
-let myDomain = "uninitialized";
-let myService = "uninitialized";
+let callerService = UNINITIALIZED;
+let callerOrigin = UNINITIALIZED;
+let myService = UNINITIALIZED;
+let myOrigin = UNINITIALIZED;
 
 function isEqualUint8Array(a, b) {
   if (a.length !== b.length) return false;
@@ -22,6 +20,21 @@ function actionExists(service, action, args) {
     item.action === action && 
     isEqualUint8Array(item.args, args)
   );
+}
+
+function pluginId(namespace, pkg) {
+  return {
+      service: namespace,
+      plugin: pkg,
+  }
+}
+
+function commonErr(val) {
+  return {
+    code: 0,
+    producer: pluginId("common", "plugin"),
+    message: val,
+  };
 }
 
 function send(req) {
@@ -78,32 +91,51 @@ export const server = {
     //}
   },
 
-  // post-graphql-get-json: func(url: string, data: string) -> result<string, string>;
   postGraphqlGetJson(url, graphQL)
   {
-    const res = postGraphQL(url, graphQL);
+    try {
+      const res = postGraphQL(url, graphQL);
+    }
+    catch (e) {
+      if (e instanceof Error) {
+        throw commonErr(`Query failed: ${e.message}`);
+      }
+      throw commonErr("GraphQL query failed.");
+    }
+
     return res.json();
   }
 }
 
 export const client = {
-  senderAppServiceAccount() {
-    return callerService;
+  //-> result<origination-data, error>;
+  getSenderApp() {
+    if (callerOrigin === UNINITIALIZED ||
+        callerService === UNINITIALIZED) {
+          throw commonErr("Error filling common:plugin imports.");
+    } else {
+      return {
+        app: callerService,
+        origin: callerOrigin,
+      };
+    }
   },
-  senderAppDomain() {
-    return callerDomain;
-  },
+
+  //-> result<string, error>;
   myServiceAccount() {
-    return myService;
+    if (myService === UNINITIALIZED)
+      throw CommonErr("Error filling common:plugin imports.");
+    else
+      return myService;
   },
-  myServiceDomain() {
-    return myDomain;
+
+  //-> result<string, error>;
+  myServiceOrigin() {
+    if (myOrigin === UNINITIALIZED)
+      throw CommonErr("Error filling common:plugin imports.");
+    else
+      return myOrigin;
   }
 }
 
-// interface client {
-//   use types.{origination-data};
-//   get-sender-app: func() -> result<origination-data, string>;
-//   get-root-domain: func() -> result<string, string>;
-//   get-service-name: func() -> result<string, string>;
-// }
+

@@ -24,7 +24,7 @@ impl SmartAuth for Component {
 impl KeyVault for Component {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
         // Mock data for now
-        Ok("NotRealKey".to_string())
+        Ok("PUB_K1_7jTdMYEaHi66ZEcrh7To9XKingVkRdBuz6abm3meFbGw8zFFve".to_string())
     }
 }
 
