@@ -13,7 +13,7 @@ import {
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib";
 import { CallCache } from "./callCache";
-import { load } from "rollup-plugin-wit-component";
+import { load } from "./lib/index";
 import { DownloadFailed, InvalidPlugin, ParserDownloadFailed, ParsingFailed, PluginDownloadFailed, handleErrors } from "./errorHandling";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
