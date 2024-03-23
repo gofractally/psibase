@@ -2,12 +2,12 @@
 # yarn lockfile v1
 
 
-"@bytecodealliance/jco@^1.0.0":
-  version "1.0.3"
-  resolved "https://registry.npmjs.org/@bytecodealliance/jco/-/jco-1.0.3.tgz"
-  integrity sha512-i5PGJcp+K+EiTLq1/yisiSr0L9KewPd9iCUEj3L0bzLR4T+XJu3q3Iw9ANyIqFL2Q2iaJ7yAL0E3Gu5PluP1zQ==
+"@bytecodealliance/jco@^1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@bytecodealliance/jco/-/jco-1.1.1.tgz#8191692bc653d5ba7800ae4fba41691455c5e609"
+  integrity sha512-s8Zz6GFPlo2g+dsGp1OMIWXSZnM4FyIloxNAc4grF5TZwFoD00Gj8b0xvpmFSeZj36X/bJPa7x3za3j7Cfeetw==
   dependencies:
-    "@bytecodealliance/preview2-shim" "0.16.0"
+    "@bytecodealliance/preview2-shim" "^0.16.1"
     binaryen "^116.0.0"
     chalk-template "^1"
     commander "^12"
@@ -15,10 +15,10 @@
     ora "^8"
     terser "^5"
 
-"@bytecodealliance/preview2-shim@0.16.0":
-  version "0.16.0"
-  resolved "https://registry.npmjs.org/@bytecodealliance/preview2-shim/-/preview2-shim-0.16.0.tgz"
-  integrity sha512-8gajvNpwHu8127PZuv56wpZQutEFmQL7F/BnwVleME1oUA9yXky2uIEK3HWN0inU2PUW8GLl4h4uLSP6/b8/eA==
+"@bytecodealliance/preview2-shim@^0.16.1":
+  version "0.16.1"
+  resolved "https://registry.yarnpkg.com/@bytecodealliance/preview2-shim/-/preview2-shim-0.16.1.tgz#c6f423dd23cdf1202296c9e3abf415433bc45165"
+  integrity sha512-KEzFY1/fSBF0cpUNbG9MdnPNc0gxinBm42HRA9+ENfsticSDjE845bh7Mun0UDD7ga/uWX061qZsfpBXUGEAfg==
 
 "@esbuild/android-arm64@0.18.20":
   version "0.18.20"
@@ -366,15 +366,6 @@ restore-cursor@^4.0.0:
     onetime "^5.1.0"
     signal-exit "^3.0.2"
 
-rollup-plugin-wit-component@^0.2:
-  version "0.2.0"
-  resolved "https://registry.npmjs.org/rollup-plugin-wit-component/-/rollup-plugin-wit-component-0.2.0.tgz"
-  integrity sha512-zJ25USjJNncOQzcukDQVcVh/xLY31cECRnYtAKVMx+oHMOJ3/JwMJYlWRfPTkcOJuVmtFHP5/WQRoOxGu7Y8Fg==
-  dependencies:
-    "@bytecodealliance/jco" "^1.0.0"
-    "@rollup/browser" "^4.9.0"
-    yootils "^0.3.1"
-
 rollup@^3.27.1:
   version "3.29.4"
   resolved "https://registry.npmjs.org/rollup/-/rollup-3.29.4.tgz"
@@ -454,5 +445,5 @@ vite@^4.3.8:
 
 yootils@^0.3.1:
   version "0.3.1"
-  resolved "https://registry.npmjs.org/yootils/-/yootils-0.3.1.tgz"
+  resolved "https://registry.yarnpkg.com/yootils/-/yootils-0.3.1.tgz#c3122bd81423640bbb0b4fd46af7d254f531af51"
   integrity sha512-A7AMeJfGefk317I/3tBoUYRcDcNavKEkpiPN/nQsBz/viI2GvT7BtrqdPD6rGqBFN8Ax7v4obf+Cl32JF9DDVw==

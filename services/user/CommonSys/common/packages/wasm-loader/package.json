@@ -14,7 +14,8 @@
     "vite": "^4.3.8"
   },
   "dependencies": {
-    "@bytecodealliance/jco": "^1.0.0",
-    "@rollup/browser": "^4.9.0"
+    "@bytecodealliance/jco": "^1.1.1",
+    "@rollup/browser": "^4.9.0",
+    "yootils": "^0.3.1"
   }
 }
