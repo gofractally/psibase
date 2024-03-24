@@ -214,11 +214,27 @@ const onPluginCallResponse = (origin: string, message: PluginCallResponse) => {
 
     verifyOriginOnTopOfStack(origin);
 
+    let {actions: newActions, result} = message;
+
     let returningCall = callStack.pop()!;
 
-    if (callStack.isEmpty() || isUnrecoverableError(message.result)) {
+    if (newActions.length > 0)
+    {
+        context.addActionsToTx(newActions);
+    }
+
+    let isError = isUnrecoverableError(result);
+    let isLastCall = callStack.isEmpty();
+
+    if (isError || isLastCall) {
+
+        if (!isError && isLastCall) {
+            if (context.addableActions.length > 0)
+                console.log(`Addable actions: ${JSON.stringify(context.addableActions, null, 2)}`);
+        }
+
         window.parent.postMessage(
-            buildFunctionCallResponse(returningCall.args, message.result),
+            buildFunctionCallResponse(returningCall.args, result),
             context.rootAppOrigin
         );
         context.reset();
@@ -238,7 +254,7 @@ const onPluginCallResponse = (origin: string, message: PluginCallResponse) => {
             callIntf,
             callMethod,
             args_json: JSON.stringify(returningCall.args.params),
-            result: message.result
+            result,
         });
 
         processTop();

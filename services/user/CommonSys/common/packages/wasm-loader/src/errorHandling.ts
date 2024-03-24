@@ -80,7 +80,23 @@ function isCommonError(error: any): error is CommonError {
     );
 }
 
-const isSyncCall = (e: any): e is Error => {
+export const isSyncCall = (e: any): e is Error => {
+    return (
+        e instanceof Error &&
+        typeof e.message === "string" &&
+        e.message.includes("synchronous_call")
+    );
+};
+
+export const isAddingAction = (e: any): e is Error => {
+    return (
+        e instanceof Error &&
+        typeof e.message === "string" &&
+        e.message.includes("adding_action")
+    );
+}
+
+const isDeserializationError = (e: any) => {
     return (
         e instanceof Error &&
         typeof e.message === "string" &&
@@ -88,16 +104,29 @@ const isSyncCall = (e: any): e is Error => {
     );
 };
 
+const isParseError = (e: any) => {
+    return (
+        e !== null &&
+        typeof e === "object" &&
+        "code" in e &&
+        typeof e.code === "string" &&
+        e.code === "PARSE_ERROR"
+    );
+};
+
 const reply = (payload: any) => {
     window.parent.postMessage(
-        buildPluginCallResponse(payload),
+        buildPluginCallResponse(payload, []),
         siblingUrl(null, "supervisor-sys")
     );
 }
 
 export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
-    if (isSyncCall(e)) {
-        console.warn("Import return value not deserializable. Likely either sync call, or import code gen error.");
+    if (isDeserializationError(e)) {
+        reply({
+            errorType: "unrecoverable",
+            val: { message: `${toString(args)}: Possible plugin import code gen error.`}
+        });
     } else if (
         e instanceof Error &&
         typeof (e as ComponentError).payload === "object" &&
@@ -112,13 +141,7 @@ export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
             errorType: "unrecoverable",
             val: { message: `${toString(args)}: Runtime error (panic)` }
         });
-    } else if (
-        e !== null &&
-        typeof e === "object" &&
-        "code" in e &&
-        typeof e.code === "string" &&
-        e.code === "PARSE_ERROR"
-    ) {
+    } else if (isParseError(e)) {
         reply({
             errorType: "unrecoverable",
             val: {

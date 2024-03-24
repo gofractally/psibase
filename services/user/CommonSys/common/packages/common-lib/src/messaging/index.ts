@@ -25,6 +25,7 @@ export {
 } from "./supervisor/PluginCallRequest";
 export {
     type PluginCallResponse,
+    type AddableAction,
     isPluginCallResponse,
     buildPluginCallResponse
 } from "./supervisor/PluginCallResponse";

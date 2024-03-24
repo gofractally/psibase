@@ -60,7 +60,7 @@ interface inviter {
     /// * `invite-public-key`: The key that is publicly associated with the private key 
     ///   embedded in the invite link. This public key should also exist on chain in a table
     ///   in the invite service.
-    delete-invite: func(invite-public-key: list<u8>) -> result<_, string>;
+    delete-invite: func(invite-public-key: list<u8>) -> result<_, error>;
 }
 
 

@@ -1,4 +1,5 @@
 import { QualifiedFunctionCallArgs, toString } from "./FunctionCallRequest";
+import { AddableAction } from "./PluginCallResponse";
 
 export interface Call<T = any> {
     caller: string;
@@ -68,12 +69,14 @@ export interface ResultCache {
 export class CallContext {
     public callStack: CallStack;
     public rootAppOrigin: string;
+    public addableActions: AddableAction[];
     
     private cache: ResultCache[];
 
     constructor() {
         this.callStack = new CallStack();
         this.cache = [];
+        this.addableActions = [];
         this.rootAppOrigin = "";
     }
 
@@ -85,6 +88,10 @@ export class CallContext {
     */
     addCacheObject(cacheObject: ResultCache): void {
         this.cache.push(cacheObject);
+    }
+
+    addActionsToTx(actions: AddableAction[]) {
+        this.addableActions.push(...actions);
     }
 
     getCachedResults(service: string, plugin: string): ResultCache[] {
@@ -99,5 +106,6 @@ export class CallContext {
         this.callStack.reset();
         this.rootAppOrigin = "";
         this.cache = [];
+        this.addableActions = [];
     }
 }

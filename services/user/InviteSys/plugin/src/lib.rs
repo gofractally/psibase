@@ -3,7 +3,7 @@ mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::account_sys::plugin::accounts;
 use bindings::auth_sys::plugin::keyvault;
-use bindings::common::plugin::{client, types as CommonTypes};
+use bindings::common::plugin::{client, server, types as CommonTypes};
 use bindings::exports::invite_sys::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
 };
@@ -103,13 +103,13 @@ impl Inviter for Component {
             }
         };
 
-        // server::add_action_to_transaction(
-        //     "createInvite",
-        //     &invite_service::action_structs::createInvite {
-        //         inviteKey: pubkey.to_owned(),
-        //     }
-        //     .packed(),
-        // )?;
+        server::add_action_to_transaction(
+            "createInvite",
+            &invite_service::action_structs::createInvite {
+                inviteKey: pubkey.to_owned(),
+            }
+            .packed(),
+        )?;
 
         let link_root = format!("{}{}", client::my_service_origin()?, "/invited");
 
@@ -126,7 +126,7 @@ impl Inviter for Component {
         };
         let params = match serde_json::to_string(&params) {
             Ok(p) => p,
-            Err(e) => {
+            Err(_) => {
                 return Err(SerializationError.err("Serializing invite id params"));
             }
         };
@@ -135,8 +135,8 @@ impl Inviter for Component {
         Ok(format!("{}?{}", link_root, query_string))
     }
 
-    fn delete_invite(_invite_public_key: Vec<u8>) -> Result<(), String> {
-        Err("Not yet implemented".to_string())
+    fn delete_invite(_invite_public_key: Vec<u8>) -> Result<(), CommonTypes::Error> {
+        Err(NotYetImplemented.err("delete_invite"))
     }
 }
 

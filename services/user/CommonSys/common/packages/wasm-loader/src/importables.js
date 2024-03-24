@@ -1,26 +1,9 @@
 const UNINITIALIZED = "uninitialized";
 
-const currentActions = [];
 let callerService = UNINITIALIZED;
 let callerOrigin = UNINITIALIZED;
 let myService = UNINITIALIZED;
 let myOrigin = UNINITIALIZED;
-
-function isEqualUint8Array(a, b) {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-};
-
-function actionExists(service, action, args) {
-  return currentActions.some(item => 
-    item.service === service && 
-    item.action === action && 
-    isEqualUint8Array(item.args, args)
-  );
-}
 
 function pluginId(namespace, pkg) {
   return {
@@ -78,18 +61,61 @@ function postGraphQL(url, graphql) {
   });
 }
 
+function isValidAction(s) {
+  return /^[a-zA-Z0-9]+$/.test(s);
+}
+
+// This will be statically replaced
+const actions = [];
+
+function alreadyAdded(action, args) {
+  let dupIndex = actions.findIndex(a=>a.action === action);
+  if (dupIndex !== -1) {
+      if (args !== actions[dupIndex].args)
+      {
+          throw new Error("Mismatched args");
+      }
+      return true;
+  }
+  return false;
+};
 
 export const server = {
   // add-action-to-transaction: func(service: string, action: string, args: list<u8>) -> result<_, string>;
-  addActionToTransaction(service, action, args) {
-    // Todo - figure out how to return stuff
-    // if (actionExists(service, action, args)) {
-    //   return "action already exists";
-    // } else {
-      currentActions.push({service, action, args});
-    //return;
-    //}
+  addActionToTransaction(action, args) {
+    
+    if (myService === UNINITIALIZED)
+      throw commonErr("Error filling common:plugin imports.");
+    else if (!isValidAction(action)) {
+      throw commonErr(`Invalid action name: ${JSON.stringify(action)}`);
+    } {
+
+      let strArgs = JSON.stringify(Array.from(args));
+      let duplicate = false;
+      try {
+        duplicate = alreadyAdded(action, strArgs);
+      } catch (e) {
+        if (e instanceof Error && e.message === "Mismatched args")
+        {
+          throw commonErr("Attempted to add the same action (with different args) into a transaction.");
+        }
+      }
+      
+      if (duplicate) {
+        return;
+      } else {
+        throw new Error(JSON.stringify({
+          type: 'adding_action',
+          action,
+          args: strArgs
+        }));
+      }
+    }
   },
+  // I think as long as groundhog day is a thing, we should only allow one of an action to be submitted 
+  // in a transaction, which will block anyone who tried to submit two actions (with different parameters).
+  // This is because we can't distinguish from two genuinely different actions, and one action that uses
+  // randomness for non-determininistic inputs between instances of groundhog day.
 
   postGraphqlGetJson(url, graphQL)
   {
@@ -137,5 +163,3 @@ export const client = {
       return myOrigin;
   }
 }
-
-

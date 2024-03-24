@@ -34,10 +34,8 @@ const getFunctionBody = (pluginFunc: PluginFunc, resultCache: ResultCache[]): st
             && f.callMethod == method;
     });
     if (!found) {
-        /*
-        I uncovered this JCO issue: https://github.com/bytecodealliance/jco/issues/405
-        Once fixed, I can just throw the following object:
-            throw {
+        return `
+            throw new Error(JSON.stringify({
                 type: 'synchronous_call',
                 target: {
                     service: '${service}',
@@ -45,25 +43,7 @@ const getFunctionBody = (pluginFunc: PluginFunc, resultCache: ResultCache[]): st
                     intf: '${intf}',
                     method: '${method}',
                     params: [...args]
-                }
-            };
-        And catch / postMessage from the normal loader catch handler (and use buildPluginSyncCall).
-        */
-       
-        return `
-            window.parent.postMessage({
-                    type: "SYNC_CALL_REQUEST",
-                    payload: {
-                        service: '${service}',
-                        plugin: '${plugin}',
-                        intf: '${intf}',
-                        method: '${method}',
-                        params: [...args],
-                    },
-                },
-                window.location.origin.replace(/\\/\\/([^.]*)/, '//supervisor-sys')
-            );
-            throw {type: "sync_call"};
+                }}));
         `
     } else {
         if (found.result !== undefined) {

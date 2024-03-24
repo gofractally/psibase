@@ -9,12 +9,22 @@ import {
     isPreloadStartMessage,
     LoaderPreloadStart,
     buildPreloadCompleteMessage,
-    toString
+    toString,
+    buildPluginSyncCall,
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib";
 import { CallCache } from "./callCache";
 import { load } from "./lib/index";
-import { DownloadFailed, InvalidPlugin, ParserDownloadFailed, ParsingFailed, PluginDownloadFailed, handleErrors } from "./errorHandling";
+import {
+    DownloadFailed,
+    InvalidPlugin,
+    ParserDownloadFailed,
+    ParsingFailed,
+    PluginDownloadFailed,
+    handleErrors,
+    isAddingAction,
+    isSyncCall
+} from "./errorHandling";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -29,12 +39,18 @@ interface Importables {
     [key: string]: string;
 }
 
+export interface Action {
+    service: string;
+    action: string;
+    args: string;
+}
+let addedActions: Action[];
+
 const wasmUrlToIntArray = (url: string) =>
     fetch(url)
         .then((res) => {
-            if (!res.ok)
-                throw new DownloadFailed(url);
-            return res.arrayBuffer()
+            if (!res.ok) throw new DownloadFailed(url);
+            return res.arrayBuffer();
         })
         .then((buffer) => new Uint8Array(buffer));
 
@@ -58,23 +74,32 @@ const componentParser = async () => {
     } else return cache.getCachedData(parserCacheKey);
 };
 
-const getParsed = async(plugin: string) => {
+const getParsed = async (plugin: string) => {
     if (!cache.exists(`${plugin}-parsed`)) {
         const pBytes: Uint8Array = await pluginBytes(plugin); //Await?
         try {
-            cache.cacheData(`${plugin}-parsed`, await (await componentParser()).parse("component", pBytes));
-            if (cache.getCachedData(`${plugin}-parsed`).exportedFuncs === undefined)
-            {
-                throw new InvalidPlugin(`${serviceName}:${plugin} does not export any functions.`);
+            cache.cacheData(
+                `${plugin}-parsed`,
+                await (await componentParser()).parse("component", pBytes)
+            );
+            if (
+                cache.getCachedData(`${plugin}-parsed`).exportedFuncs ===
+                undefined
+            ) {
+                throw new InvalidPlugin(
+                    `${serviceName}:${plugin} does not export any functions.`
+                );
             }
-        } catch(e) {
-            throw new ParsingFailed(`${serviceName}:${plugin} was able to be loaded but not parsed`);
+        } catch (e) {
+            throw new ParsingFailed(
+                `${serviceName}:${plugin} was able to be loaded but not parsed`
+            );
         }
         cache.getCachedData(`${plugin}-parsed`);
     } else {
         return cache.getCachedData(`${plugin}-parsed`);
     }
-}
+};
 
 const pluginBytes = async (plugin: string): Promise<Uint8Array> => {
     if (!cache.exists(plugin)) {
@@ -82,7 +107,10 @@ const pluginBytes = async (plugin: string): Promise<Uint8Array> => {
             cache.cacheData(plugin, await wasmUrlToIntArray(`/${plugin}.wasm`));
         } catch (e) {
             if (e instanceof DownloadFailed)
-                throw new PluginDownloadFailed({service: serviceName, plugin})
+                throw new PluginDownloadFailed({
+                    service: serviceName,
+                    plugin
+                });
         }
         await getParsed(plugin);
         return cache.getCachedData(plugin);
@@ -98,26 +126,32 @@ interface StaticImportFills {
     myService: string;
 }
 
-const initStaticImports = (staticImports: string, importFills: StaticImportFills) => {
-    let {callerService, callerOrigin, myOrigin, myService} = importFills;
+const initStaticImports = (
+    staticImports: string,
+    importFills: StaticImportFills
+) => {
+    let { callerService, callerOrigin, myOrigin, myService } = importFills;
     return staticImports
         .replace(
-            'let callerService = UNINITIALIZED;',
-            `let callerService = ${callerService === null? "null" : JSON.stringify(callerService)};`
+            "let callerService = UNINITIALIZED;",
+            `let callerService = ${callerService === null ? "null" : JSON.stringify(callerService)};`
         )
         .replace(
-            'let callerOrigin = UNINITIALIZED;',
+            "let callerOrigin = UNINITIALIZED;",
             `let callerOrigin = "${callerOrigin}";`
         )
         .replace(
-            'let myService = UNINITIALIZED;',
+            "let myService = UNINITIALIZED;",
             `let myService = "${myService}";`
         )
         .replace(
-            'let myOrigin = UNINITIALIZED;',
+            "let myOrigin = UNINITIALIZED;",
             `let myOrigin = "${myOrigin}";`
+        )
+        .replace(
+            "const actions = [];",
+            `const actions = JSON.parse(\`${JSON.stringify(addedActions)}\`);`
         );
-        
 };
 
 const getServiceName = () => {
@@ -149,70 +183,92 @@ const hasTargetFunc = (
     return found !== undefined;
 };
 
-const extractService = (callerOrigin: string, myOrigin: string): string | null => {
+const extractService = (
+    callerOrigin: string,
+    myOrigin: string
+): string | null => {
     const extractRootDomain = (origin: string): string => {
         const url = new URL(origin);
-        const parts = url.hostname.split('.');
+        const parts = url.hostname.split(".");
         parts.shift();
-        return `${parts.join('.')}${url.port ? ':' + url.port : ''}`;
+        return `${parts.join(".")}${url.port ? ":" + url.port : ""}`;
     };
 
     const callerRoot = extractRootDomain(callerOrigin);
     const myRoot = extractRootDomain(myOrigin);
 
-    return callerRoot === myRoot ? new URL(callerOrigin).hostname.split('.')[0] : null;
+    return callerRoot === myRoot
+        ? new URL(callerOrigin).hostname.split(".")[0]
+        : null;
 };
 
 const cache = new CallCache();
 
-let activeArgs: QualifiedFunctionCallArgs;
+let activeCall: PluginCallPayload;
 
-const onPluginCallRequest = async ({
-    caller,
-    args,
-    resultCache
-}: PluginCallPayload) => {
-    activeArgs = args;
-    let { service, plugin, intf, method } = args;
+const onPluginCallRequest = async (pluginCallPayload: PluginCallPayload) => {
+    try {
+        let { caller, args, resultCache } = pluginCallPayload;
+        let { service, plugin, intf, method } = args;
+        activeCall = pluginCallPayload;
 
-    // Early terminate if this is the wrong loader to handle the request
-    if (service != serviceName) {
-        throw Error(`${serviceName} received a call meant for ${service}`);
+        // Early terminate if this is the wrong loader to handle the request
+        if (service != serviceName) {
+            throw Error(`${serviceName} received a call meant for ${service}`);
+        }
+
+        const pBytes = await pluginBytes(plugin);
+        let parsed = await getParsed(plugin);
+        // Early terminate if the function being called is not exported by the plugin.
+        if (!hasTargetFunc(parsed.exportedFuncs, intf, method)) {
+            throw Error(`${toString(args)}: Named function is not an export.`);
+        }
+
+        let importFills: StaticImportFills = {
+            callerService: extractService(caller, window.origin),
+            callerOrigin: caller,
+            myService: serviceName,
+            myOrigin: `${window.origin}`
+        };
+        let importables: Importables[] = [
+            {
+                [`common:plugin/*`]: initStaticImports(
+                    importableCode,
+                    importFills
+                )
+            },
+            ...getImportFills(parsed.importedFuncs, resultCache)
+        ];
+
+        // TODO: Once we replace instead of using the rollup plugin, we can have a much better
+        //   caching strategy. Transpilation only needs to happen once.
+        // @ts-ignore
+        const pluginModule = await load(pBytes, importables);
+
+        let func =
+            typeof args.intf === "undefined" || args.intf === ""
+                ? pluginModule[args.method]
+                : pluginModule[args.intf][args.method];
+        const res = func(...args.params);
+
+        let addableActions = addedActions.map((action) => ({
+            ...action,
+            args: new Uint8Array(JSON.parse(action.args))
+        }));
+
+        window.parent.postMessage(
+            buildPluginCallResponse(res, addableActions),
+            siblingUrl(null, "supervisor-sys")
+        );
+    } catch (e: unknown) {
+        if (isSyncCall(e)) {
+            doSyncCall(JSON.parse(e.message));
+        } else if (isAddingAction(e)) {
+            onAddAction(JSON.parse(e.message));
+        } else {
+            handleErrors(activeCall.args, e);
+        }
     }
-
-    const pBytes = await pluginBytes(plugin);
-    let parsed = await getParsed(plugin);
-    // Early terminate if the function being called is not exported by the plugin.
-    if (!hasTargetFunc(parsed.exportedFuncs, intf, method)) {
-        throw Error(`${toString(args)}: Named function is not an export.`);
-    }
-
-    let importFills: StaticImportFills = {
-        callerService: extractService(caller, window.origin),
-        callerOrigin: caller,
-        myService: serviceName,
-        myOrigin: `${window.origin}`,
-    };
-    let importables: Importables[] = [
-        { [`common:plugin/*`]: initStaticImports(importableCode, importFills)},
-        ...getImportFills(parsed.importedFuncs, resultCache)
-    ];
-
-    // TODO: Once we replace instead of using the rollup plugin, we can have a much better
-    //   caching strategy. Transpilation only needs to happen once.
-    // @ts-ignore
-    const pluginModule = await load(pBytes, importables);
-
-    let func =
-        typeof args.intf === "undefined" || args.intf === ""
-            ? pluginModule[args.method]
-            : pluginModule[args.intf][args.method];
-    const res = func(...args.params);
-
-    window.parent.postMessage(
-        buildPluginCallResponse(res),
-        siblingUrl(null, "supervisor-sys")
-    );
 };
 
 const isMessageFromSupervisor = (message: MessageEvent) => {
@@ -222,7 +278,7 @@ const isMessageFromSupervisor = (message: MessageEvent) => {
     return !isTop && isParent && isSupervisorDomain;
 };
 
-const onRawEvent = async (message: MessageEvent) => {
+const onRawEvent = (message: MessageEvent) => {
     if (!isMessageFromSupervisor(message)) {
         console.warn("Loader recieved a postmessage from an unknown origin.");
         return;
@@ -234,25 +290,55 @@ const onRawEvent = async (message: MessageEvent) => {
             console.error(`Preload failed with: ${JSON.stringify(e, null, 2)}`);
         }
     } else if (isPluginCallRequest(message.data)) {
-        try {
-            await onPluginCallRequest(message.data.payload);
-        } catch (e: unknown) {
-            handleErrors(activeArgs, e);
-        }
+        addedActions = [];
+        onPluginCallRequest(message.data.payload);
     }
+};
+
+interface InteralSyncCall {
+    type: string;
+    target: {
+        service: string;
+        plugin: string;
+        intf: string;
+        method: string;
+        params: [];
+    };
+}
+
+const doSyncCall = (payload: any) => {
+    const args: QualifiedFunctionCallArgs = (payload as InteralSyncCall).target;
+    window.parent.postMessage(buildPluginSyncCall(args), supervisorDomain);
+};
+
+interface InternalAddAction {
+    type: string;
+    action: string;
+    args: string;
+}
+
+const onAddAction = (payload: any) => {
+    const { action, args } = payload as InternalAddAction;
+    addedActions.push({
+        service: serviceName,
+        action,
+        args
+    });
+    onPluginCallRequest(activeCall);
 };
 
 const onPreloadStart = async (message: LoaderPreloadStart) => {
     const { plugins } = message.payload;
-        for (const p of plugins) {
-            try {
-                await pluginBytes(p);
-            }
-            catch (e) {
-                console.error(`Preload failed: ${serviceName}:${p}\nError: ${JSON.stringify(e, null, 2)}`);
-            }
-            cache.getCachedData(`${p}-parsed`);
+    for (const p of plugins) {
+        try {
+            await pluginBytes(p);
+        } catch (e) {
+            console.error(
+                `Preload failed: ${serviceName}:${p}\nError: ${JSON.stringify(e, null, 2)}`
+            );
         }
+        cache.getCachedData(`${p}-parsed`);
+    }
 
     // TODO: add dependencies to preloadComplete so they can be loaded
     window.parent.postMessage(
