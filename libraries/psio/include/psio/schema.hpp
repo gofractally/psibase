@@ -362,7 +362,7 @@ namespace psio
 
       struct CompiledType
       {
-         enum Kind : std::uint16_t
+         enum Kind : std::uint8_t
          {
             scalar,
             struct_,
@@ -371,10 +371,10 @@ namespace psio
             array,
             variant,
             optional,
-            custom_start,
          };
          Kind                        kind;
          bool                        is_variable_size;
+         std::int16_t                custom_id = -1;
          std::uint32_t               fixed_size;
          std::vector<CompiledMember> children;
          const AnyType*              original_type;
@@ -555,13 +555,9 @@ namespace psio
          }
          void add_impl(const AnyType* type, const Custom& t, std::vector<const AnyType*>& stack)
          {
-            auto index = builtin.find(t.id);
-            if (!index)
-               // TODO: fallback
-               check(false, "Unknown custom type");
             // TODO: check that t.type is structurally equivalent to the
             // builtin.
-            auto kind = static_cast<CompiledType::Kind>(CompiledType::custom_start + *index);
+            auto kind           = static_cast<CompiledType::Kind>(CompiledType::scalar);
             auto [ctype, state] = dfs_discover(type, kind, stack);
             switch (state)
             {
@@ -575,9 +571,12 @@ namespace psio
                   // TODO: This is sufficient to prevent crashes, but not to detect all errors
                   if (!child->original_type)
                      check(false, "A Custom type may not depend on itself");
+                  ctype->kind             = child->kind;
                   ctype->is_variable_size = child->is_variable_size;
                   ctype->fixed_size       = child->fixed_size;
                   ctype->children         = child->children;
+                  if (auto index = builtin.find(t.id))
+                     ctype->custom_id = *index;
                }
                default:
                   break;
@@ -745,15 +744,16 @@ namespace psio
                {
                   check_heap_pos(pos);
                }
-               if (type->kind == CompiledType::scalar)
+               if (type->custom_id != -1)
+               {
+                  result.kind = static_cast<ItemKind>(custom_start + type->custom_id);
+                  if (offset == 0)
+                     result.data = std::span{in.src + fixed_pos, in.src + tmp_pos};
+               }
+               else if (type->kind == CompiledType::scalar)
                {
                   result.data = read(type, pos);
                   result.kind = FracParser::scalar;
-               }
-               else if (type->kind >= CompiledType::custom_start)
-               {
-                  result.kind = static_cast<ItemKind>(custom_start +
-                                                      (type->kind - CompiledType::custom_start));
                }
                else
                {
@@ -914,7 +914,11 @@ namespace psio
       inline FracParser::Item FracParser::parse(const CompiledType* ctype)
       {
          Item result{.type = ctype->original_type};
-         if (ctype->kind == CompiledType::scalar)
+         if (ctype->custom_id != -1)
+         {
+            result.kind = static_cast<ItemKind>(custom_start + ctype->custom_id);
+         }
+         else if (ctype->kind == CompiledType::scalar)
          {
             result.data = read(ctype, in.pos);
             result.kind = FracParser::scalar;
@@ -923,11 +927,6 @@ namespace psio
          {
             result        = OptionReader{ctype}.next(*this);
             result.parent = nullptr;
-         }
-         else if (ctype->kind >= CompiledType::custom_start)
-         {
-            result.kind =
-                static_cast<ItemKind>(custom_start + (ctype->kind - CompiledType::custom_start));
          }
          else
          {
@@ -941,16 +940,15 @@ namespace psio
                                           const CompiledType* ctype,
                                           std::uint32_t       fixed_pos)
       {
-         if (ctype->kind == CompiledType::scalar)
+         if (ctype->custom_id != -1)
+         {
+            result.data = read_fixed(ctype, fixed_pos);
+            result.kind = static_cast<ItemKind>(custom_start + ctype->custom_id);
+         }
+         else if (ctype->kind == CompiledType::scalar)
          {
             result.data = read_fixed(ctype, fixed_pos);
             result.kind = FracParser::scalar;
-         }
-         else if (ctype->kind >= CompiledType::custom_start)
-         {
-            result.data = read_fixed(ctype, fixed_pos);
-            result.kind =
-                static_cast<ItemKind>(custom_start + (ctype->kind - CompiledType::custom_start));
          }
          else
          {
