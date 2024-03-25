@@ -1104,11 +1104,7 @@ namespace psio
          {
             case CompiledType::struct_:
             {
-               auto heap_start = in.pos + type->fixed_size;
-               if (heap_start < offset || heap_start > in.end_pos)
-                  check(false, "Object fixed data out-of-bounds");
                stack.push_back(ObjectReader{.start_pos = offset, .index = 0, .type = type});
-               in.known_end = true;
                break;
             }
             case CompiledType::array:
