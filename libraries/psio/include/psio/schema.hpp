@@ -533,11 +533,12 @@ namespace psio
                   break;
                case finish:
                {
+                  ctype->is_variable_size    = false;
                   const CompiledType* nested = get(t.type->resolve(schema));
-                  ctype->is_variable_size    = nested->is_variable_size;
+                  ctype->children.push_back(
+                      make_member(nested, ctype->fixed_size, ctype->is_variable_size));
                   // TODO: handle array of zero-size elements
-                  ctype->fixed_size = nested->fixed_size * t.len;
-                  ctype->children.push_back({.type = nested});
+                  ctype->fixed_size *= t.len;
                }
                break;
                default:
