@@ -22,7 +22,7 @@ struct variable_struct
 };
 PSIO_REFLECT(variable_struct, value)
 
-TEST_CASE("roudtrip structs")
+TEST_CASE("roundtrip structs")
 {
    test<fixed_struct>({{0x12345678}, {0x90abcdef}});
    test<padded_struct>({{42, 0x12345678}, {43, 0x90abcdef}});
