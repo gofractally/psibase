@@ -1,4 +1,4 @@
-import { siblingUrl } from "@psibase/common-lib";
+import { getTaposForHeadBlock, siblingUrl, signAndPushTransaction, uint8ArrayToHex } from "@psibase/common-lib";
 import {
     FunctionCallRequest,
     buildMessageIFrameInitialized,
@@ -32,6 +32,7 @@ const createLoaderDomain = (subDomain = "supervisor-sys") =>
     siblingUrl(null, subDomain) + "/common/wasm-loader";
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
+const supervisorDomain = siblingUrl(null, "supervisor-sys");
 
 interface PluginManagers {
     [service: string]: string[];
@@ -208,7 +209,7 @@ const isUnrecoverableError = (result: any) => {
     return isErrorResult(result) && result.errorType === "unrecoverable";
 };
 
-const onPluginCallResponse = (origin: string, message: PluginCallResponse) => {
+const onPluginCallResponse = async (origin: string, message: PluginCallResponse) => {
     if (!context.rootAppOrigin)
         throw new Error(`Plugin responded to unknown root application origin.`);
 
@@ -230,7 +231,24 @@ const onPluginCallResponse = (origin: string, message: PluginCallResponse) => {
 
         if (!isError && isLastCall) {
             if (context.addableActions.length > 0)
-                console.log(`Addable actions: ${JSON.stringify(context.addableActions, null, 2)}`);
+            {
+                let actions = context.addableActions.map((a)=>{return {
+                        sender: "alice",
+                        service: a.service,
+                        method: a.action,
+                        rawData: uint8ArrayToHex(a.args),
+                    };
+                });
+                const tenSeconds = 10000;
+                const transaction: any = {
+                    tapos: {
+                        ...await getTaposForHeadBlock(supervisorDomain),
+                        expiration: new Date(Date.now() + tenSeconds),
+                    },
+                    actions,
+                };
+                await signAndPushTransaction(supervisorDomain, transaction, []);
+            }
         }
 
         window.parent.postMessage(
@@ -309,7 +327,7 @@ const isMessageFromChild = (message: MessageEvent): boolean => {
     return originIsChild && !isTop && !isParent;
 };
 
-const onRawEvent = (message: MessageEvent<any>) => {
+const onRawEvent = async (message: MessageEvent<any>) => {
     try {
         if (isMessageFromApplication(message)) {
             setApplicationOrigin(message.origin);
@@ -320,7 +338,7 @@ const onRawEvent = (message: MessageEvent<any>) => {
             }
         } else if (isMessageFromChild(message)) {
             if (isPluginCallResponse(message.data)) {
-                onPluginCallResponse(message.origin, message.data);
+                await onPluginCallResponse(message.origin, message.data);
             } else if (isPluginSyncCall(message.data)) {
                 onPluginSyncCall(message.origin, message.data);
             } else if (isPreloadCompleteMessage(message.data)) {
