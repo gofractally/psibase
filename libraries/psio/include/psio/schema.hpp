@@ -1005,7 +1005,17 @@ namespace psio
       {
          if (stack.empty())
             return {};
-         auto result = std::visit([this](auto& item) { return item.next(*this); }, stack.back());
+         std::size_t original_size = stack.size();
+         auto        result        = std::visit(
+             [&](auto& item)
+             {
+                // ensure that the reader can safely push items onto the stack
+                auto copy                = std::move(item);
+                auto res                 = copy.next(*this);
+                stack[original_size - 1] = std::move(copy);
+                return res;
+             },
+             stack.back());
          if (result.kind == end || std::holds_alternative<Item>(stack.back()))
          {
             stack.pop_back();
