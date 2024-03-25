@@ -938,6 +938,7 @@ namespace psio
                check(false, "Variant tag out-of-range");
             auto result   = parser.parse(type->children[tag].type);
             result.parent = type->original_type;
+            result.index  = tag;
             return result;
          }
       };
