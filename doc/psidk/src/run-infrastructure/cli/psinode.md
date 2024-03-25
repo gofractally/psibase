@@ -28,7 +28,7 @@ psinode - The psibase blockchain server
   - An `http` or `https` URL: The host component must be an IP address. All components other than the host and port must be empty. `https` requires `--tls-cert` and `--tls-key` to be provided.
   - A filesystem path: Listens on a local socket
 
-  This option can be used more than once to listen on multiple ports. If it appear in both the command line and the config file, however, any instances in the config file will be ignored. The default config file template uses port 8080.
+  This option can be used more than once to listen on multiple ports. If it appears in both the command line and the config file, however, any instances in the config file will be ignored. The default config file template uses port 8080.
 
 - `-p` *name*, `--producer` *name*
 
