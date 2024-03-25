@@ -295,14 +295,22 @@ namespace psio
 
       struct CustomHandler
       {
+         template <typename T>
+         CustomHandler(const T&) : match(&T::match), frac2json(&T::frac2json)
+         {
+         }
+         bool (*match)(const CompiledType*);
          bool (*frac2json)(const CompiledType*, FracStream& in, StreamBase& out);
       };
 
       template <typename T>
+      bool matchCustomType(const CompiledType*, T*);
+
+      template <typename T>
       struct DefaultCustomHandler
       {
-         static CustomHandler get() { return {.frac2json = &frac2json}; }
-         static bool          frac2json(const CompiledType*, FracStream& in, auto& out)
+         static bool match(const CompiledType* type) { return matchCustomType(type, (T*)nullptr); }
+         static bool frac2json(const CompiledType*, FracStream& in, auto& out)
          {
             T value;
             if (!is_packable<T>::template unpack<true, true>(&value, in.has_unknown, in.known_end,
@@ -319,7 +327,7 @@ namespace psio
          template <typename T>
          void insert(std::string name)
          {
-            insert(std::move(name), DefaultCustomHandler<T>::get());
+            insert(std::move(name), DefaultCustomHandler<T>());
          }
          void insert(std::string name, const CustomHandler& t)
          {
@@ -333,6 +341,7 @@ namespace psio
                return &pos->second;
             return nullptr;
          }
+         bool match(std::size_t index, const CompiledType* type) { return impl[index].match(type); }
          bool frac2json(const CompiledType* type,
                         std::size_t         index,
                         FracStream&         in,
@@ -374,26 +383,43 @@ namespace psio
          const AnyType*              original_type;
       };
 
+      inline bool matchCustomType(const CompiledType* type, bool*)
+      {
+         if (auto* itype = std::get_if<Int>(&type->original_type->value))
+         {
+            return itype->bits == 1 && !itype->isSigned;
+         }
+         return false;
+      }
+
       template <typename T>
       struct BlobImpl
       {
-         static bool frac2json(const CompiledType* type, FracStream& in, StreamBase& out)
+         static bool match(const CompiledType* type)
          {
             if (type->kind == CompiledType::container)
             {
                const auto& member = type->children[0];
-               if (!member.is_optional && !member.type->is_variable_size)
-               {
-                  std::uint32_t size;
-                  if (!unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
-                     return false;
-                  std::uint32_t end = in.pos + size;
-                  if (end > in.end_pos || end < size)
-                     return false;
-                  T::frac2json(std::span{in.src + in.pos, size}, out);
-                  in.pos = end;
-                  return true;
-               }
+               return !member.is_optional && !member.type->is_variable_size;
+            }
+            else
+            {
+               return !type->is_variable_size;
+            }
+         }
+         static bool frac2json(const CompiledType* type, FracStream& in, StreamBase& out)
+         {
+            if (type->kind == CompiledType::container)
+            {
+               std::uint32_t size;
+               if (!unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
+                  return false;
+               std::uint32_t end = in.pos + size;
+               if (end > in.end_pos || end < size)
+                  return false;
+               T::frac2json(std::span{in.src + in.pos, size}, out);
+               in.pos = end;
+               return true;
             }
             else if (!type->is_variable_size)
             {
@@ -416,12 +442,20 @@ namespace psio
          }
       };
 
+      struct StringImpl
+      {
+         static void frac2json(std::span<const char> in, StreamBase& out)
+         {
+            to_json(std::string_view{in.data(), in.size()}, out);
+         }
+      };
+
       inline CustomTypes standard_types()
       {
          CustomTypes result;
          result.insert<bool>("bool");
-         result.insert<std::string>("string");
-         result.insert("octet-string", {.frac2json = &BlobImpl<OctetStringImpl>::frac2json});
+         result.insert("string", BlobImpl<StringImpl>());
+         result.insert("octet-string", BlobImpl<OctetStringImpl>());
          return result;
       }
 
@@ -594,8 +628,6 @@ namespace psio
          }
          void add_impl(const AnyType* type, const Custom& t, std::vector<const AnyType*>& stack)
          {
-            // TODO: check that t.type is structurally equivalent to the
-            // builtin.
             auto kind           = static_cast<CompiledType::Kind>(CompiledType::scalar);
             auto [ctype, state] = dfs_discover(type, kind, stack);
             switch (state)
@@ -613,8 +645,12 @@ namespace psio
                   ctype->is_variable_size = child->is_variable_size;
                   ctype->fixed_size       = child->fixed_size;
                   ctype->children         = child->children;
+                  ctype->original_type    = child->original_type;
                   if (auto index = builtin.find(t.id))
-                     ctype->custom_id = *index;
+                  {
+                     if (builtin.match(*index, ctype))
+                        ctype->custom_id = *index;
+                  }
                }
                default:
                   break;
