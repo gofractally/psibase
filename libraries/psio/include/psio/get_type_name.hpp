@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -42,6 +43,8 @@ namespace psio
    constexpr const char* get_type_name(const std::tuple<T...>*);
    template <typename... T>
    constexpr const char* get_type_name(const std::variant<T...>*);
+   template <typename Rep, typename Period>
+   constexpr const char* get_type_name(const std::chrono::duration<Rep, Period>*);
 
    // clang-format off
    constexpr const char* get_type_name(const bool*) { return "bool"; }
@@ -179,7 +182,7 @@ namespace psio
    constexpr auto get_tuple_type_name()
    {
       constexpr std::size_t size =
-          sizeof("tuple") + ((std::string_view(get_type_name((T*)nullptr)).size() + 1) + ...);
+          sizeof("tuple") + ((std::string_view(get_type_name((T*)nullptr)).size() + 1) + ... + 0);
       std::array<char, size> buffer{'t', 'u', 'p', 'l', 'e'};
       (variant_type_appender{buffer.data() + 5} + ... +
        std::string_view(get_type_name((T*)nullptr)));
@@ -203,6 +206,12 @@ namespace psio
    constexpr const char* get_type_name(const std::tuple<T...>*)
    {
       return tuple_type_name<T...>.data();
+   }
+
+   template <typename Rep, typename Period>
+   constexpr const char* get_type_name(const std::chrono::duration<Rep, Period>*)
+   {
+      return "duration";
    }
 
    template <typename T>

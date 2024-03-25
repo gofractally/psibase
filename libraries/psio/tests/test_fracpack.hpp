@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psio/fracpack.hpp>
+#include <psio/schema.hpp>
 #include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
 // Prevent clang-format from munging the header order
@@ -209,6 +210,18 @@ auto test_base(const T& value)
       CHECK_THAT(psio::from_frac<T>(psio::prevalidated{data}), BitwiseEqual(value));
       CHECK(psio::fracpack_validate_strict<T>(data));
    }
+   // schema
+   {
+      using namespace psio::schema_types;
+      Schema schema = SchemaBuilder().insert<T>("T").build();
+      INFO("schema: " << psio::format_json(schema));
+      CompiledSchema      cschema(schema);
+      FracParser          parser{data, cschema, "T"};
+      std::vector<char>   json;
+      psio::vector_stream out{json};
+      to_json(parser, out);
+      CHECK(std::string_view{json.data(), json.size()} == psio::convert_to_json(value));
+   }
    // Any prefix of the data should fail to verify
    for (std::size_t i = 0; i < data.size(); ++i)
    {
@@ -254,6 +267,17 @@ template <typename T>
 T& clio_unwrap_packable(packable_wrapper<T>& wrapper)
 {
    return wrapper.value;
+}
+template <typename T, typename Stream>
+void to_json(const packable_wrapper<T>& wrapper, Stream& stream)
+{
+   to_json(wrapper.value, stream);
+}
+template <typename T>
+constexpr const char* get_type_name(const packable_wrapper<T>*)
+{
+   using psio::get_type_name;
+   return get_type_name((T*)nullptr);
 }
 
 template <typename... T>

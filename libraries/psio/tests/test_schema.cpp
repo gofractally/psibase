@@ -102,18 +102,19 @@ PSIO_REFLECT(MyType2, definitionWillNotChange(), value)
 
 TEST_CASE("schema generated")
 {
-   Schema schema;
-   schema.insert<std::uint8_t>("u8");
-   schema.insert<std::optional<std::uint8_t>>("o");
-   schema.insert<MyType>("s");
-   schema.insert<std::vector<std::int32_t>>("v");
-   schema.insert<std::variant<std::uint32_t>>("var");
-   schema.insert<MyType2>("x");
-   schema.insert<std::tuple<std::int8_t>>("tup");
-   schema.insert<std::array<std::int16_t, 1>>("a");
-   schema.insert<bool>("bool");
-   schema.insert<float>("f32");
-   schema.insert<double>("f64");
+   SchemaBuilder builder;
+   builder.insert<std::uint8_t>("u8");
+   builder.insert<std::optional<std::uint8_t>>("o");
+   builder.insert<MyType>("s");
+   builder.insert<std::vector<std::int32_t>>("v");
+   builder.insert<std::variant<std::uint32_t>>("var");
+   builder.insert<MyType2>("x");
+   builder.insert<std::tuple<std::int8_t>>("tup");
+   builder.insert<std::array<std::int16_t, 1>>("a");
+   builder.insert<bool>("bool");
+   builder.insert<float>("f32");
+   builder.insert<double>("f64");
+   Schema schema = std::move(builder).build();
    std::cout << psio::format_json(schema) << std::endl;
    CompiledSchema cschema{schema};
    CHECK(to_json(cschema, "u8", "2A") == "42");

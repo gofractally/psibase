@@ -9,6 +9,10 @@
 
 namespace psio
 {
+   template <typename T>
+      requires Packable<std::remove_cv_t<T>>
+   class shared_view_ptr;
+
    struct FracStream
    {
       FracStream(std::span<const char> buf) : src(buf.data())
@@ -73,7 +77,7 @@ namespace psio
          {
          }
          Box(T&& value) : value(new T(value)) {}
-         Box(const Box& other) : value(new T(*value)) {}
+         Box(const Box& other) : value(new T(*other.value)) {}
          Box(Box&&)                          = default;
          Box&               operator=(Box&&) = default;
          T&                 operator*() { return *value; }
@@ -96,10 +100,6 @@ namespace psio
          std::map<std::string, AnyType> types;
          const AnyType*                 get(const std::string& name) const;
          void                           insert(std::string name, AnyType type);
-         template <typename T>
-         AnyType insert();
-         template <typename T>
-         void insert(std::string name);
       };
       PSIO_REFLECT(Schema, types)
 
@@ -347,6 +347,7 @@ namespace psio
          CustomTypes result;
          result.insert<bool>("bool");
          result.insert<std::string>("string");
+         result.insert<std::vector<char>>("octet-string");
          return result;
       }
 
@@ -608,7 +609,7 @@ namespace psio
             CompiledMember result{.fixed_offset = static_cast<std::uint16_t>(fixed_size),
                                   .is_optional  = is_optional,
                                   .type         = mtype};
-            if (mtype->is_variable_size)
+            if (is_optional || mtype->is_variable_size)
                fixed_size += 4;
             else
                fixed_size += mtype->fixed_size;
@@ -896,9 +897,9 @@ namespace psio
          }
       };
 
-      FracParser::FracParser(std::span<const char> data,
-                             const CompiledSchema& schema,
-                             const std::string&    type)
+      inline FracParser::FracParser(std::span<const char> data,
+                                    const CompiledSchema& schema,
+                                    const std::string&    type)
           : in(data), builtin(schema.builtin)
       {
          if (auto xtype = schema.schema.get(type))
@@ -910,7 +911,7 @@ namespace psio
          }
       }
 
-      FracParser::Item FracParser::parse(const CompiledType* ctype)
+      inline FracParser::Item FracParser::parse(const CompiledType* ctype)
       {
          Item result{.type = ctype->original_type};
          if (ctype->kind == CompiledType::scalar)
@@ -936,7 +937,9 @@ namespace psio
          return result;
       }
 
-      void FracParser::parse_fixed(Item& result, const CompiledType* ctype, std::uint32_t fixed_pos)
+      inline void FracParser::parse_fixed(Item&               result,
+                                          const CompiledType* ctype,
+                                          std::uint32_t       fixed_pos)
       {
          if (ctype->kind == CompiledType::scalar)
          {
@@ -956,7 +959,7 @@ namespace psio
          }
       }
 
-      FracParser::Item FracParser::next()
+      inline FracParser::Item FracParser::next()
       {
          if (stack.empty())
             return {};
@@ -968,7 +971,7 @@ namespace psio
          return result;
       }
 
-      void FracParser::push(const CompiledType* type, std::uint32_t offset)
+      inline void FracParser::push(const CompiledType* type, std::uint32_t offset)
       {
          in.pos = offset;
          switch (type->kind)
@@ -1040,24 +1043,45 @@ namespace psio
                assert(!"Not implemented");
          }
       }
-      void FracParser::push_fixed(const CompiledType* type, std::uint32_t offset)
+      // \pre range must be valid
+      inline void FracParser::push_fixed(const CompiledType* type, std::uint32_t offset)
       {
-         assert(!"not implemented");
+         switch (type->kind)
+         {
+            case CompiledType::struct_:
+            {
+               auto heap_start = in.pos + type->fixed_size;
+               if (heap_start < offset || heap_start > in.end_pos)
+                  check(false, "Object fixed data out-of-bounds");
+               stack.push_back(ObjectReader{.start_pos = offset, .index = 0, .type = type});
+               in.known_end = true;
+               break;
+            }
+            case CompiledType::array:
+            {
+               stack.push_back(
+                   ArrayReader{.type = type, .pos = offset, .end = offset + type->fixed_size});
+               break;
+            }
+            default:
+               assert(!"Not a fixed size type");
+         }
       }
 
-      std::span<const char> FracParser::read(const CompiledType* type, std::uint32_t offset)
+      inline std::span<const char> FracParser::read(const CompiledType* type, std::uint32_t offset)
       {
          in.pos = offset + type->fixed_size;
          check(in.pos <= in.end_pos && in.pos >= offset, "out-of-bounds read");
          return {in.src + offset, type->fixed_size};
       }
-      std::span<const char> FracParser::read_fixed(const CompiledType* type, std::uint32_t offset)
+      inline std::span<const char> FracParser::read_fixed(const CompiledType* type,
+                                                          std::uint32_t       offset)
       {
          // TODO: verify bounds against end of fixed data
          return {in.src + offset, type->fixed_size};
       }
 
-      void FracParser::check_heap_pos(std::uint32_t offset)
+      inline void FracParser::check_heap_pos(std::uint32_t offset)
       {
          if (in.known_end)
             check(in.pos == offset, "wrong offset");
@@ -1214,8 +1238,9 @@ namespace psio
                   break;
                case FracParser::empty:
                   // skip null members
-                  if (groups.empty() ||
-                      std::visit(MemberName{item.index}, item.parent->value) == nullptr)
+                  //if (groups.empty() ||
+                  //    std::visit(MemberName{item.index}, item.parent->value) == nullptr)
+                  start_member(item);
                   {
                      stream.write("null", 4);
                   }
@@ -1237,7 +1262,7 @@ namespace psio
          }
       }
 
-      const AnyType* Schema::get(const std::string& name) const
+      inline const AnyType* Schema::get(const std::string& name) const
       {
          if (auto pos = types.find(name); pos != types.end())
          {
@@ -1246,28 +1271,33 @@ namespace psio
          return nullptr;
       }
 
-      void Schema::insert(std::string name, AnyType type)
+      inline void Schema::insert(std::string name, AnyType type)
       {
          types.insert(std::make_pair(std::move(name), std::move(type)));
       }
 
       template <typename T>
-      void Schema::insert(std::string name)
-      {
-         types.try_emplace(name, insert<T>());
-      }
+      constexpr bool is_shared_view_ptr_v = false;
+      template <typename T>
+      constexpr bool is_shared_view_ptr_v<shared_view_ptr<T>> = true;
 
-      template <typename... T>
-      std::vector<Member> insert_variant_alternatives(Schema& schema, std::variant<T...>*)
+      template <typename T>
+      constexpr bool is_duration_v = false;
+      template <typename Rep, typename Period>
+      constexpr bool is_duration_v<std::chrono::duration<Rep, Period>> = true;
+
+      template <typename S, typename... T>
+      std::vector<Member> insert_variant_alternatives(S& schema, std::variant<T...>*)
       {
          using psio::get_type_name;
-         return {Member{.name = get_type_name((T*)nullptr), .type = schema.insert<T>()}...};
+         return {
+             Member{.name = get_type_name((T*)nullptr), .type = schema.template insert<T>()}...};
       }
 
-      template <typename T, std::size_t... I>
-      std::vector<AnyType> insert_tuple_elements(Schema& schema, std::index_sequence<I...>)
+      template <typename T, typename S, std::size_t... I>
+      std::vector<AnyType> insert_tuple_elements(S& schema, std::index_sequence<I...>)
       {
-         return {schema.insert<std::remove_cvref_t<std::tuple_element_t<I, T>>>()...};
+         return {schema.template insert<std::remove_cvref_t<std::tuple_element_t<I, T>>>()...};
       }
 
       constexpr std::uint32_t float_exp_bits(int max_exponent)
@@ -1282,84 +1312,144 @@ namespace psio
       }
 
       template <typename T>
-      AnyType Schema::insert()
+      char type_id;
+
+      class SchemaBuilder
       {
-         using psio::get_type_name;
-         std::string name     = std::string("@") + get_type_name((T*)nullptr);
-         auto [pos, inserted] = types.try_emplace(name, Type{});
-         if (inserted)
+        public:
+         template <typename T>
+         SchemaBuilder& insert(std::string name) &
          {
-            if constexpr (is_std_optional_v<T>)
+            schema.insert(std::move(name), insert<T>());
+            return *this;
+         }
+         template <typename T>
+         SchemaBuilder&& insert(std::string name) &&
+         {
+            schema.insert(std::move(name), insert<T>());
+            return std::move(*this);
+         }
+         template <typename T>
+         AnyType insert()
+         {
+            auto [pos, inserted] = ids.insert({&type_id<T>, ids.size()});
+            std::string name     = "@" + std::to_string(pos->second);
+            if (inserted)
             {
-               pos->second = Option{insert<typename is_std_optional<T>::value_type>()};
-            }
-            else if constexpr (std::is_same_v<T, bool>)
-            {
-               pos->second = Custom{.type = Int{.bits = 1}, .id = "bool"};
-            }
-            else if constexpr (std::is_integral_v<T>)
-            {
-               pos->second = Int{.bits = 8 * sizeof(T), .isSigned = std::is_signed_v<T>};
-            }
-            else if constexpr (std::numeric_limits<T>::is_iec559)
-            {
-               pos->second = Float{.exp      = float_exp_bits(std::numeric_limits<T>::max_exponent),
-                                   .mantissa = std::numeric_limits<T>::digits};
-            }
-            else if constexpr (is_std_vector_v<T>)
-            {
-               pos->second = List{insert<typename is_std_vector<T>::value_type>()};
-            }
-            else if constexpr (is_std_variant_v<T>)
-            {
-               pos->second = Variant{insert_variant_alternatives(*this, (T*)nullptr)};
-            }
-            else if constexpr (is_std_array_v<T>)
-            {
-               pos->second =
-                   Array{.type = insert<std::remove_cv_t<typename is_std_array<T>::value_type>>(),
-                         .len  = is_std_array<T>::size};
-            }
-            else if constexpr (std::is_array_v<T>)
-            {
-               pos->second = Array{.type = insert<std::remove_cv_t<std::remove_extent_t<T>>>(),
-                                   .len  = std::extent_v<T>};
-            }
-            else if constexpr (reflect<T>::is_struct)
-            {
-               std::vector<Member> members;
-               reflect<T>::for_each(
-                   [&](const meta& r, auto member)
-                   {
-                      auto m = member((std::decay_t<T>*)nullptr);
-                      if constexpr (not std::is_member_function_pointer_v<decltype(m)>)
-                      {
-                         using member_type = std::remove_cvref_t<
-                             decltype(static_cast<std::decay_t<T>*>(nullptr)->*m)>;
-                         members.push_back({.name = r.name, .type = insert<member_type>()});
-                      }
-                   });
-               if constexpr (reflect<T>::definitionWillNotChange)
+               if constexpr (PackableWrapper<T>)
                {
-                  pos->second = Struct{std::move(members)};
+                  schema.insert(name, insert<std::remove_cvref_t<decltype(clio_unwrap_packable(
+                                          std::declval<T&>()))>>());
+               }
+               else if constexpr (is_shared_view_ptr_v<T>)
+               {
+                  // TODO: json could unpack nested fracpack
+                  schema.insert(name, insert<std::vector<unsigned char>>());
+               }
+               else if constexpr (std::is_same_v<T, std::vector<char>> ||
+                                  std::is_same_v<T, std::vector<signed char>> ||
+                                  std::is_same_v<T, std::vector<unsigned char>>)
+               {
+                  schema.insert(name, Custom{.type = List{insert<typename T::value_type>()},
+                                             .id   = "octet-string"});
+               }
+               else if constexpr (is_std_optional_v<T>)
+               {
+                  schema.insert(name, Option{insert<typename is_std_optional<T>::value_type>()});
+               }
+               else if constexpr (std::is_same_v<T, bool>)
+               {
+                  schema.insert(name, Custom{.type = Int{.bits = 1}, .id = "bool"});
+               }
+               else if constexpr (std::is_integral_v<T>)
+               {
+                  schema.insert(name, Int{.bits = 8 * sizeof(T), .isSigned = std::is_signed_v<T>});
+               }
+               else if constexpr (is_duration_v<T>)
+               {
+                  schema.insert(name, insert<typename T::rep>());
+               }
+               else if constexpr (std::numeric_limits<T>::is_iec559)
+               {
+                  schema.insert(name,
+                                Float{.exp = float_exp_bits(std::numeric_limits<T>::max_exponent),
+                                      .mantissa = std::numeric_limits<T>::digits});
+               }
+               else if constexpr (std::is_same_v<T, std::string> ||
+                                  std::is_same_v<T, std::string_view> ||
+                                  std::is_same_v<T, const char*>)
+               {
+                  schema.insert(
+                      name, Custom{.type = insert<std::vector<unsigned char>>(), .id = "string"});
+               }
+               else if constexpr (is_std_vector_v<T>)
+               {
+                  schema.insert(name, List{insert<typename is_std_vector<T>::value_type>()});
+               }
+               else if constexpr (is_std_variant_v<T>)
+               {
+                  schema.insert(name, Variant{insert_variant_alternatives(*this, (T*)nullptr)});
+               }
+               else if constexpr (is_std_array_v<T>)
+               {
+                  schema.insert(
+                      name,
+                      Array{
+                          .type = insert<std::remove_cv_t<typename is_std_array<T>::value_type>>(),
+                          .len  = is_std_array<T>::size});
+               }
+               else if constexpr (std::is_array_v<T>)
+               {
+                  schema.insert(name,
+                                Array{.type = insert<std::remove_cv_t<std::remove_extent_t<T>>>(),
+                                      .len  = std::extent_v<T>});
+               }
+               else if constexpr (reflect<T>::is_struct)
+               {
+                  std::vector<Member> members;
+                  reflect<T>::for_each(
+                      [&](const meta& r, auto member)
+                      {
+                         auto m = member((std::decay_t<T>*)nullptr);
+                         if constexpr (not std::is_member_function_pointer_v<decltype(m)>)
+                         {
+                            using member_type = std::remove_cvref_t<
+                                decltype(static_cast<std::decay_t<T>*>(nullptr)->*m)>;
+                            members.push_back({.name = r.name, .type = insert<member_type>()});
+                         }
+                      });
+                  if constexpr (reflect<T>::definitionWillNotChange)
+                  {
+                     schema.insert(name, Struct{std::move(members)});
+                  }
+                  else
+                  {
+                     schema.insert(name, Object{std::move(members)});
+                  }
+               }
+               else if constexpr (requires { std::tuple_size<T>::value; })
+               {
+                  schema.insert(name,
+                                Tuple{insert_tuple_elements<T>(
+                                    *this, std::make_index_sequence<std::tuple_size_v<T>>())});
                }
                else
                {
-                  pos->second = Object{std::move(members)};
+                  static_assert(false, "Don't know schema representation");
                }
             }
-            else if constexpr (requires { std::tuple_size_v<T>; })
-            {
-               pos->second = Tuple{insert_tuple_elements<T>(
-                   *this, std::make_index_sequence<std::tuple_size_v<T>>())};
-            }
-            else
-            {
-               assert(!"unimplemented");
-            }
+            return Type{std::move(name)};
          }
-         return Type{std::move(name)};
-      }
+         Schema build() &&
+         {
+            ids.clear();
+            return std::move(schema);
+         }
+
+        private:
+         Schema                             schema;
+         std::map<const void*, std::size_t> ids;
+      };
 
       void to_json(const Schema& schema, auto& stream)
       {
