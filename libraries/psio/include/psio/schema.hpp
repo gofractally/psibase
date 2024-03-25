@@ -450,7 +450,6 @@ namespace psio
             switch (state)
             {
                case start:
-                  ctype->is_variable_size = true;
                   for (const auto& member : t.members)
                   {
                      stack.push_back(&member.type);
@@ -469,7 +468,6 @@ namespace psio
             switch (state)
             {
                case start:
-                  ctype->is_variable_size = true;
                   for (const auto& member : t.members)
                   {
                      stack.push_back(&member.type);
@@ -489,7 +487,6 @@ namespace psio
             switch (state)
             {
                case start:
-                  ctype->is_variable_size = true;
                   for (const auto& member : t.members)
                   {
                      stack.push_back(&member);
@@ -528,7 +525,6 @@ namespace psio
             switch (state)
             {
                case start:
-                  ctype->is_variable_size = true;
                   stack.push_back(t.type.get());
                   break;
                case finish:
@@ -551,7 +547,6 @@ namespace psio
             switch (state)
             {
                case start:
-                  ctype->is_variable_size = true;
                   stack.push_back(t.type.get());
                   break;
                case finish:
@@ -567,7 +562,6 @@ namespace psio
             switch (state)
             {
                case start:
-                  ctype->is_variable_size = true;
                   stack.push_back(t.type.get());
                   break;
                case finish:
@@ -583,7 +577,6 @@ namespace psio
             switch (state)
             {
                case start:
-                  ctype->is_variable_size = true;
                   for (const auto& member : t.members)
                   {
                      stack.push_back(&member.type);
@@ -608,7 +601,6 @@ namespace psio
             switch (state)
             {
                case start:
-                  ctype->is_variable_size = true;
                   stack.push_back(t.type.get());
                   break;
                case finish:
@@ -698,7 +690,7 @@ namespace psio
          {
             if (auto [pos, inserted] =
                     types.insert(std::pair{type, CompiledType{.kind             = kind,
-                                                              .is_variable_size = false,
+                                                              .is_variable_size = true,
                                                               .original_type    = nullptr}});
                 inserted)
             {
