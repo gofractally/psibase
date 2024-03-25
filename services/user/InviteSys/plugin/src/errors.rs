@@ -7,6 +7,8 @@ pub enum ErrorType {
     PubKeyParse,
     SerializationError,
     DecodeInviteError,
+    QueryError,
+    CorruptedInviteId,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -43,6 +45,16 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("Failed to decode invite ID: {}", msg),
+            },
+            ErrorType::QueryError => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Failed to post graphql query: {}", msg),
+            },
+            ErrorType::CorruptedInviteId => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Corrupted invite id: {}", msg),
             },
         }
     }

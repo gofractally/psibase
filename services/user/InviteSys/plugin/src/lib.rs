@@ -31,6 +31,24 @@ struct InviteParams {
     cb: String,
 }
 
+#[derive(Deserialize)]
+struct ResponseRoot {
+    data: Data,
+}
+
+#[allow(non_snake_case)]
+#[derive(Deserialize)]
+struct Data {
+    getInvite: Option<GetInvite>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Deserialize)]
+struct GetInvite {
+    pubkey: String,
+    inviter: String,
+}
+
 struct Component;
 
 // Consider moving to admin plugin
@@ -57,7 +75,7 @@ impl Invitee for Component {
     }
 
     fn decode_invite(id: InviteId) -> Result<Invite, CommonTypes::Error> {
-        let decoded = match URL_SAFE.decode(id) {
+        let decoded = match URL_SAFE.decode(id.to_owned()) {
             Ok(enc) => match String::from_utf8(enc) {
                 Ok(dec) => dec,
                 Err(_) => {
@@ -74,6 +92,39 @@ impl Invitee for Component {
                 return Err(DecodeInviteError.err("Error deserializing JSON string into object"));
             }
         };
+        let url = format!("{}/graphql", client::my_service_origin()?);
+        let pubkey = &decoded.pk;
+        let query = format!(
+            r#"query {{
+                getInvite(pubkey: "{pubkey}") {{
+                    pubkey,
+                    inviter
+                }}
+            }}"#,
+            pubkey = pubkey
+        );
+        let response: ResponseRoot = match server::post_graphql_get_json(&url, &query) {
+            Ok(o) => match serde_json::from_str(&o) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    return Err(QueryError.err(&e.to_string()));
+                }
+            },
+            Err(e) => {
+                return Err(QueryError.err(&e.message));
+            }
+        };
+        let inv = match response.data.getInvite {
+            Some(inv) => inv,
+            None => {
+                return Err(QueryError.err("Invite not found"));
+            }
+        };
+
+        if inv.inviter != decoded.inviter {
+            return Err(CorruptedInviteId.err(&id));
+        }
+
         Ok(Invite {
             inviter: decoded.inviter,
             app: decoded.app,
@@ -94,7 +145,9 @@ impl Inviter for Component {
         };
 
         // TODO: I actually need a function here to generate both a private and
-        //       public key (and return them both)
+        //         public key (and return them both). Private needs to be added to invite link,
+        //         while public is pushed in a tx to add the invite to the chain.
+        //       When I do this, also update decode.
         let pubkey_str = keyvault::generate_keypair()?;
         let pubkey: psibase::PublicKey = match pubkey_str.parse() {
             Ok(key) => key,

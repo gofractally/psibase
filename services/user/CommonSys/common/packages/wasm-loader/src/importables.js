@@ -21,7 +21,6 @@ function commonErr(val) {
 }
 
 function send(req) {
-  console.log(`[http] Send (browser) ${req.uri}`);
   try {
     const xhr = new XMLHttpRequest();
     xhr.open(req.method.toString(), req.uri, false);
@@ -32,7 +31,11 @@ function send(req) {
       }
     }
     xhr.send(req.body && req.body.length > 0 ? req.body : null);
-    const body = xhr.response ? new TextEncoder().encode(xhr.response) : undefined;
+    if (xhr.status === 500)
+    {
+      throw commonErr(`${xhr.response}`);
+    }
+    const body = xhr.response || undefined;
     const headers = [];
     xhr.getAllResponseHeaders().trim().split(/[\r\n]+/).forEach((line) => {
       var parts = line.split(': ');
@@ -51,7 +54,7 @@ function send(req) {
 }
 
 function postGraphQL(url, graphql) {
-  send({
+  return send({
     uri: url,
     method: "POST",
     headers: {
@@ -121,6 +124,7 @@ export const server = {
   {
     try {
       const res = postGraphQL(url, graphQL);
+      return res.body;
     }
     catch (e) {
       if (e instanceof Error) {
@@ -128,8 +132,6 @@ export const server = {
       }
       throw commonErr("GraphQL query failed.");
     }
-
-    return res.json();
   }
 }
 
