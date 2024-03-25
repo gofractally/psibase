@@ -20,13 +20,15 @@ psinode - The psibase blockchain server
 
 - `-l` *interface*, `--listen` *interface*
 
-  Accept connections on *interface*. If this argument is not provided, the HTTP server will not run. The argument can be any of the following:
+  Accept connections on *interface*. The argument can be any of the following:
 
   - A port number: Listens on `0.0.0.0` with the specified port
   - An IP address: Listen on port 80 on the given interface
   - An IP address and port separated by a colon: *ipv4*`:`*port* or `[`*ipv6*`]:`*port*
   - An `http` or `https` URL: The host component must be an IP address. All components other than the host and port must be empty. `https` requires `--tls-cert` and `--tls-key` to be provided.
   - A filesystem path: Listens on a local socket
+
+  This option can be used more than once to listen on multiple ports. If it appears in both the command line and the config file, however, any instances in the config file will be ignored. The default config file template uses port 8080.
 
 - `-p` *name*, `--producer` *name*
 
@@ -62,7 +64,7 @@ psinode - The psibase blockchain server
 
 - `--service` *host*:*path*
 
-  tells psinode to host static content from *path*.
+  tells psinode to host static content from *path*. This argument is included in the default config file template. It should typically not be necessary to change these default settings.
 
 - `--admin` `static:*` | `*` | *service*
 
@@ -97,7 +99,7 @@ psinode - The psibase blockchain server
 
 ### Configuration File
 
-Options can also be specified in a configuration file loaded from *database*`/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, it will be initialized with a default configuration file that includes the [administrator service](../../default-apps/admin-sys.md).
+Options can also be specified in a configuration file loaded from *database*`/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, a default config file will be created.
 
 The configuration file also controls [logging](../configuration/logging.md).
 
