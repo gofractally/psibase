@@ -918,7 +918,7 @@ namespace psio
          {
             if (old_end_pos != 0)
             {
-               parser.check_heap_pos(old_end_pos);
+               parser.check_heap_pos(parser.in.end_pos);
                parser.in.known_end = true;
                parser.in.end_pos   = old_end_pos;
                return {.kind = FracParser::end, .type = type};
