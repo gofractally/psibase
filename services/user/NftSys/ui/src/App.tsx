@@ -37,7 +37,7 @@ function App() {
         if (!supervisor) return;
         console.info("nft waiting for supervisor loaded");
         await supervisor.onLoaded();
-        supervisor.preLoadServices(["nft-sys"]);
+        // supervisor.preLoadServices(["nft-sys"]);
         console.info("nft-sys connected to Supervisor and plugins preloaded");
     };
 
@@ -108,8 +108,18 @@ function App() {
                         NFT
                     </Heading>
                 </div>
-                <NftTable nfts={nfts} actionHandlers={actionHandlers} />
-                <SendMintNft nfts={nfts} mintNft={mintNft} resMint={resMint} />
+                <div className="flex flex-col gap-4 lg:flex-row">
+                    <div className="flex-1">
+                        <NftTable nfts={nfts} actionHandlers={actionHandlers} />
+                    </div>
+                    <div className="flex justify-center">
+                        <SendMintNft
+                            nfts={nfts}
+                            mintNft={mintNft}
+                            resMint={resMint}
+                        />
+                    </div>
+                </div>
             </div>
         </>
     );

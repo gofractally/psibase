@@ -8,6 +8,10 @@ const psibase = (appletContract: string, isServing?: boolean) => {
     // TODO: iframeResizer should go away entirely! From rpc.ts too.
     const buildAliases = [
         {
+            find: "@",
+            replacement: path.resolve(__dirname, "./src"),
+        },
+        {
             find: "/common/iframeResizer.contentWindow.js",
             replacement: path.resolve(
                 "../../CommonSys/common/resources/thirdParty/src/iframeResizer.contentWindow.js",

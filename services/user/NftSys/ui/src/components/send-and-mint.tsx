@@ -1,12 +1,35 @@
 import { useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 
-import Button from "./button";
-import Form from "./form";
-import Icon from "./icon";
-import Text from "./text";
 import { Nft } from "../App";
-import { twJoin } from "tailwind-merge";
+
+import { Button } from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form";
 
 type TransferInputs = {
     nftId: string;
@@ -20,9 +43,8 @@ interface Props {
 }
 
 export const SendMintNft = ({ nfts, mintNft, resMint }: Props) => {
-    const [activeTab, setActiveTab] = useState<"send" | "mint">("send");
-    const [transferError, setTransferError] = useState("");
-    const [formSubmitted, setFormSubmitted] = useState(false);
+    const [_transferError, setTransferError] = useState("");
+    const [_formSubmitted, setFormSubmitted] = useState(false);
     // const [manualDebitMode, setManualDebitMode] = useState(false);
 
     // const [transferHistoryResult, invalidateTransferHistoryQuery] =
@@ -40,13 +62,7 @@ export const SendMintNft = ({ nfts, mintNft, resMint }: Props) => {
     //     invalidateSharedBalancesQuery();
     // };
 
-    const {
-        register,
-        handleSubmit,
-        formState: { errors },
-        setError,
-        reset,
-    } = useForm<TransferInputs>({
+    const form = useForm<TransferInputs>({
         defaultValues: {
             nftId: "",
             to: "",
@@ -54,21 +70,22 @@ export const SendMintNft = ({ nfts, mintNft, resMint }: Props) => {
     });
 
     const onSubmit: SubmitHandler<TransferInputs> = async (
-        _data: TransferInputs,
+        data: TransferInputs,
     ) => {
         setTransferError("");
         setFormSubmitted(true);
         try {
             // await transfer(data);
+            console.log(data);
             alert("transfer mocked success");
-            reset();
+            form.reset();
         } catch (e) {
             if (
                 Array.isArray(e) &&
                 typeof e[0] === "string" &&
                 e[0].includes("Invalid account")
             ) {
-                setError("to", { message: "Invalid account" });
+                form.setError("to", { message: "Invalid account" });
             } else {
                 console.error("TRANSFER ERROR", e);
                 setTransferError(`${e}`);
@@ -80,111 +97,107 @@ export const SendMintNft = ({ nfts, mintNft, resMint }: Props) => {
 
     const liquidNfts = nfts.filter((nft) => nft.status === "owned");
 
-    const nftOptions =
-        liquidNfts.length > 0 ? (
-            liquidNfts.map((nft) => (
-                <option value={nft.id} key={nft.id}>
-                    {nft.id}
-                </option>
-            ))
-        ) : (
-            <option key="no-nfts" disabled>
-                No available NFTs
-            </option>
-        );
-
     return (
-        <div className="bg-gray-100 p-3">
-            <div className="flex gap-1">
-                <button
-                    onClick={(e) => {
-                        e.preventDefault();
-                        setActiveTab("send");
-                    }}
-                    className={twJoin(
-                        "mb-4 flex h-10 w-24 select-none items-center justify-center gap-1.5 border-gray-500 transition-colors hover:bg-gray-200",
-                        activeTab === "send" && "border-b",
-                    )}
-                >
-                    <Icon type="arrow-up" size="xs" />
-                    <Text span className="font-semibold" size="base">
-                        Send
-                    </Text>
-                </button>
-                <button
-                    onClick={(e) => {
-                        e.preventDefault();
-                        setActiveTab("mint");
-                    }}
-                    className={twJoin(
-                        "mb-4 flex h-10 w-24 select-none items-center justify-center gap-1.5 border-gray-500 transition-colors hover:bg-gray-200",
-                        activeTab === "mint" && "border-b",
-                    )}
-                >
-                    <Icon type="loading" size="xs" />
-                    <Text span className="font-semibold" size="base">
-                        Mint
-                    </Text>
-                </button>
-            </div>
-            {activeTab === "send" ? (
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="flex w-full flex-col gap-3 lg:flex-row">
-                        <div className="flex-1">
-                            <Form.Select
-                                label="NFT ID"
-                                {...register("nftId", {
-                                    required: "This field is required",
-                                })}
-                                errorText={errors.nftId?.message}
-                            >
-                                {nftOptions}
-                            </Form.Select>
-                        </div>
-                        <div className="flex-1">
-                            <Form.Input
-                                label="To"
-                                placeholder="Recipient account"
-                                {...register("to", {
-                                    required: "This field is required",
-                                })}
-                                errorText={errors.to?.message}
-                            />
-                        </div>
-                    </div>
-                    <div className="mt-7">
-                        {transferError ? (
-                            <Text className="font-medium text-red-600">
-                                There was an error. Your transfer may not have
-                                been successful. Refresh the page to check your
-                                NFT list and try again if necessary.
-                            </Text>
-                        ) : (
-                            <Button
-                                type="outline"
-                                size="lg"
-                                isSubmit
-                                isLoading={formSubmitted}
-                                disabled={formSubmitted}
-                                className="w-48"
-                            >
-                                Send
-                            </Button>
-                        )}
-                    </div>
-                </form>
-            ) : (
-                <>
-                    <button
-                        onClick={mintNft}
-                        className="rounded-md border-2 border-blue-500 bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-600"
-                    >
-                        mint
-                    </button>
-                    <pre>{JSON.stringify(resMint, null, 2)}</pre>
-                </>
-            )}
-        </div>
+        <Tabs defaultValue="send" className="w-[400px]">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="send">Send</TabsTrigger>
+                <TabsTrigger value="mint">Mint</TabsTrigger>
+            </TabsList>
+            <TabsContent value="send">
+                <Card>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)}>
+                            <CardHeader>
+                                <CardTitle>Send an NFT</CardTitle>
+                                <CardDescription>
+                                    Send one of your NFTs to another account.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <FormField
+                                    control={form.control}
+                                    name="nftId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>NFT ID</FormLabel>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {liquidNfts.map((nft) => (
+                                                        <SelectItem
+                                                            value={nft.id.toString()}
+                                                            key={`option-${nft.id}`}
+                                                        >
+                                                            {nft.id}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage>
+                                                {
+                                                    form.formState.errors.nftId
+                                                        ?.message
+                                                }
+                                            </FormMessage>
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="to"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>To</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} />
+                                            </FormControl>
+                                            <FormDescription>
+                                                Account to send the NFT to
+                                            </FormDescription>
+                                            <FormMessage>
+                                                {
+                                                    form.formState.errors.to
+                                                        ?.message
+                                                }
+                                            </FormMessage>
+                                        </FormItem>
+                                    )}
+                                />
+                            </CardContent>
+                            <CardFooter>
+                                <Button type="submit">Send</Button>
+                            </CardFooter>
+                        </form>
+                    </Form>
+                </Card>
+            </TabsContent>
+            <TabsContent value="mint">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Mint a new NFT</CardTitle>
+                        <CardDescription>
+                            Create a new NFT on the Psibase blockchain.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        {resMint ? (
+                            <pre>{JSON.stringify(resMint, null, 2)}</pre>
+                        ) : null}
+                    </CardContent>
+                    <CardFooter>
+                        <Button onClick={mintNft}>
+                            Mintnpx shadcn-ui@latest add form
+                        </Button>
+                    </CardFooter>
+                </Card>
+            </TabsContent>
+        </Tabs>
     );
 };
 

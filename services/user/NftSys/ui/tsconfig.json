@@ -6,7 +6,9 @@
         "module": "ESNext",
         "esModuleInterop": true,
         "skipLibCheck": true,
+        "baseUrl": ".",
         "paths": {
+            "@/*": ["./src/*"],
             "@psibase/common-lib": [
                 "../../CommonSys/common/packages/common-lib/src"
             ],

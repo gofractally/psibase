@@ -1,15 +1,13 @@
 import React from "react";
 
-export type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "span";
+export type HeadingTag = "h1" | "h2" | "h3" | "h4" | "span";
 
 // NOTE: These should match what's in `index.css`.
 const HEADING_STYLES: { [key in HeadingTag]: string } = {
-    h1: "text-5xl md:text-6xl font-semibold",
-    h2: "text-4xl md:text-5xl font-semibold",
-    h3: "text-3xl md:text-4xl font-semibold",
-    h4: "text-2xl md:text-3xl font-semibold tracking-normal md:tracking-[-0.02em]",
-    h5: "text-xl md:text-2xl font-semibold",
-    h6: "text-lg leading-6 md:text-xl md:leading-7 font-semibold",
+    h1: "scroll-m-20 text-4xl font-bold tracking-tight lg:text-5xl",
+    h2: "scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0",
+    h3: "scroll-m-20 text-2xl font-semibold tracking-tight",
+    h4: "scroll-m-20 text-xl font-semibold tracking-tight",
     span: "",
 };
 
@@ -39,8 +37,7 @@ export const Heading = ({
     className,
     children,
 }: HeadingProps) => {
-    let styledAsClass = "";
-    if (styledAs) styledAsClass = HEADING_STYLES[styledAs];
+    const styledAsClass = HEADING_STYLES[styledAs ?? tag];
     return React.createElement(tag, {
         className: `${styledAsClass} ${className}`,
         children,
