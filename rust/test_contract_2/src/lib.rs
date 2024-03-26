@@ -1,20 +1,18 @@
-
-/// This is another example service that adds and multiplies `i32` 
+/// This is another example service that adds and multiplies `i32`
 /// numbers, similar to test_contract. This service has additional
 /// features such as writing tables, and providing a graphiql
 /// query interface.
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use psibase::*;
-    use serde::{Serialize, Deserialize};
     use async_graphql::*;
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
 
     /// Holds an answer to a calculation done by an account `id`
-    #[table(name="AnswerTable", index=0)]
+    #[table(name = "AnswerTable", index = 0)]
     #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject)]
     pub struct Answer {
-        
         /// The account responsible for the calculation
         #[primary_key]
         id: AccountNumber,
@@ -28,13 +26,16 @@ mod service {
         let res = a + b;
 
         let answer_table = AnswerTable::new();
-        answer_table.put(&Answer{
-            id : get_sender(),
-            result : res,
-        }).unwrap();
+        answer_table
+            .put(&Answer {
+                id: get_sender(),
+                result: res,
+            })
+            .unwrap();
+
+        Wrapper::emit().history().add(a, b, res);
 
         res
-
     }
 
     #[action]
@@ -42,21 +43,49 @@ mod service {
         let res = a * b;
 
         let answer_table = AnswerTable::new();
-        answer_table.put(&Answer{
-            id : get_sender(),
-            result : res,
-        }).unwrap();
+        answer_table
+            .put(&Answer {
+                id: get_sender(),
+                result: res,
+            })
+            .unwrap();
+
+        Wrapper::emit().history().multiply(a, b, res);
 
         res
     }
+
+    #[event(history)]
+    pub fn add(a: i32, b: i32, result: i32) {}
+    #[event(history)]
+    pub fn multiply(a: i32, b: i32, result: i32) {}
 
     struct Query;
 
     #[Object]
     impl Query {
         /// Get the answer to `account`'s most recent calculation
-        async fn answer(&self, account : AccountNumber) -> Option<Answer> {
+        async fn answer(&self, account: AccountNumber) -> Option<Answer> {
             AnswerTable::new().get_index_pk().get(&account)
+        }
+
+        /// Look up an event
+        ///
+        /// ```
+        /// query {
+        ///   event(id: 1) {
+        ///     __typename
+        ///     ... on Add {
+        ///       a b result
+        ///     }
+        ///     ... on Multiply {
+        ///       a b result
+        ///     }
+        ///   }
+        /// }
+        /// ```
+        async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
+            get_event(id)
         }
     }
 
