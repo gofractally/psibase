@@ -19,6 +19,6 @@ export const buildPreLoadPluginsRequest = (
 ): PreLoadPluginsRequest => ({
     type: PRE_LOAD_PLUGINS_REQUEST,
     payload: {
-        plugins,
-    },
+        plugins
+    }
 });

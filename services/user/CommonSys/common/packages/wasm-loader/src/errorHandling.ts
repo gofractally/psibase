@@ -94,7 +94,7 @@ export const isAddingAction = (e: any): e is Error => {
         typeof e.message === "string" &&
         e.message.includes("adding_action")
     );
-}
+};
 
 const isDeserializationError = (e: any) => {
     return (
@@ -119,13 +119,15 @@ const reply = (payload: any) => {
         buildPluginCallResponse(payload, []),
         siblingUrl(null, "supervisor-sys")
     );
-}
+};
 
 export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
     if (isDeserializationError(e)) {
         reply({
             errorType: "unrecoverable",
-            val: { message: `${toString(args)}: Possible plugin import code gen error.`}
+            val: {
+                message: `${toString(args)}: Possible plugin import code gen error.`
+            }
         });
     } else if (
         e instanceof Error &&
@@ -148,29 +150,29 @@ export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
                 message: `${toString(args)}: Possible plugin import code gen error`
             }
         });
-    } else if ( e instanceof PluginDownloadFailed ) {
-        let {service, plugin} = e.pluginId;
+    } else if (e instanceof PluginDownloadFailed) {
+        let { service, plugin } = e.pluginId;
         reply({
             errorType: "unrecoverable",
             val: {
                 message: `${toString(args)}: Failed to download ${service}:${plugin}.`
             }
         });
-    } else if ( e instanceof ParserDownloadFailed ) {
+    } else if (e instanceof ParserDownloadFailed) {
         reply({
             errorType: "unrecoverable",
             val: {
                 message: `${toString(args)}: Failed to download parser. Possible network issues.`
             }
         });
-    } else if ( e instanceof ParsingFailed ) {
+    } else if (e instanceof ParsingFailed) {
         reply({
             errorType: "unrecoverable",
             val: {
                 message: `${toString(args)}: Parsing plugin failed. Possible invalid wit syntax.`
             }
         });
-    } else if (e instanceof InvalidPlugin ) {
+    } else if (e instanceof InvalidPlugin) {
         reply({
             errorType: "unrecoverable",
             val: {
@@ -179,18 +181,21 @@ export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
         });
     } else {
         // Unrecognized error
-        if (e instanceof Error)
-        {
+        if (e instanceof Error) {
             reply({
                 errorType: "unrecoverable",
-                val: { error: e.name, message: `${toString(args)}: ${e.message}` }
+                val: {
+                    error: e.name,
+                    message: `${toString(args)}: ${e.message}`
+                }
             });
-        }
-        else 
-        {
+        } else {
             reply({
                 errorType: "unrecoverable",
-                val: { error: "unknown", message: `${toString(args)}: ${JSON.stringify(e, null, 2)}` }
+                val: {
+                    error: "unknown",
+                    message: `${toString(args)}: ${JSON.stringify(e, null, 2)}`
+                }
             });
         }
     }

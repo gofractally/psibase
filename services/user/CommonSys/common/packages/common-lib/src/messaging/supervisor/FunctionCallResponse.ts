@@ -3,7 +3,7 @@ import { FunctionCallArgs } from "./index";
 
 export interface FunctionCallResponse {
     type: typeof FUNCTION_CALL_RESPONSE;
-    call: FunctionCallArgs,
+    call: FunctionCallArgs;
     result: any;
 }
 
@@ -13,7 +13,7 @@ export const isFunctionCallResponse = (
     return data && data.type == FUNCTION_CALL_RESPONSE;
 };
 
-export const isErrorResult = (result : any) => {
+export const isErrorResult = (result: any) => {
     return (
         typeof result === "object" &&
         "errorType" in result &&
@@ -21,11 +21,11 @@ export const isErrorResult = (result : any) => {
         "val" in result &&
         typeof result.val === "object"
     );
-}
+};
 
-export const isErrorResponse = (response : FunctionCallResponse) => {
+export const isErrorResponse = (response: FunctionCallResponse) => {
     return isErrorResult(response.result);
-}
+};
 
 export const buildFunctionCallResponse = (
     call: FunctionCallArgs,
@@ -34,6 +34,6 @@ export const buildFunctionCallResponse = (
     return {
         type: FUNCTION_CALL_RESPONSE,
         call,
-        result,
+        result
     };
 };

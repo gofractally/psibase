@@ -4,7 +4,7 @@ import hashJs from "hash.js";
 // Key type
 export const KeyType = {
     k1: 0,
-    r1: 1,
+    r1: 1
 };
 
 const publicKeyDataSize = 33;
@@ -126,13 +126,13 @@ export function privateStringToKeyPair(s: string) {
         [keyType, data, ec] = [
             KeyType.k1,
             stringToKey(s.substr(7), privateKeyDataSize, "K1"),
-            getK1(),
+            getK1()
         ];
     else if (s.substr(0, 7) === "PVT_R1_")
         [keyType, data, ec] = [
             KeyType.r1,
             stringToKey(s.substr(7), privateKeyDataSize, "R1"),
-            getR1(),
+            getR1()
         ];
     else throw new Error("private key must begin with PVT_K1_ or PVT_R1_");
     return { keyType, keyPair: ec.keyFromPrivate(data) };
@@ -145,13 +145,13 @@ export function publicStringToKeyPair(s: string) {
         [keyType, data, ec] = [
             KeyType.k1,
             stringToKey(s.substr(7), publicKeyDataSize, "K1"),
-            getK1(),
+            getK1()
         ];
     else if (s.substr(0, 7) === "PUB_R1_")
         [keyType, data, ec] = [
             KeyType.r1,
             stringToKey(s.substr(7), publicKeyDataSize, "R1"),
-            getR1(),
+            getR1()
         ];
     else throw new Error("public key must begin with PUB_K1_ or PUB_R1_");
     return { keyType, keyPair: ec.keyPair({ pub: data as Buffer }) };
@@ -190,7 +190,7 @@ export function publicKeyPairToFracpack({ keyType, keyPair }: any): Uint8Array {
             0,
             0,
             0, // variant size
-            y[31] & 1 ? 3 : 2, // inner array begins here
+            y[31] & 1 ? 3 : 2 // inner array begins here
         ].concat(x)
     );
 }
@@ -252,7 +252,7 @@ export function signatureToFracpack({ keyType, signature }: any): Uint8Array {
             64,
             0,
             0,
-            0, // variant size
+            0 // variant size
         ].concat(r, s)
     );
 }
@@ -266,7 +266,7 @@ export function signatureToBin({ signature }: any) {
 export function keyPairStrings(key: any): any {
     return {
         pub: publicKeyPairToString(key),
-        priv: privateKeyPairToString(key),
+        priv: privateKeyPairToString(key)
     };
 }
 

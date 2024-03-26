@@ -10,7 +10,7 @@ import {
     LoaderPreloadStart,
     buildPreloadCompleteMessage,
     toString,
-    buildPluginSyncCall,
+    buildPluginSyncCall
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib";
 import { CallCache } from "./callCache";
@@ -76,7 +76,7 @@ const componentParser = async () => {
 
 const getParsed = async (plugin: string) => {
     if (!cache.exists(`${plugin}-parsed`)) {
-        const pBytes: Uint8Array = await pluginBytes(plugin); //Await?
+        const pBytes: Uint8Array = await pluginBytes(plugin);
         try {
             cache.cacheData(
                 `${plugin}-parsed`,
@@ -240,8 +240,7 @@ const onPluginCallRequest = async (pluginCallPayload: PluginCallPayload) => {
             ...getImportFills(parsed.importedFuncs, resultCache)
         ];
 
-        // TODO: Once we replace instead of using the rollup plugin, we can have a much better
-        //   caching strategy. Transpilation only needs to happen once.
+        // Todo: Performance improvement - Cache transpilation output
         // @ts-ignore
         const pluginModule = await load(pBytes, importables);
 
@@ -349,14 +348,3 @@ const onPreloadStart = async (message: LoaderPreloadStart) => {
 
 window.addEventListener("message", onRawEvent);
 window.parent.postMessage(buildMessageLoaderInitialized(), supervisorDomain);
-
-/* On Caching the static imports
-These could be cached and then cleared on each non-sync call. Non-sync calls signify completion, 
-    and therefore this cache item should be deleted on completion so it gets recreated for the 
-    next invocation (which will presumably have a new caller, etc.).
-However, if there is an external error and we aren't notified, it could cause us to leave stale
-    static imports cached, which could be a security risk (Evaluating requests for action as 
-    though they are from a sender with higher permissions than the actual sender, for example). For 
-    this reason, and because caching static imports is likely low impact, it is better to simply 
-    rebuild them on every re-entry for now.
-*/

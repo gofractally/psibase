@@ -90,12 +90,13 @@ export class Supervisor {
             } else if (messageEvent.origin !== myOrigin) {
                 console.log("Received unauthorized message. Ignoring.");
             }
-        }
-        catch(e) {
+        } catch (e) {
             if (e instanceof Error) {
                 console.error(e.message);
             } else {
-                console.error(`Unrecognized error: ${JSON.stringify(e, null, 2)}`);
+                console.error(
+                    `Unrecognized error: ${JSON.stringify(e, null, 2)}`
+                );
             }
         }
     }
@@ -113,16 +114,22 @@ export class Supervisor {
         }
         const expected = this.pendingRequest!.call;
         const received = response.call;
-        const unexpected: boolean = expected.method != received.method || expected.service != received.service;
+        const unexpected: boolean =
+            expected.method != received.method ||
+            expected.service != received.service;
 
         if (isErrorResponse(response)) {
             this.pendingRequest!.reject(response.result.val);
         } else {
             if (unexpected) {
-                // Could be infra error rather than plugin error, printing to console to increase probability 
+                // Could be infra error rather than plugin error, printing to console to increase probability
                 // that it gets reported.
-                console.warn(`Expected reply to ${toString(expected)} but received reply to ${toString(received)}`);
-                this.pendingRequest!.reject(`Expected reply to ${toString(expected)} but received reply to ${toString(received)}`);
+                console.warn(
+                    `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`
+                );
+                this.pendingRequest!.reject(
+                    `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`
+                );
             }
 
             this.pendingRequest!.resolve(response.result);
@@ -172,9 +179,9 @@ export class Supervisor {
 
     preLoadPlugins(plugins: PluginId[]) {
         // Fully qualify any plugins with default values
-        let fqPlugins: QualifiedPluginId[] = plugins.map(plugin => ({
+        let fqPlugins: QualifiedPluginId[] = plugins.map((plugin) => ({
             ...plugin,
-            plugin: plugin.plugin || "plugin",
+            plugin: plugin.plugin || "plugin"
         }));
 
         const message = buildPreLoadPluginsRequest(fqPlugins);

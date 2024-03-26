@@ -52,12 +52,7 @@ interface keyvault {
 }
 
 world psibase-plugin {
-
-    // Needed for getting the currently logged in user, which is 
-    // necessary to generate the correct claim
     import account-sys:plugin/accounts;
-
-    // Needed for access to query functionality
     import common:plugin/server;
 
     export smart-auth;

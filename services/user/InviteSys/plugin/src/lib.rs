@@ -45,7 +45,7 @@ struct Data {
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
 struct GetInvite {
-    pubkey: String,
+    _pubkey: String,
     inviter: String,
 }
 

@@ -36,10 +36,9 @@ export const isPluginCallRequest = (data: any): data is PluginCallRequest => {
     return isEventTypeSatisfied && isSchemaSatisfied;
 };
 
-
 export const buildPluginCallRequest = (
     payload: PluginCallPayload
 ): PluginCallRequest => ({
     type: PLUGIN_CALL_REQUEST,
-    payload,
+    payload
 });

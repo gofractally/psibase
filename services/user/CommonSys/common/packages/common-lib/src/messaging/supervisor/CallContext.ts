@@ -12,7 +12,9 @@ export class CallStack {
     private storage: Array<Call> = [];
 
     push(item: Call): void {
-        console.log(`Callstack: ${' '.repeat(4*(this.storage.length))}+${toString(item.args)}`);
+        console.log(
+            `Callstack: ${" ".repeat(4 * this.storage.length)}+${toString(item.args)}`
+        );
 
         item.startTime = item.startTime || Date.now();
 
@@ -27,7 +29,9 @@ export class CallStack {
 
         let beingPopped = this.peek()!;
         let resolutionTime = Date.now() - beingPopped.startTime!;
-        console.log(`Callstack: ${' '.repeat(4*(this.storage.length - 1))}-${toString(beingPopped.args)} [${resolutionTime} ms]`);
+        console.log(
+            `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}-${toString(beingPopped.args)} [${resolutionTime} ms]`
+        );
 
         return this.storage.pop();
     }
@@ -70,7 +74,7 @@ export class CallContext {
     public callStack: CallStack;
     public rootAppOrigin: string;
     public addableActions: AddableAction[];
-    
+
     private cache: ResultCache[];
 
     constructor() {

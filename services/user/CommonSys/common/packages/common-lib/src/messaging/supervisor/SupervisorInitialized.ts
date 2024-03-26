@@ -14,5 +14,5 @@ export const isIFrameInitialized = (
 
 export const buildMessageIFrameInitialized = (): SupervisorInitialized => ({
     payload: {},
-    type: SUPERVISOR_INITIALIZED,
+    type: SUPERVISOR_INITIALIZED
 });

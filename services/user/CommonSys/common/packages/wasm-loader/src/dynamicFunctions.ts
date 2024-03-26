@@ -8,30 +8,35 @@ interface PluginFunc {
 }
 
 type FunctionInterface = {
-    namespace: string,
-    package: string,
-    name: string,
-    funcs: string[]
-}
+    namespace: string;
+    package: string;
+    name: string;
+    funcs: string[];
+};
 
 type ImportedFunctions = {
-    namespace: string,
-    package: string,
-    interfaces: FunctionInterface[],
-    funcs: string[]
-}
+    namespace: string;
+    package: string;
+    interfaces: FunctionInterface[];
+    funcs: string[];
+};
 
 const hostIntf = (intf: FunctionInterface): boolean => {
     return intf.namespace === "wasi" || intf.namespace === "common";
 };
 
-const getFunctionBody = (pluginFunc: PluginFunc, resultCache: ResultCache[]): string => {
-    let {service, plugin, intf, method} = pluginFunc;
-    const found = resultCache.find((f: ResultCache)=>{
-        return f.callService == service
-            && f.callPlugin == plugin
-            && f.callIntf == intf
-            && f.callMethod == method;
+const getFunctionBody = (
+    pluginFunc: PluginFunc,
+    resultCache: ResultCache[]
+): string => {
+    let { service, plugin, intf, method } = pluginFunc;
+    const found = resultCache.find((f: ResultCache) => {
+        return (
+            f.callService == service &&
+            f.callPlugin == plugin &&
+            f.callIntf == intf &&
+            f.callMethod == method
+        );
     });
     if (!found) {
         return `
@@ -44,16 +49,14 @@ const getFunctionBody = (pluginFunc: PluginFunc, resultCache: ResultCache[]): st
                     method: '${method}',
                     params: [...args]
                 }}));
-        `
+        `;
     } else {
         if (found.result !== undefined) {
             if (isErrorResult(found.result)) {
-                return `throw ${JSON.stringify(found.result.val)};`
+                return `throw ${JSON.stringify(found.result.val)};`;
+            } else {
+                return `return ${JSON.stringify(found.result)};`;
             }
-            else {
-                return `return ${JSON.stringify(found.result)};`
-            }
-            
         } else {
             return ""; // No-op if the sync call has no return value.
         }
@@ -61,8 +64,8 @@ const getFunctionBody = (pluginFunc: PluginFunc, resultCache: ResultCache[]): st
 };
 
 interface PkgId {
-    ns: string, 
-    pkg: string,
+    ns: string;
+    pkg: string;
 }
 const serializePkgId = (pkgId: PkgId): string => `${pkgId.ns}:${pkgId.pkg}`;
 interface FunctionIntfs {
@@ -80,9 +83,8 @@ const autoArrayInit = {
 export const getImportFills = (
     importedFuncs: ImportedFunctions,
     resultCache: ResultCache[]
-): { [key: string]: string }[] => 
-{
-    const {interfaces, funcs: freeFunctions} = importedFuncs;
+): { [key: string]: string }[] => {
+    const { interfaces, funcs: freeFunctions } = importedFuncs;
     if (freeFunctions.length !== 0) {
         // TODO: Check how this behaves if a plugin exports a freestanding function and
         //       another plugin imports it.
@@ -90,25 +92,35 @@ export const getImportFills = (
     }
 
     let importables: { [key: string]: string }[] = [];
-    let subset = interfaces.filter(i=>{
+    let subset = interfaces.filter((i) => {
         return !hostIntf(i) && !(i.funcs.length === 0);
     });
 
     let namespaced: FunctionIntfs = new Proxy({}, autoArrayInit);
     subset.forEach((intf: FunctionInterface) => {
-        let key: PkgId = {ns: intf.namespace, pkg: intf.package};
+        let key: PkgId = { ns: intf.namespace, pkg: intf.package };
         namespaced[serializePkgId(key)].push(intf);
     });
 
     for (const [pkgId, intfs] of Object.entries(namespaced)) {
-        let imp : string[] = [];
+        let imp: string[] = [];
         intfs.forEach((intf: FunctionInterface) => {
             imp.push(`export const ${intf.name} = {
             `);
-            intf.funcs.forEach((f: string)=>{
+            intf.funcs.forEach((f: string) => {
                 imp.push(`${f}(...args) {
                 `);
-                imp.push(getFunctionBody({service: intf.namespace, plugin: intf.package, intf: intf.name, method: f}, resultCache));
+                imp.push(
+                    getFunctionBody(
+                        {
+                            service: intf.namespace,
+                            plugin: intf.package,
+                            intf: intf.name,
+                            method: f
+                        },
+                        resultCache
+                    )
+                );
                 imp.push(`},`);
             });
             imp.push(`}`);
@@ -116,4 +128,4 @@ export const getImportFills = (
         importables.push({ [`${pkgId}/*`]: `${imp.join("")}` });
     }
     return importables;
-}
+};

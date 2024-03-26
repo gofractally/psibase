@@ -1,4 +1,9 @@
-import { getTaposForHeadBlock, siblingUrl, signAndPushTransaction, uint8ArrayToHex } from "@psibase/common-lib";
+import {
+    getTaposForHeadBlock,
+    siblingUrl,
+    signAndPushTransaction,
+    uint8ArrayToHex
+} from "@psibase/common-lib";
 import {
     FunctionCallRequest,
     buildMessageIFrameInitialized,
@@ -17,7 +22,12 @@ import {
     isErrorResult,
     QualifiedPluginId
 } from "@psibase/common-lib/messaging";
-import { LoaderPreloadComplete, buildPreloadStartMessage, isLoaderInitMessage, isPreloadCompleteMessage } from "@psibase/common-lib/messaging/supervisor/LoaderInitialized";
+import {
+    LoaderPreloadComplete,
+    buildPreloadStartMessage,
+    isLoaderInitMessage,
+    isPreloadCompleteMessage
+} from "@psibase/common-lib/messaging/supervisor/LoaderInitialized";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -49,36 +59,42 @@ const autoArrayInit = {
 const pluginManagers: PluginManagers = new Proxy({}, autoArrayInit);
 
 const addPluginManager = (pluginId: QualifiedPluginId): boolean => {
-    const {service, plugin} = pluginId;
-    if (!pluginManagers[service].includes(plugin))
-    {
+    const { service, plugin } = pluginId;
+    if (!pluginManagers[service].includes(plugin)) {
         pluginManagers[service].push(plugin);
         return true;
     }
     return false;
 };
 
-const getOnLoaderInit = (frameInfo: FrameInfo, resolve: (value: HTMLIFrameElement | PromiseLike<HTMLIFrameElement>) => void) => {
+const getOnLoaderInit = (
+    frameInfo: FrameInfo,
+    resolve: (value: HTMLIFrameElement | PromiseLike<HTMLIFrameElement>) => void
+) => {
     return (message: MessageEvent<any>) => {
         if (isLoaderInitMessage(message.data)) {
             // Is message from the right child?
             if (message.origin !== new URL(frameInfo.src).origin) return;
 
-            const loader = document.getElementById(frameInfo.id) as HTMLIFrameElement;
+            const loader = document.getElementById(
+                frameInfo.id
+            ) as HTMLIFrameElement;
             if (!(loader && loader.contentWindow)) {
-                console.error(`${frameInfo.service} sent LOADER_INITIALIZED, but the loader is not ready to receive messages.`);
+                console.error(
+                    `${frameInfo.service} sent LOADER_INITIALIZED, but the loader is not ready to receive messages.`
+                );
                 return;
             }
 
             resolve(loader);
         }
     };
-}
+};
 
 interface FrameInfo {
-    id: string,
-    service: string,
-    src: string
+    id: string;
+    service: string;
+    src: string;
 }
 
 const addIframe = (service: string) => {
@@ -87,7 +103,7 @@ const addIframe = (service: string) => {
     iframe.src = createLoaderDomain(service);
     iframe.style.display = "none";
 
-    let {readyState} = document;
+    let { readyState } = document;
     if (readyState === "complete" || readyState === "interactive") {
         document.body.appendChild(iframe);
     } else {
@@ -96,13 +112,10 @@ const addIframe = (service: string) => {
         });
     }
 
-    return {id: iframe.id, service, src: iframe.src};
-}
+    return { id: iframe.id, service, src: iframe.src };
+};
 
-const getLoader = async (
-    service: string
-): Promise<HTMLIFrameElement> => {
-
+const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
     // Get loader if it exists
     const iFrameId = buildIFrameId(service);
     const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
@@ -124,7 +137,7 @@ const prepareServicePlugins = async (service: string, plugins: string[]) => {
         buildPreloadStartMessage(plugins),
         siblingUrl(null, service)
     );
-}
+};
 
 const sendPluginCallRequest = async (param: PluginCallPayload) => {
     const iframe = await getLoader(param.args.service);
@@ -133,8 +146,8 @@ const sendPluginCallRequest = async (param: PluginCallPayload) => {
         siblingUrl(null, param.args.service)
     );
 
-    let {service, plugin} = param.args;
-    addPluginManager({service, plugin});
+    let { service, plugin } = param.args;
+    addPluginManager({ service, plugin });
 };
 
 const processTop = () => {
@@ -190,8 +203,8 @@ const verifyOriginOnTopOfStack = (origin: string) => {
         if (expectedHost != origin) {
             if (callStack.peek()!.caller == origin) {
                 // If this happens, it's the secondary sync call notification that can happen.
-                // It can be safely ignored. This check can be removed once this issue is 
-                //   resolved: https://github.com/bytecodealliance/jco/issues/405 and the sync 
+                // It can be safely ignored. This check can be removed once this issue is
+                //   resolved: https://github.com/bytecodealliance/jco/issues/405 and the sync
                 //   call throw in the loader is moved from within the import to the catch handler.
             }
             throw Error(
@@ -209,18 +222,20 @@ const isUnrecoverableError = (result: any) => {
     return isErrorResult(result) && result.errorType === "unrecoverable";
 };
 
-const onPluginCallResponse = async (origin: string, message: PluginCallResponse) => {
+const onPluginCallResponse = async (
+    origin: string,
+    message: PluginCallResponse
+) => {
     if (!context.rootAppOrigin)
         throw new Error(`Plugin responded to unknown root application origin.`);
 
     verifyOriginOnTopOfStack(origin);
 
-    let {actions: newActions, result} = message;
+    let { actions: newActions, result } = message;
 
     let returningCall = callStack.pop()!;
 
-    if (newActions.length > 0)
-    {
+    if (newActions.length > 0) {
         context.addActionsToTx(newActions);
     }
 
@@ -228,24 +243,23 @@ const onPluginCallResponse = async (origin: string, message: PluginCallResponse)
     let isLastCall = callStack.isEmpty();
 
     if (isError || isLastCall) {
-
         if (!isError && isLastCall) {
-            if (context.addableActions.length > 0)
-            {
-                let actions = context.addableActions.map((a)=>{return {
+            if (context.addableActions.length > 0) {
+                let actions = context.addableActions.map((a) => {
+                    return {
                         sender: "alice",
                         service: a.service,
                         method: a.action,
-                        rawData: uint8ArrayToHex(a.args),
+                        rawData: uint8ArrayToHex(a.args)
                     };
                 });
                 const tenSeconds = 10000;
                 const transaction: any = {
                     tapos: {
-                        ...await getTaposForHeadBlock(supervisorDomain),
-                        expiration: new Date(Date.now() + tenSeconds),
+                        ...(await getTaposForHeadBlock(supervisorDomain)),
+                        expiration: new Date(Date.now() + tenSeconds)
                     },
-                    actions,
+                    actions
                 };
                 await signAndPushTransaction(supervisorDomain, transaction, []);
             }
@@ -272,7 +286,7 @@ const onPluginCallResponse = async (origin: string, message: PluginCallResponse)
             callIntf,
             callMethod,
             args_json: JSON.stringify(returningCall.args.params),
-            result,
+            result
         });
 
         processTop();
@@ -290,12 +304,16 @@ const onPluginSyncCall = (origin: string, message: PluginSyncCall) => {
     processTop();
 };
 
-const onPreloadPluginsRequest = async ({ payload }: PreLoadPluginsRequest): Promise<void> => {
-    let {plugins} = payload;
+const onPreloadPluginsRequest = async ({
+    payload
+}: PreLoadPluginsRequest): Promise<void> => {
+    let { plugins } = payload;
     // Get all loaders
-    await Promise.all(plugins.map((pluginId: QualifiedPluginId) => {
-        return getLoader(pluginId.service);
-    }));
+    await Promise.all(
+        plugins.map((pluginId: QualifiedPluginId) => {
+            return getLoader(pluginId.service);
+        })
+    );
 
     // Load plugins
     plugins.forEach(addPluginManager);
@@ -305,9 +323,11 @@ const onPreloadPluginsRequest = async ({ payload }: PreLoadPluginsRequest): Prom
     }
 };
 
-const onPreloadComplete = async ({ payload: _payload }: LoaderPreloadComplete) => {
+const onPreloadComplete = async ({
+    payload: _payload
+}: LoaderPreloadComplete) => {
     // TODO: Use dependencies from the payload to DFS load other plugins
-}
+};
 
 const isMessageFromApplication = (message: MessageEvent) => {
     const isTop = message.source == window.top;
