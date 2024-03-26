@@ -1,3 +1,7 @@
+/*
+    Original source: https://github.com/DougAnderson444/rollup-plugin-wit-component
+*/
+
 // transpile our wasm code into a JavaScript module
 import { transpile } from '@bytecodealliance/jco';
 // rollup our JavaScript module into a single file
