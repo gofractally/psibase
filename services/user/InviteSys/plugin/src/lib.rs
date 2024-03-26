@@ -75,23 +75,19 @@ impl Invitee for Component {
     }
 
     fn decode_invite(id: InviteId) -> Result<Invite, CommonTypes::Error> {
-        let decoded = match URL_SAFE.decode(id.to_owned()) {
-            Ok(enc) => match String::from_utf8(enc) {
-                Ok(dec) => dec,
-                Err(_) => {
-                    return Err(DecodeInviteError.err("Error converting from UTF8"));
-                }
-            },
-            Err(_) => {
-                return Err(DecodeInviteError.err("Error decoding base64"));
-            }
-        };
-        let decoded: InviteParams = match serde_json::from_str(&decoded) {
-            Ok(d) => d,
-            Err(_) => {
-                return Err(DecodeInviteError.err("Error deserializing JSON string into object"));
-            }
-        };
+        let decoded: InviteParams = URL_SAFE
+            .decode(id.to_owned())
+            .map_err(|_| DecodeInviteError.err("Error decoding base64"))
+            .and_then(|enc| {
+                String::from_utf8(enc)
+                    .map_err(|_| DecodeInviteError.err("Error converting from UTF8"))
+            })
+            .and_then(|decoded| {
+                serde_json::from_str(&decoded).map_err(|_| {
+                    DecodeInviteError.err("Error deserializing JSON string into object")
+                })
+            })?;
+
         let url = format!("{}/graphql", client::my_service_origin()?);
         let pubkey = &decoded.pk;
         let query = format!(
@@ -103,25 +99,20 @@ impl Invitee for Component {
             }}"#,
             pubkey = pubkey
         );
-        let response: ResponseRoot = match server::post_graphql_get_json(&url, &query) {
-            Ok(o) => match serde_json::from_str(&o) {
-                Ok(parsed) => parsed,
-                Err(e) => {
-                    return Err(QueryError.err(&e.to_string()));
-                }
-            },
-            Err(e) => {
-                return Err(QueryError.err(&e.message));
-            }
-        };
-        let inv = match response.data.getInvite {
-            Some(inv) => inv,
-            None => {
-                return Err(QueryError.err("Invite not found"));
-            }
-        };
 
-        if inv.inviter != decoded.inviter {
+        let invite: GetInvite = server::post_graphql_get_json(&url, &query)
+            .map_err(|e| QueryError.err(&e.message))
+            .and_then(|result| {
+                serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
+            })
+            .and_then(|response_root: ResponseRoot| {
+                response_root
+                    .data
+                    .getInvite
+                    .ok_or_else(|| QueryError.err("Invite not found"))
+            })?;
+
+        if invite.inviter != decoded.inviter {
             return Err(CorruptedInviteId.err(&id));
         }
 
@@ -135,26 +126,16 @@ impl Invitee for Component {
 
 impl Inviter for Component {
     fn generate_invite(callback_subpath: String) -> Result<Url, CommonTypes::Error> {
-        let inviter = accounts::get_logged_in_user()?;
-
-        let inviter = match inviter {
-            Some(i) => i,
-            None => {
-                return Err(InviterLoggedIn.err(""));
-            }
-        };
+        let inviter = accounts::get_logged_in_user()?.ok_or_else(|| InviterLoggedIn.err(""))?;
 
         // TODO: I actually need a function here to generate both a private and
         //         public key (and return them both). Private needs to be added to invite link,
         //         while public is pushed in a tx to add the invite to the chain.
         //       When I do this, also update decode.
         let pubkey_str = keyvault::generate_keypair()?;
-        let pubkey: psibase::PublicKey = match pubkey_str.parse() {
-            Ok(key) => key,
-            Err(_) => {
-                return Err(PubKeyParse.err(&pubkey_str));
-            }
-        };
+        let pubkey: psibase::PublicKey = pubkey_str
+            .parse()
+            .map_err(|_| PubKeyParse.err(&pubkey_str))?;
 
         server::add_action_to_transaction(
             "createInvite",
@@ -177,12 +158,8 @@ impl Inviter for Component {
             pk: pubkey_str,
             cb: callback_url,
         };
-        let params = match serde_json::to_string(&params) {
-            Ok(p) => p,
-            Err(_) => {
-                return Err(SerializationError.err("Serializing invite id params"));
-            }
-        };
+        let params = serde_json::to_string(&params)
+            .map_err(|_| SerializationError.err("Serializing invite id params"))?;
 
         let query_string = format!("id={}", URL_SAFE.encode(params));
         Ok(format!("{}?{}", link_root, query_string))
