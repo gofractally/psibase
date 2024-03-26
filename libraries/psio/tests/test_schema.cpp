@@ -71,8 +71,8 @@ TEST_CASE("schema optional member")
    schema.insert("s", Object{{Member{"value", Option{Int{.bits = 32, .isSigned = true}}}}});
    CompiledSchema cschema{schema};
    CHECK(to_json(cschema, "s", "0400040000002A000000") == R"({"value":42})");
-   CHECK(to_json(cschema, "s", "08000100000004000000") == R"({})");
-   CHECK(to_json(cschema, "s", "0000") == R"({})");
+   CHECK(to_json(cschema, "s", "08000100000004000000") == R"({"value":null})");
+   CHECK(to_json(cschema, "s", "0000") == R"({"value":null})");
 }
 
 TEST_CASE("schema resolve")
@@ -82,8 +82,8 @@ TEST_CASE("schema resolve")
    schema.insert("s", Object{{Member{"value", Option{"i32"}}}});
    CompiledSchema cschema{schema};
    CHECK(to_json(cschema, "s", "0400040000002A000000") == R"({"value":42})");
-   CHECK(to_json(cschema, "s", "08000100000004000000") == R"({})");
-   CHECK(to_json(cschema, "s", "0000") == R"({})");
+   CHECK(to_json(cschema, "s", "08000100000004000000") == R"({"value":null})");
+   CHECK(to_json(cschema, "s", "0000") == R"({"value":null})");
 }
 
 struct MyType
