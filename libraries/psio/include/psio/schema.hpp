@@ -1527,11 +1527,157 @@ namespace psio
          }
          Schema build() &&
          {
+            optimize();
             ids.clear();
             return std::move(schema);
          }
 
+         void optimize()
+         {
+            std::map<std::string, std::vector<AnyType*>> refs;
+            // Group all aliases, user defined types are not replaced
+            // lower numbered aliases are preferred.
+            std::map<std::string, std::string> resolved;
+            for (auto& [name, type] : schema.types)
+            {
+               if (auto* alias = std::get_if<Type>(&type.value))
+               {
+                  addAlias(resolved, name, alias->type);
+               }
+               else
+               {
+                  addRef(refs, type);
+               }
+               refs.try_emplace(name);
+            }
+            // Unify references to the same type
+            for (auto& [name, locations] : refs)
+            {
+               const auto& alias = resolveAlias(resolved, name);
+               setChain(resolved, name, alias);
+               if (name != alias)
+               {
+                  auto& alias_locations = refs[alias];
+                  alias_locations.insert(alias_locations.end(), locations.begin(), locations.end());
+                  locations.clear();
+                  // ensure that the resolved location holds the actual type
+                  auto pos = schema.types.find(name);
+                  if (!std::holds_alternative<Type>(pos->second.value))
+                  {
+                     schema.types.find(alias)->second = std::move(pos->second);
+                  }
+                  schema.types.erase(pos);
+               }
+            }
+            // Write the resolved types into schema
+            for (const auto& [name, locations] : refs)
+            {
+               if (name.starts_with('@') && locations.size() == 1)
+               {
+                  auto pos           = schema.types.find(name);
+                  *locations.front() = std::move(pos->second);
+                  schema.types.erase(pos);
+               }
+               else
+               {
+                  for (AnyType* loc : locations)
+                  {
+                     *loc = Type{name};
+                  }
+               }
+            }
+         }
+
         private:
+         static void addRef(auto& refs, AnyType& type)
+         {
+            std::visit([&](auto& t) { addRef(refs, type, t); }, type.value);
+         }
+         static void addRef(auto& refs, AnyType&, List& type) { addRef(refs, *type.type); }
+         static void addRef(auto& refs, AnyType&, Array& type) { addRef(refs, *type.type); }
+         static void addRef(auto& refs, AnyType&, Option& type) { addRef(refs, *type.type); }
+         static void addRef(auto& refs, AnyType&, Custom& type) { addRef(refs, *type.type); }
+         static void addRef(auto& refs, std::vector<Member>& types)
+         {
+            for (auto& member : types)
+            {
+               addRef(refs, member.type);
+            }
+         }
+         static void addRef(auto& refs, AnyType&, Object& type) { addRef(refs, type.members); }
+         static void addRef(auto& refs, AnyType&, Struct& type) { addRef(refs, type.members); }
+         static void addRef(auto& refs, AnyType&, Tuple& type)
+         {
+            for (auto& member : type.members)
+            {
+               addRef(refs, member);
+            }
+         }
+         static void addRef(auto& refs, AnyType&, Variant& type) { addRef(refs, type.members); }
+         static void addRef(auto& refs, AnyType&, Int&) {}
+         static void addRef(auto& refs, AnyType&, Float&) {}
+         static void addRef(auto& refs, AnyType& type, Type& t) { refs[t.type].push_back(&type); }
+         static void addAlias(auto& resolved, const std::string& name, const std::string& alias)
+         {
+            const std::string& lhs = resolveAlias(resolved, name);
+            const std::string& rhs = resolveAlias(resolved, name);
+            if (auto cmp = compareAlias(lhs, rhs); cmp != 0)
+            {
+               const std::string& best = cmp < 0 ? lhs : rhs;
+               setChain(resolved, name, best);
+               setChain(resolved, alias, best);
+            }
+            else
+            {
+               setChain(resolved, name, lhs);
+               setChain(resolved, alias, rhs);
+            }
+         }
+         static const std::string& resolveAlias(auto& resolved, const std::string& name)
+         {
+            const std::string* result = &name;
+            while (true)
+            {
+               if (auto pos = resolved.find(*result); pos != resolved.end())
+               {
+                  result = &pos->second;
+               }
+               else
+               {
+                  return *result;
+               }
+            }
+         }
+         static void setChain(auto& resolved, const std::string& name, const std::string& newValue)
+         {
+            if (name == newValue)
+               return;
+            std::string current = name;
+            while (true)
+            {
+               if (auto pos = resolved.find(current); pos != resolved.end())
+               {
+                  if (pos->second == newValue)
+                     return;
+                  current     = std::move(pos->second);
+                  pos->second = newValue;
+               }
+               else
+               {
+                  resolved.insert({name, newValue});
+                  return;
+               }
+            }
+         }
+         static std::weak_ordering compareAlias(std::string_view lhs, std::string_view rhs)
+         {
+            bool lhsCanReplace = lhs.starts_with('@');
+            bool rhsCanReplace = rhs.starts_with('@');
+            if (!lhsCanReplace && !rhsCanReplace)
+               return std::weak_ordering::equivalent;
+            return std::tuple(!lhsCanReplace, lhs.size(), lhs) <=>
+                   std::tuple(!rhsCanReplace, rhs.size(), rhs);
+         }
          Schema                             schema;
          std::map<const void*, std::size_t> ids;
       };
