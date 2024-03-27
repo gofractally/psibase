@@ -1,7 +1,7 @@
 enable_testing()
 
-add_library( psio src/fpconv.c )
-target_link_libraries( psio INTERFACE rapidjson simdjson consthash )
+add_library( psio src/fpconv.c src/schema.cpp)
+target_link_libraries( psio PUBLIC rapidjson simdjson consthash )
 target_include_directories( psio PUBLIC include ${Boost_INCLUDE_DIRS} )
 add_compile_options( -Wall -Wstrict-aliasing )
 
