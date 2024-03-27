@@ -42,10 +42,10 @@ struct Data {
     getInvite: Option<GetInvite>,
 }
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, dead_code)]
 #[derive(Deserialize)]
 struct GetInvite {
-    _pubkey: String,
+    pubkey: String,
     inviter: String,
 }
 
