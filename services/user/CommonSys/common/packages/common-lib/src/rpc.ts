@@ -534,24 +534,6 @@ export function verifyFields(obj: any, fieldNames: string[]) {
     return !missingField;
 }
 
-const handleErrorCode = (code: any) => {
-    if (code === undefined) return false;
-
-    let recognizedError = ErrorMessages.some((err) => {
-        if (err.code === code) {
-            console.error(err.message);
-            return true;
-        }
-        return false;
-    });
-    if (!recognizedError)
-        console.error(
-            "Message from core contains unrecognized error code: " + code,
-        );
-
-    return true;
-};
-
 export async function getContractName() {
     if (contractName) {
         return contractName;
@@ -561,146 +543,7 @@ export async function getContractName() {
     }
 }
 
-const messageRouting = [
-    {
-        type: MessageTypes.Operation,
-        fields: ["identifier", "params", "callbackId", "sender"],
-        route: async (payload: any) => {
-            const { identifier, params, callbackId, sender } = payload;
-            const responsePayload = {
-                callbackId,
-                response: null,
-                errors: [] as any[],
-            };
-            const contractName = await getContractName();
-            const op = registeredOperations.find((o) => o.id === identifier);
-            if (op) {
-                try {
-                    const msgMetadata = { sender };
-                    const res = await op.exec(params, msgMetadata);
-                    if (res !== undefined) responsePayload.response = res;
-                } catch (e) {
-                    responsePayload.errors.push(e);
-                }
-            } else {
-                responsePayload.errors.push(
-                    `Service ${contractName} has no operation "${identifier}"`,
-                );
-            }
-
-            sendToParent({
-                type: MessageTypes.OperationResponse,
-                payload: responsePayload,
-            });
-
-            return true;
-        },
-    },
-    {
-        type: MessageTypes.Query,
-        fields: ["identifier", "params", "callbackId", "sender"],
-        route: async (payload: any) => {
-            const { identifier, params, callbackId, sender } = payload;
-            const responsePayload = {
-                callbackId,
-                response: null,
-                errors: [] as any[],
-            };
-
-            try {
-                const contractName = await getContractName();
-                const query = registeredQueries.find(
-                    (q) => q.id === identifier,
-                );
-                if (query) {
-                    try {
-                        const msgMetadata = { sender };
-                        responsePayload.response = await query.exec(
-                            params,
-                            msgMetadata,
-                        );
-                    } catch (e) {
-                        responsePayload.errors.push(e);
-                    }
-                } else {
-                    responsePayload.errors.push(
-                        `Service ${contractName} has no query "${identifier}"`,
-                    );
-                }
-            } catch (e) {
-                console.error("fail to process query message", e);
-                responsePayload.errors.push(e);
-            }
-
-            sendToParent({
-                type: MessageTypes.QueryResponse,
-                payload: responsePayload,
-            });
-        },
-    },
-    {
-        type: MessageTypes.QueryResponse,
-        fields: ["callbackId", "response", "errors"],
-        route: (payload: any) => {
-            const { callbackId, response, errors } = payload;
-            return executePromise(callbackId, response, errors);
-        },
-    },
-    {
-        type: MessageTypes.OperationResponse,
-        fields: ["callbackId", "response", "errors"],
-        route: (payload: any) => {
-            const { callbackId, response, errors } = payload;
-            return executePromise(callbackId, response, errors);
-        },
-    },
-    {
-        type: MessageTypes.TransactionReceipt,
-        fields: ["transactionId", "trace", "errors"],
-        route: (payload: any) => {
-            const { transactionId, trace, errors } = payload;
-            const callbackId = transactions[transactionId];
-            return callbackId
-                ? executePromise(callbackId, trace, errors)
-                : false;
-        },
-    },
-];
-
 export async function initializeApplet(initializer = () => {}) {
-    const rootUrl = await siblingUrl(undefined, undefined, undefined);
-
-    (window as any).iFrameResizer = {
-        targetOrigin: rootUrl,
-        onReady: async () => {
-            for (const bufferedMessage of bufferedMessages) {
-                await bufferedMessage();
-            }
-            bufferedMessages.splice(0, bufferedMessages.length);
-        },
-        onMessage: (msg: any) => {
-            let { type, payload } = msg;
-            if (type === undefined || payload === undefined) {
-                console.error("Malformed message received from core");
-                return;
-            }
-
-            const route = messageRouting.find((m) => m.type === type);
-            if (!route) {
-                console.error("Message from core specifies unknown route.");
-                return;
-            }
-
-            if (!verifyFields(payload, route.fields)) {
-                console.error("Message from core failed validation checks");
-                return;
-            }
-
-            if (handleErrorCode(payload.error)) return;
-
-            route.route(payload);
-        },
-    };
 
     let currentHref = document.location.href;
     // Clicking links that loads a new subpage of the applet
@@ -713,9 +556,6 @@ export async function initializeApplet(initializer = () => {}) {
             currentHref = document.location.href;
         }
     };
-
-    // @ts-ignore
-    await import("/common/iframeResizer.contentWindow.js");
 
     await initializer();
 }

@@ -67,22 +67,7 @@ export const Applet = ({ applet, handleMessage }: Props) => {
     );
 
     const initializeIFrame = () => {
-        // Configure iFrameResizer
         const iFrame = document.getElementById(iFrameId);
-        if (iFrame) {
-            (window as any).iFrameResize(
-                {
-                    // All options: https://github.com/davidjbradshaw/iframe-resizer/blob/master/docs/parent_page/options.md
-                    // log: true,
-                    checkOrigin: true,
-                    autoResize: false,
-                    scrolling: true,
-                    onMessage: doHandleMessage,
-                    onInit,
-                },
-                "#" + iFrameId
-            )[0].iFrameResizer;
-        }
     };
 
     return appletId && appletSrc ? (

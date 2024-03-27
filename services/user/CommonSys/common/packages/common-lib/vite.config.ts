@@ -11,9 +11,6 @@ export default defineConfig({
       name: "@psibase/common-lib",
       fileName: "common-lib",
     },
-    rollupOptions: {
-      external: ["/common/iframeResizer.contentWindow.js"],
-    },
   },
   plugins: [dts()],
 });

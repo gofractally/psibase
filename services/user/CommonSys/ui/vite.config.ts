@@ -7,12 +7,6 @@ import svgr from "vite-plugin-svgr";
 const psibase = (appletContract: string, isServing?: boolean) => {
     const buildAliases = [
         {
-            find: "/common/iframeResizer.contentWindow.js",
-            replacement: path.resolve(
-                "../common/resources/thirdParty/src/iframeResizer.contentWindow.js"
-            ),
-        },
-        {
             // bundle non-external (above) common files except fonts (which should only be referenced)
             find: /^\/common(?!\/(?:fonts))(.*)$/,
             replacement: path.resolve("../common/resources$1"),
@@ -37,7 +31,6 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
-                                "/common/iframeResizer.js",
                                 "/common/common-lib.js",
                             ],
                             makeAbsoluteExternalsRelative: false,

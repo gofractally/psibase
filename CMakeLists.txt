@@ -391,8 +391,6 @@ set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
 set(THIRD_SRC ${COMMON_SYS}/common/resources/thirdParty/src)
 set(THIRD_FILES
     ${THIRD_SRC}/htm.module.js
-    ${THIRD_SRC}/iframeResizer.contentWindow.js
-    ${THIRD_SRC}/iframeResizer.js
     ${THIRD_SRC}/react-dom.development.js
     ${THIRD_SRC}/react-dom.production.min.js
     ${THIRD_SRC}/react-router-dom.min.js

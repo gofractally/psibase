@@ -173,11 +173,6 @@ export const useApplets = () => {
                             }
                         );
                     }
-
-                    (iframe as any).iFrameResizer.sendMessage(
-                        { type: messageType, payload },
-                        restrictedTargetOrigin
-                    );
                 } catch (e) {
                     reject(e);
                 }
