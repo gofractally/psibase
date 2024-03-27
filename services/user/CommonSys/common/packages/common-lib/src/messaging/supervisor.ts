@@ -1,7 +1,7 @@
 import { siblingUrl } from "../rpc";
 import {
     QualifiedFunctionCallArgs,
-    toString
+    toString,
 } from "./supervisor/FunctionCallRequest";
 import { isErrorResponse } from "./supervisor/FunctionCallResponse";
 import { PluginId, QualifiedPluginId } from "./supervisor/PluginId";
@@ -11,7 +11,7 @@ import {
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
-    FunctionCallRequest
+    FunctionCallRequest,
 } from "./supervisor/index";
 
 const SupervisorIFrameId = "iframe-supervisor-sys" as const;
@@ -75,29 +75,35 @@ export class Supervisor {
 
     listenToRawMessages() {
         window.addEventListener("message", (event) =>
-            this.handleRawEvent(event)
+            this.handleRawEvent(event),
         );
     }
 
     handleRawEvent(messageEvent: MessageEvent) {
+        if (
+            messageEvent.origin !== myOrigin &&
+            messageEvent.origin != supervisorOrigin
+        ) {
+            console.log("Received unauthorized message. Ignoring.");
+            return;
+        }
+
+        if (messageEvent.origin !== supervisorOrigin) {
+            return;
+        }
+
         try {
-            if (messageEvent.origin === supervisorOrigin) {
-                if (isIFrameInitialized(messageEvent.data)) {
-                    this.onSupervisorInitialized();
-                } else if (isFunctionCallResponse(messageEvent.data)) {
-                    this.onFunctionCallResponse(messageEvent.data);
-                }
-            } else if (messageEvent.origin !== myOrigin) {
-                console.log("Received unauthorized message. Ignoring.");
+            if (isIFrameInitialized(messageEvent.data)) {
+                this.onSupervisorInitialized();
+            } else if (isFunctionCallResponse(messageEvent.data)) {
+                this.onFunctionCallResponse(messageEvent.data);
             }
         } catch (e) {
             if (e instanceof Error) {
                 console.error(e.message);
-            } else {
-                console.error(
-                    `Unrecognized error: ${JSON.stringify(e, null, 2)}`
-                );
+                return;
             }
+            console.error(`Unrecognized error: ${JSON.stringify(e, null, 2)}`);
         }
     }
 
@@ -112,35 +118,37 @@ export class Supervisor {
         if (!this.pendingRequest) {
             throw Error(`Received unexpected response from supervisor.`);
         }
-        const expected = this.pendingRequest!.call;
+        const expected = this.pendingRequest.call;
         const received = response.call;
-        const unexpected: boolean =
+        const unexpected =
             expected.method != received.method ||
             expected.service != received.service;
 
         if (isErrorResponse(response)) {
-            this.pendingRequest!.reject(response.result.val);
-        } else {
-            if (unexpected) {
-                // Could be infra error rather than plugin error, printing to console to increase probability
-                // that it gets reported.
-                console.warn(
-                    `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`
-                );
-                this.pendingRequest!.reject(
-                    `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`
-                );
-            }
-
-            this.pendingRequest!.resolve(response.result);
+            this.pendingRequest.reject(response.result.val);
+            return;
         }
+
+        if (unexpected) {
+            // Could be infra error rather than plugin error, printing to console to increase probability
+            // that it gets reported.
+            console.warn(
+                `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`,
+            );
+            this.pendingRequest.reject(
+                `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`,
+            );
+            return;
+        }
+
+        this.pendingRequest.resolve(response.result);
     }
 
     private getSupervisorIframe(): HTMLIFrameElement {
         if (!this.isSupervisorInitialized)
             throw new Error(`Supervisor is not initialized`);
         const iframe = document.getElementById(
-            SupervisorIFrameId
+            SupervisorIFrameId,
         ) as HTMLIFrameElement;
         if (!iframe) throw new Error(`Failed to find supervisor-sys iframe`);
         if (!iframe.contentWindow)
@@ -153,14 +161,14 @@ export class Supervisor {
 
         const fqArgs: QualifiedFunctionCallArgs = {
             ...args,
-            plugin: args.plugin || "plugin"
+            plugin: args.plugin || "plugin",
         };
 
         return new Promise((resolve, reject) => {
             this.pendingRequest = { call: args, resolve, reject };
             const message: FunctionCallRequest = {
                 type: "FUNCTION_CALL_REQUEST",
-                args: fqArgs
+                args: fqArgs,
             };
             if (iframe.contentWindow) {
                 iframe.contentWindow.postMessage(message, supervisorOrigin);
@@ -181,7 +189,7 @@ export class Supervisor {
         // Fully qualify any plugins with default values
         let fqPlugins: QualifiedPluginId[] = plugins.map((plugin) => ({
             ...plugin,
-            plugin: plugin.plugin || "plugin"
+            plugin: plugin.plugin || "plugin",
         }));
 
         const message = buildPreLoadPluginsRequest(fqPlugins);
@@ -189,7 +197,7 @@ export class Supervisor {
         const iframe = this.getSupervisorIframe();
         if (!iframe.contentWindow)
             throw new Error(
-                `Failed to get content window from supervisor iframe`
+                `Failed to get content window from supervisor iframe`,
             );
         iframe.contentWindow.postMessage(message, supervisorOrigin);
     }

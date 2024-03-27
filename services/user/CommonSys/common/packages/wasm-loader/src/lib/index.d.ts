@@ -1,4 +1,2 @@
-export default plugin;
-import { plugin } from './plugin.js';
-import { load } from './loader.js';
-export { plugin, load };
+export { plugin } from "./plugin.js";
+export { load } from "./loader.js";

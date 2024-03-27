@@ -8,7 +8,7 @@ export interface FunctionCallResponse {
 }
 
 export const isFunctionCallResponse = (
-    data: any
+    data: any,
 ): data is FunctionCallResponse => {
     return data && data.type == FUNCTION_CALL_RESPONSE;
 };
@@ -29,11 +29,11 @@ export const isErrorResponse = (response: FunctionCallResponse) => {
 
 export const buildFunctionCallResponse = (
     call: FunctionCallArgs,
-    result: any
+    result: any,
 ): FunctionCallResponse => {
     return {
         type: FUNCTION_CALL_RESPONSE,
         call,
-        result
+        result,
     };
 };

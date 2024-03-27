@@ -11,7 +11,7 @@ export {
     type FunctionCallRequest,
     type FunctionCallArgs,
     type QualifiedFunctionCallArgs,
-    toString
+    toString,
 } from "./FunctionCallRequest";
 
 export { isIFrameInitialized } from "./SupervisorInitialized";

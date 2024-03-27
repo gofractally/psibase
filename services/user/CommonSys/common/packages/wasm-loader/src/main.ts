@@ -10,7 +10,7 @@ import {
     LoaderPreloadStart,
     buildPreloadCompleteMessage,
     toString,
-    buildPluginSyncCall
+    buildPluginSyncCall,
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib";
 import { CallCache } from "./callCache";
@@ -23,7 +23,7 @@ import {
     PluginDownloadFailed,
     handleErrors,
     isAddingAction,
-    isSyncCall
+    isSyncCall,
 } from "./errorHandling";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -56,67 +56,67 @@ const wasmUrlToIntArray = (url: string) =>
 
 const parserCacheKey: string = "component-parser";
 const componentParser = async () => {
-    if (!cache.exists(parserCacheKey)) {
-        let parserBytes: Uint8Array;
-        try {
-            parserBytes = await wasmUrlToIntArray(
-                "/common/component_parser.wasm"
-            );
-        } catch (e) {
-            console.error("Loader: component_parser download failed");
-            throw new ParserDownloadFailed();
-        }
-        // Performance improvement: Target wasm32-unknown-unknown when compiling
-        //   parser instead of wasm32-wasi, then loading can be simplified without wasi
-        //   shims.
-        cache.cacheData(parserCacheKey, await load(parserBytes));
+    if (cache.exists(parserCacheKey)) {
         return cache.getCachedData(parserCacheKey);
-    } else return cache.getCachedData(parserCacheKey);
+    }
+
+    let parserBytes: Uint8Array;
+    try {
+        parserBytes = await wasmUrlToIntArray("/common/component_parser.wasm");
+    } catch (e) {
+        console.error("Loader: component_parser download failed");
+        throw new ParserDownloadFailed();
+    }
+    // Performance improvement: Target wasm32-unknown-unknown when compiling
+    //   parser instead of wasm32-wasi, then loading can be simplified without wasi
+    //   shims.
+    cache.cacheData(parserCacheKey, await load(parserBytes));
+    return cache.getCachedData(parserCacheKey);
 };
 
 const getParsed = async (plugin: string) => {
-    if (!cache.exists(`${plugin}-parsed`)) {
-        const pBytes: Uint8Array = await pluginBytes(plugin);
-        try {
-            cache.cacheData(
-                `${plugin}-parsed`,
-                await (await componentParser()).parse("component", pBytes)
-            );
-            if (
-                cache.getCachedData(`${plugin}-parsed`).exportedFuncs ===
-                undefined
-            ) {
-                throw new InvalidPlugin(
-                    `${serviceName}:${plugin} does not export any functions.`
-                );
-            }
-        } catch (e) {
-            throw new ParsingFailed(
-                `${serviceName}:${plugin} was able to be loaded but not parsed`
-            );
-        }
-        cache.getCachedData(`${plugin}-parsed`);
-    } else {
+    if (cache.exists(`${plugin}-parsed`)) {
         return cache.getCachedData(`${plugin}-parsed`);
     }
+
+    const pBytes: Uint8Array = await pluginBytes(plugin);
+    try {
+        cache.cacheData(
+            `${plugin}-parsed`,
+            await (await componentParser()).parse("component", pBytes),
+        );
+        if (
+            cache.getCachedData(`${plugin}-parsed`).exportedFuncs === undefined
+        ) {
+            throw new InvalidPlugin(
+                `${serviceName}:${plugin} does not export any functions.`,
+            );
+        }
+    } catch (e) {
+        throw new ParsingFailed(
+            `${serviceName}:${plugin} was able to be loaded but not parsed`,
+        );
+    }
+    cache.getCachedData(`${plugin}-parsed`);
 };
 
 const pluginBytes = async (plugin: string): Promise<Uint8Array> => {
-    if (!cache.exists(plugin)) {
-        try {
-            cache.cacheData(plugin, await wasmUrlToIntArray(`/${plugin}.wasm`));
-        } catch (e) {
-            if (e instanceof DownloadFailed)
-                throw new PluginDownloadFailed({
-                    service: serviceName,
-                    plugin
-                });
-        }
-        await getParsed(plugin);
-        return cache.getCachedData(plugin);
-    } else {
+    if (cache.exists(plugin)) {
         return cache.getCachedData(plugin);
     }
+
+    try {
+        cache.cacheData(plugin, await wasmUrlToIntArray(`/${plugin}.wasm`));
+    } catch (e) {
+        if (e instanceof DownloadFailed)
+            throw new PluginDownloadFailed({
+                service: serviceName,
+                plugin,
+            });
+    }
+
+    await getParsed(plugin);
+    return cache.getCachedData(plugin);
 };
 
 interface StaticImportFills {
@@ -128,29 +128,29 @@ interface StaticImportFills {
 
 const initStaticImports = (
     staticImports: string,
-    importFills: StaticImportFills
+    importFills: StaticImportFills,
 ) => {
     let { callerService, callerOrigin, myOrigin, myService } = importFills;
     return staticImports
         .replace(
             "let callerService = UNINITIALIZED;",
-            `let callerService = ${callerService === null ? "null" : JSON.stringify(callerService)};`
+            `let callerService = ${callerService === null ? "null" : JSON.stringify(callerService)};`,
         )
         .replace(
             "let callerOrigin = UNINITIALIZED;",
-            `let callerOrigin = "${callerOrigin}";`
+            `let callerOrigin = "${callerOrigin}";`,
         )
         .replace(
             "let myService = UNINITIALIZED;",
-            `let myService = "${myService}";`
+            `let myService = "${myService}";`,
         )
         .replace(
             "let myOrigin = UNINITIALIZED;",
-            `let myOrigin = "${myOrigin}";`
+            `let myOrigin = "${myOrigin}";`,
         )
         .replace(
             "const actions = [];",
-            `const actions = JSON.parse(\`${JSON.stringify(addedActions)}\`);`
+            `const actions = JSON.parse(\`${JSON.stringify(addedActions)}\`);`,
         );
 };
 
@@ -166,7 +166,7 @@ const serviceName: string = getServiceName();
 const hasTargetFunc = (
     exportedFuncs: any,
     intf: string | undefined,
-    method: string
+    method: string,
 ) => {
     const found =
         intf !== undefined
@@ -185,7 +185,7 @@ const hasTargetFunc = (
 
 const extractService = (
     callerOrigin: string,
-    myOrigin: string
+    myOrigin: string,
 ): string | null => {
     const extractRootDomain = (origin: string): string => {
         const url = new URL(origin);
@@ -228,16 +228,16 @@ const onPluginCallRequest = async (pluginCallPayload: PluginCallPayload) => {
             callerService: extractService(caller, window.origin),
             callerOrigin: caller,
             myService: serviceName,
-            myOrigin: `${window.origin}`
+            myOrigin: `${window.origin}`,
         };
         let importables: Importables[] = [
             {
                 [`common:plugin/*`]: initStaticImports(
                     importableCode,
-                    importFills
-                )
+                    importFills,
+                ),
             },
-            ...getImportFills(parsed.importedFuncs, resultCache)
+            ...getImportFills(parsed.importedFuncs, resultCache),
         ];
 
         // Todo: Performance improvement - Cache transpilation output
@@ -252,12 +252,12 @@ const onPluginCallRequest = async (pluginCallPayload: PluginCallPayload) => {
 
         let addableActions = addedActions.map((action) => ({
             ...action,
-            args: new Uint8Array(JSON.parse(action.args))
+            args: new Uint8Array(JSON.parse(action.args)),
         }));
 
         window.parent.postMessage(
             buildPluginCallResponse(res, addableActions),
-            siblingUrl(null, "supervisor-sys")
+            siblingUrl(null, "supervisor-sys"),
         );
     } catch (e: unknown) {
         if (isSyncCall(e)) {
@@ -321,7 +321,7 @@ const onAddAction = (payload: any) => {
     addedActions.push({
         service: serviceName,
         action,
-        args
+        args,
     });
     onPluginCallRequest(activeCall);
 };
@@ -333,7 +333,7 @@ const onPreloadStart = async (message: LoaderPreloadStart) => {
             await pluginBytes(p);
         } catch (e) {
             console.error(
-                `Preload failed: ${serviceName}:${p}\nError: ${JSON.stringify(e, null, 2)}`
+                `Preload failed: ${serviceName}:${p}\nError: ${JSON.stringify(e, null, 2)}`,
             );
         }
         cache.getCachedData(`${p}-parsed`);
@@ -342,7 +342,7 @@ const onPreloadStart = async (message: LoaderPreloadStart) => {
     // TODO: add dependencies to preloadComplete so they can be loaded
     window.parent.postMessage(
         buildPreloadCompleteMessage([]),
-        siblingUrl(null, "supervisor-sys")
+        siblingUrl(null, "supervisor-sys"),
     );
 };
 

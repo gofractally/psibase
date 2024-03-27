@@ -1,7 +1,7 @@
 import {
     LOADER_INITIALIZED,
     LOADER_PRELOAD_COMPLETE,
-    LOADER_PRELOAD_START
+    LOADER_PRELOAD_START,
 } from "./index";
 import { QualifiedPluginId } from "./PluginId";
 
@@ -11,14 +11,14 @@ export interface LoaderInitialized {
 }
 
 export const isLoaderInitMessage = (
-    message: any
+    message: any,
 ): message is LoaderInitialized => {
     return message && message.type == LOADER_INITIALIZED;
 };
 
 export const buildMessageLoaderInitialized = (): LoaderInitialized => ({
     payload: {},
-    type: LOADER_INITIALIZED
+    type: LOADER_INITIALIZED,
 });
 
 export interface LoaderPreloadStart {
@@ -29,18 +29,18 @@ export interface LoaderPreloadStart {
 }
 
 export const isPreloadStartMessage = (
-    message: any
+    message: any,
 ): message is LoaderPreloadStart => {
     return message && message.type == LOADER_PRELOAD_START;
 };
 
 export const buildPreloadStartMessage = (
-    plugins: string[]
+    plugins: string[],
 ): LoaderPreloadStart => ({
     payload: {
-        plugins
+        plugins,
     },
-    type: LOADER_PRELOAD_START
+    type: LOADER_PRELOAD_START,
 });
 export interface LoaderPreloadComplete {
     type: typeof LOADER_PRELOAD_COMPLETE;
@@ -50,16 +50,16 @@ export interface LoaderPreloadComplete {
 }
 
 export const isPreloadCompleteMessage = (
-    message: any
+    message: any,
 ): message is LoaderPreloadComplete => {
     return message && message.type == LOADER_PRELOAD_COMPLETE;
 };
 
 export const buildPreloadCompleteMessage = (
-    dependencies: QualifiedPluginId[]
+    dependencies: QualifiedPluginId[],
 ): LoaderPreloadComplete => ({
     payload: {
-        dependencies
+        dependencies,
     },
-    type: LOADER_PRELOAD_COMPLETE
+    type: LOADER_PRELOAD_COMPLETE,
 });

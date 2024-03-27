@@ -19,7 +19,7 @@ async function fetch_if_uncached(url) {
             if (r.ok) {
                 return {
                     url: r.url,
-                    body: await r.text()
+                    body: await r.text(),
                 };
             }
 
@@ -64,7 +64,7 @@ export const plugin = (files) => ({
             // fetch from unpkg
             try {
                 const pkg_url = await follow_redirects(
-                    `${packagesUrl}/${importee}/package.json`
+                    `${packagesUrl}/${importee}/package.json`,
                 );
                 const pkg_json = (await fetch_if_uncached(pkg_url)).body;
                 const pkg = JSON.parse(pkg_json);
@@ -73,7 +73,7 @@ export const plugin = (files) => ({
                     const url = pkg_url.replace(/\/package\.json$/, "");
                     return new URL(
                         pkg.svelte || pkg.module || pkg.main,
-                        `${url}/`
+                        `${url}/`,
                     ).href;
                 }
             } catch (err) {
@@ -114,7 +114,7 @@ export const plugin = (files) => ({
 
             // make a blob url of the bytes of the wasm file
             let wasmBlobUrl = URL.createObjectURL(
-                new Blob([found[1]], { type: "application/wasm" })
+                new Blob([found[1]], { type: "application/wasm" }),
             );
 
             // return if undefined
@@ -123,15 +123,15 @@ export const plugin = (files) => ({
             // find and replace
             code = code.replace(
                 `new URL('./${fileName}', import.meta.url)`,
-                `'${wasmBlobUrl}'`
+                `'${wasmBlobUrl}'`,
             );
         });
 
         return {
             code,
-            map: { mappings: "" } // TODO: use https://github.com/Rich-Harris/magic-string
+            map: { mappings: "" }, // TODO: use https://github.com/Rich-Harris/magic-string
         };
-    }
+    },
 });
 
 export default plugin;

@@ -59,98 +59,107 @@ declare namespace d {
     export function pollOne(e: any): void;
 }
 declare namespace re {
-    function getDirectories(): (string | {
-        _getEntry(e: any): any;
-        readViaStream(e: any): {
-            id: number;
-            handler: any;
-            read(e: any): any;
-            blockingRead(e: any): any;
-            skip(e: any): any;
-            blockingSkip(e: any): any;
-            subscribe(): void;
-        };
-        writeViaStream(e: any): {
-            id: number;
-            open: boolean;
-            handler: any;
-            checkWrite(e: any): any;
-            write(e: any): void;
-            blockingWriteAndFlush(e: any): void;
-            flush(): void;
-            blockingFlush(): void;
-            writeZeroes(e: any): void;
-            blockingWriteZeroes(e: any): void;
-            blockingWriteZeroesAndFlush(e: any): void;
-            splice(e: any, t: any): any;
-            blockingSplice(e: any, t: any): void;
-            forward(e: any): void;
-            subscribe(): void;
-        };
-        appendViaStream(): void;
-        advise(e: any, t: any, s: any, n: any): void;
-        syncData(): void;
-        getFlags(): void;
-        getType(): "directory" | "regular-file" | "fifo" | "unknown";
-        setSize(e: any): void;
-        setTimes(e: any, t: any): void;
-        read(e: any, s: any): any[];
-        write(e: any, s: any): any;
-        readDirectory(): G;
-        sync(): void;
-        createDirectoryAt(e: any): void;
-        stat(): {
-            type: string;
-            linkCount: bigint;
-            size: bigint;
-            dataAccessTimestamp: {
-                seconds: bigint;
-                nanoseconds: number;
-            };
-            dataModificationTimestamp: {
-                seconds: bigint;
-                nanoseconds: number;
-            };
-            statusChangeTimestamp: {
-                seconds: bigint;
-                nanoseconds: number;
-            };
-        };
-        statAt(e: any, s: any): {
-            type: string;
-            linkCount: bigint;
-            size: bigint;
-            dataAccessTimestamp: {
-                seconds: bigint;
-                nanoseconds: number;
-            };
-            dataModificationTimestamp: {
-                seconds: bigint;
-                nanoseconds: number;
-            };
-            statusChangeTimestamp: {
-                seconds: bigint;
-                nanoseconds: number;
-            };
-        };
-        setTimesAt(): void;
-        linkAt(): void;
-        openAt(s: any, n: any, r: any, i: any, o: any): any;
-        readlinkAt(): void;
-        removeDirectoryAt(): void;
-        renameAt(): void;
-        symlinkAt(): void;
-        unlinkFileAt(): void;
-        isSameObject(e: any): boolean;
-        metadataHash(): {
-            upper: bigint;
-            lower: bigint;
-        };
-        metadataHashAt(e: any, s: any): {
-            upper: bigint;
-            lower: bigint;
-        };
-    })[][];
+    function getDirectories(): (
+        | string
+        | {
+              _getEntry(e: any): any;
+              readViaStream(e: any): {
+                  id: number;
+                  handler: any;
+                  read(e: any): any;
+                  blockingRead(e: any): any;
+                  skip(e: any): any;
+                  blockingSkip(e: any): any;
+                  subscribe(): void;
+              };
+              writeViaStream(e: any): {
+                  id: number;
+                  open: boolean;
+                  handler: any;
+                  checkWrite(e: any): any;
+                  write(e: any): void;
+                  blockingWriteAndFlush(e: any): void;
+                  flush(): void;
+                  blockingFlush(): void;
+                  writeZeroes(e: any): void;
+                  blockingWriteZeroes(e: any): void;
+                  blockingWriteZeroesAndFlush(e: any): void;
+                  splice(e: any, t: any): any;
+                  blockingSplice(e: any, t: any): void;
+                  forward(e: any): void;
+                  subscribe(): void;
+              };
+              appendViaStream(): void;
+              advise(e: any, t: any, s: any, n: any): void;
+              syncData(): void;
+              getFlags(): void;
+              getType(): "directory" | "regular-file" | "fifo" | "unknown";
+              setSize(e: any): void;
+              setTimes(e: any, t: any): void;
+              read(e: any, s: any): any[];
+              write(e: any, s: any): any;
+              readDirectory(): G;
+              sync(): void;
+              createDirectoryAt(e: any): void;
+              stat(): {
+                  type: string;
+                  linkCount: bigint;
+                  size: bigint;
+                  dataAccessTimestamp: {
+                      seconds: bigint;
+                      nanoseconds: number;
+                  };
+                  dataModificationTimestamp: {
+                      seconds: bigint;
+                      nanoseconds: number;
+                  };
+                  statusChangeTimestamp: {
+                      seconds: bigint;
+                      nanoseconds: number;
+                  };
+              };
+              statAt(
+                  e: any,
+                  s: any,
+              ): {
+                  type: string;
+                  linkCount: bigint;
+                  size: bigint;
+                  dataAccessTimestamp: {
+                      seconds: bigint;
+                      nanoseconds: number;
+                  };
+                  dataModificationTimestamp: {
+                      seconds: bigint;
+                      nanoseconds: number;
+                  };
+                  statusChangeTimestamp: {
+                      seconds: bigint;
+                      nanoseconds: number;
+                  };
+              };
+              setTimesAt(): void;
+              linkAt(): void;
+              openAt(s: any, n: any, r: any, i: any, o: any): any;
+              readlinkAt(): void;
+              removeDirectoryAt(): void;
+              renameAt(): void;
+              symlinkAt(): void;
+              unlinkFileAt(): void;
+              isSameObject(e: any): boolean;
+              metadataHash(): {
+                  upper: bigint;
+                  lower: bigint;
+              };
+              metadataHashAt(
+                  e: any,
+                  s: any,
+              ): {
+                  upper: bigint;
+                  lower: bigint;
+              };
+          }
+    )[][];
 }
 declare namespace ye {
     function getRandomBytes(e: any): Uint8Array;
@@ -303,7 +312,10 @@ declare class Error {
     toDebugString(): any;
 }
 declare let ee: {
-    new (e: any, t: any): {
+    new (
+        e: any,
+        t: any,
+    ): {
         _getEntry(e: any): any;
         readViaStream(e: any): {
             id: number;
@@ -360,7 +372,10 @@ declare let ee: {
                 nanoseconds: number;
             };
         };
-        statAt(e: any, s: any): {
+        statAt(
+            e: any,
+            s: any,
+        ): {
             type: string;
             linkCount: bigint;
             size: bigint;
@@ -390,7 +405,10 @@ declare let ee: {
             upper: bigint;
             lower: bigint;
         };
-        metadataHashAt(e: any, s: any): {
+        metadataHashAt(
+            e: any,
+            s: any,
+        ): {
             upper: bigint;
             lower: bigint;
         };
@@ -405,8 +423,7 @@ declare class G {
         type: string;
     } | null;
 }
-declare class Pollable {
-}
+declare class Pollable {}
 declare const h: {
     new (e: any): {
         id: number;
@@ -465,8 +482,45 @@ declare class OutputStream {
     forward(e: any): void;
     subscribe(): void;
 }
-declare class D {
-}
-declare class U {
-}
-export { j as _getFileData, f as _setArgs, y as _setEnv, $ as _setFileData, A as _setStderr, k as _setStdin, B as _setStdout, b as environment, l as error, S as exit, ie as filesystemTypes, ae as incomingHandler, he as insecure, pe as insecureSeed, fe as instanceNetwork, be as ipNameLookup, r as monotonicClock, we as network, le as outgoingHandler, d as poll, re as preopens, ye as random, oe as send, N as stderr, v as stdin, L as stdout, c as streams, ke as tcp, Se as tcpCreateSocket, C as terminalInput, M as terminalOutput, W as terminalStderr, z as terminalStdin, H as terminalStdout, ie as types, Ae as udp, Be as udpCreateSocket, i as wallClock };
+declare class D {}
+declare class U {}
+export {
+    j as _getFileData,
+    f as _setArgs,
+    y as _setEnv,
+    $ as _setFileData,
+    A as _setStderr,
+    k as _setStdin,
+    B as _setStdout,
+    b as environment,
+    l as error,
+    S as exit,
+    ie as filesystemTypes,
+    ae as incomingHandler,
+    he as insecure,
+    pe as insecureSeed,
+    fe as instanceNetwork,
+    be as ipNameLookup,
+    r as monotonicClock,
+    we as network,
+    le as outgoingHandler,
+    d as poll,
+    re as preopens,
+    ye as random,
+    oe as send,
+    N as stderr,
+    v as stdin,
+    L as stdout,
+    c as streams,
+    ke as tcp,
+    Se as tcpCreateSocket,
+    C as terminalInput,
+    M as terminalOutput,
+    W as terminalStderr,
+    z as terminalStdin,
+    H as terminalStdout,
+    ie as types,
+    Ae as udp,
+    Be as udpCreateSocket,
+    i as wallClock,
+};

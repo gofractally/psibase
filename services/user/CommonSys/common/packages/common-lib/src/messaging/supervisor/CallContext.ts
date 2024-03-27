@@ -13,7 +13,7 @@ export class CallStack {
 
     push(item: Call): void {
         console.log(
-            `Callstack: ${" ".repeat(4 * this.storage.length)}+${toString(item.args)}`
+            `Callstack: ${" ".repeat(4 * this.storage.length)}+${toString(item.args)}`,
         );
 
         item.startTime = item.startTime || Date.now();
@@ -30,7 +30,7 @@ export class CallStack {
         let beingPopped = this.peek()!;
         let resolutionTime = Date.now() - beingPopped.startTime!;
         console.log(
-            `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}-${toString(beingPopped.args)} [${resolutionTime} ms]`
+            `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}-${toString(beingPopped.args)} [${resolutionTime} ms]`,
         );
 
         return this.storage.pop();
@@ -102,7 +102,7 @@ export class CallContext {
         return this.cache.filter(
             (cacheObject) =>
                 cacheObject.allowedService === service &&
-                cacheObject.callPlugin === plugin
+                cacheObject.callPlugin === plugin,
         );
     }
 

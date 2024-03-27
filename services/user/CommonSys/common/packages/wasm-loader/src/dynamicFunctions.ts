@@ -27,7 +27,7 @@ const hostIntf = (intf: FunctionInterface): boolean => {
 
 const getFunctionBody = (
     pluginFunc: PluginFunc,
-    resultCache: ResultCache[]
+    resultCache: ResultCache[],
 ): string => {
     let { service, plugin, intf, method } = pluginFunc;
     const found = resultCache.find((f: ResultCache) => {
@@ -38,6 +38,7 @@ const getFunctionBody = (
             f.callMethod == method
         );
     });
+
     if (!found) {
         return `
             throw new Error(JSON.stringify({
@@ -50,16 +51,16 @@ const getFunctionBody = (
                     params: [...args]
                 }}));
         `;
+    }
+
+    if (found.result === undefined) {
+        return ""; // No-op if the sync call has no return value.
+    }
+
+    if (isErrorResult(found.result)) {
+        return `throw ${JSON.stringify(found.result.val)};`;
     } else {
-        if (found.result !== undefined) {
-            if (isErrorResult(found.result)) {
-                return `throw ${JSON.stringify(found.result.val)};`;
-            } else {
-                return `return ${JSON.stringify(found.result)};`;
-            }
-        } else {
-            return ""; // No-op if the sync call has no return value.
-        }
+        return `return ${JSON.stringify(found.result)};`;
     }
 };
 
@@ -77,12 +78,12 @@ const autoArrayInit = {
             target[pkgId] = [];
         }
         return target[pkgId];
-    }
+    },
 };
 
 export const getImportFills = (
     importedFuncs: ImportedFunctions,
-    resultCache: ResultCache[]
+    resultCache: ResultCache[],
 ): { [key: string]: string }[] => {
     const { interfaces, funcs: freeFunctions } = importedFuncs;
     if (freeFunctions.length !== 0) {
@@ -116,10 +117,10 @@ export const getImportFills = (
                             service: intf.namespace,
                             plugin: intf.package,
                             intf: intf.name,
-                            method: f
+                            method: f,
                         },
-                        resultCache
-                    )
+                        resultCache,
+                    ),
                 );
                 imp.push(`},`);
             });

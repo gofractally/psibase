@@ -30,15 +30,15 @@ export const isPluginCallRequest = (data: any): data is PluginCallRequest => {
     if (!isSchemaSatisfied)
         throw new Error(
             `PluginCallRequest fails to meet schema. Received: ${JSON.stringify(
-                data
-            )}`
+                data,
+            )}`,
         );
     return isEventTypeSatisfied && isSchemaSatisfied;
 };
 
 export const buildPluginCallRequest = (
-    payload: PluginCallPayload
+    payload: PluginCallPayload,
 ): PluginCallRequest => ({
     type: PLUGIN_CALL_REQUEST,
-    payload
+    payload,
 });

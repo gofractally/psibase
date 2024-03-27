@@ -8,7 +8,7 @@ let myOrigin = UNINITIALIZED;
 function pluginId(namespace, pkg) {
     return {
         service: namespace,
-        plugin: pkg
+        plugin: pkg,
     };
 }
 
@@ -16,7 +16,7 @@ function commonErr(val) {
     return {
         code: 0,
         producer: pluginId("common", "plugin"),
-        message: val
+        message: val,
     };
 }
 
@@ -48,7 +48,7 @@ function send(req) {
         return {
             status: xhr.status,
             headers,
-            body
+            body,
         };
     } catch (err) {
         throw new Error(err.message);
@@ -60,9 +60,9 @@ function postGraphQL(url, graphql) {
         uri: url,
         method: "POST",
         headers: {
-            "Content-Type": "application/graphql"
+            "Content-Type": "application/graphql",
         },
-        body: graphql
+        body: graphql,
     });
 }
 
@@ -74,22 +74,25 @@ function isValidAction(s) {
 const actions = [];
 
 function alreadyAdded(action, args) {
-    let dupIndex = actions.findIndex((a) => a.action === action);
-    if (dupIndex !== -1) {
-        if (args !== actions[dupIndex].args) {
-            throw new Error("Mismatched args");
-        }
-        return true;
+    const addedAction = actions.find((a) => a.action === action);
+    if (!addedAction) {
+        return false;
     }
-    return false;
+
+    if (args !== addedAction.args) {
+        throw new Error("Mismatched args");
+    }
+
+    return true;
 }
 
 export const server = {
     // add-action-to-transaction: func(service: string, action: string, args: list<u8>) -> result<_, string>;
     addActionToTransaction(action, args) {
-        if (myService === UNINITIALIZED)
+        if (myService === UNINITIALIZED) {
             throw commonErr("Error filling common:plugin imports.");
-        else if (!isValidAction(action)) {
+        }
+        if (!isValidAction(action)) {
             throw commonErr(`Invalid action name: ${JSON.stringify(action)}`);
         }
 
@@ -100,22 +103,22 @@ export const server = {
         } catch (e) {
             if (e instanceof Error && e.message === "Mismatched args") {
                 throw commonErr(
-                    "Attempted to add the same action (with different args) into a transaction."
+                    "Attempted to add the same action (with different args) into a transaction.",
                 );
             }
         }
 
         if (duplicate) {
             return;
-        } else {
-            throw new Error(
-                JSON.stringify({
-                    type: "adding_action",
-                    action,
-                    args: strArgs
-                })
-            );
         }
+
+        throw new Error(
+            JSON.stringify({
+                type: "adding_action",
+                action,
+                args: strArgs,
+            }),
+        );
     },
     // I think as long as groundhog day is a thing, we should only allow one of an action to be submitted
     // in a transaction, which will block anyone who tried to submit two actions (with different parameters).
@@ -132,7 +135,7 @@ export const server = {
             }
             throw commonErr("GraphQL query failed.");
         }
-    }
+    },
 };
 
 export const client = {
@@ -143,7 +146,7 @@ export const client = {
         } else {
             return {
                 app: callerService,
-                origin: callerOrigin
+                origin: callerOrigin,
             };
         }
     },
@@ -160,5 +163,5 @@ export const client = {
         if (myOrigin === UNINITIALIZED)
             throw CommonErr("Error filling common:plugin imports.");
         else return myOrigin;
-    }
+    },
 };

@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build --base /common/wasm-loader",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "prettier --write 'src/**/*.{ts,js}'"
   },
   "devDependencies": {
     "prettier": "^3.2.5",
+    "prettier-plugin-tailwindcss": "^0.5.13",
     "typescript": "^5.2.2",
     "vite": "^4.3.8"
   },

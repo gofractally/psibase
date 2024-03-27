@@ -17,9 +17,9 @@ export const isPluginCallResponse = (data: any): data is PluginCallResponse =>
 
 export const buildPluginCallResponse = <T>(
     result: T,
-    actions: AddableAction[]
+    actions: AddableAction[],
 ): PluginCallResponse<T> => ({
     type: PLUGIN_CALL_RESPONSE,
     result,
-    actions
+    actions,
 });

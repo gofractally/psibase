@@ -10,15 +10,15 @@ export interface PreLoadPluginsRequest {
 }
 
 export const isPreLoadPluginsRequest = (
-    data: any
+    data: any,
 ): data is PreLoadPluginsRequest =>
     data && data.type == PRE_LOAD_PLUGINS_REQUEST;
 
 export const buildPreLoadPluginsRequest = (
-    plugins: QualifiedPluginId[]
+    plugins: QualifiedPluginId[],
 ): PreLoadPluginsRequest => ({
     type: PRE_LOAD_PLUGINS_REQUEST,
     payload: {
-        plugins
-    }
+        plugins,
+    },
 });

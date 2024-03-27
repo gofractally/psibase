@@ -2,7 +2,7 @@ import {
     getTaposForHeadBlock,
     siblingUrl,
     signAndPushTransaction,
-    uint8ArrayToHex
+    uint8ArrayToHex,
 } from "@psibase/common-lib";
 import {
     FunctionCallRequest,
@@ -20,13 +20,13 @@ import {
     CallContext,
     toString,
     isErrorResult,
-    QualifiedPluginId
+    QualifiedPluginId,
 } from "@psibase/common-lib/messaging";
 import {
     LoaderPreloadComplete,
     buildPreloadStartMessage,
     isLoaderInitMessage,
-    isPreloadCompleteMessage
+    isPreloadCompleteMessage,
 } from "@psibase/common-lib/messaging/supervisor/LoaderInitialized";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -53,7 +53,7 @@ const autoArrayInit = {
             target[service] = [];
         }
         return target[service];
-    }
+    },
 };
 
 const pluginManagers: PluginManagers = new Proxy({}, autoArrayInit);
@@ -69,7 +69,9 @@ const addPluginManager = (pluginId: QualifiedPluginId): boolean => {
 
 const getOnLoaderInit = (
     frameInfo: FrameInfo,
-    resolve: (value: HTMLIFrameElement | PromiseLike<HTMLIFrameElement>) => void
+    resolve: (
+        value: HTMLIFrameElement | PromiseLike<HTMLIFrameElement>,
+    ) => void,
 ) => {
     return (message: MessageEvent<any>) => {
         if (isLoaderInitMessage(message.data)) {
@@ -77,11 +79,11 @@ const getOnLoaderInit = (
             if (message.origin !== new URL(frameInfo.src).origin) return;
 
             const loader = document.getElementById(
-                frameInfo.id
+                frameInfo.id,
             ) as HTMLIFrameElement;
             if (!(loader && loader.contentWindow)) {
                 console.error(
-                    `${frameInfo.service} sent LOADER_INITIALIZED, but the loader is not ready to receive messages.`
+                    `${frameInfo.service} sent LOADER_INITIALIZED, but the loader is not ready to receive messages.`,
                 );
                 return;
             }
@@ -135,7 +137,7 @@ const prepareServicePlugins = async (service: string, plugins: string[]) => {
 
     loader.contentWindow!.postMessage(
         buildPreloadStartMessage(plugins),
-        siblingUrl(null, service)
+        siblingUrl(null, service),
     );
 };
 
@@ -143,7 +145,7 @@ const sendPluginCallRequest = async (param: PluginCallPayload) => {
     const iframe = await getLoader(param.args.service);
     iframe.contentWindow?.postMessage(
         buildPluginCallRequest(param),
-        siblingUrl(null, param.args.service)
+        siblingUrl(null, param.args.service),
     );
 
     let { service, plugin } = param.args;
@@ -159,25 +161,25 @@ const processTop = () => {
     sendPluginCallRequest({
         caller,
         args,
-        resultCache
+        resultCache,
     });
 };
 
 const onFunctionCallRequest = (
     origin: string,
-    message: FunctionCallRequest
+    message: FunctionCallRequest,
 ) => {
     if (!callStack.isEmpty()) {
         throw Error(
             `Plugin call resolution already in progress: ${toString(
-                callStack.peekBottom()!.args
-            )}`
+                callStack.peekBottom()!.args,
+            )}`,
         );
     }
 
     callStack.push({
         caller: new URL(origin).origin,
-        args: message.args
+        args: message.args,
     });
     processTop();
 
@@ -208,12 +210,12 @@ const verifyOriginOnTopOfStack = (origin: string) => {
                 //   call throw in the loader is moved from within the import to the catch handler.
             }
             throw Error(
-                `Plugins may only send messages when they are on top of the call stack.`
+                `Plugins may only send messages when they are on top of the call stack.`,
             );
         }
     } else {
         throw Error(
-            `Plugin messages may only be processed when the call stack is non-empty.`
+            `Plugin messages may only be processed when the call stack is non-empty.`,
         );
     }
 };
@@ -224,7 +226,7 @@ const isUnrecoverableError = (result: any) => {
 
 const onPluginCallResponse = async (
     origin: string,
-    message: PluginCallResponse
+    message: PluginCallResponse,
 ) => {
     if (!context.rootAppOrigin)
         throw new Error(`Plugin responded to unknown root application origin.`);
@@ -250,16 +252,16 @@ const onPluginCallResponse = async (
                         sender: "alice",
                         service: a.service,
                         method: a.action,
-                        rawData: uint8ArrayToHex(a.args)
+                        rawData: uint8ArrayToHex(a.args),
                     };
                 });
                 const tenSeconds = 10000;
                 const transaction: any = {
                     tapos: {
                         ...(await getTaposForHeadBlock(supervisorDomain)),
-                        expiration: new Date(Date.now() + tenSeconds)
+                        expiration: new Date(Date.now() + tenSeconds),
                     },
-                    actions
+                    actions,
                 };
                 await signAndPushTransaction(supervisorDomain, transaction, []);
             }
@@ -267,7 +269,7 @@ const onPluginCallResponse = async (
 
         window.parent.postMessage(
             buildFunctionCallResponse(returningCall.args, result),
-            context.rootAppOrigin
+            context.rootAppOrigin,
         );
         context.reset();
     } else {
@@ -276,7 +278,7 @@ const onPluginCallResponse = async (
             service: callService,
             plugin: callPlugin,
             intf: callIntf,
-            method: callMethod
+            method: callMethod,
         } = returningCall.args;
 
         context.addCacheObject({
@@ -286,7 +288,7 @@ const onPluginCallResponse = async (
             callIntf,
             callMethod,
             args_json: JSON.stringify(returningCall.args.params),
-            result
+            result,
         });
 
         processTop();
@@ -298,21 +300,21 @@ const onPluginSyncCall = (origin: string, message: PluginSyncCall) => {
 
     callStack.push({
         caller: new URL(origin).origin,
-        args: message.payload
+        args: message.payload,
     });
 
     processTop();
 };
 
 const onPreloadPluginsRequest = async ({
-    payload
+    payload,
 }: PreLoadPluginsRequest): Promise<void> => {
     let { plugins } = payload;
     // Get all loaders
     await Promise.all(
         plugins.map((pluginId: QualifiedPluginId) => {
             return getLoader(pluginId.service);
-        })
+        }),
     );
 
     // Load plugins
@@ -324,7 +326,7 @@ const onPreloadPluginsRequest = async ({
 };
 
 const onPreloadComplete = async ({
-    payload: _payload
+    payload: _payload,
 }: LoaderPreloadComplete) => {
     // TODO: Use dependencies from the payload to DFS load other plugins
 };

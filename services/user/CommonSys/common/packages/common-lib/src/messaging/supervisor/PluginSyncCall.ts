@@ -10,8 +10,8 @@ export const isPluginSyncCall = (data: any): data is PluginSyncCall =>
     data && data.type == SYNC_CALL_REQUEST;
 
 export const buildPluginSyncCall = (
-    payload: QualifiedFunctionCallArgs
+    payload: QualifiedFunctionCallArgs,
 ): PluginSyncCall => ({
     payload,
-    type: SYNC_CALL_REQUEST
+    type: SYNC_CALL_REQUEST,
 });

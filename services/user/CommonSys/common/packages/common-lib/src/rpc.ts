@@ -65,7 +65,7 @@ export function siblingUrl(
     baseUrl?: string | null,
     subDomain?: string | null,
     path?: string | null,
-    baseUrlIncludesSibling = true
+    baseUrlIncludesSibling = true,
 ): string {
     const currentUrl = new URL(baseUrl || window.location.href);
     const hostnameParts = currentUrl.hostname.split(".");
@@ -76,7 +76,7 @@ export function siblingUrl(
         hostnameParts.unshift(subDomain);
     }
     currentUrl.hostname = hostnameParts.join(".");
-    const computedPath =  path ? `/${path.replace(/^\/+/, "")}` : ``
+    const computedPath = path ? `/${path.replace(/^\/+/, "")}` : ``;
     return currentUrl.origin + computedPath;
 }
 
@@ -115,7 +115,7 @@ export async function postText(url: string, text: string) {
                 "Content-Type": "text",
             },
             body: text,
-        })
+        }),
     );
 }
 
@@ -127,7 +127,7 @@ export async function postGraphQL(url: string, graphql: string) {
                 "Content-Type": "application/graphql",
             },
             body: graphql,
-        })
+        }),
     );
 }
 
@@ -139,7 +139,7 @@ export async function postJson(url: string, json: any) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify(json),
-        })
+        }),
     );
 }
 
@@ -151,7 +151,7 @@ export async function postArrayBuffer(url: string, arrayBuffer: any) {
                 "Content-Type": "application/octet-stream",
             },
             body: arrayBuffer,
-        })
+        }),
     );
 }
 
@@ -162,7 +162,7 @@ export async function postTextGetJson(url: string, text: string) {
 
 export async function postGraphQLGetJson<GqlResponse>(
     url: string,
-    graphQL: string
+    graphQL: string,
 ): Promise<GqlResponse> {
     const res = await postGraphQL(url, graphQL);
     return res.json();
@@ -202,11 +202,11 @@ export async function packAction(baseUrl: string, action: any) {
                     await siblingUrl(
                         baseUrl,
                         service,
-                        "/pack_action/" + method
+                        "/pack_action/" + method,
                     ),
-                    data
-                )
-            )
+                    data,
+                ),
+            ),
         );
     }
     return { sender, service, method, rawData };
@@ -214,7 +214,7 @@ export async function packAction(baseUrl: string, action: any) {
 
 export async function packActions(baseUrl: string, actions: any[]) {
     return await Promise.all(
-        actions.map((action) => packAction(baseUrl, action))
+        actions.map((action) => packAction(baseUrl, action)),
     );
 }
 
@@ -224,16 +224,16 @@ export async function packTransaction(baseUrl: string, transaction: any) {
         {
             ...transaction,
             actions: await packActions(baseUrl, transaction.actions),
-        }
+        },
     );
 }
 
 export async function packAndDigestTransaction(
     baseUrl: string,
-    transaction: any
+    transaction: any,
 ) {
     const packedBytes = new Uint8Array(
-        await packTransaction(baseUrl, transaction)
+        await packTransaction(baseUrl, transaction),
     );
     const digest = new (hashJs as any).sha256().update(packedBytes).digest();
     return { transactionHex: uint8ArrayToHex(packedBytes), digest };
@@ -241,7 +241,7 @@ export async function packAndDigestTransaction(
 
 export async function packSignedTransaction(
     baseUrl: string,
-    signedTransaction: any
+    signedTransaction: any,
 ) {
     if (typeof signedTransaction.transaction !== "string")
         signedTransaction = {
@@ -250,24 +250,24 @@ export async function packSignedTransaction(
                 new Uint8Array(
                     await packTransaction(
                         baseUrl,
-                        signedTransaction.transaction
-                    )
-                )
+                        signedTransaction.transaction,
+                    ),
+                ),
             ),
         };
     return await postJsonGetArrayBuffer(
         baseUrl.replace(/\/+$/, "") + "/common/pack/SignedTransaction",
-        signedTransaction
+        signedTransaction,
     );
 }
 
 export async function pushPackedSignedTransaction(
     baseUrl: string,
-    packed: any
+    packed: any,
 ) {
     const trace = await postArrayBufferGetJson(
         baseUrl.replace(/\/+$/, "") + "/native/push_transaction",
-        packed
+        packed,
     );
     if (trace.error) throw new RPCError(trace.error, trace);
     return trace;
@@ -275,18 +275,18 @@ export async function pushPackedSignedTransaction(
 
 export async function packAndPushSignedTransaction(
     baseUrl: string,
-    signedTransaction: any
+    signedTransaction: any,
 ) {
     return await pushPackedSignedTransaction(
         baseUrl,
-        await packSignedTransaction(baseUrl, signedTransaction)
+        await packSignedTransaction(baseUrl, signedTransaction),
     );
 }
 
 export async function signTransaction(
     baseUrl: string,
     transaction: any,
-    privateKeys: string[]
+    privateKeys: string[],
 ) {
     const keys = (privateKeys || []).map((k) => {
         if (typeof k === "string") return privateStringToKeyPair(k);
@@ -297,7 +297,7 @@ export async function signTransaction(
         rawData: uint8ArrayToHex(publicKeyPairToDER(k)),
     }));
     transaction = new Uint8Array(
-        await packTransaction(baseUrl, { ...transaction, claims })
+        await packTransaction(baseUrl, { ...transaction, claims }),
     );
     const digest = new (hashJs as any).sha256().update(transaction).digest();
     const proofs = keys.map((k) =>
@@ -305,8 +305,8 @@ export async function signTransaction(
             signatureToBin({
                 keyType: k.keyType,
                 signature: k.keyPair.sign(digest),
-            })
-        )
+            }),
+        ),
     );
     const signedTransaction = uint8ArrayToHex(transaction);
     const result = { transaction: signedTransaction, proofs };
@@ -323,7 +323,7 @@ export async function signTransaction(
 export async function signAndPushTransaction(
     baseUrl: string,
     transaction: any,
-    privateKeys: string[]
+    privateKeys: string[],
 ) {
     try {
         console.log("Signing transaction...", {
@@ -334,7 +334,7 @@ export async function signAndPushTransaction(
         const signedTransaction = await signTransaction(
             baseUrl,
             transaction,
-            privateKeys
+            privateKeys,
         );
         console.log("Successfully signed transaction", { signedTransaction });
 
@@ -342,7 +342,7 @@ export async function signAndPushTransaction(
             console.log("Pushing transaction...");
             const pushedTransaction = await packAndPushSignedTransaction(
                 baseUrl,
-                signedTransaction
+                signedTransaction,
             );
             console.log("Transaction pushed!", { pushedTransaction });
             return pushedTransaction;
@@ -510,7 +510,7 @@ function sendToParent(message: any) {
     const sendMessage = async () => {
         (window as any).parentIFrame.sendMessage(
             message,
-            await siblingUrl(undefined, undefined, undefined)
+            await siblingUrl(undefined, undefined, undefined),
         );
     };
 
@@ -546,7 +546,7 @@ const handleErrorCode = (code: any) => {
     });
     if (!recognizedError)
         console.error(
-            "Message from core contains unrecognized error code: " + code
+            "Message from core contains unrecognized error code: " + code,
         );
 
     return true;
@@ -584,7 +584,7 @@ const messageRouting = [
                 }
             } else {
                 responsePayload.errors.push(
-                    `Service ${contractName} has no operation "${identifier}"`
+                    `Service ${contractName} has no operation "${identifier}"`,
                 );
             }
 
@@ -610,21 +610,21 @@ const messageRouting = [
             try {
                 const contractName = await getContractName();
                 const query = registeredQueries.find(
-                    (q) => q.id === identifier
+                    (q) => q.id === identifier,
                 );
                 if (query) {
                     try {
                         const msgMetadata = { sender };
                         responsePayload.response = await query.exec(
                             params,
-                            msgMetadata
+                            msgMetadata,
                         );
                     } catch (e) {
                         responsePayload.errors.push(e);
                     }
                 } else {
                     responsePayload.errors.push(
-                        `Service ${contractName} has no query "${identifier}"`
+                        `Service ${contractName} has no query "${identifier}"`,
                     );
                 }
             } catch (e) {
@@ -739,7 +739,7 @@ function set({ targetArray, newElements }: any, caller: any) {
 
     if (!valid) {
         console.error(
-            caller + ': All elements must have "id" and "exec" properties'
+            caller + ': All elements must have "id" and "exec" properties',
         );
         return;
     }
@@ -765,7 +765,7 @@ function set({ targetArray, newElements }: any, caller: any) {
 export function setOperations(operations: Operation[]) {
     set(
         { targetArray: registeredOperations, newElements: operations },
-        "setOperations"
+        "setOperations",
     );
 }
 
@@ -787,7 +787,7 @@ export function setQueries(queries: any[]) {
 export async function operation<Params>(
     appletId: AppletId,
     name: string,
-    params = {} as Params
+    params = {} as Params,
 ) {
     const operationPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected
@@ -825,7 +825,7 @@ export function action<ActionParams>(
     application: string,
     actionName: string,
     params: ActionParams,
-    sender: string | null = null
+    sender: string | null = null,
 ) {
     sendToParent({
         type: MessageTypes.Action,
@@ -844,7 +844,7 @@ export function action<ActionParams>(
 export function query<Params, Response>(
     appletId: AppletId,
     name: string,
-    params = {} as Params
+    params = {} as Params,
 ): Promise<Response> {
     const queryPromise = new Promise((resolve, reject) => {
         // Will leave memory hanging if we don't get a response as expected

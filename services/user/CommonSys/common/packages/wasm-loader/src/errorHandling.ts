@@ -3,7 +3,7 @@ import {
     QualifiedFunctionCallArgs,
     QualifiedPluginId,
     buildPluginCallResponse,
-    toString
+    toString,
 } from "@psibase/common-lib/messaging";
 
 export class DownloadFailed extends Error {
@@ -117,7 +117,7 @@ const isParseError = (e: any) => {
 const reply = (payload: any) => {
     window.parent.postMessage(
         buildPluginCallResponse(payload, []),
-        siblingUrl(null, "supervisor-sys")
+        siblingUrl(null, "supervisor-sys"),
     );
 };
 
@@ -126,8 +126,8 @@ export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
         reply({
             errorType: "unrecoverable",
             val: {
-                message: `${toString(args)}: Possible plugin import code gen error.`
-            }
+                message: `${toString(args)}: Possible plugin import code gen error.`,
+            },
         });
     } else if (
         e instanceof Error &&
@@ -136,48 +136,48 @@ export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
     ) {
         reply({
             errorType: "recoverable",
-            val: (e as ComponentError).payload
+            val: (e as ComponentError).payload,
         });
     } else if (e instanceof Error && e.message === "unreachable") {
         reply({
             errorType: "unrecoverable",
-            val: { message: `${toString(args)}: Runtime error (panic)` }
+            val: { message: `${toString(args)}: Runtime error (panic)` },
         });
     } else if (isParseError(e)) {
         reply({
             errorType: "unrecoverable",
             val: {
-                message: `${toString(args)}: Possible plugin import code gen error`
-            }
+                message: `${toString(args)}: Possible plugin import code gen error`,
+            },
         });
     } else if (e instanceof PluginDownloadFailed) {
         let { service, plugin } = e.pluginId;
         reply({
             errorType: "unrecoverable",
             val: {
-                message: `${toString(args)}: Failed to download ${service}:${plugin}.`
-            }
+                message: `${toString(args)}: Failed to download ${service}:${plugin}.`,
+            },
         });
     } else if (e instanceof ParserDownloadFailed) {
         reply({
             errorType: "unrecoverable",
             val: {
-                message: `${toString(args)}: Failed to download parser. Possible network issues.`
-            }
+                message: `${toString(args)}: Failed to download parser. Possible network issues.`,
+            },
         });
     } else if (e instanceof ParsingFailed) {
         reply({
             errorType: "unrecoverable",
             val: {
-                message: `${toString(args)}: Parsing plugin failed. Possible invalid wit syntax.`
-            }
+                message: `${toString(args)}: Parsing plugin failed. Possible invalid wit syntax.`,
+            },
         });
     } else if (e instanceof InvalidPlugin) {
         reply({
             errorType: "unrecoverable",
             val: {
-                message: `${toString(args)}: [InvalidPlugin] ${e.message}`
-            }
+                message: `${toString(args)}: [InvalidPlugin] ${e.message}`,
+            },
         });
     } else {
         // Unrecognized error
@@ -186,16 +186,16 @@ export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
                 errorType: "unrecoverable",
                 val: {
                     error: e.name,
-                    message: `${toString(args)}: ${e.message}`
-                }
+                    message: `${toString(args)}: ${e.message}`,
+                },
             });
         } else {
             reply({
                 errorType: "unrecoverable",
                 val: {
                     error: "unknown",
-                    message: `${toString(args)}: ${JSON.stringify(e, null, 2)}`
-                }
+                    message: `${toString(args)}: ${JSON.stringify(e, null, 2)}`,
+                },
             });
         }
     }
