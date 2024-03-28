@@ -13,6 +13,10 @@ export default defineConfig({
                 find: /^@psibase\/common-lib.*$/,
                 replacement: path.resolve("../common-lib/src")
             },
+            {
+                find: /^@psibase\/supervisor-lib.*$/,
+                replacement: path.resolve("../../../../SupervisorSys/lib/src")
+            },
         ]
     }
 });

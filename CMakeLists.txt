@@ -223,6 +223,7 @@ set(JS_DIRS
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
 set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
 set(COMMON_LOADER_DIR services/user/CommonSys/common/packages/wasm-loader/:CommonSysLoaderLib_js)
+set(SUPERVISOR_LIB_DIR services/user/SupervisorSys/lib/:SupervisorLib_js)
 
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
@@ -248,12 +249,13 @@ file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/servic
 
 # Builds the Common Sys files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${COMMON_LOADER_DIR} index.html ${CommonSysCommonLib_js_DEP})
+add_js_target(${SUPERVISOR_LIB_DIR} supervisor-lib.js)
+add_js_target(${COMMON_LOADER_DIR} index.html ${CommonSysCommonLib_js_DEP} ${SupervisorLib_js_DEP})
 
 # Build each UI
 # Each of these UIs receives the build output of CommonSys, so CommonSys files are listed as dependencies
 foreach(ROW ${JS_DIRS})
-    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonSysCommonLib_js_DEP} ${CommonSysLoaderLib_js_DEP})
+    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonSysCommonLib_js_DEP})
 endforeach()
 
 # A function that can be used to add a new target that builds a wasm component from rust
@@ -286,7 +288,7 @@ file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services
 # Build each component
 set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parser:ComponentParser)
 add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
-add_dependencies(CommonSysCommonLib_js ComponentParser)
+add_dependencies(CommonSysLoaderLib_js ComponentParser)
 
 add_rs_component(services/system/AccountSys/plugin:AccountsPlugin account_sys.wasm ${plugin-wit})
 add_rs_component(services/system/AuthSys/plugin:AuthPlugin auth_sys.wasm ${plugin-wit})
@@ -590,10 +592,12 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/SupervisorSys.psi
     NAME SupervisorSys
     VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS NftSys ProxySys AccountSys
+    PACKAGE_DEPENDS NftSys ProxySys AccountSys CommonSys
     SERVICE supervisor-sys
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
+        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/lib/dist/supervisor-lib.js /supervisor-lib.js
     DEPENDS ${SupervisorSys_js_DEP}
+    DEPENDS ${SupervisorLib_js_DEP}
 )
 
 psibase_package(

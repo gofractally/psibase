@@ -1,4 +1,4 @@
-import { QualifiedFunctionCallArgs, toString } from "./FunctionCallRequest";
+import { QualifiedFunctionCallArgs, toString } from "@psibase/common-lib";
 import { AddableAction } from "./PluginCallResponse";
 
 export interface Call<T = any> {

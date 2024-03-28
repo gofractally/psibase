@@ -3,31 +3,31 @@ import {
     siblingUrl,
     signAndPushTransaction,
     uint8ArrayToHex,
-} from "@psibase/common-lib";
+} from "@psibase/common-lib/rpc";
 import {
     FunctionCallRequest,
-    buildMessageIFrameInitialized,
-    PluginCallResponse,
     isFunctionCallRequest,
-    isPluginCallResponse,
-    PluginCallPayload,
-    buildPluginCallRequest,
     buildFunctionCallResponse,
-    isPreLoadPluginsRequest,
-    PreLoadPluginsRequest,
-    isPluginSyncCall,
-    PluginSyncCall,
-    CallContext,
     toString,
     isErrorResult,
     QualifiedPluginId,
+    isPreLoadPluginsRequest,
+    PreLoadPluginsRequest,
 } from "@psibase/common-lib/messaging";
 import {
+    isLoaderInitMessage,
+    buildMessageIFrameInitialized,
+    PluginCallResponse,
+    isPluginCallResponse,
+    PluginCallPayload,
+    buildPluginCallRequest,
+    isPluginSyncCall,
+    PluginSyncCall,
+    CallContext,
     LoaderPreloadComplete,
     buildPreloadStartMessage,
-    isLoaderInitMessage,
     isPreloadCompleteMessage,
-} from "@psibase/common-lib/messaging/supervisor/LoaderInitialized";
+} from "@psibase/supervisor-lib/messaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>

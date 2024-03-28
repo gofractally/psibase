@@ -1,4 +1,5 @@
-import { ResultCache, isErrorResult } from "@psibase/common-lib/messaging";
+import { isErrorResult } from "@psibase/common-lib/messaging";
+import { ResultCache } from "@psibase/supervisor-lib";
 
 interface PluginFunc {
     service: string;

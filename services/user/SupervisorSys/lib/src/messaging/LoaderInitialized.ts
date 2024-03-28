@@ -3,7 +3,7 @@ import {
     LOADER_PRELOAD_COMPLETE,
     LOADER_PRELOAD_START,
 } from "./index";
-import { QualifiedPluginId } from "./PluginId";
+import { QualifiedPluginId } from "@psibase/common-lib";
 
 export interface LoaderInitialized {
     type: typeof LOADER_INITIALIZED;

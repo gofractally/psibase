@@ -1,4 +1,4 @@
-import { QualifiedFunctionCallArgs } from "./FunctionCallRequest";
+import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
 import { ResultCache } from "./CallContext";
 
 const PLUGIN_CALL_REQUEST = "PLUGIN_CALL_REQUEST" as const;
