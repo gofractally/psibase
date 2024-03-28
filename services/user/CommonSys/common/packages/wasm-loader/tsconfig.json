@@ -19,7 +19,9 @@
         "paths": {
             "/common": ["../../"],
             "@psibase/common-lib": ["../common-lib/src"],
-            "@psibase/common-lib/*": ["../common-lib/src/*"]
+            "@psibase/common-lib/*": ["../common-lib/src/*"],
+            "@psibase/supervisor-lib": ["../../../../SupervisorSys/lib/src"],
+            "@psibase/supervisor-lib/*": ["../../../../SupervisorSys/lib/src/*"]
         }
     },
     "include": ["src"]

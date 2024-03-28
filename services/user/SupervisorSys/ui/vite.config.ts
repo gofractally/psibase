@@ -8,12 +8,16 @@ export default defineConfig({
             {
                 find: /^@psibase\/common-lib.*$/,
                 replacement: path.resolve(
-                    "../../CommonSys/common/packages/common-lib/src"
-                )
-            }
-        ]
+                    "../../CommonSys/common/packages/common-lib/src",
+                ),
+            },
+            {
+                find: /^@psibase\/supervisor-lib.*$/,
+                replacement: path.resolve("../lib/src"),
+            },
+        ],
     },
     build: {
         target: "esnext",
-    }
+    },
 });

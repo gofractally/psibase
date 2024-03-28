@@ -1,10 +1,12 @@
-import { siblingUrl } from "@psibase/common-lib";
+import { siblingUrl } from "@psibase/common-lib/rpc";
 import {
     QualifiedFunctionCallArgs,
     QualifiedPluginId,
-    buildPluginCallResponse,
     toString,
 } from "@psibase/common-lib/messaging";
+import {
+    buildPluginCallResponse
+} from "@psibase/supervisor-lib";
 
 export class DownloadFailed extends Error {
     url: string;
