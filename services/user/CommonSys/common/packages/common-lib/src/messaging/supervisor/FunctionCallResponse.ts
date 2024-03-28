@@ -1,29 +1,39 @@
-import { FUNCTION_CALL_RESPONSE, Message } from "./index";
+import { FUNCTION_CALL_RESPONSE } from "./index";
+import { FunctionCallArgs } from "./index";
 
-export interface FunctionCallResponse extends Message {
+export interface FunctionCallResponse {
     type: typeof FUNCTION_CALL_RESPONSE;
-    payload: {
-        id: string;
-        result: any;
-    };
+    call: FunctionCallArgs;
+    result: any;
 }
 
 export const isFunctionCallResponse = (
-    data: any
+    data: any,
 ): data is FunctionCallResponse => {
-    // TODO add further assertions on expectations in the payload.
     return data && data.type == FUNCTION_CALL_RESPONSE;
 };
 
+export const isErrorResult = (result: any) => {
+    return (
+        typeof result === "object" &&
+        "errorType" in result &&
+        typeof result.errorType === "string" &&
+        "val" in result &&
+        typeof result.val === "object"
+    );
+};
+
+export const isErrorResponse = (response: FunctionCallResponse) => {
+    return isErrorResult(response.result);
+};
+
 export const buildFunctionCallResponse = (
-    id: string,
-    result: any
+    call: FunctionCallArgs,
+    result: any,
 ): FunctionCallResponse => {
     return {
         type: FUNCTION_CALL_RESPONSE,
-        payload: {
-            id,
-            result,
-        },
+        call,
+        result,
     };
 };

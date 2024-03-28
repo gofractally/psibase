@@ -7,14 +7,15 @@ export default defineConfig({
     build: {
         rollupOptions: {
             external: ["/common/iframeResizer.contentWindow.js"]
-        }
+        },
+        minify: false
     },
     resolve: {
         alias: [
             {
                 find: /^@psibase\/common-lib.*$/,
                 replacement: path.resolve("../common-lib/src")
-            }
+            },
         ]
     }
 });

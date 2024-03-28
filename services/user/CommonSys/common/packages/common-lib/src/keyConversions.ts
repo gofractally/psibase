@@ -191,7 +191,7 @@ export function publicKeyPairToFracpack({ keyType, keyPair }: any): Uint8Array {
             0,
             0, // variant size
             y[31] & 1 ? 3 : 2, // inner array begins here
-        ].concat(x)
+        ].concat(x),
     );
 }
 
@@ -253,7 +253,7 @@ export function signatureToFracpack({ keyType, signature }: any): Uint8Array {
             0,
             0,
             0, // variant size
-        ].concat(r, s)
+        ].concat(r, s),
     );
 }
 

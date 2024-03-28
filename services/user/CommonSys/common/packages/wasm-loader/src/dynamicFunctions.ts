@@ -1,87 +1,132 @@
-import { siblingUrl } from '@psibase/common-lib'
-import { ServiceMethodIndex } from "./witParsing";
+import { ResultCache, isErrorResult } from "@psibase/common-lib/messaging";
 
-interface Func {
+interface PluginFunc {
     service: string;
+    plugin: string;
+    intf?: string;
     method: string;
 }
 
-const argString = (count: number) =>
-    [...new Array(count)]
-        .map((_, index) => index + 1)
-        .map((num) => `arg${num}`)
-        .join(", ")
-        .trim();
-
-const generateFulfilledFunction = (
-    method: string,
-    result: string | number,
-    argCount = 3
-): string =>
-    `export function ${method}(${argString(argCount)}) {
-        return ${typeof result == "number" ? result : `'${result}'`}
-      }`;
-
-export interface FunctionCallArgs {
-    service: string;
-    method: string;
-    params: any[];
-}
-export interface FunctionCallResult<T = any> extends FunctionCallArgs {
-    id: string;
-    result: T;
-}
-
-const generatePendingFunction = (
-    { method, service }: Func,
-    id: string,
-    origin: string
-): string => {
-    return `export async function ${method}(...args) {
-  
-  const payload = {
-      id: "${id}",
-      service: "${service}",
-      method: "${method}",
-      params: [...args]
-  };
-  
-  console.log('Attempting to call plugin call ${id}', payload);
-  window.parent.postMessage({ type: 'PLUGIN_CALL_FAILURE', payload }, "${origin}");
-  throw new Error("Pending function throw, this is by design.")
-  }
-`;
+type FunctionInterface = {
+    namespace: string;
+    package: string;
+    name: string;
+    funcs: string[];
 };
 
-interface FunctionResult<T = any> {
-    method: string;
-    result: T;
-}
+type ImportedFunctions = {
+    namespace: string;
+    package: string;
+    interfaces: FunctionInterface[];
+    funcs: string[];
+};
 
-export const serviceMethodIndexToImportables = (
-    serviceMethodIndex: ServiceMethodIndex,
-    service: string,
-    id: string,
-    functionsResult: FunctionResult[]
-): { [key: string]: string }[] =>
-    Object.entries(serviceMethodIndex).map(([key, methodNames]) => ({
-        [`component:${service}/${key}`]: methodNames
-            .map((methodName) => {
-                const functionResult = functionsResult.find(
-                    (funcResult) => funcResult.method == methodName
+const hostIntf = (intf: FunctionInterface): boolean => {
+    return intf.namespace === "wasi" || intf.namespace === "common";
+};
+
+const getFunctionBody = (
+    pluginFunc: PluginFunc,
+    resultCache: ResultCache[],
+): string => {
+    let { service, plugin, intf, method } = pluginFunc;
+    const found = resultCache.find((f: ResultCache) => {
+        return (
+            f.callService == service &&
+            f.callPlugin == plugin &&
+            f.callIntf == intf &&
+            f.callMethod == method
+        );
+    });
+
+    if (!found) {
+        return `
+            throw new Error(JSON.stringify({
+                type: 'synchronous_call',
+                target: {
+                    service: '${service}',
+                    plugin: '${plugin}',
+                    intf: '${intf}',
+                    method: '${method}',
+                    params: [...args]
+                }}));
+        `;
+    }
+
+    if (found.result === undefined) {
+        return ""; // No-op if the sync call has no return value.
+    }
+
+    if (isErrorResult(found.result)) {
+        return `throw ${JSON.stringify(found.result.val)};`;
+    } else {
+        return `return ${JSON.stringify(found.result)};`;
+    }
+};
+
+interface PkgId {
+    ns: string;
+    pkg: string;
+}
+const serializePkgId = (pkgId: PkgId): string => `${pkgId.ns}:${pkgId.pkg}`;
+interface FunctionIntfs {
+    [pkgId: string]: FunctionInterface[];
+}
+const autoArrayInit = {
+    get: (target: FunctionIntfs, pkgId: string): FunctionInterface[] => {
+        if (!target[pkgId]) {
+            target[pkgId] = [];
+        }
+        return target[pkgId];
+    },
+};
+
+export const getImportFills = (
+    importedFuncs: ImportedFunctions,
+    resultCache: ResultCache[],
+): { [key: string]: string }[] => {
+    const { interfaces, funcs: freeFunctions } = importedFuncs;
+    if (freeFunctions.length !== 0) {
+        // TODO: Check how this behaves if a plugin exports a freestanding function and
+        //       another plugin imports it.
+        throw Error(`TODO: Plugins may not import freestanding functions.`);
+    }
+
+    let importables: { [key: string]: string }[] = [];
+    let subset = interfaces.filter((i) => {
+        return !hostIntf(i) && !(i.funcs.length === 0);
+    });
+
+    let namespaced: FunctionIntfs = new Proxy({}, autoArrayInit);
+    subset.forEach((intf: FunctionInterface) => {
+        let key: PkgId = { ns: intf.namespace, pkg: intf.package };
+        namespaced[serializePkgId(key)].push(intf);
+    });
+
+    for (const [pkgId, intfs] of Object.entries(namespaced)) {
+        let imp: string[] = [];
+        intfs.forEach((intf: FunctionInterface) => {
+            imp.push(`export const ${intf.name} = {
+            `);
+            intf.funcs.forEach((f: string) => {
+                imp.push(`${f}(...args) {
+                `);
+                imp.push(
+                    getFunctionBody(
+                        {
+                            service: intf.namespace,
+                            plugin: intf.package,
+                            intf: intf.name,
+                            method: f,
+                        },
+                        resultCache,
+                    ),
                 );
-                return (
-                    (functionResult
-                        ? generateFulfilledFunction(
-                              functionResult.method,
-                              functionResult.result
-                          )
-                        : generatePendingFunction(
-                              { method: methodName, service: key },
-                              id,
-                              siblingUrl(null, "supervisor-sys")
-                          )) + "\n"
-                );
-            })
-            .join("\n")
-    }));
+                imp.push(`},`);
+            });
+            imp.push(`}`);
+        });
+        importables.push({ [`${pkgId}/*`]: `${imp.join("")}` });
+    }
+    return importables;
+};

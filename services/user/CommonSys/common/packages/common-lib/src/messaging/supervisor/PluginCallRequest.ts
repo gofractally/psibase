@@ -1,16 +1,16 @@
-import { FunctionCallArgs } from "./FunctionCallRequest";
+import { QualifiedFunctionCallArgs } from "./FunctionCallRequest";
+import { ResultCache } from "./CallContext";
 
 const PLUGIN_CALL_REQUEST = "PLUGIN_CALL_REQUEST" as const;
 
-export interface FunctionCallResult<T = any> extends FunctionCallArgs {
-    id: string;
+export interface FunctionCallResult<T = any> extends QualifiedFunctionCallArgs {
     result: T;
 }
 
 export interface PluginCallPayload {
-    id: string;
-    args: FunctionCallArgs;
-    precomputedResults: FunctionCallResult[];
+    caller: string;
+    args: QualifiedFunctionCallArgs;
+    resultCache: ResultCache[];
 }
 
 export interface PluginCallRequest {
@@ -21,24 +21,23 @@ export interface PluginCallRequest {
 export const isPluginCallRequest = (data: any): data is PluginCallRequest => {
     const isEventTypeSatisfied = data && data.type == PLUGIN_CALL_REQUEST;
     if (!isEventTypeSatisfied) return false;
-    const { id, args } = data.payload;
+    const { args } = data.payload;
     const isSchemaSatisfied =
-        typeof id == "string" &&
         typeof args == "object" &&
         "service" in args &&
+        "plugin" in args &&
         "method" in args;
     if (!isSchemaSatisfied)
         throw new Error(
             `PluginCallRequest fails to meet schema. Received: ${JSON.stringify(
-                data
-            )}`
+                data,
+            )}`,
         );
     return isEventTypeSatisfied && isSchemaSatisfied;
 };
 
-
 export const buildPluginCallRequest = (
-    payload: PluginCallPayload
+    payload: PluginCallPayload,
 ): PluginCallRequest => ({
     type: PLUGIN_CALL_REQUEST,
     payload,
