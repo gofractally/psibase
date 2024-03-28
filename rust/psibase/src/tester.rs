@@ -245,7 +245,7 @@ impl Chain {
     /// Create a new account which authenticates using `auth-any-sys`.
     /// Doesn't fail if the account already exists.
     pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
-        services::account_sys::Wrapper::push(self)
+        services::accounts::Wrapper::push(self)
             .newAccount(
                 account,
                 AccountNumber::new(account_raw!("auth-any-sys")),

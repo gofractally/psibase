@@ -2,7 +2,7 @@
 
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/AuthDelegateSys.hpp>
 #include <services/system/AuthEcSys.hpp>
@@ -10,7 +10,7 @@
 #include <services/system/CpuSys.hpp>
 #include <services/system/ProducerSys.hpp>
 #include <services/system/ProxySys.hpp>
-#include <services/system/RAccountSys.hpp>
+#include <services/system/RAccounts.hpp>
 #include <services/system/RAuthEcSys.hpp>
 #include <services/system/RProducerSys.hpp>
 #include <services/system/RProxySys.hpp>
@@ -76,7 +76,7 @@ namespace
    std::vector<Action> getInitialActions(std::span<PackagedService> service_packages,
                                          bool                       installUI)
    {
-      transactor<AccountSys>     asys{AccountSys::service, AccountSys::service};
+      transactor<Accounts>       asys{Accounts::service, Accounts::service};
       transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
       std::vector<Action>        actions;
       bool                       has_package_sys = false;
@@ -114,7 +114,7 @@ namespace
       std::vector<AccountNumber> accountsWithAuth;
       for (const auto& act : actions)
       {
-         if (act.service == AccountSys::service && act.method == MethodNumber{"setAuthServ"})
+         if (act.service == Accounts::service && act.method == MethodNumber{"setAuthServ"})
          {
             accountsWithAuth.push_back(act.sender);
          }
@@ -207,7 +207,7 @@ AccountNumber DefaultTestChain::addAccount(
     AccountNumber authService /* = AccountNumber("auth-any-sys") */,
     bool          show /* = false */)
 {
-   transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
+   transactor<Accounts> asys(Accounts::service, Accounts::service);
 
    auto trace = pushTransaction(  //
        makeTransaction({asys.newAccount(acc, authService, true)}));
@@ -229,8 +229,8 @@ AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
                                            const PublicKey& public_key,
                                            bool             show /* = false */)
 {
-   transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
-   transactor<AuthEcSys>  ecsys(AuthEcSys::service, AuthEcSys::service);
+   transactor<Accounts>  asys(Accounts::service, Accounts::service);
+   transactor<AuthEcSys> ecsys(AuthEcSys::service, AuthEcSys::service);
 
    auto trace = pushTransaction(makeTransaction({
        asys.newAccount(name, AuthAnySys::service, true),
@@ -256,7 +256,7 @@ void DefaultTestChain::setAuthEc(AccountNumber    name,
    auto n  = name.str();
    auto t1 = from(name).to<AuthEcSys>().setKey(pubkey);
    check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
-   auto t2 = from(name).to<AccountSys>().setAuthServ(AuthEcSys::service);
+   auto t2 = from(name).to<Accounts>().setAuthServ(AuthEcSys::service);
    check(psibase::show(show, t2.trace()) == "", "Failed to setAuthServ for " + n);
 }
 

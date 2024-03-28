@@ -8,7 +8,7 @@ endfunction()
 function(add suffix)
     add_library(services_system${suffix} INTERFACE)
     target_mapped_include_directories(services_system${suffix} INTERFACE
-        AccountSys/include
+        Accounts/include
         AuthDelegateSys/include
         AuthEcSys/include
         AuthAnySys/include
@@ -27,7 +27,7 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
-    add_subdirectory(AccountSys)
+    add_subdirectory(Accounts)
     add_subdirectory(AuthDelegateSys)
     add_subdirectory(AuthEcSys)
     add_subdirectory(AuthAnySys)

@@ -18,5 +18,5 @@ package = "demoapp1:example"
 [package.metadata.component.target.dependencies]
 "common:plugin" = { path = "../../../services/user/CommonSys/common/packages/wit/plugin.wit" }
 "invite-sys:plugin" = { path = "../../../services/user/InviteSys/plugin/wit/world.wit" }
-"account-sys:plugin" = { path = "../../../services/system/AccountSys/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../services/system/Accounts/plugin/wit/world.wit" }
 "auth-sys:plugin" = { path = "../../../services/system/AuthSys/plugin/wit/world.wit" }

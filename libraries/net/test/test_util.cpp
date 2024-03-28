@@ -3,7 +3,7 @@
 #include <psibase/Actor.hpp>
 #include <psibase/nativeTables.hpp>
 
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/CpuSys.hpp>
 #include <services/system/ProducerSys.hpp>
@@ -87,9 +87,9 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
                                                .code    = readWholeFile("CpuSys.wasm"),
                                            },
                                            {
-                                               .service = AccountSys::service,
+                                               .service = Accounts::service,
                                                .flags   = 0,
-                                               .code    = readWholeFile("AccountSys.wasm"),
+                                               .code    = readWholeFile("Accounts.wasm"),
                                            },
                                            {
                                                .service = ProducerSys::service,
@@ -109,7 +109,7 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
           .code    = readWholeFile("VerifyEcSys.wasm"),
       });
    }
-   // TransactionSys + ProducerSys + AuthAnySys + AccountSys
+   // TransactionSys + ProducerSys + AuthAnySys + Accounts
    pushTransaction(ctx,
                    Transaction{                                                         //
                                .actions = {                                             //
@@ -127,8 +127,8 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
                               .service = TransactionSys::service,
                               .method  = MethodNumber{"startBoot"},
                               .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
-                       Action{.sender  = AccountSys::service,
-                              .service = AccountSys::service,
+                       Action{.sender  = Accounts::service,
+                              .service = Accounts::service,
                               .method  = MethodNumber{"init"},
                               .rawData = psio::to_frac(std::tuple())},
                        transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)

@@ -17,4 +17,4 @@ package = "auth-sys:plugin"
 
 [package.metadata.component.target.dependencies]
 "common:plugin" = { path = "../../../user/CommonSys/common/packages/wit/plugin.wit" }
-"account-sys:plugin" = { path = "../../AccountSys/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../Accounts/plugin/wit/world.wit" }

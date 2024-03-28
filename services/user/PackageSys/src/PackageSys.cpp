@@ -1,7 +1,7 @@
 #include <services/user/PackageSys.hpp>
 
 #include <psibase/check.hpp>
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/AuthDelegateSys.hpp>
 
 using namespace psibase;
@@ -13,7 +13,7 @@ namespace UserService
    {
       AccountNumber getAuthServ(AccountNumber account)
       {
-         auto db = AccountSys::Tables(AccountSys::service);
+         auto db = Accounts::Tables(Accounts::service);
          if (auto row = db.open<AccountTable>().getIndex<0>().get(account))
             return row->authService;
          else

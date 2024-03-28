@@ -52,7 +52,7 @@ interface keyvault {
 }
 
 world psibase-plugin {
-    import account-sys:plugin/accounts;
+    import accounts:plugin/accounts;
     import common:plugin/server;
 
     export smart-auth;

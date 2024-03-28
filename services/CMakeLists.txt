@@ -17,7 +17,7 @@ add_subdirectory(user)
 add_subdirectory(psibase_tests)
 
 if(DEFINED IS_WASM)
-    install(DIRECTORY system/AccountSys/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
+    install(DIRECTORY system/Accounts/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY system/AuthAnySys/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY system/AuthEcSys/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY system/AuthSys/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")

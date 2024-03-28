@@ -1,5 +1,5 @@
 use crate::services::{
-    account_sys, auth_delegate_sys, package_sys, proxy_sys, psispace_sys, setcode_sys,
+    accounts, auth_delegate_sys, package_sys, proxy_sys, psispace_sys, setcode_sys,
 };
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
@@ -378,7 +378,7 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        actions.push(new_account_action(account_sys::SERVICE, account));
+        actions.push(new_account_action(accounts::SERVICE, account));
         if let Some(key) = key {
             actions.push(set_key_action(account, key));
             actions.push(set_auth_service_action(account, key.auth_service()));
@@ -444,7 +444,7 @@ impl<R: Read + Seek> PackagedService<R> {
 
         for account in self.get_accounts() {
             if !self.has_service(*account) {
-                result.push(account_sys::SERVICE)
+                result.push(accounts::SERVICE)
             }
         }
 

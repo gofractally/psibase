@@ -2,7 +2,7 @@
 mod bindings;
 
 use bindings::common::plugin::types as CommonTypes;
-use bindings::exports::account_sys::plugin::accounts::Guest as Accounts;
+use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
 
 struct AccountsPlugin;
 
@@ -19,7 +19,7 @@ impl Accounts for AccountsPlugin {
         Err(CommonTypes::Error {
             code: 0,
             producer: CommonTypes::PluginId {
-                service: String::from("account-sys"),
+                service: String::from("accounts"),
                 plugin: "plugin".to_string(),
             },
             message: "Function not yet implemented".to_string(),

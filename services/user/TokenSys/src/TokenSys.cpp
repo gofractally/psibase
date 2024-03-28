@@ -1,6 +1,6 @@
 #include <services/user/TokenSys.hpp>
 
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
@@ -12,7 +12,7 @@ using namespace UserService;
 using namespace UserService::Errors;
 using namespace psibase;
 using psio::view;
-using SystemService::AccountSys;
+using SystemService::Accounts;
 using SystemService::ServiceMethod;
 using SystemService::TransactionSys;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
@@ -405,7 +405,7 @@ BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
    }
    else
    {
-      check(to<AccountSys>().exists(account), invalidAccount);
+      check(to<Accounts>().exists(account), invalidAccount);
       check(exists(tokenId), tokenDNE);
 
       record = {.key = {account, tokenId}, .balance = 0};
@@ -484,8 +484,8 @@ bool TokenSys::getTokenConf(TID tokenId, psibase::EnumElement flag)
 
 void TokenSys::checkAccountValid(psibase::AccountNumber account)
 {
-   check(to<AccountSys>().exists(account), invalidAccount);
-   check(account != AccountSys::nullAccount, invalidAccount);
+   check(to<Accounts>().exists(account), invalidAccount);
+   check(account != Accounts::nullAccount, invalidAccount);
 }
 
 bool TokenSys::isSenderIssuer(TID tokenId)

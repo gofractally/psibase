@@ -1,1 +1,1 @@
-[{"sender":"prods-weak","service":"account-sys","method":"setauthserv","rawData":"0800CC351360ADA84800"},{"sender":"prods-strong","service":"account-sys","method":"setauthserv","rawData":"0800CC351360ADA84800"}]
+[{"sender":"prods-weak","service":"accounts","method":"setauthserv","rawData":"0800CC351360ADA84800"},{"sender":"prods-strong","service":"accounts","method":"setauthserv","rawData":"0800CC351360ADA84800"}]

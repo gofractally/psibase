@@ -3,7 +3,7 @@
 #include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/ProxySys.hpp>
-#include "services/system/AccountSys.hpp"
+#include "services/system/Accounts.hpp"
 
 static constexpr bool enable_print = false;
 

@@ -1,4 +1,4 @@
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/ProxySys.hpp>
@@ -53,7 +53,7 @@ void InviteSys::init()
    to<NftSys>().setUserConf(manualDebit, true);
 
    // Create the invite payer account and set its auth contract
-   to<AccountSys>().newAccount(payerAccount, AuthInviteSys::service, true);
+   to<Accounts>().newAccount(payerAccount, AuthInviteSys::service, true);
 
    // TODO - Set whitelist so only the fractally service can create invites.
    // setWhitelist({"fractally"_m})
@@ -150,7 +150,7 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
 
    check(invite->state != InviteStates::rejected, alreadyRejected.data());
 
-   bool accountExists = to<AccountSys>().exists(acceptedBy);
+   bool accountExists = to<Accounts>().exists(acceptedBy);
    check(not accountExists, "The acceptedBy account already exists");
 
    check(sender == InviteSys::payerAccount, mustUseInvitedSys.data());
@@ -159,7 +159,7 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    invite->newAccountToken = false;
 
    // Create new account, and set key & auth
-   to<AccountSys>().newAccount(acceptedBy, AuthAnySys::service, true);
+   to<Accounts>().newAccount(acceptedBy, AuthAnySys::service, true);
    std::tuple<PublicKey> params{newAccountKey};
    Action                setKey{.sender  = acceptedBy,
                                 .service = AuthEcSys::service,
@@ -168,7 +168,7 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    to<TransactionSys>().runAs(move(setKey), vector<ServiceMethod>{});
    std::tuple<AccountNumber> params2{AuthEcSys::service};
    Action                    setAuth{.sender  = acceptedBy,
-                                     .service = AccountSys::service,
+                                     .service = Accounts::service,
                                      .method  = "setAuthServ"_m,
                                      .rawData = psio::convert_to_frac(params2)};
    to<TransactionSys>().runAs(move(setAuth), vector<ServiceMethod>{});
@@ -304,10 +304,10 @@ void InviteSys::setWhitelist(vector<AccountNumber> accounts)
 
    // Detect invalid accounts
    std::map<AccountNumber, uint32_t> counts;
-   auto                              accountSys = to<AccountSys>();
+   auto                              accountsService = to<Accounts>();
    for (const auto& acc : accounts)
    {
-      if (!accountSys.exists(acc))
+      if (!accountsService.exists(acc))
       {
          std::string err = "Account " + acc.str() + " does not exist";
          abortMessage(err);
@@ -347,10 +347,10 @@ void InviteSys::setBlacklist(vector<AccountNumber> accounts)
 
    // Detect invalid accounts
    std::map<AccountNumber, uint32_t> counts;
-   auto                              accountSys = to<AccountSys>();
+   auto                              accountsService = to<Accounts>();
    for (const auto& acc : accounts)
    {
-      if (!accountSys.exists(acc))
+      if (!accountsService.exists(acc))
       {
          std::string err = "Account " + acc.str() + " does not exist";
          abortMessage(err);
