@@ -3,7 +3,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/psibase.hpp>
 
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/CommonTables.hpp>
 #include <services/user/InviteErrors.hpp>
 #include <services/user/InviteTables.hpp>
@@ -19,7 +19,7 @@ namespace UserService
       /// in the creation of a new Psibase account. This service can be used
       /// by third party applications to streamline their user onboarding.
       ///
-      /// Only this system service and AccountSys are permitted to create new accounts.
+      /// Only this system service and Accounts are permitted to create new accounts.
       class InviteSys : public psibase::Service<InviteSys>
       {
         public:
@@ -31,7 +31,7 @@ namespace UserService
                                                NewAccTable,
                                                psibase::WebContentTable>;
          /// "invite-sys"
-         static constexpr auto service = SystemService::AccountSys::inviteService;
+         static constexpr auto service = SystemService::Accounts::inviteService;
          /// "invited-sys"
          static constexpr auto payerAccount = psibase::AccountNumber("invited-sys");
 

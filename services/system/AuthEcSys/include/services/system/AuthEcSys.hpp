@@ -54,7 +54,7 @@ namespace SystemService
 
       /// This is an implementation of the standard auth service interface defined by [SystemService::AuthInterface]
       ///
-      /// This action is automatically called by `account-sys` when an account is configured to use this auth service.
+      /// This action is automatically called by `accounts` when an account is configured to use this auth service.
       ///
       /// Verifies that a particular user is allowed to use a particular auth service.
       ///

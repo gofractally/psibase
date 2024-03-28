@@ -17,7 +17,7 @@ interface types {
 
     /// An object that uniquely identifies a plugin
     record plugin-id {
-        /// The name of a service (e.g. account-sys)
+        /// The name of a service (e.g. accounts)
         service: string,
         /// The name of the plugin (e.g. plugin.wasm)
         plugin: string,

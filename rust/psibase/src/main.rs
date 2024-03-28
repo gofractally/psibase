@@ -6,7 +6,7 @@ use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{account_sys, auth_delegate_sys, psispace_sys};
+use psibase::services::{accounts, auth_delegate_sys, psispace_sys};
 use psibase::{
     account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
     get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,
@@ -102,12 +102,7 @@ enum Command {
         insecure: bool,
 
         /// Sender to use when creating the account.
-        #[clap(
-            short = 'S',
-            long,
-            value_name = "SENDER",
-            default_value = "account-sys"
-        )]
+        #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
         sender: ExactAccountNumber,
     },
 
@@ -153,12 +148,7 @@ enum Command {
         register_proxy: bool,
 
         /// Sender to use when creating the account.
-        #[clap(
-            short = 'S',
-            long,
-            value_name = "SENDER",
-            default_value = "account-sys"
-        )]
+        #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
         sender: ExactAccountNumber,
     },
 
@@ -786,7 +776,7 @@ fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error
     for account in accounts {
         out.set_label(format!("Creating {}", account));
         let group = vec![
-            account_sys::Wrapper::pack().newAccount(account, account!("auth-any-sys"), true),
+            accounts::Wrapper::pack().newAccount(account, account!("auth-any-sys"), true),
             auth_delegate_sys::Wrapper::pack_from(account).setOwner(sender),
             set_auth_service_action(account, auth_delegate_sys::SERVICE),
         ];

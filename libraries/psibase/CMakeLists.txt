@@ -159,7 +159,7 @@ function(add suffix)
         target_mapped_include_directories(psitestlib${suffix} PUBLIC
             service/include
             tester/include
-            ../../services/system/AccountSys/include
+            ../../services/system/Accounts/include
             ../../services/system/ProducerSys/include
             ../../services/system/AuthDelegateSys/include
             ../../services/system/AuthEcSys/include

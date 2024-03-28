@@ -1,7 +1,7 @@
 #include <services/system/AuthDelegateSys.hpp>
 
 #include <psibase/dispatch.hpp>
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 
 using namespace psibase;
 
@@ -20,10 +20,10 @@ namespace SystemService
       if (requester == row->owner)
          flags = (flags & ~AuthInterface::requestMask) | AuthInterface::runAsRequesterReq;
 
-      auto accountSysTables = AccountSys::Tables(AccountSys::service);
-      auto accountTable     = accountSysTables.open<AccountTable>();
-      auto accountIndex     = accountTable.getIndex<0>();
-      auto account          = accountIndex.get(row->owner);
+      auto accountsTables = Accounts::Tables(Accounts::service);
+      auto accountTable   = accountsTables.open<AccountTable>();
+      auto accountIndex   = accountTable.getIndex<0>();
+      auto account        = accountIndex.get(row->owner);
       if (!account)
          abortMessage("unknown owner \"" + sender.str() + "\"");
 

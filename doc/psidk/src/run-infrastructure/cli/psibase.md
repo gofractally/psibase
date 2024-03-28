@@ -92,7 +92,7 @@ Create or modify an account
 
 - `-S`, `--sender` *account*
 
-  Sender to use when creating the account [default: account-sys].
+  Sender to use when creating the account [default: accounts].
 
 ### deploy
 
@@ -122,7 +122,7 @@ Deploy a service
   
 - `-S`, `--sender` *sender*
 
-  Sender to use when creating the account [default: account-sys]
+  Sender to use when creating the account [default: accounts]
 
 ### info
 

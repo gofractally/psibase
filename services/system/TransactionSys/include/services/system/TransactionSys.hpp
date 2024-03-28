@@ -134,7 +134,7 @@ namespace SystemService
       /// particular auth service. Allows auth services to use user
       /// whitelists.
       ///
-      /// Called by AccountSys.
+      /// Called by Accounts.
       ///
       /// * `user`:  The user being checked
       // TODO: Return error message instead?

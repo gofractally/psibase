@@ -85,12 +85,7 @@ struct DeployCommand {
     register_proxy: bool,
 
     /// Sender to use when creating the account.
-    #[clap(
-        short = 'S',
-        long,
-        value_name = "SENDER",
-        default_value = "account-sys"
-    )]
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
     sender: ExactAccountNumber,
 }
 

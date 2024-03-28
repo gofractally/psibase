@@ -1,7 +1,7 @@
 #include <services/user/PackageSys.hpp>
 #include <services/user/RPackageSys.hpp>
 
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/AuthDelegateSys.hpp>
 
 using Tables = psibase::ServiceTables<psibase::WebContentTable>;
@@ -22,9 +22,8 @@ namespace UserService
                        psibase::AccountNumber              owner) const
       {
          std::vector<psibase::AccountNumber> result;
-         auto                                accountIndex =
-             AccountSys::Tables(AccountSys::service).open<AccountTable>().getIndex<0>();
-         auto ownerIndex = AuthDelegateSys::Tables(AuthDelegateSys::service)
+         auto accountIndex = Accounts::Tables(Accounts::service).open<AccountTable>().getIndex<0>();
+         auto ownerIndex   = AuthDelegateSys::Tables(AuthDelegateSys::service)
                                .open<AuthDelegateSys::AuthDelegateTable>()
                                .getIndex<0>();
          for (auto account : accounts)

@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN
 
 #include <psibase/DefaultTestChain.hpp>
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/AuthEcSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
@@ -30,7 +30,7 @@ namespace
 
 // - Auth
 //    - Alice cannot use AuthInviteSys
-//    - AccountSys can still create new accounts
+//    - Accounts can still create new accounts
 //    - A regular user cannot create a new account
 SCENARIO("Auth")
 {
@@ -38,18 +38,18 @@ SCENARIO("Auth")
    {
       DefaultTestChain t;
 
-      auto alice      = t.from(t.addAccount("alice"_a));
-      auto a          = alice.to<AccountSys>();
-      auto accountSys = t.from(AccountSys::service).to<AccountSys>();
+      auto alice    = t.from(t.addAccount("alice"_a));
+      auto a        = alice.to<Accounts>();
+      auto accounts = t.from(Accounts::service).to<Accounts>();
 
       THEN("Alice cannot use AuthInviteSys")
       {
          auto setAuthServ = a.setAuthServ(AuthInviteSys::service);
          CHECK(setAuthServ.failed(notWhitelisted));
       }
-      THEN("AccountSys can still create new accounts")
+      THEN("Accounts can still create new accounts")
       {
-         auto newAcc = accountSys.newAccount("bob", AuthAnySys::service, true);
+         auto newAcc = accounts.newAccount("bob", AuthAnySys::service, true);
          CHECK(newAcc.succeeded());
       }
       THEN("A regular user cannot create a new account")

@@ -1,5 +1,5 @@
 [package]
-name = "account-sys"
+name = "accounts"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,7 +11,7 @@ wit-bindgen-rt = "0.22.0"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "account-sys:plugin"
+package = "accounts:plugin"
 
 [package.metadata.component.target.dependencies]
 "common:plugin" = { path = "../../../user/CommonSys/common/packages/wit/plugin.wit" }

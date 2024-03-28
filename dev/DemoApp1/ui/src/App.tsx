@@ -17,7 +17,7 @@ function App() {
     await supervisor.onLoaded();
     supervisor.preLoadPlugins([
       { service: "invite-sys" },
-      { service: "account-sys" },
+      { service: "accounts" },
       { service: "auth-sys" },
       { service: "demoapp1" },
     ]);

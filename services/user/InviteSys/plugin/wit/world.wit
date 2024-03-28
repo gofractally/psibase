@@ -98,7 +98,7 @@ world psibase-plugin {
     import common:plugin/client;
 
     // For getting logged-in-user, for example to generate an invite
-    import account-sys:plugin/accounts;
+    import accounts:plugin/accounts;
 
     // For generating a keypair for the invite
     import auth-sys:plugin/keyvault;

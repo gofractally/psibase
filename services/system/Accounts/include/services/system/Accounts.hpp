@@ -1,8 +1,8 @@
 #pragma once
+#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/name.hpp>
-#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/chrono.hpp>
 
@@ -11,14 +11,14 @@ namespace SystemService
    /// Shows statistics accross accounts
    ///
    /// `totalAccounts` holds the total number of accounts on chain
-   struct AccountSysStatus
+   struct AccountsStatus
    {
       uint32_t totalAccounts = 0;
 
       std::tuple<> key() const { return {}; }
    };
-   PSIO_REFLECT(AccountSysStatus, totalAccounts)
-   using AccountSysStatusTable = psibase::Table<AccountSysStatus, &AccountSysStatus::key>;
+   PSIO_REFLECT(AccountsStatus, totalAccounts)
+   using AccountsStatusTable = psibase::Table<AccountsStatus, &AccountsStatus::key>;
 
    struct ResourceLimit
    {
@@ -69,20 +69,20 @@ namespace SystemService
 
    /// This service facilitates the creation of new accounts
    ///
-   /// Only the AccountSys service itself and the `inviteService` may create new accounts.
+   /// Only the Accounts service itself and the `inviteService` may create new accounts.
    /// Other services may also use this service to check if an account exists.
    // TODO: account deletion, with an index to prevent reusing IDs
-   class AccountSys : public psibase::Service<AccountSys>
+   class Accounts : public psibase::Service<Accounts>
    {
      public:
-      /// "account-sys"
-      static constexpr auto service = psibase::AccountNumber("account-sys");
+      /// "accounts"
+      static constexpr auto service = psibase::AccountNumber("accounts");
       /// "invite-sys"
       static constexpr auto inviteService = psibase::AccountNumber("invite-sys");
       /// AccountNumber 0 is reserved for the null account
       static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
 
-      using Tables = psibase::ServiceTables<AccountSysStatusTable, AccountTable>;
+      using Tables = psibase::ServiceTables<AccountsStatusTable, AccountTable>;
 
       /// Only called once during chain initialization
       ///
@@ -91,7 +91,7 @@ namespace SystemService
 
       /// Used to create a new account with a specified auth service
       ///
-      /// The accounts permitted to call this action are restricted to either AccountSys itself
+      /// The accounts permitted to call this action are restricted to either Accounts itself
       /// or the service indicated by `inviteService`. If the `requireNew` flag is set, then
       /// the action will fail if the `name` account already exists.
       void newAccount(psibase::AccountNumber name,
@@ -122,7 +122,7 @@ namespace SystemService
       };
    };
 
-   PSIO_REFLECT(AccountSys,
+   PSIO_REFLECT(Accounts,
                 method(init),
                 method(newAccount, name, authService, requireNew),
                 method(setAuthServ, authService),

@@ -1,6 +1,6 @@
 //! Interfaces for standard services
 
-pub mod account_sys;
+pub mod accounts;
 pub mod admin_sys;
 pub mod auth_delegate_sys;
 pub mod auth_ec_sys;

@@ -1,4 +1,4 @@
-use crate::services::{account_sys, auth_delegate_sys, producer_sys, transaction_sys};
+use crate::services::{accounts, auth_delegate_sys, producer_sys, transaction_sys};
 use crate::{
     method_raw, new_account_action, set_auth_service_action, validate_dependencies, AccountNumber,
     Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData, MethodNumber,
@@ -89,7 +89,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     for s in &mut service_packages[..] {
         for account in s.get_accounts() {
             if !s.has_service(*account) {
-                actions.push(new_account_action(account_sys::SERVICE, *account))
+                actions.push(new_account_action(accounts::SERVICE, *account))
             }
         }
 
@@ -112,7 +112,7 @@ pub fn get_initial_actions<R: Read + Seek>(
         },
     ));
 
-    actions.push(new_account_action(account_sys::SERVICE, producer_sys::ROOT));
+    actions.push(new_account_action(accounts::SERVICE, producer_sys::ROOT));
     actions.push(
         auth_delegate_sys::Wrapper::pack_from(producer_sys::ROOT)
             .setOwner(producer_sys::PRODUCER_ACCOUNT_STRONG),
@@ -125,7 +125,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     // If a package sets an auth service for an account, we should not override it
     let mut accounts_with_auth = HashSet::new();
     for act in &actions {
-        if act.service == account_sys::SERVICE && act.method == method!("setAuthServ") {
+        if act.service == accounts::SERVICE && act.method == method!("setAuthServ") {
             accounts_with_auth.insert(act.sender);
         }
     }

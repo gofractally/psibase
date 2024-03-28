@@ -1,4 +1,4 @@
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
@@ -12,10 +12,10 @@ using namespace psibase;
 
 namespace SystemService
 {
-   void AccountSys::init()
+   void Accounts::init()
    {
       Tables tables{getReceiver()};
-      auto   statusTable  = tables.open<AccountSysStatusTable>();
+      auto   statusTable  = tables.open<AccountsStatusTable>();
       auto   statusIndex  = statusTable.getIndex<0>();
       auto   accountTable = tables.open<AccountTable>();
       check(!statusIndex.get(std::tuple{}), "already started");
@@ -43,10 +43,10 @@ namespace SystemService
       statusTable.put({.totalAccounts = totalAccounts});
    }
 
-   void AccountSys::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
+   void Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
    {
       Tables tables{getReceiver()};
-      auto   statusTable  = tables.open<AccountSysStatusTable>();
+      auto   statusTable  = tables.open<AccountsStatusTable>();
       auto   statusIndex  = statusTable.getIndex<0>();
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
@@ -94,7 +94,7 @@ namespace SystemService
       statusTable.put(*status);
    }
 
-   void AccountSys::setAuthServ(psibase::AccountNumber authService)
+   void Accounts::setAuthServ(psibase::AccountNumber authService)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
@@ -108,7 +108,7 @@ namespace SystemService
       accountTable.put(*account);
    }
 
-   bool AccountSys::exists(AccountNumber name)
+   bool Accounts::exists(AccountNumber name)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
@@ -116,7 +116,7 @@ namespace SystemService
       return accountIndex.get(name) != std::nullopt;
    }
 
-   void AccountSys::billCpu(AccountNumber name, std::chrono::nanoseconds amount)
+   void Accounts::billCpu(AccountNumber name, std::chrono::nanoseconds amount)
    {
       Tables tables{getReceiver()};
 
@@ -133,4 +133,4 @@ namespace SystemService
 
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::AccountSys)
+PSIBASE_DISPATCH(SystemService::Accounts)

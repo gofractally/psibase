@@ -1,4 +1,4 @@
-package account-sys:plugin;
+package accounts:plugin;
 
 interface accounts {
     use common:plugin/types.{error};

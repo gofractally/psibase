@@ -1,6 +1,6 @@
 #include <services/user/SymbolSys.hpp>
 
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
@@ -147,7 +147,7 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
    check(price.value != 0, priceTooLow);
    check(nft != 0, symbolDNE);
    check(seller == nftService.getNft(nft).owner, missingRequiredAuth);
-   check(nftService.getCredRecord(nft).debitor != AccountSys::nullAccount, creditSymbolRequired);
+   check(nftService.getCredRecord(nft).debitor != Accounts::nullAccount, creditSymbolRequired);
 
    auto debitMemo = "Symbol " + symbol.str() + " is listed for sale.";
 

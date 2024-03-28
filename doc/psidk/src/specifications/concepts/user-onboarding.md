@@ -10,7 +10,7 @@ The psibase onboarding experience is intended to be comparable to the experience
 
 ### User flow
 
-New users shall be onboarded through an invitation process. The default app responsible for the creation of new accounts is called [AccountSys](../../default-apps/account-sys.md). Any "invite" services which are permitted to facilitate the creation of a new account must be configured in this service.
+New users shall be onboarded through an invitation process. The default app responsible for the creation of new accounts is called [Accounts](../../default-apps/accounts.md). Any "invite" services which are permitted to facilitate the creation of a new account must be configured in this service.
 
 > Note: The following designs are specifically for providing new accounts to *new* users. New accounts can be created by existing users simply by allowing them to pay a small amount for additional accounts.
 

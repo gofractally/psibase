@@ -1,5 +1,5 @@
 #include <psibase/dispatch.hpp>
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/AuthAnySys.hpp>
 #include <services/system/CpuSys.hpp>
 #include <services/system/TransactionSys.hpp>
@@ -117,10 +117,10 @@ namespace SystemService
 
       if (transactionSysStatus && transactionSysStatus->enforceAuth)
       {
-         auto accountSysTables = AccountSys::Tables(AccountSys::service);
-         auto accountTable     = accountSysTables.open<AccountTable>();
-         auto accountIndex     = accountTable.getIndex<0>();
-         auto account          = accountIndex.get(action.sender);
+         auto accountsTables = Accounts::Tables(Accounts::service);
+         auto accountTable   = accountsTables.open<AccountTable>();
+         auto accountIndex   = accountTable.getIndex<0>();
+         auto account        = accountIndex.get(action.sender);
          if (!account)
             abortMessage("unknown sender \"" + action.sender.str() + "\"");
 
@@ -296,12 +296,12 @@ namespace SystemService
                "transaction references non-existing block");
       }
 
-      Actor<CpuSys>     cpuSys(TransactionSys::service, CpuSys::service);
-      Actor<AccountSys> accountSys(TransactionSys::service, AccountSys::service);
+      Actor<CpuSys>   cpuSys(TransactionSys::service, CpuSys::service);
+      Actor<Accounts> accounts(TransactionSys::service, Accounts::service);
 
-      auto accountSysTables = AccountSys::Tables(AccountSys::service);
-      auto accountTable     = accountSysTables.open<AccountTable>();
-      auto accountIndex     = accountTable.getIndex<0>();
+      auto accountsTables = Accounts::Tables(Accounts::service);
+      auto accountTable   = accountsTables.open<AccountTable>();
+      auto accountIndex   = accountTable.getIndex<0>();
 
       for (auto& act : trx.actions)
       {
@@ -339,7 +339,7 @@ namespace SystemService
       if (transactionSysStatus && transactionSysStatus->enforceAuth)
       {
          std::chrono::nanoseconds cpuUsage = cpuSys.getCpuTime();
-         accountSys.billCpu(trx.actions[0].sender, cpuUsage);
+         accounts.billCpu(trx.actions[0].sender, cpuUsage);
       }
    }
 

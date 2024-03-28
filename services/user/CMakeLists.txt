@@ -9,7 +9,7 @@ function(add_user_service suffix name)
         ../PsiSpaceSys/include
         ../SymbolSys/include
         ../TokenSys/include
-        ../../system/AccountSys/include
+        ../../system/Accounts/include
         ../../system/AuthEcSys/include
         ../../system/AuthAnySys/include
         ../../system/SetCodeSys/include
@@ -32,7 +32,7 @@ function(add_user_test_impl suffix name)
       ../../PsiSpaceSys/include
       ../../SymbolSys/include
       ../../TokenSys/include
-      ../../../system/AccountSys/include
+      ../../../system/Accounts/include
       ../../../system/AuthEcSys/include
       ../../../system/AuthAnySys/include
       ../../../system/SetCodeSys/include

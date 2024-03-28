@@ -78,7 +78,7 @@
     - [Logging](run-infrastructure/configuration/logging.md)
 
 - [Default apps](default-apps/README.md)
-  - [account-sys](default-apps/account-sys.md)
+  - [accounts](default-apps/accounts.md)
   - [admin-sys](default-apps/admin-sys.md)
   - [auth-ec-sys](default-apps/auth-ec-sys.md)
   - [auth-sys](default-apps/auth-sys.md)

@@ -1,4 +1,4 @@
-#include "services/system/RAccountSys.hpp"
+#include "services/system/RAccounts.hpp"
 
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
@@ -6,7 +6,7 @@
 #include <psibase/serveSimpleUI.hpp>
 #include <psio/from_json.hpp>
 #include <psio/to_json.hpp>
-#include <services/system/AccountSys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/ProxySys.hpp>
 
 static constexpr bool enable_print = false;
@@ -16,7 +16,7 @@ using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace SystemService
 {
-   std::optional<HttpReply> RAccountSys::serveSys(HttpRequest request)
+   std::optional<HttpReply> RAccounts::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
       {
@@ -32,8 +32,8 @@ namespace SystemService
          // TODO: replace with GraphQL
          // if (request.target.starts_with("/api/accounts"))
          // {
-         //    auto accountSysTables = AccountSys::Tables(AccountSys::service);
-         //    auto accountTable     = accountSysTables.open<AccountTable>();
+         //    auto accountsTables = Accounts::Tables(Accounts::service);
+         //    auto accountTable     = accountsTables.open<AccountTable>();
          //    auto accountIndex     = accountTable.getIndex<0>();
 
          //    std::vector<Account> rows;
@@ -45,9 +45,9 @@ namespace SystemService
          // TODO: replace with GraphQL
          if (request.target == "/accounts")
          {
-            auto accountSysTables = AccountSys::Tables(AccountSys::service);
-            auto accountTable     = accountSysTables.open<AccountTable>();
-            auto accountIndex     = accountTable.getIndex<0>();
+            auto accountsTables = Accounts::Tables(Accounts::service);
+            auto accountTable   = accountsTables.open<AccountTable>();
+            auto accountIndex   = accountTable.getIndex<0>();
 
             std::vector<Account> rows;
             for (auto it = accountIndex.begin(); it != accountIndex.end(); ++it)
@@ -56,14 +56,14 @@ namespace SystemService
          }
       }
 
-      if (auto result = psibase::serveSimpleUI<AccountSys, false>(request))
+      if (auto result = psibase::serveSimpleUI<Accounts, false>(request))
          return result;
       if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
          return result;
       return std::nullopt;
    }  // serveSys
 
-   void RAccountSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   void RAccounts::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
       psibase::check(getSender() == getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
@@ -72,4 +72,4 @@ namespace SystemService
 
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::RAccountSys)
+PSIBASE_DISPATCH(SystemService::RAccounts)

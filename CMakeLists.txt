@@ -100,7 +100,7 @@ if(DEFINED WASI_SDK_PREFIX)
             -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
             -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
-        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm
+        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegateSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
@@ -118,7 +118,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
@@ -288,7 +288,7 @@ set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parse
 add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
 add_dependencies(CommonSysCommonLib_js ComponentParser)
 
-add_rs_component(services/system/AccountSys/plugin:AccountsPlugin account_sys.wasm ${plugin-wit})
+add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
 add_rs_component(services/system/AuthSys/plugin:AuthPlugin auth_sys.wasm ${plugin-wit})
 add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invite_sys.wasm ${plugin-wit} ${AuthPlugin_DEP})
 
@@ -349,20 +349,20 @@ psibase_package(
     WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm
     FLAGS allowSudo allowWriteNative
     DEPENDS wasm
-    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "CpuSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuSys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/AccountSys.psi
-    NAME AccountSys
+    OUTPUT ${SERVICE_DIR}/Accounts.psi
+    NAME Accounts
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation of new accounts"
-    SERVICE account-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm
-        SERVER raccount-sys
-        INIT
-    SERVICE raccount-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
+    SERVICE accounts
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
+        SERVER raccounts
+        INITaccounts
+    SERVICE r
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${AccountsPlugin_DEP}
@@ -477,7 +477,7 @@ psibase_package(
     DESCRIPTION "Psibase documentation"
     SERVICE doc-sys
     DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
-    PACKAGE_DEPENDS "PsiSpaceSys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "PsiSpaceSys(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
 
@@ -517,7 +517,7 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/ProducerSys/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -563,7 +563,7 @@ psibase_package(
     NAME InviteSys
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthEcSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthEcSys(^${PSIBASE_VERSION})"
     SERVICE invite-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
         SERVER invite-sys
@@ -580,7 +580,7 @@ psibase_package(
     NAME NftSys
     VERSION ${PSIBASE_VERSION}
     SERVICE nft-sys
-    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
     WASM ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
     INIT
     DEPENDS wasm
@@ -590,7 +590,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/SupervisorSys.psi
     NAME SupervisorSys
     VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS NftSys ProxySys AccountSys
+    PACKAGE_DEPENDS NftSys ProxySys Accounts
     SERVICE supervisor-sys
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
     DEPENDS ${SupervisorSys_js_DEP}
@@ -641,7 +641,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
-    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "SymbolSys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "SymbolSys(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/src/TokenUsers.json
 )
 
@@ -664,7 +664,7 @@ psibase_package(
     NAME Default
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
-    PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
+    PACKAGE_DEPENDS Accounts AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
                     ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
                     PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys
 )
@@ -674,7 +674,7 @@ psibase_package(
     NAME Minimal
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
-    PACKAGE_DEPENDS AccountSys AuthDelegateSys AuthAnySys CpuSys CommonSys PackageSys ProducerSys ProxySys
+    PACKAGE_DEPENDS Accounts AuthDelegateSys AuthAnySys CpuSys CommonSys PackageSys ProducerSys ProxySys
                     SetCodeSys TransactionSys
 )
 
@@ -692,13 +692,13 @@ function(write_package_index out)
 endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
-    AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
+    Accounts AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
     DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys ProducerSys ProxySys
     PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
     FILES ${SERVICE_DIR}/index.json
-          ${SERVICE_DIR}/AccountSys.psi
+          ${SERVICE_DIR}/Accounts.psi
           ${SERVICE_DIR}/AuthAnySys.psi
           ${SERVICE_DIR}/AuthDelegateSys.psi
           ${SERVICE_DIR}/AuthSys.psi

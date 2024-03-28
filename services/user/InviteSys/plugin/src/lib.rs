@@ -1,7 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
-use bindings::account_sys::plugin::accounts;
+use bindings::accounts::plugin::accounts;
 use bindings::auth_sys::plugin::keyvault;
 use bindings::common::plugin::{client, server, types as CommonTypes};
 use bindings::exports::invite_sys::plugin::{
