@@ -130,3 +130,19 @@ TEST_CASE("schema generated")
    CHECK(to_json(cschema, "f32", "0000803F") == "1");
    CHECK(to_json(cschema, "f64", "000000000000F03F") == "1");
 }
+
+template <typename T, typename U>
+bool isExtension()
+{
+   Schema s1 = SchemaBuilder().insert<T>("T").build();
+   Schema s2 = SchemaBuilder().insert<U>("U").build();
+   return match(s1, s2, {{Type{"T"}, Type{"U"}}}) >= 0;
+}
+
+TEST_CASE("schema compat")
+{
+   CHECK(isExtension<std::uint8_t, std::uint8_t>());
+   CHECK(!isExtension<std::uint8_t, std::int8_t>());
+   CHECK(isExtension<std::tuple<>, std::tuple<std::optional<std::uint8_t>>>());
+   CHECK(!isExtension<std::tuple<std::optional<std::uint8_t>>, std::tuple<>>());
+}

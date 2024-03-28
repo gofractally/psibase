@@ -1,4 +1,5 @@
 #include <psio/schema.hpp>
+#include <set>
 
 namespace psio::schema_types
 {
@@ -992,6 +993,133 @@ namespace psio::schema_types
             }
          }
       }
+   }
+
+   struct SchemaMatch
+   {
+      const Schema&                                       schema1;
+      const Schema&                                       schema2;
+      std::map<const AnyType*, std::size_t>               on_stack;
+      std::set<std::pair<const AnyType*, const AnyType*>> known;
+      SchemaDifference                                    difference = SchemaDifference::equivalent;
+
+      const AnyType* resolveAll(const Schema& schema, const AnyType& type)
+      {
+         const AnyType* result = &type;
+         while (true)
+         {
+            if (const Custom* c = std::get_if<Custom>(&result->value))
+               result = c->type.get();
+            else if (const Type* t = std::get_if<Type>(&result->value))
+               result = schema.get(t->type);
+            else
+               return result;
+         }
+      }
+      bool isOptional(const Schema& schema, const AnyType& type)
+      {
+         return std::holds_alternative<Option>(resolveAll(schema, type)->value);
+      }
+      bool match(const AnyType& lhs, const AnyType& rhs)
+      {
+         auto plhs    = resolveAll(schema1, lhs);
+         auto prhs    = resolveAll(schema2, rhs);
+         auto lhs_pos = on_stack.find(plhs);
+         auto rhs_pos = on_stack.find(prhs);
+         if (lhs_pos != on_stack.end() && rhs_pos != on_stack.end())
+         {
+            if (lhs_pos->second != rhs_pos->second)
+               return false;
+         }
+         else if (lhs_pos != on_stack.end() || rhs_pos != on_stack.end())
+            return false;
+
+         if (!known.insert({plhs, prhs}).second)
+            return true;
+
+         std::size_t n = on_stack.size() / 2;
+         on_stack.insert({&lhs, n});
+         on_stack.insert({&rhs, n});
+
+         bool result = std::visit([this](const auto& l, const auto& r) { return match(l, r); },
+                                  plhs->value, prhs->value);
+
+         on_stack.erase(prhs);
+         on_stack.erase(plhs);
+         return result;
+      }
+
+      static const AnyType& memberType(const AnyType& type) { return type; }
+      static const AnyType& memberType(const Member& member) { return member.type; }
+      template <typename T, typename U>
+         requires(std::is_same_v<T, Tuple> || std::is_same_v<T, Struct>) &&
+                 (std::is_same_v<U, Tuple> || std::is_same_v<U, Struct>)
+      bool match(const T& lhs, const U& rhs)
+      {
+         for (std::size_t i = 0, end = std::max(lhs.members.size(), rhs.members.size()); i != end;
+              ++i)
+         {
+            if (i >= lhs.members.size())
+            {
+               if (!isOptional(schema2, memberType(rhs.members[i])))
+                  return false;
+            }
+            else if (i >= rhs.members.size())
+            {
+               if (!isOptional(schema1, memberType(lhs.members[i])))
+                  return false;
+            }
+            else if (!match(memberType(lhs.members[i]), memberType(rhs.members[i])))
+               return false;
+         }
+         if (lhs.members.size() > rhs.members.size())
+            difference |= SchemaDifference::dropField;
+         else if (lhs.members.size() < rhs.members.size())
+            difference |= SchemaDifference::addField;
+         return true;
+      }
+      bool match(const Struct& lhs, const Struct& rhs)
+      {
+         return std::ranges::equal(lhs.members, rhs.members,
+                                   [this](const auto& l, const auto& r)
+                                   { return match(l.type, r.type); });
+      }
+      bool match(const Array& lhs, const Array& rhs)
+      {
+         return lhs.len == rhs.len && match(*lhs.type, *rhs.type);
+      }
+      bool match(const List& lhs, const List& rhs) { return match(*lhs.type, *rhs.type); }
+      bool match(const Option& lhs, const Option& rhs) { return match(*lhs.type, *rhs.type); }
+      bool match(const Variant& lhs, const Variant& rhs)
+      {
+         for (std::size_t i = 0, end = std::min(lhs.members.size(), rhs.members.size()); i != end;
+              ++i)
+         {
+            if (!match(lhs.members[i].type, rhs.members[i].type))
+               return false;
+         }
+         if (lhs.members.size() < rhs.members.size())
+            difference |= SchemaDifference::addField;
+         else if (rhs.members.size() < lhs.members.size())
+            difference |= SchemaDifference::dropField;
+         return true;
+      }
+      bool match(const Float& lhs, const Float& rhs) { return lhs == rhs; }
+      bool match(const Int& lhs, const Int& rhs) { return lhs == rhs; }
+      bool match(const auto&, const auto&) { return false; }
+   };
+
+   SchemaDifference match(const Schema&                                   schema1,
+                          const Schema&                                   schema2,
+                          const std::vector<std::pair<AnyType, AnyType>>& types)
+   {
+      SchemaMatch impl{schema1, schema2};
+      for (const auto& [lhs, rhs] : types)
+      {
+         if (!impl.match(lhs, rhs))
+            return SchemaDifference::incompatible;
+      }
+      return impl.difference;
    }
 
 }  // namespace psio::schema_types

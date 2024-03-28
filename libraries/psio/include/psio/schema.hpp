@@ -95,11 +95,16 @@ namespace psio
          to_json(*wrapper.value, stream);
       }
 
+      struct Function;
+
       struct Schema
       {
          std::map<std::string, AnyType> types;
-         const AnyType*                 get(const std::string& name) const;
-         void                           insert(std::string name, AnyType type);
+         //
+         const AnyType* get(const std::string& name) const;
+         void           insert(std::string name, AnyType type);
+         //
+         bool merge(const AnyType&, const Schema& other, const AnyType& otherType);
       };
       PSIO_REFLECT(Schema, types)
 
@@ -170,6 +175,7 @@ namespace psio
       {
          std::uint32_t bits;
          bool          isSigned;
+         friend bool   operator==(const Int&, const Int&) = default;
       };
       PSIO_REFLECT(Int, bits, isSigned)
 
@@ -246,6 +252,13 @@ namespace psio
             to_json(type.value, stream);
          }
       }
+
+      struct Function
+      {
+         AnyType params;
+         AnyType result;
+      };
+      PSIO_REFLECT(Function, params, result)
 
       struct Member
       {
@@ -804,5 +817,66 @@ namespace psio
          comma.end(stream);
          stream.write('}');
       }
+
+      enum class SchemaDifference : std::uint8_t
+      {
+         equivalent      = 0,
+         incompatible    = 1,
+         addField        = 2,
+         dropField       = 4,
+         addAlternative  = 8,
+         dropAlternative = 16,
+         upgrade         = addField | addAlternative,
+         downgrade       = dropField | dropAlternative,
+      };
+      inline SchemaDifference operator~(SchemaDifference arg)
+      {
+         return static_cast<SchemaDifference>(~static_cast<std::uint8_t>(arg));
+      }
+      inline SchemaDifference operator|(SchemaDifference lhs, SchemaDifference rhs)
+      {
+         return static_cast<SchemaDifference>(static_cast<std::uint8_t>(lhs) |
+                                              static_cast<std::uint8_t>(rhs));
+      }
+      inline SchemaDifference operator&(SchemaDifference lhs, SchemaDifference rhs)
+      {
+         return static_cast<SchemaDifference>(static_cast<std::uint8_t>(lhs) &
+                                              static_cast<std::uint8_t>(rhs));
+      }
+      inline SchemaDifference& operator|=(SchemaDifference& lhs, SchemaDifference rhs)
+      {
+         lhs = lhs | rhs;
+         return lhs;
+      }
+      inline SchemaDifference& operator&=(SchemaDifference& lhs, SchemaDifference rhs)
+      {
+         lhs = lhs & rhs;
+         return lhs;
+      }
+      inline bool operator==(SchemaDifference lhs, int rhs)
+      {
+         assert(rhs == 0);
+         return lhs == SchemaDifference::equivalent;
+      }
+      inline std::partial_ordering operator<=>(SchemaDifference lhs, int rhs)
+      {
+         assert(rhs == 0);
+         if (lhs == SchemaDifference::equivalent)
+            return std::partial_ordering::equivalent;
+         if ((lhs & ~SchemaDifference::upgrade) == 0)
+            return std::partial_ordering::greater;
+         if ((lhs & ~SchemaDifference::downgrade) == 0)
+            return std::partial_ordering::less;
+         return std::partial_ordering::unordered;
+      }
+
+      SchemaDifference match(const Schema&                                   schema1,
+                             const Schema&                                   schema2,
+                             const std::vector<std::pair<AnyType, AnyType>>& types);
    }  // namespace schema_types
+
+   using schema_types::match;
+   using schema_types::Schema;
+   using schema_types::SchemaBuilder;
+   using schema_types::SchemaDifference;
 }  // namespace psio
