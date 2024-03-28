@@ -1,27 +1,18 @@
-import { BrowserRouter, Route } from "react-router-dom";
-
-import { Applet, Dashboard, Nav } from "./views";
-import { useApplets } from "./hooks/useApplets";
+import { siblingUrl } from "@psibase/common-lib";
 
 const App = () => {
-    const { primaryApplet, subApplets, currentUser, handleMessage } =
-        useApplets();
-
     return (
         <div className="flex h-screen w-screen flex-col">
-            <Nav currentUser={currentUser} />
-            <BrowserRouter>
-                <Route path="/" exact>
-                    <Dashboard currentUser={currentUser} />
-                </Route>
-            </BrowserRouter>
-            {subApplets.map((subApplet) => (
-                <Applet
-                    applet={subApplet}
-                    handleMessage={handleMessage}
-                    key={subApplet.appletId.name}
-                />
-            ))}
+            <ul>
+                <li>
+                    <a href={siblingUrl(null, "explore-sys", null, false)}>
+                        Explorer
+                    </a>
+                </li>
+                <li>
+                    <a href={siblingUrl(null, "doc-sys", null, false)}>Docs</a>
+                </li>
+            </ul>
         </div>
     );
 };

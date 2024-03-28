@@ -1,5 +1,4 @@
 <script>
-    import { initializeApplet } from "@psibase/common-lib";
     import { onDestroy, onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { loadData } from "/src/lib/loadData.js";
@@ -21,7 +20,6 @@
     };
 
     onMount(async () => {
-        initializeApplet();
         let args = "?last=50";
         if (window.location.search) args = window.location.search;
         if (args !== "?last=50") autoUpdateMode = false;
@@ -72,7 +70,7 @@
 </script>
 
 <svelte:head>
-    <title>PsiBase Block Explorer</title>
+    <title>Psibase Block Explorer</title>
 </svelte:head>
 
 <div>

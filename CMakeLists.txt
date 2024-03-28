@@ -442,8 +442,6 @@ psibase_package(
         SERVER r-ath-ec-sys
     SERVICE r-ath-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui/index.html index.html
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui/index.js   index.js
     SERVICE verifyec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
         FLAGS isAuthService

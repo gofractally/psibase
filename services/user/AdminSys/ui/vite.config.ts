@@ -5,7 +5,7 @@ import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
-const psibase = (_appletContract: string, isServing?: boolean) => {
+const psibase = (_service: string, isServing?: boolean) => {
     const buildAliases = [
         {
             // bundle non-external (above) common files except fonts (which should only be referenced)

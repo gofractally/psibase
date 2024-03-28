@@ -6,7 +6,7 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import { isoImport } from "vite-plugin-iso-import";
 import svg from "@poppanator/sveltekit-svg";
 
-const psibase = (appletContract: string, isServing?: boolean) => {
+const psibase = (service: string, isServing?: boolean) => {
     const buildAliases = [
         {
             // bundle non-external (above) common files except fonts (which should only be referenced)
@@ -52,7 +52,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                                     const host = req.headers.host || "";
                                     const subdomain = host.split(".")[0];
                                     if (
-                                        subdomain === appletContract &&
+                                        subdomain === service &&
                                         req.method !== "POST" &&
                                         req.headers.accept !==
                                             "application/json" &&
