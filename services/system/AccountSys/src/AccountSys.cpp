@@ -55,20 +55,27 @@ namespace SystemService
       check(status.has_value(), "not started");
 
       auto sender = getSender();
-      check(sender == service || sender == inviteService, "Unauthorized account creation");
+      check(sender == service || sender == inviteService, "unauthorized account creation");
 
+      std::string strName = name.str();
       if (enable_print)
       {
          writeConsole("new acc: ");
-         writeConsole(name.str());
+         writeConsole(strName);
          writeConsole("auth con: ");
          writeConsole(authService.str());
       }
 
       check(name.value, "invalid account name");
+      check(strName.back() != '-', "account name must not end in a hyphen");
+      if (strName.size() > 2)
+      {
+         check(strName[1] != '-',
+               "accounts names with the hyphen in the second position are reserved");
+      }
 
       // Check compression roundtrip
-      check(AccountNumber{name.str()}.value, "invalid account name");
+      check(AccountNumber{strName}.value, "invalid account name");
 
       if (accountIndex.get(name))
       {
