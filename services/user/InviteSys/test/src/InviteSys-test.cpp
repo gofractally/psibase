@@ -55,7 +55,7 @@ SCENARIO("Auth")
       THEN("A regular user cannot create a new account")
       {
          auto newAcc = a.newAccount("bob", AuthAnySys::service, true);
-         CHECK(newAcc.failed("Unauthorized account creation"));
+         CHECK(newAcc.failed("unauthorized account creation"));
       }
    }
 }
