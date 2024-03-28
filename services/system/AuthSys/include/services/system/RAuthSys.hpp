@@ -9,7 +9,7 @@ namespace SystemService
    class RAuthSys : public psibase::Service<RAuthSys>
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("r-auth-sys");
+      static constexpr auto service = psibase::AccountNumber("rauth-sys");
       using Tables                  = psibase::ServiceTables<psibase::WebContentTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;

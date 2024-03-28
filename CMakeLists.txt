@@ -352,9 +352,9 @@ psibase_package(
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE account-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm
-        SERVER r-account-sys
+        SERVER raccount-sys
         INIT
-    SERVICE r-account-sys
+    SERVICE raccount-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
     DEPENDS wasm
     PACKAGE_DEPENDS "AuthAnySys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
@@ -367,8 +367,8 @@ psibase_package(
     DESCRIPTION "Auth service using Botan to verify signatures"
     SERVICE auth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
-        SERVER r-auth-sys
-    SERVICE r-auth-sys
+        SERVER rauth-sys
+    SERVICE rauth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSys/ui/index.html index.html
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSys/ui/index.js   index.js
@@ -433,8 +433,8 @@ psibase_package(
     DESCRIPTION "Auth service using secp256k1 to verify signatures"
     SERVICE auth-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
-        SERVER r-ath-ec-sys
-    SERVICE r-ath-ec-sys
+        SERVER rath-ec-sys
+    SERVICE rath-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui/index.html index.html
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui/index.js   index.js
@@ -507,8 +507,8 @@ psibase_package(
     SERVICE producer-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
         FLAGS allowWriteNative
-        SERVER r-prod-sys
-    SERVICE r-prod-sys
+        SERVER rprod-sys
+    SERVICE rprod-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/ProducerSys/src/postinstall.json
@@ -523,8 +523,8 @@ psibase_package(
     DESCRIPTION "The `proxy-sys` service routes HTTP requests to the appropriate service"
     SERVICE proxy-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
-        SERVER r-proxy-sys
-    SERVICE r-proxy-sys
+        SERVER proxy-sys
+    SERVICE rproxy-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm
     DEPENDS wasm
 )
@@ -598,9 +598,9 @@ psibase_package(
     PACKAGE_DEPENDS "NftSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
     SERVICE token-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
-        SERVER r-tok-sys
+        SERVER rtok-sys
         INIT
-    SERVICE r-tok-sys
+    SERVICE rtok-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
     DEPENDS wasm
 )
@@ -646,8 +646,8 @@ psibase_package(
     DESCRIPTION "Package manager for psibase apps"
     SERVICE package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
-        SERVER r-package-sys
-    SERVICE r-package-sys
+        SERVER rpackage-sys
+    SERVICE rpackage-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
     DEPENDS wasm
     PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})" "NopSys(^${PSIBASE_VERSION})"

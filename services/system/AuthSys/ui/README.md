@@ -13,6 +13,6 @@ Main queries:
 
 Since it's a super basic and simple plugin, we decided to leave it as a single vanilla javascript file.
 
-The workflow is simply updating the js file and running `psibase upload -r r-auth-sys . /`
+The workflow is simply updating the js file and running `psibase upload -r rauth-sys . /`
 
 This will upload the index.js and you will be able to test the changes in your psibase instance right away.
