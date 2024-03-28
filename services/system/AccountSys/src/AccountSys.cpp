@@ -68,10 +68,10 @@ namespace SystemService
 
       check(name.value, "invalid account name");
       check(strName.back() != '-', "account name must not end in a hyphen");
-      if (strName.size() > 2)
+      if (strName.size() > 2 && sender != service)
       {
          check(strName[1] != '-',
-               "accounts names with the hyphen in the second position are reserved");
+               "account names with the hyphen in the second position are reserved");
       }
 
       // Check compression roundtrip
