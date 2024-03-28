@@ -6,14 +6,8 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import { isoImport } from "vite-plugin-iso-import";
 import svg from "@poppanator/sveltekit-svg";
 
-const psibase = (appletContract: string, isServing?: boolean) => {
+const psibase = (service: string, isServing?: boolean) => {
     const buildAliases = [
-        {
-            find: "/common/iframeResizer.contentWindow.js",
-            replacement: path.resolve(
-                "../../CommonSys/common/resources/thirdParty/src/iframeResizer.contentWindow.js"
-            ),
-        },
         {
             // bundle non-external (above) common files except fonts (which should only be referenced)
             find: /^\/common(?!\/(?:fonts))(.*)$/,
@@ -39,7 +33,6 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
-                                "/common/iframeResizer.js",
                                 "/common/common-lib.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
@@ -59,7 +52,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
                                     const host = req.headers.host || "";
                                     const subdomain = host.split(".")[0];
                                     if (
-                                        subdomain === appletContract &&
+                                        subdomain === service &&
                                         req.method !== "POST" &&
                                         req.headers.accept !==
                                             "application/json" &&
