@@ -6,7 +6,7 @@ namespace SystemService
 {
    struct RAccountSys : public psibase::Service<RAccountSys>
    {
-      static constexpr auto service = psibase::AccountNumber("raccount-sys");
+      static constexpr auto service = psibase::AccountNumber("r-account-sys");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);

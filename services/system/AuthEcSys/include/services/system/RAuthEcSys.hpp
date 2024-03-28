@@ -9,7 +9,7 @@ namespace SystemService
    class RAuthEcSys : public psibase::Service<RAuthEcSys>
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("rath-ec-sys");
+      static constexpr auto service = psibase::AccountNumber("r-ath-ec-sys");
       using Tables                  = psibase::ServiceTables<psibase::WebContentTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
