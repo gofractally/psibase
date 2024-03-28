@@ -1,9 +1,6 @@
 import { getImportFills } from "./dynamicFunctions";
 import importableCode from "./importables.js?raw";
-import {
-    QualifiedFunctionCallArgs,
-    toString,
-} from "@psibase/common-lib";
+import { QualifiedFunctionCallArgs, toString } from "@psibase/common-lib";
 import {
     isPluginCallRequest,
     PluginCallPayload,

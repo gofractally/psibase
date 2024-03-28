@@ -4,9 +4,7 @@ import {
     QualifiedPluginId,
     toString,
 } from "@psibase/common-lib/messaging";
-import {
-    buildPluginCallResponse
-} from "@psibase/supervisor-lib";
+import { buildPluginCallResponse } from "@psibase/supervisor-lib";
 
 export class DownloadFailed extends Error {
     url: string;
