@@ -3,6 +3,7 @@ import { siblingUrl } from "@psibase/common-lib";
 const App = () => {
     return (
         <div className="flex h-screen w-screen flex-col">
+            Under construction...
             <ul>
                 <li>
                     <a href={siblingUrl(null, "explore-sys", null, false)}>
