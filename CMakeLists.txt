@@ -268,11 +268,11 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
         BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND cargo component build -r
-            --target wasm32-unknown-unknown
+            --target wasm32-wasi
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
             --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
         BUILD_ALWAYS 1
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-unknown-unknown/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-wasi/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
     )
 
     # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
@@ -280,10 +280,17 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
     set(${TARGET_NAME}_OUTPUT_FILE ${OUTPUT_FILE} PARENT_SCOPE)
 endfunction()
 
+# Static (not built) resource dependencies
+file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wit/*)
+
 # Build each component
 set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parser:ComponentParser)
 add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
 add_dependencies(CommonSysCommonLib_js ComponentParser)
+
+add_rs_component(services/system/AccountSys/plugin:AccountsPlugin account_sys.wasm ${plugin-wit})
+add_rs_component(services/system/AuthSys/plugin:AuthPlugin auth_sys.wasm ${plugin-wit})
+add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invite_sys.wasm ${plugin-wit} ${AuthPlugin_DEP})
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
@@ -356,7 +363,9 @@ psibase_package(
         INIT
     SERVICE raccount-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
+        DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
+    DEPENDS ${AccountsPlugin_DEP}
     PACKAGE_DEPENDS "AuthAnySys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
 )
 
@@ -370,8 +379,7 @@ psibase_package(
         SERVER rauth-sys
     SERVICE rauth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSys/ui/index.html index.html
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSys/ui/index.js   index.js
+        DATA ${COMPONENT_BIN_DIR}/${AuthPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE verify-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
         FLAGS isAuthService
@@ -383,8 +391,6 @@ set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
 set(THIRD_SRC ${COMMON_SYS}/common/resources/thirdParty/src)
 set(THIRD_FILES
     ${THIRD_SRC}/htm.module.js
-    ${THIRD_SRC}/iframeResizer.contentWindow.js
-    ${THIRD_SRC}/iframeResizer.js
     ${THIRD_SRC}/react-dom.development.js
     ${THIRD_SRC}/react-dom.production.min.js
     ${THIRD_SRC}/react-router-dom.min.js
@@ -436,8 +442,6 @@ psibase_package(
         SERVER rath-ec-sys
     SERVICE rath-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui/index.html index.html
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui/index.js   index.js
     SERVICE verifyec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
         FLAGS isAuthService
@@ -559,14 +563,16 @@ psibase_package(
     NAME InviteSys
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthEcSys(^${PSIBASE_VERSION})"
     SERVICE invite-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
         SERVER invite-sys
         INIT
+        DATA ${COMPONENT_BIN_DIR}/${InvitesPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE auth-inv-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
     DEPENDS wasm
+    DEPENDS ${InvitesPlugin_DEP}
 )
 
 psibase_package(

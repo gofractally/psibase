@@ -5,14 +5,8 @@ import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
-const psibase = (_appletContract: string, isServing?: boolean) => {
+const psibase = (_service: string, isServing?: boolean) => {
     const buildAliases = [
-        {
-            find: "/common/iframeResizer.contentWindow.js",
-            replacement: path.resolve(
-                "../../CommonSys/common/resources/thirdParty/src/iframeResizer.contentWindow.js"
-            ),
-        },
         {
             // bundle non-external (above) common files except fonts (which should only be referenced)
             find: /^\/common(?!\/(?:fonts))(.*)$/,
@@ -42,7 +36,6 @@ const psibase = (_appletContract: string, isServing?: boolean) => {
                             external: [
                                 "/common/rootdomain.mjs",
                                 "/common/common-lib.js",
-                                "/common/iframeResizer.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
                             output: {

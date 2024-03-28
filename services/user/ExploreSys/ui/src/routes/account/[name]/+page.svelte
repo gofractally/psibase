@@ -3,15 +3,10 @@
     import { page } from "$app/stores";
     import { onMount } from "svelte";
     import { LeftArrowIcon } from "/src/assets/icons";
-    import {getPubKeyByAccountName, loadTransferHistory} from "/src/lib/loadData.js";
-    import { AccountHistory, Amount, Button, Error, Loader } from "/src/components";
+    import {getPubKeyByAccountName} from "/src/lib/loadData.js";
+    import { Amount, Button, Error, Loader } from "/src/components";
 
     let data = null;
-
-    const fetchTokenTypes = async () => {
-        const url = await siblingUrl(null, "token-sys", "api/getTokenTypes");
-        return getJson(url);
-    }
 
     const fetchBalances = async (user) => {
         const url = await siblingUrl(null, "token-sys", `api/balances/${user}`);

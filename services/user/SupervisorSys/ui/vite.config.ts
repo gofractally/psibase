@@ -15,8 +15,5 @@ export default defineConfig({
     },
     build: {
         target: "esnext",
-        rollupOptions: {
-            external: ["/common/iframeResizer.contentWindow.js"]
-        }
     }
 });

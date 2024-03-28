@@ -1,0 +1,85 @@
+package common:plugin;
+
+/// Common types used by plugins
+interface types {
+
+    /// A standard error type plugins can use to propagate errors
+    /// back up the callchain.
+    /// 
+    /// The producer field should not be relied upon for correctness.
+    /// It is filled in by the plugin, which means it is possible to lie.
+    /// Also it may be changed by a downstream plugin.
+    record error {
+        code: u32,
+        producer: plugin-id,
+        message: string,
+    }
+
+    /// An object that uniquely identifies a plugin
+    record plugin-id {
+        /// The name of a service (e.g. account-sys)
+        service: string,
+        /// The name of the plugin (e.g. plugin.wasm)
+        plugin: string,
+    }
+
+    /// Data related to the origination of the current call
+    record origination-data {
+
+        /// The account name of the psibase app responsible for the call.
+        /// May be empty if the call comes from an external web app.
+        app: option<string>,
+
+        /// The domain origin responsible for the call.
+        origin: string
+    }
+}
+
+/// Common calls related to interactions with the server
+interface server {
+
+    use types.{error};
+
+    /// Adds the specified service action to the current transaction.
+    /// 
+    /// No service is specified, as it is only possible for a plugin to call an
+    /// action on its own service. To call actions on another service, it must use
+    /// that service's plugin.
+    /// 
+    /// Parameters
+    /// * `action`: The name of the action being called
+    /// * `args-json`: The arguments for the action, packed into fracpack format
+    add-action-to-transaction: func(action: string, args: list<u8>) -> result<_, error>;
+
+    /// Used to post graphql to the server and get a JSON response back
+    /// 
+    /// Parameters
+    /// * `url`: The url for the request
+    /// * `graphql`: The graphql data for the request
+    post-graphql-get-json: func(url: string, graphql: string) -> result<string, error>;
+
+    // Todo: Probably will need to implement most/all js library functionality:
+    // https://doc-sys.psibase.io/development/front-ends/reference/js-libraries.html
+}
+
+/// Common calls related to client interactions
+interface client {
+    use types.{origination-data, error};
+
+    /// Gets details about the app responsible for the call
+    get-sender-app: func() -> result<origination-data, error>;
+
+    /// Gets the account name of the service from which the currently running
+    /// plugin was fetched.
+    my-service-account: func() -> result<string, error>;
+
+    /// Gets the full domain origin of the service from which the
+    /// currently running plugin was fetched.
+    my-service-origin: func() -> result<string, error>;
+}
+
+world plugin-capabilities {
+    export types;
+    export server;
+    export client;
+}
