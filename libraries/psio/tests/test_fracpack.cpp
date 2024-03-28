@@ -61,6 +61,19 @@ void test_compat(const T& t, const U& u, bool expect_unknown)
       CHECK(psio::fracpack_validate<U>(data) ==
             (expect_unknown ? psio::validation_t::extended : psio::validation_t::valid));
    }
+   {
+      psio::Schema s1 = psio::SchemaBuilder().insert<T>("T").build();
+      psio::Schema s2 = psio::SchemaBuilder().insert<U>("U").build();
+      INFO("schema1: " << psio::format_json(s1));
+      INFO("schema2: " << psio::format_json(s2));
+      auto diff = match(s1, s2, {{psio::schema_types::Type{"T"}, psio::schema_types::Type{"U"}}});
+      if (expect_unknown)
+      {
+         CHECK((diff & psio::SchemaDifference::dropField) != 0);
+         diff &= ~psio::SchemaDifference::dropField;
+      }
+      CHECK((diff & ~(psio::SchemaDifference::upgrade)) == 0);
+   }
 }
 
 template <typename T, typename U>
@@ -153,7 +166,7 @@ TEST_CASE("compatibility")
                     struct_<std::int32_t>(42), true);
    test_compat_wrap(
        std::tuple(std::tuple(std::optional{std::uint8_t{0xFF}}), std::optional{std::uint8_t{0xCC}}),
-       std::tuple{std::tuple{}}, true);
+       std::tuple<std::tuple<>>{}, true);
 }
 
 template <typename T>

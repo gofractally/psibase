@@ -60,6 +60,7 @@ namespace psio
    constexpr const char* get_type_name(const double*) { return "double"; }
    constexpr const char* get_type_name(const char*) { return "char"; }
    constexpr const char* get_type_name(const std::string*) { return "string"; }
+   constexpr const char* get_type_name(const std::string_view*) { return "string"; }
    constexpr const char* get_type_name(const __int128*) { return "int128"; }
    constexpr const char* get_type_name(const unsigned __int128*) { return "uint128"; }
    // clang-format on

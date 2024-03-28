@@ -1052,8 +1052,8 @@ namespace psio::schema_types
       static const AnyType& memberType(const AnyType& type) { return type; }
       static const AnyType& memberType(const Member& member) { return member.type; }
       template <typename T, typename U>
-         requires(std::is_same_v<T, Tuple> || std::is_same_v<T, Struct>) &&
-                 (std::is_same_v<U, Tuple> || std::is_same_v<U, Struct>)
+         requires(std::is_same_v<T, Tuple> || std::is_same_v<T, Object>) &&
+                 (std::is_same_v<U, Tuple> || std::is_same_v<U, Object>)
       bool match(const T& lhs, const U& rhs)
       {
          for (std::size_t i = 0, end = std::max(lhs.members.size(), rhs.members.size()); i != end;

@@ -705,6 +705,10 @@ namespace psio
                {
                   schema.insert(name, Int{.bits = 8 * sizeof(T), .isSigned = std::is_signed_v<T>});
                }
+               else if constexpr (std::is_enum_v<T>)
+               {
+                  schema.insert(name, insert<std::underlying_type_t<T>>());
+               }
                else if constexpr (is_duration_v<T>)
                {
                   schema.insert(name, insert<typename T::rep>());
