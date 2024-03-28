@@ -5,7 +5,7 @@ namespace UserService
    class RTokenSys : public psibase::Service<RTokenSys>
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("rtok-sys");
+      static constexpr auto service = psibase::AccountNumber("r-tok-sys");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);

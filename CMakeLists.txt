@@ -359,9 +359,9 @@ psibase_package(
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
-        SERVER raccounts
+        SERVER r-accounts
         INITaccounts
-    SERVICE r
+    SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
@@ -376,8 +376,8 @@ psibase_package(
     DESCRIPTION "Auth service using Botan to verify signatures"
     SERVICE auth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
-        SERVER rauth-sys
-    SERVICE rauth-sys
+        SERVER r-auth-sys
+    SERVICE r-auth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
         DATA ${COMPONENT_BIN_DIR}/${AuthPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE verify-sys
@@ -439,8 +439,8 @@ psibase_package(
     DESCRIPTION "Auth service using secp256k1 to verify signatures"
     SERVICE auth-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
-        SERVER rath-ec-sys
-    SERVICE rath-ec-sys
+        SERVER r-ath-ec-sys
+    SERVICE r-ath-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
     SERVICE verifyec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
@@ -511,8 +511,8 @@ psibase_package(
     SERVICE producer-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
         FLAGS allowWriteNative
-        SERVER rprod-sys
-    SERVICE rprod-sys
+        SERVER r-prod-sys
+    SERVICE r-prod-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/ProducerSys/src/postinstall.json
@@ -527,8 +527,8 @@ psibase_package(
     DESCRIPTION "The `proxy-sys` service routes HTTP requests to the appropriate service"
     SERVICE proxy-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
-        SERVER proxy-sys
-    SERVICE rproxy-sys
+        SERVER r-proxy-sys
+    SERVICE r-proxy-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm
     DEPENDS wasm
 )
@@ -604,9 +604,9 @@ psibase_package(
     PACKAGE_DEPENDS "NftSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
     SERVICE token-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
-        SERVER rtok-sys
+        SERVER r-tok-sys
         INIT
-    SERVICE rtok-sys
+    SERVICE r-tok-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
     DEPENDS wasm
 )
@@ -652,8 +652,8 @@ psibase_package(
     DESCRIPTION "Package manager for psibase apps"
     SERVICE package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
-        SERVER rpackage-sys
-    SERVICE rpackage-sys
+        SERVER r-package-sys
+    SERVICE r-package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
     DEPENDS wasm
     PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})" "NopSys(^${PSIBASE_VERSION})"

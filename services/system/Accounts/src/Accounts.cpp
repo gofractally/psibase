@@ -68,9 +68,10 @@ namespace SystemService
 
       check(name.value, "invalid account name");
       check(strName.back() != '-', "account name must not end in a hyphen");
-      if (strName.size() > 2 && sender != service)
+      if (sender != service)
       {
-         check(!strName.starts_with("x-"), "'x-' is a reserved prefix");
+         check(!strName.starts_with("x-"),
+               "The 'x-' account prefix is reserved for infrastructure providers");
       }
 
       // Check compression roundtrip
