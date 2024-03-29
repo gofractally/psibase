@@ -9,11 +9,11 @@
 #include <services/system/CommonSys.hpp>
 #include <services/system/CpuLimit.hpp>
 #include <services/system/HttpServer.hpp>
-#include <services/system/Producer.hpp>
+#include <services/system/Producers.hpp>
 #include <services/system/RAccounts.hpp>
 #include <services/system/RAuthK1.hpp>
 #include <services/system/RHttpServer.hpp>
-#include <services/system/RProducer.hpp>
+#include <services/system/RProducers.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifyEcSys.hpp>
@@ -103,7 +103,7 @@ namespace
          s.postinstall(actions);
       }
 
-      transactor<Producer>  psys{Producer::service, Producer::service};
+      transactor<Producers> psys{Producers::service, Producers::service};
       std::vector<Producer> producerConfig = {{"firstproducer"_a, {}}};
       actions.push_back(psys.setProducers(producerConfig));
 

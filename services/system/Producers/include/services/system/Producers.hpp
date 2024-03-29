@@ -8,10 +8,10 @@ namespace SystemService
 {
    // This service manages the active producers.
    // It must have native write permission
-   class Producer : public psibase::Service<Producer>
+   class Producers : public psibase::Service<Producers>
    {
      public:
-      static constexpr auto service      = psibase::AccountNumber("producer");
+      static constexpr auto service      = psibase::AccountNumber("producers");
       static constexpr auto serviceFlags = psibase::CodeRow::allowWriteNative;
 
       /// `prods-weak` and `prods-strong` are accounts that represent authorization
@@ -44,7 +44,7 @@ namespace SystemService
                         std::vector<psibase::Claim> claims);
       void canAuthUserSys(psibase::AccountNumber user);
    };
-   PSIO_REFLECT(Producer,
+   PSIO_REFLECT(Producers,
                 method(setConsensus, consensus),
                 method(setProducers, producers),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),

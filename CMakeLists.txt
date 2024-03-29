@@ -115,14 +115,14 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/Producer.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/RProducer.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
@@ -504,18 +504,18 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Producer.psi
-    NAME Producer
+    OUTPUT ${SERVICE_DIR}/Producers.psi
+    NAME Producers
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Manages the active producers"
-    SERVICE producer
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Producer.wasm
+    SERVICE producers
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
         FLAGS allowWriteNative
         SERVER r-prod-sys
     SERVICE r-prod-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducer.wasm
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
     ACCOUNTS prods-weak prods-strong
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producer/src/postinstall.json
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
 )
@@ -665,7 +665,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonSys CpuLimit DocSys
-                    ExploreSys FractalSys InviteSys NftSys PackageSys Producer HttpServer
+                    ExploreSys FractalSys InviteSys NftSys PackageSys Producers HttpServer
                     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
 
@@ -674,7 +674,7 @@ psibase_package(
     NAME Minimal
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
-    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonSys PackageSys Producer HttpServer
+    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonSys PackageSys Producers HttpServer
                     SetCode Transact
 )
 
@@ -693,7 +693,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonSys CpuLimit Default
-    DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys Producer HttpServer
+    DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys Producers HttpServer
     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
@@ -714,7 +714,7 @@ install(
           ${SERVICE_DIR}/NftSys.psi
           ${SERVICE_DIR}/NopSys.psi
           ${SERVICE_DIR}/PackageSys.psi
-          ${SERVICE_DIR}/Producer.psi
+          ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/PsiSpaceSys.psi
           ${SERVICE_DIR}/SetCode.psi

@@ -89,7 +89,7 @@
   - [fractal-sys]()
   - [invite-sys](default-apps/invite-sys.md)
   - [nft-sys]()
-  - [producer]()
+  - [producers]()
   - [http-server](default-apps/http-server.md)
   - [psispace-sys](default-apps/psispace-sys.md)
   - [setcode](default-apps/setcode.md)

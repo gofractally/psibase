@@ -1,6 +1,6 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
-#include <services/system/Producer.hpp>
+#include <services/system/Producers.hpp>
 
 using namespace psibase;
 
@@ -34,7 +34,7 @@ namespace SystemService
       }
    }
 
-   void Producer::setConsensus(psibase::Consensus consensus)
+   void Producers::setConsensus(psibase::Consensus consensus)
    {
       check(getSender() == getReceiver(), "sender must match service account");
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
@@ -53,7 +53,7 @@ namespace SystemService
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
-   void Producer::setProducers(std::vector<psibase::Producer> prods)
+   void Producers::setProducers(std::vector<psibase::Producer> prods)
    {
       check(getSender() == getReceiver(), "sender must match service account");
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
@@ -76,7 +76,7 @@ namespace SystemService
 
    std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
    {
-      if (account == Producer::producerAccountWeak)
+      if (account == Producers::producerAccountWeak)
          return 1;
       else
          return cft.producers.size() / 2 + 1;
@@ -84,18 +84,18 @@ namespace SystemService
 
    std::size_t getThreshold(const BftConsensus& bft, AccountNumber account)
    {
-      if (account == Producer::producerAccountWeak)
+      if (account == Producers::producerAccountWeak)
          return (bft.producers.size() + 2) / 3;
       else
          return bft.producers.size() * 2 / 3 + 1;
    }
 
-   void Producer::checkAuthSys(uint32_t                    flags,
-                               psibase::AccountNumber      requester,
-                               psibase::AccountNumber      sender,
-                               ServiceMethod               action,
-                               std::vector<ServiceMethod>  allowedActions,
-                               std::vector<psibase::Claim> claims)
+   void Producers::checkAuthSys(uint32_t                    flags,
+                                psibase::AccountNumber      requester,
+                                psibase::AccountNumber      sender,
+                                ServiceMethod               action,
+                                std::vector<ServiceMethod>  allowedActions,
+                                std::vector<psibase::Claim> claims)
    {
       // verify that all claims are valid
 
@@ -141,7 +141,7 @@ namespace SystemService
       }
    }
 
-   void Producer::canAuthUserSys(psibase::AccountNumber user)
+   void Producers::canAuthUserSys(psibase::AccountNumber user)
    {
       check(user == producerAccountStrong || user == producerAccountWeak,
             "Can only authorize predefined accounts");
@@ -149,4 +149,4 @@ namespace SystemService
 
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::Producer)
+PSIBASE_DISPATCH(SystemService::Producers)

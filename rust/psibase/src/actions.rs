@@ -1,4 +1,4 @@
-use crate::services::{accounts, auth_k1, auth_sig, http_server, setcode_sys};
+use crate::services::{accounts, auth_k1, auth_sig, http_server, setcode};
 use crate::{account_raw, AccountNumber, Action, AnyPublicKey, PublicKey};
 use fracpack::Unpack;
 
@@ -27,7 +27,7 @@ pub fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumb
 }
 
 pub fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
-    setcode_sys::Wrapper::pack_from(account).setCode(account, 0, 0, wasm.into())
+    setcode::Wrapper::pack_from(account).setCode(account, 0, 0, wasm.into())
 }
 
 pub fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {

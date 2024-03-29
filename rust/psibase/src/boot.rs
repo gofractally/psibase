@@ -1,4 +1,4 @@
-use crate::services::{accounts, auth_delegate, producer, transact};
+use crate::services::{accounts, auth_delegate, producers, transact};
 use crate::{
     method_raw, new_account_action, set_auth_service_action, validate_dependencies, AccountNumber,
     Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData, MethodNumber,
@@ -19,7 +19,7 @@ macro_rules! method {
 }
 
 fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
-    producer::Wrapper::pack().setProducers(vec![ProducerConfigRow {
+    producers::Wrapper::pack().setProducers(vec![ProducerConfigRow {
         producerName: name,
         producerAuth: key,
     }])
@@ -112,13 +112,13 @@ pub fn get_initial_actions<R: Read + Seek>(
         },
     ));
 
-    actions.push(new_account_action(accounts::SERVICE, producer::ROOT));
+    actions.push(new_account_action(accounts::SERVICE, producers::ROOT));
     actions.push(
-        auth_delegate::Wrapper::pack_from(producer::ROOT)
-            .setOwner(producer::PRODUCER_ACCOUNT_STRONG),
+        auth_delegate::Wrapper::pack_from(producers::ROOT)
+            .setOwner(producers::PRODUCER_ACCOUNT_STRONG),
     );
     actions.push(set_auth_service_action(
-        producer::ROOT,
+        producers::ROOT,
         auth_delegate::SERVICE,
     ));
 
@@ -133,7 +133,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     for s in &service_packages[..] {
         for account in s.get_accounts() {
             if !accounts_with_auth.contains(account) {
-                actions.push(auth_delegate::Wrapper::pack_from(*account).setOwner(producer::ROOT));
+                actions.push(auth_delegate::Wrapper::pack_from(*account).setOwner(producers::ROOT));
                 actions.push(set_auth_service_action(*account, auth_delegate::SERVICE));
             }
         }
@@ -141,7 +141,7 @@ pub fn get_initial_actions<R: Read + Seek>(
 
     if has_package_sys {
         for s in &mut service_packages[..] {
-            s.commit_install(producer::ROOT, &mut actions)?;
+            s.commit_install(producers::ROOT, &mut actions)?;
         }
     }
 

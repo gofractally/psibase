@@ -5,8 +5,8 @@
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
 #include <psibase/serveSimpleUI.hpp>
-#include <services/system/Producer.hpp>
-#include <services/system/RProducer.hpp>
+#include <services/system/Producers.hpp>
+#include <services/system/RProducers.hpp>
 
 #include <utility>
 
@@ -56,9 +56,9 @@ PSIO_REFLECT(ProducerQuery,
              method(nextConsensus),
              method(jointStart))
 
-std::optional<HttpReply> RProducer::serveSys(HttpRequest request)
+std::optional<HttpReply> RProducers::serveSys(HttpRequest request)
 {
-   if (auto result = servePackAction<Producer>(request))
+   if (auto result = servePackAction<Producers>(request))
       return result;
 
    if (auto result = serveContent(request, Tables{getReceiver()}))
@@ -67,16 +67,16 @@ std::optional<HttpReply> RProducer::serveSys(HttpRequest request)
    if (auto result = serveGraphQL(request, ProducerQuery{}))
       return result;
 
-   if (auto result = serveSimpleUI<Producer, true>(request))
+   if (auto result = serveSimpleUI<Producers, true>(request))
       return result;
 
    return {};
 }
 
-void RProducer::storeSys(std::string path, std::string contentType, std::vector<char> content)
+void RProducers::storeSys(std::string path, std::string contentType, std::vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
    storeContent(std::move(path), std::move(contentType), std::move(content), Tables{getReceiver()});
 }
 
-PSIBASE_DISPATCH(SystemService::RProducer)
+PSIBASE_DISPATCH(SystemService::RProducers)

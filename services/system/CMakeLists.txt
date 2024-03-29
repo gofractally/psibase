@@ -14,7 +14,7 @@ function(add suffix)
         AuthAny/include
         AuthSig/include
         CpuLimit/include
-        Producer/include
+        Producers/include
         HttpServer/include
         SetCode/include
         Transact/include
@@ -33,7 +33,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(AuthAny)
     add_subdirectory(AuthSig)
     add_subdirectory(CpuLimit)
-    add_subdirectory(Producer)
+    add_subdirectory(Producers)
     add_subdirectory(HttpServer)
     add_subdirectory(SetCode)
     add_subdirectory(Transact)

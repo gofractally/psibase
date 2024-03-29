@@ -5,7 +5,7 @@
 
 namespace SystemService
 {
-   struct RProducer : public psibase::Service<RProducer>
+   struct RProducers : public psibase::Service<RProducers>
    {
       static constexpr auto service = psibase::AccountNumber("r-prod-sys");
 
@@ -13,5 +13,5 @@ namespace SystemService
 
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
-   PSIO_REFLECT(RProducer, method(serveSys, request), method(storeSys, path, contentType, content))
+   PSIO_REFLECT(RProducers, method(serveSys, request), method(storeSys, path, contentType, content))
 }  // namespace SystemService

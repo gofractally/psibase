@@ -160,7 +160,7 @@ function(add suffix)
             service/include
             tester/include
             ../../services/system/Accounts/include
-            ../../services/system/Producer/include
+            ../../services/system/Producers/include
             ../../services/system/AuthDelegate/include
             ../../services/system/AuthK1/include
             ../../services/system/AuthAny/include
