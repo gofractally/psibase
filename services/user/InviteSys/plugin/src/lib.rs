@@ -3,13 +3,13 @@ mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::account_sys::plugin::accounts;
 use bindings::auth_sys::plugin::keyvault;
-use bindings::common::plugin::{client, server, types as CommonTypes};
+use bindings::common::plugin::{client as Client, server as Server, types as CommonTypes};
 use bindings::exports::invite_sys::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
 };
 use bindings::invite_sys::plugin::types::{Invite, InviteId, Url};
 use fracpack::Pack;
-use psibase::services::invite_sys as invite_service;
+use psibase::services::invite_sys as InviteService;
 use serde::{Deserialize, Serialize};
 
 mod errors;
@@ -88,7 +88,7 @@ impl Invitee for Component {
                 })
             })?;
 
-        let url = format!("{}/graphql", client::my_service_origin()?);
+        let url = format!("{}/graphql", Client::my_service_origin()?);
         let pubkey = &decoded.pk;
         let query = format!(
             r#"query {{
@@ -100,7 +100,7 @@ impl Invitee for Component {
             pubkey = pubkey
         );
 
-        let invite: GetInvite = server::post_graphql_get_json(&url, &query)
+        let invite: GetInvite = Server::post_graphql_get_json(&url, &query)
             .map_err(|e| QueryError.err(&e.message))
             .and_then(|result| {
                 serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
@@ -137,17 +137,17 @@ impl Inviter for Component {
             .parse()
             .map_err(|_| PubKeyParse.err(&pubkey_str))?;
 
-        server::add_action_to_transaction(
+        Server::add_action_to_transaction(
             "createInvite",
-            &invite_service::action_structs::createInvite {
+            &InviteService::action_structs::createInvite {
                 inviteKey: pubkey.to_owned(),
             }
             .packed(),
         )?;
 
-        let link_root = format!("{}{}", client::my_service_origin()?, "/invited");
+        let link_root = format!("{}{}", Client::my_service_origin()?, "/invited");
 
-        let orig_data = client::get_sender_app()?;
+        let orig_data = Client::get_sender_app()?;
         let orig_domain = orig_data.origin;
         let originator = orig_data.app.unwrap_or(orig_domain.clone());
 
