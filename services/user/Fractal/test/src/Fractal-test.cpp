@@ -1,8 +1,8 @@
 #define CATCH_CONFIG_MAIN
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/commonErrors.hpp>
-#include <services/user/CoreFractalSys.hpp>
-#include <services/user/FractalSys.hpp>
+#include <services/user/CoreFractal.hpp>
+#include <services/user/Fractal.hpp>
 #include <services/user/InviteSys.hpp>
 
 using namespace psibase;
@@ -25,12 +25,12 @@ SCENARIO("Creating a fractal")
    {
       DefaultTestChain t;
 
-      auto alice      = t.from(t.addAccount("alice"_a));
-      auto fractalSys = t.from(FractalSys::service);
-      auto coreFrac   = t.from(CoreFractalSys::service);
-      auto a          = alice.to<FractalSys>();
+      auto alice          = t.from(t.addAccount("alice"_a));
+      auto fractalService = t.from(Fractal::service);
+      auto coreFrac       = t.from(CoreFractal::service);
+      auto a              = alice.to<Fractal>();
 
-      THEN("Alice can create an identity in fractal-sys")
+      THEN("Alice can create a fractal identity")
       {
          auto createIdentity = a.createIdentity();
          REQUIRE(createIdentity.succeeded());
@@ -38,21 +38,21 @@ SCENARIO("Creating a fractal")
       THEN("Alice can create a fractal")
       {
          a.createIdentity();
-         auto createFractal = a.newFractal("astronauts"_a, CoreFractalSys::service);
+         auto createFractal = a.newFractal("astronauts"_a, CoreFractal::service);
          CHECK(createFractal.succeeded());
       }
       WHEN("Alice creates a fractal")
       {
          a.createIdentity();
-         a.newFractal("astronauts"_a, CoreFractalSys::service);
+         a.newFractal("astronauts"_a, CoreFractal::service);
 
          THEN("Bob cannot create a fractal with the same name")
          {
             auto bob = t.from(t.addAccount("bob"_a));
-            auto b   = bob.to<FractalSys>();
+            auto b   = bob.to<Fractal>();
             b.createIdentity();
 
-            auto newFrac = b.newFractal("astronauts"_a, CoreFractalSys::service);
+            auto newFrac = b.newFractal("astronauts"_a, CoreFractal::service);
             CHECK(newFrac.failed("already exists"));
          }
       }
@@ -65,15 +65,15 @@ SCENARIO("Inviting people to a fractal")
    {
       DefaultTestChain t;
 
-      auto alice      = t.from(t.addAccount("alice"_a));
-      auto bob        = t.from(t.addAccount("bob"_a, userPub));
-      auto fractalSys = t.from(FractalSys::service);
-      auto coreFrac   = t.from(CoreFractalSys::service);
-      auto fractal    = "astronauts"_a;
+      auto alice          = t.from(t.addAccount("alice"_a));
+      auto bob            = t.from(t.addAccount("bob"_a, userPub));
+      auto fractalService = t.from(Fractal::service);
+      auto coreFrac       = t.from(CoreFractal::service);
+      auto fractal        = "astronauts"_a;
 
-      auto a = alice.to<FractalSys>();
+      auto a = alice.to<Fractal>();
       a.createIdentity();
-      a.newFractal(fractal, CoreFractalSys::service);
+      a.newFractal(fractal, CoreFractal::service);
 
       THEN("Alice can invite a user to the fractal")
       {
@@ -91,15 +91,15 @@ SCENARIO("Inviting people to a fractal")
             auto acceptInvite = bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
             CHECK(acceptInvite.succeeded());
 
-            auto claim = bob.with(userKeys).to<FractalSys>().claim(invPub);
+            auto claim = bob.with(userKeys).to<Fractal>().claim(invPub);
             CHECK(claim.succeeded());
          }
          WHEN("Bob claims the invite")
          {
             bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
-            bob.with(userKeys).to<FractalSys>().claim(invPub);
+            bob.with(userKeys).to<Fractal>().claim(invPub);
 
-            THEN("Bob has a fractal-sys identity")
+            THEN("Bob has a fractal identity")
             {
                auto identity = a.getIdentity(bob).returnVal();
                CHECK(identity.has_value());
@@ -107,7 +107,7 @@ SCENARIO("Inviting people to a fractal")
             }
             THEN("Bob can accept the invite")
             {
-               auto accept = bob.with(userKeys).to<FractalSys>().accept(invPub);
+               auto accept = bob.with(userKeys).to<Fractal>().accept(invPub);
                CHECK(accept.succeeded());
             }
          }
@@ -115,7 +115,7 @@ SCENARIO("Inviting people to a fractal")
          {
             bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
 
-            auto b = bob.with(userKeys).to<FractalSys>();
+            auto b = bob.with(userKeys).to<Fractal>();
             b.claim(invPub);
             b.accept(invPub);
 

@@ -13,9 +13,9 @@ namespace psibase
       // default excludes DocSys and TokenUsers
       DefaultTestChain(const std::vector<std::string>& packageNames =
                            {"Accounts", "AuthAny", "AuthDelegate", "AuthSig", "AuthK1", "CommonApi",
-                            "CpuLimit", "Explorer", "FractalSys", "InviteSys", "NftSys",
-                            "PackageSys", "Producers", "HttpServer", "PsiSpaceSys", "SetCode",
-                            "SymbolSys", "TokenSys", "Transact"},
+                            "CpuLimit", "Explorer", "Fractal", "InviteSys", "NftSys", "PackageSys",
+                            "Producers", "HttpServer", "PsiSpaceSys", "SetCode", "SymbolSys",
+                            "TokenSys", "Transact"},
                        bool                  installUI = false,
                        const DatabaseConfig& dbconfig  = {});
 

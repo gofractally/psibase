@@ -107,10 +107,10 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/CoreFractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Fractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
@@ -624,14 +624,14 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/FractalSys.psi
-    NAME FractalSys
+    OUTPUT ${SERVICE_DIR}/Fractal.psi
+    NAME Fractal
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Fractal service"
-    SERVICE fractal-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
-    SERVICE core-frac-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
+    SERVICE fractal
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Fractal.wasm
+    SERVICE core-fractal
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/CoreFractal.wasm
     DEPENDS wasm
 )
 
@@ -665,7 +665,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
-                    Explorer FractalSys InviteSys NftSys PackageSys Producers HttpServer
+                    Explorer Fractal InviteSys NftSys PackageSys Producers HttpServer
                     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
 
@@ -693,7 +693,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    DocSys Explorer FractalSys InviteSys NftSys NopSys Minimal PackageSys Producers HttpServer
+    DocSys Explorer Fractal InviteSys NftSys NopSys Minimal PackageSys Producers HttpServer
     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
@@ -708,7 +708,7 @@ install(
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/DocSys.psi
           ${SERVICE_DIR}/Explorer.psi
-          ${SERVICE_DIR}/FractalSys.psi
+          ${SERVICE_DIR}/Fractal.psi
           ${SERVICE_DIR}/InviteSys.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/NftSys.psi

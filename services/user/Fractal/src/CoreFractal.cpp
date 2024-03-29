@@ -1,14 +1,14 @@
 #include <services/system/commonErrors.hpp>
-#include <services/user/CoreFractalSys.hpp>
-#include <services/user/FractalSys.hpp>
+#include <services/user/CoreFractal.hpp>
+#include <services/user/Fractal.hpp>
 
 using namespace UserService;
 using namespace UserService::Fractal;
 using namespace psibase;
 
-CoreFractalSys::CoreFractalSys(psio::shared_view_ptr<psibase::Action> action)
+CoreFractal::CoreFractal(psio::shared_view_ptr<psibase::Action> action)
 {
-MethodNumber m{action->method()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
@@ -16,14 +16,14 @@ MethodNumber m{action->method()};
    }
 }
 
-void CoreFractalSys::init()
+void CoreFractal::init()
 {
-   to<FractalSys>().registerType();
+   to<Fractal>().registerType();
 }
 
-bool CoreFractalSys::isFracType()
+bool CoreFractal::isFracType()
 {
    return true;
 }
 
-PSIBASE_DISPATCH(UserService::Fractal::CoreFractalSys)
+PSIBASE_DISPATCH(UserService::Fractal::CoreFractal)

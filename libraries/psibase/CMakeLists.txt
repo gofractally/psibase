@@ -171,7 +171,7 @@ function(add suffix)
             ../../services/system/VerifyK1/include
             ../../services/user/CommonApi/include
             ../../services/user/Explorer/include
-            ../../services/user/FractalSys/include
+            ../../services/user/Fractal/include
             ../../services/user/InviteSys/include
             ../../services/user/NftSys/include
             ../../services/user/PackageSys/include

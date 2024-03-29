@@ -94,7 +94,7 @@ namespace UserService
       using InviteTable =
           psibase::Table<InviteRecord, &InviteRecord::key, &InviteRecord::secondary>;
 
-      // Identity on fractal-sys, does not necessarily mean you joined any fractal
+      // Identity in the fractal service, does not necessarily mean you joined a fractal
       // TODO: rename to ProfileRecord
       struct IdentityRecord
       {

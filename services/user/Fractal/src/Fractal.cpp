@@ -1,7 +1,7 @@
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
-#include <services/user/FractalSys.hpp>
+#include <services/user/Fractal.hpp>
 #include <services/user/InviteSys.hpp>
 
 using namespace UserService;
@@ -15,7 +15,7 @@ using std::tuple;
 using std::vector;
 using SystemService::Transact;
 
-FractalSys::FractalSys(psio::shared_view_ptr<psibase::Action> action)
+Fractal::Fractal(psio::shared_view_ptr<psibase::Action> action)
 {
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
@@ -25,7 +25,7 @@ FractalSys::FractalSys(psio::shared_view_ptr<psibase::Action> action)
    }
 }
 
-void FractalSys::init()
+void Fractal::init()
 {
    auto initTable = Tables().open<InitTable>();
    auto init      = (initTable.get(SingletonKey{}));
@@ -36,12 +36,12 @@ void FractalSys::init()
    to<SystemService::HttpServer>().registerServer(service);
 }
 
-void FractalSys::createIdentity()
+void Fractal::createIdentity()
 {
    newIdentity(getSender(), true);
 }
 
-void FractalSys::newIdentity(AccountNumber name, bool requireNew)
+void Fractal::newIdentity(AccountNumber name, bool requireNew)
 {
    auto identityTable = Tables().open<IdentityTable>();
    auto identity      = identityTable.get(name);
@@ -68,7 +68,7 @@ void FractalSys::newIdentity(AccountNumber name, bool requireNew)
    }
 }
 
-void FractalSys::setDispName(string displayName)
+void Fractal::setDispName(string displayName)
 {
    auto identityTable = Tables().open<IdentityTable>();
    auto identity      = identityTable.get(getSender());
@@ -83,7 +83,7 @@ void FractalSys::setDispName(string displayName)
    // Todo - emit event
 }
 
-void FractalSys::invite(AccountNumber fractal, PublicKey pubkey)
+void Fractal::invite(AccountNumber fractal, PublicKey pubkey)
 {
    auto fractalTable = Tables().open<FractalTable>();
    auto fracRecord   = fractalTable.get(fractal);
@@ -115,12 +115,12 @@ void FractalSys::invite(AccountNumber fractal, PublicKey pubkey)
    fractalTable.put(*fracRecord);
 }
 
-void FractalSys::claim(PublicKey inviteKey)
+void Fractal::claim(PublicKey inviteKey)
 {
    auto inviteTable   = Tables().open<InviteTable>();
    auto fractalInvite = inviteTable.get(inviteKey);
    check(fractalInvite.has_value(),
-         "This invite does not exist. It is either not meant for fractal-sys, or could have been "
+         "This invite does not exist. It is either not a fractal invite, or could have been "
          "deleted after expiry.");
    check(fractalInvite->recipient == AccountNumber{0}, "this invite has already been claimed");
 
@@ -150,7 +150,7 @@ void FractalSys::claim(PublicKey inviteKey)
    }
 }
 
-void FractalSys::accept(PublicKey inviteKey)
+void Fractal::accept(PublicKey inviteKey)
 {
    auto sender = getSender();
 
@@ -160,7 +160,7 @@ void FractalSys::accept(PublicKey inviteKey)
 
    auto identityTable = Tables().open<IdentityTable>();
    auto joinerProfile = identityTable.get(sender);
-   check(joinerProfile.has_value(), "only accounts with a fractal-sys profile can accept invites");
+   check(joinerProfile.has_value(), "only accounts with a fractal profile can accept invites");
 
    auto invite  = *record;
    auto fractal = invite.fractal;
@@ -203,7 +203,7 @@ void FractalSys::accept(PublicKey inviteKey)
    identityTable.put(*joinerProfile);
 }
 
-void FractalSys::reject(PublicKey inviteKey)
+void Fractal::reject(PublicKey inviteKey)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
@@ -227,7 +227,7 @@ void FractalSys::reject(PublicKey inviteKey)
    }
 }
 
-void FractalSys::registerType()
+void Fractal::registerType()
 {
    auto sender = getSender();
    auto table  = Tables().open<FractalTypeTable>();
@@ -243,7 +243,7 @@ void FractalSys::registerType()
    // TODO - emit event
 }
 
-void FractalSys::newFractal(AccountNumber account, AccountNumber type)
+void Fractal::newFractal(AccountNumber account, AccountNumber type)
 {
    auto table  = Tables().open<FractalTable>();
    auto record = table.get(account);
@@ -267,7 +267,7 @@ void FractalSys::newFractal(AccountNumber account, AccountNumber type)
    // Todo - emit event
 }
 
-void FractalSys::setFracName(AccountNumber fractalAccount, std::string displayName)
+void Fractal::setFracName(AccountNumber fractalAccount, std::string displayName)
 {
    // Todo - verify that sender has permission to update the fractal config
    check(displayName.length() < 40, "displayName too long");
@@ -282,7 +282,7 @@ void FractalSys::setFracName(AccountNumber fractalAccount, std::string displayNa
    // Todo - emit event
 }
 
-void FractalSys::setFracDesc(psibase::AccountNumber fractalAccount, std::string description)
+void Fractal::setFracDesc(psibase::AccountNumber fractalAccount, std::string description)
 {
    // Todo - verify that sender has permission to update the fractal config
    check(description.length() < 1040, "Description is too long");
@@ -297,7 +297,7 @@ void FractalSys::setFracDesc(psibase::AccountNumber fractalAccount, std::string 
    // Todo - emit event
 }
 
-void FractalSys::setFracLang(psibase::AccountNumber fractalAccount, std::string languageCode)
+void Fractal::setFracLang(psibase::AccountNumber fractalAccount, std::string languageCode)
 {
    // Todo - verify that sender has permission to update the fractal config
    check(languageCode.length() == 3, "language code invalid");
@@ -312,34 +312,34 @@ void FractalSys::setFracLang(psibase::AccountNumber fractalAccount, std::string 
    // Emit event
 }
 
-optional<IdentityRecord> FractalSys::getIdentity(AccountNumber name)
+optional<IdentityRecord> Fractal::getIdentity(AccountNumber name)
 {
    return Tables().open<IdentityTable>().get(name);
 }
 
-optional<MembershipRecord> FractalSys::getMember(AccountNumber account, AccountNumber fractal)
+optional<MembershipRecord> Fractal::getMember(AccountNumber account, AccountNumber fractal)
 {
    return Tables().open<MemberTable>().get(MembershipKey{account, fractal});
 }
 
 // TODO - rename queryableservice and delete table management from it. It should just help with events.
-auto fractalSys = QueryableService<FractalSys::Tables, FractalSys::Events>{FractalSys::service};
+auto fractalService = QueryableService<Fractal::Tables, Fractal::Events>{Fractal::service};
 struct Queries
 {
    auto getIdentity(AccountNumber user) const
    {  //
-      return FractalSys::Tables(FractalSys::service).open<Fractal::IdentityTable>().get(user);
+      return Fractal::Tables(Fractal::service).open<Fractal::IdentityTable>().get(user);
    }
 
    auto getInvite(PublicKey pubkey) const
    {  //
-      return FractalSys::Tables(FractalSys::service).open<Fractal::InviteTable>().get(pubkey);
+      return Fractal::Tables(Fractal::service).open<Fractal::InviteTable>().get(pubkey);
    }
 
    auto getMember(AccountNumber user, AccountNumber fractal) const
    {  //
       MembershipKey key{user, fractal};
-      return FractalSys::Tables(FractalSys::service).open<Fractal::MemberTable>().get(key);
+      return Fractal::Tables(Fractal::service).open<Fractal::MemberTable>().get(key);
    }
 
    auto getFractals(AccountNumber           user,
@@ -352,10 +352,9 @@ struct Queries
                     optional<string>        before,
                     optional<string>        after) const
    {
-      auto idx = FractalSys::Tables{FractalSys::service}
-                     .open<Fractal::MemberTable>()
-                     .getIndex<1>()
-                     .subindex(user);
+      auto idx =
+          Fractal::Tables{Fractal::service}.open<Fractal::MemberTable>().getIndex<1>().subindex(
+              user);
 
       auto convert = [](const auto& opt)
       {
@@ -372,36 +371,36 @@ struct Queries
 
    auto getFractal(AccountNumber fractal) const
    {  //
-      return FractalSys::Tables(FractalSys::service).open<Fractal::FractalTable>().get(fractal);
+      return Fractal::Tables(Fractal::service).open<Fractal::FractalTable>().get(fractal);
    }
 
    auto getFractalType(AccountNumber service) const
    {  //
-      return FractalSys::Tables(FractalSys::service).open<Fractal::FractalTypeTable>().get(service);
+      return Fractal::Tables(Fractal::service).open<Fractal::FractalTypeTable>().get(service);
    }
 
    auto events() const
    {  //
-      return fractalSys.allEvents();
+      return fractalService.allEvents();
    }
 
    auto serviceEvents(optional<uint32_t> first, const optional<string>& after) const
    {
-      return fractalSys.eventIndex<FractalSys::ServiceEvents>(SingletonKey{}, first, after);
+      return fractalService.eventIndex<Fractal::ServiceEvents>(SingletonKey{}, first, after);
    }
 
    auto fractalEvents(AccountNumber           fractal,
                       optional<uint32_t>      first,
                       const optional<string>& after) const
    {
-      return fractalSys.eventIndex<FractalSys::FractalEvents>(fractal, first, after);
+      return fractalService.eventIndex<Fractal::FractalEvents>(fractal, first, after);
    }
 
    auto userEvents(AccountNumber           user,
                    optional<uint32_t>      first,
                    const optional<string>& after) const
    {
-      return fractalSys.eventIndex<FractalSys::UserEvents>(user, first, after);
+      return fractalService.eventIndex<Fractal::UserEvents>(user, first, after);
    }
 };
 PSIO_REFLECT(Queries,  //
@@ -419,12 +418,12 @@ PSIO_REFLECT(Queries,  //
              //
 );
 
-optional<HttpReply> FractalSys::serveSys(HttpRequest request)
+optional<HttpReply> Fractal::serveSys(HttpRequest request)
 {
    if (auto result = serveContent(request, Tables{}))
       return result;
 
-   if (auto result = serveSimpleUI<FractalSys, true>(request))
+   if (auto result = serveSimpleUI<Fractal, true>(request))
       return result;
 
    if (auto result = serveGraphQL(request, Queries{}))
@@ -433,10 +432,10 @@ optional<HttpReply> FractalSys::serveSys(HttpRequest request)
    return nullopt;
 }
 
-void FractalSys::storeSys(string path, string contentType, vector<char> content)
+void Fractal::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
    storeContent(move(path), move(contentType), move(content), Tables());
 }
 
-PSIBASE_DISPATCH(UserService::Fractal::FractalSys)
+PSIBASE_DISPATCH(UserService::Fractal::Fractal)

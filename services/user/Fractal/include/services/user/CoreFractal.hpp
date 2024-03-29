@@ -7,13 +7,13 @@ namespace UserService
 {
    namespace Fractal
    {
-      class CoreFractalSys : public psibase::Service<CoreFractalSys>
+      class CoreFractal : public psibase::Service<CoreFractal>
       {
         public:
          using Tables                  = psibase::ServiceTables<InitTable>;
-         static constexpr auto service = psibase::AccountNumber("core-frac-sys");
+         static constexpr auto service = psibase::AccountNumber("core-fractal");
 
-         CoreFractalSys(psio::shared_view_ptr<psibase::Action> action);
+         CoreFractal(psio::shared_view_ptr<psibase::Action> action);
 
          void init();
 
@@ -32,13 +32,13 @@ namespace UserService
       };
 
       // clang-format off
-      PSIO_REFLECT(CoreFractalSys, method(init), method(isFracType)
+      PSIO_REFLECT(CoreFractal, method(init), method(isFracType)
       );
-      PSIBASE_REFLECT_EVENTS(CoreFractalSys);
-      PSIBASE_REFLECT_HISTORY_EVENTS(CoreFractalSys
+      PSIBASE_REFLECT_EVENTS(CoreFractal);
+      PSIBASE_REFLECT_HISTORY_EVENTS(CoreFractal
       );
-      PSIBASE_REFLECT_UI_EVENTS(CoreFractalSys);
-      PSIBASE_REFLECT_MERKLE_EVENTS(CoreFractalSys);
+      PSIBASE_REFLECT_UI_EVENTS(CoreFractal);
+      PSIBASE_REFLECT_MERKLE_EVENTS(CoreFractal);
       // clang-format on
 
    }  // namespace Fractal

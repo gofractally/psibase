@@ -1,6 +1,6 @@
 # HTTPS
 
-Some web technologies require a secure context when not operating over `localhost`. This includes things like clipboard access and WebRTC--two technologies used within the `FractalSys` app. For this reason, we need a means of running psinode with an SSL.
+Some web technologies require a secure context when not operating over `localhost`. This includes things like clipboard access and WebRTC--two technologies used within the `Fractal` app. For this reason, we need a means of running psinode with an SSL.
 
 ## Generating certs on local machine
 
@@ -61,10 +61,10 @@ If you're running `psinode` within a container, commands sent to psinode via the
 
 ## Running an app server in dev mode for faster iteration
 
-This uses the existing `FractalSys` app at `services/user/FractalSys/ui` as the example.
+This uses the existing `Fractal` app at `services/user/Fractal/ui` as the example.
 
 1. Create a copy of `.env.sample` named `.env` in the `ui` directory with `VITE_SECURE_LOCAL_DEV=true`
 2. Verify that the `vite.config.ts` file points at the proper location for the SSL cert and key.
 3. Run the dev server: `yarn dev`
 
-Assuming port 8081 is properly exposed, psibase will now be accessible via port 8081 at https://psibase.127.0.0.1.sslip.io:8081 and the app will be accessible at its path (https://psibase.127.0.0.1.sslip.io:8081/app/fractal-sys in this case). Modifications to the app code should be reflected immediately via Vite's HMR.
+Assuming port 8081 is properly exposed, psibase will now be accessible via port 8081 at https://psibase.127.0.0.1.sslip.io:8081 and the app will be accessible at its path (https://psibase.127.0.0.1.sslip.io:8081/app/fractal in this case). Modifications to the app code should be reflected immediately via Vite's HMR.

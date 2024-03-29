@@ -86,7 +86,7 @@
   - [cpu-limit]()
   - [doc-sys](default-apps/doc-sys.md)
   - [explorer]()
-  - [fractal-sys]()
+  - [fractal]()
   - [invite-sys](default-apps/invite-sys.md)
   - [nft-sys]()
   - [producers]()

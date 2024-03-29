@@ -9,7 +9,7 @@ namespace UserService
 {
    namespace Fractal
    {
-      class FractalSys : public psibase::Service<FractalSys>
+      class Fractal : public psibase::Service<Fractal>
       {
         public:
          using Tables = psibase::ServiceTables<InitTable,
@@ -21,9 +21,9 @@ namespace UserService
                                                IdentityTable,
                                                ServiceEventTable>;
 
-         static constexpr auto service = psibase::AccountNumber("fractal-sys");
+         static constexpr auto service = psibase::AccountNumber("fractal");
 
-         FractalSys(psio::shared_view_ptr<psibase::Action> action);
+         Fractal(psio::shared_view_ptr<psibase::Action> action);
 
          void init();
 
@@ -95,7 +95,7 @@ namespace UserService
       };
 
       // clang-format off
-      PSIO_REFLECT(FractalSys,
+      PSIO_REFLECT(Fractal,
          method(init),
 
          method(createIdentity),
@@ -119,8 +119,8 @@ namespace UserService
          method(getIdentity, name),
          method(getMember, account, fractal)
       );
-      PSIBASE_REFLECT_EVENTS(FractalSys);
-      PSIBASE_REFLECT_HISTORY_EVENTS(FractalSys,
+      PSIBASE_REFLECT_EVENTS(Fractal);
+      PSIBASE_REFLECT_HISTORY_EVENTS(Fractal,
          method(identityAdded, prevEvent, name),
          method(invCreated, prevEvent, creator, fractal),
          method(invReceived, prevEvent, receiver, fractal),
@@ -128,8 +128,8 @@ namespace UserService
          method(invRejected, prevEvent, rejecter, fractal),
          method(joinedFrac, prevEvent, fractal)
       );
-      PSIBASE_REFLECT_UI_EVENTS(FractalSys);
-      PSIBASE_REFLECT_MERKLE_EVENTS(FractalSys);
+      PSIBASE_REFLECT_UI_EVENTS(Fractal);
+      PSIBASE_REFLECT_MERKLE_EVENTS(Fractal);
       // clang-format on
 
    }  // namespace Fractal
