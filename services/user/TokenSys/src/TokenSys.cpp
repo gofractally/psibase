@@ -1,7 +1,7 @@
 #include <services/user/TokenSys.hpp>
 
 #include <services/system/Accounts.hpp>
-#include <services/system/ProxySys.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
 
@@ -96,7 +96,7 @@ void TokenSys::init()
    nftService.credit(tNft, SymbolSys::service, "Passing system token ownership");
 
    // Register proxy
-   to<SystemService::ProxySys>().registerServer(RTokenSys::service);
+   to<SystemService::HttpServer>().registerServer(RTokenSys::service);
 }
 
 TID TokenSys::create(Precision precision, Quantity maxSupply)

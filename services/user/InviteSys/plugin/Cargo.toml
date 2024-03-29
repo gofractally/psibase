@@ -23,5 +23,5 @@ package = "invite-sys:plugin"
 
 [package.metadata.component.target.dependencies]
 "common:plugin" = { path = "../../CommonSys/common/packages/wit/plugin.wit" }
-"auth-basic:plugin" = { path = "../../../system/AuthBasic/plugin/wit/world.wit" }
+"auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }

@@ -498,7 +498,7 @@ export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
         );
     };
 
-    let allServices = ["Default", "AuthBasic", "AuthAny"];
+    let allServices = ["Default", "AuthSig", "AuthAny"];
     if (currentPage == "type") {
         return (
             <TypeForm

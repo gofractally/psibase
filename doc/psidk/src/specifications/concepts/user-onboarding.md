@@ -30,7 +30,7 @@ Embedded in the query string of the generated HTTP link is a private key, genera
 
 After the invitee clicks the link, and fills out their new account details in the invite plugin, they submit a transaction that prompts its creation. However, every transaction submitted to a psibase infrastructure provider must have a sender. Therefore, in order to submit this transaction, the invite service provides the account from which the transaction is sent (since the user may not have one yet). This sender account should use a custom auth service which authorizes actions if and only if the transaction is digitally signed with a private key that corresponds to an `invite ID`.
 
-If the new account uses a PKI authorization service, such as [auth-basic](../../default-apps/auth-basic.md), it should not be configured to use the `invite ID` as its public key, since the invite creator also knows its corresponding private key.
+If the new account uses a PKI authorization service, such as [auth-sig](../../default-apps/auth-sig.md), it should not be configured to use the `invite ID` as its public key, since the invite creator also knows its corresponding private key.
 
 ### App onboarding
 

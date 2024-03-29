@@ -1,4 +1,4 @@
-use crate::services::{accounts, auth_basic, auth_ec, proxy_sys, setcode_sys};
+use crate::services::{accounts, auth_k1, auth_sig, http_server, setcode_sys};
 use crate::{account_raw, AccountNumber, Action, AnyPublicKey, PublicKey};
 use fracpack::Unpack;
 
@@ -14,9 +14,9 @@ pub fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Acti
 
 pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
     if key.key.service == account!("verifyec-sys") {
-        auth_ec::Wrapper::pack_from(account).setKey(PublicKey::unpacked(&key.key.rawData).unwrap())
+        auth_k1::Wrapper::pack_from(account).setKey(PublicKey::unpacked(&key.key.rawData).unwrap())
     } else if key.key.service == account!("verify-sys") {
-        auth_basic::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec())
+        auth_sig::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec())
     } else {
         panic!("unknown account service");
     }
@@ -31,5 +31,5 @@ pub fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
 }
 
 pub fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
-    proxy_sys::Wrapper::pack_from(service).registerServer(server_service)
+    http_server::Wrapper::pack_from(service).registerServer(server_service)
 }

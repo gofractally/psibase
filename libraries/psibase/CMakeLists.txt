@@ -160,12 +160,12 @@ function(add suffix)
             service/include
             tester/include
             ../../services/system/Accounts/include
-            ../../services/system/ProducerSys/include
+            ../../services/system/Producer/include
             ../../services/system/AuthDelegate/include
-            ../../services/system/AuthEc/include
+            ../../services/system/AuthK1/include
             ../../services/system/AuthAny/include
-            ../../services/system/CpuSys/include
-            ../../services/system/ProxySys/include
+            ../../services/system/CpuLimit/include
+            ../../services/system/HttpServer/include
             ../../services/system/SetCodeSys/include
             ../../services/system/TransactionSys/include
             ../../services/system/VerifyEcSys/include

@@ -8,7 +8,7 @@
 | 4           | service | `/common*` | [Common endpoints](#common-endpoints). Registered services only.                    |
 | 5 (lowest)  | service | `*`        | [Service-provided endpoints](#service-provided-endpoints). Registered services only.|
 
-The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys service](../../../default-apps/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct networks and by individual infrastructure providers.
+The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [http-server service](../../../default-apps/http-server.md), which handles the remaining routing rules, is customizable, both by distinct networks and by individual infrastructure providers.
 
 ## CORS and authorization
 

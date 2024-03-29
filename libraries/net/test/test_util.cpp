@@ -5,8 +5,8 @@
 
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
-#include <services/system/CpuSys.hpp>
-#include <services/system/ProducerSys.hpp>
+#include <services/system/CpuLimit.hpp>
+#include <services/system/Producer.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
 
@@ -82,9 +82,9 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
                                                .code    = readWholeFile("TransactionSys.wasm"),
                                            },
                                            {
-                                               .service = CpuSys::service,
-                                               .flags   = CpuSys::serviceFlags,
-                                               .code    = readWholeFile("CpuSys.wasm"),
+                                               .service = CpuLimit::service,
+                                               .flags   = CpuLimit::serviceFlags,
+                                               .code    = readWholeFile("CpuLimit.wasm"),
                                            },
                                            {
                                                .service = Accounts::service,
@@ -92,9 +92,9 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
                                                .code    = readWholeFile("Accounts.wasm"),
                                            },
                                            {
-                                               .service = ProducerSys::service,
-                                               .flags   = ProducerSys::serviceFlags,
-                                               .code    = readWholeFile("ProducerSys.wasm"),
+                                               .service = Producer::service,
+                                               .flags   = Producer::serviceFlags,
+                                               .code    = readWholeFile("Producer.wasm"),
                                            },
                                            {
                                                .service = AuthAny::service,
@@ -109,7 +109,7 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
           .code    = readWholeFile("VerifyEcSys.wasm"),
       });
    }
-   // TransactionSys + ProducerSys + AuthAny + Accounts
+   // TransactionSys + Producer + AuthAny + Accounts
    pushTransaction(ctx,
                    Transaction{                                                         //
                                .actions = {                                             //
@@ -123,20 +123,20 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
        ctx,
        Transaction{
            .tapos   = {.expiration = {ctx->current.header.time.seconds + 1}},
-           .actions = {Action{.sender  = TransactionSys::service,
-                              .service = TransactionSys::service,
-                              .method  = MethodNumber{"startBoot"},
-                              .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
-                       Action{.sender  = Accounts::service,
-                              .service = Accounts::service,
-                              .method  = MethodNumber{"init"},
-                              .rawData = psio::to_frac(std::tuple())},
-                       transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
-                           .setConsensus(producers),
-                       Action{.sender  = TransactionSys::service,
-                              .service = TransactionSys::service,
-                              .method  = MethodNumber{"finishBoot"},
-                              .rawData = psio::to_frac(std::tuple())}}});
+           .actions = {
+               Action{.sender  = TransactionSys::service,
+                      .service = TransactionSys::service,
+                      .method  = MethodNumber{"startBoot"},
+                      .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
+               Action{.sender  = Accounts::service,
+                      .service = Accounts::service,
+                      .method  = MethodNumber{"init"},
+                      .rawData = psio::to_frac(std::tuple())},
+               transactor<Producer>(Producer::service, Producer::service).setConsensus(producers),
+               Action{.sender  = TransactionSys::service,
+                      .service = TransactionSys::service,
+                      .method  = MethodNumber{"finishBoot"},
+                      .rawData = psio::to_frac(std::tuple())}}});
 }
 
 static Tapos getTapos(const BlockInfo& info)
@@ -166,17 +166,16 @@ Transaction setProducers(const psibase::Consensus& producers)
 {
    return Transaction{
        .tapos   = {},
-       .actions = {transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
-                       .setConsensus(producers)}};
+       .actions = {
+           transactor<Producer>(Producer::service, Producer::service).setConsensus(producers)}};
 }
 
 void setProducers(psibase::BlockContext* ctx, const psibase::Consensus& producers)
 {
    pushTransaction(
-       ctx,
-       Transaction{.tapos   = getTapos(ctx),
-                   .actions = {transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
-                                   .setConsensus(producers)}});
+       ctx, Transaction{.tapos   = getTapos(ctx),
+                        .actions = {transactor<Producer>(Producer::service, Producer::service)
+                                        .setConsensus(producers)}});
 }
 
 SignedTransaction signTransaction(const BlockInfo& prevBlock, const Transaction& trx)
@@ -216,10 +215,10 @@ BlockMessage makeBlock(const BlockInfo&                   info,
    {
       for (auto act : trx.transaction->actions())
       {
-         if (act.service() == ProducerSys::service && act.method() == MethodNumber{"setConsensus"})
+         if (act.service() == Producer::service && act.method() == MethodNumber{"setConsensus"})
          {
             using param_tuple =
-                decltype(psio::tuple_remove_view(psio::args_as_tuple(&ProducerSys::setConsensus)));
+                decltype(psio::tuple_remove_view(psio::args_as_tuple(&Producer::setConsensus)));
             auto params                        = psio::view<const param_tuple>(act.rawData());
             newBlock.block.header.newConsensus = get<0>(params);
          }

@@ -104,7 +104,7 @@ namespace UserService
          /// * The invite must not be expired
          void checkClaim(psibase::AccountNumber actor, psibase::PublicKey pubkey);
 
-         /// Called by the proxy-sys system service when an HttpRequest
+         /// Called by the http-server system service when an HttpRequest
          /// is directed at this invite service
          std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 

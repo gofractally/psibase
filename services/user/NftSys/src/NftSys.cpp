@@ -2,7 +2,7 @@
 
 #include <psibase/Bitset.hpp>
 #include <services/system/Accounts.hpp>
-#include <services/system/ProxySys.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/system/commonErrors.hpp>
 
 #include <psibase/serveSimpleUI.hpp>
@@ -45,7 +45,7 @@ void NftSys::init()
    to<NftSys>().setUserConf(userConfig::manualDebit, true);
 
    // Register serveSys handler
-   to<SystemService::ProxySys>().registerServer(NftSys::service);
+   to<SystemService::HttpServer>().registerServer(NftSys::service);
 }
 
 NID NftSys::mint()

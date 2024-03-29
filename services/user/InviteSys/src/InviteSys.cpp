@@ -1,7 +1,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
-#include <services/system/AuthEc.hpp>
-#include <services/system/ProxySys.hpp>
+#include <services/system/AuthK1.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/AuthInviteSys.hpp>
@@ -45,7 +45,7 @@ void InviteSys::init()
    initTable.put(InitializedRecord{});
 
    // Register with proxy
-   to<SystemService::ProxySys>().registerServer(InviteSys::service);
+   to<SystemService::HttpServer>().registerServer(InviteSys::service);
 
    // Configure manual debit for self on Token and NFT
    auto manualDebit = psibase::EnumElement{"manualDebit"};
@@ -162,11 +162,11 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    to<Accounts>().newAccount(acceptedBy, AuthAny::service, true);
    std::tuple<PublicKey> params{newAccountKey};
    Action                setKey{.sender  = acceptedBy,
-                                .service = AuthEc::service,
+                                .service = AuthK1::service,
                                 .method  = "setKey"_m,
                                 .rawData = psio::convert_to_frac(params)};
    to<TransactionSys>().runAs(move(setKey), vector<ServiceMethod>{});
-   std::tuple<AccountNumber> params2{AuthEc::service};
+   std::tuple<AccountNumber> params2{AuthK1::service};
    Action                    setAuth{.sender  = acceptedBy,
                                      .service = Accounts::service,
                                      .method  = "setAuthServ"_m,

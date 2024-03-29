@@ -7,11 +7,11 @@ Psibase comes with default applications that bootstrap the initial functionality
 System apps are the applications responsible for the core functionality of the network. Changing these applications could drastically alter fundamental properties about the network.
 
 - [accounts](accounts.md)
-- [auth-basic]()
+- [auth-sig]()
 - [common-sys](common-sys.md)
-- [cpu-sys]()
-- [producer-sys]()
-- [proxy-sys](proxy-sys.md)
+- [cpu-limit]()
+- [producer]()
+- [http-server](http-server.md)
 - [setcode-sys](setcode-sys.md)
 - [transact-sys](transact-sys.md)
 - [verify-sys]()

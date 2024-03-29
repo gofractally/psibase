@@ -5,15 +5,15 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthDelegate.hpp>
-#include <services/system/AuthEc.hpp>
+#include <services/system/AuthK1.hpp>
 #include <services/system/CommonSys.hpp>
-#include <services/system/CpuSys.hpp>
-#include <services/system/ProducerSys.hpp>
-#include <services/system/ProxySys.hpp>
+#include <services/system/CpuLimit.hpp>
+#include <services/system/HttpServer.hpp>
+#include <services/system/Producer.hpp>
 #include <services/system/RAccounts.hpp>
-#include <services/system/RAuthEc.hpp>
-#include <services/system/RProducerSys.hpp>
-#include <services/system/RProxySys.hpp>
+#include <services/system/RAuthK1.hpp>
+#include <services/system/RHttpServer.hpp>
+#include <services/system/RProducer.hpp>
 #include <services/system/SetCodeSys.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/VerifyEcSys.hpp>
@@ -103,8 +103,8 @@ namespace
          s.postinstall(actions);
       }
 
-      transactor<ProducerSys> psys{ProducerSys::service, ProducerSys::service};
-      std::vector<Producer>   producerConfig = {{"firstproducer"_a, {}}};
+      transactor<Producer>  psys{Producer::service, Producer::service};
+      std::vector<Producer> producerConfig = {{"firstproducer"_a, {}}};
       actions.push_back(psys.setProducers(producerConfig));
 
       auto root = AccountNumber{"root"};
@@ -230,12 +230,12 @@ AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
                                            bool             show /* = false */)
 {
    transactor<Accounts> asys(Accounts::service, Accounts::service);
-   transactor<AuthEc>   ecsys(AuthEc::service, AuthEc::service);
+   transactor<AuthK1>   ecsys(AuthK1::service, AuthK1::service);
 
    auto trace = pushTransaction(makeTransaction({
        asys.newAccount(name, AuthAny::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthServ(AuthEc::service),
+       asys.from(name).setAuthServ(AuthK1::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -249,14 +249,14 @@ AccountNumber DefaultTestChain::addAccount(const char*      name,
    return addAccount(AccountNumber(name), public_key, show);
 }
 
-void DefaultTestChain::setAuthEc(AccountNumber    name,
+void DefaultTestChain::setAuthK1(AccountNumber    name,
                                  const PublicKey& pubkey,
                                  bool             show /* = false */)
 {
    auto n  = name.str();
-   auto t1 = from(name).to<AuthEc>().setKey(pubkey);
+   auto t1 = from(name).to<AuthK1>().setKey(pubkey);
    check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
-   auto t2 = from(name).to<Accounts>().setAuthServ(AuthEc::service);
+   auto t2 = from(name).to<Accounts>().setAuthServ(AuthK1::service);
    check(psibase::show(show, t2.trace()) == "", "Failed to setAuthServ for " + n);
 }
 

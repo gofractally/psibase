@@ -2,18 +2,18 @@
 
 pub mod accounts;
 pub mod admin_sys;
-pub mod auth_basic;
 pub mod auth_delegate;
-pub mod auth_ec;
+pub mod auth_k1;
+pub mod auth_sig;
 pub mod common_sys;
-pub mod cpu_sys;
+pub mod cpu_limit;
+pub mod http_server;
 #[allow(non_snake_case)]
 pub mod invite_sys;
 #[allow(non_snake_case)]
 pub mod nft_sys;
 pub mod package_sys;
-pub mod producer_sys;
-pub mod proxy_sys;
+pub mod producer;
 pub mod psispace_sys;
 pub mod setcode_sys;
 pub mod transaction_sys;

@@ -5,7 +5,7 @@ namespace psibase
 {
    /// Interface for services which serve http
    ///
-   /// `proxy-sys` uses this interface to call into services to respond to http requests.
+   /// `http-server` uses this interface to call into services to respond to http requests.
    ///
    /// > ⚠️ Do **not** inherit from this. To implement this interface, add a [serveSys] action
    /// to your service and reflect it.
@@ -14,7 +14,7 @@ namespace psibase
       /// Handle HTTP requests
       ///
       /// Define this action in your service to handle HTTP requests. You'll also need to
-      /// register your service with [proxy-sys](/default-apps/proxy-sys.md).
+      /// register your service with [http-server](/default-apps/http-server.md).
       ///
       /// `serveSys` can do any of the following:
       ///

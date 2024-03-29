@@ -1,7 +1,7 @@
 #include <services/user/SymbolSys.hpp>
 
 #include <services/system/Accounts.hpp>
-#include <services/system/ProxySys.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
 
@@ -96,7 +96,7 @@ void SymbolSys::init()
    to<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
 
    // Register serveSys handler
-   to<SystemService::ProxySys>().registerServer(SymbolSys::service);
+   to<SystemService::HttpServer>().registerServer(SymbolSys::service);
 }
 
 void SymbolSys::create(SID newSymbol, Quantity maxDebit)

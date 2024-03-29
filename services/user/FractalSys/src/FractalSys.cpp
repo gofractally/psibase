@@ -1,4 +1,4 @@
-#include <services/system/ProxySys.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/FractalSys.hpp>
@@ -33,7 +33,7 @@ void FractalSys::init()
    initTable.put(InitializedRecord{});
 
    // Register with proxy
-   to<SystemService::ProxySys>().registerServer(service);
+   to<SystemService::HttpServer>().registerServer(service);
 }
 
 void FractalSys::createIdentity()

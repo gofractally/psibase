@@ -1,7 +1,7 @@
 #include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
-#include <services/system/CpuSys.hpp>
+#include <services/system/CpuLimit.hpp>
 #include <services/system/TransactionSys.hpp>
 
 #include <boost/container/flat_map.hpp>
@@ -296,7 +296,7 @@ namespace SystemService
                "transaction references non-existing block");
       }
 
-      Actor<CpuSys>   cpuSys(TransactionSys::service, CpuSys::service);
+      Actor<CpuLimit> cpuLimit(TransactionSys::service, CpuLimit::service);
       Actor<Accounts> accounts(TransactionSys::service, Accounts::service);
 
       auto accountsTables = Accounts::Tables(Accounts::service);
@@ -319,7 +319,7 @@ namespace SystemService
             if (&act == &trx.actions[0])
             {
                flags |= AuthInterface::firstAuthFlag;
-               cpuSys.setCpuLimit(act.sender);
+               cpuLimit.setCpuLimit(act.sender);
             }
             if (args.checkFirstAuthAndExit)
                flags |= AuthInterface::readOnlyFlag;
@@ -338,7 +338,7 @@ namespace SystemService
       check(!trx.actions.empty(), "transaction must have at least one action");
       if (transactionSysStatus && transactionSysStatus->enforceAuth)
       {
-         std::chrono::nanoseconds cpuUsage = cpuSys.getCpuTime();
+         std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
          accounts.billCpu(trx.actions[0].sender, cpuUsage);
       }
    }

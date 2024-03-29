@@ -35,7 +35,7 @@ namespace psibase
       std::vector<const ActionTrace*> top_traces;
       for (auto& inner : root.innerTraces)
          if (auto at = std::get_if<ActionTrace>(&inner.inner))
-            if (at->action.service != AccountNumber{"cpu-sys"} &&
+            if (at->action.service != AccountNumber{"cpu-limit"} &&
                 (at->action.service != AccountNumber{"accounts"} ||
                  at->action.method != MethodNumber{"billCpu"}))
                top_traces.push_back(at);

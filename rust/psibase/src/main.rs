@@ -142,7 +142,7 @@ enum Command {
         #[clap(short = 'i', long)]
         create_insecure_account: bool,
 
-        /// Register the service with ProxySys. This allows the service to host a
+        /// Register the service with HttpServer. This allows the service to host a
         /// website, serve RPC requests, and serve GraphQL requests.
         #[clap(short = 'p', long)]
         register_proxy: bool,

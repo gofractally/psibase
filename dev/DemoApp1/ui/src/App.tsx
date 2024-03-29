@@ -18,7 +18,7 @@ function App() {
     supervisor.preLoadPlugins([
       { service: "invite-sys" },
       { service: "accounts" },
-      { service: "auth-basic" },
+      { service: "auth-sig" },
       { service: "demoapp1" },
     ]);
   };
@@ -30,7 +30,7 @@ function App() {
   const run = async () => {
     try {
       const res = await supervisor.functionCall({
-        service: "auth-basic",
+        service: "auth-sig",
         intf: "keyvault",
         method: "generateKeypair",
         params: [],
@@ -111,7 +111,7 @@ function App() {
       <h3>{res}</h3>
       <div className="card">
         <button onClick={() => run()}>
-          {"auth-basic:plugin->generateKeypair"}
+          {"auth-sig:plugin->generateKeypair"}
         </button>
       </div>
 

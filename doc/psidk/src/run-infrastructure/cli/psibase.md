@@ -118,7 +118,7 @@ Deploy a service
 
 - `-p`, `--register-proxy`
 
-  Register the service with ProxySys. This allows the service to host a website, serve RPC requests, and serve GraphQL requests.
+  Register the service with HttpServer. This allows the service to host a website, serve RPC requests, and serve GraphQL requests.
   
 - `-S`, `--sender` *sender*
 

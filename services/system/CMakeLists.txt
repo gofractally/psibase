@@ -10,12 +10,12 @@ function(add suffix)
     target_mapped_include_directories(services_system${suffix} INTERFACE
         Accounts/include
         AuthDelegate/include
-        AuthEc/include
+        AuthK1/include
         AuthAny/include
-        AuthBasic/include
-        CpuSys/include
-        ProducerSys/include
-        ProxySys/include
+        AuthSig/include
+        CpuLimit/include
+        Producer/include
+        HttpServer/include
         SetCodeSys/include
         TransactionSys/include
         VerifyEcSys/include
@@ -29,12 +29,12 @@ add("-debug")
 if(DEFINED IS_WASM)
     add_subdirectory(Accounts)
     add_subdirectory(AuthDelegate)
-    add_subdirectory(AuthEc)
+    add_subdirectory(AuthK1)
     add_subdirectory(AuthAny)
-    add_subdirectory(AuthBasic)
-    add_subdirectory(CpuSys)
-    add_subdirectory(ProducerSys)
-    add_subdirectory(ProxySys)
+    add_subdirectory(AuthSig)
+    add_subdirectory(CpuLimit)
+    add_subdirectory(Producer)
+    add_subdirectory(HttpServer)
     add_subdirectory(SetCodeSys)
     add_subdirectory(TransactionSys)
     add_subdirectory(VerifyEcSys)

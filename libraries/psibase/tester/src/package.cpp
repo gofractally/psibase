@@ -2,7 +2,7 @@
 #include <psibase/check.hpp>
 #include <psibase/package.hpp>
 #include <psibase/semver.hpp>
-#include <services/system/ProxySys.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/user/PackageSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
 
@@ -205,7 +205,7 @@ namespace psibase
          if (info.server)
          {
             actions.push_back(
-                transactor<ProxySys>{account, ProxySys::service}.registerServer(*info.server));
+                transactor<HttpServer>{account, HttpServer::service}.registerServer(*info.server));
          }
       }
    }

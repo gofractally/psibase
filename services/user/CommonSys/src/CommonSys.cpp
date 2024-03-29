@@ -4,7 +4,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/serveContent.hpp>
 #include <psio/to_json.hpp>
-#include <services/system/ProxySys.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/system/TransactionSys.hpp>
 
 static constexpr bool enable_print = false;

@@ -3,7 +3,7 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
-#include <services/system/AuthEc.hpp>
+#include <services/system/AuthK1.hpp>
 #include <services/system/VerifyEcSys.hpp>
 #include <services/system/commonErrors.hpp>
 
@@ -119,8 +119,8 @@ SCENARIO("Rejecting an invite")
       auto bob     = t.from(t.addAccount("bob"_a));
       auto invited = t.from(InviteSys::payerAccount);
 
-      t.setAuthEc(alice, userPub);
-      t.setAuthEc(bob, userPub);
+      t.setAuthK1(alice, userPub);
+      t.setAuthK1(bob, userPub);
 
       WHEN("Alice creates an invite")
       {
@@ -220,7 +220,7 @@ SCENARIO("Expired invites")
 
       auto alice = t.from(t.addAccount("alice"_a));
       auto bob   = t.from(t.addAccount("bob"_a));
-      t.setAuthEc(bob, userPub);
+      t.setAuthK1(bob, userPub);
 
       auto a = alice.to<InviteSys>();
       auto b = bob.with({{userPub, userPriv}}).to<InviteSys>();
@@ -490,8 +490,8 @@ SCENARIO("Accepting an invite")
       auto bob     = t.from(t.addAccount("bob"_a));
       auto charlie = t.from(t.addAccount("charlie"_a));
       auto invited = t.from(InviteSys::payerAccount);
-      t.setAuthEc(bob, userPub);
-      t.setAuthEc(charlie, userPub);
+      t.setAuthK1(bob, userPub);
+      t.setAuthK1(charlie, userPub);
 
       WHEN("Alice creates an invite")
       {
