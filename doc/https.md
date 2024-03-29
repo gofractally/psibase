@@ -30,7 +30,7 @@ If you're using the `psibase-contributor` dev container, the `/root/psibase/` is
 p2p                 = off
 producer            = firstproducer
 host                = psibase.127.0.0.1.sslip.io
-service             = localhost:$PREFIX/share/psibase/services/admin-sys
+service             = localhost:$PREFIX/share/psibase/services/x-admin
 admin               = static:*
 database-size       = 8GiB
 database-cache-size = 256MiB

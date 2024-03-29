@@ -298,10 +298,10 @@ class API:
             return edges[0]['node']['header']
 
 _default_config = '''# psinode config
-service  = localhost:$PSIBASE_DATADIR/services/admin-sys
-service  = 127.0.0.1:$PSIBASE_DATADIR/services/admin-sys
-service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
-service  = admin-sys.:$PSIBASE_DATADIR/services/admin-sys
+service  = localhost:$PSIBASE_DATADIR/services/x-admin
+service  = 127.0.0.1:$PSIBASE_DATADIR/services/x-admin
+service  = [::1]:$PSIBASE_DATADIR/services/x-admin
+service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
 admin    = static:*
 
 admin-authz = r:any
@@ -392,7 +392,7 @@ class Node(API):
             self.tempdir.cleanup()
     def shutdown(self):
         '''Stop the server and wait for the server process to exit'''
-        with self.post('/native/admin/shutdown', service='admin-sys', json={}):
+        with self.post('/native/admin/shutdown', service='x-admin', json={}):
             pass
         self.session.close()
         self.child.wait()
@@ -413,16 +413,16 @@ class Node(API):
             url = other.socketpath
         else:
             url = other
-        with self.post('/native/admin/connect', service='admin-sys', json={'url':url}):
+        with self.post('/native/admin/connect', service='x-admin', json={'url':url}):
             pass
     def disconnect(self, other):
         '''Disconnects a peer. other can be a peer id, a URL, or a Node object.'''
         if isinstance(other, int):
-            result = self.post('/native/admin/disconnect', service='admin-sys', json={'id': other})
+            result = self.post('/native/admin/disconnect', service='x-admin', json={'id': other})
             result.raise_for_status()
             return True
         elif isinstance(other, str):
-            with self.get('/native/admin/peers', service='admin-sys') as peers:
+            with self.get('/native/admin/peers', service='x-admin') as peers:
                 peers.raise_for_status()
                 for peer in peers.json():
                     if peer['url'] == other:
@@ -473,7 +473,7 @@ class Node(API):
             time.sleep(0.1)
     def _is_ready(self):
         try:
-            with self.get('/native/admin/status', service='admin-sys') as result:
+            with self.get('/native/admin/status', service='x-admin') as result:
                 return result.status_code == requests.codes.ok and 'startup' not in result.json()
         except requests.exceptions.ConnectionError as e:
             return False

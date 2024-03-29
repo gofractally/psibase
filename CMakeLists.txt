@@ -220,7 +220,7 @@ set(JS_DIRS
     services/user/SupervisorSys/ui:SupervisorSys_js
     services/user/ExploreSys/ui:ExploreSys_js
 )
-set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
+set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
 set(COMMON_LOADER_DIR services/user/CommonSys/common/packages/wasm-loader/:CommonSysLoaderLib_js)
 
@@ -293,17 +293,17 @@ add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm ${plugi
 add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invite_sys.wasm ${plugin-wit} ${AuthPlugin_DEP})
 
 set(WASM_PSIBASE_BYPRODUCTS
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.wasm.d.ts
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.d.ts
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase.js
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.wasm
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.wasm.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.d.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.js
 )
 add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS})
 add_custom_command(
     OUTPUT ${WASM_PSIBASE_BYPRODUCTS}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
-    COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase --out-name wasm-psibase
+    COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase --out-name wasm-psibase
 )
 add_custom_target(wasm-psibase ALL DEPENDS ${WASM_PSIBASE_BYPRODUCTS})
 add_dependencies(wasm-psibase rust)
@@ -312,26 +312,26 @@ function(psinode_files target pfx)
     add_custom_target(
     ${target}
     ALL
-    DEPENDS AdminSys_js
-    COMMAND rm -rf ${pfx}/share/psibase/services/admin-sys
+    DEPENDS XAdmin_js
+    COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist ${pfx}/share/psibase/services/admin-sys
-    COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/admin-sys/common/
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
+    COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
-    COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/admin-sys/packages
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/x-admin/packages
     )
 endfunction()
 
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(AdminSys_js wasm-psibase CommonSysCommonLib_js)
+add_dependencies(XAdmin_js wasm-psibase CommonSysCommonLib_js)
 
 include(GNUInstallDirs)
-install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
-install(DIRECTORY services/user/CommonSys/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
-install(FILES services/user/CommonSys/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/admin-sys/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
+install(DIRECTORY services/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
+install(DIRECTORY services/user/CommonSys/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
+install(FILES services/user/CommonSys/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
 
 # Build service packages
 include(libraries/psibase/sdk/pack_service.cmake)

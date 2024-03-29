@@ -79,7 +79,7 @@
 
 - [Default apps](default-apps/README.md)
   - [accounts](default-apps/accounts.md)
-  - [admin-sys](default-apps/admin-sys.md)
+  - [x-admin](default-apps/x-admin.md)
   - [auth-k1](default-apps/auth-k1.md)
   - [auth-sig](default-apps/auth-sig.md)
   - [common-sys](default-apps/common-sys.md)

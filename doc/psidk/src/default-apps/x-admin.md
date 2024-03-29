@@ -1,4 +1,4 @@
-# admin-sys
+# x-admin
 
 The adminstrator service is hosted on localhost by default as a [Builtin Service](#builtin-services). It provides tools for monitoring and controlling the server.
 
@@ -56,7 +56,7 @@ Psinode monitoring is powered by metrics collected and fed into Prometheus. Then
 
 The easiest way to run these services is to use docker containers, since we prepared a docker-compose file with all the needed services.
 
-**All the following instructions are assuming you are working with the files under the Psibase repo, in the `/services/user/AdminSys/monitors` directory.**
+**All the following instructions are assuming you are working with the files under the Psibase repo, in the `/services/user/XAdmin/monitors` directory.**
 
 ### Running with docker
 
@@ -74,13 +74,13 @@ Then, simply run:
 docker-compose up
 ```
 
-Open `http://localhost:8080` and you will be able to see the Admin-Sys panel with the embedded dashboards.
+Open `http://localhost:8080` and you will be able to see the XAdmin panel with the embedded dashboards.
 
 ### Proxying Grafana
 
-If you are accessing the admin-sys ui locally, eg. from http://localhost:8080 you can skip this part.
+If you are accessing the x-admin ui locally, eg. from http://localhost:8080 you can skip this part.
 
-Most cases you will end up putting the access to the admin-sys behind a reverse proxy with at least the minimum HTTP basic-auth or perhaps restricting IPs. In any case, this reverse proxy needs to add a rule for accessing the Grafana dashboards on `/grafana` location. Here's an example:
+Most cases you will end up putting the access to the x-admin behind a reverse proxy with at least the minimum HTTP basic-auth or perhaps restricting IPs. In any case, this reverse proxy needs to add a rule for accessing the Grafana dashboards on `/grafana` location. Here's an example:
 
 ```conf
 map $http_upgrade $connection_upgrade {

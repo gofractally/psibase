@@ -130,7 +130,7 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 ### Common files
 
 `common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). 
-Booting the network with either the psibase CLI tool or with the admin-sys app will automatically install this default set of files:
+Booting the network with either the psibase CLI tool or with the x-admin app will automatically install this default set of files:
 
 | Path                          | Description                                                                                                                                                                                                           |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
