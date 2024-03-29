@@ -166,8 +166,8 @@ function(add suffix)
             ../../services/system/AuthAny/include
             ../../services/system/CpuLimit/include
             ../../services/system/HttpServer/include
-            ../../services/system/SetCodeSys/include
-            ../../services/system/TransactionSys/include
+            ../../services/system/SetCode/include
+            ../../services/system/Transact/include
             ../../services/system/VerifyEcSys/include
             ../../services/user/CommonSys/include
             ../../services/user/ExploreSys/include

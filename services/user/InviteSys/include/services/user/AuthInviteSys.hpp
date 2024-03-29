@@ -1,7 +1,7 @@
 #pragma once
 
 #include <psibase/psibase.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 #include <services/user/InviteErrors.hpp>
 
 namespace UserService

@@ -2,7 +2,7 @@
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthK1.hpp>
 #include <services/system/HttpServer.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/AuthInviteSys.hpp>
 #include <services/user/InviteSys.hpp>
@@ -86,7 +86,7 @@ void InviteSys::createInvite(PublicKey inviteKey)
    InviteRecord newInvite{
        .pubkey          = inviteKey,
        .inviter         = inviter,
-       .expiry          = to<TransactionSys>().currentBlock().time.seconds + secondsInWeek,
+       .expiry          = to<Transact>().currentBlock().time.seconds + secondsInWeek,
        .newAccountToken = true,
        .state           = InviteStates::pending,
    };
@@ -117,7 +117,7 @@ void InviteSys::accept(PublicKey inviteKey)
          "Call 'accept' with the accepting account as the sender.");
    check(invite->state != InviteStates::rejected, "This invite was already rejected");
 
-   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time.seconds;
    check(invite->expiry > now, inviteExpired.data());
 
    invite->actor = acceptedBy;
@@ -145,7 +145,7 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
 
    to<AuthInviteSys>().requireAuth(inviteKey);
 
-   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time.seconds;
    check(invite->expiry > now, inviteExpired.data());
 
    check(invite->state != InviteStates::rejected, alreadyRejected.data());
@@ -165,13 +165,13 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
                                 .service = AuthK1::service,
                                 .method  = "setKey"_m,
                                 .rawData = psio::convert_to_frac(params)};
-   to<TransactionSys>().runAs(move(setKey), vector<ServiceMethod>{});
+   to<Transact>().runAs(move(setKey), vector<ServiceMethod>{});
    std::tuple<AccountNumber> params2{AuthK1::service};
    Action                    setAuth{.sender  = acceptedBy,
                                      .service = Accounts::service,
                                      .method  = "setAuthServ"_m,
                                      .rawData = psio::convert_to_frac(params2)};
-   to<TransactionSys>().runAs(move(setAuth), vector<ServiceMethod>{});
+   to<Transact>().runAs(move(setAuth), vector<ServiceMethod>{});
 
    invite->state = InviteStates::accepted;
    invite->actor = acceptedBy;
@@ -205,7 +205,7 @@ void InviteSys::reject(PublicKey inviteKey)
    check(invite->state != InviteStates::accepted, alreadyAccepted.data());
    check(invite->state != InviteStates::rejected, alreadyRejected.data());
 
-   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time.seconds;
    check(invite->expiry > now, inviteExpired.data());
 
    auto sender = getSender();
@@ -254,7 +254,7 @@ void InviteSys::delInvite(PublicKey inviteKey)
 
 void InviteSys::delExpired(uint32_t maxDeleted)
 {
-   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time.seconds;
 
    auto table = Tables().open<InviteTable>();
 
@@ -390,7 +390,7 @@ bool InviteSys::isExpired(PublicKey pubkey)
    auto invite      = inviteTable.get(pubkey);
    check(invite.has_value(), inviteDNE.data());
 
-   auto now = to<TransactionSys>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time.seconds;
    return now >= invite->expiry;
 }
 

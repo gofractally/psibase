@@ -16,8 +16,8 @@ function(add suffix)
         CpuLimit/include
         Producer/include
         HttpServer/include
-        SetCodeSys/include
-        TransactionSys/include
+        SetCode/include
+        Transact/include
         VerifyEcSys/include
         VerifySys/include
     )
@@ -35,8 +35,8 @@ if(DEFINED IS_WASM)
     add_subdirectory(CpuLimit)
     add_subdirectory(Producer)
     add_subdirectory(HttpServer)
-    add_subdirectory(SetCodeSys)
-    add_subdirectory(TransactionSys)
+    add_subdirectory(SetCode)
+    add_subdirectory(Transact)
     add_subdirectory(VerifyEcSys)
     add_subdirectory(VerifySys)
 endif()

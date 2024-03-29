@@ -15,5 +15,5 @@ pub mod nft_sys;
 pub mod package_sys;
 pub mod producer;
 pub mod psispace_sys;
-pub mod setcode_sys;
-pub mod transaction_sys;
+pub mod setcode;
+pub mod transact;

@@ -1,14 +1,14 @@
 #include <psibase/dispatch.hpp>
-#include <services/system/SetCodeSys.hpp>
+#include <services/system/SetCode.hpp>
 
 using namespace psibase;
 
 namespace SystemService
 {
-   void SetCodeSys::setCode(AccountNumber     service,
-                            uint8_t           vmType,
-                            uint8_t           vmVersion,
-                            std::vector<char> code)
+   void SetCode::setCode(AccountNumber     service,
+                         uint8_t           vmType,
+                         uint8_t           vmVersion,
+                         std::vector<char> code)
    {
       // TODO: validate code here?
       // TODO: special rule for resource charging: pretend CodeByHashRow isn't shared
@@ -69,7 +69,7 @@ namespace SystemService
       }
    }  // setCode
 
-   void SetCodeSys::setFlags(psibase::AccountNumber service, uint64_t flags)
+   void SetCode::setFlags(psibase::AccountNumber service, uint64_t flags)
    {
       check(getSender() == getReceiver(), "incorrect sender");
       auto account = kvGet<CodeRow>(CodeRow::db, codeKey(service));
@@ -87,4 +87,4 @@ namespace SystemService
 
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::SetCodeSys)
+PSIBASE_DISPATCH(SystemService::SetCode)

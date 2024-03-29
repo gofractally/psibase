@@ -2,7 +2,7 @@
 
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
 
 #include "services/user/RTokenSys.hpp"
@@ -14,7 +14,7 @@ using namespace psibase;
 using psio::view;
 using SystemService::Accounts;
 using SystemService::ServiceMethod;
-using SystemService::TransactionSys;
+using SystemService::Transact;
 using TokenHolderConfig = typename TokenHolderRecord::Configurations;
 
 // For helpers
@@ -238,7 +238,7 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, view
    }
    else
    {
-      auto time            = to<TransactionSys>().currentBlock().time;
+      auto time            = to<Transact>().currentBlock().time;
       auto receiverBalance = getBalance(tokenId, receiver);
       receiverBalance.balance += amount.value;
       Tables().open<BalanceTable>().put(receiverBalance);
@@ -287,7 +287,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, view<co
    auto receiver        = getSender();  //The action sender is the token receiver
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
    auto receiverBalance = getBalance(tokenId, receiver);
-   auto time            = to<TransactionSys>().currentBlock().time;
+   auto time            = to<Transact>().currentBlock().time;
 
    check(amount.value > 0, quantityGt0);
    check(sharedBalance.balance >= amount.value, insufficientBalance);
@@ -322,7 +322,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, view<con
    auto token           = getToken(tokenId);
    auto fromBalance     = getBalance(tokenId, from);
    auto unrecallableBit = TokenRecord::Configurations::value(tokenConfig::unrecallable);
-   auto time            = to<TransactionSys>().currentBlock().time;
+   auto time            = to<Transact>().currentBlock().time;
 
    check(isSenderIssuer(tokenId), missingRequiredAuth);
    check(not token.config.get(unrecallableBit), tokenUnrecallable);

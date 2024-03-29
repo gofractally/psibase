@@ -29,10 +29,10 @@ pub struct ServiceMethod {
 
 /// Authenticate actions
 ///
-/// [transaction_sys](crate::services::transaction_sys::Actions)
+/// [transact](crate::services::transact::Actions)
 /// calls into auth services using `auth_interface` to authenticate
 /// senders of top-level actions and uses of
-/// [runAs](crate::services::transaction_sys::Actions::runAs).
+/// [runAs](crate::services::transact::Actions::runAs).
 /// Any service may become an auth service by implementing
 /// `auth_interface`. Any account may select any service to be
 /// its authenticator. Be careful; this allows that service to
@@ -42,7 +42,7 @@ pub struct ServiceMethod {
 /// for a canonical example of implementing `auth_interface`.
 ///
 /// This interface can't authenticate non-top-level actions other
-/// than [runAs](crate::services::transaction_sys::Actions::runAs)
+/// than [runAs](crate::services::transact::Actions::runAs)
 /// actions. Most services shouldn't call or implement
 /// `auth_interface`; use `get_sender()` TODO: link.
 ///
@@ -136,7 +136,7 @@ pub mod auth_interface {
         flags: u32,
         requester: crate::AccountNumber,
         action: crate::Action,
-        allowedActions: Vec<crate::services::transaction_sys::ServiceMethod>,
+        allowedActions: Vec<crate::services::transact::ServiceMethod>,
         claims: Vec<crate::Claim>,
     ) {
         unimplemented!()
@@ -160,15 +160,15 @@ pub mod auth_interface {
 /// This privileged service dispatches top-level actions to other
 /// services, checks TAPoS, detects duplicate transactions, and
 /// checks authorizations using
-/// [auth_interface](crate::services::transaction_sys::auth_interface).
+/// [auth_interface](crate::services::transact::auth_interface).
 ///
 /// Other services use it to get information about the chain,
 /// current block, and head block. They also use it to call actions
 /// using other accounts' authorities via
-/// [runAs](crate::services::transaction_sys::Actions::runAs).
+/// [runAs](crate::services::transact::Actions::runAs).
 // TODO: tables
 // TODO: service flags
-#[crate::service(name = "transact-sys", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "transact", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::Hex;
@@ -184,10 +184,10 @@ mod service {
 
     /// Only called once during chain initialization
     ///
-    /// This enables the auth checking system. Before this point, `transaction_sys`
+    /// This enables the auth checking system. Before this point, `transact`
     /// allows all transactions to execute without auth checks. After this point,
-    /// `transaction_sys` uses
-    /// [checkAuthSys](crate::services::transaction_sys::AuthActions::checkAuthSys)
+    /// `transact` uses
+    /// [checkAuthSys](crate::services::transact::AuthActions::checkAuthSys)
     /// to authenticate top-level actions and uses of [runAs](Self::runAs).
     #[action]
     fn finishBoot() {
@@ -214,23 +214,23 @@ mod service {
     /// * `get_sender() == action.sender's authService`
     /// * `get_sender() == action.sender`. Requires `action.sender's authService`
     ///   to approve with flag
-    ///   [RUN_AS_REQUESTER_REQ](crate::services::transaction_sys::auth_interface::RUN_AS_REQUESTER_REQ)
+    ///   [RUN_AS_REQUESTER_REQ](crate::services::transact::auth_interface::RUN_AS_REQUESTER_REQ)
     ///   (normally succeeds).
     /// * An existing `runAs` is currently on the call stack, `get_sender()` matches
     ///   `action.service` on that earlier call, and `action` matches
     ///   `allowedActions` from that same earlier call. Requires `action.sender's
     ///   authService` to approve with flag
-    ///   [RUN_AS_MATCHED_REQ](crate::services::transaction_sys::auth_interface::RUN_AS_MATCHED_REQ)
+    ///   [RUN_AS_MATCHED_REQ](crate::services::transact::auth_interface::RUN_AS_MATCHED_REQ)
     ///   if `allowedActions` is empty (normally succeeds), or
-    ///   [RUN_AS_MATCHED_EXPANDED_REQ](crate::services::transaction_sys::auth_interface::RUN_AS_MATCHED_EXPANDED_REQ)
+    ///   [RUN_AS_MATCHED_EXPANDED_REQ](crate::services::transact::auth_interface::RUN_AS_MATCHED_EXPANDED_REQ)
     ///   if not empty (normally fails).
     /// * All other cases, requires `action.sender's authService`
-    ///   to approve with flag [RUN_AS_OTHER_REQ](crate::services::transaction_sys::auth_interface::RUN_AS_OTHER_REQ)
+    ///   to approve with flag [RUN_AS_OTHER_REQ](crate::services::transact::auth_interface::RUN_AS_OTHER_REQ)
     ///   (normally fails).
     #[action]
     fn runAs(
         action: crate::Action,
-        allowedActions: Vec<crate::services::transaction_sys::ServiceMethod>,
+        allowedActions: Vec<crate::services::transact::ServiceMethod>,
     ) -> Hex<Vec<u8>> {
         unimplemented!()
     }
@@ -266,4 +266,4 @@ mod service {
     }
 }
 
-// TODO: inline functions in TransactionSys.hpp
+// TODO: inline functions in Transact.hpp

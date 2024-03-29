@@ -7,7 +7,7 @@
 #include <services/system/AuthAny.hpp>
 #include <services/system/CpuLimit.hpp>
 #include <services/system/Producer.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 #include <services/system/VerifyEcSys.hpp>
 
 #include <algorithm>
@@ -77,9 +77,9 @@ std::vector<psibase::AccountNumber> makeAccounts(
 void boot(BlockContext* ctx, const Consensus& producers, bool ec)
 {
    std::vector<GenesisService> services = {{
-                                               .service = TransactionSys::service,
-                                               .flags   = TransactionSys::serviceFlags,
-                                               .code    = readWholeFile("TransactionSys.wasm"),
+                                               .service = Transact::service,
+                                               .flags   = Transact::serviceFlags,
+                                               .code    = readWholeFile("Transact.wasm"),
                                            },
                                            {
                                                .service = CpuLimit::service,
@@ -109,7 +109,7 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
           .code    = readWholeFile("VerifyEcSys.wasm"),
       });
    }
-   // TransactionSys + Producer + AuthAny + Accounts
+   // Transact + Producer + AuthAny + Accounts
    pushTransaction(ctx,
                    Transaction{                                                         //
                                .actions = {                                             //
@@ -124,8 +124,8 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
        Transaction{
            .tapos   = {.expiration = {ctx->current.header.time.seconds + 1}},
            .actions = {
-               Action{.sender  = TransactionSys::service,
-                      .service = TransactionSys::service,
+               Action{.sender  = Transact::service,
+                      .service = Transact::service,
                       .method  = MethodNumber{"startBoot"},
                       .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
                Action{.sender  = Accounts::service,
@@ -133,8 +133,8 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
                       .method  = MethodNumber{"init"},
                       .rawData = psio::to_frac(std::tuple())},
                transactor<Producer>(Producer::service, Producer::service).setConsensus(producers),
-               Action{.sender  = TransactionSys::service,
-                      .service = TransactionSys::service,
+               Action{.sender  = Transact::service,
+                      .service = Transact::service,
                       .method  = MethodNumber{"finishBoot"},
                       .rawData = psio::to_frac(std::tuple())}}});
 }

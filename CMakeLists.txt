@@ -125,10 +125,10 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
     )
@@ -341,12 +341,12 @@ set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 set(PSIBASE_VERSION "0.7.0")
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/TransactionSys.psi
-    NAME TransactionSys
+    OUTPUT ${SERVICE_DIR}/Transact.psi
+    NAME Transact
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All transactions enter the chain through this service"
-    SERVICE transact-sys
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm
+    SERVICE transact
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
     FLAGS allowSudo allowWriteNative
     DEPENDS wasm
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})"
@@ -534,12 +534,12 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/SetCodeSys.psi
-    NAME SetCodeSys
+    OUTPUT ${SERVICE_DIR}/SetCode.psi
+    NAME SetCode
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All compiled code is uploaded to the chain through this service"
-    SERVICE setcode-sys
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm
+    SERVICE setcode
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
     FLAGS allowWriteNative
     DEPENDS wasm
 )
@@ -666,7 +666,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonSys CpuLimit DocSys
                     ExploreSys FractalSys InviteSys NftSys PackageSys Producer HttpServer
-                    PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys
+                    PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
 
 psibase_package(
@@ -675,7 +675,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonSys PackageSys Producer HttpServer
-                    SetCodeSys TransactionSys
+                    SetCode Transact
 )
 
 function(write_package_index out)
@@ -694,7 +694,7 @@ endfunction()
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonSys CpuLimit Default
     DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys Producer HttpServer
-    PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys)
+    PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -717,12 +717,12 @@ install(
           ${SERVICE_DIR}/Producer.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/PsiSpaceSys.psi
-          ${SERVICE_DIR}/SetCodeSys.psi
+          ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/SupervisorSys.psi
           ${SERVICE_DIR}/SymbolSys.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/TokenSys.psi
-          ${SERVICE_DIR}/TransactionSys.psi
+          ${SERVICE_DIR}/Transact.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

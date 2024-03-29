@@ -12,8 +12,8 @@ function(add_user_service suffix name)
         ../../system/Accounts/include
         ../../system/AuthK1/include
         ../../system/AuthAny/include
-        ../../system/SetCodeSys/include
-        ../../system/TransactionSys/include
+        ../../system/SetCode/include
+        ../../system/Transact/include
         ../../system/VerifyEcSys/include
     )
     target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} psibase-service-simple-malloc${suffix})
@@ -35,8 +35,8 @@ function(add_user_test_impl suffix name)
       ../../../system/Accounts/include
       ../../../system/AuthK1/include
       ../../../system/AuthAny/include
-      ../../../system/SetCodeSys/include
-      ../../../system/TransactionSys/include
+      ../../../system/SetCode/include
+      ../../../system/Transact/include
       ../../../system/VerifyEcSys/include
      ${CMAKE_CURRENT_LIST_DIR})
     target_link_libraries(${TARGET} services_system${suffix} psitestlib${suffix})

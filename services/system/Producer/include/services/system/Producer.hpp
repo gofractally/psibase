@@ -2,7 +2,7 @@
 
 #include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 
 namespace SystemService
 {

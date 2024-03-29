@@ -2,7 +2,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/CpuLimit.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 
 #include <boost/container/flat_map.hpp>
 #include <psibase/crypto.hpp>
@@ -19,19 +19,19 @@ static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
 
 namespace SystemService
 {
-   void TransactionSys::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
+   void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
-      auto tables      = TransactionSys::Tables(TransactionSys::service);
-      auto statusTable = tables.open<TransactionSysStatusTable>();
+      auto tables      = Transact::Tables(Transact::service);
+      auto statusTable = tables.open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
       statusTable.put({.enforceAuth = false, .bootTransactions = bootTransactions});
    }
 
-   void TransactionSys::finishBoot()
+   void Transact::finishBoot()
    {
-      auto tables      = TransactionSys::Tables(TransactionSys::service);
-      auto statusTable = tables.open<TransactionSysStatusTable>();
+      auto tables      = Transact::Tables(Transact::service);
+      auto statusTable = tables.open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       auto status      = statusIdx.get(std::tuple{});
       if (!status)
@@ -61,16 +61,16 @@ namespace SystemService
 
    // CAUTION: startBlock() is critical to chain operations. If it fails, the chain stops.
    //          If the chain stops, it can only be fixed by forking out the misbehaving
-   //          transact-sys.wasm and replacing it with a working one. That procedure
+   //          transact.wasm and replacing it with a working one. That procedure
    //          isn't implemented yet, and will likely be painful once it is (if ever).
    //          If you're tempted to do anything application-specific in startBlock,
    //          or are considering adding new features to startBlock, then consider
    //          the risk of it halting the chain if a bug or exploit appears.
-   void TransactionSys::startBlock()
+   void Transact::startBlock()
    {
       check(getSender().value == 0, "Only native code may call startBlock");
 
-      Tables tables(TransactionSys::service);
+      Tables tables(Transact::service);
 
       // Add head block to BlockSummaryTable; processTransaction uses it to
       // verify TAPoS on transactions.
@@ -105,17 +105,17 @@ namespace SystemService
    };
    boost::container::flat_map<RunAsKey, uint32_t> runAsMap;
 
-   std::vector<char> TransactionSys::runAs(psibase::Action            action,
-                                           std::vector<ServiceMethod> allowedActions)
+   std::vector<char> Transact::runAs(psibase::Action            action,
+                                     std::vector<ServiceMethod> allowedActions)
    {
       auto requester = getSender();
 
-      auto tables               = TransactionSys::Tables(TransactionSys::service);
-      auto statusTable          = tables.open<TransactionSysStatusTable>();
-      auto statusIdx            = statusTable.getIndex<0>();
-      auto transactionSysStatus = statusIdx.get(std::tuple{});
+      auto tables         = Transact::Tables(Transact::service);
+      auto statusTable    = tables.open<TransactStatusTable>();
+      auto statusIdx      = statusTable.getIndex<0>();
+      auto transactStatus = statusIdx.get(std::tuple{});
 
-      if (transactionSysStatus && transactionSysStatus->enforceAuth)
+      if (transactStatus && transactStatus->enforceAuth)
       {
          auto accountsTables = Accounts::Tables(Accounts::service);
          auto accountTable   = accountsTables.open<AccountTable>();
@@ -151,7 +151,7 @@ namespace SystemService
                   flags = AuthInterface::runAsOtherReq;
             }
 
-            Actor<AuthInterface> auth(TransactionSys::service, account->authService);
+            Actor<AuthInterface> auth(Transact::service, account->authService);
             auth.checkAuthSys(flags, requester, action.sender,
                               ServiceMethod{action.service, action.method}, allowedActions,
                               std::vector<Claim>{});
@@ -167,27 +167,27 @@ namespace SystemService
          --runAsMap[{action.sender, action.service, a.service, a.method}];
 
       return result;
-   }  // TransactionSys::runAs
+   }  // Transact::runAs
 
    static Transaction trx;
-   Transaction        TransactionSys::getTransaction() const
+   Transaction        Transact::getTransaction() const
    {
       return trx;
    }
 
-   psibase::BlockHeader TransactionSys::currentBlock() const
+   psibase::BlockHeader Transact::currentBlock() const
    {
       return getStatus().current;
    }
 
-   psibase::BlockHeader TransactionSys::headBlock() const
+   psibase::BlockHeader Transact::headBlock() const
    {
       auto& stat = getStatus();
       check(stat.head.has_value(), "head does not exist yet");
       return stat.head->header;
    }
 
-   psibase::TimePointSec TransactionSys::headBlockTime() const
+   psibase::TimePointSec Transact::headBlockTime() const
    {
       auto& stat = getStatus();
       if (stat.head)
@@ -195,7 +195,7 @@ namespace SystemService
       return {};
    }
 
-   // Native code calls this on the transaction-sys account
+   // Native code calls this on the Transact account
    //
    // All transactions pass through this function, so it's critical
    // for chain operations. A bug here can stop any new transactions
@@ -233,8 +233,8 @@ namespace SystemService
       check(trx.tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
             "transaction was submitted too early");
 
-      auto tables        = TransactionSys::Tables(TransactionSys::service);
-      auto statusTable   = tables.open<TransactionSysStatusTable>();
+      auto tables        = Transact::Tables(Transact::service);
+      auto statusTable   = tables.open<TransactStatusTable>();
       auto statusIdx     = statusTable.getIndex<0>();
       auto includedTable = tables.open<IncludedTrxTable>();
       auto includedIdx   = includedTable.getIndex<0>();
@@ -245,7 +245,7 @@ namespace SystemService
       if (!args.checkFirstAuthAndExit)
          includedTable.put({trx.tapos.expiration, id});
 
-      auto transactionSysStatus = statusIdx.get(std::tuple{});
+      auto transactStatus = statusIdx.get(std::tuple{});
 
       std::optional<BlockSummary> summary;
       if (args.checkFirstAuthAndExit)
@@ -253,9 +253,9 @@ namespace SystemService
       else
          summary = summaryIdx.get(std::tuple<>{});
 
-      if (transactionSysStatus && transactionSysStatus->bootTransactions)
+      if (transactStatus && transactStatus->bootTransactions)
       {
-         auto& bootTransactions = *transactionSysStatus->bootTransactions;
+         auto& bootTransactions = *transactStatus->bootTransactions;
          check(!bootTransactions.empty(),
                "fatal error: All boot transactions have been pushed, but finishBoot was not run.");
          check(!trx.tapos.refBlockIndex && !trx.tapos.refBlockSuffix,
@@ -266,7 +266,7 @@ namespace SystemService
                   "Wrong transaction during boot " + psio::convert_to_json(id) +
                       " != " + psio::convert_to_json(bootTransactions.front()));
             bootTransactions.erase(bootTransactions.begin());
-            statusTable.put(*transactionSysStatus);
+            statusTable.put(*transactStatus);
          }
          else
          {
@@ -296,8 +296,8 @@ namespace SystemService
                "transaction references non-existing block");
       }
 
-      Actor<CpuLimit> cpuLimit(TransactionSys::service, CpuLimit::service);
-      Actor<Accounts> accounts(TransactionSys::service, Accounts::service);
+      Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service);
+      Actor<Accounts> accounts(Transact::service, Accounts::service);
 
       auto accountsTables = Accounts::Tables(Accounts::service);
       auto accountTable   = accountsTables.open<AccountTable>();
@@ -305,7 +305,7 @@ namespace SystemService
 
       for (auto& act : trx.actions)
       {
-         if (transactionSysStatus && transactionSysStatus->enforceAuth)
+         if (transactStatus && transactStatus->enforceAuth)
          {
             auto account = accountIndex.get(act.sender);
             if (!account)
@@ -314,7 +314,7 @@ namespace SystemService
             if constexpr (enable_print)
                std::printf("call checkAuthSys on %s for sender account %s\n",
                            account->authService.str().c_str(), act.sender.str().c_str());
-            Actor<AuthInterface> auth(TransactionSys::service, account->authService);
+            Actor<AuthInterface> auth(Transact::service, account->authService);
             uint32_t             flags = AuthInterface::topActionReq;
             if (&act == &trx.actions[0])
             {
@@ -336,7 +336,7 @@ namespace SystemService
       }
 
       check(!trx.actions.empty(), "transaction must have at least one action");
-      if (transactionSysStatus && transactionSysStatus->enforceAuth)
+      if (transactStatus && transactStatus->enforceAuth)
       {
          std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
          accounts.billCpu(trx.actions[0].sender, cpuUsage);
@@ -345,4 +345,4 @@ namespace SystemService
 
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::TransactionSys)
+PSIBASE_DISPATCH(SystemService::Transact)

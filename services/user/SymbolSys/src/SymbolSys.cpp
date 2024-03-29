@@ -2,7 +2,7 @@
 
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
 
 #include <psibase/serveSimpleUI.hpp>
@@ -129,7 +129,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
 
    // Update symbol type statistics
    symType.createCounter++;
-   symType.lastPriceUpdateTime = to<TransactionSys>().headBlockTime();
+   symType.lastPriceUpdateTime = to<Transact>().headBlockTime();
 
    newSym.eventHead = emit().history().symCreated(0, newSymbol, sender, cost);
 
@@ -248,7 +248,7 @@ void SymbolSys::updatePrices()
    auto dec                = static_cast<uint64_t>((uint8_t)100 - priceAdjustmentRec.decreasePct);
    auto inc                = static_cast<uint64_t>((uint8_t)100 + priceAdjustmentRec.increasePct);
 
-   auto lastBlockTime = to<TransactionSys>().headBlockTime();
+   auto lastBlockTime = to<Transact>().headBlockTime();
    for (auto symbolType : symLengthIndex)
    {
       bool priceChanged = false;
@@ -279,7 +279,7 @@ void SymbolSys::updatePrices()
 
       if (priceChanged)
       {
-         auto blockNum        = to<TransactionSys>().currentBlock().blockNum;
+         auto blockNum        = to<Transact>().currentBlock().blockNum;
          symbolType.eventHead = emit().history().newCreatePrice(
              symbolType.eventHead, symbolType.symbolLength, blockNum, symbolType.activePrice);
       }

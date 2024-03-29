@@ -9,7 +9,7 @@ Alternatively, the `POST /native/push_boot` endpoint can be used manually in con
 
 The body of the `POST /native/push_boot` request contains a list of transactions that will each be executed in order in the first block. The first transaction is a special transaction known as the genesis transaction. The genesis transaction uploads the core services to the blockchain and it is not permitted to do anything else.
 
-A typical boot sequence contains more configuration than is able to fit in a single block. To understand how such a boot sequence is accomplished, see the description of [SystemService::TransactionSys::startBoot].
+A typical boot sequence contains more configuration than is able to fit in a single block. To understand how such a boot sequence is accomplished, see the description of [SystemService::Transact::startBoot].
 
 ## Peering with others
 

@@ -153,10 +153,10 @@ namespace psibase
       TransactionContext tc{*this, trx, trace, true, true, false};
       auto&              atrace = trace.actionTraces.emplace_back();
 
-      // Failure here aborts the block since transaction-sys relies on startBlock
+      // Failure here aborts the block since Transact relies on startBlock
       // functioning correctly. Fixing this type of failure requires forking
       // the chain, just like fixing bugs which block transactions within
-      // transaction-sys's processTransaction may require forking the chain.
+      // Transact's processTransaction may require forking the chain.
       //
       // TODO: log failure
       tc.execNonTrxAction(0, action, atrace);

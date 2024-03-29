@@ -4,7 +4,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <services/system/AuthAny.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 
 static constexpr bool enable_print = false;
 

@@ -17,9 +17,9 @@ namespace SystemService
 
    /// Authenticate actions
    ///
-   /// [TransactionSys] calls into auth services using this interface
+   /// [Transact] calls into auth services using this interface
    /// to authenticate senders of top-level actions and uses of
-   /// [TransactionSys::runAs]. Any service may become an auth
+   /// [Transact::runAs]. Any service may become an auth
    /// service by implementing `AuthInterface`. Any account may
    /// select any service to be its authenticator. Be careful;
    /// this allows that service to act on the account's behalf and
@@ -29,7 +29,7 @@ namespace SystemService
    /// implementing this interface.
    ///
    /// This interface can't authenticate non-top-level actions other
-   /// than [TransactionSys::runAs] actions. Most services shouldn't
+   /// than [Transact::runAs] actions. Most services shouldn't
    /// call or implement `AuthInterface`; use `getSender()`.
    ///
    /// Auth services shouldn't inherit from this struct. Instead,
@@ -144,7 +144,7 @@ namespace SystemService
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user))
 
-   struct TransactionSysStatus
+   struct TransactStatus
    {
       bool enforceAuth = true;
 
@@ -152,9 +152,8 @@ namespace SystemService
 
       std::tuple<> key() const { return {}; }
    };
-   PSIO_REFLECT(TransactionSysStatus, enforceAuth, bootTransactions)
-   using TransactionSysStatusTable =
-       psibase::Table<TransactionSysStatus, &TransactionSysStatus::key>;
+   PSIO_REFLECT(TransactStatus, enforceAuth, bootTransactions)
+   using TransactStatusTable = psibase::Table<TransactStatus, &TransactStatus::key>;
 
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
@@ -186,17 +185,17 @@ namespace SystemService
    /// Other services use it to get information about the chain,
    /// current block, and head block. They also use it to call actions
    /// using other accounts' authorities via [runAs].
-   struct TransactionSys : psibase::Service<TransactionSys>
+   struct Transact : psibase::Service<Transact>
    {
-      /// "transact-sys"
-      static constexpr auto service = psibase::AccountNumber("transact-sys");
+      /// "transact"
+      static constexpr auto service = psibase::AccountNumber("transact");
 
       /// Flags this service must run with
       static constexpr uint64_t serviceFlags =
           psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
 
       using Tables =
-          psibase::ServiceTables<TransactionSysStatusTable, BlockSummaryTable, IncludedTrxTable>;
+          psibase::ServiceTables<TransactStatusTable, BlockSummaryTable, IncludedTrxTable>;
 
       /// This action enables the boot procedure to be split across multiple blocks
       ///
@@ -210,9 +209,9 @@ namespace SystemService
 
       /// Only called once during chain initialization
       ///
-      /// This enables the auth checking system. Before this point, `TransactionSys`
+      /// This enables the auth checking system. Before this point, `Transact`
       /// allows all transactions to execute without auth checks. After this point,
-      /// `TransactionSys` uses [AuthInterface::checkAuthSys] to authenticate
+      /// `Transact` uses [AuthInterface::checkAuthSys] to authenticate
       /// top-level actions and uses of [runAs].
       void finishBoot();
 
@@ -262,7 +261,7 @@ namespace SystemService
       /// TODO: remove
       psibase::TimePointSec headBlockTime() const;
    };
-   PSIO_REFLECT(TransactionSys,
+   PSIO_REFLECT(Transact,
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
@@ -314,17 +313,17 @@ namespace SystemService
          return *summary;
 #endif
 
-      auto table = TransactionSys::Tables(TransactionSys::service).open<BlockSummaryTable>();
+      auto table = Transact::Tables(Transact::service).open<BlockSummaryTable>();
       auto idx   = table.getIndex<0>();
       summary    = idx.get(std::tuple<>{});
       if (!summary)
          summary.emplace();
 
       // If we've reached here, and
-      // * We're in TransactionSys::startBlock(): this update hasn't been done yet.
+      // * We're in Transact::startBlock(): this update hasn't been done yet.
       // * We're handling an RPC request: this update hasn't been done yet.
       //   RPC starts a temporary new block, but since it can't write,
-      //   RPC doesn't call TransactionSys::startBlock().
+      //   RPC doesn't call Transact::startBlock().
       // * We're in a test wasm: we don't know when a new block has been pushed, so
       //   always do this update.
       // * All other cases: this update has already been done, but is safe to repeat.

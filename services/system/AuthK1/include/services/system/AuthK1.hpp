@@ -3,7 +3,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/serveContent.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 
 namespace SystemService
 {
@@ -41,7 +41,7 @@ namespace SystemService
 
       /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
       ///
-      /// This action is automatically called by `transact-sys` when an account using this auth service submits a
+      /// This action is automatically called by `transact` when an account using this auth service submits a
       /// transaction.
       ///
       /// This action verifies that the transaction contains a claim for the user's public key.

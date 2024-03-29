@@ -1,4 +1,4 @@
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 #include <services/system/VerifyEcSys.hpp>
 #include <services/user/AuthInviteSys.hpp>
 #include <services/user/InviteSys.hpp>
@@ -58,7 +58,7 @@ namespace UserService
 
    void AuthInviteSys::requireAuth(const PublicKey& pubkey)
    {
-      auto claims = to<SystemService::TransactionSys>().getTransaction().claims;
+      auto claims = to<SystemService::Transact>().getTransaction().claims;
       bool found  = std::find_if(claims.begin(), claims.end(),
                                  [&](auto claim)
                                  {

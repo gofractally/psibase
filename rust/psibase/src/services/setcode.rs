@@ -1,5 +1,5 @@
 // TODO: service flags
-#[crate::service(name = "setcode-sys", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "setcode", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::Hex;

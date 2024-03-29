@@ -1,7 +1,7 @@
 #[crate::service(name = "auth-delegate", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{services::transaction_sys::ServiceMethod, AccountNumber, Action, Claim};
+    use crate::{services::transact::ServiceMethod, AccountNumber, Action, Claim};
 
     #[action]
     fn checkAuthSys(

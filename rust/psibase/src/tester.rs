@@ -255,8 +255,8 @@ impl Chain {
     /// Set code on an account. Also creates the account if needed.
     pub fn deploy_service(&self, account: AccountNumber, code: &[u8]) -> Result<(), anyhow::Error> {
         self.new_account(account)?;
-        // TODO: update setcode_sys::setCode to not need a vec. Needs changes to the service macro.
-        services::setcode_sys::Wrapper::push_from(self, account)
+        // TODO: update setcode::setCode to not need a vec. Needs changes to the service macro.
+        services::setcode::Wrapper::push_from(self, account)
             .setCode(account, 0, 0, code.to_vec().into())
             .get()
     }
@@ -290,8 +290,8 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
         if let Some(e) = &self.trace.error {
             return Err(anyhow!("{}", e));
         }
-        if let Some(transact_sys) = self.trace.action_traces.last() {
-            let ret = transact_sys
+        if let Some(transact) = self.trace.action_traces.last() {
+            let ret = transact
                 .inner_traces
                 .iter()
                 .filter_map(|inner| {

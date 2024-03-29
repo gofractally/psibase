@@ -7,15 +7,15 @@ namespace SystemService
 {
 
    /// All compiled code is uploaded to the chain through this service
-   struct SetCodeSys : psibase::Service<SetCodeSys>
+   struct SetCode : psibase::Service<SetCode>
    {
-      /// "setcode-sys"
-      static constexpr auto     service      = psibase::AccountNumber("setcode-sys");
+      /// "setcode"
+      static constexpr auto service = psibase::AccountNumber("setcode");
 
       /// Flags this service must run with
       static constexpr uint64_t serviceFlags = psibase::CodeRow::allowWriteNative;
 
-      /// This action is called in order to upload compiled service code to the chain 
+      /// This action is called in order to upload compiled service code to the chain
       ///
       /// Uploaded code is automatically uploaded to the account that calls the action.
       ///
@@ -31,7 +31,7 @@ namespace SystemService
       /// Sets the flags that a particular service must be run with
       void setFlags(psibase::AccountNumber service, uint64_t flags);
    };
-   PSIO_REFLECT(SetCodeSys,
+   PSIO_REFLECT(SetCode,
                 method(setCode, contact, vmType, vmVersion, code),
                 method(setFlags, service, flags))
 }  // namespace SystemService

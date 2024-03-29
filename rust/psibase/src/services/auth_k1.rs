@@ -3,9 +3,7 @@
 #[crate::service(name = "auth-k1", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{
-        services::transaction_sys::ServiceMethod, AccountNumber, Action, Claim, PublicKey,
-    };
+    use crate::{services::transact::ServiceMethod, AccountNumber, Action, Claim, PublicKey};
 
     #[action]
     fn checkAuthSys(

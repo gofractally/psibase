@@ -92,10 +92,10 @@
   - [producer]()
   - [http-server](default-apps/http-server.md)
   - [psispace-sys](default-apps/psispace-sys.md)
-  - [setcode-sys](default-apps/setcode-sys.md)
+  - [setcode](default-apps/setcode.md)
   - [symbol-sys]()
   - [token-sys]()
-  - [transact-sys](default-apps/transact-sys.md)
+  - [transact](default-apps/transact.md)
   - [verify-sys]()
 
 - [Contributing guide](contribute/README.md)

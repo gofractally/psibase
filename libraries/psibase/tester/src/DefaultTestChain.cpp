@@ -14,8 +14,8 @@
 #include <services/system/RAuthK1.hpp>
 #include <services/system/RHttpServer.hpp>
 #include <services/system/RProducer.hpp>
-#include <services/system/SetCodeSys.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/SetCode.hpp>
+#include <services/system/Transact.hpp>
 #include <services/system/VerifyEcSys.hpp>
 #include <services/user/AuthInviteSys.hpp>
 #include <services/user/CoreFractalSys.hpp>
@@ -76,10 +76,10 @@ namespace
    std::vector<Action> getInitialActions(std::span<PackagedService> service_packages,
                                          bool                       installUI)
    {
-      transactor<Accounts>       asys{Accounts::service, Accounts::service};
-      transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
-      std::vector<Action>        actions;
-      bool                       has_package_sys = false;
+      transactor<Accounts> asys{Accounts::service, Accounts::service};
+      transactor<Transact> tsys{Transact::service, Transact::service};
+      std::vector<Action>  actions;
+      bool                 has_package_sys = false;
       for (auto& s : service_packages)
       {
          for (auto account : s.accounts())
@@ -189,8 +189,7 @@ DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
    }
    auto trace = pushTransaction(
        makeTransaction(
-           {transactor<TransactionSys>{TransactionSys::service, TransactionSys::service}.startBoot(
-               transactionIds)}),
+           {transactor<Transact>{Transact::service, Transact::service}.startBoot(transactionIds)}),
        {});
    check(psibase::show(false, trace) == "", "Failed to boot");
    startBlock();
@@ -266,7 +265,7 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
 {
    addAccount(acc, AuthAny::service, show);
 
-   transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
+   transactor<SetCode> scsys{acc, SetCode::service};
 
    auto trace =
        pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
@@ -283,9 +282,8 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
 {
    addAccount(acc, AuthAny::service, show);
 
-   transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
-   auto                   setFlags =
-       transactor<SetCodeSys>{SetCodeSys::service, SetCodeSys::service}.setFlags(acc, flags);
+   transactor<SetCode> scsys{acc, SetCode::service};
+   auto setFlags = transactor<SetCode>{SetCode::service, SetCode::service}.setFlags(acc, flags);
 
    auto trace = pushTransaction(
        makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename)), setFlags}}));

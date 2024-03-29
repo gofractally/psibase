@@ -6,7 +6,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/block.hpp>
 #include <psio/reflect.hpp>
-#include <services/system/TransactionSys.hpp>
+#include <services/system/Transact.hpp>
 #include <vector>
 
 namespace SystemService
@@ -32,7 +32,7 @@ namespace SystemService
 
       /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
       ///
-      /// This action is automatically called by `transact-sys` when an account using this auth service submits a
+      /// This action is automatically called by `transact` when an account using this auth service submits a
       /// transaction.
       ///
       /// This action forwards verification to the owning account

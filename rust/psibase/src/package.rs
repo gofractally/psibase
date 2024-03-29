@@ -1,6 +1,4 @@
-use crate::services::{
-    accounts, auth_delegate, http_server, package_sys, psispace_sys, setcode_sys,
-};
+use crate::services::{accounts, auth_delegate, http_server, package_sys, psispace_sys, setcode};
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
@@ -405,7 +403,7 @@ impl<R: Read + Seek> PackagedService<R> {
             ));
             let flags = translate_flags(&info.flags)?;
             if flags != 0 {
-                group.push(setcode_sys::Wrapper::pack().setFlags(*account, flags));
+                group.push(setcode::Wrapper::pack().setFlags(*account, flags));
             }
             actions.push(group);
         }
@@ -522,7 +520,7 @@ impl PackageManifest {
                 out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
             }
             if !info.flags.is_empty() && other_info.map_or(true, |i| i.flags.is_empty()) {
-                out.push_action(setcode_sys::Wrapper::pack().setFlags(*service, 0))?;
+                out.push_action(setcode::Wrapper::pack().setFlags(*service, 0))?;
             }
             if other_info.is_none() {
                 out.push_action(set_code_action(*service, vec![]))?;
@@ -542,7 +540,7 @@ impl PackageManifest {
                 out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
             }
             if !info.flags.is_empty() {
-                out.push_action(setcode_sys::Wrapper::pack().setFlags(*service, 0))?;
+                out.push_action(setcode::Wrapper::pack().setFlags(*service, 0))?;
             }
             out.push_action(set_code_action(*service, vec![]))?;
         }

@@ -730,7 +730,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             // the transaction being rejected because it passes on one fork but not
             // another, potentially charging the user for the failed transaction. The
             // first auth check, when not part of the main execution, runs in read-only
-            // mode. TransactionSys lets the account's auth service know it's in a
+            // mode. Transact lets the account's auth service know it's in a
             // read-only mode so it doesn't fail the transaction trying to update its
             // tables.
             //

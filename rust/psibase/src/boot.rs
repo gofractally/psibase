@@ -1,4 +1,4 @@
-use crate::services::{accounts, auth_delegate, producer, transaction_sys};
+use crate::services::{accounts, auth_delegate, producer, transact};
 use crate::{
     method_raw, new_account_action, set_auth_service_action, validate_dependencies, AccountNumber,
     Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData, MethodNumber,
@@ -145,7 +145,7 @@ pub fn get_initial_actions<R: Read + Seek>(
         }
     }
 
-    actions.push(transaction_sys::Wrapper::pack().finishBoot());
+    actions.push(transact::Wrapper::pack().finishBoot());
 
     Ok(actions)
 }
@@ -202,7 +202,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     }
     boot_transactions.push(SignedTransaction {
         transaction: without_tapos(
-            vec![transaction_sys::Wrapper::pack().startBoot(transaction_ids)],
+            vec![transact::Wrapper::pack().startBoot(transaction_ids)],
             expiration,
         )
         .packed()
