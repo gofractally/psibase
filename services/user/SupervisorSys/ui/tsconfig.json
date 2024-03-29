@@ -14,9 +14,9 @@
     "noEmit": true,
 
     "paths": {
-      "@psibase/common-lib": ["../../CommonSys/common/packages/common-lib/src"],
+      "@psibase/common-lib": ["../../CommonApi/common/packages/common-lib/src"],
       "@psibase/common-lib/*": [
-        "../../CommonSys/common/packages/common-lib/src/*"
+        "../../CommonApi/common/packages/common-lib/src/*"
       ]
     },
 

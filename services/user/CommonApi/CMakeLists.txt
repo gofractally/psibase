@@ -1,5 +1,5 @@
 function(add suffix)
-    add_system_service("${suffix}" CommonSys src/CommonSys.cpp)
+    add_system_service("${suffix}" CommonApi src/CommonApi.cpp)
 endfunction(add)
 
 include(ExternalProject)

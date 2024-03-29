@@ -1,4 +1,4 @@
-#include "services/system/CommonSys.hpp"
+#include "services/system/CommonApi.hpp"
 
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
@@ -14,7 +14,7 @@ using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace SystemService
 {
-   std::optional<HttpReply> CommonSys::serveSys(HttpRequest request)
+   std::optional<HttpReply> CommonApi::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
       {
@@ -36,7 +36,7 @@ namespace SystemService
                serviceName.assign(request.host.begin(),
                                   request.host.end() - request.rootHost.size() - 1);
             else
-               serviceName = "common-sys";
+               serviceName = "common-api";
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
@@ -94,9 +94,9 @@ namespace SystemService
          return result;
       }
       return std::nullopt;
-   }  // CommonSys::serveSys
+   }  // CommonApi::serveSys
 
-   void CommonSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   void CommonApi::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
       psibase::check(getSender() == getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
@@ -105,4 +105,4 @@ namespace SystemService
 
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::CommonSys)
+PSIBASE_DISPATCH(SystemService::CommonApi)

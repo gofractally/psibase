@@ -6,14 +6,14 @@
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
         "paths": {
-            "/common": ["../../CommonSys/common"],
+            "/common": ["../../CommonApi/common"],
             "$lib": ["./src/lib"],
             "$lib/*": ["./src/lib/*"],
             "@psibase/common-lib": [
-                "../../CommonSys/common/packages/common-lib/src"
+                "../../CommonApi/common/packages/common-lib/src"
             ],
             "@psibase/common-lib/*": [
-                "../../CommonSys/common/packages/common-lib/src/*"
+                "../../CommonApi/common/packages/common-lib/src/*"
             ]
         },
         "skipLibCheck": true,
@@ -26,7 +26,7 @@
         "isolatedModules": true,
         "noEmit": true
     },
-    "include": ["src", "../../CommonSys/common/resources/useGraphQLQuery.d.ts"],
+    "include": ["src", "../../CommonApi/common/resources/useGraphQLQuery.d.ts"],
     "references": [
         {
             "path": "./tsconfig.node.json"

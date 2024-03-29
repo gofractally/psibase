@@ -106,7 +106,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm
@@ -216,13 +216,13 @@ ExternalProject_Add(
 
 # UIs built with yarn
 set(JS_DIRS
-    services/user/CommonSys/ui:CommonSys_js
+    services/user/CommonApi/ui:CommonApi_js
     services/user/SupervisorSys/ui:SupervisorSys_js
     services/user/ExploreSys/ui:ExploreSys_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
-set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
-set(COMMON_LOADER_DIR services/user/CommonSys/common/packages/wasm-loader/:CommonSysLoaderLib_js)
+set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
+set(COMMON_LOADER_DIR services/user/CommonApi/common/packages/wasm-loader/:CommonApiLoaderLib_js)
 
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
@@ -243,17 +243,17 @@ function(add_js_target TARGET_TUPLE OUTPUT_FILE)
 endfunction()
 
 # Static (not built) resource dependencies
-file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/*)
-file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts/*)
+file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/*)
+file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts/*)
 
 # Builds the Common Sys files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${COMMON_LOADER_DIR} index.html ${CommonSysCommonLib_js_DEP})
+add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP})
 
 # Build each UI
-# Each of these UIs receives the build output of CommonSys, so CommonSys files are listed as dependencies
+# Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
 foreach(ROW ${JS_DIRS})
-    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonSysCommonLib_js_DEP} ${CommonSysLoaderLib_js_DEP})
+    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP} ${CommonApiLoaderLib_js_DEP})
 endforeach()
 
 # A function that can be used to add a new target that builds a wasm component from rust
@@ -281,12 +281,12 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
 endfunction()
 
 # Static (not built) resource dependencies
-file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wit/*)
+file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/wit/*)
 
 # Build each component
-set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parser:ComponentParser)
+set(COMPONENT_PARSER_DIR services/user/CommonApi/common/packages/component-parser:ComponentParser)
 add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
-add_dependencies(CommonSysCommonLib_js ComponentParser)
+add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm ${plugin-wit})
@@ -317,20 +317,20 @@ function(psinode_files target pfx)
     COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
     COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/x-admin/packages
     )
 endfunction()
 
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(XAdmin_js wasm-psibase CommonSysCommonLib_js)
+add_dependencies(XAdmin_js wasm-psibase CommonApiCommonLib_js)
 
 include(GNUInstallDirs)
 install(DIRECTORY services/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
-install(DIRECTORY services/user/CommonSys/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
-install(FILES services/user/CommonSys/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
+install(DIRECTORY services/user/CommonApi/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
+install(FILES services/user/CommonApi/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
 
 # Build service packages
@@ -387,8 +387,8 @@ psibase_package(
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
 
-set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
-set(THIRD_SRC ${COMMON_SYS}/common/resources/thirdParty/src)
+set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi)
+set(THIRD_SRC ${COMMON_API}/common/resources/thirdParty/src)
 set(THIRD_FILES
     ${THIRD_SRC}/htm.module.js
     ${THIRD_SRC}/react-dom.development.js
@@ -400,23 +400,23 @@ set(THIRD_FILES
     ${THIRD_SRC}/useLocalStorageState.js)
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/CommonSys.psi
-    NAME CommonSys
+    OUTPUT ${SERVICE_DIR}/CommonApi.psi
+    NAME CommonApi
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Service that contains the common files and libraries used by apps on psibase"
-    SERVICE common-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
-        SERVER common-sys
-        DATA GLOB ${COMMON_SYS}/common/packages/wasm-loader/dist/*            common/wasm-loader/
-        DATA      ${COMMON_SYS}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
-        DATA GLOB ${COMMON_SYS}/common/resources/*.mjs                        common/
-        DATA      ${COMMON_SYS}/common/resources/fonts                        common/fonts
-        DATA GLOB ${COMMON_SYS}/ui/dist/*                                     /
+    SERVICE common-api
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
+        SERVER common-api
+        DATA GLOB ${COMMON_API}/common/packages/wasm-loader/dist/*            common/wasm-loader/
+        DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
+        DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
+        DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
+        DATA GLOB ${COMMON_API}/ui/dist/*                                     /
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
-    DEPENDS ${CommonSys_js_DEP}
-    DEPENDS ${CommonSysCommonLib_js_DEP}
-    DEPENDS ${CommonSysLoaderLib_js_DEP}
+    DEPENDS ${CommonApi_js_DEP}
+    DEPENDS ${CommonApiCommonLib_js_DEP}
+    DEPENDS ${CommonApiLoaderLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
@@ -664,7 +664,7 @@ psibase_package(
     NAME Default
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonSys CpuLimit DocSys
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
                     ExploreSys FractalSys InviteSys NftSys PackageSys Producers HttpServer
                     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
@@ -674,7 +674,7 @@ psibase_package(
     NAME Minimal
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
-    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonSys PackageSys Producers HttpServer
+    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi PackageSys Producers HttpServer
                     SetCode Transact
 )
 
@@ -692,7 +692,7 @@ function(write_package_index out)
 endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
-    Accounts AuthAny AuthSig AuthK1 CommonSys CpuLimit Default
+    Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
     DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys Producers HttpServer
     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
@@ -703,7 +703,7 @@ install(
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/AuthK1.psi
-          ${SERVICE_DIR}/CommonSys.psi
+          ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Default.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/DocSys.psi

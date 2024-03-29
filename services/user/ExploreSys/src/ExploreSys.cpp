@@ -3,7 +3,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
-#include <services/system/CommonSys.hpp>
+#include <services/system/CommonApi.hpp>
 #include <services/system/HttpServer.hpp>
 
 using Tables = psibase::ServiceTables<psibase::WebContentTable>;

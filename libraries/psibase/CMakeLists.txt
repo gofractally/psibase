@@ -169,7 +169,7 @@ function(add suffix)
             ../../services/system/SetCode/include
             ../../services/system/Transact/include
             ../../services/system/VerifyK1/include
-            ../../services/user/CommonSys/include
+            ../../services/user/CommonApi/include
             ../../services/user/ExploreSys/include
             ../../services/user/FractalSys/include
             ../../services/user/InviteSys/include

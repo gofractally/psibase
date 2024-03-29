@@ -2,7 +2,7 @@
 #include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
-#include <services/system/CommonSys.hpp>
+#include <services/system/CommonApi.hpp>
 #include <services/user/RTokenSys.hpp>
 #include <services/user/SymbolSys.hpp>
 #include <services/user/TokenSys.hpp>

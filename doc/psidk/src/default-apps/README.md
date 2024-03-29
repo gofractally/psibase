@@ -8,7 +8,7 @@ System apps are the applications responsible for the core functionality of the n
 
 - [accounts](accounts.md)
 - [auth-sig]()
-- [common-sys](common-sys.md)
+- [common-api](common-api.md)
 - [cpu-limit]()
 - [producers]()
 - [http-server](http-server.md)

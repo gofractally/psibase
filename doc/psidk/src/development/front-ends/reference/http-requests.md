@@ -45,12 +45,12 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 ## Common endpoints
 
-The [common-sys service](../../../default-apps/common-sys.md) endpoints which start with the `/common*` path across all domains. It handles RPC requests and serves files.
+The [common-api service](../../../default-apps/common-api.md) endpoints which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
 | Method | URL                              | Description                                                                                                              |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `GET`  | `/common/tapos/head`             | Returns [TaPoS](#tapos) for the current head block                                                                       | 
-| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-sys"` |
+| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-api"` |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                    |
 | `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction)                                                                                 |
 | `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-signed-transaction)                                                                   |
@@ -129,7 +129,7 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 
 ### Common files
 
-`common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). 
+`common-api` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). 
 Booting the network with either the psibase CLI tool or with the x-admin app will automatically install this default set of files:
 
 | Path                          | Description                                                                                                                                                                                                           |

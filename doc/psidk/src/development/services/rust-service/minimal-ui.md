@@ -59,7 +59,7 @@ If you're running a test chain locally, then it will typically be at `http://psi
 ## How it Works
 
 - psinode forwards most http requests to the [`http-server` service](../../../default-apps/http-server.md).
-- If the URL begins with `/common`, [`http-server`](../../../default-apps/http-server.md) forwards the request to the [`common-sys` service](../../../default-apps/common-sys.md). [`common-sys`](../../../default-apps/common-sys.md) provides shared resources, such as js library code and an RPC request handler for packing transactions.
+- If the URL begins with `/common`, [`http-server`](../../../default-apps/http-server.md) forwards the request to the [`common-api` service](../../../default-apps/common-api.md). [`common-api`](../../../default-apps/common-api.md) provides shared resources, such as js library code and an RPC request handler for packing transactions.
 - [`http-server`](../../../default-apps/http-server.md) looks at the request domain. If it begins with the name of a registered service, it calls that service's `serveSys` action to process the request.
 - [psibase::serve_simple_ui](https://docs.rs/psibase/latest/psibase/fn.serve_simple_ui.html) handles the following requests:
   - `GET /` returns a minimal html file which references the `/common/SimpleUI.mjs` script. This script generates the UI dynamically.

@@ -10,7 +10,7 @@ const psibase = (_service: string, isServing?: boolean) => {
         {
             // bundle non-external (above) common files except fonts (which should only be referenced)
             find: /^\/common(?!\/(?:fonts))(.*)$/,
-            replacement: path.resolve("../../CommonSys/common/resources$1"),
+            replacement: path.resolve("../../CommonApi/common/resources$1"),
         },
     ];
 
@@ -19,7 +19,7 @@ const psibase = (_service: string, isServing?: boolean) => {
         buildAliases.push({
             find: /^@psibase\/common-lib.*$/,
             replacement: path.resolve(
-                "../../CommonSys/common/packages/common-lib/src"
+                "../../CommonApi/common/packages/common-lib/src"
             ),
         });
     }

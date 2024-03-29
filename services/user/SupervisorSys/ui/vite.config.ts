@@ -8,7 +8,7 @@ export default defineConfig({
             {
                 find: /^@psibase\/common-lib.*$/,
                 replacement: path.resolve(
-                    "../../CommonSys/common/packages/common-lib/src"
+                    "../../CommonApi/common/packages/common-lib/src"
                 )
             }
         ]

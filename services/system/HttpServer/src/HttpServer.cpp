@@ -61,7 +61,7 @@ namespace SystemService
 
       // Path reserved across all subdomains
       if (req.target.starts_with("/common"))
-         serviceName = "common-sys";
+         serviceName = "common-api";
 
       // subdomain
       else if (isSubdomain(req))
@@ -69,7 +69,7 @@ namespace SystemService
 
       // root domain
       else
-         serviceName = "common-sys";
+         serviceName = "common-api";
 
       auto service = AccountNumber(serviceName);
       auto reg     = kvGet<RegisteredServiceRow>(registeredServiceKey(act.service, service));
@@ -82,7 +82,7 @@ namespace SystemService
       psibase::Actor<ServerInterface> iface(act.service, service);
 
       auto result = iface.serveSys(std::move(req));
-      if (result && serviceName != "common-sys")
+      if (result && serviceName != "common-api")
       {
          for (const auto& header : result->headers)
          {

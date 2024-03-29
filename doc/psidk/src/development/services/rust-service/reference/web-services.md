@@ -12,7 +12,7 @@
          |
          v
   +--------------+           +-----------------+
- /                \  yes     | common-sys      |
+ /                \  yes     | common-api      |
 /  target begins   \ ------> | service's       |
 \  with "/common?" /         | serveSys action |
  \                /          +-----------------+
@@ -39,7 +39,7 @@
 
 `psinode` passes most HTTP requests to the [SystemService::HttpServer] service, which then routes requests to the appropriate service's [serveSys](https://docs.rs/psibase/latest/psibase/server_interface/struct.ServerActions.html#method.serveSys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId](https://docs.rs/psibase/latest/psibase/enum.DbId.html).
 
-[SystemService::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
+[SystemService::CommonApi] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
 [SystemService::PsiSpaceSys] provides web hosting to non-service accounts.
 

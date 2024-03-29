@@ -2,7 +2,7 @@ function(add_user_service suffix name)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC
         include
-        ../CommonSys/include
+        ../CommonApi/include
         ../FractalSys/include
         ../InviteSys/include
         ../NftSys/include
@@ -25,7 +25,7 @@ function(add_user_test_impl suffix name)
     add_executable(${TARGET} ${ARGN})
     target_include_directories(${TARGET} PUBLIC
       ../include
-      ../../CommonSys/include
+      ../../CommonApi/include
       ../../FractalSys/include
       ../../InviteSys/include
       ../../NftSys/include
@@ -72,7 +72,7 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
-    add_subdirectory(CommonSys)
+    add_subdirectory(CommonApi)
     add_subdirectory(InviteSys)
     add_subdirectory(ExploreSys)
     add_subdirectory(FractalSys)
