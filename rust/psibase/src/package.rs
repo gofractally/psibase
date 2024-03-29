@@ -648,7 +648,9 @@ impl DirectoryRegistry {
 impl PackageRegistry for DirectoryRegistry {
     type R = BufReader<File>;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
-        let f = File::open(self.dir.join("index.json"))?;
+        let path = self.dir.join("index.json");
+        let f =
+            File::open(&path).with_context(|| format!("Cannot open {}", path.to_string_lossy()))?;
         let contents = std::io::read_to_string(f)?;
         let result: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
         Ok(result)
