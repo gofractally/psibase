@@ -209,6 +209,17 @@ namespace psio
          to_json(type.members, stream);
       }
 
+      struct FracPack
+      {
+         Box<AnyType> type;
+      };
+      PSIO_REFLECT_TYPENAME(FracPack)
+
+      void to_json(const FracPack& type, auto& stream)
+      {
+         to_json(type.type, stream);
+      }
+
       struct Type
       {
          std::string type;
@@ -231,11 +242,23 @@ namespace psio
          AnyType(Array type) : value(std::move(type)) {}
          AnyType(Variant type) : value(std::move(type)) {}
          AnyType(Tuple type) : value(std::move(type)) {}
+         AnyType(FracPack type) : value(std::move(type)) {}
          AnyType(Custom type) : value(std::move(type)) {}
          AnyType(Type type) : value(std::move(type)) {}
          AnyType(std::string name) : value(Type{std::move(name)}) {}
          AnyType(const char* name) : value(Type{std::move(name)}) {}
-         std::variant<Struct, Object, Array, List, Option, Variant, Tuple, Int, Float, Custom, Type>
+         std::variant<Struct,
+                      Object,
+                      Array,
+                      List,
+                      Option,
+                      Variant,
+                      Tuple,
+                      Int,
+                      Float,
+                      FracPack,
+                      Custom,
+                      Type>
                                 value;
          mutable const AnyType* resolved = nullptr;
          const AnyType*         resolve(const Schema& schema) const;
@@ -363,6 +386,7 @@ namespace psio
             array,
             variant,
             optional,
+            nested,
          };
          Kind                        kind;
          bool                        is_variable_size;
@@ -370,6 +394,7 @@ namespace psio
          std::uint32_t               fixed_size;
          std::vector<CompiledMember> children;
          const AnyType*              original_type;
+         bool is_container() const { return kind == container || kind == nested; }
       };
 
       CustomTypes standard_types();
@@ -389,6 +414,7 @@ namespace psio
       struct OptionReader;
       struct ArrayReader;
       struct VariantReader;
+      struct NestedReader;
 
       struct FracParser
       {
@@ -433,8 +459,8 @@ namespace psio
                     bool                is_optional,
                     Item&               result);
 
-         using StackItem =
-             std::variant<Item, ObjectReader, OptionReader, ArrayReader, VariantReader>;
+         using StackItem = std::
+             variant<Item, ObjectReader, OptionReader, ArrayReader, VariantReader, NestedReader>;
          FracStream             in;
          const CustomTypes&     builtin;
          std::vector<StackItem> stack;
@@ -445,6 +471,7 @@ namespace psio
          char operator()(const Object&) const { return '{'; }
          char operator()(const Variant&) const { return '{'; }
          char operator()(const Struct&) const { return '{'; }
+         char operator()(const FracPack&) const { return 0; };
          char operator()(const auto&) const { return '['; }
       };
 
@@ -453,6 +480,7 @@ namespace psio
          char operator()(const Object&) const { return '}'; }
          char operator()(const Variant&) const { return '}'; }
          char operator()(const Struct&) const { return '}'; }
+         char operator()(const FracPack&) const { return 0; };
          char operator()(const auto&) const { return ']'; }
       };
 
@@ -568,18 +596,23 @@ namespace psio
                }
             }
          };
+         auto write_bracket = [&](const FracParser::Item& item, auto&& visitor)
+         {
+            if (char ch = std::visit(visitor, item.type->original_type->value))
+               stream.write(ch);
+         };
          while (auto item = parser.next())
          {
             switch (item.kind)
             {
                case FracParser::start:
                   start_member(item);
-                  stream.write(std::visit(OpenToken{}, item.type->original_type->value));
+                  write_bracket(item, OpenToken{});
                   groups.emplace_back();
                   break;
                case FracParser::end:
                   groups.back().end(stream);
-                  stream.write(std::visit(CloseToken{}, item.type->original_type->value));
+                  write_bracket(item, CloseToken{});
                   groups.pop_back();
                   break;
                case FracParser::scalar:
@@ -684,7 +717,10 @@ namespace psio
                else if constexpr (is_shared_view_ptr_v<T>)
                {
                   // TODO: json could unpack nested fracpack
-                  schema.insert(name, insert<std::vector<unsigned char>>());
+                  schema.insert(
+                      name,
+                      Custom{.type = FracPack{insert<std::remove_cv_t<typename T::value_type>>()},
+                             .id   = "octet-string"});
                }
                else if constexpr (std::is_same_v<T, std::vector<char>> ||
                                   std::is_same_v<T, std::vector<signed char>> ||

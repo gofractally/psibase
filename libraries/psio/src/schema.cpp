@@ -70,6 +70,10 @@ namespace psio::schema_types
             const auto& member = type->children[0];
             return !member.is_optional && !member.type->is_variable_size;
          }
+         else if (type->kind == CompiledType::nested)
+         {
+            return true;
+         }
          else
          {
             return !type->is_variable_size;
@@ -77,7 +81,7 @@ namespace psio::schema_types
       }
       static bool frac2json(const CompiledType* type, FracStream& in, StreamBase& out)
       {
-         if (type->kind == CompiledType::container)
+         if (type->is_container())
          {
             std::uint32_t size;
             if (!unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
@@ -353,6 +357,24 @@ namespace psio::schema_types
       }
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
+                    const FracPack&              t,
+                    std::vector<const AnyType*>& stack)
+      {
+         auto [ctype, state] = dfs_discover(schema, type, CompiledType::nested, stack);
+         switch (state)
+         {
+            case start:
+               stack.push_back(t.type.get());
+               break;
+            case finish:
+               ctype->children.push_back({.type = schema->get(t.type->resolve(schema->schema))});
+               break;
+            default:
+               break;
+         }
+      }
+      void add_impl(CompiledSchema*              schema,
+                    const AnyType*               type,
                     const Variant&               t,
                     std::vector<const AnyType*>& stack)
       {
@@ -583,6 +605,43 @@ namespace psio::schema_types
       }
    };
 
+   struct NestedReader
+   {
+      const CompiledType* type;
+      std::uint32_t       offset;
+      std::uint32_t       old_end_pos = 0;
+      FracParser::Item    next(FracParser& parser)
+      {
+         if (old_end_pos != 0)
+         {
+            parser.check_heap_pos(parser.in.end_pos);
+            parser.in.known_end = true;
+            parser.in.pos       = parser.in.end_pos;
+            parser.in.end_pos   = old_end_pos;
+            return {.kind = FracParser::end, .type = type};
+         }
+         std::uint32_t size;
+         if (!unpack_numeric<true>(&size, parser.in.src, offset, parser.in.end_pos))
+            check(false, "Cannot read container size");
+         old_end_pos = parser.in.end_pos;
+         if (size == 0)
+         {
+            parser.in.pos = parser.in.end_pos;
+         }
+         else
+         {
+            parser.in.pos = offset;
+            auto new_end  = offset + size;
+            if (new_end > parser.in.end_pos || new_end < offset)
+               check(false, "Container size out-of-bounds");
+            parser.in.end_pos = new_end;
+         }
+         auto result   = parser.parse(type->children[0].type);
+         result.parent = type->original_type;
+         return result;
+      }
+   };
+
    FracParser::FracParser(std::span<const char> data,
                           const CompiledSchema& schema,
                           const std::string&    type)
@@ -620,7 +679,7 @@ namespace psio::schema_types
          std::uint32_t pos = fixed_pos + offset;
          if (pos < offset)
             check(false, "integer overflow");
-         if (type->kind != CompiledType::container || offset != 0)
+         if (!type->is_container() || offset != 0)
          {
             check_heap_pos(pos);
          }
@@ -727,6 +786,12 @@ namespace psio::schema_types
                check(false, "Object fixed data out-of-bounds");
             in.pos = heap_start;
             stack.push_back(ObjectReader{.start_pos = offset, .index = 0, .type = type});
+            in.known_end = true;
+            break;
+         }
+         case CompiledType::nested:
+         {
+            stack.push_back(NestedReader{.type = type, .offset = offset});
             in.known_end = true;
             break;
          }
@@ -865,6 +930,10 @@ namespace psio::schema_types
       void addRef(auto& refs, AnyType&, Variant& type)
       {
          addRef(refs, type.members);
+      }
+      void addRef(auto& refs, AnyType&, FracPack& type)
+      {
+         addRef(refs, *type.type);
       }
       void addRef(auto& refs, AnyType&, Int&) {}
       void addRef(auto& refs, AnyType&, Float&) {}
@@ -1106,6 +1175,27 @@ namespace psio::schema_types
       }
       bool match(const Float& lhs, const Float& rhs) { return lhs == rhs; }
       bool match(const Int& lhs, const Int& rhs) { return lhs == rhs; }
+      bool match(const FracPack& lhs, const FracPack& rhs) { return match(*lhs.type, *rhs.type); }
+      bool match(const FracPack& lhs, const List& rhs)
+      {
+         difference |= SchemaDifference::addAlternative;
+         auto* t = resolveAll(schema2, *rhs.type);
+         if (auto* i = std::get_if<Int>(&t->value))
+         {
+            return i->bits == 8;
+         }
+         return false;
+      }
+      bool match(const List& lhs, const FracPack& rhs)
+      {
+         difference |= SchemaDifference::dropAlternative;
+         auto* t = resolveAll(schema1, *lhs.type);
+         if (auto* i = std::get_if<Int>(&t->value))
+         {
+            return i->bits == 8;
+         }
+         return false;
+      }
       bool match(const auto&, const auto&) { return false; }
    };
 
