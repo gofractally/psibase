@@ -19,7 +19,7 @@ function(add suffix)
         SetCode/include
         Transact/include
         VerifyK1/include
-        VerifySys/include
+        VerifySig/include
     )
 endfunction(add)
 
@@ -38,5 +38,5 @@ if(DEFINED IS_WASM)
     add_subdirectory(SetCode)
     add_subdirectory(Transact)
     add_subdirectory(VerifyK1)
-    add_subdirectory(VerifySys)
+    add_subdirectory(VerifySig)
 endif()

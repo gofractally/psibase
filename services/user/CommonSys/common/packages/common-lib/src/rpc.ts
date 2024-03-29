@@ -273,7 +273,7 @@ export async function signTransaction(
         else return k;
     });
     const claims = keys.map((k) => ({
-        service: "verify-sys",
+        service: "verify-sig",
         rawData: uint8ArrayToHex(publicKeyPairToDER(k)),
     }));
     transaction = new Uint8Array(

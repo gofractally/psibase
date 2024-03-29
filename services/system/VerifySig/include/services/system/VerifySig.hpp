@@ -5,10 +5,10 @@
 
 namespace SystemService
 {
-   struct VerifySys : psibase::Service<VerifySys>
+   struct VerifySig : psibase::Service<VerifySig>
    {
-      static constexpr auto     service      = psibase::AccountNumber("verify-sys");
+      static constexpr auto     service      = psibase::AccountNumber("verify-sig");
       static constexpr uint64_t serviceFlags = psibase::CodeRow::isAuthService;
    };
-   PSIO_REFLECT(VerifySys)
+   PSIO_REFLECT(VerifySig)
 }  // namespace SystemService

@@ -488,7 +488,7 @@ namespace psibase
             result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
                 key.service, psio::from_frac<PrivateKey>(key.rawData));
          }
-         else if (key.service.str() == "verify-sys")
+         else if (key.service.str() == "verify-sig")
          {
             result = std::make_shared<OpenSSLProver>(key.service, key.rawData);
          }
@@ -2169,7 +2169,7 @@ void run(const std::string&              db_path,
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    key = psio::from_json<NewKeyRequest>(stream);
-         if (key.service.str() != "verifyk1" && key.service.str() != "verify-sys")
+         if (key.service.str() != "verifyk1" && key.service.str() != "verify-sig")
          {
             throw std::runtime_error("Not implemented for native signing: " + key.service.str());
          }
@@ -2211,7 +2211,7 @@ void run(const std::string&              db_path,
                          result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
                       }
                    }
-                   else if (key.service == AccountNumber{"verify-sys"})
+                   else if (key.service == AccountNumber{"verify-sig"})
                    {
                       if (key.rawData)
                       {

@@ -14,7 +14,7 @@ System apps are the applications responsible for the core functionality of the n
 - [http-server](http-server.md)
 - [setcode](setcode.md)
 - [transact](transact.md)
-- [verify-sys]()
+- [verify-sig]()
 
 ## Additional apps
 

@@ -1,7 +1,7 @@
 #include <services/system/AuthSig.hpp>
 
 #include <psibase/dispatch.hpp>
-#include <services/system/VerifySys.hpp>
+#include <services/system/VerifySig.hpp>
 
 #include <concepts>
 
@@ -63,7 +63,7 @@ namespace SystemService
       const auto& expected = row->pubkey.data;
       for (auto& claim : claims)
       {
-         if (claim.service == VerifySys::service && equalByteVector(claim.rawData, expected))
+         if (claim.service == VerifySig::service && equalByteVector(claim.rawData, expected))
          {
             // Billing rule: if first proof passes, and auth for first sender passes,
             // then then first sender will be charged even if the transaction fails,

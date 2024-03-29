@@ -1,10 +1,10 @@
-#include <services/system/VerifySys.hpp>
+#include <services/system/VerifySig.hpp>
 
 #include <botan/ec_group.h>
 #include <botan/pubkey.h>
 #include <botan/x509_key.h>
-#include <psibase/dispatch.hpp>
 #include <psibase/RawNativeFunctions.hpp>
+#include <psibase/dispatch.hpp>
 #include <psibase/serviceEntry.hpp>
 
 using namespace psibase;

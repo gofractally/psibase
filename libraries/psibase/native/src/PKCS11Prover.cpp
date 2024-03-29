@@ -265,7 +265,7 @@ namespace
    // to the service-specific form used in a Claim
    std::vector<char> convertPublicKey(AccountNumber service, std::vector<char>&& in)
    {
-      if (service == AccountNumber{"verify-sys"})
+      if (service == AccountNumber{"verify-sig"})
       {
          return std::move(in);
       }
@@ -312,7 +312,7 @@ namespace
                                           AccountNumber         service,
                                           std::span<const char> key)
    {
-      if (service == AccountNumber{"verify-sys"})
+      if (service == AccountNumber{"verify-sig"})
       {
          return storeKey(session, key_label, parsePrivateKey(key).get());
       }
@@ -367,7 +367,7 @@ namespace
                                      const std::vector<char>& pubkey,
                                      std::vector<char>&&      sig)
    {
-      if (service == AccountNumber{"verify-sys"})
+      if (service == AccountNumber{"verify-sig"})
       {
          return std::move(sig);
       }
@@ -434,7 +434,7 @@ void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
 
 void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session, CompoundProver& out)
 {
-   loadPKCS11Keys(session, AccountNumber{"verify-sys"}, key_label, out);
+   loadPKCS11Keys(session, AccountNumber{"verify-sig"}, key_label, out);
    loadPKCS11Keys(session, AccountNumber{"verifyk1"}, eckey_label, out);
 }
 
@@ -474,8 +474,8 @@ psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session, Ac
     : PKCS11Prover(session,
                    service,
                    ::generateKey(*session,
-                                 service == AccountNumber{"verify-sys"} ? key_label : eckey_label,
-                                 service == AccountNumber{"verify-sys"} ? NID_X9_62_prime256v1
+                                 service == AccountNumber{"verify-sig"} ? key_label : eckey_label,
+                                 service == AccountNumber{"verify-sig"} ? NID_X9_62_prime256v1
                                                                         : NID_secp256k1))
 {
 }

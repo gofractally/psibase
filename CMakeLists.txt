@@ -56,7 +56,7 @@ endif()
 
 if(DEFINED WASI_SDK_PREFIX)
     ProcessorCount(NUM_PROCS)
-    # This is used by the VerifySys service. The kinds of keys supported need to be configured
+    # This is used by the VerifySig service. The kinds of keys supported need to be configured
     # here.  We use a minimized build to keep the size of the service down. Static linking is
     # not enough because the algorithms are looked up dynamically.
     #
@@ -130,7 +130,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
@@ -380,8 +380,8 @@ psibase_package(
     SERVICE r-auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         DATA ${COMPONENT_BIN_DIR}/${AuthPlugin_OUTPUT_FILE} /plugin.wasm
-    SERVICE verify-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
+    SERVICE verify-sig
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         FLAGS isAuthService
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"

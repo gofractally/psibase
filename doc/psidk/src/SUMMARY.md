@@ -96,6 +96,6 @@
   - [symbol-sys]()
   - [token-sys]()
   - [transact](default-apps/transact.md)
-  - [verify-sys]()
+  - [verify-sig]()
 
 - [Contributing guide](contribute/README.md)
