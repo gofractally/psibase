@@ -18,7 +18,7 @@ function(add suffix)
         HttpServer/include
         SetCode/include
         Transact/include
-        VerifyEcSys/include
+        VerifyK1/include
         VerifySys/include
     )
 endfunction(add)
@@ -37,6 +37,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(HttpServer)
     add_subdirectory(SetCode)
     add_subdirectory(Transact)
-    add_subdirectory(VerifyEcSys)
+    add_subdirectory(VerifyK1)
     add_subdirectory(VerifySys)
 endif()

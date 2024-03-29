@@ -1,6 +1,6 @@
 #include <psibase/dispatch.hpp>
 #include <services/system/AuthK1.hpp>
-#include <services/system/VerifyEcSys.hpp>
+#include <services/system/VerifyK1.hpp>
 
 #include <cstdio>
 
@@ -40,7 +40,7 @@ namespace SystemService
       auto expected = psio::convert_to_frac(row->pubkey);
       for (auto& claim : claims)
       {
-         if (claim.service == VerifyEcSys::service && claim.rawData == expected)
+         if (claim.service == VerifyK1::service && claim.rawData == expected)
          {
             // Billing rule: if first proof passes, and auth for first sender passes,
             // then then first sender will be charged even if the transaction fails,

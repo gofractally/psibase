@@ -168,7 +168,7 @@ function(add suffix)
             ../../services/system/HttpServer/include
             ../../services/system/SetCode/include
             ../../services/system/Transact/include
-            ../../services/system/VerifyEcSys/include
+            ../../services/system/VerifyK1/include
             ../../services/user/CommonSys/include
             ../../services/user/ExploreSys/include
             ../../services/user/FractalSys/include
@@ -180,7 +180,7 @@ function(add suffix)
             ../../services/user/TokenSys/include
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE
-            ../../services/system/VerifyEcSys/include
+            ../../services/system/VerifyK1/include
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start

@@ -343,7 +343,7 @@ pub trait Signer: std::fmt::Debug {
 impl Signer for PrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
-            service: AccountNumber::new(account_raw!("verifyec-sys")),
+            service: AccountNumber::new(account_raw!("verifyk1")),
             rawData: fracpack::Pack::packed(&PublicKey::from(
                 &secp256k1::PublicKey::from_secret_key(
                     secp256k1::SECP256K1,
@@ -893,7 +893,7 @@ pub struct AnyPublicKey {
 
 impl AnyPublicKey {
     pub fn auth_service(&self) -> AccountNumber {
-        if self.key.service == AccountNumber::new(account_raw!("verifyec-sys")) {
+        if self.key.service == AccountNumber::new(account_raw!("verifyk1")) {
             AccountNumber::new(account_raw!("auth-k1"))
         } else {
             AccountNumber::new(account_raw!("auth-sig"))
@@ -917,7 +917,7 @@ impl FromStr for AnyPublicKey {
         if let Ok(pkey) = PublicKey::from_str(key) {
             return Ok(Self {
                 key: crate::Claim {
-                    service: AccountNumber::new(account_raw!("verifyec-sys")),
+                    service: AccountNumber::new(account_raw!("verifyk1")),
                     rawData: fracpack::Pack::packed(&pkey).into(),
                 },
             });

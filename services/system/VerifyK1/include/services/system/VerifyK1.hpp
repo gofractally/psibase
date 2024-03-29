@@ -5,9 +5,9 @@
 
 namespace SystemService
 {
-   namespace VerifyEcSys
+   namespace VerifyK1
    {
-      static constexpr auto     service      = psibase::AccountNumber("verifyec-sys");
+      static constexpr auto     service      = psibase::AccountNumber("verifyk1");
       static constexpr uint64_t serviceFlags = psibase::CodeRow::isAuthService;
-   }  // namespace VerifyEcSys
+   }  // namespace VerifyK1
 }  // namespace SystemService

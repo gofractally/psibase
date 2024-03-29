@@ -129,7 +129,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
@@ -442,8 +442,8 @@ psibase_package(
         SERVER r-ath-ec-sys
     SERVICE r-ath-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
-    SERVICE verifyec-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
+    SERVICE verifyk1
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
         FLAGS isAuthService
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"

@@ -269,7 +269,7 @@ namespace
       {
          return std::move(in);
       }
-      else if (service == AccountNumber{"verifyec-sys"})
+      else if (service == AccountNumber{"verifyk1"})
       {
          const unsigned char* p = reinterpret_cast<const unsigned char*>(in.data());
          std::unique_ptr<EVP_PKEY, OpenSSLDeleter> key(d2i_PUBKEY(nullptr, &p, in.size()));
@@ -299,7 +299,7 @@ namespace
          }
          else
          {
-            throw std::runtime_error("Unsupported curve for verifyec-sys");
+            throw std::runtime_error("Unsupported curve for verifyk1");
          }
       }
       else
@@ -316,7 +316,7 @@ namespace
       {
          return storeKey(session, key_label, parsePrivateKey(key).get());
       }
-      else if (service == AccountNumber{"verifyec-sys"})
+      else if (service == AccountNumber{"verifyk1"})
       {
          auto           k = psio::from_frac<PrivateKey>(key);
          EccPrivateKey* eckey;
@@ -371,7 +371,7 @@ namespace
       {
          return std::move(sig);
       }
-      else if (service == AccountNumber{"verifyec-sys"})
+      else if (service == AccountNumber{"verifyk1"})
       {
          EccSignature result;
          check(result.size() == sig.size(), "Wrong size for ECDSA signature");
@@ -435,7 +435,7 @@ void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
 void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session, CompoundProver& out)
 {
    loadPKCS11Keys(session, AccountNumber{"verify-sys"}, key_label, out);
-   loadPKCS11Keys(session, AccountNumber{"verifyec-sys"}, eckey_label, out);
+   loadPKCS11Keys(session, AccountNumber{"verifyk1"}, eckey_label, out);
 }
 
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,

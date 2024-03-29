@@ -1,5 +1,5 @@
 #include <services/system/Transact.hpp>
-#include <services/system/VerifyEcSys.hpp>
+#include <services/system/VerifyK1.hpp>
 #include <services/user/AuthInviteSys.hpp>
 #include <services/user/InviteSys.hpp>
 
@@ -62,7 +62,7 @@ namespace UserService
       bool found  = std::find_if(claims.begin(), claims.end(),
                                  [&](auto claim)
                                  {
-                                   return claim.service == SystemService::VerifyEcSys::service &&
+                                   return claim.service == SystemService::VerifyK1::service &&
                                           psio::from_frac<PublicKey>(claim.rawData) == pubkey;
                                 }) != claims.end();
 

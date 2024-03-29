@@ -1,6 +1,6 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/AuthK1.hpp>
-#include <services/system/VerifyEcSys.hpp>
+#include <services/system/VerifyK1.hpp>
 
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
@@ -49,7 +49,7 @@ TEST_CASE("ec")
        .rawData = psio::convert_to_frac(test_cntr::payload{}),
    }});
    ec_trx.claims.push_back({
-       .service = SystemService::VerifyEcSys::service,
+       .service = SystemService::VerifyK1::service,
        .rawData = psio::convert_to_frac(pub_key1),
    });
    expect(t.pushTransaction(ec_trx), "proofs and claims must have same size");

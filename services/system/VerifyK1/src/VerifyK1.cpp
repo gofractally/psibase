@@ -2,7 +2,7 @@
 #include <psibase/check.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/from_bin.hpp>
-#include <services/system/VerifyEcSys.hpp>
+#include <services/system/VerifyK1.hpp>
 
 using namespace psibase;
 
@@ -23,7 +23,7 @@ extern "C" [[clang::export_name("prestart")]] void prestart()
 // TODO: r1
 extern "C" [[clang::export_name("verify")]] void verify()
 {
-   check(context, "VerifyEcSys not fully built");
+   check(context, "VerifyK1 not fully built");
 
    auto act  = getCurrentAction();
    auto data = psio::from_frac<VerifyArgs>(act.rawData);

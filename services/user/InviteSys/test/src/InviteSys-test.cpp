@@ -4,7 +4,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthK1.hpp>
-#include <services/system/VerifyEcSys.hpp>
+#include <services/system/VerifyK1.hpp>
 #include <services/system/commonErrors.hpp>
 
 #include "services/user/AuthInviteSys.hpp"
@@ -564,7 +564,7 @@ SCENARIO("Accepting an invite")
             for (const auto& key : keys)
             {
                trx.claims.push_back({
-                   .service = VerifyEcSys::service,
+                   .service = VerifyK1::service,
                    .rawData = psio::convert_to_frac(key.first),
                });
             }

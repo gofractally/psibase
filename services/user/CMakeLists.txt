@@ -14,7 +14,7 @@ function(add_user_service suffix name)
         ../../system/AuthAny/include
         ../../system/SetCode/include
         ../../system/Transact/include
-        ../../system/VerifyEcSys/include
+        ../../system/VerifyK1/include
     )
     target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} psibase-service-simple-malloc${suffix})
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
@@ -37,7 +37,7 @@ function(add_user_test_impl suffix name)
       ../../../system/AuthAny/include
       ../../../system/SetCode/include
       ../../../system/Transact/include
-      ../../../system/VerifyEcSys/include
+      ../../../system/VerifyK1/include
      ${CMAKE_CURRENT_LIST_DIR})
     target_link_libraries(${TARGET} services_system${suffix} psitestlib${suffix})
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
