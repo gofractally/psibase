@@ -87,7 +87,7 @@ export default defineConfig(({ command }) => ({
     plugins: [
         isoImport(),
         sveltekit(),
-        psibase("explore-sys", command === "serve"),
+        psibase("explorer", command === "serve"),
         // @ts-ignore
         svg({
             svgoOptions: {

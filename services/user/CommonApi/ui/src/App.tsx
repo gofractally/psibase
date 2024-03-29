@@ -6,7 +6,7 @@ const App = () => {
             Under construction...
             <ul>
                 <li>
-                    <a href={siblingUrl(null, "explore-sys", null, false)}>
+                    <a href={siblingUrl(null, "explorer", null, false)}>
                         Explorer
                     </a>
                 </li>

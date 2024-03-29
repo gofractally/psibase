@@ -273,7 +273,7 @@ class API:
                 if num < 0:
                     return None
             args = 'first:1 ge:%d' % num
-        result = self.graphql('explore-sys', '''
+        result = self.graphql('explorer', '''
             query {
                 blocks(%s) {
                     edges {

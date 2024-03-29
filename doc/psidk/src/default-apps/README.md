@@ -22,7 +22,7 @@ Psibase also comes with various apps meant to demonstrate additional functionali
 
 - [x-admin](x-admin.md)
 - [doc-sys](doc-sys.md)
-- [explore-sys]()
+- [explorer]()
 - [fractal-sys]()
 - [invite-sys](invite-sys.md)
 - [nft-sys]()

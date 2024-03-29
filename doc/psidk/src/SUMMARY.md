@@ -85,7 +85,7 @@
   - [common-api](default-apps/common-api.md)
   - [cpu-limit]()
   - [doc-sys](default-apps/doc-sys.md)
-  - [explore-sys]()
+  - [explorer]()
   - [fractal-sys]()
   - [invite-sys](default-apps/invite-sys.md)
   - [nft-sys]()

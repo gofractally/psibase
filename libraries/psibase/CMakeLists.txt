@@ -170,7 +170,7 @@ function(add suffix)
             ../../services/system/Transact/include
             ../../services/system/VerifyK1/include
             ../../services/user/CommonApi/include
-            ../../services/user/ExploreSys/include
+            ../../services/user/Explorer/include
             ../../services/user/FractalSys/include
             ../../services/user/InviteSys/include
             ../../services/user/NftSys/include

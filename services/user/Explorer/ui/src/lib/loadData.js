@@ -136,7 +136,7 @@ function queryTransferHistory(account) {
 
 export async function loadTransferHistory(account) {
     const query = queryTransferHistory(account);
-    const host = window.location.host.replace("explore-sys.", "token-sys.");
+    const host = window.location.host.replace("explorer.", "token-sys.");
     const url = `${window.location.protocol}//${host}/graphql`;
     const result = await useGraphQLQuery(url, query);
     return result;
@@ -145,7 +145,7 @@ export async function loadTransferHistory(account) {
 export async function getAccountsByKey(pubKey) {
     try {
         const host = window.location.host.replace(
-            "explore-sys.",
+            "explorer.",
             "auth-k1."
         );
         const url = `${window.location.protocol}//${host}/accwithkey/${pubKey}`;
@@ -162,7 +162,7 @@ export async function getAccountsByKey(pubKey) {
 export async function getPubKeyByAccountName(account) {
     try {
         const host = window.location.host.replace(
-            "explore-sys.",
+            "explorer.",
             "auth-k1."
         );
         const url = `${window.location.protocol}//${host}/account/${account}`;

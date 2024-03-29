@@ -5,14 +5,14 @@
 
 namespace SystemService
 {
-   struct ExploreSys : public psibase::Service<ExploreSys>
+   struct Explorer : public psibase::Service<Explorer>
    {
-      static constexpr auto service = psibase::AccountNumber("explore-sys");
+      static constexpr auto service = psibase::AccountNumber("explorer");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
-   PSIO_REFLECT(ExploreSys,  //
+   PSIO_REFLECT(Explorer,  //
                 method(serveSys, request),
                 method(storeSys, path, contentType, content))
 }  // namespace SystemService

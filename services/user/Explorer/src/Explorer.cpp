@@ -1,4 +1,4 @@
-#include "services/user/ExploreSys.hpp"
+#include "services/user/Explorer.hpp"
 
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
@@ -21,7 +21,7 @@ PSIO_REFLECT(  //
 
 namespace SystemService
 {
-   std::optional<psibase::HttpReply> ExploreSys::serveSys(psibase::HttpRequest request)
+   std::optional<psibase::HttpReply> Explorer::serveSys(psibase::HttpRequest request)
    {
       if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
@@ -30,7 +30,7 @@ namespace SystemService
       return std::nullopt;
    }
 
-   void ExploreSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   void Explorer::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
       psibase::check(psibase::getSender() == psibase::getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
@@ -38,4 +38,4 @@ namespace SystemService
    }
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::ExploreSys)
+PSIBASE_DISPATCH(SystemService::Explorer)

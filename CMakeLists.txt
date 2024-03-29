@@ -109,7 +109,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
@@ -218,7 +218,7 @@ ExternalProject_Add(
 set(JS_DIRS
     services/user/CommonApi/ui:CommonApi_js
     services/user/SupervisorSys/ui:SupervisorSys_js
-    services/user/ExploreSys/ui:ExploreSys_js
+    services/user/Explorer/ui:Explorer_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -545,15 +545,15 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/ExploreSys.psi
-    NAME ExploreSys
+    OUTPUT ${SERVICE_DIR}/Explorer.psi
+    NAME Explorer
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Block explorer"
-    SERVICE explore-sys
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm
-    SERVER explore-sys
-    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist /
-    DEPENDS ExploreSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist/index.html
+    SERVICE explorer
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
+    SERVER explorer
+    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Explorer/ui/dist /
+    DEPENDS Explorer_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Explorer/ui/dist/index.html
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
@@ -665,7 +665,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
-                    ExploreSys FractalSys InviteSys NftSys PackageSys Producers HttpServer
+                    Explorer FractalSys InviteSys NftSys PackageSys Producers HttpServer
                     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
 
@@ -693,7 +693,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys Producers HttpServer
+    DocSys Explorer FractalSys InviteSys NftSys NopSys Minimal PackageSys Producers HttpServer
     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
@@ -707,7 +707,7 @@ install(
           ${SERVICE_DIR}/Default.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/DocSys.psi
-          ${SERVICE_DIR}/ExploreSys.psi
+          ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/FractalSys.psi
           ${SERVICE_DIR}/InviteSys.psi
           ${SERVICE_DIR}/Minimal.psi
