@@ -1,4 +1,4 @@
-use crate::services::{accounts, auth_delegate_sys, producer_sys, transaction_sys};
+use crate::services::{accounts, auth_delegate, producer_sys, transaction_sys};
 use crate::{
     method_raw, new_account_action, set_auth_service_action, validate_dependencies, AccountNumber,
     Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData, MethodNumber,
@@ -114,12 +114,12 @@ pub fn get_initial_actions<R: Read + Seek>(
 
     actions.push(new_account_action(accounts::SERVICE, producer_sys::ROOT));
     actions.push(
-        auth_delegate_sys::Wrapper::pack_from(producer_sys::ROOT)
+        auth_delegate::Wrapper::pack_from(producer_sys::ROOT)
             .setOwner(producer_sys::PRODUCER_ACCOUNT_STRONG),
     );
     actions.push(set_auth_service_action(
         producer_sys::ROOT,
-        auth_delegate_sys::SERVICE,
+        auth_delegate::SERVICE,
     ));
 
     // If a package sets an auth service for an account, we should not override it
@@ -133,13 +133,9 @@ pub fn get_initial_actions<R: Read + Seek>(
     for s in &service_packages[..] {
         for account in s.get_accounts() {
             if !accounts_with_auth.contains(account) {
-                actions.push(
-                    auth_delegate_sys::Wrapper::pack_from(*account).setOwner(producer_sys::ROOT),
-                );
-                actions.push(set_auth_service_action(
-                    *account,
-                    auth_delegate_sys::SERVICE,
-                ));
+                actions
+                    .push(auth_delegate::Wrapper::pack_from(*account).setOwner(producer_sys::ROOT));
+                actions.push(set_auth_service_action(*account, auth_delegate::SERVICE));
             }
         }
     }
@@ -170,7 +166,7 @@ pub fn get_initial_actions<R: Read + Seek>(
 /// If `initial_key` is set, then this initializes all accounts to use
 /// that key and sets the key the initial producer signs blocks with.
 /// If it is not set, then this initializes all accounts to use
-/// `auth-any-sys` (no keys required) and sets it up so producers
+/// `auth-any` (no keys required) and sets it up so producers
 /// don't need to sign blocks.
 pub fn create_boot_transactions<R: Read + Seek>(
     initial_key: &Option<AnyPublicKey>,

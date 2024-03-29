@@ -9,10 +9,10 @@ function(add suffix)
     add_library(services_system${suffix} INTERFACE)
     target_mapped_include_directories(services_system${suffix} INTERFACE
         Accounts/include
-        AuthDelegateSys/include
-        AuthEcSys/include
-        AuthAnySys/include
-        AuthSys/include
+        AuthDelegate/include
+        AuthEc/include
+        AuthAny/include
+        AuthBasic/include
         CpuSys/include
         ProducerSys/include
         ProxySys/include
@@ -28,10 +28,10 @@ add("-debug")
 
 if(DEFINED IS_WASM)
     add_subdirectory(Accounts)
-    add_subdirectory(AuthDelegateSys)
-    add_subdirectory(AuthEcSys)
-    add_subdirectory(AuthAnySys)
-    add_subdirectory(AuthSys)
+    add_subdirectory(AuthDelegate)
+    add_subdirectory(AuthEc)
+    add_subdirectory(AuthAny)
+    add_subdirectory(AuthBasic)
     add_subdirectory(CpuSys)
     add_subdirectory(ProducerSys)
     add_subdirectory(ProxySys)

@@ -145,8 +145,8 @@ PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3
 PUB_R1_7pGpnu7HZVwi8kiLLDK2MJ6aYYS23eRJYmDXSLq5WZFCN6WEqY
 ```
 
-The default auth app [auth-ec-sys](../../../default-apps/auth-ec-sys.md) only accepts K1 keys.
-The default auth app [auth-sys](../../../default-apps/auth-sys.md) accepts K1 or R1 keys.
+The default auth app [auth-ec](../../../default-apps/auth-ec.md) only accepts K1 keys.
+The default auth app [auth-basic](../../../default-apps/auth-basic.md) accepts K1 or R1 keys.
 
 ## React GraphQL hooks (js)
 

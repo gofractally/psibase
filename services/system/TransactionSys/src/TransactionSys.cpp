@@ -1,6 +1,6 @@
 #include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthAnySys.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/CpuSys.hpp>
 #include <services/system/TransactionSys.hpp>
 

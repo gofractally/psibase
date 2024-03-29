@@ -3,15 +3,15 @@
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthAnySys.hpp>
-#include <services/system/AuthDelegateSys.hpp>
-#include <services/system/AuthEcSys.hpp>
+#include <services/system/AuthAny.hpp>
+#include <services/system/AuthDelegate.hpp>
+#include <services/system/AuthEc.hpp>
 #include <services/system/CommonSys.hpp>
 #include <services/system/CpuSys.hpp>
 #include <services/system/ProducerSys.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/RAccounts.hpp>
-#include <services/system/RAuthEcSys.hpp>
+#include <services/system/RAuthEc.hpp>
 #include <services/system/RProducerSys.hpp>
 #include <services/system/RProxySys.hpp>
 #include <services/system/SetCodeSys.hpp>
@@ -90,7 +90,7 @@ namespace
             }
             if (!s.hasService(account))
             {
-               actions.push_back(asys.newAccount(account, AuthAnySys::service, true));
+               actions.push_back(asys.newAccount(account, AuthAny::service, true));
             }
          }
 
@@ -108,7 +108,7 @@ namespace
       actions.push_back(psys.setProducers(producerConfig));
 
       auto root = AccountNumber{"root"};
-      actions.push_back(asys.newAccount(root, AuthAnySys::service, true));
+      actions.push_back(asys.newAccount(root, AuthAny::service, true));
 
       // If a package sets an auth service for an account, we should not override it
       std::vector<AccountNumber> accountsWithAuth;
@@ -128,8 +128,8 @@ namespace
             if (!std::ranges::binary_search(accountsWithAuth, account))
             {
                actions.push_back(
-                   transactor<AuthDelegateSys>{account, AuthDelegateSys::service}.setOwner(root));
-               actions.push_back(asys.from(account).setAuthServ(AuthDelegateSys::service));
+                   transactor<AuthDelegate>{account, AuthDelegate::service}.setOwner(root));
+               actions.push_back(asys.from(account).setAuthServ(AuthDelegate::service));
             }
          }
       }
@@ -204,7 +204,7 @@ DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
 
 AccountNumber DefaultTestChain::addAccount(
     AccountNumber acc,
-    AccountNumber authService /* = AccountNumber("auth-any-sys") */,
+    AccountNumber authService /* = AccountNumber("auth-any") */,
     bool          show /* = false */)
 {
    transactor<Accounts> asys(Accounts::service, Accounts::service);
@@ -219,7 +219,7 @@ AccountNumber DefaultTestChain::addAccount(
 
 AccountNumber DefaultTestChain::addAccount(
     const char*   acc,
-    AccountNumber authService /* = AccountNumber("auth-any-sys")*/,
+    AccountNumber authService /* = AccountNumber("auth-any")*/,
     bool          show /* = false */)
 {
    return addAccount(AccountNumber(acc), authService, show);
@@ -229,13 +229,13 @@ AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
                                            const PublicKey& public_key,
                                            bool             show /* = false */)
 {
-   transactor<Accounts>  asys(Accounts::service, Accounts::service);
-   transactor<AuthEcSys> ecsys(AuthEcSys::service, AuthEcSys::service);
+   transactor<Accounts> asys(Accounts::service, Accounts::service);
+   transactor<AuthEc>   ecsys(AuthEc::service, AuthEc::service);
 
    auto trace = pushTransaction(makeTransaction({
-       asys.newAccount(name, AuthAnySys::service, true),
+       asys.newAccount(name, AuthAny::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthServ(AuthEcSys::service),
+       asys.from(name).setAuthServ(AuthEc::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -254,9 +254,9 @@ void DefaultTestChain::setAuthEc(AccountNumber    name,
                                  bool             show /* = false */)
 {
    auto n  = name.str();
-   auto t1 = from(name).to<AuthEcSys>().setKey(pubkey);
+   auto t1 = from(name).to<AuthEc>().setKey(pubkey);
    check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
-   auto t2 = from(name).to<Accounts>().setAuthServ(AuthEcSys::service);
+   auto t2 = from(name).to<Accounts>().setAuthServ(AuthEc::service);
    check(psibase::show(show, t2.trace()) == "", "Failed to setAuthServ for " + n);
 }
 
@@ -264,7 +264,7 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            const char*   filename,
                                            bool          show /* = false */)
 {
-   addAccount(acc, AuthAnySys::service, show);
+   addAccount(acc, AuthAny::service, show);
 
    transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
 
@@ -281,7 +281,7 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            std::uint64_t flags,
                                            bool          show /* = false */)
 {
-   addAccount(acc, AuthAnySys::service, show);
+   addAccount(acc, AuthAny::service, show);
 
    transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
    auto                   setFlags =

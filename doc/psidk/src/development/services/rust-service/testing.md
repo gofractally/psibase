@@ -91,7 +91,7 @@ action:
      => transact-sys::
     raw_retval: 0 bytes
     action:
-        transact-sys => auth-any-sys::checkauthsys
+        transact-sys => auth-any::checkauthsys
         raw_retval: 0 bytes
     action:
         example => example::add

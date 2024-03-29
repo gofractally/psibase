@@ -1,6 +1,4 @@
-use crate::services::{
-    accounts, auth_delegate_sys, package_sys, proxy_sys, psispace_sys, setcode_sys,
-};
+use crate::services::{accounts, auth_delegate, package_sys, proxy_sys, psispace_sys, setcode_sys};
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
@@ -383,8 +381,8 @@ impl<R: Read + Seek> PackagedService<R> {
             actions.push(set_key_action(account, key));
             actions.push(set_auth_service_action(account, key.auth_service()));
         } else {
-            actions.push(auth_delegate_sys::Wrapper::pack_from(account).setOwner(sender));
-            actions.push(set_auth_service_action(account, auth_delegate_sys::SERVICE));
+            actions.push(auth_delegate::Wrapper::pack_from(account).setOwner(sender));
+            actions.push(set_auth_service_action(account, auth_delegate::SERVICE));
         }
         Ok(())
     }

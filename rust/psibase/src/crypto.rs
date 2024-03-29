@@ -894,9 +894,9 @@ pub struct AnyPublicKey {
 impl AnyPublicKey {
     pub fn auth_service(&self) -> AccountNumber {
         if self.key.service == AccountNumber::new(account_raw!("verifyec-sys")) {
-            AccountNumber::new(account_raw!("auth-ec-sys"))
+            AccountNumber::new(account_raw!("auth-ec"))
         } else {
-            AccountNumber::new(account_raw!("auth-sys"))
+            AccountNumber::new(account_raw!("auth-basic"))
         }
     }
 }

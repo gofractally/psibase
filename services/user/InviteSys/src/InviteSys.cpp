@@ -1,6 +1,6 @@
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthAnySys.hpp>
-#include <services/system/AuthEcSys.hpp>
+#include <services/system/AuthAny.hpp>
+#include <services/system/AuthEc.hpp>
 #include <services/system/ProxySys.hpp>
 #include <services/system/TransactionSys.hpp>
 #include <services/system/commonErrors.hpp>
@@ -159,14 +159,14 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    invite->newAccountToken = false;
 
    // Create new account, and set key & auth
-   to<Accounts>().newAccount(acceptedBy, AuthAnySys::service, true);
+   to<Accounts>().newAccount(acceptedBy, AuthAny::service, true);
    std::tuple<PublicKey> params{newAccountKey};
    Action                setKey{.sender  = acceptedBy,
-                                .service = AuthEcSys::service,
+                                .service = AuthEc::service,
                                 .method  = "setKey"_m,
                                 .rawData = psio::convert_to_frac(params)};
    to<TransactionSys>().runAs(move(setKey), vector<ServiceMethod>{});
-   std::tuple<AccountNumber> params2{AuthEcSys::service};
+   std::tuple<AccountNumber> params2{AuthEc::service};
    Action                    setAuth{.sender  = acceptedBy,
                                      .service = Accounts::service,
                                      .method  = "setAuthServ"_m,

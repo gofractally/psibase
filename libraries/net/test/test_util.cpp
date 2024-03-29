@@ -4,7 +4,7 @@
 #include <psibase/nativeTables.hpp>
 
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthAnySys.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/CpuSys.hpp>
 #include <services/system/ProducerSys.hpp>
 #include <services/system/TransactionSys.hpp>
@@ -97,9 +97,9 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
                                                .code    = readWholeFile("ProducerSys.wasm"),
                                            },
                                            {
-                                               .service = AuthAnySys::service,
+                                               .service = AuthAny::service,
                                                .flags   = 0,
-                                               .code    = readWholeFile("AuthAnySys.wasm"),
+                                               .code    = readWholeFile("AuthAny.wasm"),
                                            }};
    if (ec)
    {
@@ -109,7 +109,7 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
           .code    = readWholeFile("VerifyEcSys.wasm"),
       });
    }
-   // TransactionSys + ProducerSys + AuthAnySys + Accounts
+   // TransactionSys + ProducerSys + AuthAny + Accounts
    pushTransaction(ctx,
                    Transaction{                                                         //
                                .actions = {                                             //

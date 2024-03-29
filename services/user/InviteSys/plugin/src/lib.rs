@@ -2,7 +2,7 @@
 mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::accounts::plugin::accounts;
-use bindings::auth_sys::plugin::keyvault;
+use bindings::auth_basic::plugin::keyvault;
 use bindings::common::plugin::{client, server, types as CommonTypes};
 use bindings::exports::invite_sys::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,

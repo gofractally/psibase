@@ -2,8 +2,8 @@
 
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthAnySys.hpp>
-#include <services/system/AuthEcSys.hpp>
+#include <services/system/AuthAny.hpp>
+#include <services/system/AuthEc.hpp>
 #include <services/system/VerifyEcSys.hpp>
 #include <services/system/commonErrors.hpp>
 
@@ -49,12 +49,12 @@ SCENARIO("Auth")
       }
       THEN("Accounts can still create new accounts")
       {
-         auto newAcc = accounts.newAccount("bob", AuthAnySys::service, true);
+         auto newAcc = accounts.newAccount("bob", AuthAny::service, true);
          CHECK(newAcc.succeeded());
       }
       THEN("A regular user cannot create a new account")
       {
-         auto newAcc = a.newAccount("bob", AuthAnySys::service, true);
+         auto newAcc = a.newAccount("bob", AuthAny::service, true);
          CHECK(newAcc.failed("unauthorized account creation"));
       }
    }

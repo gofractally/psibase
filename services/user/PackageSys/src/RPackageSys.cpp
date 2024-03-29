@@ -2,7 +2,7 @@
 #include <services/user/RPackageSys.hpp>
 
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthDelegateSys.hpp>
+#include <services/system/AuthDelegate.hpp>
 
 using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
@@ -23,20 +23,20 @@ namespace UserService
       {
          std::vector<psibase::AccountNumber> result;
          auto accountIndex = Accounts::Tables(Accounts::service).open<AccountTable>().getIndex<0>();
-         auto ownerIndex   = AuthDelegateSys::Tables(AuthDelegateSys::service)
-                               .open<AuthDelegateSys::AuthDelegateTable>()
+         auto ownerIndex   = AuthDelegate::Tables(AuthDelegate::service)
+                               .open<AuthDelegate::AuthDelegateTable>()
                                .getIndex<0>();
          for (auto account : accounts)
          {
             if (auto accountRow = accountIndex.get(account))
             {
-               if (accountRow->authService != AuthDelegateSys::service)
+               if (accountRow->authService != AuthDelegate::service)
                {
                   if (account != owner &&
                       std::ranges::find(accounts, accountRow->authService) == accounts.end())
                   {
                      psibase::abortMessage("Account " + account.str() + " does not use " +
-                                           AuthDelegateSys::service.str() + " as its auth service");
+                                           AuthDelegate::service.str() + " as its auth service");
                   }
                }
                else

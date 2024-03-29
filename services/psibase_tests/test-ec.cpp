@@ -1,5 +1,5 @@
 #include <psibase/DefaultTestChain.hpp>
-#include <services/system/AuthEcSys.hpp>
+#include <services/system/AuthEc.hpp>
 #include <services/system/VerifyEcSys.hpp>
 
 #include <psibase/nativeTables.hpp>
@@ -25,11 +25,11 @@ TEST_CASE("ec")
    DefaultTestChain t;
    auto             test_service = t.addService("test-service"_a, "test-service.wasm");
 
-   transactor<SystemService::AuthEcSys> ecsys(SystemService::AuthEcSys::service,
-                                              SystemService::AuthEcSys::service);
+   transactor<SystemService::AuthEc> ecsys(SystemService::AuthEc::service,
+                                           SystemService::AuthEc::service);
 
    auto alice = t.from(t.addAccount(AccountNumber("alice")));
-   auto bob   = t.from(t.addAccount(AccountNumber("bob"), AccountNumber("auth-ec-sys")));
+   auto bob   = t.from(t.addAccount(AccountNumber("bob"), AccountNumber("auth-ec")));
    auto sue   = t.addAccount("sue", pub_key1);
 
    expect(t.pushTransaction(t.makeTransaction({{

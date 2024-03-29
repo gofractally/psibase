@@ -101,10 +101,10 @@ if(DEFINED WASI_SDK_PREFIX)
             -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
         BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegateSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthEc.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthBasic.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CoreFractalSys.wasm
@@ -119,8 +119,8 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthEc.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthBasic.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducerSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProxySys.wasm
@@ -289,7 +289,7 @@ add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
 add_dependencies(CommonSysCommonLib_js ComponentParser)
 
 add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
-add_rs_component(services/system/AuthSys/plugin:AuthPlugin auth_sys.wasm ${plugin-wit})
+add_rs_component(services/system/AuthBasic/plugin:AuthPlugin auth_basic.wasm ${plugin-wit})
 add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invite_sys.wasm ${plugin-wit} ${AuthPlugin_DEP})
 
 set(WASM_PSIBASE_BYPRODUCTS
@@ -366,19 +366,19 @@ psibase_package(
         DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${AccountsPlugin_DEP}
-    PACKAGE_DEPENDS "AuthAnySys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/AuthSys.psi
-    NAME AuthSys
+    OUTPUT ${SERVICE_DIR}/AuthBasic.psi
+    NAME AuthBasic
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service using Botan to verify signatures"
-    SERVICE auth-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
-        SERVER r-auth-sys
-    SERVICE r-auth-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
+    SERVICE auth-basic
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthBasic.wasm
+        SERVER r-auth-basic
+    SERVICE r-auth-basic
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthBasic.wasm
         DATA ${COMPONENT_BIN_DIR}/${AuthPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE verify-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
@@ -423,25 +423,25 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/AuthDelegateSys.psi
-    NAME AuthDelegateSys
+    OUTPUT ${SERVICE_DIR}/AuthDelegate.psi
+    NAME AuthDelegate
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service that delegates authorization to another account"
-    SERVICE auth-dlg-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegateSys.wasm
+    SERVICE auth-delegate
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
     DEPENDS wasm
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/AuthEcSys.psi
-    NAME AuthEcSys
+    OUTPUT ${SERVICE_DIR}/AuthEc.psi
+    NAME AuthEc
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service using secp256k1 to verify signatures"
-    SERVICE auth-ec-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
+    SERVICE auth-ec
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthEc.wasm
         SERVER r-ath-ec-sys
     SERVICE r-ath-ec-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthEc.wasm
     SERVICE verifyec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
         FLAGS isAuthService
@@ -450,12 +450,12 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/AuthAnySys.psi
-    NAME AuthAnySys
+    OUTPUT ${SERVICE_DIR}/AuthAny.psi
+    NAME AuthAny
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Insecure auth service that allows any access"
-    SERVICE auth-any-sys
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm
+    SERVICE auth-any
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
     DEPENDS wasm
 )
 
@@ -563,7 +563,7 @@ psibase_package(
     NAME InviteSys
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthEcSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthEc(^${PSIBASE_VERSION})"
     SERVICE invite-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
         SERVER invite-sys
@@ -664,7 +664,7 @@ psibase_package(
     NAME Default
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
-    PACKAGE_DEPENDS Accounts AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
+    PACKAGE_DEPENDS Accounts AuthAny AuthBasic AuthDelegate AuthEc CommonSys CpuSys DocSys
                     ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
                     PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys
 )
@@ -674,7 +674,7 @@ psibase_package(
     NAME Minimal
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
-    PACKAGE_DEPENDS Accounts AuthDelegateSys AuthAnySys CpuSys CommonSys PackageSys ProducerSys ProxySys
+    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuSys CommonSys PackageSys ProducerSys ProxySys
                     SetCodeSys TransactionSys
 )
 
@@ -692,17 +692,17 @@ function(write_package_index out)
 endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
-    Accounts AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
+    Accounts AuthAny AuthBasic AuthEc CommonSys CpuSys Default
     DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys ProducerSys ProxySys
     PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
     FILES ${SERVICE_DIR}/index.json
           ${SERVICE_DIR}/Accounts.psi
-          ${SERVICE_DIR}/AuthAnySys.psi
-          ${SERVICE_DIR}/AuthDelegateSys.psi
-          ${SERVICE_DIR}/AuthSys.psi
-          ${SERVICE_DIR}/AuthEcSys.psi
+          ${SERVICE_DIR}/AuthAny.psi
+          ${SERVICE_DIR}/AuthDelegate.psi
+          ${SERVICE_DIR}/AuthBasic.psi
+          ${SERVICE_DIR}/AuthEc.psi
           ${SERVICE_DIR}/CommonSys.psi
           ${SERVICE_DIR}/Default.psi
           ${SERVICE_DIR}/CpuSys.psi

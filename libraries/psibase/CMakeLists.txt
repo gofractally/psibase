@@ -161,9 +161,9 @@ function(add suffix)
             tester/include
             ../../services/system/Accounts/include
             ../../services/system/ProducerSys/include
-            ../../services/system/AuthDelegateSys/include
-            ../../services/system/AuthEcSys/include
-            ../../services/system/AuthAnySys/include
+            ../../services/system/AuthDelegate/include
+            ../../services/system/AuthEc/include
+            ../../services/system/AuthAny/include
             ../../services/system/CpuSys/include
             ../../services/system/ProxySys/include
             ../../services/system/SetCodeSys/include

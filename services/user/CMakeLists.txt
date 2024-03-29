@@ -10,8 +10,8 @@ function(add_user_service suffix name)
         ../SymbolSys/include
         ../TokenSys/include
         ../../system/Accounts/include
-        ../../system/AuthEcSys/include
-        ../../system/AuthAnySys/include
+        ../../system/AuthEc/include
+        ../../system/AuthAny/include
         ../../system/SetCodeSys/include
         ../../system/TransactionSys/include
         ../../system/VerifyEcSys/include
@@ -33,8 +33,8 @@ function(add_user_test_impl suffix name)
       ../../SymbolSys/include
       ../../TokenSys/include
       ../../../system/Accounts/include
-      ../../../system/AuthEcSys/include
-      ../../../system/AuthAnySys/include
+      ../../../system/AuthEc/include
+      ../../../system/AuthAny/include
       ../../../system/SetCodeSys/include
       ../../../system/TransactionSys/include
       ../../../system/VerifyEcSys/include

@@ -2,7 +2,7 @@
 
 #include <psibase/check.hpp>
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthDelegateSys.hpp>
+#include <services/system/AuthDelegate.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -21,8 +21,8 @@ namespace UserService
       }
       AccountNumber getOwner(AccountNumber account)
       {
-         auto db = AuthDelegateSys::Tables(AuthDelegateSys::service);
-         if (auto row = db.open<AuthDelegateSys::AuthDelegateTable>().getIndex<0>().get(account))
+         auto db = AuthDelegate::Tables(AuthDelegate::service);
+         if (auto row = db.open<AuthDelegate::AuthDelegateTable>().getIndex<0>().get(account))
             return row->owner;
          else
             abortMessage("Cannot find owner for " + account.str());
@@ -34,14 +34,14 @@ namespace UserService
       auto sender = getSender();
       for (AccountNumber account : package.accounts)
       {
-         if (auto auth = getAuthServ(account); auth != AuthDelegateSys::service)
+         if (auto auth = getAuthServ(account); auth != AuthDelegate::service)
          {
             // - A single account doesn't need to use delegation
             // - Accounts that have special auth defined in this package are okay
             if (account != sender &&
                 std::ranges::find(package.accounts, auth) == package.accounts.end())
                abortMessage("Account " + account.str() + " in " + package.name + " does not use " +
-                            AuthDelegateSys::service.str() + " as its auth service");
+                            AuthDelegate::service.str() + " as its auth service");
          }
          else
          {

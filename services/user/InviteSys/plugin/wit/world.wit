@@ -101,7 +101,7 @@ world psibase-plugin {
     import accounts:plugin/accounts;
 
     // For generating a keypair for the invite
-    import auth-sys:plugin/keyvault;
+    import auth-basic:plugin/keyvault;
 
     export admin;
     export inviter;

@@ -3,7 +3,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <services/system/AuthAnySys.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/TransactionSys.hpp>
 
 static constexpr bool enable_print = false;
@@ -35,7 +35,7 @@ namespace SystemService
          }
          accountTable.put({
              .accountNum  = code.codeNum,
-             .authService = AuthAnySys::service,
+             .authService = AuthAny::service,
          });
          ++totalAccounts;
       }

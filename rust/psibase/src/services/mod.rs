@@ -2,9 +2,9 @@
 
 pub mod accounts;
 pub mod admin_sys;
-pub mod auth_delegate_sys;
-pub mod auth_ec_sys;
-pub mod auth_sys;
+pub mod auth_basic;
+pub mod auth_delegate;
+pub mod auth_ec;
 pub mod common_sys;
 pub mod cpu_sys;
 #[allow(non_snake_case)]

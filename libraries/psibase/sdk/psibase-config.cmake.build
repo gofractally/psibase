@@ -57,8 +57,8 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/libraries/psibase/common/include
         @ROOT_SOURCE_DIR@/libraries/psibase/wasm32-wasi
         @ROOT_SOURCE_DIR@/services/system/Accounts/include
-        @ROOT_SOURCE_DIR@/services/system/AuthAnySys/include
-        @ROOT_SOURCE_DIR@/services/system/AuthEcSys/include
+        @ROOT_SOURCE_DIR@/services/system/AuthAny/include
+        @ROOT_SOURCE_DIR@/services/system/AuthEc/include
         @ROOT_SOURCE_DIR@/services/system/ProducerSys/include
         @ROOT_SOURCE_DIR@/services/system/ProxySys/include
         @ROOT_SOURCE_DIR@/services/system/SetCodeSys/include

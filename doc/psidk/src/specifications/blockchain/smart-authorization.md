@@ -54,7 +54,7 @@ classDiagram
 
 > Note: A `SignedTransaction` should be eventually renamed to something more generic, like `AuthedTransaction`, since "Signed" implies the specific claim/proof technique of using digital signatures.
 
-The submitted `SignedTransaction` is sent to the AuthService defined by an account (e.g. [AuthSys](../../default-apps/auth-sys.md)) and the corresponding verification service. These services will fail the transaction if either the claims in the transaction are incorrect, or if the proof does not prove the claim.
+The submitted `SignedTransaction` is sent to the AuthService defined by an account (e.g. [AuthBasic](../../default-apps/auth-basic.md)) and the corresponding verification service. These services will fail the transaction if either the claims in the transaction are incorrect, or if the proof does not prove the claim.
 
 ## Supervisor
 

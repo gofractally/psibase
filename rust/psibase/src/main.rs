@@ -6,7 +6,7 @@ use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{accounts, auth_delegate_sys, psispace_sys};
+use psibase::services::{accounts, auth_delegate, psispace_sys};
 use psibase::{
     account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
     get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,
@@ -358,7 +358,7 @@ async fn modify(
     }
 
     if insecure {
-        actions.push(set_auth_service_action(account, account!("auth-any-sys")));
+        actions.push(set_auth_service_action(account, account!("auth-any")));
     }
 
     let trx = with_tapos(
@@ -776,9 +776,9 @@ fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error
     for account in accounts {
         out.set_label(format!("Creating {}", account));
         let group = vec![
-            accounts::Wrapper::pack().newAccount(account, account!("auth-any-sys"), true),
-            auth_delegate_sys::Wrapper::pack_from(account).setOwner(sender),
-            set_auth_service_action(account, auth_delegate_sys::SERVICE),
+            accounts::Wrapper::pack().newAccount(account, account!("auth-any"), true),
+            auth_delegate::Wrapper::pack_from(account).setOwner(sender),
+            set_auth_service_action(account, auth_delegate::SERVICE),
         ];
         out.push(group)?;
     }

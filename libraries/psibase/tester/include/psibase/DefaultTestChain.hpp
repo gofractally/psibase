@@ -12,7 +12,7 @@ namespace psibase
      public:
       // default excludes DocSys and TokenUsers
       DefaultTestChain(const std::vector<std::string>& packageNames =
-                           {"Accounts", "AuthAnySys", "AuthDelegateSys", "AuthSys", "AuthEcSys",
+                           {"Accounts", "AuthAny", "AuthDelegate", "AuthBasic", "AuthEc",
                             "CommonSys", "CpuSys", "ExploreSys", "FractalSys", "InviteSys",
                             "NftSys", "PackageSys", "ProducerSys", "ProxySys", "PsiSpaceSys",
                             "SetCodeSys", "SymbolSys", "TokenSys", "TransactionSys"},
@@ -44,11 +44,11 @@ namespace psibase
       void setAuthEc(AccountNumber name, const PublicKey& pubkey, bool show = false);
 
       AccountNumber addAccount(const char*   acc,
-                               AccountNumber authService = AccountNumber("auth-any-sys"),
+                               AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
 
       AccountNumber addAccount(AccountNumber acc,
-                               AccountNumber authService = AccountNumber("auth-any-sys"),
+                               AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
    };
 }  // namespace psibase
