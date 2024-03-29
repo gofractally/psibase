@@ -433,7 +433,7 @@ namespace psio
             end,
             scalar,
             empty,
-            custom_start,
+            custom,
          };
          struct Item
          {
@@ -635,19 +635,18 @@ namespace psio
                      stream.write("null", 4);
                   }
                   break;
-               default:
+               case FracParser::custom:
                   start_member(item);
                   if (item.data.empty())
                   {
-                     if (!parser.builtin.frac2json(item.type, item.kind - FracParser::custom_start,
-                                                   parser.in, stream))
+                     if (!parser.builtin.frac2json(item.type, item.type->custom_id, parser.in,
+                                                   stream))
                         check(false, "Failed to parse custom type");
                   }
                   else
                   {
                      FracStream tmpin{item.data};
-                     if (!parser.builtin.frac2json(item.type, item.kind - FracParser::custom_start,
-                                                   tmpin, stream))
+                     if (!parser.builtin.frac2json(item.type, item.type->custom_id, tmpin, stream))
                         check(false, "Failed to parse custom type");
                   }
                   break;

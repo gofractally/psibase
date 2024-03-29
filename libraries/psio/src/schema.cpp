@@ -719,7 +719,7 @@ namespace psio::schema_types
          }
          if (type->custom_id != -1 && enableCustom)
          {
-            result.kind = static_cast<ItemKind>(custom_start + type->custom_id);
+            result.kind = FracParser::custom;
             if (offset == 0)
                result.data = std::span{in.src + fixed_pos, in.src + tmp_pos};
             else
@@ -743,7 +743,7 @@ namespace psio::schema_types
       Item result{.type = ctype};
       if (ctype->custom_id != -1 && enableCustom)
       {
-         result.kind = static_cast<ItemKind>(custom_start + ctype->custom_id);
+         result.kind = FracParser::custom;
       }
       else if (ctype->kind == CompiledType::scalar)
       {
@@ -768,7 +768,7 @@ namespace psio::schema_types
       if (ctype->custom_id != -1 && enableCustom)
       {
          result.data = read_fixed(ctype, fixed_pos);
-         result.kind = static_cast<ItemKind>(custom_start + ctype->custom_id);
+         result.kind = FracParser::custom;
       }
       else if (ctype->kind == CompiledType::scalar)
       {
