@@ -527,8 +527,8 @@ psibase_package(
     DESCRIPTION "The `http-server` service routes HTTP requests to the appropriate service"
     SERVICE http-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
-        SERVER r-http-server
-    SERVICE r-http-server
+        SERVER rhttp-server
+    SERVICE rhttp-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
     DEPENDS wasm
 )

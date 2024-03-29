@@ -161,6 +161,12 @@ namespace psibase
    {
       for (const auto& [account, index, info] : services)
       {
+         if (account.value == 0)
+         {
+            std::string filename = std::string(archive.getEntry(index).filename());
+            abortMessage("Service with filename: " + filename + " has invalid account name");
+         }
+
          out.push_back(GenesisService{
              .service   = account,
              .flags     = translateFlags(info.flags),

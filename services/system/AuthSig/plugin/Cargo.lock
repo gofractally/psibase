@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "auth-basic"
+name = "auth-sig"
 version = "0.1.0"
 dependencies = [
  "bitflags",
