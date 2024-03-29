@@ -2,11 +2,28 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
-import wasm from 'vite-plugin-wasm';
+import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
+const psibase = (_service: string, isServing?: boolean) => {
+    const buildAliases = [
+        {
+            // bundle non-external (above) common files except fonts (which should only be referenced)
+            find: /^\/common(?!\/(?:fonts))(.*)$/,
+            replacement: path.resolve("../../CommonSys/common/resources$1"),
+        },
+    ];
 
-const psibase = (appletContract: string) => {
+    // if we're in dev mode, we need to alias the common-lib to the local source
+    if (isServing) {
+        buildAliases.push({
+            find: /^@psibase\/common-lib.*$/,
+            replacement: path.resolve(
+                "../../CommonSys/common/packages/common-lib/src"
+            ),
+        });
+    }
+
     return [
         {
             name: "psibase",
@@ -18,8 +35,7 @@ const psibase = (appletContract: string) => {
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
-                                "/common/rpc.mjs",
-                                "/common/iframeResizer.js",
+                                "/common/common-lib.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
                             output: {
@@ -43,12 +59,12 @@ const psibase = (appletContract: string) => {
                                 autoRewrite: true,
                                 bypass: (req, _res, _opt) => {
                                     if (
-                                        req.url === "/" || (
-                                            req.method !== "POST"
-                                         && req.method !== "PUT"
-                                         && req.headers.accept !== "application/json"
-                                         && !req.url.startsWith("/common")
-                                         )
+                                        req.url === "/" ||
+                                        (req.method !== "POST" &&
+                                            req.method !== "PUT" &&
+                                            req.headers.accept !==
+                                                "application/json" &&
+                                            !req.url.startsWith("/common"))
                                     ) {
                                         return req.url;
                                     }
@@ -58,35 +74,24 @@ const psibase = (appletContract: string) => {
                         },
                     },
                     resolve: {
-                        alias: [
-                            {
-                                find: "/common/iframeResizer.contentWindow.js",
-                                replacement: path.resolve(
-                                    "../../CommonSys/common/thirdParty/src/iframeResizer.contentWindow.js"
-                                ),
-                            },
-                            {
-                                // bundle non-external (above) common files except fonts (which should only be referenced)
-                                find: /^\/common(?!\/(?:fonts))(.*)$/,
-                                replacement: path.resolve(
-                                    "../../CommonSys/common$1"
-                                ),
-                            },
-                        ],
+                        alias: buildAliases,
                     },
                 };
             },
         },
         alias({
             entries: [
-                { find: "common/rpc.mjs", replacement: "/common/rpc.mjs" },
+                {
+                    find: /^@psibase\/common-lib.*$/,
+                    replacement: "/common/common-lib.js",
+                },
             ],
         }),
     ];
 };
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
     plugins: [
         react({
             babel: {
@@ -95,8 +100,8 @@ export default defineConfig({
                 },
             },
         }),
-        psibase("__contract__(kebabCase)"),
+        psibase("__contract__(kebabCase)", command === "serve"),
         wasm(),
-        topLevelAwait()
+        topLevelAwait(),
     ],
-});
+}));

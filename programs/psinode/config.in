@@ -3,9 +3,9 @@
 p2p      = off
 # producer = psibase
 # key      = <private key>
-# host     = 127.0.0.1.sslip.io
-# listen   = 8080
-# peer     = localhost:8080
+host     = psibase.127.0.0.1.sslip.io
+listen   = 8080
+# peer     = http://localhost:8080/
 service  = localhost:$PSIBASE_DATADIR/services/admin-sys
 service  = 127.0.0.1:$PSIBASE_DATADIR/services/admin-sys
 service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
@@ -20,4 +20,4 @@ admin-authz = rw:loopback
 [logger.stderr]
 type   = console
 filter = Severity >= info
-format = [{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}
+format = [{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}

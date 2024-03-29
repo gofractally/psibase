@@ -33,8 +33,7 @@ namespace psibase
    {
       auto getProducers = [](auto& consensus) -> auto&
       {
-         return std::visit(
-             [](auto& c) -> auto& { return c.producers; }, consensus);
+         return std::visit([](auto& c) -> auto& { return c.producers; }, consensus);
       };
       auto& prods = getProducers(status.consensus);
       if (prods.size() == 1)
@@ -202,8 +201,7 @@ namespace psibase
       if (status->nextConsensus && std::get<1>(*status->nextConsensus) == status->current.blockNum)
       {
          auto& nextConsensus = std::get<0>(*status->nextConsensus);
-         auto& prods         = std::visit(
-             [](auto& c) -> auto& { return c.producers; }, nextConsensus);
+         auto& prods = std::visit([](auto& c) -> auto& { return c.producers; }, nextConsensus);
          // Special case: If no producers are specified, use the producers of the current block
          if (prods.empty())
          {
@@ -405,6 +403,7 @@ namespace psibase
             session.commit();
             active = true;
          }
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, info) << "Transaction succeeded";
          return std::move(t.subjectiveData);
       }

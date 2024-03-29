@@ -1,0 +1,41 @@
+package psibase:component-parser;
+
+interface types {
+
+    record intf {
+        namespace: string,
+        %package: string,
+        name: string,
+        funcs: list<string>
+    }
+
+    record functions {
+        namespace: string,
+        %package: string,
+        interfaces: list<intf>,
+        funcs: list<string>
+    }
+    
+    record component-extraction {
+        /// A representation of all imported functions
+        imported-funcs : functions,
+
+        /// A respresentation of all exported functions
+        /// Self-reported namespaces for functions parsed from this component should not be trusted,
+        /// since a component could declare itself in whatever namespace it wants. Instead, the namespace
+        /// is always equal to the domain of the component within the registry from which it was 
+        /// retrieved.
+        exported-funcs: functions,
+
+        // The WIT definition of the component's world.
+        wit: string,
+
+        // Debug string
+        debug: string,
+    }
+}
+
+world component {
+    use types.{component-extraction};
+    export parse: func(name: string, bytes: list<u8>) -> result<component-extraction, string>;
+}

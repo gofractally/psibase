@@ -6,19 +6,22 @@ use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::psispace_sys;
+use psibase::services::{account_sys, auth_delegate_sys, psispace_sys};
 use psibase::{
-    account, apply_proxy, as_json, create_boot_transactions, get_tapos_for_head,
-    new_account_action, push_transaction, reg_server, set_auth_service_action, set_code_action,
+    account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
+    get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,
+    push_transaction, push_transactions, reg_server, set_auth_service_action, set_code_action,
     set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
-    AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
-    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
-    Transaction,
+    AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, Meta,
+    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry, ServiceInfo,
+    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::fmt;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -53,6 +56,10 @@ struct Args {
     /// error, stack, full, or json
     #[clap(long, value_name = "FORMAT", default_value = "stack")]
     trace: TraceFormat,
+
+    /// Controls whether the transaction's console output is shown
+    #[clap(long, action=clap::ArgAction::Set, min_values=0, require_equals=true, default_value="true", default_missing_value="true")]
+    console: bool,
 
     #[clap(subcommand)]
     command: Command,
@@ -182,6 +189,7 @@ enum Command {
     /// Install apps to the chain
     Install {
         /// Packages to install
+        #[clap(required = true)]
         packages: Vec<String>,
 
         /// Set all accounts to authenticate using this key
@@ -196,6 +204,10 @@ enum Command {
         /// that they create will be owned by this account.
         #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
         sender: ExactAccountNumber,
+
+        /// Install the package even if it is already installed
+        #[clap(long)]
+        reinstall: bool,
     },
 
     /// Prints a list of apps
@@ -218,7 +230,19 @@ enum Command {
     /// Find packages
     Search {
         /// Regular expressions to search for in package names and descriptions
+        #[clap(required = true)]
         patterns: Vec<String>,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
+    },
+
+    /// Shows package contents
+    Info {
+        /// Packages to show
+        #[clap(required = true)]
+        packages: Vec<String>,
 
         /// A URL or path to a package repository (repeatable)
         #[clap(long, value_name = "URL")]
@@ -312,6 +336,8 @@ async fn create(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -354,6 +380,8 @@ async fn modify(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -413,6 +441,8 @@ async fn deploy(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -474,6 +504,8 @@ async fn upload(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -543,7 +575,15 @@ async fn monitor_trx(
     progress: ProgressBar,
     n: u64,
 ) -> Result<(), anyhow::Error> {
-    let result = push_transaction(&args.api, client.clone(), trx.packed(), args.trace).await;
+    let result = push_transaction(
+        &args.api,
+        client.clone(),
+        trx.packed(),
+        args.trace,
+        args.console,
+        Some(&progress),
+    )
+    .await;
     if let Err(err) = result {
         progress.suspend(|| {
             println!("=====\n{:?}", err);
@@ -619,10 +659,18 @@ async fn boot(
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
-    push_boot(args, &client, boot_transactions.packed()).await?;
+    push_boot(args, &client, boot_transactions.packed(), &progress).await?;
     progress.inc(1);
     for transaction in transactions {
-        push_transaction(&args.api, client.clone(), transaction.packed(), args.trace).await?;
+        push_transaction(
+            &args.api,
+            client.clone(),
+            transaction.packed(),
+            args.trace,
+            args.console,
+            Some(&progress),
+        )
+        .await?;
         progress.inc(1)
     }
     if !args.suppress_ok {
@@ -635,11 +683,15 @@ async fn push_boot(
     args: &Args,
     client: &reqwest::Client,
     packed: Vec<u8>,
+    progress: &ProgressBar,
 ) -> Result<(), anyhow::Error> {
+    let trace: TransactionTrace =
+        as_json(client.post(args.api.join("native/push_boot")?).body(packed)).await?;
+    if args.console {
+        progress.suspend(|| print!("{}", trace.console()));
+    }
     args.trace
-        .error_for_trace(
-            as_json(client.post(args.api.join("native/push_boot")?).body(packed)).await?,
-        )
+        .error_for_trace(trace, Some(progress))
         .context("Failed to boot")
 }
 
@@ -726,29 +778,81 @@ async fn upload_tree(
     Ok(())
 }
 
-async fn monitor_install_trx(
-    args: &Args,
-    client: &reqwest::Client,
-    tapos: &TaposRefBlock,
-    actions: Vec<Action>,
-    progress: ProgressBar,
-    n: u64,
+fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>>(
+    accounts: Vec<AccountNumber>,
+    out: &mut TransactionBuilder<F>,
+    sender: AccountNumber,
 ) -> Result<(), anyhow::Error> {
-    let trx = with_tapos(tapos, actions);
-
-    let result = push_transaction(
-        &args.api,
-        client.clone(),
-        sign_transaction(trx, &args.sign)?.packed(),
-        args.trace,
-    )
-    .await;
-
-    if let Err(err) = result {
-        progress.abandon_with_message(format!("{}: {:?}", progress.message(), err));
-        return Err(err);
+    for account in accounts {
+        out.set_label(format!("Creating {}", account));
+        let group = vec![
+            account_sys::Wrapper::pack().newAccount(account, account!("auth-any-sys"), true),
+            auth_delegate_sys::Wrapper::pack_from(account).setOwner(sender),
+            set_auth_service_action(account, auth_delegate_sys::SERVICE),
+        ];
+        out.push(group)?;
     }
-    progress.inc(n);
+    Ok(())
+}
+
+async fn apply_packages<
+    R: PackageRegistry,
+    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+>(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    reg: &R,
+    ops: Vec<PackageOp>,
+    accounts: &mut Vec<AccountNumber>,
+    out: &mut TransactionBuilder<F>,
+    sender: AccountNumber,
+    key: &Option<AnyPublicKey>,
+) -> Result<(), anyhow::Error> {
+    for op in ops {
+        match op {
+            PackageOp::Install(info) => {
+                // TODO: verify ownership of existing accounts
+                let mut package = reg.get_by_info(&info).await?;
+                accounts.extend_from_slice(package.get_accounts());
+                out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                let mut account_actions = vec![];
+                package.install_accounts(&mut account_actions, sender, key)?;
+                out.push_all(account_actions)?;
+                let mut actions = vec![];
+                package.install(&mut actions, sender, true)?;
+                out.push_all(actions)?;
+            }
+            PackageOp::Replace(meta, info) => {
+                let mut package = reg.get_by_info(&info).await?;
+                accounts.extend_from_slice(package.get_accounts());
+                // TODO: skip unmodified files (?)
+                out.set_label(format!(
+                    "Updating {}-{} -> {}-{}",
+                    &meta.name, &meta.version, &info.name, &info.version
+                ));
+                // Remove out-dated files. This needs to happen before installing
+                // new files, to handle the case where a service that stores
+                // data files is replaced by a service that does not provide
+                // removeSys.
+                let old_manifest =
+                    get_installed_manifest(base_url, client, &meta.name, sender).await?;
+                old_manifest.upgrade(package.manifest(), out)?;
+                // Install the new package
+                let mut account_actions = vec![];
+                package.install_accounts(&mut account_actions, sender, key)?;
+                out.push_all(account_actions)?;
+                let mut actions = vec![];
+                package.install(&mut actions, sender, true)?;
+                out.push_all(actions)?;
+            }
+            PackageOp::Remove(meta) => {
+                out.set_label(format!("Removing {}", &meta.name));
+                let old_manifest =
+                    get_installed_manifest(base_url, client, &meta.name, sender).await?;
+                old_manifest.remove(out)?;
+            }
+        }
+    }
     Ok(())
 }
 
@@ -759,97 +863,85 @@ async fn install(
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     sources: &Vec<String>,
+    reinstall: bool,
 ) -> Result<(), anyhow::Error> {
     let installed = PackageList::installed(&args.api, &mut client).await?;
     let package_registry = get_package_registry(sources, client.clone()).await?;
-    let to_install = installed.resolve_new(&package_registry, packages).await?;
-
-    let mut all_account_actions = vec![];
-    let mut all_init_actions = vec![];
-    for mut package in to_install {
-        let mut account_actions = vec![];
-        package.install_accounts(&mut account_actions, sender, key)?;
-        all_account_actions.push((account_actions, package.name().to_string()));
-        let mut actions = vec![];
-        package.install(&mut actions, sender, true)?;
-        all_init_actions.push((actions, package.name().to_string()));
-    }
+    let to_install = installed
+        .resolve_changes(&package_registry, packages, reinstall)
+        .await?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
-    let progress = ProgressBar::new(all_account_actions.len() as u64).with_style(
-        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
-    );
+
+    let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+        if actions.first().unwrap().sender != sender {
+            actions.insert(
+                0,
+                Action {
+                    sender,
+                    service: account!("nop-sys"),
+                    method: method!("nop"),
+                    rawData: Default::default(),
+                },
+            );
+        }
+        Ok(sign_transaction(with_tapos(&tapos, actions), &args.sign)?)
+    };
 
     let action_limit: usize = 64 * 1024;
 
-    // create all accounts
-    {
-        let mut n: u64 = 0;
-        let mut size: usize = 0;
-        let mut trx_actions = vec![];
-        for (actions, name) in all_account_actions {
-            progress.set_message("Deploying ".to_string() + &name);
-            for group in actions {
-                if size >= action_limit {
-                    monitor_install_trx(
-                        args,
-                        &client,
-                        &tapos,
-                        trx_actions.drain(..).collect(),
-                        progress.clone(),
-                        n,
-                    )
-                    .await?;
-                    n = 0;
-                    size = 0;
-                }
-                for act in group {
-                    size += act.rawData.len();
-                    trx_actions.push(act);
-                }
-            }
-            n += 1;
-        }
-        if !trx_actions.is_empty() {
-            monitor_install_trx(args, &client, &tapos, trx_actions, progress.clone(), n).await?;
-        }
-    }
+    let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
+    let mut new_accounts = vec![];
 
-    // Wait for a new block after the accounts are created, so the
-    // first auth check doesn't fail
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    progress.set_position(0);
+    let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
+    apply_packages(
+        &args.api,
+        &mut client,
+        &package_registry,
+        to_install,
+        &mut new_accounts,
+        &mut trx_builder,
+        sender,
+        key,
+    )
+    .await?;
+
+    new_accounts = get_accounts_to_create(&args.api, &mut client, &new_accounts, sender).await?;
+    create_accounts(new_accounts, &mut account_builder, sender)?;
+
+    let account_transactions = account_builder.finish()?;
+    let transactions = trx_builder.finish()?;
 
     {
-        let mut n: u64 = 0;
-        let mut size: usize = 0;
-        let mut trx_actions = vec![];
-        for (actions, name) in all_init_actions {
-            progress.set_message("Initializing ".to_string() + &name);
-            for act in actions {
-                if size >= action_limit {
-                    monitor_install_trx(
-                        args,
-                        &client,
-                        &tapos,
-                        trx_actions.drain(..).collect(),
-                        progress.clone(),
-                        n,
-                    )
-                    .await?;
-                    n = 0;
-                    size = 0;
-                }
-
-                size += act.rawData.len();
-                trx_actions.push(act);
-            }
-            n += 1;
-        }
-        if !trx_actions.is_empty() {
-            monitor_install_trx(args, &client, &tapos, trx_actions, progress.clone(), n).await?;
-        }
+        let progress = ProgressBar::new(account_transactions.len() as u64).with_style(
+            ProgressStyle::with_template("{wide_bar} {pos}/{len} accounts\n{msg}")?,
+        );
+        push_transactions(
+            &args.api,
+            client.clone(),
+            account_transactions,
+            args.trace,
+            args.console,
+            &progress,
+        )
+        .await?;
+        progress.finish_and_clear();
     }
+
+    let progress = ProgressBar::new(transactions.len() as u64).with_style(
+        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
+    );
+
+    push_transactions(
+        &args.api,
+        client.clone(),
+        transactions,
+        args.trace,
+        args.console,
+        &progress,
+    )
+    .await?;
+
     if !args.suppress_ok {
         progress.finish_with_message("Ok");
     } else {
@@ -868,19 +960,19 @@ async fn list(
     sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     if all || (installed && available) || (!all & !installed && !available) {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
         }
     } else if installed {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         for name in installed.into_vec() {
             println!("{}", name);
         }
     } else if available {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
@@ -933,6 +1025,123 @@ async fn search(
     Ok(())
 }
 
+struct ServicePrinter<'a> {
+    service: AccountNumber,
+    info: Option<&'a ServiceInfo>,
+    data: &'a [PackageDataFile],
+}
+
+impl fmt::Display for ServicePrinter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(info) = &self.info {
+            writeln!(f, "service: {}", self.service)?;
+            if !info.flags.is_empty() {
+                write!(f, "  flags:")?;
+                for flag in &info.flags {
+                    write!(f, " {}", flag)?;
+                }
+                writeln!(f, "")?;
+            }
+            if let Some(server) = &info.server {
+                writeln!(f, "  server: {}", server)?;
+            }
+        } else {
+            writeln!(f, "account: {}", self.service)?;
+        }
+        if !self.data.is_empty() {
+            writeln!(f, "  files:")?;
+            for file in self.data {
+                writeln!(f, "    {}", &file.filename)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn get_service_data(s: &[PackageDataFile], account: AccountNumber) -> &[PackageDataFile] {
+    let key = account.to_string();
+    let lower = s.partition_point(|file| &file.account.to_string() < &key);
+    let upper = s.partition_point(|file| &file.account.to_string() <= &key);
+    &s[lower..upper]
+}
+
+async fn show_package<T: PackageRegistry + ?Sized>(
+    reg: &T,
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    package: &Meta,
+    origin: &PackageOrigin,
+) -> Result<(), anyhow::Error> {
+    let mut manifest = get_manifest(reg, base_url, client, package, origin).await?;
+    println!("name: {}-{}", &package.name, &package.version);
+    println!("description: {}", &package.description);
+    let mut services: Vec<_> = manifest.services.into_iter().collect();
+    services.sort_by(|lhs, rhs| lhs.0.to_string().cmp(&rhs.0.to_string()));
+    manifest.data.sort_by(|lhs, rhs| {
+        (
+            lhs.account.to_string(),
+            lhs.service.to_string(),
+            &lhs.filename,
+        )
+            .cmp(&(
+                rhs.account.to_string(),
+                rhs.service.to_string(),
+                &rhs.filename,
+            ))
+    });
+
+    for account in &package.accounts {
+        let info = services
+            .binary_search_by(|service| service.0.to_string().cmp(&account.to_string()))
+            .map_or(None, |idx| Some(&services[idx].1));
+        print!(
+            "{}",
+            &ServicePrinter {
+                service: *account,
+                info,
+                data: get_service_data(&manifest.data, *account)
+            }
+        );
+    }
+    Ok(())
+}
+
+// an unbooted chain has no packages installed
+fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageList, anyhow::Error> {
+    if let Err(e) = &list {
+        if e.root_cause()
+            .to_string()
+            .contains("Need genesis block; use 'psibase boot' to boot chain")
+        {
+            return Ok(PackageList::new());
+        }
+    }
+    list
+}
+
+async fn package_info(
+    args: &Args,
+    mut client: reqwest::Client,
+    packages: &Vec<String>,
+    sources: &Vec<String>,
+) -> Result<(), anyhow::Error> {
+    let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
+    let package_registry = get_package_registry(sources, client.clone()).await?;
+    let reglist = PackageList::from_registry(&package_registry)?;
+
+    for package in packages {
+        if let Some((meta, origin)) = installed.get_by_name(package)? {
+            show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
+        } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
+            show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
+        } else {
+            eprintln!("Package {} not found", package);
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize)]
 struct TokenData<'a> {
     exp: i64,
@@ -953,7 +1162,7 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
 
 async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
     let (builder, result) = apply_proxy(reqwest::Client::builder(), &args.proxy).await?;
-    Ok((builder.build()?, result))
+    Ok((builder.gzip(true).build()?, result))
 }
 
 #[tokio::main]
@@ -1039,6 +1248,7 @@ async fn main() -> Result<(), anyhow::Error> {
             key,
             package_source,
             sender,
+            reinstall,
         } => {
             install(
                 &args,
@@ -1047,6 +1257,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 (*sender).into(),
                 key,
                 package_source,
+                *reinstall,
             )
             .await?
         }
@@ -1060,6 +1271,10 @@ async fn main() -> Result<(), anyhow::Error> {
             patterns,
             package_source,
         } => search(&args, client, patterns, package_source).await?,
+        Command::Info {
+            packages,
+            package_source,
+        } => package_info(&args, client, packages, package_source).await?,
         Command::CreateToken {
             expires_after,
             mode,

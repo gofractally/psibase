@@ -674,6 +674,36 @@ namespace psio
       from_json_hex(obj, stream);
    }
 
+   template <typename T, std::size_t N, typename S>
+      requires std::same_as<T, char> || std::same_as<T, unsigned char> ||
+               std::same_as<T, signed char>
+   void from_json_hex(std::array<T, N>& result, S& stream)
+   {
+      auto s = stream.get_string();
+      if (s.size() != 2 * N)
+         abort_error(from_json_error::expected_hex_string);
+      if (!unhex(result.data(), s.begin(), s.end()))
+         abort_error(from_json_error::expected_hex_string);
+   }
+
+   template <std::size_t N, typename S>
+   void from_json(std::array<char, N>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
+   template <std::size_t N, typename S>
+   void from_json(std::array<unsigned char, N>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
+   template <std::size_t N, typename S>
+   void from_json(std::array<signed char, N>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
    /// \exclude
    template <typename S, typename F>
    inline void from_json_object(S& stream, F f)

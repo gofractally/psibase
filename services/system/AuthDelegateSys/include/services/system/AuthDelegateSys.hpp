@@ -38,7 +38,8 @@ namespace SystemService
       /// This action forwards verification to the owning account
       void checkAuthSys(std::uint32_t               flags,
                         psibase::AccountNumber      requester,
-                        psibase::Action             action,
+                        psibase::AccountNumber      sender,
+                        ServiceMethod               action,
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
@@ -61,7 +62,7 @@ namespace SystemService
       Tables db{psibase::getReceiver()};
    };
    PSIO_REFLECT(AuthDelegateSys,  //
-                method(checkAuthSys, flags, requester, action, allowedActions, claims),
+                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
                 method(setOwner, owner)
                 //

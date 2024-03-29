@@ -31,7 +31,8 @@ option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
 
 add_subdirectory(native)
-file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\")\n")
+add_subdirectory(rust)
+file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\", \"rust\")\n")
 
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
@@ -112,6 +113,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
@@ -151,6 +153,7 @@ ExternalProject_Add(
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
 )
 
@@ -200,46 +203,94 @@ add_custom_command(
 add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
 
-# Run yarn to build service UIs
+# Cargo psibase
+ExternalProject_Add(
+    cargo-psibase
+    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
+    CONFIGURE_COMMAND   ""
+    BUILD_COMMAND       cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
+    BUILD_ALWAYS        1
+    INSTALL_COMMAND     ""
+)
+
+# UIs built with yarn
 set(JS_DIRS
-    services/system/AccountSys/ui:AccountSys_js
-    services/user/PsiSpaceSys/ui:PsiSpaceSys_js
     services/user/CommonSys/ui:CommonSys_js
-    services/user/TokenSys/ui:TokenSys_js
+    services/user/SupervisorSys/ui:SupervisorSys_js
     services/user/ExploreSys/ui:ExploreSys_js
-    services/user/InviteSys/ui:InviteSys_js
 )
 set(ADMIN_DIR services/user/AdminSys/ui:AdminSys_js)
-set(COMMON_DIR services/user/CommonSys/common-lib/:CommonSysLib_js)
+set(COMMON_LIB_DIR services/user/CommonSys/common/packages/common-lib/:CommonSysCommonLib_js)
+set(COMMON_LOADER_DIR services/user/CommonSys/common/packages/wasm-loader/:CommonSysLoaderLib_js)
 
-function(add_js_target ENTRY OUTPUT_FILE)
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ENTRY})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 DEP ${ENTRY})
+function(add_js_target TARGET_TUPLE OUTPUT_FILE)
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
+    set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
+    file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
 
-    file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
-    set(DEPENDENCIES ${sources} ${ARGN})
+    # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE}
-        DEPENDS ${DEPENDENCIES}
+        OUTPUT ${OUTPUT_FILEPATH}
+        DEPENDS ${SOURCES} ${ARGN}
         COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
     )
-    add_custom_target(
-        ${DEP}
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE}
-    )
-    set(${DEP}_dep ${DEP} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE} PARENT_SCOPE)
+    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
+    add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
+    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
 endfunction()
 
-list(TRANSFORM JS_DIRS REPLACE "^[^:]+:([^:]+)$" \\1 OUTPUT_VARIABLE JS_DEPS)
-file(GLOB common LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/*)
-file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts/*)
+# Static (not built) resource dependencies
+file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/*)
+file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts/*)
 
-# Builds the Common Sys Lib
-add_js_target(${COMMON_DIR} common-lib.js)
+# Builds the Common Sys files that the UIs (just below) depend on
+add_js_target(${COMMON_LIB_DIR} common-lib.js)
+add_js_target(${COMMON_LOADER_DIR} index.html ${CommonSysCommonLib_js_DEP})
 
-foreach(ENTRY ${JS_DIRS})
-    add_js_target(${ENTRY} index.html ${common} ${common-fonts} CommonSysLib_js)
+# Build each UI
+# Each of these UIs receives the build output of CommonSys, so CommonSys files are listed as dependencies
+foreach(ROW ${JS_DIRS})
+    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonSysCommonLib_js_DEP} ${CommonSysLoaderLib_js_DEP})
 endforeach()
+
+# A function that can be used to add a new target that builds a wasm component from rust
+set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/components)
+function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
+    set(OUTPUT_FILEPATH ${COMPONENT_BIN_DIR}/${OUTPUT_FILE})
+
+    ExternalProject_Add(${TARGET_NAME}
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
+        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND cargo component build -r
+            --target wasm32-wasi
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
+            --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
+        BUILD_ALWAYS 1
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-wasi/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+    )
+
+    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
+    set(${TARGET_NAME}_OUTPUT_FILE ${OUTPUT_FILE} PARENT_SCOPE)
+endfunction()
+
+# Static (not built) resource dependencies
+file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/wit/*)
+
+# Build each component
+set(COMPONENT_PARSER_DIR services/user/CommonSys/common/packages/component-parser:ComponentParser)
+add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
+add_dependencies(CommonSysCommonLib_js ComponentParser)
+
+add_rs_component(services/system/AccountSys/plugin:AccountsPlugin account_sys.wasm ${plugin-wit})
+add_rs_component(services/system/AuthSys/plugin:AuthPlugin auth_sys.wasm ${plugin-wit})
+add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invite_sys.wasm ${plugin-wit} ${AuthPlugin_DEP})
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/wasm-psibase/wasm-psibase_bg.js
@@ -266,21 +317,20 @@ function(psinode_files target pfx)
     COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/AdminSys/ui/dist ${pfx}/share/psibase/services/admin-sys
     COMMAND mkdir -p ${pfx}/share/psibase/services/admin-sys/common
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/rpc.mjs ${pfx}/share/psibase/services/admin-sys/common/
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/keyConversions.mjs ${pfx}/share/psibase/services/admin-sys/common/
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/resources/fonts ${pfx}/share/psibase/services/admin-sys/common/fonts
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/admin-sys/common/
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
     COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/admin-sys/packages
     )
 endfunction()
 
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(AdminSys_js wasm-psibase)
+add_dependencies(AdminSys_js wasm-psibase CommonSysCommonLib_js)
 
 include(GNUInstallDirs)
 install(DIRECTORY services/user/AdminSys/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
-install(DIRECTORY services/user/CommonSys/common/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
-install(FILES services/user/CommonSys/common/rpc.mjs services/user/CommonSys/common/keyConversions.mjs DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
+install(DIRECTORY services/user/CommonSys/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
+install(FILES services/user/CommonSys/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys/common COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/admin-sys/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/admin-sys COMPONENT ServerData)
 
 # Build service packages
@@ -288,20 +338,24 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
+set(PSIBASE_VERSION "0.7.0")
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactionSys.psi
     NAME TransactionSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionSys.wasm
     FLAGS allowSudo allowWriteNative
     DEPENDS wasm
-    PACKAGE_DEPENDS AccountSys CpuSys
+    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "CpuSys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AccountSys.psi
     NAME AccountSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE account-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AccountSys.wasm
@@ -309,36 +363,34 @@ psibase_package(
         INIT
     SERVICE r-account-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccountSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AccountSys/ui/dist /
-    DEPENDS ${AccountSys_js_dep}
+        DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
-    PACKAGE_DEPENDS AuthAnySys ProxySys
+    DEPENDS ${AccountsPlugin_DEP}
+    PACKAGE_DEPENDS "AuthAnySys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSys.psi
     NAME AuthSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service using Botan to verify signatures"
     SERVICE auth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSys.wasm
         SERVER r-auth-sys
     SERVICE r-auth-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSys/ui/index.html index.html
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSys/ui/index.js   index.js
+        DATA ${COMPONENT_BIN_DIR}/${AuthPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE verify-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySys.wasm
         FLAGS isAuthService
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 set(COMMON_SYS ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonSys)
-set(THIRD_SRC ${COMMON_SYS}/common/thirdParty/src)
+set(THIRD_SRC ${COMMON_SYS}/common/resources/thirdParty/src)
 set(THIRD_FILES
     ${THIRD_SRC}/htm.module.js
-    ${THIRD_SRC}/iframeResizer.contentWindow.js
-    ${THIRD_SRC}/iframeResizer.js
     ${THIRD_SRC}/react-dom.development.js
     ${THIRD_SRC}/react-dom.production.min.js
     ${THIRD_SRC}/react-router-dom.min.js
@@ -346,26 +398,34 @@ set(THIRD_FILES
     ${THIRD_SRC}/react.production.min.js
     ${THIRD_SRC}/semantic-ui-react.min.js
     ${THIRD_SRC}/useLocalStorageState.js)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CommonSys.psi
     NAME CommonSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Service that contains the common files and libraries used by apps on psibase"
     SERVICE common-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonSys.wasm
         SERVER common-sys
-        DATA      ${COMMON_SYS}/common-lib/dist/common-lib.js common/common-lib.js
-        DATA GLOB ${COMMON_SYS}/common/*.mjs                  common/
-        DATA      ${COMMON_SYS}/common/fonts                  common/fonts
-        DATA GLOB ${COMMON_SYS}/ui/dist/*                     /
-        DATA GLOB ${THIRD_FILES}                              common
-    DEPENDS ${CommonSys_js_dep}
+        DATA GLOB ${COMMON_SYS}/common/packages/wasm-loader/dist/*            common/wasm-loader/
+        DATA      ${COMMON_SYS}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
+        DATA GLOB ${COMMON_SYS}/common/resources/*.mjs                        common/
+        DATA      ${COMMON_SYS}/common/resources/fonts                        common/fonts
+        DATA GLOB ${COMMON_SYS}/ui/dist/*                                     /
+        DATA GLOB ${THIRD_FILES}                                              common
+        DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
+    DEPENDS ${CommonSys_js_DEP}
+    DEPENDS ${CommonSysCommonLib_js_DEP}
+    DEPENDS ${CommonSysLoaderLib_js_DEP}
+    DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthDelegateSys.psi
     NAME AuthDelegateSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-dlg-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegateSys.wasm
@@ -375,24 +435,24 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthEcSys.psi
     NAME AuthEcSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Auth service using secp256k1 to verify signatures"
     SERVICE auth-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthEcSys.wasm
         SERVER r-ath-ec-sys
     SERVICE r-ath-ec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthEcSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui/index.html index.html
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthEcSys/ui/index.js   index.js
     SERVICE verifyec-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyEcSys.wasm
         FLAGS isAuthService
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthAnySys.psi
     NAME AuthAnySys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Insecure auth service that allows any access"
     SERVICE auth-any-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAnySys.wasm
@@ -402,6 +462,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CpuSys.psi
     NAME CpuSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Service that manages CPU billing"
     SERVICE cpu-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuSys.wasm
@@ -412,29 +473,40 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/DocSys.psi
     NAME DocSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Psibase documentation"
     SERVICE doc-sys
     DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
-    PACKAGE_DEPENDS PsiSpaceSys AccountSys
+    PACKAGE_DEPENDS "PsiSpaceSys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/NopSys.psi
+    NAME NopSys
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Service that does nothing"
+    SERVICE nop-sys
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
+    DEPENDS wasm
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/PsiSpaceSys.psi
     NAME PsiSpaceSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Provides web hosting to non-service accounts"
     SERVICE psispace-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
-    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/PsiSpaceSys/ui/dist /
     SERVER psispace-sys
-    DEPENDS ${PsiSpaceSys_js_dep}
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/ProducerSys.psi
     NAME ProducerSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Manages the active producers"
     SERVICE producer-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ProducerSys.wasm
@@ -445,12 +517,13 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/ProducerSys/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys AccountSys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/ProxySys.psi
     NAME ProxySys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "The `proxy-sys` service routes HTTP requests to the appropriate service"
     SERVICE proxy-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ProxySys.wasm
@@ -463,6 +536,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/SetCodeSys.psi
     NAME SetCodeSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All compiled code is uploaded to the chain through this service"
     SERVICE setcode-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCodeSys.wasm
@@ -473,6 +547,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/ExploreSys.psi
     NAME ExploreSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Block explorer"
     SERVICE explore-sys
     WASM ${CMAKE_CURRENT_BINARY_DIR}/ExploreSys.wasm
@@ -480,56 +555,68 @@ psibase_package(
     DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist /
     DEPENDS ExploreSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/ExploreSys/ui/dist/index.html
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/InviteSys.psi
     NAME InviteSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS AccountSys ProxySys NftSys TokenSys
+    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthEcSys(^${PSIBASE_VERSION})"
     SERVICE invite-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist /
         SERVER invite-sys
         INIT
+        DATA ${COMPONENT_BIN_DIR}/${InvitesPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE auth-inv-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
-    DEPENDS InviteSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/InviteSys/ui/dist/index.html
     DEPENDS wasm
+    DEPENDS ${InvitesPlugin_DEP}
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/NftSys.psi
     NAME NftSys
+    VERSION ${PSIBASE_VERSION}
     SERVICE nft-sys
-    PACKAGE_DEPENDS AccountSys ProxySys
+    PACKAGE_DEPENDS "AccountSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
     WASM ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
     INIT
     DEPENDS wasm
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/SupervisorSys.psi
+    NAME SupervisorSys
+    VERSION ${PSIBASE_VERSION}
+    PACKAGE_DEPENDS NftSys ProxySys AccountSys
+    SERVICE supervisor-sys
+        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
+    DEPENDS ${SupervisorSys_js_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenSys.psi
     NAME TokenSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Token service"
-    PACKAGE_DEPENDS NftSys ProxySys
+    PACKAGE_DEPENDS "NftSys(^${PSIBASE_VERSION})" "ProxySys(^${PSIBASE_VERSION})"
     SERVICE token-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
         SERVER r-tok-sys
         INIT
     SERVICE r-tok-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist /
-    DEPENDS TokenSys_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/ui/dist/index.html
     DEPENDS wasm
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/SymbolSys.psi
     NAME SymbolSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS TokenSys NftSys
+    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})"
     SERVICE symbol-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
         INIT
@@ -539,6 +626,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/FractalSys.psi
     NAME FractalSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Fractal service"
     SERVICE fractal-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/FractalSys.wasm
@@ -550,15 +638,17 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
-    PACKAGE_DEPENDS TokenSys SymbolSys AccountSys
+    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "SymbolSys(^${PSIBASE_VERSION})" "AccountSys(^${PSIBASE_VERSION})"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/src/TokenUsers.json
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/PackageSys.psi
     NAME PackageSys
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Package manager for psibase apps"
     SERVICE package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
@@ -566,21 +656,23 @@ psibase_package(
     SERVICE r-package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
     DEPENDS wasm
-    PACKAGE_DEPENDS ProxySys
+    PACKAGE_DEPENDS "ProxySys(^${PSIBASE_VERSION})" "NopSys(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Default.psi
     NAME Default
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS AccountSys AuthAnySys AuthSys AuthDelegateSys AuthEcSys CommonSys CpuSys DocSys
                     ExploreSys FractalSys InviteSys NftSys PackageSys ProducerSys ProxySys
-                    PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys
+                    PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Minimal.psi
     NAME Minimal
+    VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
     PACKAGE_DEPENDS AccountSys AuthDelegateSys AuthAnySys CpuSys CommonSys PackageSys ProducerSys ProxySys
                     SetCodeSys TransactionSys
@@ -601,8 +693,8 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     AccountSys AuthAnySys AuthSys AuthEcSys CommonSys CpuSys Default
-    DocSys ExploreSys FractalSys InviteSys NftSys Minimal PackageSys ProducerSys ProxySys
-    PsiSpaceSys SetCodeSys SymbolSys TokenUsers TokenSys TransactionSys)
+    DocSys ExploreSys FractalSys InviteSys NftSys NopSys Minimal PackageSys ProducerSys ProxySys
+    PsiSpaceSys SetCodeSys SupervisorSys SymbolSys TokenUsers TokenSys TransactionSys)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -620,11 +712,13 @@ install(
           ${SERVICE_DIR}/InviteSys.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/NftSys.psi
+          ${SERVICE_DIR}/NopSys.psi
           ${SERVICE_DIR}/PackageSys.psi
           ${SERVICE_DIR}/ProducerSys.psi
           ${SERVICE_DIR}/ProxySys.psi
           ${SERVICE_DIR}/PsiSpaceSys.psi
           ${SERVICE_DIR}/SetCodeSys.psi
+          ${SERVICE_DIR}/SupervisorSys.psi
           ${SERVICE_DIR}/SymbolSys.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/TokenSys.psi

@@ -14,6 +14,7 @@ target_link_libraries(example Psibase::service)
 
 psibase_package(
     NAME Example
+    VERSION 1.0.0
     DESCRIPTION "An example service"
     SERVICE example
     TARGET example

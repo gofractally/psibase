@@ -1,9 +1,10 @@
-use binaryen::{CodegenConfig, Module};
+use std::path::PathBuf;
 use std::{
     env,
-    fs::{create_dir_all, hard_link, read, remove_dir_all, write},
+    fs::{create_dir_all, hard_link, remove_dir_all},
     process::{exit, Command},
 };
+use wasm_opt::OptimizationOptions;
 
 fn main() {
     let cargo = env::var("CARGO").unwrap();
@@ -33,12 +34,13 @@ fn main() {
 
         let target_dir = out_dir.clone() + "/" + name + "-target";
         if !Command::new(&cargo)
-            .args(["build"])
+            .args(["rustc"])
             .args(["--color", "always"])
             .args(["--target", "wasm32-wasi"])
             .args(["--target-dir", &target_dir])
             .args(["--manifest-path", &(package_dir + "/Cargo.toml")])
             .args(["--release"])
+            .args(["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"])
             .status()
             .unwrap()
             .success()
@@ -46,14 +48,17 @@ fn main() {
             exit(1);
         }
 
-        let code = read(target_dir + "/wasm32-wasi/release/" + name + ".wasm").unwrap();
-        let mut module = Module::read(&code).unwrap();
-        module.optimize(&CodegenConfig {
-            shrink_level: 1,
-            optimization_level: 2,
-            debug_info: false,
-        });
-        write(out_dir.clone() + "/" + name + ".wasm", module.write()).unwrap();
+        let infile = PathBuf::from(target_dir + "/wasm32-wasi/release/" + name + ".wasm");
+        let outfile = PathBuf::from(out_dir.clone() + "/" + name + ".wasm");
+        let debug_build = false;
+        OptimizationOptions::new_opt_level_2()
+            .shrink_level(wasm_opt::ShrinkLevel::Level1)
+            .enable_feature(wasm_opt::Feature::BulkMemory)
+            .enable_feature(wasm_opt::Feature::SignExt)
+            .enable_feature(wasm_opt::Feature::Simd)
+            .debug_info(debug_build)
+            .run(&infile, &outfile)
+            .unwrap();
     };
 
     build("service_wasi_polyfill");

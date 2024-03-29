@@ -3,7 +3,7 @@ enable_testing()
 function(downloadThirdParty depName depUrl)
     ExternalProject_Add(
         ${depName}
-        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/common/thirdParty
+        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/common/resources/thirdParty
         URL ${depUrl}
         DOWNLOAD_NO_EXTRACT 1
         CONFIGURE_COMMAND ""

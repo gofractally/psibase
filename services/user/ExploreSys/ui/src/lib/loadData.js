@@ -1,4 +1,4 @@
-import { getJson } from "/common/rpc.mjs?client";
+import { getJson } from "@psibase/common-lib";
 import {
     useGraphQLPagedQuery,
     useGraphQLQuery,
@@ -32,7 +32,7 @@ function decodeArgs(args) {
         .replace("?", "")
         .replaceAll("=", ":")
         .replaceAll("&", " ")
-        .replaceAll("%22", "\"");
+        .replaceAll("%22", '"');
 }
 
 export async function loadData(args) {

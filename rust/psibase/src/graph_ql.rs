@@ -1,9 +1,11 @@
 use crate::{
-    get_key_bytes, kv_get, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes, RawKey,
-    TableIndex, TableRecord, ToKey,
+    get_key_bytes, get_sequential_bytes, kv_get, kv_greater_equal_bytes, kv_less_than_bytes,
+    kv_max_bytes, AccountNumber, DbId, MethodNumber, RawKey, TableIndex, TableRecord, ToKey,
 };
+use anyhow::anyhow;
 use async_graphql::connection::{query_with, Connection, Edge};
 use async_graphql::OutputType;
+use fracpack::{Unpack, UnpackOwned};
 use std::cmp::{max, min};
 use std::mem::take;
 use std::ops::RangeBounds;
@@ -326,4 +328,49 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
         )
         .await
     }
+}
+
+pub fn get_event_in_db<T: DecodeEvent>(db: DbId, event_id: u64) -> Result<T, anyhow::Error> {
+    let Some(data) = get_sequential_bytes(db, event_id) else {
+        return Err(anyhow!("Event not found"));
+    };
+    let (_, Some(type_)) = <(AccountNumber, Option<MethodNumber>)>::unpacked(&data)? else {
+        return Err(anyhow!("Missing event type"));
+    };
+    T::decode(type_, &data)
+}
+
+pub fn get_event<T: DecodeEvent + EventDb>(event_id: u64) -> Result<T, anyhow::Error> {
+    get_event_in_db(T::db(), event_id)
+}
+
+pub trait DecodeEvent {
+    fn decode(type_: MethodNumber, data: &[u8]) -> Result<Self, anyhow::Error>
+    where
+        Self: Sized;
+}
+
+pub fn decode_event_data<T: UnpackOwned>(data: &[u8]) -> Result<T, anyhow::Error> {
+    let (_, _, Some(content)) = <(AccountNumber, Option<MethodNumber>, Option<T>)>::unpacked(data)?
+    else {
+        return Err(anyhow!("Missing event data"));
+    };
+    Ok(content)
+}
+
+impl<T: UnpackOwned + NamedEvent> DecodeEvent for T {
+    fn decode(type_: MethodNumber, data: &[u8]) -> Result<T, anyhow::Error> {
+        if type_ != <T as NamedEvent>::name() {
+            return Err(anyhow!("Wrong event type"));
+        }
+        decode_event_data::<T>(data)
+    }
+}
+
+pub trait NamedEvent {
+    fn name() -> MethodNumber;
+}
+
+pub trait EventDb {
+    fn db() -> DbId;
 }

@@ -40,6 +40,8 @@ function(add_libs suffix)
     add_library(psio${suffix} INTERFACE)
     target_include_directories(psio${suffix} INTERFACE ${root}/include)
     target_link_libraries(psio${suffix} INTERFACE
+        -L${root}/lib
+        -lpsio
         boost
         simdjson${suffix}
         wasm-base${suffix}
