@@ -83,6 +83,16 @@ namespace psio::schema_types
       {
          if (type->is_container())
          {
+            if (type->kind == CompiledType::nested)
+            {
+               CustomTypes builtin;
+               FracParser  tmpParser{in, type, builtin, false};
+               while (tmpParser.next())
+               {
+               }
+               in.has_unknown = tmpParser.in.has_unknown;
+               in.known_end   = tmpParser.in.known_end;
+            }
             std::uint32_t size;
             if (!unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
                return false;
@@ -497,8 +507,22 @@ namespace psio::schema_types
             (void)unpack_numeric<false>(&fixed_size, parser.in.src, fixed_pos, parser.in.end_pos);
          }
          if (index == type->children.size())
-            // TODO: validate extensions
+         {
+            if (fixed_size > type->fixed_size)
+            {
+               if (type->kind == CompiledType::struct_)
+                  check(false, "non-extensible struct may not not have extensions");
+               // TODO:
+               bool last_has_value = true;
+               if (!verify_extensions(parser.in.src, parser.in.known_end, last_has_value,
+                                      fixed_pos + type->fixed_size, fixed_pos + fixed_size,
+                                      parser.in.pos, parser.in.end_pos))
+                  check(false, "All extensions must be optional");
+               parser.in.has_unknown = true;
+               parser.in.known_end   = false;
+            }
             return {.kind = FracParser::end, .type = type};
+         }
          const auto&      member = type->children[index];
          FracParser::Item result{
              .type = member.type, .parent = type->original_type, .index = index};
@@ -581,6 +605,7 @@ namespace psio::schema_types
          if (old_end_pos != 0)
          {
             parser.check_heap_pos(parser.in.end_pos);
+            parser.in.pos       = parser.in.end_pos;
             parser.in.known_end = true;
             parser.in.end_pos   = old_end_pos;
             return {.kind = FracParser::end, .type = type};
@@ -656,6 +681,15 @@ namespace psio::schema_types
       }
    }
 
+   FracParser::FracParser(const FracStream&   in,
+                          const CompiledType* type,
+                          const CustomTypes&  builtin,
+                          bool                enableCustom)
+       : in(in), builtin(builtin), enableCustom(enableCustom)
+   {
+      stack.push_back(parse(type));
+   }
+
    FracParser::~FracParser() = default;
 
    void FracParser::deref(std::uint32_t       fixed_pos,
@@ -683,11 +717,13 @@ namespace psio::schema_types
          {
             check_heap_pos(pos);
          }
-         if (type->custom_id != -1)
+         if (type->custom_id != -1 && enableCustom)
          {
             result.kind = static_cast<ItemKind>(custom_start + type->custom_id);
             if (offset == 0)
                result.data = std::span{in.src + fixed_pos, in.src + tmp_pos};
+            else
+               in.pos = pos;
          }
          else if (type->kind == CompiledType::scalar)
          {
@@ -705,7 +741,7 @@ namespace psio::schema_types
    FracParser::Item FracParser::parse(const CompiledType* ctype)
    {
       Item result{.type = ctype};
-      if (ctype->custom_id != -1)
+      if (ctype->custom_id != -1 && enableCustom)
       {
          result.kind = static_cast<ItemKind>(custom_start + ctype->custom_id);
       }
@@ -729,7 +765,7 @@ namespace psio::schema_types
 
    void FracParser::parse_fixed(Item& result, const CompiledType* ctype, std::uint32_t fixed_pos)
    {
-      if (ctype->custom_id != -1)
+      if (ctype->custom_id != -1 && enableCustom)
       {
          result.data = read_fixed(ctype, fixed_pos);
          result.kind = static_cast<ItemKind>(custom_start + ctype->custom_id);

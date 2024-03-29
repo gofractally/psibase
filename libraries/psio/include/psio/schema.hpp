@@ -421,6 +421,10 @@ namespace psio
          FracParser(std::span<const char> data,
                     const CompiledSchema& schema,
                     const std::string&    type);
+         FracParser(const FracStream&   in,
+                    const CompiledType* type,
+                    const CustomTypes&  builtin,
+                    bool                enableCustom = true);
          ~FracParser();
          // returns a start token, an end token or a primitive
          enum ItemKind : std::uint16_t
@@ -464,6 +468,8 @@ namespace psio
          FracStream             in;
          const CustomTypes&     builtin;
          std::vector<StackItem> stack;
+         // If false, all Custom handling will be ignored
+         bool enableCustom = true;
       };
 
       struct OpenToken
@@ -690,6 +696,16 @@ namespace psio
       class SchemaBuilder
       {
         public:
+         SchemaBuilder& expandNested(bool value = true) &
+         {
+            expandNested_ = value;
+            return *this;
+         }
+         SchemaBuilder&& expandNested(bool value = true) &&
+         {
+            expandNested_ = value;
+            return std::move(*this);
+         }
          template <typename T>
          SchemaBuilder& insert(std::string name) &
          {
@@ -716,11 +732,19 @@ namespace psio
                }
                else if constexpr (is_shared_view_ptr_v<T>)
                {
-                  // TODO: json could unpack nested fracpack
-                  schema.insert(
-                      name,
-                      Custom{.type = FracPack{insert<std::remove_cv_t<typename T::value_type>>()},
+                  if (expandNested_)
+                  {
+                     schema.insert(name,
+                                   FracPack{insert<std::remove_cv_t<typename T::value_type>>()});
+                  }
+                  else
+                  {
+                     schema.insert(
+                         name,
+                         Custom{
+                             .type = FracPack{insert<std::remove_cv_t<typename T::value_type>>()},
                              .id   = "octet-string"});
+                  }
                }
                else if constexpr (std::is_same_v<T, std::vector<char>> ||
                                   std::is_same_v<T, std::vector<signed char>> ||
@@ -834,6 +858,7 @@ namespace psio
          void optimize();
 
         private:
+         bool                               expandNested_ = false;
          Schema                             schema;
          std::map<const void*, std::size_t> ids;
       };

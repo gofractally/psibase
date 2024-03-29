@@ -170,6 +170,7 @@ namespace psio
    }
 
    // clang-format off
+template <typename S> void to_json(std::byte value, S& stream)          { return int_to_json(static_cast<unsigned char>(value), stream); }
 template <typename S> void to_json(unsigned char value, S& stream)      { return int_to_json(value, stream); }
 template <typename S> void to_json(uint16_t value, S& stream)           { return int_to_json(value, stream); }
 template <typename S> void to_json(uint32_t value, S& stream)           { return int_to_json(value, stream); }

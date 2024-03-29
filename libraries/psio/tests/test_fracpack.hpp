@@ -221,6 +221,8 @@ auto test_base(const T& value)
       psio::vector_stream out{json};
       to_json(parser, out);
       CHECK(std::string_view{json.data(), json.size()} == psio::convert_to_json(value));
+      CHECK(parser.in.pos == parser.in.end_pos);
+      CHECK(!parser.in.has_unknown);
    }
    // Any prefix of the data should fail to verify
    for (std::size_t i = 0; i < data.size(); ++i)
