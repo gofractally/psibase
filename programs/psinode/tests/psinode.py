@@ -229,12 +229,12 @@ class API:
         '''
         producers = [_get_producer_claim(p) for p in prods]
         if algorithm is None:
-            return self.push_action('producer', 'producer', 'setProducers', {'producers': producers})
+            return self.push_action('producers', 'producers', 'setProducers', {'producers': producers})
         elif algorithm == 'cft':
             mode = 'CftConsensus'
         elif algorithm == 'bft':
             mode = 'BftConsensus'
-        return self.push_action('producer', 'producer', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
+        return self.push_action('producers', 'producers', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
 
     # Queries
     def graphql(self, service, query):
@@ -260,7 +260,7 @@ class API:
         '''Returns a tuple of (current producers, next producers). The next producers are empty except when the chain is in the process of changing block producers.'''
         def flatten(producers):
             return [p['name'] for p in producers]
-        result = self.graphql('producer', 'query { producers { name } nextProducers { name } }')
+        result = self.graphql('producers', 'query { producers { name } nextProducers { name } }')
         return (flatten(result['producers']), flatten(result['nextProducers']))
 
     def get_block_header(self, num=-1):
