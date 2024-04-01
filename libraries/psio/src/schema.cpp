@@ -87,8 +87,10 @@ namespace psio::schema_types
             {
                CustomTypes builtin;
                FracParser  tmpParser{in, type, builtin, false};
-               while (tmpParser.next())
+               while (auto next = tmpParser.next())
                {
+                  if (next.kind == FracParser::error)
+                     return false;
                }
                in.has_unknown = tmpParser.in.has_unknown;
                in.known_end   = tmpParser.in.known_end;
@@ -489,11 +491,78 @@ namespace psio::schema_types
    }
    //-----
 
+   validation_t fracpack_validate(std::span<const char> data,
+                                  const CompiledSchema& schema,
+                                  const std::string&    type)
+   {
+      FracParser parser(data, schema, type, false);
+      while (auto item = parser.next())
+      {
+         if (item.kind == FracParser::error)
+            return validation_t::invalid;
+      }
+      if (parser.in.known_end && parser.in.pos != data.size())
+         return validation_t::invalid;
+      return parser.in.has_unknown ? validation_t::extended : validation_t::valid;
+   }
+
+   namespace
+   {
+
+      FracParser::Item makeError(const CompiledType* type, std::string_view msg)
+      {
+         return {.kind = FracParser::error, .data = msg, .type = type};
+      }
+
+      void setError(FracParser::Item& result, std::string_view msg)
+      {
+         result.kind = FracParser::error;
+         result.data = msg;
+      }
+
+      FracParser::Item check_heap_pos(const FracParser&   parser,
+                                      const CompiledType* type,
+                                      std::uint32_t       offset)
+      {
+         if (parser.in.known_end)
+            if (parser.in.pos != offset)
+               return makeError(type, "wrong offset");
+            else if (parser.in.pos > offset)
+               return makeError(type, "offset moved backwards");
+         return {};
+      }
+
+      struct ValidateScalar
+      {
+         void operator()(const auto&) {}
+         void operator()(const Int& type)
+         {
+            if (auto trailing = type.bits & 0x7)
+            {
+               if (!type.isSigned)
+               {
+                  std::uint8_t high = result.data.back();
+                  if (high >> trailing)
+                     setError(result, "unused bits of unsigned integer must be zero filled");
+               }
+               else
+               {
+                  std::int8_t high = result.data.back();
+                  if (static_cast<unsigned>(-(high >> trailing)) > 1)
+                     setError(result, "signed integer must be sign extended");
+               }
+            }
+         }
+         FracParser::Item& result;
+      };
+   }  // namespace
+
    struct ObjectReader
    {
       std::uint32_t       start_pos;
       std::uint32_t       index;
       const CompiledType* type;
+      bool                last_has_value = true;
       FracParser::Item    next(FracParser& parser)
       {
          std::uint16_t fixed_size;
@@ -511,16 +580,16 @@ namespace psio::schema_types
             if (fixed_size > type->fixed_size)
             {
                if (type->kind == CompiledType::struct_)
-                  check(false, "non-extensible struct may not not have extensions");
-               // TODO:
-               bool last_has_value = true;
+                  return makeError(type, "non-extensible struct may not not have extensions");
                if (!verify_extensions(parser.in.src, parser.in.known_end, last_has_value,
                                       fixed_pos + type->fixed_size, fixed_pos + fixed_size,
                                       parser.in.pos, parser.in.end_pos))
-                  check(false, "All extensions must be optional");
+                  return makeError(type, "All extensions must be optional");
                parser.in.has_unknown = true;
                parser.in.known_end   = false;
             }
+            if (type->kind != CompiledType::struct_ && !last_has_value)
+               return makeError(type, "Trailing empty optionals must be omitted");
             return {.kind = FracParser::end, .type = type};
          }
          const auto&      member = type->children[index];
@@ -532,10 +601,10 @@ namespace psio::schema_types
          if (!member.is_optional && !member.type->is_variable_size)
          {
             if (member.fixed_offset > fixed_size)
-               check(false, "Missing non-optional member");
+               return makeError(type, "Missing non-optional member");
             if (member.type->fixed_size >
                 static_cast<std::uint16_t>(fixed_size - member.fixed_offset))
-               check(false, "Fixed data too small");
+               return makeError(type, "Fixed data too small");
             parser.parse_fixed(result, member.type, fixed_pos);
          }
          else if (member.is_optional && member.fixed_offset >= fixed_size)
@@ -545,6 +614,7 @@ namespace psio::schema_types
          else
          {
             parser.deref(fixed_pos, fixed_end, member.type, member.is_optional, result);
+            last_has_value = result.kind != FracParser::empty;
          }
          return result;
       }
@@ -604,7 +674,8 @@ namespace psio::schema_types
       {
          if (old_end_pos != 0)
          {
-            parser.check_heap_pos(parser.in.end_pos);
+            if (auto err = check_heap_pos(parser, type, parser.in.end_pos))
+               return err;
             parser.in.pos       = parser.in.end_pos;
             parser.in.known_end = true;
             parser.in.end_pos   = old_end_pos;
@@ -612,17 +683,19 @@ namespace psio::schema_types
          }
          uint8_t tag;
          if (!unpack_numeric<true>(&tag, parser.in.src, parser.in.pos, parser.in.end_pos))
-            check(false, "Cannot unpack variant tag");
+            return makeError(type, "Cannot unpack variant tag");
          if (tag & 0x80)
-            check(false, "Variant tag cannot be greater than 127");
+            return makeError(type, "Variant tag cannot be greater than 127");
          uint32_t size;
          if (!unpack_numeric<true>(&size, parser.in.src, parser.in.pos, parser.in.end_pos))
-            check(false, "Cannot read variant tag");
-         auto new_end      = parser.in.pos + size;
+            return makeError(type, "Cannot read variant tag");
+         auto new_end = parser.in.pos + size;
+         if (new_end > parser.in.end_pos || new_end < size)
+            return makeError(type, "Variant size out-of-bounds");
          old_end_pos       = parser.in.end_pos;
          parser.in.end_pos = new_end;
          if (tag >= type->children.size())
-            check(false, "Variant tag out-of-range");
+            return makeError(type, "Variant tag out-of-range");
          auto result   = parser.parse(type->children[tag].type);
          result.parent = type->original_type;
          result.index  = tag;
@@ -639,7 +712,8 @@ namespace psio::schema_types
       {
          if (old_end_pos != 0)
          {
-            parser.check_heap_pos(parser.in.end_pos);
+            if (auto err = check_heap_pos(parser, type, parser.in.end_pos))
+               return err;
             parser.in.known_end = true;
             parser.in.pos       = parser.in.end_pos;
             parser.in.end_pos   = old_end_pos;
@@ -647,7 +721,7 @@ namespace psio::schema_types
          }
          std::uint32_t size;
          if (!unpack_numeric<true>(&size, parser.in.src, offset, parser.in.end_pos))
-            check(false, "Cannot read container size");
+            return makeError(type, "Cannot read container size");
          old_end_pos = parser.in.end_pos;
          if (size == 0)
          {
@@ -658,7 +732,7 @@ namespace psio::schema_types
             parser.in.pos = offset;
             auto new_end  = offset + size;
             if (new_end > parser.in.end_pos || new_end < offset)
-               check(false, "Container size out-of-bounds");
+               return makeError(type, "Container size out-of-bounds");
             parser.in.end_pos = new_end;
          }
          auto result   = parser.parse(type->children[0].type);
@@ -669,8 +743,9 @@ namespace psio::schema_types
 
    FracParser::FracParser(std::span<const char> data,
                           const CompiledSchema& schema,
-                          const std::string&    type)
-       : in(data), builtin(schema.builtin)
+                          const std::string&    type,
+                          bool                  enableCustom)
+       : in(data), builtin(schema.builtin), enableCustom(enableCustom)
    {
       if (auto xtype = schema.schema.get(type))
       {
@@ -701,7 +776,7 @@ namespace psio::schema_types
       std::uint32_t offset;
       auto          tmp_pos = fixed_pos;
       if (!unpack_numeric<true>(&offset, in.src, tmp_pos, end_fixed_pos))
-         check(false, "Cannot read pointer");
+         return setError(result, "Cannot read pointer");
       // If the type is an optional
       if (is_optional && offset == 1)
       {
@@ -712,10 +787,15 @@ namespace psio::schema_types
          // validate offset
          std::uint32_t pos = fixed_pos + offset;
          if (pos < offset)
-            check(false, "integer overflow");
+            return setError(result, "integer overflow");
          if (!type->is_container() || offset != 0)
          {
-            check_heap_pos(pos);
+            if (auto err = check_heap_pos(*this, type, pos))
+            {
+               result.data = err.data;
+               result.kind = err.kind;
+               return;
+            }
          }
          if (type->custom_id != -1 && enableCustom)
          {
@@ -727,13 +807,14 @@ namespace psio::schema_types
          }
          else if (type->kind == CompiledType::scalar)
          {
-            result.data = read(type, pos);
-            result.kind = FracParser::scalar;
+            read(type, pos, result);
          }
          else
          {
-            push(type, pos);
-            result.kind = FracParser::start;
+            if (auto err = push(type, pos, offset != 0))
+               result = err;
+            else
+               result.kind = FracParser::start;
          }
       }
    }
@@ -747,8 +828,7 @@ namespace psio::schema_types
       }
       else if (ctype->kind == CompiledType::scalar)
       {
-         result.data = read(ctype, in.pos);
-         result.kind = FracParser::scalar;
+         read(ctype, in.pos, result);
       }
       else if (ctype->kind == CompiledType::optional)
       {
@@ -757,8 +837,10 @@ namespace psio::schema_types
       }
       else
       {
-         push(ctype, in.pos);
-         result.kind = FracParser::start;
+         if (auto err = push(ctype, in.pos))
+            result = err;
+         else
+            result.kind = FracParser::start;
       }
       return result;
    }
@@ -797,14 +879,16 @@ namespace psio::schema_types
              return res;
           },
           stack.back());
-      if (result.kind == end || std::holds_alternative<Item>(stack.back()))
+      if (result.kind == error)
+         stack.clear();
+      else if (result.kind == end || std::holds_alternative<Item>(stack.back()))
       {
          stack.pop_back();
       }
       return result;
    }
 
-   void FracParser::push(const CompiledType* type, std::uint32_t offset)
+   FracParser::Item FracParser::push(const CompiledType* type, std::uint32_t offset, bool pointer)
    {
       in.pos = offset;
       switch (type->kind)
@@ -816,10 +900,10 @@ namespace psio::schema_types
             if (type->kind == CompiledType::struct_)
                fixed_size = type->fixed_size;
             else if (!unpack_numeric<true>(&fixed_size, in.src, in.pos, in.end_pos))
-               check(false, "Failed to read object size");
+               return makeError(type, "Failed to read object size");
             auto heap_start = in.pos + fixed_size;
             if (heap_start < in.pos || heap_start > in.end_pos)
-               check(false, "Object fixed data out-of-bounds");
+               return makeError(type, "Object fixed data out-of-bounds");
             in.pos = heap_start;
             stack.push_back(ObjectReader{.start_pos = offset, .index = 0, .type = type});
             in.known_end = true;
@@ -836,19 +920,22 @@ namespace psio::schema_types
             // get size
             std::uint32_t size;
             if (!unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
-               check(false, "Failed to read container size");
+               return makeError(type, "Failed to read container size");
             auto heap_start = in.pos + size;
             if (heap_start < in.pos || heap_start > in.end_pos)
-               check(false, "Container size out-of-bounds");
+               return makeError(type, "Container size out-of-bounds");
             const CompiledMember& member = type->children[0];
+            if (pointer && size == 0)
+               return makeError(type, "Empty container member must use zero offset");
             if (member.is_optional || member.type->is_variable_size)
             {
-               check(size % 4 == 0, "Container size is not an exact number of pointers");
+               if (size % 4 != 0)
+                  return makeError(type, "Container size is not an exact number of pointers");
             }
             else
             {
-               check(size % member.type->fixed_size == 0,
-                     "Container size is not an exact number of elements");
+               if (size % member.type->fixed_size != 0)
+                  return makeError(type, "Container size is not an exact number of elements");
             }
             auto pos = in.pos;
             in.pos   = heap_start;
@@ -861,7 +948,7 @@ namespace psio::schema_types
             auto start = offset;
             auto end   = offset + type->fixed_size;
             if (end > in.end_pos || end < offset)
-               check(false, "Array data too large");
+               return makeError(type, "Array data too large");
             in.pos = end;
             stack.push_back(ArrayReader{.type = type, .pos = start, .end = end});
             break;
@@ -881,6 +968,7 @@ namespace psio::schema_types
          default:
             assert(!"Not implemented");
       }
+      return {};
    }
    void FracParser::push_fixed(const CompiledType* type, std::uint32_t offset)
    {
@@ -902,24 +990,22 @@ namespace psio::schema_types
       }
    }
 
-   std::span<const char> FracParser::read(const CompiledType* type, std::uint32_t offset)
+   void FracParser::read(const CompiledType* type, std::uint32_t offset, Item& result)
    {
       in.pos = offset + type->fixed_size;
-      check(in.pos <= in.end_pos && in.pos >= offset, "out-of-bounds read");
-      return {in.src + offset, type->fixed_size};
+      if (in.pos > in.end_pos || in.pos < offset)
+         result = makeError(type, "out-of-bounds read");
+      else
+      {
+         result.data = {in.src + offset, type->fixed_size};
+         result.kind = FracParser::scalar;
+         std::visit(ValidateScalar{result}, type->original_type->value);
+      }
    }
    std::span<const char> FracParser::read_fixed(const CompiledType* type, std::uint32_t offset)
    {
       // TODO: verify bounds against end of fixed data
       return {in.src + offset, type->fixed_size};
-   }
-
-   void FracParser::check_heap_pos(std::uint32_t offset)
-   {
-      if (in.known_end)
-         check(in.pos == offset, "wrong offset");
-      else
-         check(in.pos <= offset, "offset moved backwards");
    }
 
    namespace

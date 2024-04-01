@@ -211,11 +211,11 @@ auto test_base(const T& value)
       CHECK(psio::fracpack_validate_strict<T>(data));
    }
    // schema
+   using namespace psio::schema_types;
+   Schema         schema = SchemaBuilder().insert<T>("T").build();
+   CompiledSchema cschema(schema);
    {
-      using namespace psio::schema_types;
-      Schema schema = SchemaBuilder().insert<T>("T").build();
       INFO("schema: " << psio::format_json(schema));
-      CompiledSchema      cschema(schema);
       FracParser          parser{data, cschema, "T"};
       std::vector<char>   json;
       psio::vector_stream out{json};
@@ -227,6 +227,7 @@ auto test_base(const T& value)
    // Any prefix of the data should fail to verify
    for (std::size_t i = 0; i < data.size(); ++i)
    {
+      INFO("leading bytes: " << i);
       // Making a copy in a separate allocation allows asan to detect out-of-bounds access
       std::unique_ptr<char[]> copy{new char[i]};
       std::memcpy(copy.get(), data.data(), i);
@@ -245,6 +246,7 @@ auto test_base(const T& value)
          CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
                                                                    copy.get(), pos, i));
       }
+      CHECK(!fracpack_validate({copy.get(), i}, cschema, "T"));
    }
    return data;
 }

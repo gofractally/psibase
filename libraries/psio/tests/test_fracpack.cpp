@@ -232,6 +232,13 @@ void test_invalid(const char* hex)
       CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
                                                                 data.data(), pos, data.size()));
    }
+   {
+      using namespace psio::schema_types;
+      Schema schema = SchemaBuilder().insert<T>("T").build();
+      INFO("schema: " << psio::format_json(schema));
+      CompiledSchema cschema(schema);
+      CHECK(!fracpack_validate(data, cschema, "T"));
+   }
 }
 
 template <typename T>

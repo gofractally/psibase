@@ -420,7 +420,8 @@ namespace psio
       {
          FracParser(std::span<const char> data,
                     const CompiledSchema& schema,
-                    const std::string&    type);
+                    const std::string&    type,
+                    bool                  enableCustom = true);
          FracParser(const FracStream&   in,
                     const CompiledType* type,
                     const CustomTypes&  builtin,
@@ -429,6 +430,7 @@ namespace psio
          // returns a start token, an end token or a primitive
          enum ItemKind : std::uint16_t
          {
+            error,
             start,
             end,
             scalar,
@@ -449,12 +451,11 @@ namespace psio
          // Starts parsing the given type at the current pos
          Item parse(const CompiledType* ctype);
          void parse_fixed(Item& result, const CompiledType* ctype, std::uint32_t offset);
-         void push(const CompiledType* type, std::uint32_t offset);
+         Item push(const CompiledType* type, std::uint32_t offset, bool is_pointer = false);
          // \pre range must be valid
          void push_fixed(const CompiledType* type, std::uint32_t offset);
-         void check_heap_pos(std::uint32_t pos);
          //
-         std::span<const char> read(const CompiledType* type, std::uint32_t offset);
+         void                  read(const CompiledType* type, std::uint32_t offset, Item& result);
          std::span<const char> read_fixed(const CompiledType* type, std::uint32_t offset);
 
          void deref(std::uint32_t       fixed_pos,
@@ -471,6 +472,10 @@ namespace psio
          // If false, all Custom handling will be ignored
          bool enableCustom = true;
       };
+
+      validation_t fracpack_validate(std::span<const char> data,
+                                     const CompiledSchema& schema,
+                                     const std::string&    type);
 
       struct OpenToken
       {
@@ -650,6 +655,8 @@ namespace psio
                         check(false, "Failed to parse custom type");
                   }
                   break;
+               case FracParser::error:
+                  check(false, std::string_view(item.data.data(), item.data.size()));
             }
          }
       }
