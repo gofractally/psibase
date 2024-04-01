@@ -31,18 +31,18 @@ import {
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
-    SupervisorSys here
+    Supervisor here
   </div>
 `;
 
 const context = new CallContext();
 const callStack = context.callStack;
 
-const createLoaderDomain = (subDomain = "supervisor-sys") =>
+const createLoaderDomain = (subDomain = "supervisor") =>
     siblingUrl(null, subDomain) + "/common/wasm-loader";
 
 const buildIFrameId = (service: string) => `iframe-${service}`;
-const supervisorDomain = siblingUrl(null, "supervisor-sys");
+const supervisorDomain = siblingUrl(null, "supervisor");
 
 interface PluginManagers {
     [service: string]: string[];

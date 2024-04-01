@@ -117,7 +117,7 @@ const isParseError = (e: any) => {
 const reply = (payload: any) => {
     window.parent.postMessage(
         buildPluginCallResponse(payload, []),
-        siblingUrl(null, "supervisor-sys"),
+        siblingUrl(null, "supervisor"),
     );
 };
 

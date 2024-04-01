@@ -14,9 +14,9 @@ import {
     FunctionCallRequest,
 } from "./supervisor/index";
 
-const SupervisorIFrameId = "iframe-supervisor-sys" as const;
+const SupervisorIFrameId = "iframe-supervisor" as const;
 
-const getSupervisorHref = (subDomain = "supervisor-sys"): string => {
+const getSupervisorHref = (subDomain = "supervisor"): string => {
     const currentUrl = window.location.href;
     const url = new URL(currentUrl);
     const hostnameParts = url.hostname.split(".");
@@ -50,7 +50,7 @@ const setupSupervisorIFrame = (src: string) => {
     }
 };
 
-const supervisorOrigin = siblingUrl(null, "supervisor-sys");
+const supervisorOrigin = siblingUrl(null, "supervisor");
 
 const my = new URL(window.location.href);
 const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`;
@@ -150,7 +150,7 @@ export class Supervisor {
         const iframe = document.getElementById(
             SupervisorIFrameId,
         ) as HTMLIFrameElement;
-        if (!iframe) throw new Error(`Failed to find supervisor-sys iframe`);
+        if (!iframe) throw new Error(`Failed to find supervisor iframe`);
         if (!iframe.contentWindow)
             throw new Error(`Failed to access iframe contentWindow`);
         return iframe;

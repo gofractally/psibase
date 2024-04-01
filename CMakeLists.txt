@@ -217,7 +217,7 @@ ExternalProject_Add(
 # UIs built with yarn
 set(JS_DIRS
     services/user/CommonApi/ui:CommonApi_js
-    services/user/SupervisorSys/ui:SupervisorSys_js
+    services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
@@ -587,13 +587,13 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/SupervisorSys.psi
-    NAME SupervisorSys
+    OUTPUT ${SERVICE_DIR}/Supervisor.psi
+    NAME Supervisor
     VERSION ${PSIBASE_VERSION}
     PACKAGE_DEPENDS Nft HttpServer Accounts
-    SERVICE supervisor-sys
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
-    DEPENDS ${SupervisorSys_js_DEP}
+    SERVICE supervisor
+        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist /
+    DEPENDS ${Supervisor_js_DEP}
 )
 
 psibase_package(
@@ -666,7 +666,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
                     Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
+                    Sites SetCode Supervisor SymbolSys TokenUsers TokenSys Transact
 )
 
 psibase_package(
@@ -694,7 +694,7 @@ endfunction()
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
     DocSys Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    Sites SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
+    Sites SetCode Supervisor SymbolSys TokenUsers TokenSys Transact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -718,7 +718,7 @@ install(
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
-          ${SERVICE_DIR}/SupervisorSys.psi
+          ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/SymbolSys.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/TokenSys.psi

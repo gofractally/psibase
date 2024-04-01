@@ -33,7 +33,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   </div>
 `;
 
-const supervisorDomain = siblingUrl(null, "supervisor-sys");
+const supervisorDomain = siblingUrl(null, "supervisor");
 
 interface Importables {
     [key: string]: string;
@@ -257,7 +257,7 @@ const onPluginCallRequest = async (pluginCallPayload: PluginCallPayload) => {
 
         window.parent.postMessage(
             buildPluginCallResponse(res, addableActions),
-            siblingUrl(null, "supervisor-sys"),
+            siblingUrl(null, "supervisor"),
         );
     } catch (e: unknown) {
         if (isSyncCall(e)) {
@@ -342,7 +342,7 @@ const onPreloadStart = async (message: LoaderPreloadStart) => {
     // TODO: add dependencies to preloadComplete so they can be loaded
     window.parent.postMessage(
         buildPreloadCompleteMessage([]),
-        siblingUrl(null, "supervisor-sys"),
+        siblingUrl(null, "supervisor"),
     );
 };
 
