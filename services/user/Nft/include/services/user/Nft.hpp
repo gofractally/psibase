@@ -9,14 +9,14 @@
 
 namespace UserService
 {
-   class NftSys : public psibase::Service<NftSys>
+   class Nft : public psibase::Service<Nft>
    {
      public:
       using Tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;
 
-      static constexpr auto service = psibase::AccountNumber("nft-sys");
+      static constexpr auto service = psibase::AccountNumber("nft");
 
-      NftSys(psio::shared_view_ptr<psibase::Action> action);
+      Nft(psio::shared_view_ptr<psibase::Action> action);
 
       void init();
       NID  mint();
@@ -64,7 +64,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO_REFLECT(NftSys,
+   PSIO_REFLECT(Nft,
       method(init),
       method(mint),
       method(burn, nftId),
@@ -80,8 +80,8 @@ namespace UserService
       method(exists, nftId),
       method(getUserConf, account, flag)
    );
-   PSIBASE_REFLECT_EVENTS(NftSys);
-   PSIBASE_REFLECT_HISTORY_EVENTS(NftSys,
+   PSIBASE_REFLECT_EVENTS(Nft);
+   PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
       method(minted, prevEvent, nftId, issuer),
       method(burned, prevEvent, nftId),
       method(userConfSet, prevEvent, account, flag, enable),
@@ -89,8 +89,8 @@ namespace UserService
       method(uncredited, prevEvent, nftId, sender, receiver, memo),
       method(transferred, prevEvent, nftId, creditor, debitor, memo)
    );
-   PSIBASE_REFLECT_UI_EVENTS(NftSys);
-   PSIBASE_REFLECT_MERKLE_EVENTS(NftSys);
+   PSIBASE_REFLECT_UI_EVENTS(Nft);
+   PSIBASE_REFLECT_MERKLE_EVENTS(Nft);
 
    // clang-format on
 

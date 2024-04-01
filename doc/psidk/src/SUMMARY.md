@@ -88,7 +88,7 @@
   - [explorer]()
   - [fractal]()
   - [invite](default-apps/invite.md)
-  - [nft-sys]()
+  - [nft]()
   - [producers]()
   - [http-server](default-apps/http-server.md)
   - [psispace-sys](default-apps/psispace-sys.md)

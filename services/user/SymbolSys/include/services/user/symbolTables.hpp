@@ -7,7 +7,7 @@
 #include <psibase/time.hpp>
 #include <string>
 
-#include "services/user/NftSys.hpp"
+#include "services/user/Nft.hpp"
 #include "services/user/tokenTypes.hpp"
 
 namespace UserService

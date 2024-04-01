@@ -274,7 +274,7 @@ SCENARIO("Interactions with the Issuer NFT")
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto nft     = alice.to<NftSys>().getNft(token.ownerNft).returnVal();
+      auto nft     = alice.to<Nft>().getNft(token.ownerNft).returnVal();
 
       THEN("The Issuer NFT is owned by Alice")
       {
@@ -282,11 +282,11 @@ SCENARIO("Interactions with the Issuer NFT")
       }
       WHEN("Alice credits the issuer NFT to Bob")
       {
-         alice.to<NftSys>().credit(nft.id, bob, memo);
+         alice.to<Nft>().credit(nft.id, bob, memo);
 
          THEN("The NFT is owned by Bob")
          {
-            auto newNft = alice.to<NftSys>().getNft(token.ownerNft).returnVal();
+            auto newNft = alice.to<Nft>().getNft(token.ownerNft).returnVal();
             nft.owner   = bob.id;
             CHECK((newNft.id == nft.id && newNft.issuer == nft.issuer  //
                    && newNft.owner == nft.owner));
@@ -322,7 +322,7 @@ SCENARIO("Interactions with the Issuer NFT")
          Quantity quantity{1'000e8};
          a.mint(tokenId, quantity, memo);
          a.credit(tokenId, bob, quantity, memo);
-         alice.to<NftSys>().burn(nft.id);
+         alice.to<Nft>().burn(nft.id);
 
          THEN("Alice may not mint new tokens")
          {
@@ -330,7 +330,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not credit the issuer NFT to anyone")
          {
-            CHECK(alice.to<NftSys>().credit(nft.id, bob, memo).failed(nftDNE));
+            CHECK(alice.to<Nft>().credit(nft.id, bob, memo).failed(nftDNE));
          }
          THEN("Alice may not recall Bob's tokens")
          {
@@ -726,7 +726,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       WHEN("Alice burns the symbol owner NFT")
       {
-         alice.to<NftSys>().burn(nftId);
+         alice.to<Nft>().burn(nftId);
 
          THEN("Alice is unable to map the symbol to the token")
          {
@@ -736,7 +736,7 @@ SCENARIO("Mapping a symbol to a token")
       WHEN("Alice burns the token owner NFT")
       {
          auto tokenNft = a.getToken(newToken).returnVal().ownerNft;
-         alice.to<NftSys>().burn(tokenNft);
+         alice.to<Nft>().burn(tokenNft);
 
          THEN("Alice is unable to map the symbol to the token")
          {
@@ -755,7 +755,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       THEN("Alice is able to map the symbol to the token")
       {
-         alice.to<NftSys>().credit(nftId, TokenSys::service, memo);
+         alice.to<Nft>().credit(nftId, TokenSys::service, memo);
          CHECK(a.mapSymbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
@@ -765,7 +765,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       WHEN("Alice maps the symbol to the token")
       {
-         alice.to<NftSys>().credit(nftId, TokenSys::service, memo);
+         alice.to<Nft>().credit(nftId, TokenSys::service, memo);
          a.mapSymbol(newToken, symbolId);
 
          THEN("The symbol record is identical")
@@ -781,7 +781,7 @@ SCENARIO("Mapping a symbol to a token")
             alice.to<SymbolSys>().create(newSymbol, symbolCost);
             auto newNft = alice.to<SymbolSys>().getSymbol(newSymbol).returnVal().ownerNft;
 
-            alice.to<NftSys>().credit(newNft, TokenSys::service, memo);
+            alice.to<Nft>().credit(newNft, TokenSys::service, memo);
             CHECK(a.mapSymbol(newToken, newSymbol).failed(tokenHasSymbol));
          }
       }

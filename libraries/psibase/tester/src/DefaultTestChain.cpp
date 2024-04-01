@@ -22,7 +22,7 @@
 #include <services/user/Explorer.hpp>
 #include <services/user/Fractal.hpp>
 #include <services/user/Invite.hpp>
-#include <services/user/NftSys.hpp>
+#include <services/user/Nft.hpp>
 #include <services/user/PackageSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
 #include <services/user/RTokenSys.hpp>

@@ -173,7 +173,7 @@ function(add suffix)
             ../../services/user/Explorer/include
             ../../services/user/Fractal/include
             ../../services/user/Invite/include
-            ../../services/user/NftSys/include
+            ../../services/user/Nft/include
             ../../services/user/PackageSys/include
             ../../services/user/PsiSpaceSys/include
             ../../services/user/SymbolSys/include

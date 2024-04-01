@@ -6,7 +6,7 @@
 #include <services/system/commonErrors.hpp>
 #include <string>
 
-#include "services/user/NftSys.hpp"
+#include "services/user/Nft.hpp"
 
 using namespace UserService;
 using namespace UserService::Errors;
@@ -31,8 +31,8 @@ SCENARIO("Minting & burning nfts")
       auto alice = t.from(t.addAccount("alice"_a));
       auto bob   = t.from(t.addAccount("bob"_a));
 
-      auto a = alice.to<NftSys>();
-      auto b = bob.to<NftSys>();
+      auto a = alice.to<Nft>();
+      auto b = bob.to<Nft>();
 
       THEN("Alice can mint an NFT")
       {
@@ -107,9 +107,9 @@ SCENARIO("Transferring NFTs")
       auto bob     = t.from(t.addAccount("bob"));
       auto charlie = t.from(t.addAccount("charlie"));
 
-      auto a = alice.to<NftSys>();
-      auto b = bob.to<NftSys>();
-      auto c = charlie.to<NftSys>();
+      auto a = alice.to<Nft>();
+      auto b = bob.to<Nft>();
+      auto c = charlie.to<Nft>();
 
       THEN("Bob is configured to use auto-debit by default")
       {

@@ -19,13 +19,13 @@ Consider an app that wants to create a new token with a symbol. A user is presen
 To accomplish this, the following steps would be required:
 1. create@token-sys: Create a new token
 2. Look up the nft created by the token contract that represents ownership of the new token
-3. debit@nft-sys: Debit the token nft
+3. debit@nft: Debit the token nft
 4. Look up how much a new symbol costs
 5. credit@token-sys: Send the cost of a new symbol to the symbol contract
 6. create@symbol-sys: Tell the symbol contract to create a new symbol (it will debit the tokens sent in the previous step)
 7. Look up the NFT generated that represents the ownership of the new symbol
-8. debit@nft-sys: Debit the symbol NFT
-9. credit@nft-sys: Transfer the symbol NFT back to the symbol contract
+8. debit@nft: Debit the symbol NFT
+9. credit@nft: Transfer the symbol NFT back to the symbol contract
 10. Look up the ID of the newly created token
 11. mapToken@symbol: Map the symbol to the new token ID
 
@@ -49,16 +49,16 @@ void TokenSys::createAndMap(Precision p, Quantity maxSupply, SID symbolId)
     // Create new token, and give ownership to sender
     auto tid = create(p, maxSupply);
     auto tokenNft = getToken(tid).ownerNft;
-    senderAt<NftSys>().debit(tokenNft, "Debit token ownership NFT");
+    senderAt<Nft>().debit(tokenNft, "Debit token ownership NFT");
 
     // Create new symbol
     auto cost = to<SymbolSys>().getCost(symbolId.str().size());
     senderAt<SymbolSys>().create(symbolId, cost);
     auto symbolNft = to<SymbolSys>().getSymbol(symbolId).ownerNft;
-    senderAt<NftSys>().debit(symbolNft, "Take ownership of new symbol");
+    senderAt<Nft>().debit(symbolNft, "Take ownership of new symbol");
 
     // Map symbol to token
-    senderAt<NftSys>().credit(symbolNft, SymbolSys::service, "Give symbol to symbol-sys");
+    senderAt<Nft>().credit(symbolNft, SymbolSys::service, "Give symbol to symbol-sys");
     senderAt<SymbolSys>().mapToken(tid, symbolId);
 }
 

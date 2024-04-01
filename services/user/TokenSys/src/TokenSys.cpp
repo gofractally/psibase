@@ -66,7 +66,7 @@ void TokenSys::init()
    initTable.put(InitializedRecord{});
 
    auto tokService = to<TokenSys>();
-   auto nftService = to<NftSys>();
+   auto nftService = to<Nft>();
 
    // Configure manual debit for self on Token and NFT
    tokService.setUserConf(userConfig::manualDebit, true);
@@ -74,11 +74,11 @@ void TokenSys::init()
 
    // Configure manual debit for Nft on Token
    {
-      auto holder  = getTokenHolder(NftSys::service);
+      auto holder  = getTokenHolder(Nft::service);
       auto flagBit = TokenHolderRecord::Configurations::value(userConfig::manualDebit);
 
       holder.config.set(flagBit, true);
-      holder.eventHead = emit().history().userConfSet(holder.eventHead, NftSys::service,
+      holder.eventHead = emit().history().userConfSet(holder.eventHead, Nft::service,
                                                       userConfig::manualDebit, true);
 
       Tables().open<TokenHolderTable>().put(holder);
@@ -104,7 +104,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    auto creator    = getSender();
    auto tokenTable = Tables().open<TokenTable>();
    auto tokenIdx   = tokenTable.getIndex<0>();
-   auto nftService = to<NftSys>();
+   auto nftService = to<Nft>();
 
    TID newId = (tokenIdx.begin() == tokenIdx.end()) ? 1 : (*(--tokenIdx.end())).id + 1;
    Precision::fracpack_validate(precision);  // Todo remove if/when happens automatically
@@ -349,7 +349,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
    auto sender     = getSender();
    auto symbol     = to<SymbolSys>().getSymbol(symbolId);
    auto token      = getToken(tokenId);
-   auto nftService = to<NftSys>();
+   auto nftService = to<Nft>();
 
    check(symbol.ownerNft != NID{0}, symbolDNE);
    check(nftService.exists(symbol.ownerNft), missingRequiredAuth);
@@ -491,7 +491,7 @@ void TokenSys::checkAccountValid(psibase::AccountNumber account)
 bool TokenSys::isSenderIssuer(TID tokenId)
 {
    auto token      = getToken(tokenId);
-   auto nftService = to<NftSys>();
+   auto nftService = to<Nft>();
 
    return nftService.exists(token.ownerNft) &&
           nftService.getNft(token.ownerNft).owner == getSender();

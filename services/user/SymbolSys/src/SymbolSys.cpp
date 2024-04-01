@@ -6,7 +6,7 @@
 #include <services/system/commonErrors.hpp>
 
 #include <psibase/serveSimpleUI.hpp>
-#include "services/user/NftSys.hpp"
+#include "services/user/Nft.hpp"
 #include "services/user/TokenSys.hpp"
 
 using namespace UserService;
@@ -57,7 +57,7 @@ void SymbolSys::init()
 
    // Configure manualDebit for self on Token and NFT
    to<TokenSys>().setUserConf("manualDebit"_m, true);
-   to<NftSys>().setUserConf("manualDebit"_m, true);
+   to<Nft>().setUserConf("manualDebit"_m, true);
 
    // Configure default symbol length records to establish initial prices
    auto nextSym = [](SymbolLengthRecord& s)
@@ -91,8 +91,8 @@ void SymbolSys::init()
 
    // Offer system token symbol
    auto symbolOwnerNft = getSymbol(sysTokenSymbol);
-   to<NftSys>().credit(symbolOwnerNft.ownerNft, TokenSys::service,
-                       "System token symbol ownership nft");
+   to<Nft>().credit(symbolOwnerNft.ownerNft, TokenSys::service,
+                    "System token symbol ownership nft");
    to<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
 
    // Register serveSys handler
@@ -120,11 +120,11 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    }
 
    // Mint and offer ownership NFT
-   newSym.ownerNft    = to<NftSys>().mint();
+   newSym.ownerNft    = to<Nft>().mint();
    auto nftCreditMemo = "This NFT conveys ownership of symbol: " + symString;
    if (sender != getReceiver())
    {
-      to<NftSys>().credit(newSym.ownerNft, sender, nftCreditMemo);
+      to<Nft>().credit(newSym.ownerNft, sender, nftCreditMemo);
    }
 
    // Update symbol type statistics
@@ -142,7 +142,7 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
    auto seller       = getSender();
    auto symbolRecord = getSymbol(symbol);
    auto nft          = symbolRecord.ownerNft;
-   auto nftService   = to<NftSys>();
+   auto nftService   = to<Nft>();
 
    check(price.value != 0, priceTooLow);
    check(nft != 0, symbolDNE);
@@ -175,7 +175,7 @@ void SymbolSys::buySymbol(SID symbol)
    auto sellerMemo = "Symbol " + symbol.str() + " sold";
    tokenService.debit(TokenSys::sysToken, buyer, salePrice, buyerMemo);
    tokenService.credit(TokenSys::sysToken, seller, salePrice, sellerMemo);
-   to<NftSys>().credit(symbolRecord.ownerNft, buyer, buyerMemo);
+   to<Nft>().credit(symbolRecord.ownerNft, buyer, buyerMemo);
 
    symbolRecord.saleDetails.seller    = AccountNumber{0};
    symbolRecord.saleDetails.salePrice = 0;
@@ -195,7 +195,7 @@ void SymbolSys::unlistSymbol(SID symbol)
    check(seller == symbolRecord.saleDetails.seller, missingRequiredAuth);
 
    auto unlistMemo = "Unlisting symbol " + symbol.str();
-   to<NftSys>().credit(symbolRecord.ownerNft, seller, unlistMemo);
+   to<Nft>().credit(symbolRecord.ownerNft, seller, unlistMemo);
 
    symbolRecord.saleDetails = SaleDetails{};
    symbolRecord.eventHead   = emit().history().symUnlisted(symbolRecord.eventHead, symbol, seller);

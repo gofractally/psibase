@@ -43,7 +43,7 @@ pub struct CreditRecord {
     debitor: AccountNumber,
 }
 
-#[crate::service(name = "nft-sys", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "nft", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{AccountNumber, NamedBit};
@@ -54,27 +54,27 @@ mod service {
     }
 
     #[action]
-    fn mint() -> crate::services::nft_sys::NID {
+    fn mint() -> crate::services::nft::NID {
         unimplemented!()
     }
 
     #[action]
-    fn burn(nftId: crate::services::nft_sys::NID) {
+    fn burn(nftId: crate::services::nft::NID) {
         unimplemented!()
     }
 
     #[action]
-    fn credit(nftId: crate::services::nft_sys::NID, receiver: AccountNumber, memo: String) {
+    fn credit(nftId: crate::services::nft::NID, receiver: AccountNumber, memo: String) {
         unimplemented!()
     }
 
     #[action]
-    fn uncredit(nftId: crate::services::nft_sys::NID, memo: String) {
+    fn uncredit(nftId: crate::services::nft::NID, memo: String) {
         unimplemented!()
     }
 
     #[action]
-    fn debit(nftId: crate::services::nft_sys::NID, memo: String) {
+    fn debit(nftId: crate::services::nft::NID, memo: String) {
         unimplemented!()
     }
 
@@ -84,22 +84,22 @@ mod service {
     }
 
     #[action]
-    fn getNft(nftId: crate::services::nft_sys::NID) -> super::NftRecord {
+    fn getNft(nftId: crate::services::nft::NID) -> nft::NftRecord {
         unimplemented!()
     }
 
     #[action]
-    fn getNftHolder(account: AccountNumber) -> super::NftHolderRecord {
+    fn getNftHolder(account: AccountNumber) -> nft::NftHolderRecord {
         unimplemented!()
     }
 
     #[action]
-    fn getCredRecord(nftId: crate::services::nft_sys::NID) -> super::CreditRecord {
+    fn getCredRecord(nftId: crate::services::nft::NID) -> nft::CreditRecord {
         unimplemented!()
     }
 
     #[action]
-    fn exists(nftId: crate::services::nft_sys::NID) -> bool {
+    fn exists(nftId: crate::services::nft::NID) -> bool {
         unimplemented!()
     }
 

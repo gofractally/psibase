@@ -1,4 +1,4 @@
-#include <services/user/NftSys.hpp>
+#include <services/user/Nft.hpp>
 
 #include <psibase/Bitset.hpp>
 #include <services/system/Accounts.hpp>
@@ -24,7 +24,7 @@ namespace
    }
 }  // namespace
 
-NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
+Nft::Nft(psio::shared_view_ptr<psibase::Action> action)
 {
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
@@ -34,7 +34,7 @@ NftSys::NftSys(psio::shared_view_ptr<psibase::Action> action)
    }
 }
 
-void NftSys::init()
+void Nft::init()
 {
    auto initTable = Tables().open<InitTable>();
    auto init      = (initTable.get(SingletonKey{}));
@@ -42,13 +42,13 @@ void NftSys::init()
    initTable.put(InitializedRecord{});
 
    // Configure manual debit for self on Token and NFT
-   to<NftSys>().setUserConf(userConfig::manualDebit, true);
+   to<Nft>().setUserConf(userConfig::manualDebit, true);
 
    // Register serveSys handler
-   to<SystemService::HttpServer>().registerServer(NftSys::service);
+   to<SystemService::HttpServer>().registerServer(Nft::service);
 }
 
-NID NftSys::mint()
+NID Nft::mint()
 {
    auto issuer   = getSender();
    auto holder   = getNftHolder(issuer);
@@ -75,7 +75,7 @@ NID NftSys::mint()
    return newId;
 }
 
-void NftSys::burn(NID nftId)
+void Nft::burn(NID nftId)
 {
    auto record = getNft(nftId);
 
@@ -88,7 +88,7 @@ void NftSys::burn(NID nftId)
    Tables().open<NftHolderTable>().put(holder);
 }
 
-void NftSys::credit(NID nftId, psibase::AccountNumber receiver, view<const Memo> memo)
+void Nft::credit(NID nftId, psibase::AccountNumber receiver, view<const Memo> memo)
 {
    auto                   record          = getNft(nftId);
    psibase::AccountNumber sender          = getSender();
@@ -134,7 +134,7 @@ void NftSys::credit(NID nftId, psibase::AccountNumber receiver, view<const Memo>
    Tables().open<NftHolderTable>().put(receiverHolder);
 }
 
-void NftSys::uncredit(NID nftId, view<const Memo> memo)
+void Nft::uncredit(NID nftId, view<const Memo> memo)
 {
    auto                   record       = getNft(nftId);
    psibase::AccountNumber sender       = getSender();
@@ -158,7 +158,7 @@ void NftSys::uncredit(NID nftId, view<const Memo> memo)
    Tables().open<CreditTable>().erase(nftId);
 }
 
-void NftSys::debit(NID nftId, view<const Memo> memo)
+void Nft::debit(NID nftId, view<const Memo> memo)
 {
    auto record       = getNft(nftId);
    auto debitor      = getSender();
@@ -185,7 +185,7 @@ void NftSys::debit(NID nftId, view<const Memo> memo)
    Tables().open<CreditTable>().erase(nftId);
 }
 
-void NftSys::setUserConf(psibase::EnumElement flag, bool enable)
+void Nft::setUserConf(psibase::EnumElement flag, bool enable)
 {
    auto sender  = getSender();
    auto record  = getNftHolder(sender);
@@ -200,7 +200,7 @@ void NftSys::setUserConf(psibase::EnumElement flag, bool enable)
    Tables().open<NftHolderTable>().put(record);
 }
 
-NftRecord NftSys::getNft(NID nftId)
+NftRecord Nft::getNft(NID nftId)
 {
    auto nftIdx    = Tables().open<NftTable>().getIndex<0>();
    auto nftRecord = nftIdx.get(nftId);
@@ -225,7 +225,7 @@ NftRecord NftSys::getNft(NID nftId)
    return *nftRecord;
 }
 
-NftHolderRecord NftSys::getNftHolder(AccountNumber account)
+NftHolderRecord Nft::getNftHolder(AccountNumber account)
 {
    auto nftHodler = Tables().open<NftHolderTable>().get(account);
 
@@ -242,7 +242,7 @@ NftHolderRecord NftSys::getNftHolder(AccountNumber account)
    }
 }
 
-CreditRecord NftSys::getCredRecord(NID nftId)
+CreditRecord Nft::getCredRecord(NID nftId)
 {
    auto creditRecord = Tables().open<CreditTable>().get(nftId);
 
@@ -258,12 +258,12 @@ CreditRecord NftSys::getCredRecord(NID nftId)
    }
 }
 
-bool NftSys::exists(NID nftId)
+bool Nft::exists(NID nftId)
 {
    return Tables().open<NftTable>().get(nftId).has_value();
 }
 
-bool NftSys::getUserConf(psibase::AccountNumber account, psibase::EnumElement flag)
+bool Nft::getUserConf(psibase::AccountNumber account, psibase::EnumElement flag)
 {
    auto hodler = Tables().open<NftHolderTable>().get(account);
    if (hodler.has_value() == false)
@@ -277,27 +277,27 @@ bool NftSys::getUserConf(psibase::AccountNumber account, psibase::EnumElement fl
    }
 }
 
-auto nftSys = QueryableService<NftSys::Tables, NftSys::Events>{NftSys::service};
+auto nftService = QueryableService<Nft::Tables, Nft::Events>{Nft::service};
 struct NftQuery
 {
    auto events() const
    {  //
-      return nftSys.allEvents();
+      return nftService.allEvents();
    }
    auto nftEvents(NID nftId, optional<uint32_t> first, const optional<string>& after) const
    {
-      return nftSys.eventIndex<NftSys::NftEvents>(nftId, first, after);
+      return nftService.eventIndex<Nft::NftEvents>(nftId, first, after);
    }
    auto userEvents(AccountNumber           user,
                    optional<uint32_t>      first,
                    const optional<string>& after) const
    {
-      return nftSys.eventIndex<NftSys::UserEvents>(user, first, after);
+      return nftService.eventIndex<Nft::UserEvents>(user, first, after);
    }
 
-   auto nftHolders() const { return nftSys.index<NftHolderTable, 0>(); }
-   auto nfts() const { return nftSys.index<NftTable, 0>(); }
-   auto nftCredits() const { return nftSys.index<CreditTable, 0>(); }
+   auto nftHolders() const { return nftService.index<NftHolderTable, 0>(); }
+   auto nfts() const { return nftService.index<NftTable, 0>(); }
+   auto nftCredits() const { return nftService.index<CreditTable, 0>(); }
 };
 PSIO_REFLECT(NftQuery,
              method(events),
@@ -307,13 +307,13 @@ PSIO_REFLECT(NftQuery,
              method(nfts),
              method(nftCredits));
 
-std::optional<psibase::HttpReply> NftSys::serveSys(psibase::HttpRequest request)
+std::optional<psibase::HttpReply> Nft::serveSys(psibase::HttpRequest request)
 {
-   if (auto result = serveSimpleUI<NftSys, true>(request))
+   if (auto result = serveSimpleUI<Nft, true>(request))
       return result;
    if (auto result = serveGraphQL(request, NftQuery{}))
       return result;
    return nullopt;
 }
 
-PSIBASE_DISPATCH(UserService::NftSys)
+PSIBASE_DISPATCH(UserService::Nft)

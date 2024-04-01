@@ -5,7 +5,7 @@ function(add_user_service suffix name)
         ../CommonApi/include
         ../Fractal/include
         ../Invite/include
-        ../NftSys/include
+        ../Nft/include
         ../PsiSpaceSys/include
         ../SymbolSys/include
         ../TokenSys/include
@@ -28,7 +28,7 @@ function(add_user_test_impl suffix name)
       ../../CommonApi/include
       ../../Fractal/include
       ../../Invite/include
-      ../../NftSys/include
+      ../../Nft/include
       ../../PsiSpaceSys/include
       ../../SymbolSys/include
       ../../TokenSys/include
@@ -64,7 +64,7 @@ endfunction()
 function(add suffix)
     add_library(services_user${suffix} INTERFACE)
     target_include_directories(services_user${suffix} INTERFACE
-        NftSys/include
+        Nft/include
     )
 endfunction(add)
 
@@ -77,7 +77,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(Explorer)
     add_subdirectory(Fractal)
     add_subdirectory(SimpleService)
-    add_subdirectory(NftSys)
+    add_subdirectory(Nft)
     add_subdirectory(NopSys)
     add_subdirectory(PackageSys)
     add_subdirectory(PsiSpaceSys)

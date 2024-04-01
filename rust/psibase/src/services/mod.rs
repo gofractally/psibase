@@ -10,7 +10,7 @@ pub mod http_server;
 #[allow(non_snake_case)]
 pub mod invite;
 #[allow(non_snake_case)]
-pub mod nft_sys;
+pub mod nft;
 pub mod package_sys;
 pub mod producers;
 pub mod psispace_sys;

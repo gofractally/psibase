@@ -6,7 +6,7 @@
 #include <services/system/commonErrors.hpp>
 #include <services/user/AuthInvite.hpp>
 #include <services/user/Invite.hpp>
-#include <services/user/NftSys.hpp>
+#include <services/user/Nft.hpp>
 #include <services/user/TokenSys.hpp>
 
 #include <psibase/Bitset.hpp>
@@ -50,7 +50,7 @@ void Invite::init()
    // Configure manual debit for self on Token and NFT
    auto manualDebit = psibase::EnumElement{"manualDebit"};
    to<TokenSys>().setUserConf(manualDebit, true);
-   to<NftSys>().setUserConf(manualDebit, true);
+   to<Nft>().setUserConf(manualDebit, true);
 
    // Create the invite payer account and set its auth contract
    to<Accounts>().newAccount(payerAccount, AuthInvite::service, true);

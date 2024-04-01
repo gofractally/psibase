@@ -6,7 +6,7 @@
 #include <psibase/Table.hpp>
 #include <services/user/tokenTypes.hpp>
 
-#include "services/user/NftSys.hpp"
+#include "services/user/Nft.hpp"
 #include "services/user/symbolTables.hpp"
 
 namespace UserService

@@ -112,7 +112,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Fractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
@@ -563,7 +563,7 @@ psibase_package(
     NAME Invite
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthK1(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthK1(^${PSIBASE_VERSION})"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SERVER invite
@@ -576,12 +576,12 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/NftSys.psi
-    NAME NftSys
+    OUTPUT ${SERVICE_DIR}/Nft.psi
+    NAME Nft
     VERSION ${PSIBASE_VERSION}
-    SERVICE nft-sys
+    SERVICE nft
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
     INIT
     DEPENDS wasm
 )
@@ -590,7 +590,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/SupervisorSys.psi
     NAME SupervisorSys
     VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS NftSys HttpServer Accounts
+    PACKAGE_DEPENDS Nft HttpServer Accounts
     SERVICE supervisor-sys
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/SupervisorSys/ui/dist /
     DEPENDS ${SupervisorSys_js_DEP}
@@ -601,7 +601,7 @@ psibase_package(
     NAME TokenSys
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Token service"
-    PACKAGE_DEPENDS "NftSys(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
     SERVICE token-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
         SERVER r-tok-sys
@@ -616,7 +616,7 @@ psibase_package(
     NAME SymbolSys
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})"
     SERVICE symbol-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
         INIT
@@ -665,7 +665,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
-                    Explorer Fractal Invite NftSys PackageSys Producers HttpServer
+                    Explorer Fractal Invite Nft PackageSys Producers HttpServer
                     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
 
@@ -693,7 +693,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    DocSys Explorer Fractal Invite NftSys NopSys Minimal PackageSys Producers HttpServer
+    DocSys Explorer Fractal Invite Nft NopSys Minimal PackageSys Producers HttpServer
     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
@@ -711,7 +711,7 @@ install(
           ${SERVICE_DIR}/Fractal.psi
           ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/Minimal.psi
-          ${SERVICE_DIR}/NftSys.psi
+          ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/NopSys.psi
           ${SERVICE_DIR}/PackageSys.psi
           ${SERVICE_DIR}/Producers.psi

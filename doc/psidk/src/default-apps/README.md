@@ -25,7 +25,7 @@ Psibase also comes with various apps meant to demonstrate additional functionali
 - [explorer]()
 - [fractal]()
 - [invite](invite.md)
-- [nft-sys]()
+- [nft]()
 - [psispace-sys](psispace-sys.md)
 - [symbol-sys]()
 - [token-sys]()

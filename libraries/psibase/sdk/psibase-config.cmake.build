@@ -66,7 +66,7 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/services/system/VerifyK1/include
         @ROOT_SOURCE_DIR@/services/user/CommonApi/include
         @ROOT_SOURCE_DIR@/services/user/Explorer/include
-        @ROOT_SOURCE_DIR@/services/user/NftSys/include
+        @ROOT_SOURCE_DIR@/services/user/Nft/include
         @ROOT_SOURCE_DIR@/services/user/PsiSpaceSys/include
         @ROOT_SOURCE_DIR@/services/user/SymbolSys/include
         @ROOT_SOURCE_DIR@/services/user/TokenSys/include

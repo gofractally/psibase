@@ -5,7 +5,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/commonErrors.hpp>
 
-#include "services/user/NftSys.hpp"
+#include "services/user/Nft.hpp"
 #include "services/user/SymbolSys.hpp"
 #include "services/user/TokenSys.hpp"
 
@@ -96,7 +96,7 @@ SCENARIO("Buying a symbol")
          AND_THEN("Alice owns the symbol")
          {
             auto ownerNftId = getSymbol.returnVal().ownerNft;
-            auto getNft     = alice.to<NftSys>().getNft(ownerNftId);
+            auto getNft     = alice.to<Nft>().getNft(ownerNftId);
             CHECK(getNft.succeeded());
 
             auto nft = getNft.returnVal();
@@ -111,7 +111,7 @@ SCENARIO("Buying a symbol")
          AND_THEN("Alice-Symbol shared balance is updated accordingly")
          {
             auto getSharedBalance =
-                alice.to<TokenSys>().getSharedBal(sysToken, alice, NftSys::service);
+                alice.to<TokenSys>().getSharedBal(sysToken, alice, Nft::service);
             CHECK(getSharedBalance.succeeded());
             CHECK(getSharedBalance.returnVal().balance == 0);
          }
@@ -129,7 +129,7 @@ SCENARIO("Buying a symbol")
          auto symbolId = SID{"abc"};
          a.create(symbolId, quantity);
          auto nftId = a.getSymbol(symbolId).returnVal().ownerNft;
-         alice.to<NftSys>().debit(nftId, memo);
+         alice.to<Nft>().debit(nftId, memo);
 
          THEN("Bob cannot create the same symbol")
          {
@@ -208,7 +208,7 @@ SCENARIO("Measuring price increases")
             CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
             a.create(SID{"bcd"}, quantity);
             auto balance = alice.to<TokenSys>()
-                               .getSharedBal(sysToken, alice, NftSys::service)
+                               .getSharedBal(sysToken, alice, Nft::service)
                                .returnVal()
                                .balance;
             CHECK(balance == 0);
@@ -295,12 +295,12 @@ SCENARIO("Using symbol ownership NFT")
       a.create(symbolId, symbolCost);
       auto symbolRecord = a.getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
-      alice.to<NftSys>().debit(nftId, memo);
+      alice.to<Nft>().debit(nftId, memo);
 
       WHEN("Alice transfers her symbol to Bob")
       {
-         alice.to<NftSys>().credit(nftId, bob, memo);
-         bob.to<NftSys>().debit(nftId, memo);
+         alice.to<Nft>().credit(nftId, bob, memo);
+         bob.to<Nft>().debit(nftId, memo);
          // No additional testing needed to confirm transfers work, as it's piggybacking on NFT transferability
 
          THEN("The symbol record is identical")
@@ -311,7 +311,7 @@ SCENARIO("Using symbol ownership NFT")
       }
       WHEN("Alice burns her symbol owner NFT")
       {
-         alice.to<NftSys>().burn(nftId);
+         alice.to<Nft>().burn(nftId);
 
          THEN("The symbol record is identical")
          {
@@ -349,7 +349,7 @@ SCENARIO("Buying and selling symbols")
 
       // Map system symbol to system token
       auto sysSymbolNft = alice.to<SymbolSys>().getSymbol(sysSymbol).returnVal().ownerNft;
-      alice.to<NftSys>().credit(sysSymbolNft, TokenSys::service, memo);
+      alice.to<Nft>().credit(sysSymbolNft, TokenSys::service, memo);
       alice.to<TokenSys>().mapSymbol(sysToken, sysSymbol);
 
       WHEN("Alice creates a symbol")
@@ -359,16 +359,16 @@ SCENARIO("Buying and selling symbols")
          alice.to<SymbolSys>().create(symbol, symbolCost);
 
          auto symbolNft        = alice.to<SymbolSys>().getSymbol(symbol).returnVal().ownerNft;
-         auto initialNftRecord = alice.to<NftSys>().getNft(symbolNft).returnVal();
+         auto initialNftRecord = alice.to<Nft>().getNft(symbolNft).returnVal();
 
          THEN("Alice can list it for sale")
          {
-            alice.to<NftSys>().credit(symbolNft, SymbolSys::service, memo);
+            alice.to<Nft>().credit(symbolNft, SymbolSys::service, memo);
             CHECK(alice.to<SymbolSys>().listSymbol(symbol, Quantity{1'000e8}).succeeded());
 
             AND_THEN("Alice no longer owns the symbol")
             {
-               auto newNftRecord = alice.to<NftSys>().getNft(symbolNft).returnVal();
+               auto newNftRecord = alice.to<Nft>().getNft(symbolNft).returnVal();
                CHECK(newNftRecord != initialNftRecord);
 
                // Make sure only owner changed
@@ -402,7 +402,7 @@ SCENARIO("Buying and selling symbols")
          WHEN("The symbol is for sale")
          {
             auto listPrice = Quantity{1'000e8};
-            alice.to<NftSys>().credit(symbolNft, SymbolSys::service, memo);
+            alice.to<Nft>().credit(symbolNft, SymbolSys::service, memo);
             alice.to<SymbolSys>().listSymbol(symbol, listPrice);
 
             THEN("Alice cannot buy the symbol")
@@ -436,7 +436,7 @@ SCENARIO("Buying and selling symbols")
 
                THEN("Bob owns the symbol")
                {
-                  auto newNftRecord = bob.to<NftSys>().getNft(symbolNft).returnVal();
+                  auto newNftRecord = bob.to<Nft>().getNft(symbolNft).returnVal();
                   CHECK(newNftRecord.owner == bob.id);
 
                   newNftRecord.owner = initialNftRecord.owner;
@@ -453,7 +453,7 @@ SCENARIO("Buying and selling symbols")
                }
                THEN("Bob can reslist the symbol")
                {
-                  bob.to<NftSys>().credit(symbolNft, SymbolSys::service, memo);
+                  bob.to<Nft>().credit(symbolNft, SymbolSys::service, memo);
                   bob.to<SymbolSys>().listSymbol(symbol, listPrice);
                }
             }
