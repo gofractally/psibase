@@ -1,6 +1,6 @@
 /// Interface for services which serve http
 ///
-/// [proxy.sys](https://doc-sys.psibase.io/default-apps/http-server.html) uses this
+/// [proxy.sys](https://docs.psibase.io/default-apps/http-server.html) uses this
 /// interface to call into services to respond to http requests.
 ///
 /// To implement this interface, add a [serveSys](ServerActions::serveSys) action to
@@ -21,7 +21,7 @@ pub mod server_interface {
     /// Handle HTTP requests
     ///
     /// Define this action in your service to handle HTTP requests. You'll also need to
-    /// [register your service](https://doc-sys.psibase.io/services/rust-service/reference/web-services.html#registration).
+    /// [register your service](https://docs.psibase.io/services/rust-service/reference/web-services.html#registration).
     ///
     /// `serveSys` can do any of the following:
     ///

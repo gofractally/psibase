@@ -11,7 +11,7 @@ const App = () => {
                     </a>
                 </li>
                 <li>
-                    <a href={siblingUrl(null, "doc-sys", null, false)}>Docs</a>
+                    <a href={siblingUrl(null, "docs", null, false)}>Docs</a>
                 </li>
             </ul>
         </div>

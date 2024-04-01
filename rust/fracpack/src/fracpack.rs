@@ -2,7 +2,7 @@
 // TODO: option to allow/disallow unknown fields during verify and unpack
 // TODO: replace 'a with 'de; change macro to look for 'de specifically instead of assuming
 
-//! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
+//! Rust support for the [fracpack format](https://docs.psibase.io/format/fracpack.html)
 //!
 //! [Psibase](https://about.psibase.io) uses a new binary format, `fracpack`, which has the following goals:
 //!

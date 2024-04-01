@@ -83,7 +83,7 @@
           "id": "serviceName",
           "type":"promptString",
           "description": "Name of the service to test",
-          "default": "TokenSys"
+          "default": "Tokens"
         },
       ]
 }

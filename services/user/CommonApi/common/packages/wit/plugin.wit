@@ -59,7 +59,7 @@ interface server {
     post-graphql-get-json: func(url: string, graphql: string) -> result<string, error>;
 
     // Todo: Probably will need to implement most/all js library functionality:
-    // https://doc-sys.psibase.io/development/front-ends/reference/js-libraries.html
+    // https://docs.psibase.io/development/front-ends/reference/js-libraries.html
 }
 
 /// Common calls related to client interactions

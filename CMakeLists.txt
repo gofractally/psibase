@@ -246,7 +246,7 @@ endfunction()
 file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/*)
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts/*)
 
-# Builds the Common Sys files that the UIs (just below) depend on
+# Builds the Common files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
 add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP})
 
@@ -471,11 +471,11 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/DocSys.psi
-    NAME DocSys
+    OUTPUT ${SERVICE_DIR}/Docs.psi
+    NAME Docs
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Psibase documentation"
-    SERVICE doc-sys
+    SERVICE docs
     DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
@@ -664,7 +664,7 @@ psibase_package(
     NAME Default
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
                     Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
@@ -693,7 +693,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    DocSys Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
+    Docs Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
 
 install(
@@ -706,7 +706,7 @@ install(
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Default.psi
           ${SERVICE_DIR}/CpuLimit.psi
-          ${SERVICE_DIR}/DocSys.psi
+          ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractal.psi
           ${SERVICE_DIR}/Invite.psi

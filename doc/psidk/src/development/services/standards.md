@@ -2,7 +2,7 @@
 
 ## Standard account names
 
-Trusted system services have account names which end with `-sys`. Only chain operators may create accounts with this suffix.
+Subjective system services have account names which begin with `x-`. Only the infrastructure providers may create accounts with this suffix.
 
 ## Standard actions
 

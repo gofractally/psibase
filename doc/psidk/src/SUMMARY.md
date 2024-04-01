@@ -84,7 +84,7 @@
   - [auth-sig](default-apps/auth-sig.md)
   - [common-api](default-apps/common-api.md)
   - [cpu-limit]()
-  - [doc-sys](default-apps/doc-sys.md)
+  - [docs](default-apps/docs.md)
   - [explorer]()
   - [fractal]()
   - [invite](default-apps/invite.md)

@@ -21,7 +21,7 @@ System apps are the applications responsible for the core functionality of the n
 Psibase also comes with various apps meant to demonstrate additional functionality. These additional apps can be removed or replaced by other custom apps without upsetting any of the core functionality of the network.
 
 - [x-admin](x-admin.md)
-- [doc-sys](doc-sys.md)
+- [docs](docs.md)
 - [explorer]()
 - [fractal]()
 - [invite](invite.md)
