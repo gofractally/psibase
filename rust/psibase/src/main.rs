@@ -869,7 +869,7 @@ async fn install(
                 0,
                 Action {
                     sender,
-                    service: account!("nop-sys"),
+                    service: account!("nop"),
                     method: method!("nop"),
                     rawData: Default::default(),
                 },

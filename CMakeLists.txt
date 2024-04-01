@@ -113,7 +113,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Fractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Nop.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
@@ -482,12 +482,12 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/NopSys.psi
-    NAME NopSys
+    OUTPUT ${SERVICE_DIR}/Nop.psi
+    NAME Nop
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Service that does nothing"
-    SERVICE nop-sys
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
+    SERVICE nop
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/Nop.wasm
     DEPENDS wasm
 )
 
@@ -656,7 +656,7 @@ psibase_package(
     SERVICE r-package-sys
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "NopSys(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Nop(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -693,7 +693,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    DocSys Explorer Fractal Invite Nft NopSys Minimal PackageSys Producers HttpServer
+    DocSys Explorer Fractal Invite Nft Nop Minimal PackageSys Producers HttpServer
     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
@@ -712,7 +712,7 @@ install(
           ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
-          ${SERVICE_DIR}/NopSys.psi
+          ${SERVICE_DIR}/Nop.psi
           ${SERVICE_DIR}/PackageSys.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/HttpServer.psi
