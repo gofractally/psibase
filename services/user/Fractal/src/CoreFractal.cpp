@@ -3,7 +3,7 @@
 #include <services/user/Fractal.hpp>
 
 using namespace UserService;
-using namespace UserService::Fractal;
+using namespace UserService::FractalNs;
 using namespace psibase;
 
 CoreFractal::CoreFractal(psio::shared_view_ptr<psibase::Action> action)
@@ -26,4 +26,4 @@ bool CoreFractal::isFracType()
    return true;
 }
 
-PSIBASE_DISPATCH(UserService::Fractal::CoreFractal)
+PSIBASE_DISPATCH(UserService::FractalNs::CoreFractal)

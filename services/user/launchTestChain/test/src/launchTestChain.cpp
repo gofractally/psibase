@@ -44,8 +44,8 @@ SCENARIO("Testing default psibase chain")
    alice.to<TokenSys>().mint(create.returnVal(), 100e4, memo);
 
    // Create a fractal
-   alice.to<Fractal::Fractal>().createIdentity();
-   alice.to<Fractal::Fractal>().newFractal("astronauts"_a, Fractal::CoreFractal::service);
+   alice.to<FractalNs::Fractal>().createIdentity();
+   alice.to<FractalNs::Fractal>().newFractal("astronauts"_a, FractalNs::CoreFractal::service);
 
    // Make a couple blocks
    t.finishBlock();

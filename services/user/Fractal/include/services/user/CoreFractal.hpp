@@ -5,7 +5,7 @@
 
 namespace UserService
 {
-   namespace Fractal
+   namespace FractalNs
    {
       class CoreFractal : public psibase::Service<CoreFractal>
       {
@@ -41,5 +41,5 @@ namespace UserService
       PSIBASE_REFLECT_MERKLE_EVENTS(CoreFractal);
       // clang-format on
 
-   }  // namespace Fractal
+   }  // namespace FractalNs
 }  // namespace UserService

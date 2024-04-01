@@ -8,7 +8,7 @@
 using namespace psibase;
 using namespace UserService;
 using namespace UserService::Errors;
-using namespace UserService::Fractal;
+using namespace UserService::FractalNs;
 
 namespace
 {

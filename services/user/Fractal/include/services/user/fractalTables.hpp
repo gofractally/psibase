@@ -3,7 +3,7 @@
 
 namespace UserService
 {
-   namespace Fractal
+   namespace FractalNs
    {
 
       struct ServiceEventRecord
@@ -108,5 +108,5 @@ namespace UserService
       PSIO_REFLECT(IdentityRecord, name, displayName, eventHead);
       using IdentityTable = psibase::Table<IdentityRecord, &IdentityRecord::name>;
 
-   }  // namespace Fractal
+   }  // namespace FractalNs
 }  // namespace UserService

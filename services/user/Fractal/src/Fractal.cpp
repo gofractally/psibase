@@ -5,7 +5,7 @@
 #include <services/user/InviteSys.hpp>
 
 using namespace UserService;
-using namespace UserService::Fractal;
+using namespace UserService::FractalNs;
 using namespace psibase;
 using std::move;
 using std::nullopt;
@@ -328,18 +328,18 @@ struct Queries
 {
    auto getIdentity(AccountNumber user) const
    {  //
-      return Fractal::Tables(Fractal::service).open<Fractal::IdentityTable>().get(user);
+      return Fractal::Tables(Fractal::service).open<IdentityTable>().get(user);
    }
 
    auto getInvite(PublicKey pubkey) const
    {  //
-      return Fractal::Tables(Fractal::service).open<Fractal::InviteTable>().get(pubkey);
+      return Fractal::Tables(Fractal::service).open<InviteTable>().get(pubkey);
    }
 
    auto getMember(AccountNumber user, AccountNumber fractal) const
    {  //
       MembershipKey key{user, fractal};
-      return Fractal::Tables(Fractal::service).open<Fractal::MemberTable>().get(key);
+      return Fractal::Tables(Fractal::service).open<MemberTable>().get(key);
    }
 
    auto getFractals(AccountNumber           user,
@@ -352,9 +352,7 @@ struct Queries
                     optional<string>        before,
                     optional<string>        after) const
    {
-      auto idx =
-          Fractal::Tables{Fractal::service}.open<Fractal::MemberTable>().getIndex<1>().subindex(
-              user);
+      auto idx = Fractal::Tables{Fractal::service}.open<MemberTable>().getIndex<1>().subindex(user);
 
       auto convert = [](const auto& opt)
       {
@@ -371,12 +369,12 @@ struct Queries
 
    auto getFractal(AccountNumber fractal) const
    {  //
-      return Fractal::Tables(Fractal::service).open<Fractal::FractalTable>().get(fractal);
+      return Fractal::Tables(Fractal::service).open<FractalTable>().get(fractal);
    }
 
    auto getFractalType(AccountNumber service) const
    {  //
-      return Fractal::Tables(Fractal::service).open<Fractal::FractalTypeTable>().get(service);
+      return Fractal::Tables(Fractal::service).open<FractalTypeTable>().get(service);
    }
 
    auto events() const
@@ -438,4 +436,4 @@ void Fractal::storeSys(string path, string contentType, vector<char> content)
    storeContent(move(path), move(contentType), move(content), Tables());
 }
 
-PSIBASE_DISPATCH(UserService::Fractal::Fractal)
+PSIBASE_DISPATCH(UserService::FractalNs::Fractal)

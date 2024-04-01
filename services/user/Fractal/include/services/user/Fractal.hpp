@@ -7,7 +7,7 @@
 
 namespace UserService
 {
-   namespace Fractal
+   namespace FractalNs
    {
       class Fractal : public psibase::Service<Fractal>
       {
@@ -132,6 +132,6 @@ namespace UserService
       PSIBASE_REFLECT_MERKLE_EVENTS(Fractal);
       // clang-format on
 
-   }  // namespace Fractal
+   }  // namespace FractalNs
 
 }  // namespace UserService

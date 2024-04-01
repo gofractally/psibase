@@ -4,10 +4,10 @@
 
 namespace UserService
 {
-   namespace Fractal
+   namespace FractalNs
    {
       namespace Errors
       {
       }  // namespace Errors
-   }     // namespace Fractal
+   }     // namespace FractalNs
 }  // namespace UserService
