@@ -1,8 +1,8 @@
-#include "TokenSys.hpp"
+#include "Tokens.hpp"
 
 namespace UserService
 {
-   class RTokenSys : public psibase::Service<RTokenSys>
+   class RTokens : public psibase::Service<RTokens>
    {
      public:
       static constexpr auto service = psibase::AccountNumber("r-tok-sys");
@@ -13,6 +13,6 @@ namespace UserService
      private:
       std::optional<psibase::HttpReply> _serveRestEndpoints(psibase::HttpRequest& request);
    };
-   PSIO_REFLECT(RTokenSys, method(serveSys, request), method(storeSys, path, contentType, content))
+   PSIO_REFLECT(RTokens, method(serveSys, request), method(storeSys, path, contentType, content))
 
 }  // namespace UserService

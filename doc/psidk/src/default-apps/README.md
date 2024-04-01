@@ -28,4 +28,4 @@ Psibase also comes with various apps meant to demonstrate additional functionali
 - [nft]()
 - [sites](sites.md)
 - [symbol]()
-- [token-sys]()
+- [tokens]()

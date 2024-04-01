@@ -7,13 +7,13 @@
 
 #include "services/user/CoreFractal.hpp"
 #include "services/user/Fractal.hpp"
-#include "services/user/RTokenSys.hpp"
+#include "services/user/RTokens.hpp"
 #include "services/user/Symbol.hpp"
-#include "services/user/TokenSys.hpp"
+#include "services/user/Tokens.hpp"
 
 using namespace psibase;
 using namespace psibase::benchmarking;
-using UserService::TokenSys;
+using UserService::Tokens;
 using namespace UserService::Errors;
 using namespace UserService;
 
@@ -28,8 +28,8 @@ SCENARIO("Testing default psibase chain")
 
    auto alice     = t.from(t.addAccount("alice"_a));
    auto bob       = t.from(t.addAccount("bob"_a));
-   auto sysIssuer = t.from(Symbol::service).to<TokenSys>();
-   auto sysToken  = TokenSys::sysToken;
+   auto sysIssuer = t.from(Symbol::service).to<Tokens>();
+   auto sysToken  = Tokens::sysToken;
 
    // Let sys token be tradeable
    sysIssuer.setTokenConf(sysToken, "untradeable"_m, false);
@@ -40,8 +40,8 @@ SCENARIO("Testing default psibase chain")
    sysIssuer.credit(sysToken, alice, 1'000e8, memo);
    sysIssuer.credit(sysToken, bob, 1'000e8, memo);
 
-   auto create = alice.to<TokenSys>().create(4, 1'000'000e4);
-   alice.to<TokenSys>().mint(create.returnVal(), 100e4, memo);
+   auto create = alice.to<Tokens>().create(4, 1'000'000e4);
+   alice.to<Tokens>().mint(create.returnVal(), 100e4, memo);
 
    // Create a fractal
    alice.to<FractalNs::Fractal>().createIdentity();

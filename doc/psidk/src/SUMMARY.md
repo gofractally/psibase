@@ -94,7 +94,7 @@
   - [sites](default-apps/sites.md)
   - [setcode](default-apps/setcode.md)
   - [symbol]()
-  - [token-sys]()
+  - [tokens]()
   - [transact](default-apps/transact.md)
   - [verify-sig]()
 

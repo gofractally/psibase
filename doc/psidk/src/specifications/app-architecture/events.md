@@ -71,8 +71,8 @@ For example, in the example Token Service, a `Transferred` event is defined, and
   using UserEvents = psibase::EventIndex<&TokenHolderRecord::eventHead, "prevEvent">;
 
   // Reflect the events
-  PSIBASE_REFLECT_EVENTS(TokenSys)
-  PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys,
+  PSIBASE_REFLECT_EVENTS(Tokens)
+  PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
       method(transferred, prevEvent, tokenId, time, sender, receiver, amount, memo)
   );
 ```
@@ -82,7 +82,7 @@ The definition of `UserEvents` indicates that the head event ID is stored in the
 When the `transferred` event gets emitted by the service, the ID of the previous transferred event is included (via the `prevEvent` field) in the new event, and the event ID of the new event is saved to state (in the `eventHead` field of the sender's `TokenHolderRecord`):
 
 ```cpp
-void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
+void Tokens::debit(TID tokenId, AccountNumber sender, Quantity amount, const_view<String> memo)
 {
     // ...
 
@@ -107,19 +107,19 @@ Notice that the `transferred` event is emitted twice, in order to generate the e
 In Psibase, it is very simple to provide GraphQL access to any event chain. In the below example, you can see how the Token Service exposes an index of all events (via the `events` query), and an index on just the user events (via the `userEvents` query):
 
 ```cpp
-  // Create a QueryableService object using TokenSys service details
-  auto tokenSys = QueryableService<TokenSys::Tables, TokenSys::Events>{TokenSys::service};
+  // Create a QueryableService object using Tokens service details
+  auto tokenService = QueryableService<Tokens::Tables, Tokens::Events>{Tokens::service};
 
   // Construct and reflect the query object
   struct TokenQuery
   {
       auto events() const
       {
-          return tokenSys.allEvents();
+          return tokenService.allEvents();
       }
       auto userEvents(AccountNumber holder, optional<uint32_t> first, const optional<string>& after) const
       {
-          return tokenSys.eventIndex<TokenSys::UserEvents>(holder, first, after);
+          return tokenService.eventIndex<Tokens::UserEvents>(holder, first, after);
       }
   };
   PSIO_REFLECT(TokenQuery,
@@ -128,7 +128,7 @@ In Psibase, it is very simple to provide GraphQL access to any event chain. In t
   )
 
   // Expose the defined queries over a GraphQL interface
-  optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
+  optional<HttpReply> RTokens::serveSys(HttpRequest request)
   {
       if (auto result = serveGraphQL(request, TokenQuery{}))
           return result;
@@ -137,14 +137,14 @@ In Psibase, it is very simple to provide GraphQL access to any event chain. In t
   }
 ```
 
-Once the above Service and RPC Service are deployed, a front-end developer may access `https://token-sys.<domain>/graphql` to see these queries are now available as part of the GraphQL schema:
+Once the above Service and RPC Service are deployed, a front-end developer may access `https://tokens.<domain>/graphql` to see these queries are now available as part of the GraphQL schema:
 
 
 ```
   ...
   type Query {
-      events: TokenSys_Events!
-      userEvents(holder: String! first: Float after: String): TokenSys_EventsHistoryConnection!
+      events: Tokens_Events!
+      userEvents(holder: String! first: Float after: String): Tokens_EventsHistoryConnection!
   }
 
 ```

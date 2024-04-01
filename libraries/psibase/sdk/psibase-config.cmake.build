@@ -69,7 +69,7 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/services/user/Nft/include
         @ROOT_SOURCE_DIR@/services/user/Sites/include
         @ROOT_SOURCE_DIR@/services/user/Symbol/include
-        @ROOT_SOURCE_DIR@/services/user/TokenSys/include
+        @ROOT_SOURCE_DIR@/services/user/Tokens/include
         @ROOT_SOURCE_DIR@/services/user/Invite/include
     )
     target_link_libraries(psibase${suffix} INTERFACE

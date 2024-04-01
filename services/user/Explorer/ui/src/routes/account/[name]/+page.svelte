@@ -9,7 +9,7 @@
     let data = null;
 
     const fetchBalances = async (user) => {
-        const url = await siblingUrl(null, "token-sys", `api/balances/${user}`);
+        const url = await siblingUrl(null, "tokens", `api/balances/${user}`);
         return getJson(url);
     }
 

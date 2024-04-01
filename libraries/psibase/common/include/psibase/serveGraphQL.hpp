@@ -776,7 +776,7 @@ namespace psibase
    ///         {
    ///           "event_id": "3",
    ///           "tokenId": 1,
-   ///           "creator": "token-sys",
+   ///           "creator": "tokens",
    ///           "precision": {
    ///             "value": 8
    ///           },
@@ -788,7 +788,7 @@ namespace psibase
    ///           "event_id": "4",
    ///           "prevEvent": 1,
    ///           "tokenId": "3",
-   ///           "setter": "token-sys",
+   ///           "setter": "tokens",
    ///           "flag": "untradeable",
    ///           "enable": true
    ///         }

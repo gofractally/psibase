@@ -124,10 +124,10 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
@@ -563,7 +563,7 @@ psibase_package(
     NAME Invite
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthK1(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})" "AuthK1(^${PSIBASE_VERSION})"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SERVER invite
@@ -597,17 +597,17 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/TokenSys.psi
-    NAME TokenSys
+    OUTPUT ${SERVICE_DIR}/Tokens.psi
+    NAME Tokens
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Token service"
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
-    SERVICE token-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
+    SERVICE tokens
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
         SERVER r-tok-sys
         INIT
     SERVICE r-tok-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
     DEPENDS wasm
 )
 
@@ -616,7 +616,7 @@ psibase_package(
     NAME Symbol
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})"
     SERVICE symbol
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
         INIT
@@ -641,8 +641,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
-    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "Symbol(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/src/TokenUsers.json
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION})" "Symbol(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/src/TokenUsers.json
 )
 
 psibase_package(
@@ -666,7 +666,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
                     Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol TokenUsers TokenSys Transact
+                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
 
 psibase_package(
@@ -694,7 +694,7 @@ endfunction()
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
     DocSys Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    Sites SetCode Supervisor Symbol TokenUsers TokenSys Transact)
+    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -721,7 +721,7 @@ install(
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TokenUsers.psi
-          ${SERVICE_DIR}/TokenSys.psi
+          ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/Transact.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)

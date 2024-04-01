@@ -4,14 +4,14 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
 #include <services/system/commonErrors.hpp>
-#include <services/user/RTokenSys.hpp>
-#include <services/user/TokenSys.hpp>
+#include <services/user/RTokens.hpp>
+#include <services/user/Tokens.hpp>
 
 #include "services/user/Symbol.hpp"
 
 using namespace psibase;
 using namespace psibase::benchmarking;
-using UserService::TokenSys;
+using UserService::Tokens;
 using namespace UserService::Errors;
 using namespace UserService;
 
@@ -36,12 +36,12 @@ SCENARIO("Using system token")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
 
-      auto sysIssuer   = t.from(Symbol::service).to<TokenSys>();
+      auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e8;
-      auto sysToken    = TokenSys::sysToken;
+      auto sysToken    = Tokens::sysToken;
       sysIssuer.mint(sysToken, userBalance, memo);
 
       THEN("The system token is untradeable by default")
@@ -84,7 +84,7 @@ SCENARIO("Creating a token")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
 
       THEN("Alice may create a token")
@@ -157,9 +157,9 @@ SCENARIO("Minting tokens")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
-      auto b     = bob.to<TokenSys>();
+      auto b     = bob.to<Tokens>();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
 
@@ -214,9 +214,9 @@ SCENARIO("Recalling tokens")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
-      auto b     = bob.to<TokenSys>();
+      auto b     = bob.to<Tokens>();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -268,9 +268,9 @@ SCENARIO("Interactions with the Issuer NFT")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
-      auto b     = bob.to<TokenSys>();
+      auto b     = bob.to<Tokens>();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -355,9 +355,9 @@ SCENARIO("Burning tokens")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
-      auto b     = bob.to<TokenSys>();
+      auto b     = bob.to<Tokens>();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -434,9 +434,9 @@ SCENARIO("Toggling manual-debit")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
-      auto b     = bob.to<TokenSys>();
+      auto b     = bob.to<Tokens>();
 
       THEN("Alice and Bob both have manualDebit disabled")
       {
@@ -497,9 +497,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
-      auto b     = bob.to<TokenSys>();
+      auto b     = bob.to<Tokens>();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -566,9 +566,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
       DefaultTestChain t;
 
       auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
-      auto b     = bob.to<TokenSys>();
+      auto b     = bob.to<Tokens>();
 
       auto tokenId = a.create(8, 1'000'000'000e8).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -697,13 +697,13 @@ SCENARIO("Mapping a symbol to a token")
 
       auto alice = t.from(t.addAccount("alice"_a));
       auto bob   = t.from(t.addAccount("bob"_a));
-      auto a     = alice.to<TokenSys>();
-      auto b     = bob.to<TokenSys>();
+      auto a     = alice.to<Tokens>();
+      auto b     = bob.to<Tokens>();
 
       // Issue system tokens
-      auto sysIssuer   = t.from(Symbol::service).to<TokenSys>();
+      auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e8;
-      auto sysToken    = TokenSys::sysToken;
+      auto sysToken    = Tokens::sysToken;
       sysIssuer.setTokenConf(sysToken, untradeable, false);
       sysIssuer.mint(sysToken, userBalance, memo);
       sysIssuer.credit(sysToken, alice, userBalance, memo);
@@ -755,7 +755,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       THEN("Alice is able to map the symbol to the token")
       {
-         alice.to<Nft>().credit(nftId, TokenSys::service, memo);
+         alice.to<Nft>().credit(nftId, Tokens::service, memo);
          CHECK(a.mapSymbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
@@ -765,7 +765,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       WHEN("Alice maps the symbol to the token")
       {
-         alice.to<Nft>().credit(nftId, TokenSys::service, memo);
+         alice.to<Nft>().credit(nftId, Tokens::service, memo);
          a.mapSymbol(newToken, symbolId);
 
          THEN("The symbol record is identical")
@@ -781,7 +781,7 @@ SCENARIO("Mapping a symbol to a token")
             alice.to<Symbol>().create(newSymbol, symbolCost);
             auto newNft = alice.to<Symbol>().getSymbol(newSymbol).returnVal().ownerNft;
 
-            alice.to<Nft>().credit(newNft, TokenSys::service, memo);
+            alice.to<Nft>().credit(newNft, Tokens::service, memo);
             CHECK(a.mapSymbol(newToken, newSymbol).failed(tokenHasSymbol));
          }
       }

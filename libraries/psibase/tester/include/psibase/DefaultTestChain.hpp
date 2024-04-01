@@ -14,7 +14,7 @@ namespace psibase
       DefaultTestChain(const std::vector<std::string>& packageNames =
                            {"Accounts", "AuthAny", "AuthDelegate", "AuthSig", "AuthK1", "CommonApi",
                             "CpuLimit", "Explorer", "Fractal", "Invite", "Nft", "Packages",
-                            "Producers", "HttpServer", "Sites", "SetCode", "Symbol", "TokenSys",
+                            "Producers", "HttpServer", "Sites", "SetCode", "Symbol", "Tokens",
                             "Transact"},
                        bool                  installUI = false,
                        const DatabaseConfig& dbconfig  = {});

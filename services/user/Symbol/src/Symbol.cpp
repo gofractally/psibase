@@ -7,7 +7,7 @@
 
 #include <psibase/serveSimpleUI.hpp>
 #include "services/user/Nft.hpp"
-#include "services/user/TokenSys.hpp"
+#include "services/user/Tokens.hpp"
 
 using namespace UserService;
 using namespace psibase;
@@ -56,7 +56,7 @@ void Symbol::init()
    initTable.put(InitializedRecord{});
 
    // Configure manualDebit for self on Token and NFT
-   to<TokenSys>().setUserConf("manualDebit"_m, true);
+   to<Tokens>().setUserConf("manualDebit"_m, true);
    to<Nft>().setUserConf("manualDebit"_m, true);
 
    // Configure default symbol length records to establish initial prices
@@ -91,9 +91,8 @@ void Symbol::init()
 
    // Offer system token symbol
    auto symbolOwnerNft = getSymbol(sysTokenSymbol);
-   to<Nft>().credit(symbolOwnerNft.ownerNft, TokenSys::service,
-                    "System token symbol ownership nft");
-   to<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
+   to<Nft>().credit(symbolOwnerNft.ownerNft, Tokens::service, "System token symbol ownership nft");
+   to<Tokens>().mapSymbol(Tokens::sysToken, sysTokenSymbol);
 
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Symbol::service);
@@ -116,7 +115,7 @@ void Symbol::create(SID newSymbol, Quantity maxDebit)
    auto debitMemo = "This transfer created the new symbol: " + symString;
    if (sender != getReceiver())  // Symbol itself doesn't need to pay
    {
-      to<TokenSys>().debit(TokenSys::sysToken, sender, cost, debitMemo);
+      to<Tokens>().debit(Tokens::sysToken, sender, cost, debitMemo);
    }
 
    // Mint and offer ownership NFT
@@ -166,15 +165,15 @@ void Symbol::buySymbol(SID symbol)
    auto buyer               = getSender();
    auto symbolRecord        = getSymbol(symbol);
    auto [salePrice, seller] = symbolRecord.saleDetails;
-   auto tokenService        = to<TokenSys>();
+   auto tokenService        = to<Tokens>();
 
    check(symbolRecord.ownerNft != 0, symbolDNE);
    check(buyer != seller, buyerIsSeller);
 
    auto buyerMemo  = "Buying symbol " + symbol.str();
    auto sellerMemo = "Symbol " + symbol.str() + " sold";
-   tokenService.debit(TokenSys::sysToken, buyer, salePrice, buyerMemo);
-   tokenService.credit(TokenSys::sysToken, seller, salePrice, sellerMemo);
+   tokenService.debit(Tokens::sysToken, buyer, salePrice, buyerMemo);
+   tokenService.credit(Tokens::sysToken, seller, salePrice, sellerMemo);
    to<Nft>().credit(symbolRecord.ownerNft, buyer, buyerMemo);
 
    symbolRecord.saleDetails.seller    = AccountNumber{0};

@@ -8,7 +8,7 @@ function(add_user_service suffix name)
         ../Nft/include
         ../Sites/include
         ../Symbol/include
-        ../TokenSys/include
+        ../Tokens/include
         ../../system/Accounts/include
         ../../system/AuthK1/include
         ../../system/AuthAny/include
@@ -31,7 +31,7 @@ function(add_user_test_impl suffix name)
       ../../Nft/include
       ../../Sites/include
       ../../Symbol/include
-      ../../TokenSys/include
+      ../../Tokens/include
       ../../../system/Accounts/include
       ../../../system/AuthK1/include
       ../../../system/AuthAny/include
@@ -82,7 +82,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(Packages)
     add_subdirectory(Sites)
     add_subdirectory(Symbol)
-    add_subdirectory(TokenSys)
+    add_subdirectory(Tokens)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

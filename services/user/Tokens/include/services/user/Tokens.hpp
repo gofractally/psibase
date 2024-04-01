@@ -11,16 +11,16 @@
 
 namespace UserService
 {
-   class TokenSys : public psibase::Service<TokenSys>
+   class Tokens : public psibase::Service<Tokens>
    {
      public:
       using Tables = psibase::
           ServiceTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
 
-      static constexpr auto service  = psibase::AccountNumber("token-sys");
+      static constexpr auto service  = psibase::AccountNumber("tokens");
       static constexpr auto sysToken = TID{1};
 
-      TokenSys(psio::shared_view_ptr<psibase::Action> action);
+      Tokens(psio::shared_view_ptr<psibase::Action> action);
 
       void init();
 
@@ -104,7 +104,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO_REFLECT(TokenSys,
+   PSIO_REFLECT(Tokens,
       method(init),
       method(create, precision, maxSupply),
       method(mint, tokenId, amount, memo),
@@ -125,8 +125,8 @@ namespace UserService
       method(getTokenConf, tokenId, flag),
       method(mapSymbol, symbolId, tokenId),
     );
-   PSIBASE_REFLECT_EVENTS(TokenSys);
-   PSIBASE_REFLECT_HISTORY_EVENTS(TokenSys,
+   PSIBASE_REFLECT_EVENTS(Tokens);
+   PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
       method(created, prevEvent, tokenId, creator, precision, maxSupply),
       method(minted, prevEvent, tokenId, minter, amount, memo),
       method(burned, prevEvent, tokenId, burner, amount),
@@ -136,8 +136,8 @@ namespace UserService
       method(transferred, prevEvent, tokenId, time, sender, receiver, amount, memo),
       method(recalled, prevEvent, tokenId, time, from, amount, memo),
    );
-   PSIBASE_REFLECT_UI_EVENTS(TokenSys);
-   PSIBASE_REFLECT_MERKLE_EVENTS(TokenSys);
+   PSIBASE_REFLECT_UI_EVENTS(Tokens);
+   PSIBASE_REFLECT_MERKLE_EVENTS(Tokens);
    // clang-format on
 
 }  // namespace UserService

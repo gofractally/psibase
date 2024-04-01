@@ -3,9 +3,9 @@
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <services/system/CommonApi.hpp>
-#include <services/user/RTokenSys.hpp>
+#include <services/user/RTokens.hpp>
 #include <services/user/Symbol.hpp>
-#include <services/user/TokenSys.hpp>
+#include <services/user/Tokens.hpp>
 #include <string>
 #include <vector>
 
@@ -13,7 +13,7 @@ using namespace UserService;
 using namespace std;
 using namespace psibase;
 
-auto tokenSys = QueryableService<TokenSys::Tables, TokenSys::Events>{TokenSys::service};
+auto tokenService = QueryableService<Tokens::Tables, Tokens::Events>{Tokens::service};
 
 struct UserBalanceRecord
 {
@@ -29,15 +29,15 @@ struct TokenQuery
 {
    auto allBalances() const
    {  //
-      return tokenSys.index<BalanceTable, 0>();
+      return tokenService.index<BalanceTable, 0>();
    }
    auto userBalances(AccountNumber user) const
    {  //
       vector<UserBalanceRecord> balances;
-      for (auto tokenType : tokenSys.index<TokenTable, 0>())
+      for (auto tokenType : tokenService.index<TokenTable, 0>())
       {
          auto tid = tokenType.id;
-         if (auto bal = tokenSys.index<BalanceTable, 0>().get(BalanceKey{user, tid}))
+         if (auto bal = tokenService.index<BalanceTable, 0>().get(BalanceKey{user, tid}))
          {
             balances.push_back(UserBalanceRecord{user, bal->balance, tokenType.precision.value, tid,
                                                  tokenType.symbolId});
@@ -48,34 +48,34 @@ struct TokenQuery
 
    auto sharedBalances() const
    {  //
-      return tokenSys.index<SharedBalanceTable, 0>();
+      return tokenService.index<SharedBalanceTable, 0>();
    }
 
    auto tokens() const
    {  //
-      return tokenSys.index<TokenTable, 0>();
+      return tokenService.index<TokenTable, 0>();
    }
 
    auto userConf(AccountNumber user, psibase::EnumElement flag) const
    {
-      return to<TokenSys>().getUserConf(user, flag);
+      return to<Tokens>().getUserConf(user, flag);
    }
 
    auto events() const
    {  //
-      return tokenSys.allEvents();
+      return tokenService.allEvents();
    }
 
    auto userEvents(AccountNumber           user,
                    optional<uint32_t>      first,
                    const optional<string>& after) const
    {
-      return tokenSys.eventIndex<TokenSys::UserEvents>(user, first, after);
+      return tokenService.eventIndex<Tokens::UserEvents>(user, first, after);
    }
 
    auto tokenEvents(TID tokenId, optional<uint32_t> first, const optional<string>& after) const
    {
-      return tokenSys.eventIndex<TokenSys::TokenEvents>(tokenId, first, after);
+      return tokenService.eventIndex<Tokens::TokenEvents>(tokenId, first, after);
    }
 };
 PSIO_REFLECT(TokenQuery,
@@ -88,9 +88,9 @@ PSIO_REFLECT(TokenQuery,
              method(userEvents, user, first, after),
              method(tokenEvents, tokenId, first, after))
 
-optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
+optional<HttpReply> RTokens::serveSys(HttpRequest request)
 {
-   if (auto result = servePackAction<TokenSys>(request))
+   if (auto result = servePackAction<Tokens>(request))
       return result;
 
    if (auto result = serveContent(request, ServiceTables<WebContentTable>{getReceiver()}))
@@ -102,11 +102,11 @@ optional<HttpReply> RTokenSys::serveSys(HttpRequest request)
    return nullopt;
 }
 
-void RTokenSys::storeSys(string path, string contentType, vector<char> content)
+void RTokens::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
    storeContent(std::move(path), std::move(contentType), std::move(content),
                 ServiceTables<WebContentTable>{getReceiver()});
 }
 
-PSIBASE_DISPATCH(UserService::RTokenSys)
+PSIBASE_DISPATCH(UserService::RTokens)

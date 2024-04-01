@@ -1,11 +1,11 @@
-#include <services/user/TokenSys.hpp>
+#include <services/user/Tokens.hpp>
 
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
 
-#include "services/user/RTokenSys.hpp"
+#include "services/user/RTokens.hpp"
 #include "services/user/Symbol.hpp"
 
 using namespace UserService;
@@ -47,7 +47,7 @@ namespace
 
 }  // namespace
 
-TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
+Tokens::Tokens(psio::shared_view_ptr<psibase::Action> action)
 {
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
@@ -57,7 +57,7 @@ TokenSys::TokenSys(psio::shared_view_ptr<psibase::Action> action)
    }
 }
 
-void TokenSys::init()
+void Tokens::init()
 {
    // Set initialized flag
    auto initTable = Tables().open<InitTable>();
@@ -65,7 +65,7 @@ void TokenSys::init()
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
-   auto tokService = to<TokenSys>();
+   auto tokService = to<Tokens>();
    auto nftService = to<Nft>();
 
    // Configure manual debit for self on Token and NFT
@@ -96,10 +96,10 @@ void TokenSys::init()
    nftService.credit(tNft, Symbol::service, "Passing system token ownership");
 
    // Register proxy
-   to<SystemService::HttpServer>().registerServer(RTokenSys::service);
+   to<SystemService::HttpServer>().registerServer(RTokens::service);
 }
 
-TID TokenSys::create(Precision precision, Quantity maxSupply)
+TID Tokens::create(Precision precision, Quantity maxSupply)
 {
    auto creator    = getSender();
    auto tokenTable = Tables().open<TokenTable>();
@@ -112,7 +112,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    check(maxSupply.value > 0, supplyGt0);
 
    auto nftId = nftService.mint();
-   if (creator != TokenSys::service)
+   if (creator != Tokens::service)
    {
       nftService.credit(nftId, creator, "Nft for new token ID: " + std::to_string(newId));
    }
@@ -130,7 +130,7 @@ TID TokenSys::create(Precision precision, Quantity maxSupply)
    return newId;
 }
 
-void TokenSys::mint(TID tokenId, Quantity amount, view<const Memo> memo)
+void Tokens::mint(TID tokenId, Quantity amount, view<const Memo> memo)
 {
    auto sender  = getSender();
    auto token   = getToken(tokenId);
@@ -149,7 +149,7 @@ void TokenSys::mint(TID tokenId, Quantity amount, view<const Memo> memo)
    Tables().open<BalanceTable>().put(balance);
 }
 
-void TokenSys::burn(TID tokenId, Quantity amount)
+void Tokens::burn(TID tokenId, Quantity amount)
 {
    auto sender  = getSender();
    auto token   = getToken(tokenId);
@@ -177,7 +177,7 @@ void TokenSys::burn(TID tokenId, Quantity amount)
    Tables().open<TokenHolderTable>().put(holder);
 }
 
-void TokenSys::setUserConf(psibase::EnumElement flag, bool enable)
+void Tokens::setUserConf(psibase::EnumElement flag, bool enable)
 {
    auto sender  = getSender();
    auto holder  = getTokenHolder(sender);
@@ -191,7 +191,7 @@ void TokenSys::setUserConf(psibase::EnumElement flag, bool enable)
    Tables().open<TokenHolderTable>().put(holder);
 }
 
-void TokenSys::setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable)
+void Tokens::setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable)
 {
    check(isSenderIssuer(tokenId), missingRequiredAuth);
    if (flag == tokenConfig::unrecallable)
@@ -209,7 +209,7 @@ void TokenSys::setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable)
    Tables().open<TokenTable>().put(token);
 }
 
-void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, view<const Memo> memo)
+void Tokens::credit(TID tokenId, AccountNumber receiver, Quantity amount, view<const Memo> memo)
 {
    auto sender      = getSender();
    auto balance     = getBalance(tokenId, sender);
@@ -255,10 +255,10 @@ void TokenSys::credit(TID tokenId, AccountNumber receiver, Quantity amount, view
    }
 }
 
-void TokenSys::uncredit(TID              tokenId,
-                        AccountNumber    receiver,
-                        Quantity         maxAmount,
-                        view<const Memo> memo)
+void Tokens::uncredit(TID              tokenId,
+                      AccountNumber    receiver,
+                      Quantity         maxAmount,
+                      view<const Memo> memo)
 {
    auto sender          = getSender();
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
@@ -282,7 +282,7 @@ void TokenSys::uncredit(TID              tokenId,
    Tables().open<BalanceTable>().put(creditorBalance);
 }
 
-void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, view<const Memo> memo)
+void Tokens::debit(TID tokenId, AccountNumber sender, Quantity amount, view<const Memo> memo)
 {
    auto receiver        = getSender();  //The action sender is the token receiver
    auto sharedBalance   = getSharedBal(tokenId, sender, receiver);
@@ -316,7 +316,7 @@ void TokenSys::debit(TID tokenId, AccountNumber sender, Quantity amount, view<co
    Tables().open<TokenHolderTable>().put(receiverHolder);
 }
 
-void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, view<const Memo> memo)
+void Tokens::recall(TID tokenId, AccountNumber from, Quantity amount, view<const Memo> memo)
 {
    auto sender          = getSender();
    auto token           = getToken(tokenId);
@@ -344,7 +344,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, view<con
    Tables().open<TokenTable>().put(token);
 }
 
-void TokenSys::mapSymbol(TID tokenId, SID symbolId)
+void Tokens::mapSymbol(TID tokenId, SID symbolId)
 {
    auto sender     = getSender();
    auto symbol     = to<Symbol>().getSymbol(symbolId);
@@ -371,7 +371,7 @@ void TokenSys::mapSymbol(TID tokenId, SID symbolId)
    nftService.burn(symbol.ownerNft);
 }
 
-TokenRecord TokenSys::getToken(TID tokenId)
+TokenRecord Tokens::getToken(TID tokenId)
 {
    auto tokenTable = Tables().open<TokenTable>();
    auto tokenOpt   = tokenTable.get(tokenId);
@@ -380,7 +380,7 @@ TokenRecord TokenSys::getToken(TID tokenId)
    return *tokenOpt;
 }
 
-SID TokenSys::getTokenSymbol(TID tokenId)
+SID Tokens::getTokenSymbol(TID tokenId)
 {
    auto token = getToken(tokenId);
    psibase::check(token.symbolId != SID{0}, noMappedSymbol);
@@ -388,12 +388,12 @@ SID TokenSys::getTokenSymbol(TID tokenId)
    return token.symbolId;
 }
 
-bool TokenSys::exists(TID tokenId)
+bool Tokens::exists(TID tokenId)
 {
    return Tables().open<TokenTable>().get(tokenId).has_value();
 }
 
-BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
+BalanceRecord Tokens::getBalance(TID tokenId, AccountNumber account)
 {
    auto balanceTable = Tables().open<BalanceTable>();
    auto balanceOpt   = balanceTable.get(BalanceKey{account, tokenId});
@@ -414,9 +414,7 @@ BalanceRecord TokenSys::getBalance(TID tokenId, AccountNumber account)
    return record;
 }
 
-SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
-                                           AccountNumber creditor,
-                                           AccountNumber debitor)
+SharedBalanceRecord Tokens::getSharedBal(TID tokenId, AccountNumber creditor, AccountNumber debitor)
 {
    auto             sharedBalanceTable = Tables().open<SharedBalanceTable>();
    auto             sbIdx              = sharedBalanceTable.getIndex<0>();
@@ -441,7 +439,7 @@ SharedBalanceRecord TokenSys::getSharedBal(TID           tokenId,
    return record;
 }
 
-TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
+TokenHolderRecord Tokens::getTokenHolder(AccountNumber account)
 {
    auto acTable = Tables().open<TokenHolderTable>();
    auto acIdx   = acTable.getIndex<0>();
@@ -461,7 +459,7 @@ TokenHolderRecord TokenSys::getTokenHolder(AccountNumber account)
    return record;
 }
 
-bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::EnumElement flag)
+bool Tokens::getUserConf(psibase::AccountNumber account, psibase::EnumElement flag)
 {
    auto holder = Tables().open<TokenHolderTable>().getIndex<0>().get(account);
    if (holder.has_value() == false)
@@ -474,7 +472,7 @@ bool TokenSys::getUserConf(psibase::AccountNumber account, psibase::EnumElement 
    }
 }
 
-bool TokenSys::getTokenConf(TID tokenId, psibase::EnumElement flag)
+bool Tokens::getTokenConf(TID tokenId, psibase::EnumElement flag)
 {
    auto token     = getToken(tokenId);
    auto flagIndex = TokenRecord::Configurations::value(flag);
@@ -482,13 +480,13 @@ bool TokenSys::getTokenConf(TID tokenId, psibase::EnumElement flag)
    return token.config.get(flagIndex);
 }
 
-void TokenSys::checkAccountValid(psibase::AccountNumber account)
+void Tokens::checkAccountValid(psibase::AccountNumber account)
 {
    check(to<Accounts>().exists(account), invalidAccount);
    check(account != Accounts::nullAccount, invalidAccount);
 }
 
-bool TokenSys::isSenderIssuer(TID tokenId)
+bool Tokens::isSenderIssuer(TID tokenId)
 {
    auto token      = getToken(tokenId);
    auto nftService = to<Nft>();
@@ -497,4 +495,4 @@ bool TokenSys::isSenderIssuer(TID tokenId)
           nftService.getNft(token.ownerNft).owner == getSender();
 }
 
-PSIBASE_DISPATCH(UserService::TokenSys)
+PSIBASE_DISPATCH(UserService::Tokens)
