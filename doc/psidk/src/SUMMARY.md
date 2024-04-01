@@ -91,7 +91,7 @@
   - [nft]()
   - [producers]()
   - [http-server](default-apps/http-server.md)
-  - [psispace-sys](default-apps/psispace-sys.md)
+  - [sites](default-apps/sites.md)
   - [setcode](default-apps/setcode.md)
   - [symbol-sys]()
   - [token-sys]()

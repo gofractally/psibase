@@ -1,4 +1,4 @@
-use crate::services::{accounts, auth_delegate, http_server, packages, psispace_sys, setcode};
+use crate::services::{accounts, auth_delegate, http_server, packages, setcode, sites};
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
@@ -270,7 +270,7 @@ impl<R: Read + Seek> PackagedService<R> {
             let service = if self.has_service(*sender) {
                 *sender
             } else {
-                psispace_sys::SERVICE
+                sites::SERVICE
             };
             let mut file = self.archive.by_index(*index)?;
             let path = data_re
@@ -280,13 +280,11 @@ impl<R: Read + Seek> PackagedService<R> {
                 .unwrap()
                 .as_str();
             if let Some(t) = mime_guess::from_path(path).first() {
-                actions.push(
-                    psispace_sys::Wrapper::pack_from_to(*sender, service).storeSys(
-                        path.to_string(),
-                        t.essence_str().to_string(),
-                        read(&mut file)?.into(),
-                    ),
-                );
+                actions.push(sites::Wrapper::pack_from_to(*sender, service).storeSys(
+                    path.to_string(),
+                    t.essence_str().to_string(),
+                    read(&mut file)?.into(),
+                ));
             } else {
                 Err(Error::UnknownFileType {
                     path: file.name().to_string(),
@@ -330,7 +328,7 @@ impl<R: Read + Seek> PackagedService<R> {
             let service = if self.has_service(*sender) {
                 *sender
             } else {
-                psispace_sys::SERVICE
+                sites::SERVICE
             };
             let file = self.archive.by_index(*index).unwrap();
             let path = data_re
@@ -509,7 +507,7 @@ impl PackageManifest {
         for file in &self.data {
             if !new_files.contains(file) {
                 out.push_action(
-                    psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                    sites::Wrapper::pack_from_to(file.account, file.service)
                         .removeSys(file.filename.clone()),
                 )?;
             }
@@ -517,7 +515,7 @@ impl PackageManifest {
         for (service, info) in &self.services {
             let other_info = other.services.get(service);
             if info.server.is_some() && other_info.map_or(true, |i| i.server.is_none()) {
-                out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
+                out.push_action(reg_server(*service, sites::SERVICE))?;
             }
             if !info.flags.is_empty() && other_info.map_or(true, |i| i.flags.is_empty()) {
                 out.push_action(setcode::Wrapper::pack().setFlags(*service, 0))?;
@@ -531,13 +529,13 @@ impl PackageManifest {
     pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
         for file in &self.data {
             out.push_action(
-                psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                sites::Wrapper::pack_from_to(file.account, file.service)
                     .removeSys(file.filename.clone()),
             )?;
         }
         for (service, info) in &self.services {
             if info.server.is_some() {
-                out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
+                out.push_action(reg_server(*service, sites::SERVICE))?;
             }
             if !info.flags.is_empty() {
                 out.push_action(setcode::Wrapper::pack().setFlags(*service, 0))?;

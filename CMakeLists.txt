@@ -117,7 +117,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
@@ -477,7 +477,7 @@ psibase_package(
     DESCRIPTION "Psibase documentation"
     SERVICE doc-sys
     DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
-    PACKAGE_DEPENDS "PsiSpaceSys(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
 
@@ -492,13 +492,13 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/PsiSpaceSys.psi
-    NAME PsiSpaceSys
+    OUTPUT ${SERVICE_DIR}/Sites.psi
+    NAME Sites
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Provides web hosting to non-service accounts"
-    SERVICE psispace-sys
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
-    SERVER psispace-sys
+    SERVICE sites
+    WASM ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
+    SERVER sites
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
@@ -666,7 +666,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
                     Explorer Fractal Invite Nft Packages Producers HttpServer
-                    PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
+                    Sites SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
 
 psibase_package(
@@ -694,7 +694,7 @@ endfunction()
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
     DocSys Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
+    Sites SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -716,7 +716,7 @@ install(
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/HttpServer.psi
-          ${SERVICE_DIR}/PsiSpaceSys.psi
+          ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/SupervisorSys.psi
           ${SERVICE_DIR}/SymbolSys.psi

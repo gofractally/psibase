@@ -11,7 +11,7 @@ members = [
     "test_contract",
     "test_contract_2",
     "test_service_elections",
-    "test_service_psispace",
+    "test_service_sites",
     "test_fracpack",
 ]
 

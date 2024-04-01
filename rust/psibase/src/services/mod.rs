@@ -13,6 +13,6 @@ pub mod invite;
 pub mod nft;
 pub mod packages;
 pub mod producers;
-pub mod psispace_sys;
 pub mod setcode;
+pub mod sites;
 pub mod transact;

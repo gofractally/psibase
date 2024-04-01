@@ -1,6 +1,6 @@
 // TODO: tables
 
-#[crate::service(name = "psispace-sys", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "sites", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{http::HttpRequest, Hex};

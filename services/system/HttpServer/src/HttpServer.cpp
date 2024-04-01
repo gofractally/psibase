@@ -76,7 +76,7 @@ namespace SystemService
       if (reg)
          service = reg->server;
       else
-         service = "psispace-sys"_a;
+         service = "sites"_a;
 
       // TODO: avoid repacking (both directions)
       psibase::Actor<ServerInterface> iface(act.service, service);

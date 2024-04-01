@@ -175,7 +175,7 @@ function(add suffix)
             ../../services/user/Invite/include
             ../../services/user/Nft/include
             ../../services/user/Packages/include
-            ../../services/user/PsiSpaceSys/include
+            ../../services/user/Sites/include
             ../../services/user/SymbolSys/include
             ../../services/user/TokenSys/include
         )

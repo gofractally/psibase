@@ -10,7 +10,7 @@ namespace SystemService
    /// Rule set:
    /// - If the target starts with `/common`, then route the request to [SystemService::CommonApi].
    /// - Else if there's a subdomain and it references a registered service, then route the request to that service.
-   /// - Else if the request references an unregistered subdomain, then route the request to `psispace-sys`.
+   /// - Else if the request references an unregistered subdomain, then route the request to `sites`.
    /// - Else route the request to [CommonApi]; this handles the chain's main domain.
    ///
    /// See [C++ Web Services](../development/services/cpp-service/reference/web-services.md) or

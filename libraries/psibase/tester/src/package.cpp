@@ -4,7 +4,7 @@
 #include <psibase/semver.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/user/Packages.hpp>
-#include <services/user/PsiSpaceSys.hpp>
+#include <services/user/Sites.hpp>
 
 #include <zlib.h>
 
@@ -191,7 +191,7 @@ namespace psibase
    {
       for (const auto& [sender, index] : data)
       {
-         AccountNumber service = PsiSpaceSys::service;
+         AccountNumber service = Sites::service;
          if (hasService(sender))
          {
             service = sender;
@@ -200,7 +200,7 @@ namespace psibase
          auto pos  = path.find('/');
          assert(pos != std::string::npos);
          path = path.substr(pos);
-         actions.push_back(transactor<PsiSpaceSys>{sender, service}.storeSys(
+         actions.push_back(transactor<Sites>{sender, service}.storeSys(
              path, guessMimeType(path), archive.getEntry(index).read()));
       }
    }
@@ -286,7 +286,7 @@ namespace psibase
       first = true;
       for (const auto& [sender, index] : data)
       {
-         AccountNumber service = PsiSpaceSys::service;
+         AccountNumber service = Sites::service;
          if (hasService(sender))
          {
             service = sender;

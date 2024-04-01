@@ -21,7 +21,7 @@
          |                +-----------+
          v                |
   +----------------+      |  +-----------------+
- /                  \  no |  | psispace        |
+ /                  \  no |  | sites           |
 /  on a subdomain?   \ ---+  | service's       |
 \                    /       | serveSys action |
  \                  /        +-----------------+
@@ -41,7 +41,7 @@
 
 [SystemService::CommonApi] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
-[SystemService::PsiSpaceSys] provides web hosting to non-service accounts.
+[SystemService::Sites] provides web hosting to non-service accounts or services who didn't [register](#registration) for HTTP handling.
 
 `psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Services don't serve these.
 

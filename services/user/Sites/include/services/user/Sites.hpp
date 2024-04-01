@@ -5,30 +5,30 @@
 
 namespace SystemService
 {
-   struct PsiSpaceContentKey
+   struct SitesContentKey
    {
       psibase::AccountNumber account = {};
       std::string            path    = {};
 
       // TODO: upgrade wasi-sdk; <=> for string is missing
-      friend bool operator<(const PsiSpaceContentKey& a, const PsiSpaceContentKey& b)
+      friend bool operator<(const SitesContentKey& a, const SitesContentKey& b)
       {
          return std::tie(a.account, a.path) < std::tie(b.account, b.path);
       }
    };
-   PSIO_REFLECT(PsiSpaceContentKey, account, path)
+   PSIO_REFLECT(SitesContentKey, account, path)
 
-   struct PsiSpaceContentRow
+   struct SitesContentRow
    {
       psibase::AccountNumber account     = {};
       std::string            path        = {};
       std::string            contentType = {};
       std::vector<char>      content     = {};
 
-      PsiSpaceContentKey key() const { return {account, path}; }
+      SitesContentKey key() const { return {account, path}; }
    };
-   PSIO_REFLECT(PsiSpaceContentRow, account, path, contentType, content)
-   using PsiSpaceContentTable = psibase::Table<PsiSpaceContentRow, &PsiSpaceContentRow::key>;
+   PSIO_REFLECT(SitesContentRow, account, path, contentType, content)
+   using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
 
    /// Provide web hosting
    ///
@@ -38,13 +38,13 @@ namespace SystemService
    /// Uploading a directory tree:
    ///
    /// ```
-   /// psibase -a $ROOT_URL -s $PVT_KEY upload -r -S $ACCOUNT psispace-sys $DIR /
+   /// psibase -a $ROOT_URL -s $PVT_KEY upload -r -S $ACCOUNT sites $DIR /
    /// ```
    ///
    /// Uploading a single file:
    ///
    /// ```
-   /// psibase -a $ROOT_URL -s $PVT_KEY upload -S $ACCOUNT psispace-sys
+   /// psibase -a $ROOT_URL -s $PVT_KEY upload -S $ACCOUNT sites
    ///           $PATH_TO_FILE /index.html
    /// ```
    ///
@@ -52,17 +52,17 @@ namespace SystemService
    /// `http://psibase.127.0.0.1.sslip.io:8080/` and don't protect the accounts with keypairs.
    ///
    /// After files are uploaded, the site is available at `http://$ACCOUNT.$DOMAIN`
-   struct PsiSpaceSys : psibase::Service<PsiSpaceSys>
+   struct Sites : psibase::Service<Sites>
    {
-      static constexpr auto service = psibase::AccountNumber("psispace-sys");
-      using Tables                  = psibase::ServiceTables<PsiSpaceContentTable>;
+      static constexpr auto service = psibase::AccountNumber("sites");
+      using Tables                  = psibase::ServiceTables<SitesContentTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
       void removeSys(std::string path);
    };
 
-   PSIO_REFLECT(PsiSpaceSys,
+   PSIO_REFLECT(Sites,
                 method(serveSys, request),
                 method(storeSys, path, contentType, content),
                 method(removeSys, path))

@@ -1,5 +1,5 @@
 [package]
-name = "psispace-sys"
+name = "sites"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true

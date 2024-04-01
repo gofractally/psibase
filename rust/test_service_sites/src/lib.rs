@@ -1,9 +1,9 @@
-/// psispace-sys replica
+/// sites replica
 ///
-/// This is a replica of the original CPP psispace-sys contract as an example,
+/// This is a replica of the original CPP sites contract as an example,
 /// to demonstrate tables and http functionalities.
-/// Please don't publish this as the real psispace-sys service.
-#[psibase::service(name = "psispace-sys")]
+/// Please don't publish this as the real sites service.
+#[psibase::service(name = "sites")]
 mod service {
     use async_graphql::*;
     use psibase::{
@@ -183,7 +183,7 @@ mod tests {
     use psibase::{account, AccountNumber, ChainResult, HexBytes, HttpReply, HttpRequest, Table};
     use serde_json::{json, Value};
 
-    #[psibase::test_case(services("psispace-sys"))]
+    #[psibase::test_case(services("sites"))]
     fn users_can_store_content(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let bob = account!("bob");
         chain.new_account(bob)?;
@@ -197,7 +197,7 @@ mod tests {
             content.clone(),
         );
 
-        let stored_content = ContentTable::with_service(account!("psispace-sys"))
+        let stored_content = ContentTable::with_service(account!("sites"))
             .get_index_pk()
             .get(&(bob, path.clone()));
 
@@ -216,7 +216,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(services("psispace-sys"))]
+    #[psibase::test_case(services("sites"))]
     fn paths_must_begin_with_slash(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let bob = account!("bob");
         chain.new_account(bob)?;
@@ -238,7 +238,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(services("psispace-sys"))]
+    #[psibase::test_case(services("sites"))]
     fn index_files_are_retrieved_for_folders(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let bob = account!("bob");
         chain.new_account(bob)?;
@@ -270,11 +270,11 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(services("psispace-sys"))]
+    #[psibase::test_case(services("sites"))]
     fn contract_files_are_retrieved(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let index_path = "/index.html".to_owned();
         let index_content_type = "text/html".to_owned();
-        let index_content: HexBytes = "<h1>PsiSpace File Upload Manager</h1>"
+        let index_content: HexBytes = "<h1>File Upload Manager</h1>"
             .to_owned()
             .into_bytes()
             .into();
@@ -297,19 +297,19 @@ mod tests {
         );
 
         // index path retrieves index.html file
-        let response = push_servesys_request(&chain, "psispace-sys", "/").get()?;
+        let response = push_servesys_request(&chain, "sites", "/").get()?;
         assert!(response.is_some());
         assert_reply(&response.unwrap(), &index_content_type, &index_content);
 
         // retrieves styles.css from default profile
-        let response = push_servesys_request(&chain, "psispace-sys", "/assets/styles.css").get()?;
+        let response = push_servesys_request(&chain, "sites", "/assets/styles.css").get()?;
         assert!(response.is_some());
         assert_reply(&response.unwrap(), &style_content_type, &style_content);
 
         Ok(())
     }
 
-    #[psibase::test_case(services("psispace-sys"))]
+    #[psibase::test_case(services("sites"))]
     fn default_profile_files_are_retrieved(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let index_path = "/default-profile/default-profile.html".to_owned();
         let index_content_type = "text/html".to_owned();
@@ -348,7 +348,7 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(services("psispace-sys"))]
+    #[psibase::test_case(services("sites"))]
     fn graphql_content_query_retrieves_properly(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -393,7 +393,7 @@ mod tests {
         let json_query = format!("{{\"query\":\"{}\"}}", gql).replace('\n', "");
 
         let response = Wrapper::push(&chain).serveSys(HttpRequest {
-            host: "psispace-sys.testnet.psibase.io".to_string(),
+            host: "sites.testnet.psibase.io".to_string(),
             rootHost: "testnet.psibase.io".to_string(),
             target: "/graphql".to_string(),
             method: "POST".to_string(),

@@ -1,4 +1,4 @@
-#include "services/user/PsiSpaceSys.hpp"
+#include "services/user/Sites.hpp"
 
 #include <psibase/dispatch.hpp>
 #include <psibase/serveActionTemplates.hpp>
@@ -17,7 +17,7 @@ namespace SystemService
 
          auto content() const
          {
-            return PsiSpaceSys::Tables{service}.open<PsiSpaceContentTable>().getIndex<0>();
+            return Sites::Tables{service}.open<SitesContentTable>().getIndex<0>();
          }
       };
       PSIO_REFLECT(  //
@@ -25,7 +25,7 @@ namespace SystemService
           method(content))
    }  // namespace
 
-   std::optional<HttpReply> PsiSpaceSys::serveSys(HttpRequest request)
+   std::optional<HttpReply> Sites::serveSys(HttpRequest request)
    {
       check(request.host.size() > request.rootHost.size(), "oops");
 
@@ -33,12 +33,12 @@ namespace SystemService
                                    request.host.size() - request.rootHost.size() - 1};
       auto             account = AccountNumber(accountName);
 
-      if (account == PsiSpaceSys::service)
+      if (account == Sites::service)
       {
-         if (auto result = psibase::serveActionTemplates<PsiSpaceSys>(request))
+         if (auto result = psibase::serveActionTemplates<Sites>(request))
             return result;
 
-         if (auto result = psibase::servePackAction<PsiSpaceSys>(request))
+         if (auto result = psibase::servePackAction<Sites>(request))
             return result;
 
          if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
@@ -48,27 +48,27 @@ namespace SystemService
       Tables tables{getReceiver()};
       if (request.method == "GET")
       {
-         auto index  = tables.open<PsiSpaceContentTable>().getIndex<0>();
+         auto index  = tables.open<SitesContentTable>().getIndex<0>();
          auto target = request.target;
          auto pos    = target.find('?');
          if (pos != target.npos)
             target.resize(pos);
-         auto content = index.get(PsiSpaceContentKey{account, target});
+         auto content = index.get(SitesContentKey{account, target});
          if (!content)
          {
             if (target.ends_with('/'))
-               content = index.get(PsiSpaceContentKey{account, target + "index.html"});
+               content = index.get(SitesContentKey{account, target + "index.html"});
             else
-               content = index.get(PsiSpaceContentKey{account, target + "/index.html"});
+               content = index.get(SitesContentKey{account, target + "/index.html"});
          }
          if (!content && target == "/")
          {
-            content = index.get(
-                PsiSpaceContentKey{getReceiver(), "/default-profile/default-profile.html"});
+            content =
+                index.get(SitesContentKey{getReceiver(), "/default-profile/default-profile.html"});
          }
          if (!content && target.starts_with("/default-profile/"))
          {
-            content = index.get(PsiSpaceContentKey{getReceiver(), target});
+            content = index.get(SitesContentKey{getReceiver(), target});
          }
          if (content)
          {
@@ -80,15 +80,15 @@ namespace SystemService
       }
 
       return std::nullopt;
-   }  // PsiSpaceSys::serveSys
+   }  // Sites::serveSys
 
-   void PsiSpaceSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   void Sites::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
       Tables tables{getReceiver()};
-      auto   table = tables.template open<PsiSpaceContentTable>();
+      auto   table = tables.template open<SitesContentTable>();
 
       check(path.starts_with('/'), "Path doesn't begin with /");
-      PsiSpaceContentRow row{
+      SitesContentRow row{
           .account     = getSender(),
           .path        = std::move(path),
           .contentType = std::move(contentType),
@@ -97,12 +97,12 @@ namespace SystemService
       table.put(row);
    }
 
-   void PsiSpaceSys::removeSys(std::string path)
+   void Sites::removeSys(std::string path)
    {
       Tables tables{getReceiver()};
-      auto   table = tables.template open<PsiSpaceContentTable>();
-      table.erase(PsiSpaceContentKey{getSender(), path});
+      auto   table = tables.template open<SitesContentTable>();
+      table.erase(SitesContentKey{getSender(), path});
    }
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::PsiSpaceSys)
+PSIBASE_DISPATCH(SystemService::Sites)

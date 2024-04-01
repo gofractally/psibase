@@ -6,7 +6,7 @@ function(add_user_service suffix name)
         ../Fractal/include
         ../Invite/include
         ../Nft/include
-        ../PsiSpaceSys/include
+        ../Sites/include
         ../SymbolSys/include
         ../TokenSys/include
         ../../system/Accounts/include
@@ -29,7 +29,7 @@ function(add_user_test_impl suffix name)
       ../../Fractal/include
       ../../Invite/include
       ../../Nft/include
-      ../../PsiSpaceSys/include
+      ../../Sites/include
       ../../SymbolSys/include
       ../../TokenSys/include
       ../../../system/Accounts/include
@@ -80,7 +80,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(Nft)
     add_subdirectory(Nop)
     add_subdirectory(Packages)
-    add_subdirectory(PsiSpaceSys)
+    add_subdirectory(Sites)
     add_subdirectory(SymbolSys)
     add_subdirectory(TokenSys)
 endif()
