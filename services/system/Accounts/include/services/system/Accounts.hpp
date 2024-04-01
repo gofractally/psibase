@@ -77,8 +77,8 @@ namespace SystemService
      public:
       /// "accounts"
       static constexpr auto service = psibase::AccountNumber("accounts");
-      /// "invite-sys"
-      static constexpr auto inviteService = psibase::AccountNumber("invite-sys");
+      /// "invite"
+      static constexpr auto inviteService = psibase::AccountNumber("invite");
       /// AccountNumber 0 is reserved for the null account
       static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
 

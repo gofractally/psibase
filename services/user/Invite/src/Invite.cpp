@@ -4,8 +4,8 @@
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
-#include <services/user/AuthInviteSys.hpp>
-#include <services/user/InviteSys.hpp>
+#include <services/user/AuthInvite.hpp>
+#include <services/user/Invite.hpp>
 #include <services/user/NftSys.hpp>
 #include <services/user/TokenSys.hpp>
 
@@ -15,7 +15,7 @@
 
 using namespace psibase;
 using namespace UserService;
-using namespace UserService::Invite;
+using namespace UserService::InviteNs;
 using namespace UserService::Errors;
 using namespace SystemService;
 using psio::view;
@@ -27,7 +27,7 @@ using std::optional;
 using std::string;
 using std::vector;
 
-InviteSys::InviteSys(psio::shared_view_ptr<Action> action)
+Invite::Invite(psio::shared_view_ptr<Action> action)
 {
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"} && m != MethodNumber{"storeSys"})
@@ -37,7 +37,7 @@ InviteSys::InviteSys(psio::shared_view_ptr<Action> action)
    }
 }
 
-void InviteSys::init()
+void Invite::init()
 {
    auto initTable = Tables().open<InitTable>();
    auto init      = (initTable.get(SingletonKey{}));
@@ -45,7 +45,7 @@ void InviteSys::init()
    initTable.put(InitializedRecord{});
 
    // Register with proxy
-   to<SystemService::HttpServer>().registerServer(InviteSys::service);
+   to<SystemService::HttpServer>().registerServer(Invite::service);
 
    // Configure manual debit for self on Token and NFT
    auto manualDebit = psibase::EnumElement{"manualDebit"};
@@ -53,13 +53,13 @@ void InviteSys::init()
    to<NftSys>().setUserConf(manualDebit, true);
 
    // Create the invite payer account and set its auth contract
-   to<Accounts>().newAccount(payerAccount, AuthInviteSys::service, true);
+   to<Accounts>().newAccount(payerAccount, AuthInvite::service, true);
 
    // TODO - Set whitelist so only the fractally service can create invites.
    // setWhitelist({"fractally"_m})
 }
 
-void InviteSys::createInvite(PublicKey inviteKey)
+void Invite::createInvite(PublicKey inviteKey)
 {
    auto inviteTable = Tables().open<InviteTable>();
    check(not inviteTable.get(inviteKey).has_value(), inviteAlreadyExists.data());
@@ -104,16 +104,16 @@ void InviteSys::createInvite(PublicKey inviteKey)
    eventTable.put(eventRecord);
 }
 
-void InviteSys::accept(PublicKey inviteKey)
+void Invite::accept(PublicKey inviteKey)
 {
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.get(inviteKey);
    check(invite.has_value(), inviteDNE.data());
 
-   to<AuthInviteSys>().requireAuth(inviteKey);
+   to<AuthInvite>().requireAuth(inviteKey);
 
    auto acceptedBy = getSender();
-   check(acceptedBy != InviteSys::payerAccount,
+   check(acceptedBy != Invite::payerAccount,
          "Call 'accept' with the accepting account as the sender.");
    check(invite->state != InviteStates::rejected, "This invite was already rejected");
 
@@ -136,14 +136,14 @@ void InviteSys::accept(PublicKey inviteKey)
    eventTable.put(eventRecord);
 }
 
-void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, PublicKey newAccountKey)
+void Invite::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, PublicKey newAccountKey)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.get(inviteKey);
    check(invite.has_value(), inviteDNE.data());
 
-   to<AuthInviteSys>().requireAuth(inviteKey);
+   to<AuthInvite>().requireAuth(inviteKey);
 
    auto now = to<Transact>().currentBlock().time.seconds;
    check(invite->expiry > now, inviteExpired.data());
@@ -153,7 +153,7 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    bool accountExists = to<Accounts>().exists(acceptedBy);
    check(not accountExists, "The acceptedBy account already exists");
 
-   check(sender == InviteSys::payerAccount, mustUseInvitedSys.data());
+   check(sender == Invite::payerAccount, mustUseInvitedSys.data());
    check(inviteKey != newAccountKey, needUniquePubkey.data());
    check(invite->newAccountToken, noNewAccToken.data());
    invite->newAccountToken = false;
@@ -195,13 +195,13 @@ void InviteSys::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, Publ
    eventTable.put(eventRecord);
 }
 
-void InviteSys::reject(PublicKey inviteKey)
+void Invite::reject(PublicKey inviteKey)
 {
    auto table  = Tables().open<InviteTable>();
    auto invite = table.get(inviteKey);
    check(invite.has_value(), inviteDNE);
 
-   to<AuthInviteSys>().requireAuth(inviteKey);
+   to<AuthInvite>().requireAuth(inviteKey);
    check(invite->state != InviteStates::accepted, alreadyAccepted.data());
    check(invite->state != InviteStates::rejected, alreadyRejected.data());
 
@@ -209,7 +209,7 @@ void InviteSys::reject(PublicKey inviteKey)
    check(invite->expiry > now, inviteExpired.data());
 
    auto sender = getSender();
-   if (sender == InviteSys::payerAccount)
+   if (sender == Invite::payerAccount)
    {
       check(invite->newAccountToken == true,
             "Only an existing account can be used to reject this invite");
@@ -232,7 +232,7 @@ void InviteSys::reject(PublicKey inviteKey)
    eventTable.put(eventRecord);
 }
 
-void InviteSys::delInvite(PublicKey inviteKey)
+void Invite::delInvite(PublicKey inviteKey)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
@@ -252,7 +252,7 @@ void InviteSys::delInvite(PublicKey inviteKey)
    eventTable.put(eventRecord);
 }
 
-void InviteSys::delExpired(uint32_t maxDeleted)
+void Invite::delExpired(uint32_t maxDeleted)
 {
    auto now = to<Transact>().currentBlock().time.seconds;
 
@@ -285,7 +285,7 @@ void InviteSys::delExpired(uint32_t maxDeleted)
    eventTable.put(eventRecord);
 }
 
-void InviteSys::setWhitelist(vector<AccountNumber> accounts)
+void Invite::setWhitelist(vector<AccountNumber> accounts)
 {
    check(getSender() == getReceiver(), missingRequiredAuth.data());
 
@@ -336,7 +336,7 @@ void InviteSys::setWhitelist(vector<AccountNumber> accounts)
    eventTable.put(eventRecord);
 }
 
-void InviteSys::setBlacklist(vector<AccountNumber> accounts)
+void Invite::setBlacklist(vector<AccountNumber> accounts)
 {
    check(getSender() == getReceiver(), missingRequiredAuth.data());
 
@@ -379,12 +379,12 @@ void InviteSys::setBlacklist(vector<AccountNumber> accounts)
    eventTable.put(eventRecord);
 }
 
-optional<InviteRecord> InviteSys::getInvite(PublicKey pubkey)
+optional<InviteRecord> Invite::getInvite(PublicKey pubkey)
 {
    return Tables().open<InviteTable>().get(pubkey);
 }
 
-bool InviteSys::isExpired(PublicKey pubkey)
+bool Invite::isExpired(PublicKey pubkey)
 {
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.get(pubkey);
@@ -394,7 +394,7 @@ bool InviteSys::isExpired(PublicKey pubkey)
    return now >= invite->expiry;
 }
 
-void InviteSys::checkClaim(AccountNumber actor, PublicKey pubkey)
+void Invite::checkClaim(AccountNumber actor, PublicKey pubkey)
 {
    auto invite = getInvite(pubkey);
    check(invite.has_value(), "This invite does not exist. It may have been deleted after expiry.");
@@ -403,41 +403,39 @@ void InviteSys::checkClaim(AccountNumber actor, PublicKey pubkey)
    check(not isExpired(pubkey), "this invite is expired");
 }
 
-auto inviteSys = QueryableService<InviteSys::Tables, InviteSys::Events>{InviteSys::service};
+auto invite = QueryableService<Invite::Tables, Invite::Events>{Invite::service};
 struct Queries
 {
    auto getEventHead(AccountNumber user) const
    {  //
-      return InviteSys::Tables(InviteSys::service).open<Invite::UserEventTable>().get(user);
+      return Invite::Tables(Invite::service).open<InviteNs::UserEventTable>().get(user);
    }
 
    auto getInvite(string pubkey) const
    {
-      return InviteSys::Tables(InviteSys::service)
-          .open<InviteTable>()
-          .get(publicKeyFromString(pubkey));
+      return Invite::Tables(Invite::service).open<InviteTable>().get(publicKeyFromString(pubkey));
    }
 
    auto getInviter(psibase::AccountNumber user)
    {
-      return InviteSys::Tables(InviteSys::service).open<Invite::NewAccTable>().get(user);
+      return Invite::Tables(Invite::service).open<InviteNs::NewAccTable>().get(user);
    }
 
    auto events() const
    {  //
-      return inviteSys.allEvents();
+      return invite.allEvents();
    }
 
    auto userEvents(AccountNumber           user,
                    optional<uint32_t>      first,
                    const optional<string>& after) const
    {
-      return inviteSys.eventIndex<InviteSys::UserEvents>(user, first, after);
+      return invite.eventIndex<Invite::UserEvents>(user, first, after);
    }
 
    auto serviceEvents(optional<uint32_t> first, const optional<string>& after) const
    {
-      return inviteSys.eventIndex<InviteSys::ServiceEvents>(SingletonKey{}, first, after);
+      return invite.eventIndex<Invite::ServiceEvents>(SingletonKey{}, first, after);
    }
 };
 PSIO_REFLECT(Queries,
@@ -448,12 +446,12 @@ PSIO_REFLECT(Queries,
              method(userEvents, user, first, after),
              method(serviceEvents, first, after));
 
-auto InviteSys::serveSys(HttpRequest request) -> std::optional<HttpReply>
+auto Invite::serveSys(HttpRequest request) -> std::optional<HttpReply>
 {
    if (auto result = serveContent(request, Tables{}))
       return result;
 
-   if (auto result = serveSimpleUI<InviteSys, true>(request))
+   if (auto result = serveSimpleUI<Invite, true>(request))
       return result;
 
    if (auto result = serveGraphQL(request, Queries{}))
@@ -462,10 +460,10 @@ auto InviteSys::serveSys(HttpRequest request) -> std::optional<HttpReply>
    return std::nullopt;
 }
 
-void InviteSys::storeSys(string path, string contentType, vector<char> content)
+void Invite::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
    storeContent(move(path), move(contentType), move(content), Tables());
 }
 
-PSIBASE_DISPATCH(UserService::Invite::InviteSys)
+PSIBASE_DISPATCH(UserService::InviteNs::Invite)

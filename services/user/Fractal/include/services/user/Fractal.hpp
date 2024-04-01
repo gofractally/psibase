@@ -38,7 +38,7 @@ namespace UserService
 
          /// Allows a user to claim ownership of an invite.
          ///
-         /// This uses the invite-sys system service to get proof that the claimant is
+         /// This uses the invite system service to get proof that the claimant is
          /// the true recipient of the invite.
          ///
          /// A user may claim more than one invite without accepting or rejecting them.

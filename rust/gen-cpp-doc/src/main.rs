@@ -748,7 +748,7 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/services/system/AuthSig/include"),
         &("-I".to_owned() + repo_path + "/services/system/SetCode/include"),
         &("-I".to_owned() + repo_path + "/services/user/CommonApi/include"),
-        &("-I".to_owned() + repo_path + "/services/user/InviteSys/include"),
+        &("-I".to_owned() + repo_path + "/services/user/Invite/include"),
         &("-I".to_owned() + repo_path + "/services/user/PsiSpaceSys/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/external/simdjson/include"),

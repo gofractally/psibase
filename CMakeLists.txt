@@ -105,13 +105,13 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CoreFractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Fractal.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NftSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/NopSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
@@ -290,7 +290,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm ${plugin-wit})
-add_rs_component(services/user/InviteSys/plugin:InvitesPlugin invite_sys.wasm ${plugin-wit} ${AuthPlugin_DEP})
+add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm ${plugin-wit} ${AuthPlugin_DEP})
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -559,18 +559,18 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/InviteSys.psi
-    NAME InviteSys
+    OUTPUT ${SERVICE_DIR}/Invite.psi
+    NAME Invite
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "NftSys(^${PSIBASE_VERSION})" "TokenSys(^${PSIBASE_VERSION})" "AuthK1(^${PSIBASE_VERSION})"
-    SERVICE invite-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/InviteSys.wasm
-        SERVER invite-sys
+    SERVICE invite
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
+        SERVER invite
         INIT
         DATA ${COMPONENT_BIN_DIR}/${InvitesPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE auth-inv-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInviteSys.wasm
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
     DEPENDS wasm
     DEPENDS ${InvitesPlugin_DEP}
 )
@@ -665,7 +665,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
-                    Explorer Fractal InviteSys NftSys PackageSys Producers HttpServer
+                    Explorer Fractal Invite NftSys PackageSys Producers HttpServer
                     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
 
@@ -693,7 +693,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    DocSys Explorer Fractal InviteSys NftSys NopSys Minimal PackageSys Producers HttpServer
+    DocSys Explorer Fractal Invite NftSys NopSys Minimal PackageSys Producers HttpServer
     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
@@ -709,7 +709,7 @@ install(
           ${SERVICE_DIR}/DocSys.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractal.psi
-          ${SERVICE_DIR}/InviteSys.psi
+          ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/NftSys.psi
           ${SERVICE_DIR}/NopSys.psi

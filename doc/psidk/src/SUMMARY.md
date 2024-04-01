@@ -87,7 +87,7 @@
   - [doc-sys](default-apps/doc-sys.md)
   - [explorer]()
   - [fractal]()
-  - [invite-sys](default-apps/invite-sys.md)
+  - [invite](default-apps/invite.md)
   - [nft-sys]()
   - [producers]()
   - [http-server](default-apps/http-server.md)

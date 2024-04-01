@@ -8,6 +8,6 @@
 #include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
-#include <services/user/InviteSys.hpp>
+#include <services/user/Invite.hpp>
 #include <services/user/InviteTables.hpp>
 #include <services/user/PsiSpaceSys.hpp>

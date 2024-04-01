@@ -29,9 +29,10 @@ pub struct NewAccountRecord {
     invitee: AccountNumber,
 }
 
-#[crate::service(name = "invite-sys", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "invite", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
+    use crate::services::invite::InviteRecord;
     use crate::{http::HttpRequest, AccountNumber, Hex, PublicKey};
 
     #[action]
@@ -86,7 +87,7 @@ mod service {
 
     // For synchronous calls between services:
     #[action]
-    fn getInvite(pubkey: PublicKey) -> Option<super::InviteRecord> {
+    fn getInvite(pubkey: PublicKey) -> Option<InviteRecord> {
         unimplemented!()
     }
     #[action]

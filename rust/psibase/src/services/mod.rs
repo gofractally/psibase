@@ -8,7 +8,7 @@ pub mod common_api;
 pub mod cpu_limit;
 pub mod http_server;
 #[allow(non_snake_case)]
-pub mod invite_sys;
+pub mod invite;
 #[allow(non_snake_case)]
 pub mod nft_sys;
 pub mod package_sys;

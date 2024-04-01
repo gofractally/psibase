@@ -1,4 +1,4 @@
-package invite-sys:plugin;
+package invite:plugin;
 
 interface types {
     /// This is the information encoded into an invite URL.

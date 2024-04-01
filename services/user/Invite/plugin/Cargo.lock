@@ -972,7 +972,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "invite-sys"
+name = "invite"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.0",

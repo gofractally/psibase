@@ -13,7 +13,7 @@ pub enum ErrorType {
 
 fn my_plugin_id() -> PluginId {
     return PluginId {
-        service: "invite-sys".to_string(),
+        service: "invite".to_string(),
         plugin: "plugin".to_string(),
     };
 }

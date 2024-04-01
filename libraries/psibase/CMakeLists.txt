@@ -172,7 +172,7 @@ function(add suffix)
             ../../services/user/CommonApi/include
             ../../services/user/Explorer/include
             ../../services/user/Fractal/include
-            ../../services/user/InviteSys/include
+            ../../services/user/Invite/include
             ../../services/user/NftSys/include
             ../../services/user/PackageSys/include
             ../../services/user/PsiSpaceSys/include

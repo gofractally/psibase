@@ -4,7 +4,7 @@ function(add_user_service suffix name)
         include
         ../CommonApi/include
         ../Fractal/include
-        ../InviteSys/include
+        ../Invite/include
         ../NftSys/include
         ../PsiSpaceSys/include
         ../SymbolSys/include
@@ -27,7 +27,7 @@ function(add_user_test_impl suffix name)
       ../include
       ../../CommonApi/include
       ../../Fractal/include
-      ../../InviteSys/include
+      ../../Invite/include
       ../../NftSys/include
       ../../PsiSpaceSys/include
       ../../SymbolSys/include
@@ -73,7 +73,7 @@ add("-debug")
 
 if(DEFINED IS_WASM)
     add_subdirectory(CommonApi)
-    add_subdirectory(InviteSys)
+    add_subdirectory(Invite)
     add_subdirectory(Explorer)
     add_subdirectory(Fractal)
     add_subdirectory(launchTestChain)

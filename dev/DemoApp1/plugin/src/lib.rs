@@ -3,7 +3,7 @@ mod bindings;
 
 use bindings::common::plugin::types as CommonTypes;
 use bindings::exports::demoapp1::example::intf::Guest as Intf;
-use bindings::invite_sys;
+use bindings::invite;
 use bindings::Guest as MainInterface;
 
 struct Component;
@@ -16,7 +16,7 @@ impl MainInterface for Component {
 
 impl Intf for Component {
     fn helloworld2() -> Result<String, CommonTypes::Error> {
-        Ok(invite_sys::plugin::inviter::generate_invite("/subpath")?)
+        Ok(invite::plugin::inviter::generate_invite("/subpath")?)
     }
 }
 

@@ -6,7 +6,7 @@
 
 namespace UserService
 {
-   class AuthInviteSys
+   class AuthInvite
    {
      public:
       static constexpr auto service = psibase::AccountNumber("auth-inv-sys");
@@ -27,7 +27,7 @@ namespace UserService
 
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
-   PSIO_REFLECT(AuthInviteSys,  //
+   PSIO_REFLECT(AuthInvite,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
                 method(requireAuth, pubkey),

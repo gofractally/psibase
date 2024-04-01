@@ -4,7 +4,7 @@
 
 namespace UserService
 {
-   namespace Invite
+   namespace InviteNs
    {
       struct ServiceEventRecord
       {

@@ -3,7 +3,7 @@
 #include <services/system/commonErrors.hpp>
 #include <services/user/CoreFractal.hpp>
 #include <services/user/Fractal.hpp>
-#include <services/user/InviteSys.hpp>
+#include <services/user/Invite.hpp>
 
 using namespace psibase;
 using namespace UserService;
@@ -88,7 +88,7 @@ SCENARIO("Inviting people to a fractal")
 
          THEN("Bob can claim the invite")
          {
-            auto acceptInvite = bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
+            auto acceptInvite = bob.with(userAndInviteKeys).to<InviteNs::Invite>().accept(invPub);
             CHECK(acceptInvite.succeeded());
 
             auto claim = bob.with(userKeys).to<Fractal>().claim(invPub);
@@ -96,7 +96,7 @@ SCENARIO("Inviting people to a fractal")
          }
          WHEN("Bob claims the invite")
          {
-            bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
+            bob.with(userAndInviteKeys).to<InviteNs::Invite>().accept(invPub);
             bob.with(userKeys).to<Fractal>().claim(invPub);
 
             THEN("Bob has a fractal identity")
@@ -113,7 +113,7 @@ SCENARIO("Inviting people to a fractal")
          }
          WHEN("Bob accepts the invite to a fractal")
          {
-            bob.with(userAndInviteKeys).to<Invite::InviteSys>().accept(invPub);
+            bob.with(userAndInviteKeys).to<InviteNs::Invite>().accept(invPub);
 
             auto b = bob.with(userKeys).to<Fractal>();
             b.claim(invPub);
@@ -126,7 +126,7 @@ SCENARIO("Inviting people to a fractal")
                CHECK(member->inviter == alice.id);
             }
             THEN("No one else can join using that invite")
-            THEN("The invite no longer exists in invite-sys") {}
+            THEN("The invite no longer exists in invite") {}
          }
       }
       /* Todo */

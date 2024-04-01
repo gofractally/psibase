@@ -10,7 +10,7 @@
 
 namespace UserService
 {
-   namespace Invite
+   namespace InviteNs
    {
 
       /// This service facilitates the creation and redemption of invites
@@ -20,7 +20,7 @@ namespace UserService
       /// by third party applications to streamline their user onboarding.
       ///
       /// Only this system service and Accounts are permitted to create new accounts.
-      class InviteSys : public psibase::Service<InviteSys>
+      class Invite : public psibase::Service<Invite>
       {
         public:
          using Tables = psibase::ServiceTables<InviteSettingsTable,
@@ -30,14 +30,14 @@ namespace UserService
                                                InitTable,
                                                NewAccTable,
                                                psibase::WebContentTable>;
-         /// "invite-sys"
+         /// "invite"
          static constexpr auto service = SystemService::Accounts::inviteService;
          /// "invited-sys"
          static constexpr auto payerAccount = psibase::AccountNumber("invited-sys");
 
          /// Constructor prevents actions from being called until after init() has
          /// been called
-         InviteSys(psio::shared_view_ptr<psibase::Action> action);
+         Invite(psio::shared_view_ptr<psibase::Action> action);
 
          /// Called once during chain initialization
          ///
@@ -143,7 +143,7 @@ namespace UserService
       };
 
       // clang-format off
-      PSIO_REFLECT(InviteSys,
+      PSIO_REFLECT(Invite,
          method(init),
          method(createInvite, inviteKey, inviter),
          method(accept, inviteKey),
@@ -159,8 +159,8 @@ namespace UserService
          method(setWhitelist, accounts),
          method(setBlacklist, accounts)
       );
-      PSIBASE_REFLECT_EVENTS(InviteSys);
-      PSIBASE_REFLECT_HISTORY_EVENTS(InviteSys,
+      PSIBASE_REFLECT_EVENTS(Invite);
+      PSIBASE_REFLECT_HISTORY_EVENTS(Invite,
          method(inviteCreated, prevEvent, inviteKey, inviter),
          method(inviteDeleted, prevEvent, inviteKey),
          method(expInvDeleted, prevEvent, numCheckedRows, numDeleted),
@@ -169,9 +169,9 @@ namespace UserService
          method(whitelistSet, prevEvent, accounts),
          method(blacklistSet, prevEvent, accounts)
       );
-      PSIBASE_REFLECT_UI_EVENTS(InviteSys);
-      PSIBASE_REFLECT_MERKLE_EVENTS(InviteSys);
+      PSIBASE_REFLECT_UI_EVENTS(Invite);
+      PSIBASE_REFLECT_MERKLE_EVENTS(Invite);
       // clang-format on
-   }  // namespace Invite
+   }  // namespace InviteNs
 
 }  // namespace UserService

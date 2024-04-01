@@ -2,7 +2,7 @@
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/Fractal.hpp>
-#include <services/user/InviteSys.hpp>
+#include <services/user/Invite.hpp>
 
 using namespace UserService;
 using namespace UserService::FractalNs;
@@ -89,7 +89,7 @@ void Fractal::invite(AccountNumber fractal, PublicKey pubkey)
    auto fracRecord   = fractalTable.get(fractal);
    check(fracRecord.has_value(), "fractal DNE");
 
-   to<Invite::InviteSys>().createInvite(pubkey);
+   to<InviteNs::Invite>().createInvite(pubkey);
 
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.get(pubkey);
@@ -125,7 +125,7 @@ void Fractal::claim(PublicKey inviteKey)
    check(fractalInvite->recipient == AccountNumber{0}, "this invite has already been claimed");
 
    auto sender = getSender();
-   to<Invite::InviteSys>().checkClaim(sender, inviteKey);
+   to<InviteNs::Invite>().checkClaim(sender, inviteKey);
 
    // Save the claimant account name with the invite
    auto record      = *fractalInvite;
@@ -137,7 +137,7 @@ void Fractal::claim(PublicKey inviteKey)
    newIdentity(sender, requireNew);
 
    // Invite has officially been accepted/associated with an account. No need to keep original inv object
-   to<Invite::InviteSys>().delInvite(inviteKey);
+   to<InviteNs::Invite>().delInvite(inviteKey);
 
    // Emit InviteReceived event
    auto identityTable = Tables().open<IdentityTable>();

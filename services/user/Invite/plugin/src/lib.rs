@@ -4,12 +4,12 @@ use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::accounts::plugin::accounts;
 use bindings::auth_sig::plugin::keyvault;
 use bindings::common::plugin::{client, server, types as CommonTypes};
-use bindings::exports::invite_sys::plugin::{
+use bindings::exports::invite::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
 };
-use bindings::invite_sys::plugin::types::{Invite, InviteId, Url};
+use bindings::invite::plugin::types::{Invite, InviteId, Url};
 use fracpack::Pack;
-use psibase::services::invite_sys as invite_service;
+use psibase::services::invite as invite_service;
 use serde::{Deserialize, Serialize};
 
 mod errors;

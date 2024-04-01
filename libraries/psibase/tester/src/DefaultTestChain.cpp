@@ -17,11 +17,11 @@
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifyK1.hpp>
-#include <services/user/AuthInviteSys.hpp>
+#include <services/user/AuthInvite.hpp>
 #include <services/user/CoreFractal.hpp>
 #include <services/user/Explorer.hpp>
 #include <services/user/Fractal.hpp>
-#include <services/user/InviteSys.hpp>
+#include <services/user/Invite.hpp>
 #include <services/user/NftSys.hpp>
 #include <services/user/PackageSys.hpp>
 #include <services/user/PsiSpaceSys.hpp>
