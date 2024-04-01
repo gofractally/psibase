@@ -4,7 +4,7 @@
 #include <psibase/serveSimpleUI.hpp>
 #include <services/system/CommonApi.hpp>
 #include <services/user/RTokenSys.hpp>
-#include <services/user/SymbolSys.hpp>
+#include <services/user/Symbol.hpp>
 #include <services/user/TokenSys.hpp>
 #include <string>
 #include <vector>

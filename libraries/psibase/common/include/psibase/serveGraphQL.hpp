@@ -458,7 +458,7 @@ namespace psibase
    ///       "event_id": "13",
    ///       "event_type": "credited",
    ///       "tokenId": 1,
-   ///       "sender": "symbol-sys",
+   ///       "sender": "symbol",
    ///       "receiver": "alice",
    ///       "amount": {
    ///         "value": "100000000000"
@@ -709,11 +709,11 @@ namespace psibase
 
    template <typename T>
    concept EventType = requires(T events) {
-                          typename decltype(events)::History;
-                          // Don't require Ui and Merkle for now
-                          //typename decltype(events)::Ui;
-                          //typename decltype(events)::Merkle;
-                       };
+      typename decltype(events)::History;
+      // Don't require Ui and Merkle for now
+      //typename decltype(events)::Ui;
+      //typename decltype(events)::Merkle;
+   };
 
    /// GraphQL support for decoding multiple events
    ///

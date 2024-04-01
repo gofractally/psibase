@@ -26,7 +26,7 @@
 #include <services/user/Packages.hpp>
 #include <services/user/RTokenSys.hpp>
 #include <services/user/Sites.hpp>
-#include <services/user/SymbolSys.hpp>
+#include <services/user/Symbol.hpp>
 #include <services/user/TokenSys.hpp>
 #include <utility>
 #include <vector>

@@ -93,7 +93,7 @@
   - [http-server](default-apps/http-server.md)
   - [sites](default-apps/sites.md)
   - [setcode](default-apps/setcode.md)
-  - [symbol-sys]()
+  - [symbol]()
   - [token-sys]()
   - [transact](default-apps/transact.md)
   - [verify-sig]()

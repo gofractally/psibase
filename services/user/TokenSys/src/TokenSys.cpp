@@ -6,7 +6,7 @@
 #include <services/system/commonErrors.hpp>
 
 #include "services/user/RTokenSys.hpp"
-#include "services/user/SymbolSys.hpp"
+#include "services/user/Symbol.hpp"
 
 using namespace UserService;
 using namespace UserService::Errors;
@@ -93,7 +93,7 @@ void TokenSys::init()
 
    // Pass system token ownership to symbol service
    auto tNft = getToken(tid).ownerNft;
-   nftService.credit(tNft, SymbolSys::service, "Passing system token ownership");
+   nftService.credit(tNft, Symbol::service, "Passing system token ownership");
 
    // Register proxy
    to<SystemService::HttpServer>().registerServer(RTokenSys::service);
@@ -347,7 +347,7 @@ void TokenSys::recall(TID tokenId, AccountNumber from, Quantity amount, view<con
 void TokenSys::mapSymbol(TID tokenId, SID symbolId)
 {
    auto sender     = getSender();
-   auto symbol     = to<SymbolSys>().getSymbol(symbolId);
+   auto symbol     = to<Symbol>().getSymbol(symbolId);
    auto token      = getToken(tokenId);
    auto nftService = to<Nft>();
 

@@ -8,7 +8,7 @@
 #include "services/user/CoreFractal.hpp"
 #include "services/user/Fractal.hpp"
 #include "services/user/RTokenSys.hpp"
-#include "services/user/SymbolSys.hpp"
+#include "services/user/Symbol.hpp"
 #include "services/user/TokenSys.hpp"
 
 using namespace psibase;
@@ -28,7 +28,7 @@ SCENARIO("Testing default psibase chain")
 
    auto alice     = t.from(t.addAccount("alice"_a));
    auto bob       = t.from(t.addAccount("bob"_a));
-   auto sysIssuer = t.from(SymbolSys::service).to<TokenSys>();
+   auto sysIssuer = t.from(Symbol::service).to<TokenSys>();
    auto sysToken  = TokenSys::sysToken;
 
    // Let sys token be tradeable

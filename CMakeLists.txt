@@ -126,7 +126,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/TokenSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
@@ -612,13 +612,13 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/SymbolSys.psi
-    NAME SymbolSys
+    OUTPUT ${SERVICE_DIR}/Symbol.psi
+    NAME Symbol
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Symbol service"
     PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})"
-    SERVICE symbol-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/SymbolSys.wasm
+    SERVICE symbol
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
         INIT
     DEPENDS wasm
 )
@@ -641,7 +641,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
-    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "SymbolSys(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "TokenSys(^${PSIBASE_VERSION})" "Symbol(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/TokenSys/src/TokenUsers.json
 )
 
@@ -666,7 +666,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
                     Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor SymbolSys TokenUsers TokenSys Transact
+                    Sites SetCode Supervisor Symbol TokenUsers TokenSys Transact
 )
 
 psibase_package(
@@ -694,7 +694,7 @@ endfunction()
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
     DocSys Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    Sites SetCode Supervisor SymbolSys TokenUsers TokenSys Transact)
+    Sites SetCode Supervisor Symbol TokenUsers TokenSys Transact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -719,7 +719,7 @@ install(
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Supervisor.psi
-          ${SERVICE_DIR}/SymbolSys.psi
+          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/TokenSys.psi
           ${SERVICE_DIR}/Transact.psi

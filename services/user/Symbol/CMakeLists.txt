@@ -1,5 +1,5 @@
 function(add suffix)
-    add_user_service("${suffix}" SymbolSys src/SymbolSys.cpp)
+    add_user_service("${suffix}" Symbol src/Symbol.cpp)
 endfunction(add)
 
 conditional_add()

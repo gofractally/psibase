@@ -1,4 +1,4 @@
-#include <services/user/SymbolSys.hpp>
+#include <services/user/Symbol.hpp>
 
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
@@ -38,7 +38,7 @@ namespace PricingDefaults
 
 }  // namespace PricingDefaults
 
-SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
+Symbol::Symbol(psio::shared_view_ptr<psibase::Action> action)
 {
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
@@ -48,7 +48,7 @@ SymbolSys::SymbolSys(psio::shared_view_ptr<psibase::Action> action)
    }
 }
 
-void SymbolSys::init()
+void Symbol::init()
 {
    auto initTable = Tables().open<InitTable>();
    auto init      = (initTable.get(SingletonKey{}));
@@ -87,7 +87,7 @@ void SymbolSys::init()
    priceAdjustmentSingleton.put(PriceAdjustmentRecord{0, increasePct, decreasePct});
 
    // Create system token symbol
-   to<SymbolSys>().create(sysTokenSymbol, initialPrice);
+   to<Symbol>().create(sysTokenSymbol, initialPrice);
 
    // Offer system token symbol
    auto symbolOwnerNft = getSymbol(sysTokenSymbol);
@@ -96,10 +96,10 @@ void SymbolSys::init()
    to<TokenSys>().mapSymbol(TokenSys::sysToken, sysTokenSymbol);
 
    // Register serveSys handler
-   to<SystemService::HttpServer>().registerServer(SymbolSys::service);
+   to<SystemService::HttpServer>().registerServer(Symbol::service);
 }
 
-void SymbolSys::create(SID newSymbol, Quantity maxDebit)
+void Symbol::create(SID newSymbol, Quantity maxDebit)
 {
    auto sender = getSender();
    auto newSym = getSymbol(newSymbol);
@@ -114,7 +114,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
 
    // Debit the sender the cost of the new symbol
    auto debitMemo = "This transfer created the new symbol: " + symString;
-   if (sender != getReceiver())  // SymbolSys itself doesn't need to pay
+   if (sender != getReceiver())  // Symbol itself doesn't need to pay
    {
       to<TokenSys>().debit(TokenSys::sysToken, sender, cost, debitMemo);
    }
@@ -137,7 +137,7 @@ void SymbolSys::create(SID newSymbol, Quantity maxDebit)
    Tables().open<SymbolLengthTable>().put(symType);
 }
 
-void SymbolSys::listSymbol(SID symbol, Quantity price)
+void Symbol::listSymbol(SID symbol, Quantity price)
 {
    auto seller       = getSender();
    auto symbolRecord = getSymbol(symbol);
@@ -161,7 +161,7 @@ void SymbolSys::listSymbol(SID symbol, Quantity price)
    Tables().open<SymbolTable>().put(symbolRecord);
 }
 
-void SymbolSys::buySymbol(SID symbol)
+void Symbol::buySymbol(SID symbol)
 {
    auto buyer               = getSender();
    auto symbolRecord        = getSymbol(symbol);
@@ -186,7 +186,7 @@ void SymbolSys::buySymbol(SID symbol)
    Tables().open<SymbolTable>().put(symbolRecord);
 }
 
-void SymbolSys::unlistSymbol(SID symbol)
+void Symbol::unlistSymbol(SID symbol)
 {
    auto seller       = getSender();
    auto symbolRecord = getSymbol(symbol);
@@ -203,7 +203,7 @@ void SymbolSys::unlistSymbol(SID symbol)
    Tables().open<SymbolTable>().put(symbolRecord);
 }
 
-SymbolRecord SymbolSys::getSymbol(SID symbol)
+SymbolRecord Symbol::getSymbol(SID symbol)
 {
    check(symbol.value != 0, invalidSymbol);
 
@@ -223,12 +223,12 @@ SymbolRecord SymbolSys::getSymbol(SID symbol)
    }
 }
 
-Quantity SymbolSys::getPrice(uint8_t numChars)
+Quantity Symbol::getPrice(uint8_t numChars)
 {
    return getSymbolType(numChars).activePrice;
 }
 
-SymbolLengthRecord SymbolSys::getSymbolType(uint8_t numChars)
+SymbolLengthRecord Symbol::getSymbolType(uint8_t numChars)
 {
    updatePrices();
 
@@ -238,7 +238,7 @@ SymbolLengthRecord SymbolSys::getSymbolType(uint8_t numChars)
    return *symbolType;
 }
 
-void SymbolSys::updatePrices()
+void Symbol::updatePrices()
 {
    auto symLengthTable = Tables().open<SymbolLengthTable>();
    auto symLengthIndex = symLengthTable.getIndex<0>();
@@ -288,33 +288,33 @@ void SymbolSys::updatePrices()
    }
 }
 
-bool SymbolSys::exists(SID symbol)
+bool Symbol::exists(SID symbol)
 {
    return Tables().open<SymbolTable>().get(symbol).has_value();
 }
 
-auto symbolSys = QueryableService<SymbolSys::Tables, SymbolSys::Events>{SymbolSys::service};
+auto symbolService = QueryableService<Symbol::Tables, Symbol::Events>{Symbol::service};
 struct SymbolQuery
 {
    auto events() const
    {  //
-      return symbolSys.allEvents();
+      return symbolService.allEvents();
    }
    auto symbolEvents(SID symbolId, optional<uint32_t> first, const optional<string>& after) const
    {
-      return symbolSys.eventIndex<SymbolSys::SymbolEvents>(symbolId, first, after);
+      return symbolService.eventIndex<Symbol::SymbolEvents>(symbolId, first, after);
    }
    auto lengthEvents(uint8_t length, optional<uint32_t> first, const optional<string>& after) const
    {
-      return symbolSys.eventIndex<SymbolSys::SymbolTypeEvents>(length, first, after);
+      return symbolService.eventIndex<Symbol::SymbolTypeEvents>(length, first, after);
    }
    auto symbolTypes() const
    {  //
-      return symbolSys.index<SymbolLengthTable, 0>();
+      return symbolService.index<SymbolLengthTable, 0>();
    }
    auto symbols() const
    {  //
-      return symbolSys.index<SymbolTable, 0>();
+      return symbolService.index<SymbolTable, 0>();
    }
 };
 PSIO_REFLECT(SymbolQuery,
@@ -324,13 +324,13 @@ PSIO_REFLECT(SymbolQuery,
              method(symbolTypes),
              method(symbols));
 
-optional<HttpReply> SymbolSys::serveSys(HttpRequest request)
+optional<HttpReply> Symbol::serveSys(HttpRequest request)
 {
-   if (auto result = serveSimpleUI<SymbolSys, true>(request))
+   if (auto result = serveSimpleUI<Symbol, true>(request))
       return result;
    if (auto result = serveGraphQL(request, SymbolQuery{}))
       return result;
    return nullopt;
 }
 
-PSIBASE_DISPATCH(UserService::SymbolSys)
+PSIBASE_DISPATCH(UserService::Symbol)

@@ -9,7 +9,7 @@
 
 namespace UserService
 {
-   class SymbolSys : public psibase::Service<SymbolSys>
+   class Symbol : public psibase::Service<Symbol>
    {
      public:
       using Tables = psibase::ServiceTables<SymbolTable,
@@ -18,10 +18,10 @@ namespace UserService
                                             InitTable,
                                             UserEventTable>;
 
-      static constexpr auto service        = psibase::AccountNumber("symbol-sys");
+      static constexpr auto service        = psibase::AccountNumber("symbol");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 
-      SymbolSys(psio::shared_view_ptr<psibase::Action> action);
+      Symbol(psio::shared_view_ptr<psibase::Action> action);
 
       //void setAdjustRates(uint8_t increasePct, uint8_t decreasePct);
       //void configSymType(uint8_t symbolLength, Quantity startPrice, Quantity floorPrice, uint8_t targetCreatedPerDay);
@@ -63,7 +63,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO_REFLECT(SymbolSys,
+   PSIO_REFLECT(Symbol,
       method(init),
       method(create, newSymbol, maxDebit),
       method(listSymbol, symbol, price),
@@ -77,16 +77,16 @@ namespace UserService
       method(getSymbolType, numChars),
       method(updatePrices)
    );
-   PSIBASE_REFLECT_EVENTS(SymbolSys);
-   PSIBASE_REFLECT_HISTORY_EVENTS(SymbolSys,
+   PSIBASE_REFLECT_EVENTS(Symbol);
+   PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,
       method(symCreated, prevEvent, symbol, owner, cost),
       method(symListed, prevEvent, symbol, seller, cost),
       method(symSold, prevEvent, symbol, buyer, seller, cost),
       method(symUnlisted, prevEvent, symbol, owner),
       method(newCreatePrice, prevEvent, symbolLength, blockNum, newPrice)
    );
-   PSIBASE_REFLECT_UI_EVENTS(SymbolSys);
-   PSIBASE_REFLECT_MERKLE_EVENTS(SymbolSys);
+   PSIBASE_REFLECT_UI_EVENTS(Symbol);
+   PSIBASE_REFLECT_MERKLE_EVENTS(Symbol);
    // clang-format on
 
 }  // namespace UserService

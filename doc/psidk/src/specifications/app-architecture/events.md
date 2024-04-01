@@ -221,7 +221,7 @@ Which, when submitted to a Psinode, returns the User Events index as expected:
             "tokenId": 1,
             "prevEvent": "0",
             "time": "2022-09-19T16:15:21.000Z",
-            "sender": "symbol-sys",
+            "sender": "symbol",
             "receiver": "alice",
             "amount": {
               "value": "100000000000"

@@ -31,7 +31,7 @@ if(DEFINED IS_WASM)
     install(DIRECTORY user/Fractal/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/Nft/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/Sites/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
-    install(DIRECTORY user/SymbolSys/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
+    install(DIRECTORY user/Symbol/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/TokenSys/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
 endif()
 

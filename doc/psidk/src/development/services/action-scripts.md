@@ -22,7 +22,7 @@ To accomplish this, the following steps would be required:
 3. debit@nft: Debit the token nft
 4. Look up how much a new symbol costs
 5. credit@token-sys: Send the cost of a new symbol to the symbol contract
-6. create@symbol-sys: Tell the symbol contract to create a new symbol (it will debit the tokens sent in the previous step)
+6. create@symbol: Tell the symbol contract to create a new symbol (it will debit the tokens sent in the previous step)
 7. Look up the NFT generated that represents the ownership of the new symbol
 8. debit@nft: Debit the symbol NFT
 9. credit@nft: Transfer the symbol NFT back to the symbol contract
@@ -34,7 +34,7 @@ Notice that the lookup in steps 2 and 7 each require that prior actions were com
 With Action Scripts, the entire sequence can be shrunk down to:
 1. Look up how much a new symbol costs
 2. credit@token-sys: Send the cost of a new symbol to the symbol contract
-3. create@symbol-sys: Create a new symbol
+3. create@symbol: Create a new symbol
 4. createAndMap@tokenSys: Creates a new token, and map it to the newly created symbol
 
 This sequence contains only three actions which can be fit in a single transaction which will execute atomically. 
@@ -52,14 +52,14 @@ void TokenSys::createAndMap(Precision p, Quantity maxSupply, SID symbolId)
     senderAt<Nft>().debit(tokenNft, "Debit token ownership NFT");
 
     // Create new symbol
-    auto cost = to<SymbolSys>().getCost(symbolId.str().size());
-    senderAt<SymbolSys>().create(symbolId, cost);
-    auto symbolNft = to<SymbolSys>().getSymbol(symbolId).ownerNft;
+    auto cost = to<Symbol>().getCost(symbolId.str().size());
+    senderAt<Symbol>().create(symbolId, cost);
+    auto symbolNft = to<Symbol>().getSymbol(symbolId).ownerNft;
     senderAt<Nft>().debit(symbolNft, "Take ownership of new symbol");
 
     // Map symbol to token
-    senderAt<Nft>().credit(symbolNft, SymbolSys::service, "Give symbol to symbol-sys");
-    senderAt<SymbolSys>().mapToken(tid, symbolId);
+    senderAt<Nft>().credit(symbolNft, Symbol::service, "Give symbol to symbol");
+    senderAt<Symbol>().mapToken(tid, symbolId);
 }
 
 ```

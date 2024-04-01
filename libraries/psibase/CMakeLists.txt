@@ -176,7 +176,7 @@ function(add suffix)
             ../../services/user/Nft/include
             ../../services/user/Packages/include
             ../../services/user/Sites/include
-            ../../services/user/SymbolSys/include
+            ../../services/user/Symbol/include
             ../../services/user/TokenSys/include
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE

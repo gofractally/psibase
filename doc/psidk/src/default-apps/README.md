@@ -27,5 +27,5 @@ Psibase also comes with various apps meant to demonstrate additional functionali
 - [invite](invite.md)
 - [nft]()
 - [sites](sites.md)
-- [symbol-sys]()
+- [symbol]()
 - [token-sys]()

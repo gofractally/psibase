@@ -7,7 +7,7 @@ function(add_user_service suffix name)
         ../Invite/include
         ../Nft/include
         ../Sites/include
-        ../SymbolSys/include
+        ../Symbol/include
         ../TokenSys/include
         ../../system/Accounts/include
         ../../system/AuthK1/include
@@ -30,7 +30,7 @@ function(add_user_test_impl suffix name)
       ../../Invite/include
       ../../Nft/include
       ../../Sites/include
-      ../../SymbolSys/include
+      ../../Symbol/include
       ../../TokenSys/include
       ../../../system/Accounts/include
       ../../../system/AuthK1/include
@@ -81,7 +81,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(Nop)
     add_subdirectory(Packages)
     add_subdirectory(Sites)
-    add_subdirectory(SymbolSys)
+    add_subdirectory(Symbol)
     add_subdirectory(TokenSys)
 endif()
 
