@@ -6,7 +6,7 @@ use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{accounts, auth_delegate, sites_sys};
+use psibase::services::{accounts, auth_delegate, sites};
 use psibase::{
     account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
     get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,

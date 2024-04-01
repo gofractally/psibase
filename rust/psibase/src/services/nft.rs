@@ -84,17 +84,17 @@ mod service {
     }
 
     #[action]
-    fn getNft(nftId: crate::services::nft::NID) -> nft::NftRecord {
+    fn getNft(nftId: crate::services::nft::NID) -> super::NftRecord {
         unimplemented!()
     }
 
     #[action]
-    fn getNftHolder(account: AccountNumber) -> nft::NftHolderRecord {
+    fn getNftHolder(account: AccountNumber) -> super::NftHolderRecord {
         unimplemented!()
     }
 
     #[action]
-    fn getCredRecord(nftId: crate::services::nft::NID) -> nft::CreditRecord {
+    fn getCredRecord(nftId: crate::services::nft::NID) -> super::CreditRecord {
         unimplemented!()
     }
 
