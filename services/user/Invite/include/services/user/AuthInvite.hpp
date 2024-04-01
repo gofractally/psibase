@@ -9,7 +9,7 @@ namespace UserService
    class AuthInvite
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("auth-inv-sys");
+      static constexpr auto service = psibase::AccountNumber("auth-invite");
 
       using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 

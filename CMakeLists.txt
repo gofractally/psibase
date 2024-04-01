@@ -439,8 +439,8 @@ psibase_package(
     DESCRIPTION "Auth service using secp256k1 to verify signatures"
     SERVICE auth-k1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthK1.wasm
-        SERVER r-ath-ec-sys
-    SERVICE r-ath-ec-sys
+        SERVER r-auth-k1
+    SERVICE r-auth-k1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
     SERVICE verifyk1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
@@ -511,8 +511,8 @@ psibase_package(
     SERVICE producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
         FLAGS allowWriteNative
-        SERVER r-prod-sys
-    SERVICE r-prod-sys
+        SERVER r-producers
+    SERVICE r-producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
@@ -569,7 +569,7 @@ psibase_package(
         SERVER invite
         INIT
         DATA ${COMPONENT_BIN_DIR}/${InvitesPlugin_OUTPUT_FILE} /plugin.wasm
-    SERVICE auth-inv-sys
+    SERVICE auth-invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
     DEPENDS wasm
     DEPENDS ${InvitesPlugin_DEP}
@@ -604,9 +604,9 @@ psibase_package(
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
     SERVICE tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
-        SERVER r-tok-sys
+        SERVER r-tokens
         INIT
-    SERVICE r-tok-sys
+    SERVICE r-tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
     DEPENDS wasm
 )
