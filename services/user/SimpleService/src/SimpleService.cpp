@@ -5,7 +5,7 @@ namespace company
    class MinService : public psibase::Service<MinService>
    {
      public:
-      static constexpr psibase::account_id_type id = psibase::name_to_number("mincon");  //_a;
+      static constexpr psibase::account_id_type id = psibase::name_to_number("simpleserv");  //_a;
       void                                      hello() { psibase::writeConsole("hello world"); }
    };
 
