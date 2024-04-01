@@ -11,7 +11,7 @@ pub mod http_server;
 pub mod invite;
 #[allow(non_snake_case)]
 pub mod nft;
-pub mod package_sys;
+pub mod packages;
 pub mod producers;
 pub mod psispace_sys;
 pub mod setcode;

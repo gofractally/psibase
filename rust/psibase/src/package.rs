@@ -1,4 +1,4 @@
-use crate::services::{accounts, auth_delegate, http_server, package_sys, psispace_sys, setcode};
+use crate::services::{accounts, auth_delegate, http_server, packages, psispace_sys, setcode};
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
@@ -363,7 +363,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
         serde_json::to_writer(&mut manifest_encoder, &manifest)?;
         actions.push(
-            package_sys::Wrapper::pack_from(sender)
+            packages::Wrapper::pack_from(sender)
                 .postinstall(self.meta.clone(), manifest_encoder.finish()?.into()),
         );
         Ok(())
@@ -844,7 +844,7 @@ pub async fn get_accounts_to_create(
     let result: NewAccountsQuery = crate::gql_query(
         base_url,
         client,
-        package_sys::SERVICE,
+        packages::SERVICE,
         format!(
             "query {{ newAccounts(accounts: {}, owner: {}) }}",
             serde_json::to_string(accounts)?,
@@ -862,7 +862,7 @@ pub async fn get_installed_manifest(
     package: &str,
     owner: AccountNumber,
 ) -> Result<PackageManifest, anyhow::Error> {
-    let url = package_sys::SERVICE
+    let url = packages::SERVICE
         .url(base_url)?
         .join(&format!("/manifest?package={}&owner={}", package, owner))?;
     crate::as_json(client.get(url)).await
@@ -903,7 +903,7 @@ impl PackageList {
         let mut end_cursor: Option<String> = None;
         let mut result = PackageList::new();
         loop {
-            let data = crate::gql_query::<InstalledQuery>(base_url, client, package_sys::SERVICE,
+            let data = crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE,
                                         format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {

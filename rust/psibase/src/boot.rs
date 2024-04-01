@@ -84,7 +84,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     service_packages: &mut [PackagedService<R>],
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
-    let has_package_sys = true;
+    let has_packages = true;
 
     for s in &mut service_packages[..] {
         for account in s.get_accounts() {
@@ -139,7 +139,7 @@ pub fn get_initial_actions<R: Read + Seek>(
         }
     }
 
-    if has_package_sys {
+    if has_packages {
         for s in &mut service_packages[..] {
             s.commit_install(producers::ROOT, &mut actions)?;
         }

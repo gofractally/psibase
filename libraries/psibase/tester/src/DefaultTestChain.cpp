@@ -23,7 +23,7 @@
 #include <services/user/Fractal.hpp>
 #include <services/user/Invite.hpp>
 #include <services/user/Nft.hpp>
-#include <services/user/PackageSys.hpp>
+#include <services/user/Packages.hpp>
 #include <services/user/PsiSpaceSys.hpp>
 #include <services/user/RTokenSys.hpp>
 #include <services/user/SymbolSys.hpp>
@@ -79,14 +79,14 @@ namespace
       transactor<Accounts> asys{Accounts::service, Accounts::service};
       transactor<Transact> tsys{Transact::service, Transact::service};
       std::vector<Action>  actions;
-      bool                 has_package_sys = false;
+      bool                 has_packages = false;
       for (auto& s : service_packages)
       {
          for (auto account : s.accounts())
          {
-            if (account == PackageSys::service)
+            if (account == Packages::service)
             {
-               has_package_sys = true;
+               has_packages = true;
             }
             if (!s.hasService(account))
             {
@@ -134,7 +134,7 @@ namespace
          }
       }
 
-      if (has_package_sys)
+      if (has_packages)
       {
          for (auto& s : service_packages)
          {

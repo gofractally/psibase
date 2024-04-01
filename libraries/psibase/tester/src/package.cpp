@@ -3,7 +3,7 @@
 #include <psibase/package.hpp>
 #include <psibase/semver.hpp>
 #include <services/system/HttpServer.hpp>
-#include <services/user/PackageSys.hpp>
+#include <services/user/Packages.hpp>
 #include <services/user/PsiSpaceSys.hpp>
 
 #include <zlib.h>
@@ -320,7 +320,7 @@ namespace psibase
       stream.write('}');
       manifest = gzip(std::move(manifest));
       actions.push_back(
-          transactor<PackageSys>{sender, PackageSys::service}.postinstall(meta, manifest));
+          transactor<Packages>{sender, Packages::service}.postinstall(meta, manifest));
    }
 
    const PackageInfo& get(const std::vector<PackageInfo>& index, const PackageRef& ref)

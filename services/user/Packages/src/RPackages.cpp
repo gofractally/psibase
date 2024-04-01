@@ -1,5 +1,5 @@
-#include <services/user/PackageSys.hpp>
-#include <services/user/RPackageSys.hpp>
+#include <services/user/Packages.hpp>
+#include <services/user/RPackages.hpp>
 
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthDelegate.hpp>
@@ -14,7 +14,7 @@ namespace UserService
    {
       auto installed() const
       {
-         return PackageSys::Tables(PackageSys::service).open<InstalledPackageTable>().getIndex<0>();
+         return Packages::Tables(Packages::service).open<InstalledPackageTable>().getIndex<0>();
       }
       // Returns the accounts that need to be created to install a package.
       // Validates that existing accounts have the correct owner.
@@ -115,7 +115,7 @@ namespace UserService
          auto [owner, package] =
              parse_query_string(target.substr(prefix.size()), "owner", "package");
          auto manifestIndex =
-             PackageSys::Tables(PackageSys::service).open<PackageManifestTable>().getIndex<0>();
+             Packages::Tables(Packages::service).open<PackageManifestTable>().getIndex<0>();
          if (auto result =
                  manifestIndex.get(std::tuple(std::string(package), psibase::AccountNumber(owner))))
          {
@@ -129,7 +129,7 @@ namespace UserService
       return {};
    }
 
-   std::optional<psibase::HttpReply> RPackageSys::serveSys(psibase::HttpRequest request)
+   std::optional<psibase::HttpReply> RPackages::serveSys(psibase::HttpRequest request)
    {
       if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
@@ -140,7 +140,7 @@ namespace UserService
       return std::nullopt;
    }
 
-   void RPackageSys::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   void RPackages::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
       psibase::check(psibase::getSender() == psibase::getReceiver(), "wrong sender");
       psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
@@ -148,4 +148,4 @@ namespace UserService
    }
 }  // namespace UserService
 
-PSIBASE_DISPATCH(UserService::RPackageSys)
+PSIBASE_DISPATCH(UserService::RPackages)

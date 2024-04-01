@@ -114,14 +114,14 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Nop.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PsiSpaceSys.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokenSys.wasm
@@ -646,15 +646,15 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/PackageSys.psi
-    NAME PackageSys
+    OUTPUT ${SERVICE_DIR}/Packages.psi
+    NAME Packages
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Package manager for psibase apps"
-    SERVICE package-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/PackageSys.wasm
-        SERVER r-package-sys
-    SERVICE r-package-sys
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackageSys.wasm
+    SERVICE packages
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
+        SERVER r-packages
+    SERVICE r-packages
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Nop(^${PSIBASE_VERSION})"
 )
@@ -665,7 +665,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit DocSys
-                    Explorer Fractal Invite Nft PackageSys Producers HttpServer
+                    Explorer Fractal Invite Nft Packages Producers HttpServer
                     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact
 )
 
@@ -674,7 +674,7 @@ psibase_package(
     NAME Minimal
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
-    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi PackageSys Producers HttpServer
+    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Packages Producers HttpServer
                     SetCode Transact
 )
 
@@ -693,7 +693,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    DocSys Explorer Fractal Invite Nft Nop Minimal PackageSys Producers HttpServer
+    DocSys Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     PsiSpaceSys SetCode SupervisorSys SymbolSys TokenUsers TokenSys Transact)
 
 install(
@@ -713,7 +713,7 @@ install(
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/Nop.psi
-          ${SERVICE_DIR}/PackageSys.psi
+          ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/PsiSpaceSys.psi

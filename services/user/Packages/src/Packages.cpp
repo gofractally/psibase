@@ -1,4 +1,4 @@
-#include <services/user/PackageSys.hpp>
+#include <services/user/Packages.hpp>
 
 #include <psibase/check.hpp>
 #include <services/system/Accounts.hpp>
@@ -29,7 +29,7 @@ namespace UserService
       }
    }  // namespace
 
-   void PackageSys::postinstall(PackageMeta package, std::vector<char> manifest)
+   void Packages::postinstall(PackageMeta package, std::vector<char> manifest)
    {
       auto sender = getSender();
       for (AccountNumber account : package.accounts)
@@ -64,4 +64,4 @@ namespace UserService
    }
 }  // namespace UserService
 
-PSIBASE_DISPATCH(UserService::PackageSys)
+PSIBASE_DISPATCH(UserService::Packages)

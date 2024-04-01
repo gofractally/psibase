@@ -174,7 +174,7 @@ function(add suffix)
             ../../services/user/Fractal/include
             ../../services/user/Invite/include
             ../../services/user/Nft/include
-            ../../services/user/PackageSys/include
+            ../../services/user/Packages/include
             ../../services/user/PsiSpaceSys/include
             ../../services/user/SymbolSys/include
             ../../services/user/TokenSys/include
