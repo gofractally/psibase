@@ -4,7 +4,9 @@
         "useDefineForClassFields": true,
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
+        "baseUrl": ".",
         "paths": {
+            "@/*": ["./src/*"],
             "/common": ["../common"],
             "@psibase/common-lib": ["../common/packages/common-lib/src"],
             "@psibase/common-lib/*": ["../common/packages/common-lib/src/*"]
