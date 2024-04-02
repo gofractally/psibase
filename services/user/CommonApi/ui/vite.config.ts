@@ -7,9 +7,8 @@ import svgr from "vite-plugin-svgr";
 const psibase = (appletContract: string, isServing?: boolean) => {
     const buildAliases = [
         {
-            // bundle non-external (above) common files except fonts (which should only be referenced)
-            find: /^\/common(?!\/(?:fonts))(.*)$/,
-            replacement: path.resolve("../common/resources$1"),
+            find: "@",
+            replacement: path.resolve(__dirname, "./src"),
         },
     ];
 
@@ -87,4 +86,9 @@ export default defineConfig(({ command }) => ({
         svgr({ exportAsDefault: true }),
         psibase("psibase", command === "serve"),
     ],
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, "./src"),
+        },
+    },
 }));
