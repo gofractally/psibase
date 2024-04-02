@@ -146,3 +146,43 @@ TEST_CASE("schema compat")
    CHECK(isExtension<std::tuple<>, std::tuple<std::optional<std::uint8_t>>>());
    CHECK(!isExtension<std::tuple<std::optional<std::uint8_t>>, std::tuple<>>());
 }
+
+TEST_CASE("schema error")
+{
+   CHECK_THROWS(
+       []
+       {
+          Schema schema;
+          schema.insert("T", Type{"T"});
+          CompiledSchema{schema};
+       }());
+   CHECK_THROWS(
+       []
+       {
+          Schema schema;
+          schema.insert("T", Custom{.type = Type{"T"}, .id = "bool"});
+          CompiledSchema{schema};
+       }());
+   CHECK_THROWS(
+       []
+       {
+          Schema schema;
+          schema.insert("T",
+                        Custom{.type = Custom{.type = Type{"T"}, .id = "bool"}, .id = "string"});
+          CompiledSchema{schema};
+       }());
+   CHECK_NOTHROW(
+       []
+       {
+          Schema schema;
+          schema.insert("T", Custom{.type = Option{Type{"T"}}, .id = "string"});
+          CompiledSchema{schema};
+       }());
+   CHECK_NOTHROW(
+       []
+       {
+          Schema schema;
+          schema.insert("T", Option{Custom{.type = Type{"T"}, .id = "string"}});
+          CompiledSchema{schema};
+       }());
+}

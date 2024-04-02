@@ -7,6 +7,7 @@ namespace psio::schema_types
    {
       if (!resolved)
       {
+         std::size_t    n      = schema.types.size();
          const AnyType* result = this;
          while (auto* alias = std::get_if<Type>(&result->value))
          {
@@ -14,6 +15,7 @@ namespace psio::schema_types
             {
                result = next;
             }
+            check(n-- > 0, "Cycle in type definitions");
          }
          resolved = result;
       }
@@ -175,11 +177,15 @@ namespace psio::schema_types
                                                  type->fixed_size, type->is_variable_size));
          }
       }
+
+      // List, Option, and Variant do not require their children to be completed first.
+      // All other types do.
+
       enum VertexEvent
       {
          start,
          finish,
-         other,  // For now, we don't need to distinguish these
+         done,
       };
       // nodes that have been discovered but not completed
       // have original_type == nullptr and fixed_size represents
@@ -192,33 +198,54 @@ namespace psio::schema_types
                                                          CompiledType::Kind           kind,
                                                          std::vector<const AnyType*>& stack)
       {
-         if (auto [pos, inserted] = schema->types.insert(std::pair{
-                 type,
-                 CompiledType{.kind = kind, .is_variable_size = true, .original_type = nullptr}});
-             inserted)
+         auto& ctype = schema->types[type];
+         if (ctype.kind == CompiledType::uninitialized)
          {
-            pos->second.fixed_size = stack.size();
+            ctype.kind       = kind;
+            ctype.fixed_size = stack.size();
             stack.push_back(type);
-            return {&pos->second, start};
+            return {&ctype, start};
          }
          else
          {
-            if (pos->second.original_type == nullptr && pos->second.fixed_size == stack.size())
+            if (ctype.original_type == nullptr)
             {
-               pos->second.original_type = type;
-               pos->second.fixed_size    = 0;
-               return {&pos->second, finish};
+               if (ctype.fixed_size != stack.size())
+               {
+                  check(false, "Invalid recursive type definition");
+               }
+               ctype.original_type = type;
+               ctype.fixed_size    = 0;
+               return {&ctype, finish};
             }
             else
             {
-               return {&pos->second, other};
+               return {&ctype, done};
             }
          }
       }
+      CompiledType* dfs_terminal(CompiledSchema*    schema,
+                                 const AnyType*     type,
+                                 CompiledType::Kind kind)
+      {
+         auto& ctype = schema->types[type];
+         if (ctype.kind == CompiledType::uninitialized)
+         {
+            ctype.kind          = kind;
+            ctype.original_type = type;
+            return &ctype;
+         }
+         else
+         {
+            return nullptr;
+         }
+      }
+
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const Object&                t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
          auto [ctype, state] = dfs_discover(schema, type, CompiledType::object, stack);
          switch (state)
@@ -226,7 +253,7 @@ namespace psio::schema_types
             case start:
                for (const auto& member : t.members)
                {
-                  stack.push_back(&member.type);
+                  stack.push_back(member.type.resolve(schema->schema));
                }
                break;
             case finish:
@@ -239,7 +266,8 @@ namespace psio::schema_types
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const Struct&                t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
          auto [ctype, state] = dfs_discover(schema, type, CompiledType::struct_, stack);
          switch (state)
@@ -247,7 +275,7 @@ namespace psio::schema_types
             case start:
                for (const auto& member : t.members)
                {
-                  stack.push_back(&member.type);
+                  stack.push_back(member.type.resolve(schema->schema));
                }
                break;
             case finish:
@@ -261,7 +289,8 @@ namespace psio::schema_types
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const Tuple&                 t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
          auto [ctype, state] = dfs_discover(schema, type, CompiledType::object, stack);
          switch (state)
@@ -269,7 +298,7 @@ namespace psio::schema_types
             case start:
                for (const auto& member : t.members)
                {
-                  stack.push_back(&member);
+                  stack.push_back(member.resolve(schema->schema));
                }
                break;
             case finish:
@@ -287,35 +316,38 @@ namespace psio::schema_types
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const Int&                   t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
-         schema->types.insert({type,
-                               {.kind             = CompiledType::scalar,
-                                .is_variable_size = false,
-                                .fixed_size       = (t.bits + 7) / 8,
-                                .original_type    = type}});
+         if (auto* ctype = dfs_terminal(schema, type, CompiledType::scalar))
+         {
+            ctype->is_variable_size = false;
+            ctype->fixed_size       = (t.bits + 7) / 8;
+         }
       }
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const Float&                 t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
-         schema->types.insert({type,
-                               {.kind             = CompiledType::scalar,
-                                .is_variable_size = false,
-                                .fixed_size       = (t.exp + t.mantissa + 7) / 8,
-                                .original_type    = type}});
+         if (auto* ctype = dfs_terminal(schema, type, CompiledType::scalar))
+         {
+            ctype->is_variable_size = false;
+            ctype->fixed_size       = (t.exp + t.mantissa + 7) / 8;
+         }
       }
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const Array&                 t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
          auto [ctype, state] = dfs_discover(schema, type, CompiledType::array, stack);
          switch (state)
          {
             case start:
-               stack.push_back(t.type.get());
+               stack.push_back(t.type->resolve(schema->schema));
                break;
             case finish:
             {
@@ -331,52 +363,43 @@ namespace psio::schema_types
                break;
          }
       }
-      void add_impl(CompiledSchema*              schema,
-                    const AnyType*               type,
-                    const Option&                t,
-                    std::vector<const AnyType*>& stack)
+      void add_impl(CompiledSchema* schema,
+                    const AnyType*  type,
+                    const Option&   t,
+                    std::vector<const AnyType*>&,
+                    std::vector<const AnyType*>& queue)
       {
-         auto [ctype, state] = dfs_discover(schema, type, CompiledType::optional, stack);
-         switch (state)
+         if (CompiledType* ctype = dfs_terminal(schema, type, CompiledType::optional))
          {
-            case start:
-               stack.push_back(t.type.get());
-               break;
-            case finish:
-               ctype->children.push_back({.type = schema->get(t.type->resolve(schema->schema))});
-               break;
-            default:
-               break;
+            const AnyType* nested = t.type->resolve(schema->schema);
+            queue.push_back(nested);
+            ctype->children.push_back({.type = &schema->types[nested]});
          }
       }
-      void add_impl(CompiledSchema*              schema,
-                    const AnyType*               type,
-                    const List&                  t,
-                    std::vector<const AnyType*>& stack)
+      void add_impl(CompiledSchema* schema,
+                    const AnyType*  type,
+                    const List&     t,
+                    std::vector<const AnyType*>&,
+                    std::vector<const AnyType*>& queue)
       {
-         auto [ctype, state] = dfs_discover(schema, type, CompiledType::container, stack);
-         switch (state)
+         if (CompiledType* ctype = dfs_terminal(schema, type, CompiledType::container))
          {
-            case start:
-               stack.push_back(t.type.get());
-               break;
-            case finish:
-               ctype->children.push_back({.type = schema->get(t.type->resolve(schema->schema))});
-               break;
-            default:
-               break;
+            const AnyType* nested = t.type->resolve(schema->schema);
+            queue.push_back(nested);
+            ctype->children.push_back({.type = &schema->types[nested]});
          }
       }
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const FracPack&              t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
          auto [ctype, state] = dfs_discover(schema, type, CompiledType::nested, stack);
          switch (state)
          {
             case start:
-               stack.push_back(t.type.get());
+               stack.push_back(t.type->resolve(schema->schema));
                break;
             case finish:
                ctype->children.push_back({.type = schema->get(t.type->resolve(schema->schema))});
@@ -385,59 +408,38 @@ namespace psio::schema_types
                break;
          }
       }
-      void add_impl(CompiledSchema*              schema,
-                    const AnyType*               type,
-                    const Variant&               t,
-                    std::vector<const AnyType*>& stack)
+      void add_impl(CompiledSchema* schema,
+                    const AnyType*  type,
+                    const Variant&  t,
+                    std::vector<const AnyType*>&,
+                    std::vector<const AnyType*>& queue)
       {
-         auto [ctype, state] = dfs_discover(schema, type, CompiledType::variant, stack);
-         switch (state)
+         if (CompiledType* ctype = dfs_terminal(schema, type, CompiledType::variant))
          {
-            case start:
-               for (const auto& member : t.members)
-               {
-                  stack.push_back(&member.type);
-               }
-               break;
-            case finish:
-               for (const auto& member : t.members)
-               {
-                  ctype->children.push_back(
-                      {.type = schema->get(member.type.resolve(schema->schema))});
-               }
-               break;
-            default:
-               break;
+            for (const auto& member : t.members)
+            {
+               const AnyType* nested = member.type.resolve(schema->schema);
+               queue.push_back(nested);
+               ctype->children.push_back({.type = &schema->types[nested]});
+            }
          }
       }
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const Custom&                t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
-         auto kind           = static_cast<CompiledType::Kind>(CompiledType::scalar);
-         auto [ctype, state] = dfs_discover(schema, type, kind, stack);
+         auto [ctype, state] = dfs_discover(schema, type, CompiledType::custom, stack);
          switch (state)
          {
             case start:
-               stack.push_back(t.type.get());
+               stack.push_back(t.type->resolve(schema->schema));
                break;
             case finish:
             {
                CompiledType* child = schema->get(t.type->resolve(schema->schema));
-               // TODO: This is sufficient to prevent crashes, but not to detect all errors
-               if (!child->original_type)
-                  check(false, "A Custom type may not depend on itself");
-               ctype->kind             = child->kind;
-               ctype->is_variable_size = child->is_variable_size;
-               ctype->fixed_size       = child->fixed_size;
-               ctype->children         = child->children;
-               ctype->original_type    = child->original_type;
-               if (auto index = schema->builtin.find(t.id))
-               {
-                  if (schema->builtin.match(*index, ctype))
-                     ctype->custom_id = *index;
-               }
+               *ctype              = *child;
             }
             default:
                break;
@@ -446,17 +448,12 @@ namespace psio::schema_types
       void add_impl(CompiledSchema*              schema,
                     const AnyType*               type,
                     const Type&                  t,
-                    std::vector<const AnyType*>& stack)
+                    std::vector<const AnyType*>& stack,
+                    std::vector<const AnyType*>&)
       {
-         if (const AnyType* next = schema->schema.get(t.type))
-         {
-            stack.push_back(next);
-         }
-         else
-         {
-            check(false, "undefined type: " + t.type);
-         }
+         assert(!"type aliases should be resolved before pushing them onto the stack");
       }
+
    }  // namespace
 
    CompiledSchema::CompiledSchema(const Schema& schema, CustomTypes builtin)
@@ -464,16 +461,38 @@ namespace psio::schema_types
    {
       // collect root types
       std::vector<const AnyType*> stack;
+      std::vector<const AnyType*> queue;
       for (const auto& [name, type] : schema.types)
       {
-         stack.push_back(&type);
+         if (!std::holds_alternative<Type>(type.value))
+            queue.push_back(&type);
+         else
+            // Detect cycles
+            type.resolve(schema);
       }
       // Process all reachable types
-      while (!stack.empty())
+      while (!queue.empty())
       {
-         auto top = stack.back();
-         stack.pop_back();
-         std::visit([&](const auto& t) { add_impl(this, top, t, stack); }, top->value);
+         stack.swap(queue);
+         while (!stack.empty())
+         {
+            auto top = stack.back();
+            stack.pop_back();
+            std::visit([&](const auto& t) { add_impl(this, top, t, stack, queue); }, top->value);
+         }
+      }
+      // Custom types need to be resolved last, so the full object graph
+      // is available for matching.
+      for (auto& [type, ctype] : types)
+      {
+         if (auto* t = std::get_if<Custom>(&type->value))
+         {
+            if (auto index = this->builtin.find(t->id))
+            {
+               if (this->builtin.match(*index, &ctype))
+                  ctype.custom_id = *index;
+            }
+         }
       }
    }
 

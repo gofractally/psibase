@@ -387,13 +387,16 @@ namespace psio
             variant,
             optional,
             nested,
+            // Used only during initialization
+            custom,
+            uninitialized,
          };
-         Kind                        kind;
-         bool                        is_variable_size;
-         std::int16_t                custom_id = -1;
-         std::uint32_t               fixed_size;
+         Kind                        kind             = uninitialized;
+         bool                        is_variable_size = true;
+         std::int16_t                custom_id        = -1;
+         std::uint32_t               fixed_size       = 0;
          std::vector<CompiledMember> children;
-         const AnyType*              original_type;
+         const AnyType*              original_type = nullptr;
          bool is_container() const { return kind == container || kind == nested; }
       };
 
