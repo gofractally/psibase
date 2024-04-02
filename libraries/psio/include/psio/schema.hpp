@@ -792,8 +792,8 @@ namespace psio
                                   std::is_same_v<T, std::string_view> ||
                                   std::is_same_v<T, const char*>)
                {
-                  schema.insert(
-                      name, Custom{.type = insert<std::vector<unsigned char>>(), .id = "string"});
+                  schema.insert(name,
+                                Custom{.type = List{insert<unsigned char>()}, .id = "string"});
                }
                else if constexpr (is_std_vector_v<T>)
                {

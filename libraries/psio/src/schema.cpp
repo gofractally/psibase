@@ -67,7 +67,11 @@ namespace psio::schema_types
    {
       static bool match(const CompiledType* type)
       {
-         if (type->kind == CompiledType::container)
+         if constexpr (requires { T::match(type); })
+         {
+            return T::match(type);
+         }
+         else if (type->kind == CompiledType::container)
          {
             const auto& member = type->children[0];
             return !member.is_optional && !member.type->is_variable_size;
@@ -130,6 +134,18 @@ namespace psio::schema_types
 
    struct StringImpl
    {
+      static bool match(const CompiledType* type)
+      {
+         if (type->kind == CompiledType::container)
+         {
+            const auto& member = type->children[0];
+            if (const auto* t = std::get_if<Int>(&member.type->original_type->value))
+            {
+               return !member.is_optional && t->bits == 8;
+            }
+         }
+         return false;
+      }
       static void frac2json(std::span<const char> in, StreamBase& out)
       {
          to_json(std::string_view{in.data(), in.size()}, out);

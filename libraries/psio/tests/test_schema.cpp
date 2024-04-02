@@ -186,3 +186,11 @@ TEST_CASE("schema error")
           CompiledSchema{schema};
        }());
 }
+
+TEST_CASE("schema wrong custom")
+{
+   Schema schema;
+   schema.insert("s", Custom{.type = List{Int{.bits = 32, .isSigned = true}}, .id = "string"});
+   CompiledSchema cschema{schema};
+   CHECK(to_json(cschema, "s", "040000002A000000") == R"([42])");
+}
