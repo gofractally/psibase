@@ -86,18 +86,18 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_install(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'ExploreSys'])
-        a.run_psibase(['install', 'SymbolSys', 'TokenSys', 'TokenUsers'])
+        a.boot(packages=['Minimal', 'Explorer'])
+        a.run_psibase(['install', 'Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
-        a.graphql('token-sys', '''query { userBalances(user: "alice") { user balance precision token symbol } }''')
+        a.graphql('tokens', '''query { userBalances(user: "alice") { user balance precision token symbol } }''')
 
     @testutil.psinode_test
     def test_upgrade(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'ExploreSys', 'PsiSpaceSys'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
-        foo10 = TestPackage('foo', '1.0.0').depends('PsiSpaceSys').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
-        foo11 = TestPackage('foo', '1.1.0').depends('PsiSpaceSys').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
+        foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
+        foo11 = TestPackage('foo', '1.1.0').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
 
         # These just need to be valid and distinct
         original_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071d0305737461727400000663616c6c65640001086f726967696e616c00000a070202000b02000b');

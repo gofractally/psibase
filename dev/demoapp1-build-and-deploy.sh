@@ -19,4 +19,4 @@ cd ./ui
 rm -rf node_modules
 rm -rf dist
 yarn --mutex network && yarn build
-psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload -r psispace-sys ./dist / -S $account_name
+psibase -a http://psibase.127.0.0.1.sslip.io:8079 upload -r sites ./dist / -S $account_name

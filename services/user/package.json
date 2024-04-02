@@ -1,7 +1,7 @@
 {
     "private": true,
     "workspaces": [
-        "FractalSys/ui",
+        "Fractal/ui",
         "components"
     ]
 }

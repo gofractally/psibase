@@ -2436,17 +2436,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "psispace-sys"
-version = "0.7.0"
-dependencies = [
- "async-graphql",
- "fracpack",
- "psibase",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "pulldown-cmark"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2983,6 +2972,17 @@ name = "siphasher"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
+
+[[package]]
+name = "sites"
+version = "0.7.0"
+dependencies = [
+ "async-graphql",
+ "fracpack",
+ "psibase",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "slab"

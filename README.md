@@ -34,7 +34,7 @@ A demonstration deployment is currently hosted at [psibase.io](https://psibase.i
 
 ## Technical docs 📓
 
-Documentation is hosted on the [doc-sys app](https://doc-sys.psibase.io/) of our demo deployment.
+Documentation is hosted on the [docs app](https://docs.psibase.io/) of our demo deployment.
 
 ## Build from source 🛠️
 
@@ -111,7 +111,7 @@ To execute psinode from the docker image, you can use the following docker comma
 docker run --rm -p 8080:8080 -p 3000:3000 -p 9090:9090 ghcr.io/gofractally/psinode:VERSION
 ```
 
-Run psinode with `--help` to learn about the various options, or consult our technical [docs](https://doc-sys.psibase.io/).
+Run psinode with `--help` to learn about the various options, or consult our technical [docs](https://docs.psibase.io/).
 
 ## Contribute 🧬
 

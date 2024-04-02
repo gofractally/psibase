@@ -17,15 +17,15 @@ In psibase blockchains, an Action Script may be written to bundle all the action
 Consider an app that wants to create a new token with a symbol. A user is presented with a form that lets them select the properties of the new token, the name of the symbol, and a button labeled, "Create."
 
 To accomplish this, the following steps would be required:
-1. create@token-sys: Create a new token
+1. create@tokens: Create a new token
 2. Look up the nft created by the token contract that represents ownership of the new token
-3. debit@nft-sys: Debit the token nft
+3. debit@nft: Debit the token nft
 4. Look up how much a new symbol costs
-5. credit@token-sys: Send the cost of a new symbol to the symbol contract
-6. create@symbol-sys: Tell the symbol contract to create a new symbol (it will debit the tokens sent in the previous step)
+5. credit@tokens: Send the cost of a new symbol to the symbol contract
+6. create@symbol: Tell the symbol contract to create a new symbol (it will debit the tokens sent in the previous step)
 7. Look up the NFT generated that represents the ownership of the new symbol
-8. debit@nft-sys: Debit the symbol NFT
-9. credit@nft-sys: Transfer the symbol NFT back to the symbol contract
+8. debit@nft: Debit the symbol NFT
+9. credit@nft: Transfer the symbol NFT back to the symbol contract
 10. Look up the ID of the newly created token
 11. mapToken@symbol: Map the symbol to the new token ID
 
@@ -33,33 +33,33 @@ Notice that the lookup in steps 2 and 7 each require that prior actions were com
 
 With Action Scripts, the entire sequence can be shrunk down to:
 1. Look up how much a new symbol costs
-2. credit@token-sys: Send the cost of a new symbol to the symbol contract
-3. create@symbol-sys: Create a new symbol
-4. createAndMap@tokenSys: Creates a new token, and map it to the newly created symbol
+2. credit@tokens: Send the cost of a new symbol to the symbol contract
+3. create@symbol: Create a new symbol
+4. createAndMap@tokenService: Creates a new token, and map it to the newly created symbol
 
 This sequence contains only three actions which can be fit in a single transaction which will execute atomically. 
 
-To implement the createAndMap@tokenSys Action Script, the c++ code would be significantly simpler, due to the ability to receive action return values.
+To implement the createAndMap@tokenService Action Script, the c++ code would be significantly simpler, due to the ability to receive action return values.
 
 ```cpp
-// tokenSys.cpp (pseudocode)
+// tokenService.cpp (pseudocode)
 
-void TokenSys::createAndMap(Precision p, Quantity maxSupply, SID symbolId)
+void Tokens::createAndMap(Precision p, Quantity maxSupply, SID symbolId)
 {
     // Create new token, and give ownership to sender
     auto tid = create(p, maxSupply);
     auto tokenNft = getToken(tid).ownerNft;
-    senderAt<NftSys>().debit(tokenNft, "Debit token ownership NFT");
+    senderAt<Nft>().debit(tokenNft, "Debit token ownership NFT");
 
     // Create new symbol
-    auto cost = to<SymbolSys>().getCost(symbolId.str().size());
-    senderAt<SymbolSys>().create(symbolId, cost);
-    auto symbolNft = to<SymbolSys>().getSymbol(symbolId).ownerNft;
-    senderAt<NftSys>().debit(symbolNft, "Take ownership of new symbol");
+    auto cost = to<Symbol>().getCost(symbolId.str().size());
+    senderAt<Symbol>().create(symbolId, cost);
+    auto symbolNft = to<Symbol>().getSymbol(symbolId).ownerNft;
+    senderAt<Nft>().debit(symbolNft, "Take ownership of new symbol");
 
     // Map symbol to token
-    senderAt<NftSys>().credit(symbolNft, SymbolSys::service, "Give symbol to symbol-sys");
-    senderAt<SymbolSys>().mapToken(tid, symbolId);
+    senderAt<Nft>().credit(symbolNft, Symbol::service, "Give symbol to symbol");
+    senderAt<Symbol>().mapToken(tid, symbolId);
 }
 
 ```

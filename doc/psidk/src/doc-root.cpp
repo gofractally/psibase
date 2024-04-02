@@ -1,13 +1,13 @@
 #define GENERATING_DOCUMENTATION
 
 #include <psibase/psibase.hpp>
-#include <services/system/AccountSys.hpp>
-#include <services/system/AuthSys.hpp>
-#include <services/system/AuthEcSys.hpp>
-#include <services/system/CommonSys.hpp>
-#include <services/system/ProxySys.hpp>
-#include <services/system/TransactionSys.hpp>
-#include <services/system/SetCodeSys.hpp>
-#include <services/user/PsiSpaceSys.hpp>
-#include <services/user/InviteSys.hpp>
+#include <services/system/Accounts.hpp>
+#include <services/system/AuthK1.hpp>
+#include <services/system/AuthSig.hpp>
+#include <services/system/CommonApi.hpp>
+#include <services/system/HttpServer.hpp>
+#include <services/system/SetCode.hpp>
+#include <services/system/Transact.hpp>
+#include <services/user/Invite.hpp>
 #include <services/user/InviteTables.hpp>
+#include <services/user/Sites.hpp>

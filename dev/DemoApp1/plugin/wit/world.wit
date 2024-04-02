@@ -1,15 +1,13 @@
-package component:demoapp1;
+package demoapp1:example;
 
-
-
-
-interface demoapp2 {
-    callintoplugin: func() -> string;
+interface intf {
+    use common:plugin/types.{error};
+    helloworld2: func() -> result<string, error>;
 }
 
 world example {
-
-    import demoapp2;
+    import invite:plugin/inviter;
 
     export helloworld: func() -> string;
+    export intf;
 }

@@ -1,15 +1,15 @@
 # Administration
 
-Much of the administration of an individual node can be done via the graphical user interface provided at `admin-sys.your_host.com`, where `your-host` is the public address of your psibase infrastructure node (e.g. psibase.127.0.0.1.sslip.io for local nodes). To learn more about the administration app, see the documentation on [admin-sys](../default-apps/admin-sys.md). For more complex administration requirements, psinode exposes many services and configuration options over an http interface.
+Much of the administration of an individual node can be done via the graphical user interface provided at `x-admin.your_host.com`, where `your-host` is the public address of your psibase infrastructure node (e.g. psibase.127.0.0.1.sslip.io for local nodes). To learn more about the administration app, see the documentation on [x-admin](../default-apps/x-admin.md). For more complex administration requirements, psinode exposes many services and configuration options over an http interface.
 
 ## Booting a network
 
-Booting a network is only a valid operation if psinode does not yet have any chain. It can be done either with the [`psibase`](./cli/psibase.md#boot) CLI tool, or by using the GUI provided by the [admin-sys](../default-apps/admin-sys.md) service.
+Booting a network is only a valid operation if psinode does not yet have any chain. It can be done either with the [`psibase`](./cli/psibase.md#boot) CLI tool, or by using the GUI provided by the [x-admin](../default-apps/x-admin.md) service.
 Alternatively, the `POST /native/push_boot` endpoint can be used manually in conjunction with `POST /native/push_transaction` to perform a custom boot sequence. 
 
 The body of the `POST /native/push_boot` request contains a list of transactions that will each be executed in order in the first block. The first transaction is a special transaction known as the genesis transaction. The genesis transaction uploads the core services to the blockchain and it is not permitted to do anything else.
 
-A typical boot sequence contains more configuration than is able to fit in a single block. To understand how such a boot sequence is accomplished, see the description of [SystemService::TransactionSys::startBoot].
+A typical boot sequence contains more configuration than is able to fit in a single block. To understand how such a boot sequence is accomplished, see the description of [SystemService::Transact::startBoot].
 
 ## Peering with others
 
@@ -184,7 +184,7 @@ Example:
     "services": [
         {
             "host": "localhost",
-            "root": "/usr/share/psibase/services/admin-sys"
+            "root": "/usr/share/psibase/services/x-admin"
         }
     ],
     "admin": "builtin:*",

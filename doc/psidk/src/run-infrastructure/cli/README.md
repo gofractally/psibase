@@ -23,7 +23,7 @@ This will:
 
 ### Boot the chain
 
-Interacting with the node can now be done either through the psibase cli tool, or graphically through the [admin-sys app](../../default-apps/admin-sys.md).
+Interacting with the node can now be done either through the psibase cli tool, or graphically through the [x-admin app](../../default-apps/x-admin.md).
 
 In a separate terminal, while `psinode` is running, run the following:
 

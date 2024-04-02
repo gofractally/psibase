@@ -92,7 +92,7 @@ Create or modify an account
 
 - `-S`, `--sender` *account*
 
-  Sender to use when creating the account [default: account-sys].
+  Sender to use when creating the account [default: accounts].
 
 ### deploy
 
@@ -118,11 +118,11 @@ Deploy a service
 
 - `-p`, `--register-proxy`
 
-  Register the service with ProxySys. This allows the service to host a website, serve RPC requests, and serve GraphQL requests.
+  Register the service with HttpServer. This allows the service to host a website, serve RPC requests, and serve GraphQL requests.
   
 - `-S`, `--sender` *sender*
 
-  Sender to use when creating the account [default: account-sys]
+  Sender to use when creating the account [default: accounts]
 
 ### info
 

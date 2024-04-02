@@ -741,15 +741,15 @@ fn parse<'tu>(
         &("-I".to_owned() + &clang_include_dir),
         &("-I".to_owned() + build_path + "/wasm/boost"),
         &("-I".to_owned() + build_path + "/wasm/deps/include"),
-        &("-I".to_owned() + repo_path + "/services/system/ProxySys/include"),
-        &("-I".to_owned() + repo_path + "/services/system/TransactionSys/include"),
-        &("-I".to_owned() + repo_path + "/services/system/AccountSys/include"),
-        &("-I".to_owned() + repo_path + "/services/system/AuthEcSys/include"),
-        &("-I".to_owned() + repo_path + "/services/system/AuthSys/include"),
-        &("-I".to_owned() + repo_path + "/services/system/SetCodeSys/include"),
-        &("-I".to_owned() + repo_path + "/services/user/CommonSys/include"),
-        &("-I".to_owned() + repo_path + "/services/user/InviteSys/include"),
-        &("-I".to_owned() + repo_path + "/services/user/PsiSpaceSys/include"),
+        &("-I".to_owned() + repo_path + "/services/system/HttpServer/include"),
+        &("-I".to_owned() + repo_path + "/services/system/Transact/include"),
+        &("-I".to_owned() + repo_path + "/services/system/Accounts/include"),
+        &("-I".to_owned() + repo_path + "/services/system/AuthK1/include"),
+        &("-I".to_owned() + repo_path + "/services/system/AuthSig/include"),
+        &("-I".to_owned() + repo_path + "/services/system/SetCode/include"),
+        &("-I".to_owned() + repo_path + "/services/user/CommonApi/include"),
+        &("-I".to_owned() + repo_path + "/services/user/Invite/include"),
+        &("-I".to_owned() + repo_path + "/services/user/Sites/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/external/simdjson/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/common/include"),
@@ -765,7 +765,7 @@ fn parse<'tu>(
 fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
     let cpp_doc_re = Regex::new(r"[{][{] *#cpp-doc +(::[^ ]+)+ *[}][}]").unwrap();
     let svg_bob_re = Regex::new(r"(?s)```svgbob(.*?)```").unwrap();
-    
+
     for item in book.iter() {
         match item {
             BookItem::Chapter(chapter) => {
@@ -802,11 +802,15 @@ fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
                     let svg = svgbob::to_svg(markup);
 
                     // Custom dark theme for SvgBob
-                    let styled_svg = svg.replace("<rect ", "<rect style=\"fill:transparent; stroke:white;\" ");
+                    let styled_svg =
+                        svg.replace("<rect ", "<rect style=\"fill:transparent; stroke:white;\" ");
                     let styled_svg = styled_svg.replace("<text ", "<text style=\"fill:white;\" ");
-                    let styled_svg = styled_svg.replace("<line ", "<line style=\"stroke:white;stroke-width:2;\" ");
-                    let styled_svg = styled_svg.replace("<polygon ", "<polygon style=\"stroke:white;fill:white;\" ");
-                    let styled_svg = styled_svg.replace("<path", "<path style=\"stroke:white;stroke-width:2;\"");
+                    let styled_svg = styled_svg
+                        .replace("<line ", "<line style=\"stroke:white;stroke-width:2;\" ");
+                    let styled_svg = styled_svg
+                        .replace("<polygon ", "<polygon style=\"stroke:white;fill:white;\" ");
+                    let styled_svg =
+                        styled_svg.replace("<path", "<path style=\"stroke:white;stroke-width:2;\"");
 
                     format!("<pre class=\"svgbob\">{}</pre>", styled_svg)
                 })

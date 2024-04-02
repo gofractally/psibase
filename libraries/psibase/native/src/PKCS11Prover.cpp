@@ -265,11 +265,11 @@ namespace
    // to the service-specific form used in a Claim
    std::vector<char> convertPublicKey(AccountNumber service, std::vector<char>&& in)
    {
-      if (service == AccountNumber{"verify-sys"})
+      if (service == AccountNumber{"verify-sig"})
       {
          return std::move(in);
       }
-      else if (service == AccountNumber{"verifyec-sys"})
+      else if (service == AccountNumber{"verifyk1"})
       {
          const unsigned char* p = reinterpret_cast<const unsigned char*>(in.data());
          std::unique_ptr<EVP_PKEY, OpenSSLDeleter> key(d2i_PUBKEY(nullptr, &p, in.size()));
@@ -299,7 +299,7 @@ namespace
          }
          else
          {
-            throw std::runtime_error("Unsupported curve for verifyec-sys");
+            throw std::runtime_error("Unsupported curve for verifyk1");
          }
       }
       else
@@ -312,11 +312,11 @@ namespace
                                           AccountNumber         service,
                                           std::span<const char> key)
    {
-      if (service == AccountNumber{"verify-sys"})
+      if (service == AccountNumber{"verify-sig"})
       {
          return storeKey(session, key_label, parsePrivateKey(key).get());
       }
-      else if (service == AccountNumber{"verifyec-sys"})
+      else if (service == AccountNumber{"verifyk1"})
       {
          auto           k = psio::from_frac<PrivateKey>(key);
          EccPrivateKey* eckey;
@@ -367,11 +367,11 @@ namespace
                                      const std::vector<char>& pubkey,
                                      std::vector<char>&&      sig)
    {
-      if (service == AccountNumber{"verify-sys"})
+      if (service == AccountNumber{"verify-sig"})
       {
          return std::move(sig);
       }
-      else if (service == AccountNumber{"verifyec-sys"})
+      else if (service == AccountNumber{"verifyk1"})
       {
          EccSignature result;
          check(result.size() == sig.size(), "Wrong size for ECDSA signature");
@@ -434,8 +434,8 @@ void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
 
 void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session, CompoundProver& out)
 {
-   loadPKCS11Keys(session, AccountNumber{"verify-sys"}, key_label, out);
-   loadPKCS11Keys(session, AccountNumber{"verifyec-sys"}, eckey_label, out);
+   loadPKCS11Keys(session, AccountNumber{"verify-sig"}, key_label, out);
+   loadPKCS11Keys(session, AccountNumber{"verifyk1"}, eckey_label, out);
 }
 
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,
@@ -474,8 +474,8 @@ psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session, Ac
     : PKCS11Prover(session,
                    service,
                    ::generateKey(*session,
-                                 service == AccountNumber{"verify-sys"} ? key_label : eckey_label,
-                                 service == AccountNumber{"verify-sys"} ? NID_X9_62_prime256v1
+                                 service == AccountNumber{"verify-sig"} ? key_label : eckey_label,
+                                 service == AccountNumber{"verify-sig"} ? NID_X9_62_prime256v1
                                                                         : NID_secp256k1))
 {
 }

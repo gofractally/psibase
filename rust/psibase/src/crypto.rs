@@ -343,7 +343,7 @@ pub trait Signer: std::fmt::Debug {
 impl Signer for PrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
-            service: AccountNumber::new(account_raw!("verifyec-sys")),
+            service: AccountNumber::new(account_raw!("verifyk1")),
             rawData: fracpack::Pack::packed(&PublicKey::from(
                 &secp256k1::PublicKey::from_secret_key(
                     secp256k1::SECP256K1,
@@ -382,7 +382,7 @@ impl Signer for PKCS8PrivateKeyK1 {
         })
         .unwrap();
         crate::Claim {
-            service: AccountNumber::new(account_raw!("verify-sys")),
+            service: AccountNumber::new(account_raw!("verify-sig")),
             rawData: crate::Hex::from(keydata),
         }
     }
@@ -453,7 +453,7 @@ fn lookup_public_key(session: &Session, key: ObjectHandle) -> Result<ObjectHandl
 impl Signer for PKCS11PrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
-            service: AccountNumber::new(account_raw!("verify-sys")),
+            service: AccountNumber::new(account_raw!("verify-sig")),
             rawData: crate::Hex::from(self.pubkey.clone()),
         }
     }
@@ -893,10 +893,10 @@ pub struct AnyPublicKey {
 
 impl AnyPublicKey {
     pub fn auth_service(&self) -> AccountNumber {
-        if self.key.service == AccountNumber::new(account_raw!("verifyec-sys")) {
-            AccountNumber::new(account_raw!("auth-ec-sys"))
+        if self.key.service == AccountNumber::new(account_raw!("verifyk1")) {
+            AccountNumber::new(account_raw!("auth-k1"))
         } else {
-            AccountNumber::new(account_raw!("auth-sys"))
+            AccountNumber::new(account_raw!("auth-sig"))
         }
     }
 }
@@ -908,7 +908,7 @@ impl FromStr for AnyPublicKey {
         if key.starts_with("pkcs11:") {
             return Ok(Self {
                 key: crate::Claim {
-                    service: AccountNumber::new(account_raw!("verify-sys")),
+                    service: AccountNumber::new(account_raw!("verify-sig")),
                     rawData: load_pkcs11_public_key(key)?.into(),
                 },
             });
@@ -917,7 +917,7 @@ impl FromStr for AnyPublicKey {
         if let Ok(pkey) = PublicKey::from_str(key) {
             return Ok(Self {
                 key: crate::Claim {
-                    service: AccountNumber::new(account_raw!("verifyec-sys")),
+                    service: AccountNumber::new(account_raw!("verifyk1")),
                     rawData: fracpack::Pack::packed(&pkey).into(),
                 },
             });
@@ -928,7 +928,7 @@ impl FromStr for AnyPublicKey {
         data.decode_msg::<spki::SubjectPublicKeyInfo<AnyRef, BitStringRef>>()?;
         Ok(Self {
             key: crate::Claim {
-                service: AccountNumber::new(account_raw!("verify-sys")),
+                service: AccountNumber::new(account_raw!("verify-sig")),
                 rawData: data.into_vec().into(),
             },
         })

@@ -52,7 +52,7 @@ pub fn reflect(attr: TokenStream, item: TokenStream) -> TokenStream {
     reflect_attr_macro(attr, item)
 }
 
-/// Define a [psibase](https://about.psibase.io) service interface.
+/// Define a [psibase](https://psibase.io) service interface.
 ///
 /// This macro defines the interface to a service so that other
 /// services, test cases, and apps which push transactions to the
@@ -299,7 +299,7 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
     service_macro_impl(attr, item)
 }
 
-/// Define a [psibase](https://about.psibase.io) test case.
+/// Define a [psibase](https://psibase.io) test case.
 ///
 /// Psibase tests run in WASM. They create block chains, push transactions,
 /// and check the success or failure of those transactions to verify

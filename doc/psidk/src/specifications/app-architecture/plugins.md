@@ -248,10 +248,10 @@ Note over TokenCreator app: Alice submits form with new token<br>characteristics
 
 TokenCreator app->>Token plugin: CreateToken
     Token plugin->>Symbol plugin: BuySymbol
-        Symbol plugin->>psinode: [Action] credit@token-sys
-        Symbol plugin->>psinode: [Action] buySymbol@symbol-sys
+        Symbol plugin->>psinode: [Action] credit@tokens
+        Symbol plugin->>psinode: [Action] buySymbol@symbol
         Symbol plugin-->>Token plugin: reply
-    Token plugin->>psinode: [Action] mapToNewToken@symbol-sys
+    Token plugin->>psinode: [Action] mapToNewToken@symbol
     Token plugin-->>TokenCreator app: reply
 ```
 

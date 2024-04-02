@@ -2,32 +2,32 @@
 
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <services/system/AccountSys.hpp>
-#include <services/system/AuthAnySys.hpp>
-#include <services/system/AuthDelegateSys.hpp>
-#include <services/system/AuthEcSys.hpp>
-#include <services/system/CommonSys.hpp>
-#include <services/system/CpuSys.hpp>
-#include <services/system/ProducerSys.hpp>
-#include <services/system/ProxySys.hpp>
-#include <services/system/RAccountSys.hpp>
-#include <services/system/RAuthEcSys.hpp>
-#include <services/system/RProducerSys.hpp>
-#include <services/system/RProxySys.hpp>
-#include <services/system/SetCodeSys.hpp>
-#include <services/system/TransactionSys.hpp>
-#include <services/system/VerifyEcSys.hpp>
-#include <services/user/AuthInviteSys.hpp>
-#include <services/user/CoreFractalSys.hpp>
-#include <services/user/ExploreSys.hpp>
-#include <services/user/FractalSys.hpp>
-#include <services/user/InviteSys.hpp>
-#include <services/user/NftSys.hpp>
-#include <services/user/PackageSys.hpp>
-#include <services/user/PsiSpaceSys.hpp>
-#include <services/user/RTokenSys.hpp>
-#include <services/user/SymbolSys.hpp>
-#include <services/user/TokenSys.hpp>
+#include <services/system/Accounts.hpp>
+#include <services/system/AuthAny.hpp>
+#include <services/system/AuthDelegate.hpp>
+#include <services/system/AuthK1.hpp>
+#include <services/system/CommonApi.hpp>
+#include <services/system/CpuLimit.hpp>
+#include <services/system/HttpServer.hpp>
+#include <services/system/Producers.hpp>
+#include <services/system/RAccounts.hpp>
+#include <services/system/RAuthK1.hpp>
+#include <services/system/RHttpServer.hpp>
+#include <services/system/RProducers.hpp>
+#include <services/system/SetCode.hpp>
+#include <services/system/Transact.hpp>
+#include <services/system/VerifyK1.hpp>
+#include <services/user/AuthInvite.hpp>
+#include <services/user/CoreFractal.hpp>
+#include <services/user/Explorer.hpp>
+#include <services/user/Fractal.hpp>
+#include <services/user/Invite.hpp>
+#include <services/user/Nft.hpp>
+#include <services/user/Packages.hpp>
+#include <services/user/RTokens.hpp>
+#include <services/user/Sites.hpp>
+#include <services/user/Symbol.hpp>
+#include <services/user/Tokens.hpp>
 #include <utility>
 #include <vector>
 
@@ -76,21 +76,21 @@ namespace
    std::vector<Action> getInitialActions(std::span<PackagedService> service_packages,
                                          bool                       installUI)
    {
-      transactor<AccountSys>     asys{AccountSys::service, AccountSys::service};
-      transactor<TransactionSys> tsys{TransactionSys::service, TransactionSys::service};
-      std::vector<Action>        actions;
-      bool                       has_package_sys = false;
+      transactor<Accounts> asys{Accounts::service, Accounts::service};
+      transactor<Transact> tsys{Transact::service, Transact::service};
+      std::vector<Action>  actions;
+      bool                 has_packages = false;
       for (auto& s : service_packages)
       {
          for (auto account : s.accounts())
          {
-            if (account == PackageSys::service)
+            if (account == Packages::service)
             {
-               has_package_sys = true;
+               has_packages = true;
             }
             if (!s.hasService(account))
             {
-               actions.push_back(asys.newAccount(account, AuthAnySys::service, true));
+               actions.push_back(asys.newAccount(account, AuthAny::service, true));
             }
          }
 
@@ -103,18 +103,18 @@ namespace
          s.postinstall(actions);
       }
 
-      transactor<ProducerSys> psys{ProducerSys::service, ProducerSys::service};
-      std::vector<Producer>   producerConfig = {{"firstproducer"_a, {}}};
+      transactor<Producers> psys{Producers::service, Producers::service};
+      std::vector<Producer> producerConfig = {{"firstproducer"_a, {}}};
       actions.push_back(psys.setProducers(producerConfig));
 
       auto root = AccountNumber{"root"};
-      actions.push_back(asys.newAccount(root, AuthAnySys::service, true));
+      actions.push_back(asys.newAccount(root, AuthAny::service, true));
 
       // If a package sets an auth service for an account, we should not override it
       std::vector<AccountNumber> accountsWithAuth;
       for (const auto& act : actions)
       {
-         if (act.service == AccountSys::service && act.method == MethodNumber{"setAuthServ"})
+         if (act.service == Accounts::service && act.method == MethodNumber{"setAuthServ"})
          {
             accountsWithAuth.push_back(act.sender);
          }
@@ -128,13 +128,13 @@ namespace
             if (!std::ranges::binary_search(accountsWithAuth, account))
             {
                actions.push_back(
-                   transactor<AuthDelegateSys>{account, AuthDelegateSys::service}.setOwner(root));
-               actions.push_back(asys.from(account).setAuthServ(AuthDelegateSys::service));
+                   transactor<AuthDelegate>{account, AuthDelegate::service}.setOwner(root));
+               actions.push_back(asys.from(account).setAuthServ(AuthDelegate::service));
             }
          }
       }
 
-      if (has_package_sys)
+      if (has_packages)
       {
          for (auto& s : service_packages)
          {
@@ -189,8 +189,7 @@ DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
    }
    auto trace = pushTransaction(
        makeTransaction(
-           {transactor<TransactionSys>{TransactionSys::service, TransactionSys::service}.startBoot(
-               transactionIds)}),
+           {transactor<Transact>{Transact::service, Transact::service}.startBoot(transactionIds)}),
        {});
    check(psibase::show(false, trace) == "", "Failed to boot");
    startBlock();
@@ -204,10 +203,10 @@ DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
 
 AccountNumber DefaultTestChain::addAccount(
     AccountNumber acc,
-    AccountNumber authService /* = AccountNumber("auth-any-sys") */,
+    AccountNumber authService /* = AccountNumber("auth-any") */,
     bool          show /* = false */)
 {
-   transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
+   transactor<Accounts> asys(Accounts::service, Accounts::service);
 
    auto trace = pushTransaction(  //
        makeTransaction({asys.newAccount(acc, authService, true)}));
@@ -219,7 +218,7 @@ AccountNumber DefaultTestChain::addAccount(
 
 AccountNumber DefaultTestChain::addAccount(
     const char*   acc,
-    AccountNumber authService /* = AccountNumber("auth-any-sys")*/,
+    AccountNumber authService /* = AccountNumber("auth-any")*/,
     bool          show /* = false */)
 {
    return addAccount(AccountNumber(acc), authService, show);
@@ -229,13 +228,13 @@ AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
                                            const PublicKey& public_key,
                                            bool             show /* = false */)
 {
-   transactor<AccountSys> asys(AccountSys::service, AccountSys::service);
-   transactor<AuthEcSys>  ecsys(AuthEcSys::service, AuthEcSys::service);
+   transactor<Accounts> asys(Accounts::service, Accounts::service);
+   transactor<AuthK1>   ecsys(AuthK1::service, AuthK1::service);
 
    auto trace = pushTransaction(makeTransaction({
-       asys.newAccount(name, AuthAnySys::service, true),
+       asys.newAccount(name, AuthAny::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthServ(AuthEcSys::service),
+       asys.from(name).setAuthServ(AuthK1::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -249,14 +248,14 @@ AccountNumber DefaultTestChain::addAccount(const char*      name,
    return addAccount(AccountNumber(name), public_key, show);
 }
 
-void DefaultTestChain::setAuthEc(AccountNumber    name,
+void DefaultTestChain::setAuthK1(AccountNumber    name,
                                  const PublicKey& pubkey,
                                  bool             show /* = false */)
 {
    auto n  = name.str();
-   auto t1 = from(name).to<AuthEcSys>().setKey(pubkey);
+   auto t1 = from(name).to<AuthK1>().setKey(pubkey);
    check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
-   auto t2 = from(name).to<AccountSys>().setAuthServ(AuthEcSys::service);
+   auto t2 = from(name).to<Accounts>().setAuthServ(AuthK1::service);
    check(psibase::show(show, t2.trace()) == "", "Failed to setAuthServ for " + n);
 }
 
@@ -264,9 +263,9 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            const char*   filename,
                                            bool          show /* = false */)
 {
-   addAccount(acc, AuthAnySys::service, show);
+   addAccount(acc, AuthAny::service, show);
 
-   transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
+   transactor<SetCode> scsys{acc, SetCode::service};
 
    auto trace =
        pushTransaction(makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename))}}));
@@ -281,11 +280,10 @@ AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            std::uint64_t flags,
                                            bool          show /* = false */)
 {
-   addAccount(acc, AuthAnySys::service, show);
+   addAccount(acc, AuthAny::service, show);
 
-   transactor<SetCodeSys> scsys{acc, SetCodeSys::service};
-   auto                   setFlags =
-       transactor<SetCodeSys>{SetCodeSys::service, SetCodeSys::service}.setFlags(acc, flags);
+   transactor<SetCode> scsys{acc, SetCode::service};
+   auto setFlags = transactor<SetCode>{SetCode::service, SetCode::service}.setFlags(acc, flags);
 
    auto trace = pushTransaction(
        makeTransaction({{scsys.setCode(acc, 0, 0, readWholeFile(filename)), setFlags}}));
