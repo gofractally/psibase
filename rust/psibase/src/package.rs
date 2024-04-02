@@ -1,6 +1,4 @@
-use crate::services::{
-    account_sys, auth_delegate_sys, package_sys, proxy_sys, psispace_sys, setcode_sys,
-};
+use crate::services::{accounts, auth_delegate, http_server, packages, setcode, sites};
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
@@ -272,7 +270,7 @@ impl<R: Read + Seek> PackagedService<R> {
             let service = if self.has_service(*sender) {
                 *sender
             } else {
-                psispace_sys::SERVICE
+                sites::SERVICE
             };
             let mut file = self.archive.by_index(*index)?;
             let path = data_re
@@ -282,13 +280,11 @@ impl<R: Read + Seek> PackagedService<R> {
                 .unwrap()
                 .as_str();
             if let Some(t) = mime_guess::from_path(path).first() {
-                actions.push(
-                    psispace_sys::Wrapper::pack_from_to(*sender, service).storeSys(
-                        path.to_string(),
-                        t.essence_str().to_string(),
-                        read(&mut file)?.into(),
-                    ),
-                );
+                actions.push(sites::Wrapper::pack_from_to(*sender, service).storeSys(
+                    path.to_string(),
+                    t.essence_str().to_string(),
+                    read(&mut file)?.into(),
+                ));
             } else {
                 Err(Error::UnknownFileType {
                     path: file.name().to_string(),
@@ -300,7 +296,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn reg_server(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
         for (account, _, info) in &self.services {
             if let Some(server) = &info.server {
-                actions.push(proxy_sys::Wrapper::pack_from(*account).registerServer(*server))
+                actions.push(http_server::Wrapper::pack_from(*account).registerServer(*server))
             }
         }
         Ok(())
@@ -332,7 +328,7 @@ impl<R: Read + Seek> PackagedService<R> {
             let service = if self.has_service(*sender) {
                 *sender
             } else {
-                psispace_sys::SERVICE
+                sites::SERVICE
             };
             let file = self.archive.by_index(*index).unwrap();
             let path = data_re
@@ -365,7 +361,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
         serde_json::to_writer(&mut manifest_encoder, &manifest)?;
         actions.push(
-            package_sys::Wrapper::pack_from(sender)
+            packages::Wrapper::pack_from(sender)
                 .postinstall(self.meta.clone(), manifest_encoder.finish()?.into()),
         );
         Ok(())
@@ -378,13 +374,13 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        actions.push(new_account_action(account_sys::SERVICE, account));
+        actions.push(new_account_action(accounts::SERVICE, account));
         if let Some(key) = key {
             actions.push(set_key_action(account, key));
             actions.push(set_auth_service_action(account, key.auth_service()));
         } else {
-            actions.push(auth_delegate_sys::Wrapper::pack_from(account).setOwner(sender));
-            actions.push(set_auth_service_action(account, auth_delegate_sys::SERVICE));
+            actions.push(auth_delegate::Wrapper::pack_from(account).setOwner(sender));
+            actions.push(set_auth_service_action(account, auth_delegate::SERVICE));
         }
         Ok(())
     }
@@ -405,7 +401,7 @@ impl<R: Read + Seek> PackagedService<R> {
             ));
             let flags = translate_flags(&info.flags)?;
             if flags != 0 {
-                group.push(setcode_sys::Wrapper::pack().setFlags(*account, flags));
+                group.push(setcode::Wrapper::pack().setFlags(*account, flags));
             }
             actions.push(group);
         }
@@ -444,13 +440,13 @@ impl<R: Read + Seek> PackagedService<R> {
 
         for account in self.get_accounts() {
             if !self.has_service(*account) {
-                result.push(account_sys::SERVICE)
+                result.push(accounts::SERVICE)
             }
         }
 
         for (_, _, info) in &self.services {
             if let Some(_) = &info.server {
-                result.push(proxy_sys::SERVICE)
+                result.push(http_server::SERVICE)
             }
         }
 
@@ -511,7 +507,7 @@ impl PackageManifest {
         for file in &self.data {
             if !new_files.contains(file) {
                 out.push_action(
-                    psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                    sites::Wrapper::pack_from_to(file.account, file.service)
                         .removeSys(file.filename.clone()),
                 )?;
             }
@@ -519,10 +515,10 @@ impl PackageManifest {
         for (service, info) in &self.services {
             let other_info = other.services.get(service);
             if info.server.is_some() && other_info.map_or(true, |i| i.server.is_none()) {
-                out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
+                out.push_action(reg_server(*service, sites::SERVICE))?;
             }
             if !info.flags.is_empty() && other_info.map_or(true, |i| i.flags.is_empty()) {
-                out.push_action(setcode_sys::Wrapper::pack().setFlags(*service, 0))?;
+                out.push_action(setcode::Wrapper::pack().setFlags(*service, 0))?;
             }
             if other_info.is_none() {
                 out.push_action(set_code_action(*service, vec![]))?;
@@ -533,16 +529,16 @@ impl PackageManifest {
     pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
         for file in &self.data {
             out.push_action(
-                psispace_sys::Wrapper::pack_from_to(file.account, file.service)
+                sites::Wrapper::pack_from_to(file.account, file.service)
                     .removeSys(file.filename.clone()),
             )?;
         }
         for (service, info) in &self.services {
             if info.server.is_some() {
-                out.push_action(reg_server(*service, psispace_sys::SERVICE))?;
+                out.push_action(reg_server(*service, sites::SERVICE))?;
             }
             if !info.flags.is_empty() {
-                out.push_action(setcode_sys::Wrapper::pack().setFlags(*service, 0))?;
+                out.push_action(setcode::Wrapper::pack().setFlags(*service, 0))?;
             }
             out.push_action(set_code_action(*service, vec![]))?;
         }
@@ -846,7 +842,7 @@ pub async fn get_accounts_to_create(
     let result: NewAccountsQuery = crate::gql_query(
         base_url,
         client,
-        package_sys::SERVICE,
+        packages::SERVICE,
         format!(
             "query {{ newAccounts(accounts: {}, owner: {}) }}",
             serde_json::to_string(accounts)?,
@@ -864,7 +860,7 @@ pub async fn get_installed_manifest(
     package: &str,
     owner: AccountNumber,
 ) -> Result<PackageManifest, anyhow::Error> {
-    let url = package_sys::SERVICE
+    let url = packages::SERVICE
         .url(base_url)?
         .join(&format!("/manifest?package={}&owner={}", package, owner))?;
     crate::as_json(client.get(url)).await
@@ -905,7 +901,7 @@ impl PackageList {
         let mut end_cursor: Option<String> = None;
         let mut result = PackageList::new();
         loop {
-            let data = crate::gql_query::<InstalledQuery>(base_url, client, package_sys::SERVICE,
+            let data = crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE,
                                         format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {

@@ -66,7 +66,7 @@ Follow the instructions at [trying the service](../minimal-ui/#trying-the-servic
 
 # What's Happening?
 
-When a service calls another, the system pauses its execution and runs that other service. The system returns the result back to the original caller and resumes execution. This behavior is core to most of psibase's functionality. e.g. the [SystemService::TransactionSys] service receives a transaction then calls a service for each action within the transaction. These services may call more services, creating a tree of actions.
+When a service calls another, the system pauses its execution and runs that other service. The system returns the result back to the original caller and resumes execution. This behavior is core to most of psibase's functionality. e.g. the [SystemService::Transact] service receives a transaction then calls a service for each action within the transaction. These services may call more services, creating a tree of actions.
 
 "Action" may refer to:
 

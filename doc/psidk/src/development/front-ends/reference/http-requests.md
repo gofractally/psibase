@@ -8,7 +8,7 @@
 | 4           | service | `/common*` | [Common endpoints](#common-endpoints). Registered services only.                    |
 | 5 (lowest)  | service | `*`        | [Service-provided endpoints](#service-provided-endpoints). Registered services only.|
 
-The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys service](../../../default-apps/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct networks and by individual infrastructure providers.
+The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [http-server service](../../../default-apps/http-server.md), which handles the remaining routing rules, is customizable, both by distinct networks and by individual infrastructure providers.
 
 ## CORS and authorization
 
@@ -45,12 +45,12 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 ## Common endpoints
 
-The [common-sys service](../../../default-apps/common-sys.md) endpoints which start with the `/common*` path across all domains. It handles RPC requests and serves files.
+The [common-api service](../../../default-apps/common-api.md) endpoints which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
 | Method | URL                              | Description                                                                                                              |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `GET`  | `/common/tapos/head`             | Returns [TaPoS](#tapos) for the current head block                                                                       | 
-| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-sys"` |
+| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-api"` |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                    |
 | `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction)                                                                                 |
 | `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-signed-transaction)                                                                   |
@@ -114,14 +114,14 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 ```json
 {
   "service": "...",     // The service which verifies the proof meets
-                        // the claim, e.g. "verifyec-sys"
+                        // the claim, e.g. "verifyk1"
   "rawData": "..."      // Hex string containing the claim data.
-                        // e.g. `verifyec-sys` expects a public key
+                        // e.g. `verifyk1` expects a public key
                         // in fracpack format.
 }
 ```
 
-`Proof` is a hex string containing data which proves the claim. e.g. `verifyec-sys` expects a signature in fracpack format. See [Signing (js)](#signing-js) to fill claims and proofs.
+`Proof` is a hex string containing data which proves the claim. e.g. `verifyk1` expects a signature in fracpack format. See [Signing (js)](#signing-js) to fill claims and proofs.
 
 ### Pack signed transaction
 
@@ -129,8 +129,8 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 
 ### Common files
 
-`common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). 
-Booting the network with either the psibase CLI tool or with the admin-sys app will automatically install this default set of files:
+`common-api` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). 
+Booting the network with either the psibase CLI tool or with the x-admin app will automatically install this default set of files:
 
 | Path                          | Description                                                                                                                                                                                                           |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

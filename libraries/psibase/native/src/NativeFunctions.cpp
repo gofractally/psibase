@@ -617,7 +617,7 @@ namespace psibase
    }
 
    // TODO: return an extensible struct instead of a vector.
-   //       maybe include intrinsic usage so transact-sys can veto?
+   //       maybe include intrinsic usage so transact can veto?
    uint32_t NativeFunctions::kvGetTransactionUsage()
    {
       auto seq  = transactionContext.kvResourceDeltas.extract_sequence();

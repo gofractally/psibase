@@ -133,7 +133,7 @@ pub struct Claim {
 ///    * A multiple of 8192. For this case, refBlockIndex = (blockNum >> 13) | 0x80
 /// * refBlockSuffix = last 4 bytes of the block ID, bit-casted to u32     .
 ///
-/// TransactionSys maintains block suffixes for:
+/// Transact maintains block suffixes for:
 /// * The most-recent 128 blocks. This allows transactions to depend on other recent transactions.
 /// * The most-recent 128 blocks which have block numbers which are a multiple of 8192. This gives
 ///   users which sign transactions offline plenty of time to do so.
@@ -145,7 +145,7 @@ pub struct Claim {
 /// A transaction will be rejected if:
 /// * It is expired.
 /// * It arrives earlier than (expired - maxTrxLifetime). maxTrxLifetime
-///   is defined in TransactionSys.cpp and may be changed in the future.
+///   is defined in Transact.cpp and may be changed in the future.
 /// * It references a block that isn't on the current fork, or a block which
 ///   is too old. For best results, use the most-recent irreversible block which
 ///   meets the criteria.

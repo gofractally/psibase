@@ -13,7 +13,7 @@ sequenceDiagram
 
     Alice->>Symbol app: Buy symbol
     activate Symbol app
-    Symbol app-->>Supervisor: Actions [Token-sys: credit,<br> symbol-sys: buySymbol]
+    Symbol app-->>Supervisor: Actions [tokens: credit,<br> symbol: buySymbol]
     Supervisor-->>Token plugin: Is Symbol app allowed to act on Alice's behalf?
     activate Token plugin
     Note over Token plugin: Check local storage <br> [No answer found]

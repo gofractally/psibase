@@ -96,7 +96,7 @@ async fn lookup_token(
         reqwest::Client::new()
             .get(get_url(
                 api,
-                psibase::account!("token-sys"),
+                psibase::account!("tokens"),
                 "/api/getTokenTypes",
             )?)
             .send()
@@ -114,8 +114,8 @@ async fn lookup_token(
 }
 
 // Interface to the action we need
-mod token_sys {
-    #[psibase::service(name = "token-sys", dispatch = false)]
+mod tokens {
+    #[psibase::service(name = "tokens", dispatch = false)]
     #[allow(non_snake_case, unused_variables)]
     mod service {
         #[action]
@@ -148,7 +148,7 @@ async fn transfer_impl(
             counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1
         );
         // println!("{} -> {} {}", from, to, memo);
-        actions.push(token_sys::Wrapper::pack_from(from.into()).credit(
+        actions.push(tokens::Wrapper::pack_from(from.into()).credit(
             token_id,
             to.into(),
             (1u64,),

@@ -16,9 +16,9 @@ function App() {
   const init = async () => {
     await supervisor.onLoaded();
     supervisor.preLoadPlugins([
-      { service: "invite-sys" },
-      { service: "account-sys" },
-      { service: "auth-sys" },
+      { service: "invite" },
+      { service: "accounts" },
+      { service: "auth-sig" },
       { service: "demoapp1" },
     ]);
   };
@@ -30,7 +30,7 @@ function App() {
   const run = async () => {
     try {
       const res = await supervisor.functionCall({
-        service: "auth-sys",
+        service: "auth-sig",
         intf: "keyvault",
         method: "generateKeypair",
         params: [],
@@ -58,7 +58,7 @@ function App() {
   const run3 = async () => {
     try {
       const inviteUrl: string = (await supervisor.functionCall({
-        service: "invite-sys",
+        service: "invite",
         intf: "inviter",
         method: "generateInvite",
         params: ["/subpath"],
@@ -67,7 +67,7 @@ function App() {
       const id: string | null = new URL(inviteUrl).searchParams.get("id");
       if (id !== null) {
         const inviteObject: Invite = (await supervisor.functionCall({
-          service: "invite-sys",
+          service: "invite",
           intf: "invitee",
           method: "decodeInvite",
           params: [id as string],
@@ -91,7 +91,7 @@ function App() {
       "eyJpbnZpdGVyIjoiYWxpY2UiLCJhcHAiOiJkZW1vYXBwMSIsInBrIjoiUFVCX0sxXzdqVGRNWUVhSGk2NlpFY3JoN1RvOVhLaW5nVmtSZEJ1ejZhYm0zbWVGYkd3OHpGRnZlIiwiY2IiOiJodHRwczovL2RlbW9hcHAxLnBzaWJhc2UuMTI3LjAuMC4xLnNzbGlwLmlvOjgwOTAvc3VicGF0aCJ9";
     try {
       const inviteObject: Invite = (await supervisor.functionCall({
-        service: "invite-sys",
+        service: "invite",
         intf: "invitee",
         method: "decodeInvite",
         params: [inviteId],
@@ -111,7 +111,7 @@ function App() {
       <h3>{res}</h3>
       <div className="card">
         <button onClick={() => run()}>
-          {"auth-sys:plugin->generateKeypair"}
+          {"auth-sig:plugin->generateKeypair"}
         </button>
       </div>
 
