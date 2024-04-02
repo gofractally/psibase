@@ -58,8 +58,7 @@ pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
 
 /// Handle `/schema` request
 ///
-/// If `request` is a `GET /schema`, then this returns a
-/// [schema](https://docs.psibase.io/development/format/schema.html) which
+/// If `request` is a `GET /schema`, then this returns a schema which
 /// defines the service interface.
 ///
 /// If `request` doesn't match the above, then this returns `None`.

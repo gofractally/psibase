@@ -2,7 +2,7 @@
 
 # Actions
 
-{{#cpp-doc ::SystemService::AuthK1}}
+{{#cpp-doc ::SystemService::AuthSig}}
 
 # Tables
 

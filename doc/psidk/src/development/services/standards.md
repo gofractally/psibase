@@ -1,8 +1,8 @@
 # Standards
 
-## Standard account names
+## Reserved account names
 
-Subjective system services have account names which begin with `x-`. Only the infrastructure providers may create accounts with this suffix.
+By convention, apps that are specific to an individual node operator are hosted at subdomains that begin with "x-". Therefore, to avoid being overshadowed by these apps, user account names may not begin with "x-".
 
 ## Standard actions
 

@@ -41,7 +41,7 @@
 
 [SystemService::CommonApi] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
-[SystemService::Sites] provides web hosting to non-service accounts or services who didn't [register](#registration) for HTTP handling.
+[SystemService::Sites] provides web hosting for non-service accounts or service accounts that did not [register](#registration) for HTTP handling.
 
 `psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Services don't serve these.
 

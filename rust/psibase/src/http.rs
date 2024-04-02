@@ -24,8 +24,7 @@ pub struct HttpHeader {
 /// An HTTP Request
 ///
 /// Most services receive this via their [serveSys](crate::server_interface::ServerActions::serveSys)
-/// action. [http-server](https://docs.psibase.io/default-apps/http-server.html) receives it via
-/// its `serve` exported function.
+/// action. The `http-server` service receives it via its `serve` exported function.
 
 #[derive(
     Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
