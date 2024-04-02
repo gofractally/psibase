@@ -289,6 +289,7 @@ namespace psio::schema_types
          switch (state)
          {
             case start:
+               check(!t.members.empty(), "Zero-size types not supported");
                for (const auto& member : t.members)
                {
                   stack.push_back(member.type.resolve(schema->schema));

@@ -171,6 +171,13 @@ TEST_CASE("schema error")
                         Custom{.type = Custom{.type = Type{"T"}, .id = "bool"}, .id = "string"});
           CompiledSchema{schema};
        }());
+   CHECK_THROWS(
+       []
+       {
+          Schema schema;
+          schema.insert("T", Struct{});
+          CompiledSchema{schema};
+       }());
    CHECK_NOTHROW(
        []
        {
