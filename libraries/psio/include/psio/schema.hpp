@@ -752,15 +752,15 @@ namespace psio
                          name,
                          Custom{
                              .type = FracPack{insert<std::remove_cv_t<typename T::value_type>>()},
-                             .id   = "octet-string"});
+                             .id   = "hex"});
                   }
                }
                else if constexpr (std::is_same_v<T, std::vector<char>> ||
                                   std::is_same_v<T, std::vector<signed char>> ||
                                   std::is_same_v<T, std::vector<unsigned char>>)
                {
-                  schema.insert(name, Custom{.type = List{insert<typename T::value_type>()},
-                                             .id   = "octet-string"});
+                  schema.insert(
+                      name, Custom{.type = List{insert<typename T::value_type>()}, .id = "hex"});
                }
                else if constexpr (is_std_optional_v<T>)
                {
@@ -811,7 +811,7 @@ namespace psio
                                 std::is_same_v<value_type, signed char> ||
                                 std::is_same_v<value_type, unsigned char>)
                   {
-                     arr = Custom{.type = std::move(arr), .id = "octet-string"};
+                     arr = Custom{.type = std::move(arr), .id = "hex"};
                   }
                   schema.insert(name, std::move(arr));
                }

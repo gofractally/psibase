@@ -141,7 +141,7 @@ namespace psio::schema_types
       CustomTypes result;
       result.insert<bool>("bool");
       result.insert("string", BlobImpl<StringImpl>());
-      result.insert("octet-string", BlobImpl<OctetStringImpl>());
+      result.insert("hex", BlobImpl<OctetStringImpl>());
       return result;
    }
 
