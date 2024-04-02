@@ -852,7 +852,7 @@ namespace psio
                }
                else
                {
-                  static_assert(false, "Don't know schema representation");
+                  static_assert(reflect<T>::is_struct, "Don't know schema representation");
                }
             }
             return Type{std::move(name)};
