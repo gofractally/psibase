@@ -19,7 +19,7 @@ async-trait = "0.1.77"
 chrono = "0.4"
 const_format = "0.2"
 custom_error = "1.9"
-fracpack = { version = "0.7.0", path = "../fracpack" }
+fracpack = { version = "0.8.0", path = "../fracpack" }
 flate2 = "1.0"
 futures = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
@@ -27,8 +27,8 @@ include_dir = "0.7.3"
 sha2 = "0.10"
 mime_guess = "2.0"
 percent-encoding = "2.3"
-psibase_macros = { version = "0.7.0", path = "../psibase_macros" }
-psibase_names = { version = "0.7.0", path = "../psibase_names" }
+psibase_macros = { version = "0.8.0", path = "../psibase_macros" }
+psibase_names = { version = "0.8.0", path = "../psibase_names" }
 regex = "1"
 ripemd = "0.1"
 serde = { version = "1.0", features = ["derive", "rc"] }
