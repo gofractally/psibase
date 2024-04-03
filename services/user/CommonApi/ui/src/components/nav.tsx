@@ -1,4 +1,5 @@
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
+import { SettingsDropdown } from "@/components/settings-dropdown";
 
 function HoverBorderGradientDemo() {
     return (
@@ -20,7 +21,9 @@ export const Nav = () => {
             <div>
                 <HoverBorderGradientDemo />
             </div>
-            <div></div>
+            <div>
+                <SettingsDropdown />
+            </div>
         </div>
     );
 };
