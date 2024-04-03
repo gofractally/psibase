@@ -613,7 +613,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "custom_error",
  "psibase_macros",
@@ -1340,7 +1340,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1389,7 +1389,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "darling",
  "proc-macro-error",
@@ -1401,7 +1401,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "seahash",
 ]
