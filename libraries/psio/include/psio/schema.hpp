@@ -233,20 +233,20 @@ namespace psio
 
       struct AnyType
       {
-         AnyType(Int type) : value(std::move(type)) {}
-         AnyType(Float type) : value(std::move(type)) {}
-         AnyType(Object type) : value(std::move(type)) {}
-         AnyType(Struct type) : value(std::move(type)) {}
-         AnyType(Option type) : value(std::move(type)) {}
-         AnyType(List type) : value(std::move(type)) {}
-         AnyType(Array type) : value(std::move(type)) {}
-         AnyType(Variant type) : value(std::move(type)) {}
-         AnyType(Tuple type) : value(std::move(type)) {}
-         AnyType(FracPack type) : value(std::move(type)) {}
-         AnyType(Custom type) : value(std::move(type)) {}
-         AnyType(Type type) : value(std::move(type)) {}
-         AnyType(std::string name) : value(Type{std::move(name)}) {}
-         AnyType(const char* name) : value(Type{std::move(name)}) {}
+         AnyType(Int type);
+         AnyType(Float type);
+         AnyType(Object type);
+         AnyType(Struct type);
+         AnyType(Option type);
+         AnyType(List type);
+         AnyType(Array type);
+         AnyType(Variant type);
+         AnyType(Tuple type);
+         AnyType(FracPack type);
+         AnyType(Custom type);
+         AnyType(Type type);
+         AnyType(std::string name);
+         AnyType(const char* name);
          std::variant<Struct,
                       Object,
                       Array,
@@ -289,6 +289,21 @@ namespace psio
          AnyType     type;
       };
       PSIO_REFLECT(Member, name, type)
+
+      inline AnyType::AnyType(Int type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Float type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Object type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Struct type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Option type) : value(std::move(type)) {}
+      inline AnyType::AnyType(List type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Array type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Variant type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Tuple type) : value(std::move(type)) {}
+      inline AnyType::AnyType(FracPack type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Custom type) : value(std::move(type)) {}
+      inline AnyType::AnyType(Type type) : value(std::move(type)) {}
+      inline AnyType::AnyType(std::string name) : value(Type{std::move(name)}) {}
+      inline AnyType::AnyType(const char* name) : value(Type{std::move(name)}) {}
 
       struct CommaList
       {
