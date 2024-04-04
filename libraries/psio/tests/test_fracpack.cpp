@@ -8,6 +8,35 @@ TEST_CASE("roundtrip")
        {1, 2.0, "Although I am an old man, night is generally my time for walking."});
 }
 
+namespace psio
+{
+
+   template <typename S>
+   struct expand_shared_view_ptr_stream : S
+   {
+      using S::S;
+   };
+
+   template <typename T, typename S>
+   void to_json(const shared_view_ptr<T>& obj, expand_shared_view_ptr_stream<S>& stream)
+   {
+      to_json(obj->unpack(), stream);
+   }
+
+   std::string expand_json(const auto& t)
+   {
+      expand_shared_view_ptr_stream<size_stream> ss;
+      to_json(t, ss);
+      std::string                                     result(ss.size, 0);
+      expand_shared_view_ptr_stream<fixed_buf_stream> fbs(result.data(), result.size());
+      to_json(t, fbs);
+      if (fbs.pos != fbs.end)
+         abort_error(stream_error::underrun);
+      return result;
+   }
+
+}  // namespace psio
+
 template <typename T, typename U>
 void test_compat(const T& t, const U& u, bool expect_unknown)
 {
@@ -60,6 +89,31 @@ void test_compat(const T& t, const U& u, bool expect_unknown)
       CHECK_THAT(psio::from_frac<U>(psio::prevalidated{data}), BitwiseEqual(u));
       CHECK(psio::fracpack_validate<U>(data) ==
             (expect_unknown ? psio::validation_t::extended : psio::validation_t::valid));
+   }
+   {
+      using namespace psio::schema_types;
+      psio::Schema s1 = psio::SchemaBuilder().insert<T>("T").build();
+      psio::Schema s2 = psio::SchemaBuilder().expandNested().insert<U>("U").build();
+      INFO("schema1: " << psio::format_json(s1));
+      INFO("schema2: " << psio::format_json(s2));
+      // validate schema comparison
+      auto diff = match(s1, s2, {{psio::schema_types::Type{"T"}, psio::schema_types::Type{"U"}}});
+      if (expect_unknown)
+      {
+         CHECK((diff & psio::SchemaDifference::dropField) != 0);
+         diff &= ~psio::SchemaDifference::dropField;
+      }
+      CHECK((diff & ~(psio::SchemaDifference::upgrade)) == 0);
+      // validate compatible serialization
+      CompiledSchema      cschema(s2);
+      FracParser          parser{data, cschema, "U"};
+      std::vector<char>   json;
+      psio::vector_stream out{json};
+      to_json(parser, out);
+      CHECK(std::string_view{json.data(), json.size()} == psio::expand_json(u));
+      if (parser.in.known_end)
+         CHECK(parser.in.pos == parser.in.end_pos);
+      CHECK(parser.in.has_unknown == expect_unknown);
    }
 }
 
@@ -153,7 +207,7 @@ TEST_CASE("compatibility")
                     struct_<std::int32_t>(42), true);
    test_compat_wrap(
        std::tuple(std::tuple(std::optional{std::uint8_t{0xFF}}), std::optional{std::uint8_t{0xCC}}),
-       std::tuple{std::tuple{}}, true);
+       std::tuple<std::tuple<>>{}, true);
 }
 
 template <typename T>
@@ -177,6 +231,13 @@ void test_invalid(const char* hex)
       bool          known_end;
       CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
                                                                 data.data(), pos, data.size()));
+   }
+   {
+      using namespace psio::schema_types;
+      Schema schema = SchemaBuilder().insert<T>("T").build();
+      INFO("schema: " << psio::format_json(schema));
+      CompiledSchema cschema(schema);
+      CHECK(!fracpack_validate(data, cschema, "T"));
    }
 }
 

@@ -6,6 +6,7 @@
 #include <optional>
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
+#include <psio/tuple.hpp>
 #include <type_traits>
 #include <variant>
 
@@ -169,6 +170,7 @@ namespace psio
    }
 
    // clang-format off
+template <typename S> void to_json(std::byte value, S& stream)          { return int_to_json(static_cast<unsigned char>(value), stream); }
 template <typename S> void to_json(unsigned char value, S& stream)      { return int_to_json(value, stream); }
 template <typename S> void to_json(uint16_t value, S& stream)           { return int_to_json(value, stream); }
 template <typename S> void to_json(uint32_t value, S& stream)           { return int_to_json(value, stream); }
@@ -234,8 +236,7 @@ template <typename S> void to_json(float value, S& stream)              { return
       write_newline(stream);
       std::visit(
           [&](const auto& t) { to_json(get_type_name<std::decay_t<decltype(t)>>(), stream); }, obj);
-      stream.write(':');
-      write_newline(stream);
+      write_colon(stream);
       std::visit([&](auto& x) { return to_json(x, stream); }, obj);
       decrease_indent(stream);
       write_newline(stream);
@@ -250,16 +251,16 @@ template <typename S> void to_json(float value, S& stream)              { return
          return stream.write(']');
       increase_indent(stream);
 
-      tuple_for_each(obj,
-                     [&](int idx, auto& item)
-                     {
-                        write_newline(stream);
-                        if (idx)
-                        {
-                           stream.write(',');
-                        }
-                        to_json(item, stream);
-                     });
+      psio::tuple_for_each(obj,
+                           [&](int idx, auto& item)
+                           {
+                              write_newline(stream);
+                              if (idx)
+                              {
+                                 stream.write(',');
+                              }
+                              to_json(item, stream);
+                           });
       decrease_indent(stream);
       write_newline(stream);
       return stream.write(']');
@@ -366,6 +367,33 @@ template <typename S> void to_json(float value, S& stream)              { return
    void to_json(const std::array<char, N>& obj, S& stream)
    {
       to_json_hex(reinterpret_cast<const char*>(obj.data()), obj.size(), stream);
+   }
+
+   template <typename T, std::size_t N, typename S>
+   void to_json(const std::array<T, N>& obj, S& stream)
+   {
+      stream.write('[');
+      bool first = true;
+      for (auto& v : obj)
+      {
+         if (first)
+         {
+            increase_indent(stream);
+         }
+         else
+         {
+            stream.write(',');
+         }
+         write_newline(stream);
+         first = false;
+         to_json(v, stream);
+      }
+      if (!first)
+      {
+         decrease_indent(stream);
+         write_newline(stream);
+      }
+      stream.write(']');
    }
 
    template <typename T>
