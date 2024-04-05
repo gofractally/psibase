@@ -266,14 +266,15 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
 
     ExternalProject_Add(${TARGET_NAME}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
-        INSTALL_BYPRODUCTS ${OUTPUT_FILEPATH}
+        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND cargo component build -r
             --target wasm32-wasi
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
             --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-wasi/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
         BUILD_ALWAYS 1
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-wasi/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+        INSTALL_COMMAND ""
     )
 
     # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
