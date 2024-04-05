@@ -431,7 +431,7 @@ class Node(API):
         else:
             return self.disconnect(other.socketpath) or other.disconnect(self.socketpath)
 
-    def boot(self, producer=None, packages=[]):
+    def boot(self, producer=None, packages=[], timeout=20):
         '''boots the chain. If a producer is not specified, uses the name of this node'''
         if producer is None:
             producer = self.producer
@@ -447,7 +447,7 @@ class Node(API):
             if calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.000Z")) <= now:
                 return False
             return node.get_producers() == ([producer],[])
-        self.wait(isbooted)
+        self.wait(isbooted, timeout)
     def run_psibase(self, args):
         self._find_psibase()
         subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath] + args)
