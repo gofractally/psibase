@@ -233,6 +233,7 @@ function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
     add_custom_command(
         OUTPUT ${OUTPUT_FILEPATH}
+        BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist
         DEPENDS ${SOURCES} ${ARGN}
         COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
     )
@@ -265,14 +266,14 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
 
     ExternalProject_Add(${TARGET_NAME}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
-        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
+        INSTALL_BYPRODUCTS ${OUTPUT_FILEPATH}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND cargo component build -r
             --target wasm32-wasi
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
             --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
         BUILD_ALWAYS 1
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-wasi/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-wasi/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
     )
 
     # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
