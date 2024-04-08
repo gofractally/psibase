@@ -169,10 +169,11 @@ namespace SystemService
       return result;
    }  // Transact::runAs
 
-   static Transaction trx;
-   Transaction        Transact::getTransaction() const
+   static std::span<const char>  trxData;
+   psio::view<const Transaction> Transact::getTransaction() const
    {
-      return trx;
+      check(trxData.data() != nullptr, "No transaction");
+      return psio::view<const Transaction>(psio::prevalidated{trxData});
    }
 
    psibase::BlockHeader Transact::currentBlock() const
@@ -214,23 +215,26 @@ namespace SystemService
       // TODO: subjective mitigation hooks
       // TODO: limit execution time
       // TODO: limit charged CPU & NET which can go into a block
-      auto top_act = getCurrentAction();
-      auto args    = psio::from_frac<ProcessTransactionArgs>(top_act.rawData);
-      // TODO: avoid copying inner rawData during unpack
-      auto t = args.transaction.data_without_size_prefix();
+      auto top_act = getCurrentActionView();
+      auto args    = psio::view<const ProcessTransactionArgs>(top_act->rawData());
+      auto t       = args.transaction().data_without_size_prefix();
       check(psio::fracpack_validate_strict<Transaction>(t), "transaction has invalid format");
-      trx     = psio::from_frac<Transaction>(psio::prevalidated{t});
-      auto id = sha256(args.transaction.data(), args.transaction.size());
+      trxData  = t;
+      auto trx = psio::view<const Transaction>(psio::prevalidated{t});
+      auto id  = sha256(t.data(), t.size());
+      // unpack some fields for convenience
+      auto tapos  = trx.tapos().unpack();
+      auto claims = trx.claims().unpack();
 
-      check(trx.actions.size() > 0, "transaction has no actions");
+      check(trx.actions().size() > 0, "transaction has no actions");
 
       const auto& stat = getStatus();
       // printf("time: ", psio::convert_to_json(stat.current.time),
-      //       " expiration: ", psio::convert_to_json(trx.tapos.expiration), "\n");
+      //       " expiration: ", psio::convert_to_json(tapos.expiration), "\n");
 
-      check(!(trx.tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
-      check(stat.current.time < trx.tapos.expiration, "transaction has expired");
-      check(trx.tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
+      check(!(tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
+      check(stat.current.time < tapos.expiration, "transaction has expired");
+      check(tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
             "transaction was submitted too early");
 
       auto tables        = Transact::Tables(Transact::service);
@@ -241,14 +245,14 @@ namespace SystemService
       auto summaryTable  = tables.open<BlockSummaryTable>();
       auto summaryIdx    = summaryTable.getIndex<0>();
 
-      check(!includedIdx.get(std::tuple{trx.tapos.expiration, id}), "duplicate transaction");
-      if (!args.checkFirstAuthAndExit)
-         includedTable.put({trx.tapos.expiration, id});
+      check(!includedIdx.get(std::tuple{tapos.expiration, id}), "duplicate transaction");
+      if (!args.checkFirstAuthAndExit())
+         includedTable.put({tapos.expiration, id});
 
       auto transactStatus = statusIdx.get(std::tuple{});
 
       std::optional<BlockSummary> summary;
-      if (args.checkFirstAuthAndExit)
+      if (args.checkFirstAuthAndExit())
          summary = getBlockSummary();  // startBlock() might not have run
       else
          summary = summaryIdx.get(std::tuple<>{});
@@ -258,9 +262,9 @@ namespace SystemService
          auto& bootTransactions = *transactStatus->bootTransactions;
          check(!bootTransactions.empty(),
                "fatal error: All boot transactions have been pushed, but finishBoot was not run.");
-         check(!trx.tapos.refBlockIndex && !trx.tapos.refBlockSuffix,
+         check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
                "transaction references non-existing block");
-         if (!args.checkFirstAuthAndExit)
+         if (!args.checkFirstAuthAndExit())
          {
             check(id == bootTransactions.front(),
                   "Wrong transaction during boot " + psio::convert_to_json(id) +
@@ -277,22 +281,22 @@ namespace SystemService
       }
       else if (summary)
       {
-         if (trx.tapos.refBlockIndex & 0x80)
-            check(((trx.tapos.refBlockIndex - 2) & 0x7f) <= (stat.head->header.blockNum >> 13) - 2,
+         if (tapos.refBlockIndex & 0x80)
+            check(((tapos.refBlockIndex - 2) & 0x7f) <= (stat.head->header.blockNum >> 13) - 2,
                   "transaction references non-existing block");
          else
-            check(((trx.tapos.refBlockIndex - 2) & 0x7f) <= stat.head->header.blockNum - 2,
+            check(((tapos.refBlockIndex - 2) & 0x7f) <= stat.head->header.blockNum - 2,
                   "transaction references non-existing block");
 
-         // printf("expected suffix: ", summary->blockSuffixes[trx.tapos.refBlockIndex], "\n");
-         check(trx.tapos.refBlockSuffix == summary->blockSuffixes[trx.tapos.refBlockIndex],
+         // printf("expected suffix: ", summary->blockSuffixes[tapos.refBlockIndex], "\n");
+         check(tapos.refBlockSuffix == summary->blockSuffixes[tapos.refBlockIndex],
                "transaction references non-existing block");
       }
       else
       {
-         // printf("refBlockIndex: ", trx.tapos.refBlockIndex,
-         //       " refBlockSuffix: ", trx.tapos.refBlockSuffix, "; should be 0\n");
-         check(!trx.tapos.refBlockIndex && !trx.tapos.refBlockSuffix,
+         // printf("refBlockIndex: ", tapos.refBlockIndex,
+         //       " refBlockSuffix: ", tapos.refBlockSuffix, "; should be 0\n");
+         check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
                "transaction references non-existing block");
       }
 
@@ -303,44 +307,55 @@ namespace SystemService
       auto accountTable   = accountsTables.open<AccountTable>();
       auto accountIndex   = accountTable.getIndex<0>();
 
-      for (auto& act : trx.actions)
+      for (auto act : trx.actions())
       {
          if (transactStatus && transactStatus->enforceAuth)
          {
-            auto account = accountIndex.get(act.sender);
+            auto account = accountIndex.get(act.sender().unpack());
             if (!account)
-               abortMessage("unknown sender \"" + act.sender.str() + "\"");
+               abortMessage("unknown sender \"" + act.sender().unpack().str() + "\"");
 
             if constexpr (enable_print)
                std::printf("call checkAuthSys on %s for sender account %s\n",
-                           account->authService.str().c_str(), act.sender.str().c_str());
+                           account->authService.str().c_str(), act.sender().unpack().str().c_str());
             Actor<AuthInterface> auth(Transact::service, account->authService);
             uint32_t             flags = AuthInterface::topActionReq;
-            if (&act == &trx.actions[0])
+            if (get_view_data(act) == get_view_data(trx.actions()[0]))
             {
                flags |= AuthInterface::firstAuthFlag;
-               cpuLimit.setCpuLimit(act.sender);
+               cpuLimit.setCpuLimit(act.sender());
             }
-            if (args.checkFirstAuthAndExit)
+            if (args.checkFirstAuthAndExit())
                flags |= AuthInterface::readOnlyFlag;
             // This can execute user defined code, so we must set the timer first
-            auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender,
-                              ServiceMethod{act.service, act.method}, std::vector<ServiceMethod>{},
-                              trx.claims);
+            auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
+                              ServiceMethod{act.service(), act.method()},
+                              std::vector<ServiceMethod>{}, claims);
          }
-         if (args.checkFirstAuthAndExit)
+         if (args.checkFirstAuthAndExit())
             break;
          if constexpr (enable_print)
             std::printf("call action\n");
-         call(act);  // TODO: avoid copy (serializing)
+
+         auto data = find_view_span(act);
+         if (data.data() != nullptr)
+         {
+            psibase::raw::call(data.data(), data.size());
+         }
+         else
+         {
+            psibase::call(act.unpack());
+         }
       }
 
-      check(!trx.actions.empty(), "transaction must have at least one action");
+      check(!trx.actions().empty(), "transaction must have at least one action");
       if (transactStatus && transactStatus->enforceAuth)
       {
          std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
-         accounts.billCpu(trx.actions[0].sender, cpuUsage);
+         accounts.billCpu(trx.actions()[0].sender(), cpuUsage);
       }
+
+      trxData = std::span<const char>{};
    }
 
 }  // namespace SystemService
