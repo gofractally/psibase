@@ -1,8 +1,8 @@
 #pragma once
+#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
-#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/fracpack.hpp>
 
@@ -80,7 +80,7 @@ namespace psibase
          using result_type = decltype(psio::result_of(MemberPtr));
          if constexpr (not std::is_same_v<void, result_type>)
          {
-            return psibase::fraccall<result_type>(act);
+            return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(act);
          }
          else
          {
@@ -104,7 +104,8 @@ namespace psibase
                         .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = decltype(psio::result_of(MemberPtr));
          if constexpr (not std::is_same_v<void, result_type>)
-            return psibase::fraccall<result_type>(act).unpack();
+            return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(act)
+                .unpack();
          else
             psibase::fraccall<void>(act);
       }
