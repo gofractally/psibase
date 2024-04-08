@@ -6,10 +6,10 @@ p2p      = off
 host     = psibase.127.0.0.1.sslip.io
 listen   = 8080
 # peer     = http://localhost:8080/
-service  = localhost:$PSIBASE_DATADIR/services/admin-sys
-service  = 127.0.0.1:$PSIBASE_DATADIR/services/admin-sys
-service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
-service  = admin-sys.:$PSIBASE_DATADIR/services/admin-sys
+service  = localhost:$PSIBASE_DATADIR/services/x-admin
+service  = 127.0.0.1:$PSIBASE_DATADIR/services/x-admin
+service  = [::1]:$PSIBASE_DATADIR/services/x-admin
+service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
 admin    = static:*
 
 http-timeout = 4s

@@ -1,6 +1,6 @@
 #include "test_fracpack.hpp"
 
-TEST_CASE("roudtrip float/double")
+TEST_CASE("roundtrip float/double")
 {
    test<float>({std::copysign(std::numeric_limits<float>::quiet_NaN(), -1.0f),
                 std::copysign(std::numeric_limits<float>::signaling_NaN(), -1.0f),

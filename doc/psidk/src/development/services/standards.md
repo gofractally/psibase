@@ -1,8 +1,8 @@
 # Standards
 
-## Standard account names
+## Reserved account names
 
-Trusted system services have account names which end with `-sys`. Only chain operators may create accounts with this suffix.
+By convention, apps that are specific to an individual node operator are hosted at subdomains that begin with "x-". Therefore, to avoid being overshadowed by these apps, user account names may not begin with "x-".
 
 ## Standard actions
 

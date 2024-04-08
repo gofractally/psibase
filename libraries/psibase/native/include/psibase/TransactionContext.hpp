@@ -19,7 +19,7 @@ namespace psibase
 
    // TODO: handle unpacking within TransactionContext?
    //       * Verify unpack of signed, no extra fields
-   //       * Allow inner Transaction to have extra fields; transaction_sys should verify instead
+   //       * Allow inner Transaction to have extra fields; transact should verify instead
    //       Might be redundant elsewhere?
    struct TransactionContext
    {

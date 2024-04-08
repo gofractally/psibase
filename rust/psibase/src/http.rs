@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// An HTTP header
 ///
-/// Note: `proxy-sys` aborts when most services set HTTP headers. It only allows services
+/// Note: `http-server` aborts when most services set HTTP headers. It only allows services
 /// it trust to set them in order to enforce security rules.
 #[derive(
     Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
@@ -24,8 +24,7 @@ pub struct HttpHeader {
 /// An HTTP Request
 ///
 /// Most services receive this via their [serveSys](crate::server_interface::ServerActions::serveSys)
-/// action. [proxy-sys](https://doc-sys.psibase.io/default-apps/proxy-sys.html) receives it via
-/// its `serve` exported function.
+/// action. The `http-server` service receives it via its `serve` exported function.
 
 #[derive(
     Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,

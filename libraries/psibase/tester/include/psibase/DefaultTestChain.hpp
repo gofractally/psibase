@@ -10,12 +10,12 @@ namespace psibase
    class DefaultTestChain : public TestChain
    {
      public:
-      // default excludes DocSys and TokenUsers
+      // default excludes Docs and TokenUsers
       DefaultTestChain(const std::vector<std::string>& packageNames =
-                           {"AccountSys", "AuthAnySys", "AuthDelegateSys", "AuthSys", "AuthEcSys",
-                            "CommonSys", "CpuSys", "ExploreSys", "FractalSys", "InviteSys",
-                            "NftSys", "PackageSys", "ProducerSys", "ProxySys", "PsiSpaceSys",
-                            "SetCodeSys", "SymbolSys", "TokenSys", "TransactionSys"},
+                           {"Accounts", "AuthAny", "AuthDelegate", "AuthSig", "AuthK1", "CommonApi",
+                            "CpuLimit", "Explorer", "Fractal", "Invite", "Nft", "Packages",
+                            "Producers", "HttpServer", "Sites", "SetCode", "Symbol", "Tokens",
+                            "Transact"},
                        bool                  installUI = false,
                        const DatabaseConfig& dbconfig  = {});
 
@@ -41,14 +41,14 @@ namespace psibase
       AccountNumber addAccount(const char* name, const PublicKey& public_key, bool show = false);
       AccountNumber addAccount(AccountNumber name, const PublicKey& public_key, bool show = false);
 
-      void setAuthEc(AccountNumber name, const PublicKey& pubkey, bool show = false);
+      void setAuthK1(AccountNumber name, const PublicKey& pubkey, bool show = false);
 
       AccountNumber addAccount(const char*   acc,
-                               AccountNumber authService = AccountNumber("auth-any-sys"),
+                               AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
 
       AccountNumber addAccount(AccountNumber acc,
-                               AccountNumber authService = AccountNumber("auth-any-sys"),
+                               AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
    };
 }  // namespace psibase

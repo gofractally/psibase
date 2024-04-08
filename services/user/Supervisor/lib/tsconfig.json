@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "useDefineForClassFields": true,
+        "module": "ESNext",
+        "lib": ["ESNext", "DOM"],
+        "skipLibCheck": true,
+
+        "moduleResolution": "Node",
+        "allowJs": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "esModuleInterop": true,
+        "noEmit": true,
+
+        /* Linting */
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "paths": {
+            "/common": ["../../"],
+            "@psibase/common-lib": ["../../CommonApi/common/packages/common-lib/src"],
+            "@psibase/common-lib/*": ["../../CommonApi/common/packages/common-lib/src/*"]
+        }
+    },
+    "include": ["src/**/*"]
+}

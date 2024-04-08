@@ -1,8 +1,8 @@
 #! /bin/bash
 
-root_dir="/root/psibase/services/user/CommonSys"
-account_name="common-sys"
-rust_name="common-sys"
+root_dir="/root/psibase/services/user/CommonApi"
+account_name="common-api"
+rust_name="common-api"
 
 cd $root_dir
 

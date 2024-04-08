@@ -21,6 +21,7 @@ if(DEFINED IS_NATIVE)
         test_std_array.cpp
         test_chrono.cpp
         test_view.cpp
+        test_schema.cpp
     )
     target_link_libraries(psio-tests psio catch2 Threads::Threads )
 endif()

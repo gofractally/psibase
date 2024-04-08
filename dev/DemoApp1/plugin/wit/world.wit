@@ -6,7 +6,7 @@ interface intf {
 }
 
 world example {
-    import invite-sys:plugin/inviter;
+    import invite:plugin/inviter;
 
     export helloworld: func() -> string;
     export intf;

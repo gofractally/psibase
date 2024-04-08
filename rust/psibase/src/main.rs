@@ -6,7 +6,7 @@ use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{account_sys, auth_delegate_sys, psispace_sys};
+use psibase::services::{accounts, auth_delegate, sites};
 use psibase::{
     account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
     get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,
@@ -102,12 +102,7 @@ enum Command {
         insecure: bool,
 
         /// Sender to use when creating the account.
-        #[clap(
-            short = 'S',
-            long,
-            value_name = "SENDER",
-            default_value = "account-sys"
-        )]
+        #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
         sender: ExactAccountNumber,
     },
 
@@ -147,18 +142,13 @@ enum Command {
         #[clap(short = 'i', long)]
         create_insecure_account: bool,
 
-        /// Register the service with ProxySys. This allows the service to host a
+        /// Register the service with HttpServer. This allows the service to host a
         /// website, serve RPC requests, and serve GraphQL requests.
         #[clap(short = 'p', long)]
         register_proxy: bool,
 
         /// Sender to use when creating the account.
-        #[clap(
-            short = 'S',
-            long,
-            value_name = "SENDER",
-            default_value = "account-sys"
-        )]
+        #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
         sender: ExactAccountNumber,
     },
 
@@ -279,7 +269,7 @@ fn store_sys(
     content_type: &str,
     content: &[u8],
 ) -> Action {
-    psispace_sys::Wrapper::pack_from_to(sender, service).storeSys(
+    sites::Wrapper::pack_from_to(sender, service).storeSys(
         path.to_string(),
         content_type.to_string(),
         content.to_vec().into(),
@@ -368,7 +358,7 @@ async fn modify(
     }
 
     if insecure {
-        actions.push(set_auth_service_action(account, account!("auth-any-sys")));
+        actions.push(set_auth_service_action(account, account!("auth-any")));
     }
 
     let trx = with_tapos(
@@ -786,9 +776,9 @@ fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error
     for account in accounts {
         out.set_label(format!("Creating {}", account));
         let group = vec![
-            account_sys::Wrapper::pack().newAccount(account, account!("auth-any-sys"), true),
-            auth_delegate_sys::Wrapper::pack_from(account).setOwner(sender),
-            set_auth_service_action(account, auth_delegate_sys::SERVICE),
+            accounts::Wrapper::pack().newAccount(account, account!("auth-any"), true),
+            auth_delegate::Wrapper::pack_from(account).setOwner(sender),
+            set_auth_service_action(account, auth_delegate::SERVICE),
         ];
         out.push(group)?;
     }
@@ -879,7 +869,7 @@ async fn install(
                 0,
                 Action {
                     sender,
-                    service: account!("nop-sys"),
+                    service: account!("nop"),
                     method: method!("nop"),
                     rawData: Default::default(),
                 },

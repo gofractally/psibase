@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -36,10 +37,14 @@ namespace psio
    constexpr const char* get_type_name(const std::vector<T>*);
    template <typename T, size_t S>
    constexpr const char* get_type_name(const std::array<T, S>*);
+   template <typename T, size_t S>
+   constexpr const char* get_type_name(const T (*)[S]);
    template <typename... T>
    constexpr const char* get_type_name(const std::tuple<T...>*);
    template <typename... T>
    constexpr const char* get_type_name(const std::variant<T...>*);
+   template <typename Rep, typename Period>
+   constexpr const char* get_type_name(const std::chrono::duration<Rep, Period>*);
 
    // clang-format off
    constexpr const char* get_type_name(const bool*) { return "bool"; }
@@ -55,6 +60,7 @@ namespace psio
    constexpr const char* get_type_name(const double*) { return "double"; }
    constexpr const char* get_type_name(const char*) { return "char"; }
    constexpr const char* get_type_name(const std::string*) { return "string"; }
+   constexpr const char* get_type_name(const std::string_view*) { return "string"; }
    constexpr const char* get_type_name(const __int128*) { return "int128"; }
    constexpr const char* get_type_name(const unsigned __int128*) { return "uint128"; }
    // clang-format on
@@ -95,9 +101,6 @@ namespace psio
    template <typename T>
    constexpr auto vector_type_name = append_type_name<T>("[]");
 
-   template <typename T, size_t S>
-   constexpr auto array_type_name = append_type_name<T>("[#]");
-
    template <typename T>
    constexpr auto optional_type_name = append_type_name<T>("?");
 
@@ -106,10 +109,44 @@ namespace psio
    {
       return vector_type_name<T>.data();
    }
+
+   constexpr std::size_t const_log10(std::size_t n)
+   {
+      std::size_t result = 0;
+      do
+      {
+         n /= 10;
+         ++result;
+      } while (n > 0);
+      return result;
+   }
+
+   template <typename T, std::size_t S>
+   constexpr auto get_array_type_name()
+   {
+      constexpr std::string_view               name   = get_type_name((T*)nullptr);
+      std::array<char, 2 + const_log10(S) + 1> bounds = {};
+      bounds[0]                                       = '[';
+      bounds[bounds.size() - 2]                       = ']';
+      for (std::size_t N = S, i = bounds.size() - 3; i > 0; --i, N /= 10)
+      {
+         bounds[i] = '0' + N % 10;
+      }
+      return array_cat(to_array<name.size()>(name), bounds);
+   }
+
+   template <typename T, size_t S>
+   constexpr auto array_type_name = get_array_type_name<T, S>();
+
    template <typename T, size_t S>
    constexpr const char* get_type_name(const std::array<T, S>*)
    {
-      return "array";  //array_type_name<T,S>.data();
+      return array_type_name<T, S>.data();
+   }
+   template <typename T, size_t S>
+   constexpr const char* get_type_name(const T (*)[S])
+   {
+      return array_type_name<T, S>.data();
    }
 
    template <typename T>
@@ -146,7 +183,7 @@ namespace psio
    constexpr auto get_tuple_type_name()
    {
       constexpr std::size_t size =
-          sizeof("tuple") + ((std::string_view(get_type_name((T*)nullptr)).size() + 1) + ...);
+          sizeof("tuple") + ((std::string_view(get_type_name((T*)nullptr)).size() + 1) + ... + 0);
       std::array<char, size> buffer{'t', 'u', 'p', 'l', 'e'};
       (variant_type_appender{buffer.data() + 5} + ... +
        std::string_view(get_type_name((T*)nullptr)));
@@ -162,10 +199,20 @@ namespace psio
    {
       return variant_type_name<T...>.data();
    }
+
+   template <typename... T>
+   constexpr auto tuple_type_name = get_tuple_type_name<T...>();
+
    template <typename... T>
    constexpr const char* get_type_name(const std::tuple<T...>*)
    {
-      return get_tuple_type_name<T...>().data();
+      return tuple_type_name<T...>.data();
+   }
+
+   template <typename Rep, typename Period>
+   constexpr const char* get_type_name(const std::chrono::duration<Rep, Period>*)
+   {
+      return "duration";
    }
 
    template <typename T>

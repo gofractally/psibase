@@ -2,9 +2,9 @@
 // TODO: option to allow/disallow unknown fields during verify and unpack
 // TODO: replace 'a with 'de; change macro to look for 'de specifically instead of assuming
 
-//! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
+//! Rust support for the fracpack format.
 //!
-//! [Psibase](https://about.psibase.io) uses a new binary format, `fracpack`, which has the following goals:
+//! [Psibase](https://psibase.io) uses a new binary format, `fracpack`, which has the following goals:
 //!
 //! - Quickly pack and unpack data, making it suitable for service-to-service communication, node-to-node communication, blockchain-to-outside communication, and database storage.
 //! - Forwards and backwards compatibility; it supports adding new optional fields to the end of structs and tuples, even when they are embedded in variable-length vectors, fixed-length arrays, optional, and other structs and tuples.

@@ -1,0 +1,22 @@
+{
+  "name": "@psibase/supervisor",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write 'src/**/*.ts'"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "prettier-plugin-tailwindcss": "^0.5.13",
+    "typescript": "^5.2.2",
+    "vite": "^4.3.8"
+  },
+  "dependencies": {
+    "@bytecodealliance/preview2-shim": "^0.14.1",
+    "rollup-plugin-wit-component": "^0.1.3"
+  }
+}
