@@ -244,7 +244,7 @@ namespace SystemService
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
       /// Get the currently executing transaction
-      psibase::Transaction getTransaction() const;
+      psio::view<const psibase::Transaction> getTransaction() const;
 
       /// Get the current block header
       psibase::BlockHeader currentBlock() const;

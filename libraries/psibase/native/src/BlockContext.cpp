@@ -265,6 +265,9 @@ namespace psibase
       }
 
       status->head = current;  // Also calculates blockId
+      // authCode can be loaded from the database. We don't need an
+      // extra copy in the status table.
+      status->head->header.authCode.reset();
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
 
