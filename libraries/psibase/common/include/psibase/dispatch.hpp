@@ -1,16 +1,53 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
-#include <psibase/Service.hpp>
 #include <psibase/RawNativeFunctions.hpp>
+#include <psibase/Service.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
 {
+
+   template <typename T>
+   std::span<const char> find_view_span(psio::view<T> v)
+   {
+      const char*   start       = psio::get_view_data(v);
+      bool          has_unknown = false;
+      bool          known_end;
+      std::uint32_t pos = 0;
+      if (!psio::is_packable<std::remove_cv_t<T>>::template unpack<false, true>(
+              nullptr, has_unknown, known_end, start, pos, 0xffffffffu))
+      {
+         static_assert(!psio::is_std_optional_v<std::remove_cv_t<T>>,
+                       "Optional members are not stored in contiguous memory");
+         assert(!"View must be valid");
+         __builtin_unreachable();
+      }
+      if (known_end)
+         return {start, pos};
+      else
+         return {};
+   }
+
+   template <typename T>
+   constexpr bool is_view_v = false;
+   template <typename T>
+   constexpr bool is_view_v<psio::view<T>> = true;
+
    template <typename R, typename T, typename MemberPtr, typename... Args>
    void callMethod(T& service, MemberPtr method, Args&&... args)
    {
-      psio::shared_view_ptr<R> p((service.*method)(std::forward<decltype(args)>(args)...));
-      raw::setRetval(p.data(), p.size());
+      if constexpr (is_view_v<R>)
+      {
+         R    v((service.*method)(std::forward<decltype(args)>(args)...));
+         auto s = find_view_span(v);
+         check(s.data() != nullptr, "Cannot handle extensions in returned view");
+         raw::setRetval(s.data(), s.size());
+      }
+      else
+      {
+         psio::shared_view_ptr<R> p((service.*method)(std::forward<decltype(args)>(args)...));
+         raw::setRetval(p.data(), p.size());
+      }
    }
 
    template <typename F, typename T, std::size_t... I>
