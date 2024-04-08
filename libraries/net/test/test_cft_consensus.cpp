@@ -1,6 +1,5 @@
 #include <psibase/cft.hpp>
 
-#include <psibase/fork_database.hpp>
 #include <psibase/log.hpp>
 #include <psibase/mock_routing.hpp>
 #include <psibase/mock_timer.hpp>
