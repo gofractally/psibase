@@ -473,12 +473,14 @@ namespace psio::schema_types
 
    }  // namespace
 
-   CompiledSchema::CompiledSchema(const Schema& schema, CustomTypes builtin)
+   CompiledSchema::CompiledSchema(const Schema&               schema,
+                                  CustomTypes                 builtin,
+                                  std::vector<const AnyType*> extraTypes)
        : schema(schema), builtin(std::move(builtin))
    {
       // collect root types
       std::vector<const AnyType*> stack;
-      std::vector<const AnyType*> queue;
+      std::vector<const AnyType*> queue = std::move(extraTypes);
       for (const auto& [name, type] : schema.types)
       {
          if (!std::holds_alternative<Type>(type.value))

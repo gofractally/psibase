@@ -520,7 +520,9 @@ namespace psio
 
       struct CompiledSchema
       {
-         CompiledSchema(const Schema& schema, CustomTypes builtin = standard_types());
+         CompiledSchema(const Schema&               schema,
+                        CustomTypes                 builtin    = standard_types(),
+                        std::vector<const AnyType*> extraTypes = {});
          CompiledType*       get(const AnyType* type);
          const CompiledType* get(const AnyType* type) const;
          //
