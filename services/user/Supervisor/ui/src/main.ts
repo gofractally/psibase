@@ -8,6 +8,7 @@ import {
     FunctionCallRequest,
     isFunctionCallRequest,
     buildFunctionCallResponse,
+    buildMessageIFrameInitialized,
     toString,
     isErrorResult,
     QualifiedPluginId,
@@ -16,7 +17,6 @@ import {
 } from "@psibase/common-lib/messaging";
 import {
     isLoaderInitMessage,
-    buildMessageIFrameInitialized,
     PluginCallResponse,
     isPluginCallResponse,
     PluginCallPayload,

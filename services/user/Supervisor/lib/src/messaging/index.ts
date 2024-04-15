@@ -1,5 +1,3 @@
-export { buildMessageLoaderInitialized as buildMessageIFrameInitialized } from "./LoaderInitialized";
-
 export const LOADER_INITIALIZED = "LOADER_INITIALIZED" as const;
 export const LOADER_PRELOAD_START = "LOADER_PRELOAD_START" as const;
 export const LOADER_PRELOAD_COMPLETE = "LOADER_PRELOAD_COMPLETE" as const;

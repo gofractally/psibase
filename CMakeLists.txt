@@ -592,10 +592,10 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
     NAME Supervisor
     VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS Nft HttpServer Accounts CommonApi
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist /
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/lib/dist/supervisor-lib.js /supervisor-lib.js
+    DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
+    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/lib/dist/supervisor-lib.js /supervisor-lib.js
     DEPENDS ${Supervisor_js_DEP}
     DEPENDS ${SupervisorLib_js_DEP}
 )

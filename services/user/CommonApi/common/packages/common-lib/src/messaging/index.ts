@@ -23,4 +23,7 @@ export {
 } from "./PreLoadPluginsRequest";
 
 export { type PluginId, type QualifiedPluginId } from "./PluginId";
-export { isIFrameInitialized } from "./SupervisorInitialized";
+export {
+    isIFrameInitialized,
+    buildMessageIFrameInitialized,
+} from "./SupervisorInitialized";
