@@ -72,6 +72,7 @@ namespace psio
       template <typename T>
       struct Box
       {
+         Box() : value(new T()) {}
          template <std::convertible_to<T> U>
          Box(U&& value) : value(new T(std::forward<U>(value)))
          {
@@ -93,6 +94,18 @@ namespace psio
       void to_json(const Box<T>& wrapper, Stream& stream)
       {
          to_json(*wrapper.value, stream);
+      }
+
+      template <typename T>
+      T& clio_unwrap_packable(Box<T>& box)
+      {
+         return *box;
+      }
+
+      template <typename T>
+      const T& clio_unwrap_packable(const Box<T>& box)
+      {
+         return *box;
       }
 
       struct Function;
@@ -124,6 +137,16 @@ namespace psio
          to_json_members(type.members, stream);
       }
 
+      inline auto& clio_unwrap_packable(Object& type)
+      {
+         return type.members;
+      }
+
+      inline auto& clio_unwrap_packable(const Object& type)
+      {
+         return type.members;
+      }
+
       struct Struct
       {
          std::vector<Member> members;
@@ -133,6 +156,16 @@ namespace psio
       void to_json(const Struct& type, auto& stream)
       {
          to_json_members(type.members, stream);
+      }
+
+      inline auto& clio_unwrap_packable(Struct& type)
+      {
+         return type.members;
+      }
+
+      inline auto& clio_unwrap_packable(const Struct& type)
+      {
+         return type.members;
       }
 
       struct Array
@@ -153,6 +186,15 @@ namespace psio
          to_json(*type.type, stream);
       }
 
+      inline auto& clio_unwrap_packable(List& type)
+      {
+         return *type.type;
+      }
+      inline auto& clio_unwrap_packable(const List& type)
+      {
+         return *type.type;
+      }
+
       struct Option
       {
          Box<AnyType> type;
@@ -162,6 +204,15 @@ namespace psio
       void to_json(const Option& type, auto& stream)
       {
          to_json(*type.type, stream);
+      }
+
+      inline auto& clio_unwrap_packable(Option& type)
+      {
+         return *type.type;
+      }
+      inline auto& clio_unwrap_packable(const Option& type)
+      {
+         return *type.type;
       }
 
       struct Custom
@@ -198,6 +249,16 @@ namespace psio
          to_json_members(type.members, stream);
       }
 
+      inline auto& clio_unwrap_packable(Variant& type)
+      {
+         return type.members;
+      }
+
+      inline auto& clio_unwrap_packable(const Variant& type)
+      {
+         return type.members;
+      }
+
       struct Tuple
       {
          std::vector<AnyType> members;
@@ -207,6 +268,16 @@ namespace psio
       void to_json(const Tuple& type, auto& stream)
       {
          to_json(type.members, stream);
+      }
+
+      inline auto& clio_unwrap_packable(Tuple& type)
+      {
+         return type.members;
+      }
+
+      inline auto& clio_unwrap_packable(const Tuple& type)
+      {
+         return type.members;
       }
 
       struct FracPack
@@ -220,6 +291,15 @@ namespace psio
          to_json(type.type, stream);
       }
 
+      inline auto& clio_unwrap_packable(FracPack& type)
+      {
+         return *type.type;
+      }
+      inline auto& clio_unwrap_packable(const FracPack& type)
+      {
+         return *type.type;
+      }
+
       struct Type
       {
          std::string type;
@@ -231,8 +311,18 @@ namespace psio
          to_json(type.type, stream);
       }
 
+      inline auto& clio_unwrap_packable(Type& type)
+      {
+         return type.type;
+      }
+      inline auto& clio_unwrap_packable(const Type& type)
+      {
+         return type.type;
+      }
+
       struct AnyType
       {
+         AnyType();
          AnyType(Int type);
          AnyType(Float type);
          AnyType(Object type);
@@ -276,6 +366,16 @@ namespace psio
          }
       }
 
+      inline auto& clio_unwrap_packable(AnyType& type)
+      {
+         return type.value;
+      }
+      template <std::same_as<AnyType> T>
+      auto& clio_unwrap_packable(const T& type)
+      {
+         return type.value;
+      }
+
       struct Function
       {
          AnyType params;
@@ -290,6 +390,7 @@ namespace psio
       };
       PSIO_REFLECT(Member, name, type)
 
+      inline AnyType::AnyType() {}
       inline AnyType::AnyType(Int type) : value(std::move(type)) {}
       inline AnyType::AnyType(Float type) : value(std::move(type)) {}
       inline AnyType::AnyType(Object type) : value(std::move(type)) {}
