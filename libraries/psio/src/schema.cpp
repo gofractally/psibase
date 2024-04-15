@@ -926,6 +926,37 @@ namespace psio::schema_types
       return result;
    }
 
+   FracParser::Item FracParser::select_child(std::uint32_t index)
+   {
+      if (stack.empty())
+         return makeError(nullptr, "Parse stack is empty");
+      if (auto* item = std::get_if<Item>(&stack.back()))
+      {
+         if (item->kind == start)
+         {
+            stack.pop_back();
+         }
+      }
+      if (auto* reader = std::get_if<ObjectReader>(&stack.back()))
+      {
+         auto copy    = std::move(*reader);
+         copy.index   = index;
+         in.known_end = false;
+         stack.clear();
+         return reader->next(*this);
+      }
+      else
+      {
+         return makeError(std::visit([](auto& item) { return item.type; }, stack.back()),
+                          "Can only select child of object types");
+      }
+   }
+
+   void FracParser::push(const Item& item)
+   {
+      stack.push_back(item);
+   }
+
    FracParser::Item FracParser::push(const CompiledType* type, std::uint32_t offset, bool pointer)
    {
       in.pos = offset;

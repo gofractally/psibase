@@ -569,6 +569,8 @@ namespace psio
             Item                  next(FracParser&) { return *this; }
          };
          Item next();
+         Item select_child(std::uint32_t index);
+         void push(const Item&);
          // Starts parsing the given type at the current pos
          Item parse(const CompiledType* ctype);
          void parse_fixed(Item& result, const CompiledType* ctype, std::uint32_t offset);
