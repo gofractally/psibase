@@ -631,9 +631,9 @@ async fn boot(
     package_source: &Vec<String>,
     services: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
-    let now_plus_30secs = Utc::now() + Duration::seconds(30);
+    let now_plus_120secs = Utc::now() + Duration::seconds(120);
     let expiration = TimePointSec {
-        seconds: now_plus_30secs.timestamp() as u32,
+        seconds: now_plus_120secs.timestamp() as u32,
     };
     let default_services = vec!["Default".to_string()];
     let package_registry = get_package_registry(package_source, client.clone()).await?;
