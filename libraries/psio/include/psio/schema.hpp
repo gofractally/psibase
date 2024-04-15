@@ -467,13 +467,13 @@ namespace psio
          {
             insert(std::move(name), DefaultCustomHandler<T>());
          }
-         void         insert(std::string name, const CustomHandler& t);
-         std::size_t* find(const std::string& name);
-         bool         match(std::size_t index, const CompiledType* type);
-         bool         frac2json(const CompiledType* type,
-                                std::size_t         index,
-                                FracStream&         in,
-                                auto&               out) const
+         void               insert(std::string name, const CustomHandler& t);
+         const std::size_t* find(const std::string& name) const;
+         bool               match(std::size_t index, const CompiledType* type) const;
+         bool               frac2json(const CompiledType* type,
+                                      std::size_t         index,
+                                      FracStream&         in,
+                                      auto&               out) const
          {
             StreamRef stream{out};
             return impl[index].frac2json(type, in, stream);

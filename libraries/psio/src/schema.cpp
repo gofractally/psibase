@@ -42,13 +42,13 @@ namespace psio::schema_types
       impl.push_back(t);
       names.insert({std::move(name), index});
    }
-   std::size_t* CustomTypes::find(const std::string& name)
+   const std::size_t* CustomTypes::find(const std::string& name) const
    {
       if (auto pos = names.find(name); pos != names.end())
          return &pos->second;
       return nullptr;
    }
-   bool CustomTypes::match(std::size_t index, const CompiledType* type)
+   bool CustomTypes::match(std::size_t index, const CompiledType* type) const
    {
       return impl[index].match(type);
    }
