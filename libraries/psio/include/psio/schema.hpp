@@ -26,6 +26,13 @@ namespace psio
       std::uint32_t end_pos;
       bool          has_unknown = false;
       bool          known_end   = true;
+
+      template <bool Unpack, bool Verify, typename T>
+      bool unpack(T* value)
+      {
+         return is_packable<T>::template unpack<Unpack, Verify>(value, has_unknown, known_end, src,
+                                                                pos, end_pos);
+      }
    };
 
    class StreamBase
