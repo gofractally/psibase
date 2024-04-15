@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 #include <iostream>
 #include <psibase/Actor.hpp>
+#include <psibase/Rpc.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
 #include <psio/to_hex.hpp>
@@ -212,6 +213,8 @@ namespace psibase
        */
       [[nodiscard]] TransactionTrace pushTransaction(Transaction    trx,
                                                      const KeyList& keys = defaultKeys());
+
+      HttpReply http(const HttpRequest& request);
 
       template <typename Action>
       auto trace(Action&& a, const KeyList& keyList = defaultKeys())
