@@ -20,7 +20,7 @@
         "noImplicitReturns": true,
         "noFallthroughCasesInSwitch": true,
         "paths": {
-            "/common": ["../../"],
+            "/common": ["../../CommonApi/common"],
             "@psibase/common-lib": ["../../CommonApi/common/packages/common-lib/src"],
             "@psibase/common-lib/*": ["../../CommonApi/common/packages/common-lib/src/*"]
         }

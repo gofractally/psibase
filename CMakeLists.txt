@@ -250,7 +250,7 @@ file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/servic
 
 # Builds the Common files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${SUPERVISOR_LIB_DIR} supervisor-lib.js)
+add_js_target(${SUPERVISOR_LIB_DIR} supervisor-lib.js ${CommonApiCommonLib_js_DEP})
 add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP} ${SupervisorLib_js_DEP})
 
 # Build each UI
@@ -303,7 +303,7 @@ set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.d.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.js
 )
-add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS})
+add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS} ${CommonApiCommonLib_js_DEP})
 add_custom_command(
     OUTPUT ${WASM_PSIBASE_BYPRODUCTS}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
