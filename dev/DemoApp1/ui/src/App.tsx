@@ -43,12 +43,14 @@ function App() {
 
   const run2 = async () => {
     try {
+      console.log("running 2");
       const res = await supervisor.functionCall({
         service: "demoapp1",
         intf: "intf",
-        method: "helloworld2",
+        method: "multipli",
         params: [],
       });
+      console.log(res, "was res 2");
       setRes(res as string);
     } catch (e) {
       console.error(`${JSON.stringify(e, null, 2)}`);
@@ -57,6 +59,7 @@ function App() {
 
   const run3 = async () => {
     try {
+      console.log("trying to run the inviteUrl...");
       const inviteUrl: string = (await supervisor.functionCall({
         service: "invite",
         intf: "inviter",
@@ -107,7 +110,7 @@ function App() {
 
   return (
     <>
-      <h1>Psibase Demo App 1</h1>
+      <h1>Psibase Demo App 1 1</h1>
       <h3>{res}</h3>
       <div className="card">
         <button onClick={() => run()}>

@@ -6,6 +6,7 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
+    use psibase::services::demoapp1 as app_1;
     use psibase::*;
     use serde::{Deserialize, Serialize};
 
@@ -20,6 +21,9 @@ mod service {
         /// The result of the calculation
         result: i32,
     }
+
+    #[table(record = "WebContentRow", index = 1)]
+    struct WebContentTable;
 
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {
@@ -50,7 +54,7 @@ mod service {
             })
             .unwrap();
 
-        Wrapper::emit().history().multiply(a, b, res);
+        // Wrapper::emit().history().multiply(a, b, res);
 
         res
     }
@@ -92,9 +96,17 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_simple_ui::<Wrapper>(&request))
+        None.or_else(|| serve_content(&request, &WebContentTable::new()))
             .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn storeSys(path: String, contentType: String, content: HexBytes) {
+        check(get_sender() == get_service(), "unauthorized");
+        let table = WebContentTable::new();
+        store_content(path, contentType, content, &table).unwrap();
     }
 }
 
