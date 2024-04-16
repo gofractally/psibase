@@ -9,6 +9,7 @@
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
+#include <psio/finally.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 #include <psio/view.hpp>
@@ -909,38 +910,64 @@ struct callbacks
       BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
       BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
 
-      psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead()};
-      bc.start();
-      psibase::check(!bc.needGenesisAction, "Need genesis block; use 'psibase boot' to boot chain");
-      psibase::SignedTransaction trx;
-      psibase::Action            action{
-                     .sender  = psibase::AccountNumber(),
-                     .service = psibase::proxyServiceNum,
-                     .rawData = std::vector(args_packed.begin(), args_packed.end()),
-      };
-      psibase::TransactionTrace   trace;
-      psibase::TransactionContext tc{bc, trx, trace, true, false, true};
-      psibase::ActionTrace        atrace;
-      auto                        startExecTime = std::chrono::steady_clock::now();
-      tc.execServe(action, atrace);
-      auto          endExecTime = std::chrono::steady_clock::now();
-      unsigned      status      = 500;
-      std::uint64_t nBytes      = 0;
-      if (psio::fracpack_validate<std::optional<psibase::HttpReply>>(atrace.rawRetval))
+      psibase::TransactionTrace trace;
+      psibase::ActionTrace      atrace;
+
+      constexpr auto nullTime      = std::chrono::steady_clock::time_point::min();
+      auto           startExecTime = nullTime;
+      auto           endExecTime   = nullTime;
+      unsigned       status        = 500;
+      std::uint64_t  nBytes        = 0;
+      auto           billableTime  = std::chrono::nanoseconds(0);
+      auto           databaseTime  = std::chrono::steady_clock::duration(0);
+      try
       {
-         auto result =
-             psio::view<std::optional<psibase::HttpReply>>(psio::prevalidated{atrace.rawRetval});
-         if (result)
+         psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead()};
+         bc.start();
+         psibase::check(!bc.needGenesisAction,
+                        "Need genesis block; use 'psibase boot' to boot chain");
+         psibase::SignedTransaction trx;
+         psibase::Action            action{
+                        .sender  = psibase::AccountNumber(),
+                        .service = psibase::proxyServiceNum,
+                        .rawData = std::vector(args_packed.begin(), args_packed.end()),
+         };
+         psibase::TransactionContext tc{bc, trx, trace, true, false, true};
+         psio::finally               recordBillableTime{[&]()
+                                          {
+                                             billableTime = tc.getBillableTime();
+                                             databaseTime = tc.databaseTime;
+                                          }};
+         startExecTime = std::chrono::steady_clock::now();
+         tc.execServe(action, atrace);
+         endExecTime = std::chrono::steady_clock::now();
+         if (psio::fracpack_validate<std::optional<psibase::HttpReply>>(atrace.rawRetval))
          {
-            status = 200;
-            nBytes = result->body().size();
+            auto result =
+                psio::view<std::optional<psibase::HttpReply>>(psio::prevalidated{atrace.rawRetval});
+            if (result)
+            {
+               status = 200;
+               nBytes = result->body().size();
+            }
+            else
+            {
+               status = 404;
+            }
          }
-         else
+      }
+      catch (std::exception& e)
+      {
+         if (!trace.error)
          {
-            status = 404;
+            trace.error = e.what();
          }
       }
       auto endTime = std::chrono::steady_clock::now();
+      if (startExecTime == nullTime)
+         startExecTime = endTime;
+      if (endExecTime == nullTime)
+         endExecTime = endTime;
 
       trace.actionTraces.push_back(std::move(atrace));
 
@@ -955,13 +982,13 @@ struct callbacks
           std::chrono::duration_cast<std::chrono::microseconds>(startExecTime - startTime));
       BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "ServiceLoadTime",
                                   std::chrono::duration_cast<std::chrono::microseconds>(
-                                      endExecTime - startExecTime - tc.getBillableTime()));
+                                      endExecTime - startExecTime - billableTime));
       BOOST_LOG_SCOPED_LOGGER_TAG(
           chain.logger, "DatabaseTime",
-          std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime));
-      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "WasmExecTime",
-                                  std::chrono::duration_cast<std::chrono::microseconds>(
-                                      tc.getBillableTime() - tc.databaseTime));
+          std::chrono::duration_cast<std::chrono::microseconds>(databaseTime));
+      BOOST_LOG_SCOPED_LOGGER_TAG(
+          chain.logger, "WasmExecTime",
+          std::chrono::duration_cast<std::chrono::microseconds>(billableTime - databaseTime));
       BOOST_LOG_SCOPED_LOGGER_TAG(
           chain.logger, "ResponseTime",
           std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime));
