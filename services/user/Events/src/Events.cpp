@@ -1,10 +1,10 @@
 #include <services/user/Events.hpp>
 
 #include <sqlite3.h>
-
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/schema.hpp>
+#include <regex>
 
 using namespace psibase;
 using namespace psio::schema_types;
@@ -49,10 +49,12 @@ struct SchemaCache
          }
          else
          {
-            check(false, "service " + service.str() + " does not have a registered schema");
+            return nullptr;
          }
       }
-      return pos->second.cschema.get(pos->second.schema.getType(db, event));
+      if (auto type = pos->second.schema.getType(db, event))
+         return pos->second.cschema.get(type);
+      return nullptr;
    }
 
    struct CacheEntry
@@ -89,9 +91,8 @@ struct EventIndexTable
 
 struct EventVTab : sqlite3_vtab
 {
-   EventVTab(DbId db, AccountNumber service, MethodNumber event)
-       : index{db, service, event},
-         rowType(SchemaCache::instance().getSchemaType(db, service, event))
+   EventVTab(DbId db, AccountNumber service, MethodNumber event, const CompiledType* type)
+       : index{db, service, event}, rowType(type)
    {
    }
    EventIndexTable     index;
@@ -508,9 +509,10 @@ int event_connect(sqlite3*           db,
          check(false, "Unknown argument: " + std::string(arg));
       }
    }
-   if (service == AccountNumber{} || event == MethodNumber{})
+   const CompiledType* type = SchemaCache::instance().getSchemaType(event_db, service, event);
+   if (type == nullptr)
       return SQLITE_ERROR;
-   auto                vtab = std::make_unique<EventVTab>(event_db, service, event);
+   auto                vtab = std::make_unique<EventVTab>(event_db, service, event, type);
    std::vector<char>   index;
    psio::vector_stream stream{index};
    stream.write("CREATE TABLE e(", 15);
@@ -894,6 +896,40 @@ void EventIndex::send(int i)
    }
 }
 
+void load_tables(sqlite3* db, std::string_view sql)
+{
+   std::regex          table_re("\"(history|ui|events).([-a-zA-Z0-9]+).([_a-zA-Z0-9]+)\"");
+   std::regex_iterator iter(sql.begin(), sql.end(), table_re);
+   decltype(iter)      end;
+   std::string         stmt;
+   for (const auto& match : std::ranges::subrange(iter, end))
+   {
+      std::string serviceStr = match[2].str();
+      if (serviceStr != AccountNumber{serviceStr}.str())
+         continue;
+      std::string typeStr = match[3].str();
+      if (typeStr != MethodNumber{typeStr}.str())
+         continue;
+      stmt += "CREATE VIRTUAL TABLE IF NOT EXISTS \"";
+      stmt += match[1].str();
+      stmt += '.';
+      stmt += serviceStr;
+      stmt += '.';
+      stmt += typeStr;
+      stmt += "\" USING events(db=";
+      stmt += match[1].str();
+      stmt += ",service=";
+      stmt += serviceStr;
+      stmt += ",type=";
+      stmt += typeStr;
+      stmt += ")";
+      // ignore errors. the error will be reported later as
+      // accessing a table that doesn't exist in the main query
+      sqlite3_exec(db, stmt.c_str(), ignore_row, nullptr, nullptr);
+      stmt.clear();
+   }
+}
+
 std::optional<HttpReply> serveSql(const HttpRequest& request)
 {
    if (request.target != "/sql")
@@ -907,14 +943,7 @@ std::optional<HttpReply> serveSql(const HttpRequest& request)
    {
       abortMessage(std::string("sqlite3_create_module: ") + sqlite3_errstr(err));
    }
-   char* errmsg;
-   if (int err = sqlite3_exec(
-           db,
-           "CREATE VIRTUAL TABLE myevents USING events(db=history,service=events,type=testevent)",
-           ignore_row, nullptr, &errmsg))
-   {
-      abortMessage(std::string("sqlite3_exec: ") + sqlite3_errstr(err));
-   }
+   load_tables(db, {request.body.data(), request.body.size()});
    std::vector<char> result;
    {
       check(request.body.size() <= std::numeric_limits<int>::max(), "Query too large");

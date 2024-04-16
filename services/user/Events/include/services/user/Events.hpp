@@ -6,7 +6,6 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
-#include <psibase/check.hpp>
 #include <psibase/db.hpp>
 #include <psio/reflect.hpp>
 #include <psio/schema.hpp>
@@ -18,32 +17,33 @@ namespace UserService
 
    struct ServiceSchema
    {
-      psibase::AccountNumber                                       service;
-      psio::Schema                                                 schema;
-      std::map<psibase::MethodNumber, psio::schema_types::AnyType> ui;
-      std::map<psibase::MethodNumber, psio::schema_types::AnyType> history;
-      std::map<psibase::MethodNumber, psio::schema_types::AnyType> merkle;
-      const auto&                                                  getDb(psibase::DbId db) const
+      psibase::AccountNumber service;
+      psio::Schema           schema;
+      using EventMap = std::map<psibase::MethodNumber, psio::schema_types::AnyType>;
+      EventMap ui;
+      EventMap history;
+      EventMap merkle;
+      //
+      const EventMap* getDb(psibase::DbId db) const
       {
          switch (db)
          {
             case psibase::DbId::uiEvent:
-               return ui;
+               return &ui;
             case psibase::DbId::merkleEvent:
-               return merkle;
+               return &merkle;
             case psibase::DbId::historyEvent:
-               return history;
+               return &history;
             default:
-               psibase::abortMessage("Not an event db");
+               return nullptr;
          }
       }
       const psio::schema_types::AnyType* getType(psibase::DbId db, psibase::MethodNumber event)
       {
-         const auto& types = getDb(db);
-         if (auto pos = types.find(event); pos != types.end())
-            return &pos->second;
-         else
-            psibase::abortMessage("Unknown event type");
+         if (const auto* types = getDb(db))
+            if (auto pos = types->find(event); pos != types->end())
+               return &pos->second;
+         return nullptr;
       }
       std::vector<const psio::schema_types::AnyType*> types() const
       {
