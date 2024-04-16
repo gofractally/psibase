@@ -223,6 +223,7 @@ set(JS_DIRS
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
 set(COMMON_LOADER_DIR services/user/CommonApi/common/packages/wasm-loader/:CommonApiLoaderLib_js)
+set(SUPERVISOR_LIB_DIR services/user/Supervisor/lib/:SupervisorLib_js)
 
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
@@ -249,12 +250,13 @@ file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/servic
 
 # Builds the Common files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP})
+add_js_target(${SUPERVISOR_LIB_DIR} supervisor-lib.js ${CommonApiCommonLib_js_DEP})
+add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP} ${SupervisorLib_js_DEP})
 
 # Build each UI
 # Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
 foreach(ROW ${JS_DIRS})
-    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP} ${CommonApiLoaderLib_js_DEP})
+    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP})
 endforeach()
 
 # A function that can be used to add a new target that builds a wasm component from rust
@@ -301,7 +303,7 @@ set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.d.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.js
 )
-add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS})
+add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS} ${CommonApiCommonLib_js_DEP})
 add_custom_command(
     OUTPUT ${WASM_PSIBASE_BYPRODUCTS}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
@@ -592,10 +594,12 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
     NAME Supervisor
     VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS Nft HttpServer Accounts
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist /
+    DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
+    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/lib/dist/supervisor-lib.js /supervisor-lib.js
     DEPENDS ${Supervisor_js_DEP}
+    DEPENDS ${SupervisorLib_js_DEP}
 )
 
 psibase_package(

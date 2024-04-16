@@ -1,4 +1,4 @@
-import { QualifiedFunctionCallArgs } from "./FunctionCallRequest";
+import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
 import { SYNC_CALL_REQUEST } from "./index";
 
 export interface PluginSyncCall {

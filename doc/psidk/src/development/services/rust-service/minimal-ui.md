@@ -50,7 +50,7 @@ This will build the service and deploy it to the chain:
 cargo psibase deploy -ip example-ui
 ```
 
-The `-p` option will register the service with the [`http-server` service](../../../default-apps/http-server.md). This allows the service to handle web requests. See the [`registerServer`](../../../default-apps/http-server.md#systemserviceproxysysregisterserver) docs for more details.
+The `-p` option will register the service with the [`http-server` service](../../../default-apps/http-server.md). This allows the service to handle web requests. See the [`registerServer`](../../../default-apps/http-server.md) docs for more details.
 
 ## Trying the UI
 

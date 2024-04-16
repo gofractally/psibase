@@ -1,17 +1,17 @@
 import { getImportFills } from "./dynamicFunctions";
 import importableCode from "./importables.js?raw";
+import { QualifiedFunctionCallArgs, toString } from "@psibase/common-lib";
 import {
     isPluginCallRequest,
     PluginCallPayload,
     buildPluginCallResponse,
     buildMessageLoaderInitialized,
-    QualifiedFunctionCallArgs,
     isPreloadStartMessage,
     LoaderPreloadStart,
     buildPreloadCompleteMessage,
-    toString,
     buildPluginSyncCall,
-} from "@psibase/common-lib/messaging";
+} from "@psibase/supervisor-lib";
+
 import { siblingUrl } from "@psibase/common-lib";
 import { CallCache } from "./callCache";
 import { load } from "./lib/index";

@@ -1,18 +1,18 @@
-import { siblingUrl } from "../rpc";
+import { siblingUrl } from "./rpc";
 import {
     QualifiedFunctionCallArgs,
     toString,
-} from "./supervisor/FunctionCallRequest";
-import { isErrorResponse } from "./supervisor/FunctionCallResponse";
-import { PluginId, QualifiedPluginId } from "./supervisor/PluginId";
-import { buildPreLoadPluginsRequest } from "./supervisor/PreLoadPluginsRequest";
+} from "./messaging/FunctionCallRequest";
+import { isErrorResponse } from "./messaging/FunctionCallResponse";
+import { PluginId, QualifiedPluginId } from "./messaging/PluginId";
+import { buildPreLoadPluginsRequest } from "./messaging/PreLoadPluginsRequest";
 import {
     isIFrameInitialized,
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
     FunctionCallRequest,
-} from "./supervisor/index";
+} from "./messaging";
 
 const SupervisorIFrameId = "iframe-supervisor" as const;
 
