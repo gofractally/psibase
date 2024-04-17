@@ -6,8 +6,8 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
-    use psibase::services::demoapp1 as app_1;
     use psibase::*;
+    use psibase::{services::demoapp1 as app_1, AccountNumber};
     use serde::{Deserialize, Serialize};
 
     /// Holds an answer to a calculation done by an account `id`
@@ -73,6 +73,13 @@ mod service {
             AnswerTable::new().get_index_pk().get(&account)
         }
 
+        async fn answers(&self, account: AccountNumber) -> Option<Vec<i32>> {
+            let answer_table = AnswerTable::new();
+            let tab = answer_table.get_index_pk();
+
+            Some(tab.iter().map(|val| val.result).collect())
+        }
+
         /// Look up an event
         ///
         /// ```
@@ -109,13 +116,3 @@ mod service {
         store_content(path, contentType, content, &table).unwrap();
     }
 }
-
-// TODO: testing not working
-// #[psibase::test_case(services("example"))]
-// fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
-//     let result = Wrapper::push(&chain).add(3, 4);
-//     assert_eq!(result.get()?, 7);
-//     println!("\n\nTrace:\n{}", result.trace);
-
-//     Ok(())
-// }

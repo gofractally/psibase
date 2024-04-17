@@ -23,12 +23,12 @@ impl Intf for Component {
     }
 
     fn multipli() -> String {
-        let _ = server::add_action_to_transaction(
+        let res = server::add_action_to_transaction(
             "multiply",
-            &app_1::action_structs::multiply { a: 4, b: 5 }.packed(),
+            &app_1::action_structs::multiply { a: 3, b: 7 }.packed(),
         );
 
-        "derpy doop".to_string()
+        format!("Mutliply res is {:?}", res)
     }
 }
 
