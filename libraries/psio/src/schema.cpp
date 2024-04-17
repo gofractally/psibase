@@ -943,7 +943,7 @@ namespace psio::schema_types
          copy.index   = index;
          in.known_end = false;
          stack.clear();
-         return reader->next(*this);
+         return copy.next(*this);
       }
       else
       {
