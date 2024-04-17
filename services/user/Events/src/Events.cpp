@@ -80,20 +80,15 @@ struct SchemaCache
 
 struct EventIndexTable
 {
-   DbId              db;
-   AccountNumber     service;
-   MethodNumber      event;
-   std::vector<char> key() const
-   {
-      return psio::convert_to_key(
-          std::tuple(AccountNumber{"events"}, std::uint8_t{1}, db, service, event));
-   }
+   DbId          db;
+   AccountNumber service;
+   MethodNumber  event;
 };
 
 void to_key(const EventIndexTable& obj, auto& stream)
 {
    psio::to_key(AccountNumber{"events"}, stream);
-   psio::to_key(std::uint16_t{1}, stream);
+   psio::to_key(eventIndexesNum, stream);
    psio::to_key(obj.db, stream);
    psio::to_key(obj.service, stream);
    psio::to_key(obj.event, stream);
@@ -104,10 +99,19 @@ struct EventVTab : sqlite3_vtab
    EventVTab(DbId db, AccountNumber service, MethodNumber event, const CompiledType* type)
        : index{db, service, event}, rowType(type)
    {
+      auto secondary =
+          EventsTables{getReceiver()}
+              .open<
+                  SecondaryIndexTable>();  //SecondaryIndexTable(DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum)));
+      if (auto row = secondary.getIndex<0>().get(std::tuple((std::uint32_t)db, service, event)))
+         indexes = std::move(row->indexes);
+      else
+         indexes = std::vector{SecondaryIndexInfo{}};
    }
-   EventIndexTable     index;
-   const CompiledType* rowType;
-   std::vector<char>   key() const { return psio::convert_to_key(index); }
+   EventIndexTable                 index;
+   std::vector<SecondaryIndexInfo> indexes;
+   const CompiledType*             rowType;
+   std::vector<char>               key() const { return psio::convert_to_key(index); }
 };
 
 struct EventCursor : sqlite3_vtab_cursor
@@ -572,10 +576,13 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
    auto                          vtab = static_cast<EventVTab*>(base_vtab);
    std::vector<IndexConstraints> constraints(vtab->rowType->children.size() + 1);
    constraints[0] = {.usable = true, .unique = true};
-   // TODO: mark indexed columns
+   for (const auto& index : vtab->indexes)
+   {
+      constraints[index.getPos()].usable = true;
+   }
    for (int i = 0; i < info->nConstraint; ++i)
    {
-      if (info->aConstraint[i].usable)
+      if (info->aConstraint[i].usable && constraints[info->aConstraint[i].iColumn + 1].usable)
       {
          switch (info->aConstraint[i].op)
          {
@@ -593,7 +600,7 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
          }
       }
    }
-   int  best = std::ranges::max_element(constraints) - constraints.begin() - 1;
+   int  best = std::ranges::min_element(constraints) - constraints.begin() - 1;
    char buf[info->nConstraint + 1];
    int  argc = 0;
    for (int i = 0; i < info->nConstraint; ++i)
@@ -931,9 +938,26 @@ void EventIndex::setSchema(const ServiceSchema& schema)
    EventsTables{}.open<ServiceSchemaTable>().put(schema);
 }
 
-void EventIndex::indexEvent(std::uint64_t id)
+void EventIndex::addIndex(std::uint32_t          db,
+                          psibase::AccountNumber service,
+                          psibase::MethodNumber  event,
+                          std::uint8_t           column)
 {
-   check(false, "not implemented");
+   auto secondary =
+       EventsTables{getReceiver()}
+           .open<
+               SecondaryIndexTable>();  //SecondaryIndexTable(DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum)));
+   auto row = secondary.getIndex<0>().get(std::tuple(db, service, event));
+   if (!row)
+      row = SecondaryIndexRecord{db, service, event, std::vector{SecondaryIndexInfo{}}};
+   // Don't add duplicate indexes
+   for (const auto& index : row->indexes)
+   {
+      if (index.indexNum == column)
+         return;
+   }
+   row->indexes.push_back(SecondaryIndexInfo{column});
+   secondary.put(*row);
 }
 
 void EventIndex::send(int i, double d)
@@ -964,7 +988,8 @@ bool EventIndex::indexSome(std::uint32_t dbNum, std::uint32_t max)
    check(!!dbStatus, "DatabaseStatusRow not found");
 
    auto table = DbIndexStatusTable(
-       DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, std::uint16_t{0})));
+       DbId::writeOnly,
+       psio::convert_to_key(std::tuple(EventIndex::service, dbIndexStatusTableNum)));
    auto status = table.getIndex<0>().get(static_cast<std::uint32_t>(db));
    if (!status)
       status = DbIndexStatus{static_cast<std::uint32_t>(db), 1};
@@ -974,17 +999,21 @@ bool EventIndex::indexSome(std::uint32_t dbNum, std::uint32_t max)
    auto              eventNum = status->nextEventNumber;
    auto              eventEnd = getNextEventNumber(*dbStatus, db);
    auto&             cache    = SchemaCache::instance();
-   AnyType           u64Type  = Int{.bits = 64, .isSigned = false};
-   CompiledType      u64{.kind             = CompiledType::scalar,
-                         .is_variable_size = false,
-                         .fixed_size       = 8,
-                         .original_type    = &u64Type};
-   CompiledType      wrapper{
-            .kind       = CompiledType::object,
-            .fixed_size = 16,
-            .children   = {{.fixed_offset = 0, .is_optional = false, .type = &u64},
-                           {.fixed_offset = 8, .is_optional = true, .type = &u64},
-                           {.fixed_offset = 12, .is_optional = true, .type = nullptr}},
+   auto              secondary =
+       EventsTables{getReceiver()}
+           .open<
+               SecondaryIndexTable>();  //SecondaryIndexTable(DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum)));
+   AnyType      u64Type = Int{.bits = 64, .isSigned = false};
+   CompiledType u64{.kind             = CompiledType::scalar,
+                    .is_variable_size = false,
+                    .fixed_size       = 8,
+                    .original_type    = &u64Type};
+   CompiledType wrapper{
+       .kind       = CompiledType::object,
+       .fixed_size = 16,
+       .children   = {{.fixed_offset = 0, .is_optional = false, .type = &u64},
+                      {.fixed_offset = 8, .is_optional = true, .type = &u64},
+                      {.fixed_offset = 12, .is_optional = true, .type = nullptr}},
    };
    for (; max != 0 && eventNum != eventEnd; --max, ++eventNum)
    {
@@ -1017,10 +1046,12 @@ bool EventIndex::indexSome(std::uint32_t dbNum, std::uint32_t max)
              return true;
           }())
          continue;
-      // TODO: make secondary indexes configurable
-      for (int i = -1, end = static_cast<int>(ctype->children.size()); i < end; ++i)
+
+      auto indexes = secondary.getIndex<0>().get(std::tuple(dbNum, service, *type));
+      if (!indexes)
+         indexes.emplace(SecondaryIndexRecord{.indexes = std::vector{SecondaryIndexInfo{}}});
+      for (const auto& index : indexes->indexes)
       {
-         SecondaryIndexInfo  index{static_cast<std::uint8_t>(i)};
          psio::vector_stream stream{key};
          to_key(EventIndexTable{db, service, *type}, stream);
          to_key(index.indexNum, stream);

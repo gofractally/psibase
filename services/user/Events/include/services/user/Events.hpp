@@ -62,7 +62,7 @@ namespace UserService
 
    struct SecondaryIndexInfo
    {
-      std::uint8_t indexNum;
+      std::uint8_t indexNum = 0xff;
       // TODO: allow indexes over multiple columns
       std::span<const std::uint8_t> columns() const
       {
@@ -71,7 +71,25 @@ namespace UserService
          else
             return {&indexNum, 1};
       }
+      int getPos() const
+      {
+         if (indexNum == 0xff)
+            return 0;
+         else
+            return indexNum + 1;
+      }
    };
+   PSIO_REFLECT(SecondaryIndexInfo, indexNum)
+
+   struct SecondaryIndexRecord
+   {
+      std::uint32_t                   db;
+      psibase::AccountNumber          service;
+      psibase::MethodNumber           event;
+      std::vector<SecondaryIndexInfo> indexes;
+      auto                            primaryKey() const { return std::tuple(db, service, event); }
+   };
+   PSIO_REFLECT(SecondaryIndexRecord, db, service, event, indexes);
 
    // For each db, tracks the lowest event number that has not been indexed.
    struct DbIndexStatus
@@ -83,16 +101,31 @@ namespace UserService
 
    using ServiceSchemaTable = psibase::Table<ServiceSchema, &ServiceSchema::service>;
    using DbIndexStatusTable = psibase::Table<DbIndexStatus, &DbIndexStatus::db>;
-   using EventsTables       = psibase::ServiceTables<ServiceSchemaTable>;
+   using SecondaryIndexTable =
+       psibase::Table<SecondaryIndexRecord, &SecondaryIndexRecord::primaryKey>;
+   using EventsTables = psibase::ServiceTables<ServiceSchemaTable, SecondaryIndexTable>;
+
+   // These are stored in the writeOnly database
+   constexpr std::uint16_t dbIndexStatusTableNum{0};
+   constexpr std::uint16_t eventIndexesNum{1};
+   constexpr std::uint16_t secondaryIndexTableNum{2};
 
    struct EventIndex : psibase::Service<EventIndex>
    {
       static constexpr psibase::AccountNumber service{"events"};
       // Sets the schema associated with a service
       void setSchema(const ServiceSchema& schema);
-      void indexEvent(std::uint64_t id);
+      // Adds an index.
+      // TODO: Add existing rows to the index
+      // TODO: There should be a way to construct the index concurrently.
+      void addIndex(std::uint32_t          db,
+                    psibase::AccountNumber service,
+                    psibase::MethodNumber  event,
+                    std::uint8_t           column);
+      // Temporary for testing
       void send(int i, double d);
       bool indexSome(std::uint32_t db, std::uint32_t max);
+      // Runs in subjective mode at the end of each block
       void onBlock();
       // Standard HTTP API
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&);
@@ -112,7 +145,7 @@ namespace UserService
    };
    PSIO_REFLECT(EventIndex,
                 method(setSchema, schema),
-                method(indexEvent, id),
+                method(addIndex, db, service, event, column),
                 method(send, i),
                 method(indexSome, db, maxRows),
                 method(onBlock),
