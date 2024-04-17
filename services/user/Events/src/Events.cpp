@@ -719,6 +719,59 @@ KeyResult sql_to_key(const Int& type, sqlite3_value* key, std::vector<char>& out
    }
 }
 
+KeyResult double_to_key(const Float& type, double value, std::vector<char>& out)
+{
+   psio::vector_stream stream{out};
+   if (type == Float{.exp = 11, .mantissa = 53})
+   {
+      to_key(value, stream);
+      return KeyResult::exact;
+   }
+   else if (type == Float{.exp = 8, .mantissa = 24})
+   {
+      auto fvalue = static_cast<float>(value);
+      auto result = KeyResult::exact;
+      to_key(value, stream);
+      if (fvalue != value)
+      {
+         result = KeyResult::rounded;
+         if (fvalue < value)
+            ++out.back();
+      }
+      return result;
+   }
+   abortMessage("Only single and double precision floating-point are supported");
+}
+
+KeyResult sql_to_key(const Float& type, sqlite3_value* key, std::vector<char>& out)
+{
+   switch (sqlite3_value_numeric_type(key))
+   {
+      case SQLITE_INTEGER:
+      {
+         auto value  = sqlite3_value_int64(key);
+         auto dvalue = static_cast<double>(value);
+         if (static_cast<sqlite_int64>(dvalue) < value)
+         {
+            dvalue = std::nextafter(dvalue, std::numeric_limits<double>::infinity());
+         }
+         auto result = double_to_key(type, sqlite3_value_int64(key), out);
+         if (static_cast<sqlite_int64>(dvalue) < value)
+            return KeyResult::rounded;
+         return result;
+      }
+      case SQLITE_FLOAT:
+         return double_to_key(type, sqlite3_value_double(key), out);
+      case SQLITE_TEXT:
+      case SQLITE_BLOB:
+         return KeyResult::overflow;
+      case SQLITE_NULL:
+         return KeyResult::underflow;
+      default:
+         abortMessage("Unknown sqlite3_value");
+   }
+}
+
 KeyResult sql_to_key(const auto& type, sqlite3_value* key, std::vector<char>& out)
 {
    abortMessage("Not implemented");
@@ -883,9 +936,9 @@ void EventIndex::indexEvent(std::uint64_t id)
    check(false, "not implemented");
 }
 
-void EventIndex::send(int i)
+void EventIndex::send(int i, double d)
 {
-   auto id = emit().history().testEvent(i);
+   auto id = emit().history().testEvent(i, d);
 }
 
 std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, DbId db)

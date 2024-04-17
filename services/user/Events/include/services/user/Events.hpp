@@ -91,7 +91,7 @@ namespace UserService
       // Sets the schema associated with a service
       void setSchema(const ServiceSchema& schema);
       void indexEvent(std::uint64_t id);
-      void send(int i);
+      void send(int i, double d);
       bool indexSome(std::uint32_t db, std::uint32_t max);
       void onBlock();
       // Standard HTTP API
@@ -103,7 +103,7 @@ namespace UserService
          };
          struct History
          {
-            void testEvent(int32_t i) {}
+            void testEvent(int32_t i, double d) {}
          };
          struct Merkle
          {

@@ -38,10 +38,17 @@ std::vector<R> sql(TestChain& chain, std::string_view s)
 
 struct TestEvent
 {
-   int         i;
+   int         i                                              = 0;
+   double      d                                              = 0;
    friend bool operator==(const TestEvent&, const TestEvent&) = default;
 };
-PSIO_REFLECT(TestEvent, i)
+PSIO_REFLECT(TestEvent, i, d)
+
+std::ostream& operator<<(std::ostream& os, const TestEvent& e)
+{
+   os << psio::convert_to_json(e) << std::endl;
+   return os;
+}
 
 TEST_CASE("events")
 {
@@ -49,15 +56,19 @@ TEST_CASE("events")
    auto             events = chain.from(chain.addService<Events>("Events.wasm")).to<Events>();
    expect(chain.from(Events::service).to<HttpServer>().registerServer(Events::service).trace());
 
-   ServiceSchema schema{
-       .service = Events::service,
-       .schema  = SchemaBuilder().insert<int>("i32").build(),
-       .history = {{MethodNumber{"testevent"}, Object{.members = {{"i", Type{"i32"}}}}}}};
+   ServiceSchema schema{.service = Events::service,
+                        .schema  = SchemaBuilder().insert<int>("i32").insert<double>("f64").build(),
+                        .history = {{MethodNumber{"testevent"},
+                                     Object{.members = {{"i", Type{"i32"}}, {"d", Type{"f64"}}}}}}};
    expect(events.setSchema(schema).trace());
-   expect(events.send(42).trace());
-   expect(events.send(72).trace());
-   expect(events.send(42).trace());
-   expect(events.send(91).trace());
+   expect(events.send(42, 1.414).trace());
+   expect(events.send(72, 3.14159).trace());
+   expect(events.send(42, 2.718).trace());
+   expect(events.send(91, 1.618).trace());
+
+   CHECK(sql<TestEvent>(chain,
+                        "SELECT i,d FROM \"history.events.testevent\" WHERE d > 2 ORDER BY d") ==
+         std::vector<TestEvent>{{42, 2.718}, {72, 3.14159}});
 
    CHECK(sql<TestEvent>(chain, "SELECT i FROM \"history.events.testevent\" ORDER BY ROWID") ==
          std::vector<TestEvent>{{42}, {72}, {42}, {91}});
