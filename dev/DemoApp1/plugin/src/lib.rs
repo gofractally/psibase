@@ -22,10 +22,14 @@ impl Intf for Component {
         Ok(invite::plugin::inviter::generate_invite("/subpath")?)
     }
 
-    fn multipli() -> String {
+    fn multipli(a: u32, b: u32) -> String {
         let res = server::add_action_to_transaction(
             "multiply",
-            &app_1::action_structs::multiply { a: 3, b: 7 }.packed(),
+            &app_1::action_structs::multiply {
+                a: a as i32,
+                b: b as i32,
+            }
+            .packed(),
         );
 
         format!("Mutliply res is {:?}", res)

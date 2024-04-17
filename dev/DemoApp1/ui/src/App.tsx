@@ -1,6 +1,8 @@
 import "./App.css";
 import { Supervisor } from "@psibase/common-lib/messaging";
 import { useEffect, useState } from "react";
+import { fetchAnswers } from "./utils/fetchAnswers";
+import { wait } from "./utils/wait";
 
 const supervisor = new Supervisor();
 
@@ -48,9 +50,16 @@ function App() {
         service: "demoapp1",
         intf: "intf",
         method: "multipli",
-        params: [],
+        params: [Number(a), Number(b)],
       });
       console.log(res, "was res 2");
+      const requests = [...Array(5)];
+      for (const req in requests) {
+        const { answer } = await fetchAnswers();
+        console.log(req + 1, answer);
+        setAnswer(answer.result.toString());
+        await wait(1000);
+      }
       setRes(res as string);
     } catch (e) {
       console.error(`${JSON.stringify(e, null, 2)}`);
@@ -108,6 +117,10 @@ function App() {
     }
   };
 
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [answer, setAnswer] = useState("?");
+
   return (
     <>
       <h1>Psibase Demo App 1 1</h1>
@@ -128,6 +141,14 @@ function App() {
 
       <div className="card">
         <button onClick={() => run4()}>{"Just decode"}</button>
+      </div>
+
+      <div className="card">
+        <button onClick={() => run2()}>{"Do maths on blockchain"}</button>
+        <input type="text" onChange={(e) => setA(e.target.value)} />
+        x
+        <input type="text" onChange={(e) => setB(e.target.value)} />
+        {answer}
       </div>
     </>
   );
