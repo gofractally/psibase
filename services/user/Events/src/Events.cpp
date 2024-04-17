@@ -3,6 +3,7 @@
 #include <sqlite3.h>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psio/schema.hpp>
 #include <regex>
 
@@ -89,6 +90,15 @@ struct EventIndexTable
    }
 };
 
+void to_key(const EventIndexTable& obj, auto& stream)
+{
+   psio::to_key(AccountNumber{"events"}, stream);
+   psio::to_key(std::uint16_t{1}, stream);
+   psio::to_key(obj.db, stream);
+   psio::to_key(obj.service, stream);
+   psio::to_key(obj.event, stream);
+}
+
 struct EventVTab : sqlite3_vtab
 {
    EventVTab(DbId db, AccountNumber service, MethodNumber event, const CompiledType* type)
@@ -97,7 +107,7 @@ struct EventVTab : sqlite3_vtab
    }
    EventIndexTable     index;
    const CompiledType* rowType;
-   std::vector<char>   key() const { return index.key(); }
+   std::vector<char>   key() const { return psio::convert_to_key(index); }
 };
 
 struct EventCursor : sqlite3_vtab_cursor
@@ -127,8 +137,7 @@ struct EventCursor : sqlite3_vtab_cursor
    }
    void seek()
    {
-      // TODO: move to subjective
-      auto sz = psibase::raw::kvGreaterEqual(DbId::service, key.data(), key.size(), prefixLen);
+      auto sz = psibase::raw::kvGreaterEqual(DbId::writeOnly, key.data(), key.size(), prefixLen);
       if (sz == 0xffffffffu)
       {
          setEof();
@@ -876,24 +885,113 @@ void EventIndex::indexEvent(std::uint64_t id)
 
 void EventIndex::send(int i)
 {
-   auto            id = emit().history().testEvent(i);
-   EventIndexTable table{DbId::historyEvent, getReceiver(), MethodNumber{"testEvent"}};
-   auto            value = std::vector<char>{};
+   auto id = emit().history().testEvent(i);
+}
+
+std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, DbId db)
+{
+   switch (db)
    {
-      auto key = table.key();
-      key.push_back('\xFF');
-      psio::vector_stream stream(key);
-      to_key(id, stream);
-      psibase::kvPutRaw(DbId::service, key, value);
+      case DbId::historyEvent:
+         return status.nextHistoryEventNumber;
+      case DbId::uiEvent:
+         return status.nextUIEventNumber;
+      case DbId::merkleEvent:
+         return status.nextMerkleEventNumber;
+      default:
+         abortMessage("Not an event db");
    }
+}
+
+bool EventIndex::indexSome(std::uint32_t dbNum, std::uint32_t max)
+{
+   const auto db       = static_cast<DbId>(dbNum);
+   const auto dbStatus = psibase::kvGet<psibase::DatabaseStatusRow>(
+       psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
+   check(!!dbStatus, "DatabaseStatusRow not found");
+
+   auto table = DbIndexStatusTable(
+       DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, std::uint16_t{0})));
+   auto status = table.getIndex<0>().get(static_cast<std::uint32_t>(db));
+   if (!status)
+      status = DbIndexStatus{static_cast<std::uint32_t>(db), 1};
+
+   std::vector<char> key;
+   std::vector<char> data;
+   auto              eventNum = status->nextEventNumber;
+   auto              eventEnd = getNextEventNumber(*dbStatus, db);
+   auto&             cache    = SchemaCache::instance();
+   AnyType           u64Type  = Int{.bits = 64, .isSigned = false};
+   CompiledType      u64{.kind             = CompiledType::scalar,
+                         .is_variable_size = false,
+                         .fixed_size       = 8,
+                         .original_type    = &u64Type};
+   CompiledType      wrapper{
+            .kind       = CompiledType::object,
+            .fixed_size = 16,
+            .children   = {{.fixed_offset = 0, .is_optional = false, .type = &u64},
+                           {.fixed_offset = 8, .is_optional = true, .type = &u64},
+                           {.fixed_offset = 12, .is_optional = true, .type = nullptr}},
+   };
+   for (; max != 0 && eventNum != eventEnd; --max, ++eventNum)
    {
-      auto key = table.key();
-      key.push_back('\0');
-      psio::vector_stream stream(key);
-      to_key(i, stream);
-      to_key(id, stream);
-      psibase::kvPutRaw(DbId::service, key, value);
+      std::uint32_t sz = psibase::raw::getSequential(db, eventNum);
+      data.resize(sz);
+      psibase::raw::getResult(data.data(), sz, 0);
+      if (!psio::fracpack_validate<SequentialRecord<MethodNumber>>(data))
+         continue;
+      auto [service, type] = psio::from_frac<SequentialRecord<MethodNumber>>(data);
+      if (!type)
+         continue;
+      const CompiledType* ctype = cache.getSchemaType(db, service, *type);
+      if (!ctype)
+         continue;
+      wrapper.children[2].type = ctype;
+
+      FracParser parser(psio::FracStream{data}, &wrapper, psibase_builtins, false);
+      parser.next();  // start
+      parser.next();  // service
+      parser.next();  // type
+      auto saved = parser.in;
+      // validate remaining data
+      if (![&]
+          {
+             while (auto item = parser.next())
+             {
+                if (item.kind == FracParser::error)
+                   return false;
+             }
+             return true;
+          }())
+         continue;
+      // TODO: make secondary indexes configurable
+      for (int i = -1, end = static_cast<int>(ctype->children.size()); i < end; ++i)
+      {
+         SecondaryIndexInfo  index{static_cast<std::uint8_t>(i)};
+         psio::vector_stream stream{key};
+         to_key(EventIndexTable{db, service, *type}, stream);
+         to_key(index.indexNum, stream);
+         for (const auto& column : index.columns())
+         {
+            parser.in = saved;
+            parser.parse(ctype);
+            parser.select_child(column);
+            to_key(parser, stream);
+         }
+         to_key(eventNum, stream);
+         psibase::raw::kvPut(DbId::writeOnly, key.data(), key.size(), nullptr, 0);
+         key.clear();
+      }
    }
+   if (eventNum != status->nextEventNumber)
+      table.put(*status);
+   return eventNum != eventEnd;
+}
+
+void Events::onBlock()
+{
+   indexSome((std::uint32_t)DbId::historyEvent, 1000);
+   indexSome((std::uint32_t)DbId::merkleEvent, 1000);
 }
 
 void load_tables(sqlite3* db, std::string_view sql)

@@ -43,6 +43,7 @@ namespace psibase
                                                      BlockNum                    irr      = {});
       void                                     start(Block&& src);
       void                                     callStartBlock();
+      void                                     callOnBlock();
       Checksum256                              makeEventMerkleRoot();
       Checksum256                              makeTransactionMerkle();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(const Prover&, const Claim&);

@@ -5,6 +5,7 @@
 #include <psio/fracpack.hpp>
 #include <psio/to_json.hpp>
 #include <psio/to_json/map.hpp>
+#include <ranges>
 #include <variant>
 
 namespace psio
@@ -785,6 +786,82 @@ namespace psio
                         check(false, "Failed to parse custom type");
                   }
                   break;
+               case FracParser::error:
+                  check(false, std::string_view(item.data.data(), item.data.size()));
+            }
+         }
+      }
+
+      void scalar_to_key(const Int& type, std::span<const char> data, auto& stream)
+      {
+         if (type.isSigned)
+         {
+            stream.write(data.back() ^ 0x80);
+            data = data.first(data.size() - 1);
+         }
+         for (char ch : std::ranges::reverse_view{data})
+            stream.write(ch);
+      }
+      void scalar_to_key(const Float& type, std::span<const char> data, auto& stream)
+      {
+         // check for zero
+         bool is_minus_zero =
+             data.back() == 0x80 &&
+             std::ranges::all_of(data.first(data.size() - 1), [](char ch) { return ch == 0; });
+         if ((data.back() & 0x80) && !is_minus_zero)
+         {
+            for (char ch : data | std::views::reverse)
+               stream.write(ch ^ 0xff);
+         }
+         else
+         {
+            stream.write(data.back() | 0x80);
+            data = data.first(data.size() - 1);
+            for (char ch : std::ranges::reverse_view{data})
+               stream.write(ch);
+         }
+      }
+      void scalar_to_key(const auto& type, std::span<const char>, auto& stream)
+      {
+         check(false, "Not a scalar type");
+      }
+
+      // TODO: Allow extensions without breaking key ordering
+      void to_key(FracParser& parser, auto& stream)
+      {
+         auto start_member = [&](const auto& item)
+         {
+            // TODO: determine whether the member is optional
+         };
+         while (auto item = parser.next())
+         {
+            switch (item.kind)
+            {
+               case FracParser::start:
+                  start_member(item);
+                  break;
+               case FracParser::end:
+                  // TODO:
+                  // container with non-optional elements:
+                  // - end = 0, value = 1
+                  // container with optional elements:
+                  // - end = 0, empty optional = 1, value = 2
+                  // container of 8-bit or 1-bit Int
+                  // - end = 00 00,
+                  // - 0 = 00 01
+                  // - x = x
+                  break;
+               case FracParser::scalar:
+                  start_member(item);
+                  std::visit([&](const auto& type) { scalar_to_key(type, item.data, stream); },
+                             item.type->original_type->value);
+                  break;
+               case FracParser::empty:
+                  start_member(item);
+                  stream.write('\0');
+                  break;
+               case FracParser::custom:
+                  check(false, "to_key does not handle custom types");
                case FracParser::error:
                   check(false, std::string_view(item.data.data(), item.data.size()));
             }

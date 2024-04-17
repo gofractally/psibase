@@ -60,16 +60,42 @@ namespace UserService
    };
    PSIO_REFLECT(ServiceSchema, service, schema, ui, history, merkle)
 
+   struct SecondaryIndexInfo
+   {
+      std::uint8_t indexNum;
+      // TODO: allow indexes over multiple columns
+      std::span<const std::uint8_t> columns() const
+      {
+         if (indexNum == 0xffu)
+            return {};
+         else
+            return {&indexNum, 1};
+      }
+   };
+
+   // For each db, tracks the lowest event number that has not been indexed.
+   struct DbIndexStatus
+   {
+      std::uint32_t db;
+      std::uint64_t nextEventNumber;
+   };
+   PSIO_REFLECT(DbIndexStatus, db, nextEventNumber);
+
    using ServiceSchemaTable = psibase::Table<ServiceSchema, &ServiceSchema::service>;
-   using EventsTables = psibase::ServiceTables<ServiceSchemaTable /* 1 reserved for indexes */>;
+   using DbIndexStatusTable = psibase::Table<DbIndexStatus, &DbIndexStatus::db>;
+   using EventsTables       = psibase::ServiceTables<ServiceSchemaTable>;
 
    struct EventIndex : psibase::Service<EventIndex>
    {
       static constexpr psibase::AccountNumber service{"events"};
-      void                                    setSchema(const ServiceSchema& schema);
-      void                                    indexEvent(std::uint64_t id);
-      void                                    send(int i);
-      std::optional<psibase::HttpReply>       serveSys(const psibase::HttpRequest&);
+      // Sets the schema associated with a service
+      void setSchema(const ServiceSchema& schema);
+      void indexEvent(std::uint64_t id);
+      void send(int i);
+      bool indexSome(std::uint32_t db, std::uint32_t max);
+      void onBlock();
+      // Standard HTTP API
+      std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&);
       struct Events
       {
          struct Ui
@@ -88,6 +114,8 @@ namespace UserService
                 method(setSchema, schema),
                 method(indexEvent, id),
                 method(send, i),
+                method(indexSome, db, maxRows),
+                method(onBlock),
                 method(serveSys, request))
 
    PSIBASE_REFLECT_EVENTS(EventIndex);

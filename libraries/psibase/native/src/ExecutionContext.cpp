@@ -183,9 +183,12 @@ namespace psibase
                            const VMOptions&    vmOptions,
                            ExecutionMemory&    memory,
                            AccountNumber       service)
-          : NativeFunctions{transactionContext.blockContext.db, transactionContext,
-                            transactionContext.allowDbRead, transactionContext.allowDbWrite,
-                            transactionContext.allowDbReadSubjective},
+          : NativeFunctions{transactionContext.blockContext.db,
+                            transactionContext,
+                            transactionContext.allowDbRead,
+                            transactionContext.allowDbWrite,
+                            transactionContext.allowDbReadSubjective,
+                            transactionContext.allowDbWriteSubjective},
             vmOptions{vmOptions},
             wa{memory.impl->wa}
       {

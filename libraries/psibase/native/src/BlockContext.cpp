@@ -165,6 +165,36 @@ namespace psibase
       active = true;
    }
 
+   void BlockContext::callOnBlock()
+   {
+      checkActive();
+      active = false;
+
+      Action action{
+          .sender = {},
+          // TODO: Either pick a better root or allow multiple independent services
+          // to be stored in the database.
+          .service = AccountNumber{"events"},
+          .method  = MethodNumber("onBlock"),
+          .rawData = psio::to_frac(std::tuple()),
+      };
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, true, false, true, true};
+      auto&              atrace = trace.actionTraces.emplace_back();
+
+      try
+      {
+         tc.execNonTrxAction(0, action, atrace);
+      }
+      catch (std::exception& e)
+      {
+         PSIBASE_LOG(trxLogger, info) << "onBlock failed: " << e.what();
+      }
+
+      active = true;
+   }
+
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
       Merkle m;
@@ -191,6 +221,7 @@ namespace psibase
    std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision(const Prover& prover,
                                                                         const Claim&  claim)
    {
+      callOnBlock();
       checkActive();
       check(!needGenesisAction, "missing genesis action in block");
       active = false;

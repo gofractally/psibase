@@ -86,6 +86,10 @@ namespace psibase
       {
          check(self.allowDbRead,
                "database access disabled during proof verification or first auth");
+
+         if (!self.allowDbWrite && self.allowDbWriteSubjective && db == uint32_t(DbId::writeOnly))
+            return {(DbId)db, true, false};
+
          check(self.allowDbWrite, "database writes disabled during query");
 
          if (keyHasServicePrefix(db))

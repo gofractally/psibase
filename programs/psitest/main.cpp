@@ -311,6 +311,7 @@ struct test_chain
                                       true,
                                       false,
                                       true,
+                                      false,
                                       {},
                                       &*nativeFunctionsActionContext});
       }
