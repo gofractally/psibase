@@ -84,11 +84,9 @@ TEST_CASE("events")
                                      Object{.members = {{"i", Type{"i32"}}, {"d", Type{"f64"}}}}}}};
    expect(events.setSchema(schema).trace());
    expect(
-       events.addIndex((uint32_t)DbId::historyEvent, Events::service, MethodNumber{"testevent"}, 0)
-           .trace());
+       events.addIndex(DbId::historyEvent, Events::service, MethodNumber{"testevent"}, 0).trace());
    expect(
-       events.addIndex((uint32_t)DbId::historyEvent, Events::service, MethodNumber{"testevent"}, 1)
-           .trace());
+       events.addIndex(DbId::historyEvent, Events::service, MethodNumber{"testevent"}, 1).trace());
    expect(events.send(42, 1.414).trace());
    expect(events.send(72, 3.14159).trace());
    expect(events.send(42, 2.718).trace());

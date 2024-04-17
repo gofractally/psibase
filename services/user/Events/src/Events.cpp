@@ -103,7 +103,7 @@ struct EventVTab : sqlite3_vtab
           EventsTables{getReceiver()}
               .open<
                   SecondaryIndexTable>();  //SecondaryIndexTable(DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum)));
-      if (auto row = secondary.getIndex<0>().get(std::tuple((std::uint32_t)db, service, event)))
+      if (auto row = secondary.getIndex<0>().get(std::tuple(db, service, event)))
          indexes = std::move(row->indexes);
       else
          indexes = std::vector{SecondaryIndexInfo{}};
@@ -938,7 +938,7 @@ void EventIndex::setSchema(const ServiceSchema& schema)
    EventsTables{}.open<ServiceSchemaTable>().put(schema);
 }
 
-void EventIndex::addIndex(std::uint32_t          db,
+void EventIndex::addIndex(psibase::DbId          db,
                           psibase::AccountNumber service,
                           psibase::MethodNumber  event,
                           std::uint8_t           column)
@@ -980,9 +980,8 @@ std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, DbId db)
    }
 }
 
-bool EventIndex::indexSome(std::uint32_t dbNum, std::uint32_t max)
+bool EventIndex::indexSome(psibase::DbId db, std::uint32_t max)
 {
-   const auto db       = static_cast<DbId>(dbNum);
    const auto dbStatus = psibase::kvGet<psibase::DatabaseStatusRow>(
        psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
    check(!!dbStatus, "DatabaseStatusRow not found");
@@ -990,9 +989,9 @@ bool EventIndex::indexSome(std::uint32_t dbNum, std::uint32_t max)
    auto table = DbIndexStatusTable(
        DbId::writeOnly,
        psio::convert_to_key(std::tuple(EventIndex::service, dbIndexStatusTableNum)));
-   auto status = table.getIndex<0>().get(static_cast<std::uint32_t>(db));
+   auto status = table.getIndex<0>().get(db);
    if (!status)
-      status = DbIndexStatus{static_cast<std::uint32_t>(db), 1};
+      status = DbIndexStatus{db, 1};
 
    std::vector<char> key;
    std::vector<char> data;
@@ -1047,7 +1046,7 @@ bool EventIndex::indexSome(std::uint32_t dbNum, std::uint32_t max)
           }())
          continue;
 
-      auto indexes = secondary.getIndex<0>().get(std::tuple(dbNum, service, *type));
+      auto indexes = secondary.getIndex<0>().get(std::tuple(db, service, *type));
       if (!indexes)
          indexes.emplace(SecondaryIndexRecord{.indexes = std::vector{SecondaryIndexInfo{}}});
       for (const auto& index : indexes->indexes)
@@ -1074,8 +1073,8 @@ bool EventIndex::indexSome(std::uint32_t dbNum, std::uint32_t max)
 
 void Events::onBlock()
 {
-   indexSome((std::uint32_t)DbId::historyEvent, 1000);
-   indexSome((std::uint32_t)DbId::merkleEvent, 1000);
+   indexSome(DbId::historyEvent, 1000);
+   indexSome(DbId::merkleEvent, 1000);
 }
 
 void load_tables(sqlite3* db, std::string_view sql)

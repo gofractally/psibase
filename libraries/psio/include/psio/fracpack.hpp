@@ -86,6 +86,12 @@ namespace psio
    {
    };
 
+   template <typename T>
+      requires(!PackableNumeric<T> && PackableNumeric<std::underlying_type_t<T>>)
+   struct is_packable_memcpy<T> : std::bool_constant<true>
+   {
+   };
+
    template <PackableMemcpy T, std::size_t N>
    struct is_packable_memcpy<std::array<T, N>> : std::bool_constant<true>
    {

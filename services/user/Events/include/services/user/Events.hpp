@@ -83,7 +83,7 @@ namespace UserService
 
    struct SecondaryIndexRecord
    {
-      std::uint32_t                   db;
+      psibase::DbId                   db;
       psibase::AccountNumber          service;
       psibase::MethodNumber           event;
       std::vector<SecondaryIndexInfo> indexes;
@@ -94,7 +94,7 @@ namespace UserService
    // For each db, tracks the lowest event number that has not been indexed.
    struct DbIndexStatus
    {
-      std::uint32_t db;
+      psibase::DbId db;
       std::uint64_t nextEventNumber;
    };
    PSIO_REFLECT(DbIndexStatus, db, nextEventNumber);
@@ -118,13 +118,13 @@ namespace UserService
       // Adds an index.
       // TODO: Add existing rows to the index
       // TODO: There should be a way to construct the index concurrently.
-      void addIndex(std::uint32_t          db,
+      void addIndex(psibase::DbId          db,
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
       // Temporary for testing
       void send(int i, double d);
-      bool indexSome(std::uint32_t db, std::uint32_t max);
+      bool indexSome(psibase::DbId db, std::uint32_t max);
       // Runs in subjective mode at the end of each block
       void onBlock();
       // Standard HTTP API
