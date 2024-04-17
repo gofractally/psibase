@@ -45,6 +45,21 @@ function App() {
 
   const run2 = async () => {
     try {
+      const res = await supervisor.functionCall({
+        service: "demoapp1",
+        intf: "intf",
+        method: "helloworld2",
+        params: [],
+      });
+      setRes(res as string);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+  };
+
+
+  const run5 = async () => {
+    try {
       console.log("running 2");
       const res = await supervisor.functionCall({
         service: "demoapp1",
@@ -52,11 +67,8 @@ function App() {
         method: "multipli",
         params: [Number(a), Number(b)],
       });
-      console.log(res, "was res 2");
-      const requests = [...Array(5)];
-      for (const req in requests) {
+      for (let i = 0; i < 5; i++) {
         const { answer } = await fetchAnswers();
-        console.log(req + 1, answer);
         setAnswer(answer.result.toString());
         await wait(1000);
       }
@@ -144,7 +156,7 @@ function App() {
       </div>
 
       <div className="card">
-        <button onClick={() => run2()}>{"Do maths on blockchain"}</button>
+        <button onClick={() => run5()}>{"Multiplication on blockchain"}</button>
         <input type="text" onChange={(e) => setA(e.target.value)} />
         x
         <input type="text" onChange={(e) => setB(e.target.value)} />
