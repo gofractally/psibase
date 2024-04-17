@@ -7,7 +7,6 @@
 mod service {
     use async_graphql::*;
     use psibase::*;
-    use psibase::{services::demoapp1 as app_1, AccountNumber};
     use serde::{Deserialize, Serialize};
 
     /// Holds an answer to a calculation done by an account `id`
