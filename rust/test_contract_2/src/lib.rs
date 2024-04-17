@@ -7,7 +7,6 @@
 mod service {
     use async_graphql::*;
     use psibase::*;
-    use psibase::{services::demoapp1 as app_1, AccountNumber};
     use serde::{Deserialize, Serialize};
 
     /// Holds an answer to a calculation done by an account `id`
@@ -21,9 +20,6 @@ mod service {
         /// The result of the calculation
         result: i32,
     }
-
-    #[table(record = "WebContentRow", index = 1)]
-    struct WebContentTable;
 
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {
@@ -54,7 +50,7 @@ mod service {
             })
             .unwrap();
 
-        // Wrapper::emit().history().multiply(a, b, res);
+        Wrapper::emit().history().multiply(a, b, res);
 
         res
     }
@@ -71,13 +67,6 @@ mod service {
         /// Get the answer to `account`'s most recent calculation
         async fn answer(&self, account: AccountNumber) -> Option<Answer> {
             AnswerTable::new().get_index_pk().get(&account)
-        }
-
-        async fn answers(&self, account: AccountNumber) -> Option<Vec<i32>> {
-            let answer_table = AnswerTable::new();
-            let tab = answer_table.get_index_pk();
-
-            Some(tab.iter().map(|val| val.result).collect())
         }
 
         /// Look up an event
@@ -103,16 +92,18 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
+        None.or_else(|| serve_simple_ui::<Wrapper>(&request))
             .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
     }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn storeSys(path: String, contentType: String, content: HexBytes) {
-        check(get_sender() == get_service(), "unauthorized");
-        let table = WebContentTable::new();
-        store_content(path, contentType, content, &table).unwrap();
-    }
 }
+
+// TODO: testing not working
+// #[psibase::test_case(services("example"))]
+// fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     let result = Wrapper::push(&chain).add(3, 4);
+//     assert_eq!(result.get()?, 7);
+//     println!("\n\nTrace:\n{}", result.trace);
+
+//     Ok(())
+// }
