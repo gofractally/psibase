@@ -11,12 +11,7 @@ using namespace SystemService;
 using namespace UserService;
 using namespace psio::schema_types;
 
-std::vector<char> vec(std::string_view s)
-{
-   return std::vector(s.begin(), s.end());
-}
-
-HttpRequest sql(std::string_view s)
+HttpRequest makeQuery(std::string_view s)
 {
    return {.host        = "events.psibase.io",
            .rootHost    = "psibase.io",
@@ -27,9 +22,9 @@ HttpRequest sql(std::string_view s)
 }
 
 template <typename R>
-std::vector<R> sql(TestChain& chain, std::string_view s)
+std::vector<R> query(TestChain& chain, std::string_view s)
 {
-   auto response = chain.http(sql(s));
+   auto response = chain.http(makeQuery(s));
    CHECK(response.contentType == "application/json");
    response.body.push_back('\0');
    psio::json_token_stream stream(response.body.data());
@@ -46,7 +41,7 @@ PSIO_REFLECT(ExplainQueryPlan, id, parent, detail)
 
 void explain(TestChain& chain, std::string_view s)
 {
-   auto plan = sql<ExplainQueryPlan>(chain, std::string("EXPLAIN QUERY PLAN ") + std::string(s));
+   auto plan = query<ExplainQueryPlan>(chain, std::string("EXPLAIN QUERY PLAN ") + std::string(s));
    std::vector<std::int64_t> stack;
    for (const auto& row : plan)
    {
@@ -92,18 +87,21 @@ TEST_CASE("events")
    expect(events.send(42, 2.718).trace());
    expect(events.send(91, 1.618).trace());
 
-   explain(chain, "SELECT i,d FROM \"history.events.testevent\" WHERE d > 2 ORDER BY d");
+   explain(
+       chain,
+       R"""(SELECT * FROM "history.events.testevent" WHERE d > 2 UNION SELECT * FROM "history.events.testevent" WHERE i >= 50 ORDER BY d)""");
 
-   CHECK(sql<TestEvent>(chain,
-                        "SELECT i,d FROM \"history.events.testevent\" WHERE d > 2 ORDER BY d") ==
+   CHECK(query<TestEvent>(
+             chain, R"""(SELECT i,d FROM "history.events.testevent" WHERE d > 2 ORDER BY d)""") ==
          std::vector<TestEvent>{{42, 2.718}, {72, 3.14159}});
 
-   CHECK(sql<TestEvent>(chain, "SELECT i FROM \"history.events.testevent\" ORDER BY ROWID") ==
-         std::vector<TestEvent>{{42}, {72}, {42}, {91}});
+   CHECK(
+       query<TestEvent>(chain, R"""(SELECT i FROM "history.events.testevent" ORDER BY ROWID)""") ==
+       std::vector<TestEvent>{{42}, {72}, {42}, {91}});
 
    CHECK(
-       sql<TestEvent>(
+       query<TestEvent>(
            chain,
-           "SELECT i FROM \"history.events.testevent\" WHERE i = '\"history.unknown.unknown\"'") ==
+           R"""(SELECT i FROM "history.events.testevent" WHERE i = '"history.unknown.unknown"')""") ==
        std::vector<TestEvent>{});
 }
