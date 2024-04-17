@@ -54,8 +54,6 @@ mod service {
             })
             .unwrap();
 
-        // Wrapper::emit().history().multiply(a, b, res);
-
         res
     }
 
@@ -68,7 +66,6 @@ mod service {
 
     #[Object]
     impl Query {
-        /// Get the answer to `account`'s most recent calculation
         async fn answer(&self, account: AccountNumber) -> Option<Answer> {
             AnswerTable::new().get_index_pk().get(&account)
         }
@@ -80,21 +77,6 @@ mod service {
             Some(tab.iter().map(|val| val.result).collect())
         }
 
-        /// Look up an event
-        ///
-        /// ```
-        /// query {
-        ///   event(id: 1) {
-        ///     __typename
-        ///     ... on Add {
-        ///       a b result
-        ///     }
-        ///     ... on Multiply {
-        ///       a b result
-        ///     }
-        ///   }
-        /// }
-        /// ```
         async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
             get_event(id)
         }
