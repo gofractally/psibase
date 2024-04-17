@@ -57,10 +57,8 @@ function App() {
     }
   };
 
-
   const run5 = async () => {
     try {
-      console.log("running 2");
       const res = await supervisor.functionCall({
         service: "demoapp1",
         intf: "intf",
