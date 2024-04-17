@@ -78,7 +78,6 @@ function App() {
 
   const run3 = async () => {
     try {
-      console.log("trying to run the inviteUrl...");
       const inviteUrl: string = (await supervisor.functionCall({
         service: "invite",
         intf: "inviter",
