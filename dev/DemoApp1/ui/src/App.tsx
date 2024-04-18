@@ -62,7 +62,7 @@ function App() {
       const res = await supervisor.functionCall({
         service: "demoapp1",
         intf: "intf",
-        method: "multipli",
+        method: "multiply",
         params: [Number(a), Number(b)],
       });
       for (let i = 0; i < 5; i++) {

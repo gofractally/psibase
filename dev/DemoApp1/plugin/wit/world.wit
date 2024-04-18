@@ -3,7 +3,7 @@ package demoapp1:example;
 interface intf {
     use common:plugin/types.{error};
     helloworld2: func() -> result<string, error>;
-    multipli: func(a: u32, b: u32) -> string;
+    multiply: func(a: u32, b: u32) -> result<string, error>;
 }
 
 world example {

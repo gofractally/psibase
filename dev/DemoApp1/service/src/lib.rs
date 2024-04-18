@@ -43,7 +43,7 @@ mod service {
 
     #[action]
     pub fn multiply(a: u32, b: u32) -> u32 {
-        let res = a * b + 1;
+        let res = a * b;
 
         let answer_table = AnswerTable::new();
         answer_table
