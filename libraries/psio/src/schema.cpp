@@ -563,10 +563,12 @@ namespace psio::schema_types
                                       std::uint32_t       offset)
       {
          if (parser.in.known_end)
+         {
             if (parser.in.pos != offset)
                return makeError(type, "wrong offset");
             else if (parser.in.pos > offset)
                return makeError(type, "offset moved backwards");
+         }
          return {};
       }
 
