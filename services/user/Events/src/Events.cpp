@@ -438,6 +438,8 @@ const ExtraCustom<SqlCustomHandler> psibase_sql_builtins{
     psibase_builtins,
     {{"bool", {&bool_to_sql}}, {"string", {&string_to_sql}}, {"hex", {&blob_to_sql}}}};
 
+std::string_view jsonPrefix("\x2f\x0a\xc4\x5b\xc1\xe1\x4d\xcc\x60\x02\xd4\xbe\x67\xb9\x06\xd4", 16);
+
 int event_column(sqlite3_vtab_cursor* cursor, sqlite3_context* ctx, int n)
 {
    auto*      c = static_cast<EventCursor*>(cursor);
@@ -473,7 +475,7 @@ int event_column(sqlite3_vtab_cursor* cursor, sqlite3_context* ctx, int n)
    }
    // json as text
    parser.push(std::move(item));
-   std::vector<char>   result;
+   std::vector<char>   result(jsonPrefix.begin(), jsonPrefix.end());
    psio::vector_stream stream{result};
    to_json(parser, stream);
    sqlite3_result_text64(ctx, result.data(), result.size(), SQLITE_TRANSIENT, SQLITE_UTF8);
@@ -906,10 +908,18 @@ void column_to_json(sqlite3_stmt* stmt, int i, auto& stream)
          to_json(sqlite3_column_double(stmt, i), stream);
          break;
       case SQLITE_TEXT:
-         to_json(std::string_view{reinterpret_cast<const char*>(sqlite3_column_text(stmt, i)),
-                                  static_cast<std::size_t>(sqlite3_column_bytes(stmt, i))},
-                 stream);
+      {
+         auto result = std::string_view{reinterpret_cast<const char*>(sqlite3_column_text(stmt, i)),
+                                        static_cast<std::size_t>(sqlite3_column_bytes(stmt, i))};
+         if (result.starts_with(jsonPrefix))
+         {
+            result.remove_prefix(jsonPrefix.size());
+            stream.write(result.data(), result.size());
+         }
+         else
+            to_json(result, stream);
          break;
+      }
       case SQLITE_BLOB:
          to_json_hex(reinterpret_cast<const char*>(sqlite3_column_text(stmt, i)),
                      static_cast<std::size_t>(sqlite3_column_bytes(stmt, i)), stream);
@@ -964,9 +974,9 @@ void EventIndex::addIndex(psibase::DbId          db,
    dirtyTable.put(IndexDirtyRecord{db, service, event});
 }
 
-void EventIndex::send(int i, double d)
+void EventIndex::send(int i, double d, std::vector<int32_t> v, std::string s)
 {
-   auto id = emit().history().testEvent(i, d);
+   auto id = emit().history().testEvent(i, d, v, s);
 }
 
 std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, DbId db)

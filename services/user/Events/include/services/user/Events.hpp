@@ -42,7 +42,7 @@ namespace UserService
       {
          if (const auto* types = getDb(db))
             if (auto pos = types->find(event); pos != types->end())
-               return &pos->second;
+               return pos->second.resolve(schema);
          return nullptr;
       }
       std::vector<const psio::schema_types::AnyType*> types() const
@@ -156,7 +156,7 @@ namespace UserService
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
       // Temporary for testing
-      void send(int i, double d);
+      void send(int i, double d, std::vector<int32_t> v, std::string s);
       // returns true if there is more to do
       bool indexSome(psibase::DbId db, std::uint32_t max);
       // Applies pending index changes
@@ -172,7 +172,7 @@ namespace UserService
          };
          struct History
          {
-            void testEvent(int32_t i, double d) {}
+            void testEvent(int32_t i, double d, std::vector<int32_t> v, std::string s) {}
          };
          struct Merkle
          {

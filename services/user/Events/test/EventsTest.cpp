@@ -55,11 +55,13 @@ void explain(TestChain& chain, std::string_view s)
 
 struct TestEvent
 {
-   int         i                                              = 0;
-   double      d                                              = 0;
-   friend bool operator==(const TestEvent&, const TestEvent&) = default;
+   int                       i = 0;
+   double                    d = 0;
+   std::vector<std::int32_t> v;
+   std::string               s;
+   friend bool               operator==(const TestEvent&, const TestEvent&) = default;
 };
-PSIO_REFLECT(TestEvent, i, d)
+PSIO_REFLECT(TestEvent, i, d, v, s)
 
 std::ostream& operator<<(std::ostream& os, const TestEvent& e)
 {
@@ -74,22 +76,26 @@ TEST_CASE("events")
    expect(chain.from(Events::service).to<HttpServer>().registerServer(Events::service).trace());
 
    ServiceSchema schema{.service = Events::service,
-                        .schema  = SchemaBuilder().insert<int>("i32").insert<double>("f64").build(),
-                        .history = {{MethodNumber{"testevent"},
-                                     Object{.members = {{"i", Type{"i32"}}, {"d", Type{"f64"}}}}}}};
+                        .schema  = SchemaBuilder().insert<TestEvent>("testevent").build(),
+                        .history = {{MethodNumber{"testevent"}, Type{"testevent"}}}};
    expect(events.setSchema(schema).trace());
-   expect(events.send(42, 1.414).trace());
-   expect(events.send(72, 3.14159).trace());
+   expect(events.send(42, 1.414, std::vector{1}, "a").trace());
+   expect(events.send(72, 3.14159, std::vector{2}, "b").trace());
    expect(
        events.addIndex(DbId::historyEvent, Events::service, MethodNumber{"testevent"}, 0).trace());
    expect(
        events.addIndex(DbId::historyEvent, Events::service, MethodNumber{"testevent"}, 1).trace());
-   expect(events.send(42, 2.718).trace());
-   expect(events.send(91, 1.618).trace());
+   expect(events.send(42, 2.718, std::vector{3}, "c").trace());
+   expect(events.send(91, 1.618, std::vector{4}, "d").trace());
 
    explain(
        chain,
        R"""(SELECT * FROM "history.events.testevent" WHERE d > 2 UNION SELECT * FROM "history.events.testevent" WHERE i >= 50 ORDER BY d)""");
+
+   CHECK(
+       query<TestEvent>(
+           chain, R"""(SELECT i,d,v,s FROM "history.events.testevent" WHERE d > 2 ORDER BY d)""") ==
+       std::vector<TestEvent>{{42, 2.718, {3}, "c"}, {72, 3.14159, {2}, "b"}});
 
    CHECK(query<TestEvent>(
              chain, R"""(SELECT i,d FROM "history.events.testevent" WHERE d > 2 ORDER BY d)""") ==

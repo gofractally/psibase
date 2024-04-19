@@ -480,7 +480,12 @@ namespace psio::schema_types
    {
       // collect root types
       std::vector<const AnyType*> stack;
-      std::vector<const AnyType*> queue = std::move(extraTypes);
+      std::vector<const AnyType*> queue;
+      for (const auto* type : extraTypes)
+      {
+         if (!std::holds_alternative<Type>(type->value))
+            queue.push_back(type);
+      }
       for (const auto& [name, type] : schema.types)
       {
          if (!std::holds_alternative<Type>(type.value))
