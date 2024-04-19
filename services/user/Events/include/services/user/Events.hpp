@@ -23,6 +23,62 @@ namespace UserService
       EventMap ui;
       EventMap history;
       EventMap merkle;
+
+      template <typename T>
+      static void makeEvents(psio::SchemaBuilder&                       builder,
+                             EventMap&                                  out,
+                             std::vector<psio::schema_types::AnyType*>& eventTypes)
+      {
+         psio::reflect<T>::for_each(
+             [&](const psio::meta& ref, auto member)
+             {
+                using m = psio::MemberPtrType<decltype(member(std::declval<T*>()))>;
+                if constexpr (m::isFunction)
+                {
+                   psio::schema_types::Object type;
+                   auto                       nameIter = ref.param_names.begin();
+                   auto                       nameEnd  = ref.param_names.end();
+                   auto                       i        = ref.param_names.size();
+                   forEachType(typename m::SimplifiedArgTypes{},
+                               [&](auto* t)
+                               {
+                                  std::string name =
+                                      nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
+                                  type.members.push_back(
+                                      {std::move(name),
+                                       builder.insert<std::remove_pointer_t<decltype(t)>>()});
+                               });
+                   auto [pos, inserted] =
+                       out.try_emplace(psibase::MethodNumber{ref.name}, std::move(type));
+                   if (inserted)
+                   {
+                      eventTypes.push_back(&pos->second);
+                   }
+                }
+             });
+      }
+
+      template <typename T>
+      static ServiceSchema make()
+      {
+         ServiceSchema                             result{.service = T::service};
+         std::vector<psio::schema_types::AnyType*> eventTypes;
+         psio::SchemaBuilder                       builder;
+         if constexpr (requires { typename T::Events::Ui; })
+         {
+            makeEvents<typename T::Events::Ui>(builder, result.ui, eventTypes);
+         }
+         if constexpr (requires { typename T::Events::History; })
+         {
+            makeEvents<typename T::Events::History>(builder, result.history, eventTypes);
+         }
+         if constexpr (requires { typename T::Events::Merkle; })
+         {
+            makeEvents<typename T::Events::Merkle>(builder, result.merkle, eventTypes);
+         }
+         result.schema = std::move(builder).build(eventTypes);
+         return result;
+      }
       //
       const EventMap* getDb(psibase::DbId db) const
       {
@@ -188,7 +244,7 @@ namespace UserService
                 method(serveSys, request))
 
    PSIBASE_REFLECT_EVENTS(EventIndex);
-   PSIBASE_REFLECT_HISTORY_EVENTS(EventIndex, method(testEvent, i));
+   PSIBASE_REFLECT_HISTORY_EVENTS(EventIndex, method(testEvent, i, d, v, s));
    PSIBASE_REFLECT_UI_EVENTS(EventIndex);
    PSIBASE_REFLECT_MERKLE_EVENTS(EventIndex);
    using Events = EventIndex;

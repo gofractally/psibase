@@ -75,9 +75,8 @@ TEST_CASE("events")
    auto             events = chain.from(chain.addService<Events>("Events.wasm")).to<Events>();
    expect(chain.from(Events::service).to<HttpServer>().registerServer(Events::service).trace());
 
-   ServiceSchema schema{.service = Events::service,
-                        .schema  = SchemaBuilder().insert<TestEvent>("testevent").build(),
-                        .history = {{MethodNumber{"testevent"}, Type{"testevent"}}}};
+   auto schema = ServiceSchema::make<Events>();
+   std::cout << psio::format_json(schema) << std::endl;
    expect(events.setSchema(schema).trace());
    expect(events.send(42, 1.414, std::vector{1}, "a").trace());
    expect(events.send(72, 3.14159, std::vector{2}, "b").trace());

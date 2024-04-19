@@ -1206,12 +1206,16 @@ namespace psio::schema_types
       }
    }  // namespace
 
-   void SchemaBuilder::optimize()
+   void SchemaBuilder::optimize(std::span<AnyType* const> ext)
    {
       std::map<std::string, std::vector<AnyType*>> refs;
       // Group all aliases, user defined types are not replaced
       // lower numbered aliases are preferred.
       std::map<std::string, std::string> resolved;
+      for (AnyType* type : ext)
+      {
+         addRef(refs, *type);
+      }
       for (auto& [name, type] : schema.types)
       {
          if (auto* alias = std::get_if<Type>(&type.value))

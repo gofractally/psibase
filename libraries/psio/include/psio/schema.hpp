@@ -1061,14 +1061,14 @@ namespace psio
             }
             return Type{std::move(name)};
          }
-         Schema build() &&
+         Schema build(std::span<AnyType* const> ext = {}) &&
          {
-            optimize();
+            optimize(ext);
             ids.clear();
             return std::move(schema);
          }
 
-         void optimize();
+         void optimize(std::span<AnyType* const> ext = {});
 
         private:
          bool                               expandNested_ = false;
