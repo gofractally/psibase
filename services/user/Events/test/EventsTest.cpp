@@ -70,6 +70,19 @@ std::ostream& operator<<(std::ostream& os, const TestEvent& e)
    return os;
 }
 
+struct Opt
+{
+   std::optional<std::int32_t> opt;
+   friend bool                 operator==(const Opt&, const Opt&) = default;
+};
+PSIO_REFLECT(Opt, opt)
+
+std::ostream& operator<<(std::ostream& os, const Opt& e)
+{
+   os << psio::convert_to_json(e) << std::endl;
+   return os;
+}
+
 TEST_CASE("events")
 {
    DefaultTestChain chain;
@@ -116,4 +129,9 @@ TEST_CASE("events")
            chain,
            R"""(SELECT i FROM "history.test-service.testevent" WHERE i = '"history.unknown.unknown"')""") ==
        std::vector<TestEvent>{});
+
+   expect(testService.to<TestService>().sendOptional(std::nullopt).trace());
+   expect(testService.to<TestService>().sendOptional(42).trace());
+   CHECK(query<Opt>(chain, R"""(SELECT * FROM "history.test-service.opt" ORDER BY ROWID)""") ==
+         std::vector<Opt>{{}, {42}});
 }
