@@ -11,6 +11,7 @@ export default defineConfig({
       name: "@psibase/common-lib",
       fileName: "common-lib",
     },
+    minify: false,
   },
   plugins: [dts()],
 });
