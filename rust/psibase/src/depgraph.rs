@@ -71,7 +71,7 @@ impl PackageDisposition {
 //
 //struct DepGraph
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum PackageOp {
     Install(PackageInfo),
     Replace(Meta, PackageInfo),
@@ -551,7 +551,7 @@ mod tests {
             name: "A".to_string(),
             version: "1.0.0".to_string(),
         });
-        assert_eq!(graph.solve()?, vec![a]);
+        assert_eq!(graph.solve()?, vec![PackageOp::Install(a)]);
         Ok(())
     }
 
@@ -564,14 +564,16 @@ mod tests {
 {"name":"B","description":"","version":"1.0.0","depends":[{"name":"A","version":"1.0.0"}],"accounts":[]}
 ]"#,
         )?;
+        let mut packages_ops = Vec::new();
         for package in &packages {
             graph.add(package.clone());
+            packages_ops.push(PackageOp::Install(package.clone()));
         }
         graph.add_input(PackageRef {
             name: "B".to_string(),
             version: "1.0.0".to_string(),
         });
-        assert_eq!(graph.solve()?, packages);
+        assert_eq!(graph.solve()?, packages_ops);
         Ok(())
     }
 

@@ -92,11 +92,26 @@ fn extract_str(str: &BuildString) -> String {
 }
 
 pub fn create_schema<T: Reflect>() -> Schema<BuildString> {
+    // println!("im hereeee1");
+    // let mut schema = Schema {
+    //     userTypes: Vec::new(),
+    // };
+    // println!("im here1b");
+    // let mut builder = SchemaBuilder {
+    //     names: Vec::new(),  // Initialize an empty vector
+    //     type_refs: HashMap::new(),  // Initialize an empty hash map
+    //     schema
+    // };
+    // println!("im here1c");
     let mut builder: SchemaBuilder = Default::default();
+    // println!("im here2");
     builder.get_type_ref::<T>(false);
+    // println!("im here3");
     let mut names: HashSet<String> = HashSet::new();
     for shared_name in builder.names {
+        // println!("im here4");
         let name = extract_str(&shared_name);
+        // println!("im here5 {}", name);
         if names.contains(&name) {
             let mut i = 0;
             let new_name = loop {

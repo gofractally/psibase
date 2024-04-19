@@ -11,7 +11,7 @@
 extern "C"
 {
    // clang-format off
-   [[clang::import_name("testerCreateChain")]]      uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
+   [[clang::import_name("testerCreateChain")]]      uint32_t testerCreateChain(uint64_t hot_bytes, uint64_t warm_bytes, uint64_t cool_bytes, uint64_t cold_bytes);
    [[clang::import_name("testerDestroyChain")]]     void     testerDestroyChain(uint32_t chain);
    [[clang::import_name("testerFinishBlock")]]      void     testerFinishBlock(uint32_t chain_index);
    [[clang::import_name("testerGetChainPath")]]     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);

@@ -432,6 +432,8 @@ async fn deploy(opts: &DeployCommand, root: &str) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main2() -> Result<(), Error> {
+    pretty("TEST-DEV", "Psibase test");
+
     let mut is_cargo_subcommand = false;
     if let Some(arg) = env::args().nth(1) {
         is_cargo_subcommand = arg == "psibase";

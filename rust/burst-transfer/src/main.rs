@@ -2,6 +2,7 @@ use std::sync::atomic::AtomicI32;
 
 use anyhow::{anyhow, Context};
 use psibase::fracpack::Pack;
+use psibase::{AnyPrivateKey, TraceFormat};
 
 /// Randomly push transfers to a blockchain in bursts
 #[derive(clap::Parser, Debug)]
@@ -18,7 +19,7 @@ struct Args {
 
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
-    sign: Vec<psibase::PrivateKey>,
+    sign: Vec<AnyPrivateKey>,
 
     /// Token symbol
     #[clap(required = true)]
@@ -40,6 +41,15 @@ struct Args {
     /// maintain <BURST_SIZE> transactions in flight.
     #[clap(short = 'd', long, default_value_t = 1000)]
     delay: u32,
+
+    /// Controls how transaction traces are reported. Possible values are
+    /// error, stack, full, or json
+    #[clap(long, value_name = "FORMAT", default_value = "stack")]
+    trace: TraceFormat,
+
+    /// Controls whether the transaction's console output is shown
+    #[clap(long, action=clap::ArgAction::Set, min_values=0, require_equals=true, default_value="true", default_missing_value="true")]
+    console: bool,
 }
 
 // Get the url for a service's path
@@ -169,6 +179,9 @@ async fn transfer_impl(
         &args.api,
         reqwest::Client::new(),
         psibase::sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
+        args.console,
+        None,
     )
     .await?;
     Ok(())

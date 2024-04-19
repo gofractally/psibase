@@ -7,14 +7,16 @@
 //! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
 
 use crate::{
-    kv_get, services, status_key, tester_raw, AccountNumber, Action, Caller, InnerTraceEnum,
-    Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace,
+    get_result_bytes, kv_get, services, status_key, tester_raw, AccountNumber, Action, Caller, InnerTraceEnum, Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
 use psibase_macros::account_raw;
 use std::cell::{Cell, RefCell};
 use std::{marker::PhantomData, ptr::null_mut};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
 /// Execute a shell command
 ///
@@ -25,31 +27,15 @@ pub fn execute(command: &str) -> i32 {
 
 /// Read a file into memory. Returns `None` if failure.
 pub fn read_whole_file(filename: &str) -> Option<Vec<u8>> {
-    struct Context {
-        size: usize,
-        bytes: Vec<u8>,
-    }
-    let mut context = Context {
-        size: 0,
-        bytes: Vec::new(),
+    let path = Path::new(filename);
+    let mut file = match File::open(&path) {
+        Ok(file) => file,
+        Err(_) => return None,
     };
-    unsafe {
-        unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-            let context = &mut *(alloc_context as *mut Context);
-            context.size = size;
-            context.bytes.reserve(size);
-            context.bytes.as_mut_ptr()
-        }
-        if !tester_raw::testerReadWholeFile(
-            filename.as_ptr(),
-            filename.len(),
-            (&mut context) as *mut Context as *mut u8,
-            alloc,
-        ) {
-            return None;
-        }
-        context.bytes.set_len(context.size);
-        Some(context.bytes)
+    let mut buffer = Vec::new();
+    match file.read_to_end(&mut buffer) {
+        Ok(_) => Some(buffer),
+        Err(_) => None,
     }
 }
 
@@ -76,31 +62,28 @@ impl Drop for Chain {
 impl Chain {
     /// Create a new chain and make it active for database native functions.
     ///
-    /// Shortcut for `Tester::create(1_000_000_000, 32, 32, 32, 38)`
+    /// Shortcut for `Tester::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)`
     pub fn new() -> Chain {
-        Self::create(1_000_000_000, 32, 32, 32, 38)
+        Self::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)
     }
 
     /// Create a new chain and make it active for database native functions.
     ///
-    /// `max_objects` is the maximum number of objects the database can hold.
-    /// The remaining arguments are log-base-2 of file sizes for the database's
-    /// various files. e.g. `32` is 4 GB.
+    /// The arguments are the file sizes in bytes for the database's
+    /// various files.
     pub fn create(
-        max_objects: u64,
-        hot_addr_bits: u64,
-        warm_addr_bits: u64,
-        cool_addr_bits: u64,
-        cold_addr_bits: u64,
+        hot_bytes: u64,
+        warm_bytes: u64,
+        cool_bytes: u64,
+        cold_bytes: u64,
     ) -> Chain {
         unsafe {
             Chain {
                 chain_handle: tester_raw::testerCreateChain(
-                    max_objects,
-                    hot_addr_bits,
-                    warm_addr_bits,
-                    cool_addr_bits,
-                    cold_addr_bits,
+                    hot_bytes,
+                    warm_bytes,
+                    cool_bytes,
+                    cold_bytes,
                 ),
                 status: None.into(),
                 producing: false.into(),
@@ -170,30 +153,18 @@ impl Chain {
         }
 
         let transaction = transaction.packed();
-        struct Context {
-            size: usize,
-            bytes: Vec<u8>,
-        }
-        let mut context = Context {
-            size: 0,
-            bytes: Vec::new(),
-        };
         unsafe {
-            unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-                let context = &mut *(alloc_context as *mut Context);
-                context.size = size;
-                context.bytes.reserve(size);
-                context.bytes.as_mut_ptr()
-            }
-            tester_raw::testerPushTransaction(
+            // unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
+            //     let context = &mut *(alloc_context as *mut Context);
+            //     context.size = size;
+            //     context.bytes.reserve(size);
+            //     context.bytes.as_mut_ptr()
+            // }
+            let size = tester_raw::testerPushTransaction(
                 self.chain_handle,
                 transaction.as_ptr(),
-                transaction.len(),
-                (&mut context) as *mut Context as *mut u8,
-                alloc,
-            );
-            context.bytes.set_len(context.size);
-            TransactionTrace::unpacked(&context.bytes).unwrap()
+                transaction.len());
+            TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
         }
     }
 

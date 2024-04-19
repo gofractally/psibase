@@ -71,7 +71,7 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
     if func.sig.inputs.len() > 1 {
         abort!(func.sig.inputs, "test_case has more than 1 argument")
     }
-
+    
     let inputs = func.sig.inputs;
     let output = func.sig.output;
     func.sig.inputs = Default::default();
@@ -114,17 +114,29 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
         block = parse_quote! {{
             fn with_chain(#inputs) #output #block
             fn create_chain() -> Result<psibase::Chain, psibase::Error> {
+                use psibase::*;
+                use std::io::Cursor;
+            
                 let mut chain = psibase::Chain::new();
-                for trx in psibase::create_boot_transactions(
+            
+                let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
+            
+                let (boot_tx, subsequent_tx) = psibase::create_boot_transactions(
                     &None,
                     psibase::account!("prod"),
                     false,
-                    false,
-                    false,
                     psibase::TimePointSec { seconds: 10 },
-                ) {
+                    &mut services[..],
+                ).unwrap();
+            
+                for trx in boot_tx {
                     chain.push(&trx).ok()?;
                 }
+            
+                for trx in subsequent_tx {
+                    chain.push(&trx).ok()?;
+                }
+            
                 #deploy_services
                 Ok(chain)
             }
@@ -175,11 +187,15 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
     }
 
     func.block = block.into();
-    quote! {
+    let q = quote! {
         #[::std::prelude::v1::test]
         #func
-    }
-    .into()
+    };
+
+    // println!("Debug 3: {:?}", "after block check");
+    // println!("final quote:\n {}", q);
+
+    q.into()
 }
 
 struct LoadServices {
