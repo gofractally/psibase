@@ -186,6 +186,8 @@ namespace psibase
       try
       {
          tc.execNonTrxAction(0, action, atrace);
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, info) << "onBlock succeeded";
       }
       catch (std::exception& e)
       {
