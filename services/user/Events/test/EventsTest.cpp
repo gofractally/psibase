@@ -1,6 +1,7 @@
 #include <services/user/Events.hpp>
 
 #include <services/system/HttpServer.hpp>
+#include "TestService.hpp"
 
 #define CATCH_CONFIG_MAIN
 
@@ -72,41 +73,47 @@ std::ostream& operator<<(std::ostream& os, const TestEvent& e)
 TEST_CASE("events")
 {
    DefaultTestChain chain;
-   auto             events = chain.from(chain.addService<Events>("Events.wasm")).to<Events>();
+   chain.addService<Events>("Events.wasm");
    expect(chain.from(Events::service).to<HttpServer>().registerServer(Events::service).trace());
 
-   auto schema = ServiceSchema::make<Events>();
+   auto testService = chain.from(chain.addService<TestService>("Events-TestService.wasm"));
+
+   auto schema = ServiceSchema::make<TestService>();
    std::cout << psio::format_json(schema) << std::endl;
-   expect(events.setSchema(schema).trace());
-   expect(events.send(42, 1.414, std::vector{1}, "a").trace());
-   expect(events.send(72, 3.14159, std::vector{2}, "b").trace());
-   expect(
-       events.addIndex(DbId::historyEvent, Events::service, MethodNumber{"testevent"}, 0).trace());
-   expect(
-       events.addIndex(DbId::historyEvent, Events::service, MethodNumber{"testevent"}, 1).trace());
-   expect(events.send(42, 2.718, std::vector{3}, "c").trace());
-   expect(events.send(91, 1.618, std::vector{4}, "d").trace());
+   expect(testService.to<Events>().setSchema(schema).trace());
+   expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
+   expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());
+   expect(testService.to<Events>()
+              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 0)
+              .trace());
+   expect(testService.to<Events>()
+              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 1)
+              .trace());
+   expect(testService.to<TestService>().send(42, 2.718, std::vector{3}, "c").trace());
+   expect(testService.to<TestService>().send(91, 1.618, std::vector{4}, "d").trace());
 
    explain(
        chain,
-       R"""(SELECT * FROM "history.events.testevent" WHERE d > 2 UNION SELECT * FROM "history.events.testevent" WHERE i >= 50 ORDER BY d)""");
-
-   CHECK(
-       query<TestEvent>(
-           chain, R"""(SELECT i,d,v,s FROM "history.events.testevent" WHERE d > 2 ORDER BY d)""") ==
-       std::vector<TestEvent>{{42, 2.718, {3}, "c"}, {72, 3.14159, {2}, "b"}});
-
-   CHECK(query<TestEvent>(
-             chain, R"""(SELECT i,d FROM "history.events.testevent" WHERE d > 2 ORDER BY d)""") ==
-         std::vector<TestEvent>{{42, 2.718}, {72, 3.14159}});
-
-   CHECK(
-       query<TestEvent>(chain, R"""(SELECT i FROM "history.events.testevent" ORDER BY ROWID)""") ==
-       std::vector<TestEvent>{{42}, {72}, {42}, {91}});
+       R"""(SELECT * FROM "history.test-service.testevent" WHERE d > 2 UNION SELECT * FROM "history.test-service.testevent" WHERE i >= 50 ORDER BY d)""");
 
    CHECK(
        query<TestEvent>(
            chain,
-           R"""(SELECT i FROM "history.events.testevent" WHERE i = '"history.unknown.unknown"')""") ==
+           R"""(SELECT i,d,v,s FROM "history.test-service.testevent" WHERE d > 2 ORDER BY d)""") ==
+       std::vector<TestEvent>{{42, 2.718, {3}, "c"}, {72, 3.14159, {2}, "b"}});
+
+   CHECK(query<TestEvent>(
+             chain,
+             R"""(SELECT i,d FROM "history.test-service.testevent" WHERE d > 2 ORDER BY d)""") ==
+         std::vector<TestEvent>{{42, 2.718}, {72, 3.14159}});
+
+   CHECK(query<TestEvent>(chain,
+                          R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID)""") ==
+         std::vector<TestEvent>{{42}, {72}, {42}, {91}});
+
+   CHECK(
+       query<TestEvent>(
+           chain,
+           R"""(SELECT i FROM "history.test-service.testevent" WHERE i = '"history.unknown.unknown"')""") ==
        std::vector<TestEvent>{});
 }

@@ -974,11 +974,6 @@ void EventIndex::addIndex(psibase::DbId          db,
    dirtyTable.put(IndexDirtyRecord{db, service, event});
 }
 
-void EventIndex::send(int i, double d, std::vector<int32_t> v, std::string s)
-{
-   auto id = emit().history().testEvent(i, d, v, s);
-}
-
 std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, DbId db)
 {
    switch (db)

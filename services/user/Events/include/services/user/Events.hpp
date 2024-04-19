@@ -211,8 +211,6 @@ namespace UserService
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
-      // Temporary for testing
-      void send(int i, double d, std::vector<int32_t> v, std::string s);
       // returns true if there is more to do
       bool indexSome(psibase::DbId db, std::uint32_t max);
       // Applies pending index changes
@@ -221,31 +219,13 @@ namespace UserService
       void onBlock();
       // Standard HTTP API
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&);
-      struct Events
-      {
-         struct Ui
-         {
-         };
-         struct History
-         {
-            void testEvent(int32_t i, double d, std::vector<int32_t> v, std::string s) {}
-         };
-         struct Merkle
-         {
-         };
-      };
    };
    PSIO_REFLECT(EventIndex,
                 method(setSchema, schema),
                 method(addIndex, db, service, event, column),
-                method(send, i),
                 method(indexSome, db, maxRows),
                 method(onBlock),
                 method(serveSys, request))
 
-   PSIBASE_REFLECT_EVENTS(EventIndex);
-   PSIBASE_REFLECT_HISTORY_EVENTS(EventIndex, method(testEvent, i, d, v, s));
-   PSIBASE_REFLECT_UI_EVENTS(EventIndex);
-   PSIBASE_REFLECT_MERKLE_EVENTS(EventIndex);
    using Events = EventIndex;
 }  // namespace UserService
