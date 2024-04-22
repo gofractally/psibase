@@ -571,7 +571,7 @@ namespace psio
             ItemKind              kind;
             std::span<const char> data;
             const CompiledType*   type;
-            const AnyType*        parent;
+            const CompiledType*   parent;
             std::uint32_t         index;
             explicit              operator bool() const { return type != nullptr; }
             Item                  next(FracParser&) { return *this; }
@@ -731,7 +731,8 @@ namespace psio
             if (!groups.empty())
             {
                groups.back().next(stream);
-               if (auto* name = std::visit(MemberName{item.index}, item.parent->value))
+               if (auto* name =
+                       std::visit(MemberName{item.index}, item.parent->original_type->value))
                {
                   to_json(*name, stream);
                   write_colon(stream);
@@ -806,7 +807,7 @@ namespace psio
       {
          // check for zero
          bool is_minus_zero =
-             data.back() == 0x80 &&
+             data.back() == static_cast<char>(0x80) &&
              std::ranges::all_of(data.first(data.size() - 1), [](char ch) { return ch == 0; });
          if ((data.back() & 0x80) && !is_minus_zero)
          {
@@ -826,12 +827,32 @@ namespace psio
          check(false, "Not a scalar type");
       }
 
+      inline bool isOctet(const CompiledType* type)
+      {
+         if (const auto* intType = std::get_if<Int>(&type->original_type->value))
+         {
+            return intType->bits <= 8;
+         }
+         return false;
+      }
+
+      inline bool isOctet(const CompiledMember& member)
+      {
+         return !member.is_optional && isOctet(member.type);
+      }
+
       // TODO: Allow extensions without breaking key ordering
       void to_key(FracParser& parser, auto& stream)
       {
          auto start_member = [&](const auto& item)
          {
-            // TODO: determine whether the member is optional
+            if (item.parent)
+            {
+               if (item.parent->kind == CompiledType::optional)
+                  stream.write('\1');
+               if (item.parent->children[item.index].is_optional)
+                  stream.write('\1');
+            }
          };
          while (auto item = parser.next())
          {
@@ -850,14 +871,58 @@ namespace psio
                   // - end = 00 00,
                   // - 0 = 00 01
                   // - x = x
+                  switch (item.type->kind)
+                  {
+                     case CompiledType::container:
+                        if (isOctet(item.type->children[0]))
+                        {
+                           stream.write("\0", 2);
+                        }
+                        else
+                        {
+                           stream.write('\0');
+                        }
+                        break;
+                     default:
+                        break;
+                  }
                   break;
                case FracParser::scalar:
-                  start_member(item);
+                  if (item.parent)
+                  {
+                     auto optionalCount = (item.parent->kind == CompiledType::container) +
+                                          (item.parent->children[item.index].is_optional ||
+                                           item.parent->kind == CompiledType::optional);
+                     if (optionalCount == 2)
+                        stream.write('\1');
+                     if (optionalCount != 0)
+                     {
+                        if (isOctet(item.parent->children[0].type))
+                        {
+                           char             buf[1];
+                           fixed_buf_stream tmp_stream(buf, 1);
+                           std::visit([&](const auto& type)
+                                      { scalar_to_key(type, item.data, tmp_stream); },
+                                      item.type->original_type->value);
+                           stream.write(buf[0]);
+                           if (buf[0] == '\0')
+                              stream.write('\1');
+                           break;
+                        }
+                        stream.write('\1');
+                     }
+                  }
                   std::visit([&](const auto& type) { scalar_to_key(type, item.data, stream); },
                              item.type->original_type->value);
                   break;
                case FracParser::empty:
-                  start_member(item);
+                  if (item.parent)
+                  {
+                     if (item.parent->kind == CompiledType::container)
+                        stream.write('\1');
+                     if (isOctet(item.parent->children[item.index].type))
+                        stream.write('\0');
+                  }
                   stream.write('\0');
                   break;
                case FracParser::custom:

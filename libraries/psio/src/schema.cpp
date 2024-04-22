@@ -505,6 +505,19 @@ namespace psio::schema_types
             std::visit([&](const auto& t) { add_impl(this, top, t, stack, queue); }, top->value);
          }
       }
+      // Resolve optional elements of containers
+      for (auto& [type, ctype] : types)
+      {
+         if (ctype.kind == CompiledType::container)
+         {
+            CompiledMember& member = ctype.children[0];
+            if (member.type->kind == CompiledType::optional)
+            {
+               member.is_optional = true;
+               member.type        = member.type->children[0].type;
+            }
+         }
+      }
       // Custom types need to be resolved last, so the full object graph
       // is available for matching.
       for (auto& [type, ctype] : types)
@@ -638,8 +651,7 @@ namespace psio::schema_types
             return {.kind = FracParser::end, .type = type};
          }
          const auto&      member = type->children[index];
-         FracParser::Item result{
-             .type = member.type, .parent = type->original_type, .index = index};
+         FracParser::Item result{.type = member.type, .parent = type, .index = index};
          ++index;
          auto fixed_end = fixed_pos + fixed_size;
          fixed_pos += member.fixed_offset;
@@ -676,7 +688,7 @@ namespace psio::schema_types
          else
             completed = true;
          const CompiledType* nested = type->children[0].type;
-         FracParser::Item    result{.type = nested, .parent = type->original_type};
+         FracParser::Item    result{.type = nested, .parent = type};
          auto                start_pos = parser.in.pos;
          parser.in.pos += 4;
          parser.deref(start_pos, parser.in.end_pos, nested, true, result);
@@ -696,7 +708,7 @@ namespace psio::schema_types
             return {.kind = FracParser::end, .type = type};
          }
          const CompiledMember& member = type->children[0];
-         FracParser::Item      result{.type = member.type, .parent = type->original_type};
+         FracParser::Item      result{.type = member.type, .parent = type};
          if (!member.is_optional && !member.type->is_variable_size)
          {
             parser.parse_fixed(result, member.type, pos);
@@ -742,7 +754,7 @@ namespace psio::schema_types
          if (tag >= type->children.size())
             return makeError(type, "Variant tag out-of-range");
          auto result   = parser.parse(type->children[tag].type);
-         result.parent = type->original_type;
+         result.parent = type;
          result.index  = tag;
          return result;
       }
@@ -781,7 +793,7 @@ namespace psio::schema_types
             parser.in.end_pos = new_end;
          }
          auto result   = parser.parse(type->children[0].type);
-         result.parent = type->original_type;
+         result.parent = type;
          return result;
       }
    };
@@ -877,8 +889,7 @@ namespace psio::schema_types
       }
       else if (ctype->kind == CompiledType::optional)
       {
-         result        = OptionReader{ctype}.next(*this);
-         result.parent = nullptr;
+         result = OptionReader{ctype}.next(*this);
       }
       else
       {
