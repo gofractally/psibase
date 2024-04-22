@@ -823,13 +823,13 @@ KeyResult sql_to_key(const CompiledMember& member, sqlite3_value* key, std::vect
    }
 }
 
-const AnyType uint64Type = Int{.bits = 64, .isSigned = false};
+const AnyType u64Type = Int{.bits = 64, .isSigned = false};
 
-const CompiledType eventIdType{
+const CompiledType u64{
     .kind             = CompiledType::scalar,
     .is_variable_size = false,
     .fixed_size       = 8,
-    .original_type    = &uint64Type,
+    .original_type    = &u64Type,
 };
 
 int event_filter(sqlite3_vtab_cursor* cursor,
@@ -844,9 +844,8 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    key.push_back(static_cast<char>(index));
    c->prefixLen = key.size();
    c->key       = key;
-   auto keyType =
-       index >= 0 ? vtab->rowType->children[index] : CompiledMember{.type = &eventIdType};
-   auto incKey = [&](std::vector<char>& k)
+   auto keyType = index >= 0 ? vtab->rowType->children[index] : CompiledMember{.type = &u64};
+   auto incKey  = [&](std::vector<char>& k)
    {
       std::size_t i = k.size();
       while (i > c->prefixLen)
@@ -1023,18 +1022,10 @@ struct EventWrapper
                                 {.fixed_offset = 12, .is_optional = true, .type = event}}}
    {
    }
-   static const AnyType      u64Type;
-   static const CompiledType u64;
-   void                      set(const CompiledType* event) { wrapper.children[2].type = event; }
-   const CompiledType*       get() const { return &wrapper; }
-   CompiledType              wrapper;
+   void                set(const CompiledType* event) { wrapper.children[2].type = event; }
+   const CompiledType* get() const { return &wrapper; }
+   CompiledType        wrapper;
 };
-
-const AnyType      EventWrapper::u64Type = Int{.bits = 64, .isSigned = false};
-const CompiledType EventWrapper::u64{.kind             = CompiledType::scalar,
-                                     .is_variable_size = false,
-                                     .fixed_size       = 8,
-                                     .original_type    = &u64Type};
 
 bool EventIndex::indexSome(psibase::DbId db, std::uint32_t max)
 {
@@ -1057,18 +1048,7 @@ bool EventIndex::indexSome(psibase::DbId db, std::uint32_t max)
    auto              secondary = SecondaryIndexTable(
        DbId::writeOnly,
        psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum)));
-   AnyType      u64Type = Int{.bits = 64, .isSigned = false};
-   CompiledType u64{.kind             = CompiledType::scalar,
-                    .is_variable_size = false,
-                    .fixed_size       = 8,
-                    .original_type    = &u64Type};
-   CompiledType wrapper{
-       .kind       = CompiledType::object,
-       .fixed_size = 16,
-       .children   = {{.fixed_offset = 0, .is_optional = false, .type = &u64},
-                      {.fixed_offset = 8, .is_optional = true, .type = &u64},
-                      {.fixed_offset = 12, .is_optional = true, .type = nullptr}},
-   };
+   EventWrapper wrapper(nullptr);
    for (; max != 0 && eventNum != eventEnd; --max, ++eventNum)
    {
       std::uint32_t sz = psibase::raw::getSequential(db, eventNum);
@@ -1082,9 +1062,9 @@ bool EventIndex::indexSome(psibase::DbId db, std::uint32_t max)
       const CompiledType* ctype = cache.getSchemaType(db, service, *type);
       if (!ctype)
          continue;
-      wrapper.children[2].type = ctype;
+      wrapper.set(ctype);
 
-      FracParser parser(psio::FracStream{data}, &wrapper, psibase_builtins, false);
+      FracParser parser(psio::FracStream{data}, wrapper.get(), psibase_builtins, false);
       check(parser.next().kind == FracParser::start, "expected start");        // start
       check(parser.next().kind == FracParser::scalar, "expected service");     // service
       check(parser.next().kind == FracParser::scalar, "expected event type");  // type
