@@ -1,5 +1,5 @@
 [package]
-name = "example"
+name = "service"
 edition = "2021"
 version = "0.1.0"
 
