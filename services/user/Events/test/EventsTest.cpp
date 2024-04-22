@@ -105,9 +105,13 @@ TEST_CASE("events")
    expect(testService.to<TestService>().send(42, 2.718, std::vector{3}, "c").trace());
    expect(testService.to<TestService>().send(91, 1.618, std::vector{4}, "d").trace());
 
+   expect(testService.to<Events>()
+              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"opt"}, 0)
+              .trace());
+
    explain(
        chain,
-       R"""(SELECT * FROM "history.test-service.testevent" WHERE d > 2 UNION SELECT * FROM "history.test-service.testevent" WHERE i >= 50 ORDER BY d)""");
+       R"""(SELECT * FROM "history.test-service.opt" WHERE opt > 10 AND OPT < 100 ORDER BY ROWID)""");
 
    CHECK(
        query<TestEvent>(
@@ -134,4 +138,9 @@ TEST_CASE("events")
    expect(testService.to<TestService>().sendOptional(42).trace());
    CHECK(query<Opt>(chain, R"""(SELECT * FROM "history.test-service.opt" ORDER BY ROWID)""") ==
          std::vector<Opt>{{}, {42}});
+   CHECK(
+       query<Opt>(
+           chain,
+           R"""(SELECT * FROM "history.test-service.opt" WHERE opt > 10 AND opt < 100 ORDER BY ROWID)""") ==
+       std::vector<Opt>{{42}});
 }

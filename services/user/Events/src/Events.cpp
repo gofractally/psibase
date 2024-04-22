@@ -614,7 +614,7 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
       {
          // TODO: check that the collating sequence matches the index order
          buf[argc]                           = type;
-         info->aConstraintUsage[i].argvIndex = argc;
+         info->aConstraintUsage[i].argvIndex = argc + 1;
          ++argc;
       };
       if (info->aConstraint[i].usable && info->aConstraint[i].iColumn == best)
@@ -789,13 +789,35 @@ KeyResult sql_to_key(const auto& type, sqlite3_value* key, std::vector<char>& ou
    abortMessage("Not implemented");
 }
 
-KeyResult sql_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
+KeyResult sql_to_key(const CompiledMember& member, sqlite3_value* key, std::vector<char>& out)
 {
-   switch (type->kind)
+   switch (member.type->kind)
    {
       case CompiledType::scalar:
-         return std::visit([&](auto& t) { return sql_to_key(t, key, out); },
-                           type->original_type->value);
+      {
+         if (member.is_optional)
+         {
+            if (sqlite3_value_type(key) == SQLITE_NULL)
+            {
+               out.push_back(0);
+               return KeyResult::exact;
+            }
+            else
+            {
+               out.push_back(1);
+               auto result = std::visit([&](auto& t) { return sql_to_key(t, key, out); },
+                                        member.type->original_type->value);
+               if (result == KeyResult::underflow)
+                  return KeyResult::rounded;
+               return result;
+            }
+         }
+         else
+         {
+            return std::visit([&](auto& t) { return sql_to_key(t, key, out); },
+                              member.type->original_type->value);
+         }
+      }
       default:
          abortMessage("Not implemented");
    }
@@ -820,10 +842,11 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    auto*             vtab = static_cast<EventVTab*>(cursor->pVtab);
    std::vector<char> key  = vtab->key();
    key.push_back(static_cast<char>(index));
-   c->prefixLen                = key.size();
-   c->key                      = key;
-   const CompiledType* keyType = index >= 0 ? vtab->rowType->children[index].type : &eventIdType;
-   auto                incKey  = [&](std::vector<char>& k)
+   c->prefixLen = key.size();
+   c->key       = key;
+   auto keyType =
+       index >= 0 ? vtab->rowType->children[index] : CompiledMember{.type = &eventIdType};
+   auto incKey = [&](std::vector<char>& k)
    {
       std::size_t i = k.size();
       while (i > c->prefixLen)
@@ -1062,9 +1085,9 @@ bool EventIndex::indexSome(psibase::DbId db, std::uint32_t max)
       wrapper.children[2].type = ctype;
 
       FracParser parser(psio::FracStream{data}, &wrapper, psibase_builtins, false);
-      parser.next();  // start
-      parser.next();  // service
-      parser.next();  // type
+      check(parser.next().kind == FracParser::start, "expected start");        // start
+      check(parser.next().kind == FracParser::scalar, "expected service");     // service
+      check(parser.next().kind == FracParser::scalar, "expected event type");  // type
       auto saved = parser.in;
       // validate remaining data
       if (![&]
@@ -1090,7 +1113,7 @@ bool EventIndex::indexSome(psibase::DbId db, std::uint32_t max)
          {
             parser.in = saved;
             parser.parse(ctype);
-            parser.select_child(column);
+            parser.push(parser.select_child(column));
             to_key(parser, stream);
          }
          to_key(eventNum, stream);
@@ -1099,7 +1122,10 @@ bool EventIndex::indexSome(psibase::DbId db, std::uint32_t max)
       }
    }
    if (eventNum != status->nextEventNumber)
+   {
+      status->nextEventNumber = eventNum;
       table.put(*status);
+   }
    return eventNum != eventEnd;
 }
 
@@ -1183,7 +1209,7 @@ bool Events::processQueue(std::uint32_t maxSteps)
                 {
                    parser.in = saved;
                    parser.parse(ctype);
-                   parser.select_child(column);
+                   parser.push(parser.select_child(column));
                    to_key(parser, stream);
                 }
                 to_key(eventNum, stream);
