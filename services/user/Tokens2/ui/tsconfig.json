@@ -18,7 +18,15 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    "paths": {
+      "/common": ["../../CommonApi/common"],
+      "@psibase/common-lib": ["../../CommonApi/common/packages/common-lib/src"],
+      "@psibase/common-lib/*": [
+        "../../CommonApi/common/packages/common-lib/src/*"
+      ]
+    }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

@@ -1,14 +1,38 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+#[psibase::service]
+#[allow(non_snake_case)]
+mod service {
+    use async_graphql::*;
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    // #[table(name = "BalanceTable", index = 0)]
+    // #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject)]
+    // pub struct Balance {
+    //     #[primary_key]
+    //     owner: AccountNumber;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    // }
+
+    #[table(record = "WebContentRow", index = 0)]
+    struct WebContentTable;
+
+    #[action]
+    pub fn credit(from: AccountNumber, to: AccountNumber) -> i32 {
+        5
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+        None.or_else(|| serve_content(&request, &WebContentTable::new()))
+            .or_else(|| serve_graphiql(&request))
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn storeSys(path: String, contentType: String, content: HexBytes) {
+        check(get_sender() == get_service(), "unauthorized");
+        let table = WebContentTable::new();
+        store_content(path, contentType, content, &table).unwrap();
     }
 }

@@ -1,0 +1,14 @@
+package component:tokens2;
+
+interface inft {
+    use common:plugin/types.{error};
+}
+
+/// An example world for the component to target.
+world example {
+
+    import common:plugin/server;
+    import common:plugin/client;
+
+    export hello-world: func() -> string;
+}
