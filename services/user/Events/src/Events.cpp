@@ -1245,12 +1245,11 @@ bool Events::processQueue(std::uint32_t maxSteps)
                 data.resize(sz);
                 psibase::raw::getResult(data.data(), data.size(), 0);
                 FracParser parser{psio::FracStream{data}, wrapper.get(), psibase_builtins, false};
-                parser.select_child(2);
-                auto                saved = parser.in;
+                auto       saved = parser.get_pos(parser.select_child(2));
                 psio::vector_stream stream{subkey};
                 for (const auto& column : item.info.columns())
                 {
-                   parser.in = saved;
+                   parser.set_pos(saved);
                    parser.parse(ctype);
                    parser.push(parser.select_child(column));
                    to_key(parser, stream);

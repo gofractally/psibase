@@ -975,6 +975,80 @@ namespace psio::schema_types
       stack.push_back(item);
    }
 
+   namespace
+   {
+
+      struct StartPos
+      {
+         std::uint32_t operator()(const ObjectReader& reader, const FracParser&) const
+         {
+            return reader.start_pos;
+         }
+         std::uint32_t operator()(const ArrayReader& reader, const FracParser&) const
+         {
+            if (reader.type->kind == CompiledType::container)
+            {
+               return reader.pos - 4;
+            }
+            else
+            {
+               return reader.pos;
+            }
+         }
+         std::uint32_t operator()(const OptionReader&, const FracParser& parser) const
+         {
+            return parser.in.pos;
+         }
+         std::uint32_t operator()(const VariantReader&, const FracParser& parser) const
+         {
+            return parser.in.pos;
+         }
+         std::uint32_t operator()(const NestedReader&, const FracParser& parser) const
+         {
+            return parser.in.pos;
+         }
+         std::uint32_t operator()(const FracParser::Item& reader, const FracParser& parser) const
+         {
+            check(false, "Only single item put back is supported");
+            return 0;
+         }
+      };
+
+   }  // namespace
+
+   std::uint32_t FracParser::get_pos(const Item& item) const
+   {
+      switch (item.kind)
+      {
+         case FracParser::start:
+            // peek at the top of the stack
+            return std::visit([&](auto& r) { return StartPos{}(r, *this); }, stack.back());
+         case FracParser::scalar:
+            return static_cast<std::uint32_t>(item.data.data() - in.src);
+         case FracParser::custom:
+            if (item.data.empty())
+            {
+               return in.pos;
+            }
+            else
+            {
+               return static_cast<std::uint32_t>(item.data.data() - in.src);
+            }
+         case FracParser::end:
+         case FracParser::empty:
+         case FracParser::error:
+            check(false, "Cannot get start pos");
+      }
+      return 0;
+   }
+
+   void FracParser::set_pos(std::uint32_t pos)
+   {
+      in.pos       = pos;
+      in.known_end = true;
+      stack.clear();
+   }
+
    FracParser::Item FracParser::push(const CompiledType* type, std::uint32_t offset, bool pointer)
    {
       in.pos = offset;

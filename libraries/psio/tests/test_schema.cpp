@@ -201,3 +201,26 @@ TEST_CASE("schema wrong custom")
    CompiledSchema cschema{schema};
    CHECK(to_json(cschema, "s", "040000002A000000") == R"([42])");
 }
+
+TEST_CASE("schema select")
+{
+   Schema schema;
+   schema.insert("inner", Object{.members = {{.name = "d", .type = Int{.bits = 32}}}});
+   schema.insert("outer", Object{.members = {{.name = "data", .type = Type{"inner"}}}});
+   CompiledSchema cschema{schema};
+   auto           input = unhex("04000400000004002A000000");
+   FracParser     parser{input, cschema, "outer"};
+   CompiledType*  innerType = cschema.get(schema.get("inner"));
+   auto           saved     = parser.get_pos(parser.select_child(0));
+   {
+      parser.set_pos(saved);
+      auto item = parser.parse(innerType);
+      if (item.kind == FracParser::error)
+         check(false, std::string_view(item.data.data(), item.data.size()));
+      parser.push(parser.select_child(0));
+      std::vector<char> data;
+      vector_stream     out{data};
+      to_json(parser, out);
+      CHECK(std::string_view(data.data(), data.size()) == "42");
+   }
+}

@@ -579,6 +579,13 @@ namespace psio
          Item next();
          Item select_child(std::uint32_t index);
          void push(const Item&);
+         // Returns the position that the item starts at. The item must
+         // be the most recent item, and must be one of start, scalar, or custom
+         // - empty elements are not necessarily represented in the packed data
+         // - I'm not sure what the position of an end element should mean
+         std::uint32_t get_pos(const Item&) const;
+         // Sets the current position to pos and clears the parse stack
+         void set_pos(std::uint32_t pos);
          // Starts parsing the given type at the current pos
          Item parse(const CompiledType* ctype);
          void parse_fixed(Item& result, const CompiledType* ctype, std::uint32_t offset);
