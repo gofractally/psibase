@@ -789,37 +789,71 @@ KeyResult sql_to_key(const auto& type, sqlite3_value* key, std::vector<char>& ou
    abortMessage("Not implemented");
 }
 
-KeyResult sql_to_key(const CompiledMember& member, sqlite3_value* key, std::vector<char>& out)
+KeyResult string_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
-   switch (member.type->kind)
+   psio::vector_stream stream(out);
+   to_key(std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
+                           static_cast<std::size_t>(sqlite3_value_bytes(key))},
+          stream);
+   return KeyResult::exact;
+}
+
+KeyResult blob_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
+{
+   psio::vector_stream stream(out);
+   to_key(std::string_view{reinterpret_cast<const char*>(sqlite3_value_blob(key)),
+                           static_cast<std::size_t>(sqlite3_value_bytes(key))},
+          stream);
+   return KeyResult::exact;
+}
+
+struct ToKeyCustomHandler
+{
+   KeyResult (*to_key)(const CompiledType*, sqlite3_value*, std::vector<char>&);
+   explicit operator bool() const { return to_key != nullptr; }
+};
+
+const ExtraCustom<ToKeyCustomHandler> psibase_to_key_builtins{
+    psibase_builtins,
+    {{"string", {&string_to_key}}, {"hex", {&blob_to_key}}}};
+
+KeyResult sql_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
+{
+   switch (type->kind)
    {
       case CompiledType::scalar:
-      {
-         if (member.is_optional)
-         {
-            if (sqlite3_value_type(key) == SQLITE_NULL)
-            {
-               out.push_back(0);
-               return KeyResult::exact;
-            }
-            else
-            {
-               out.push_back(1);
-               auto result = std::visit([&](auto& t) { return sql_to_key(t, key, out); },
-                                        member.type->original_type->value);
-               if (result == KeyResult::underflow)
-                  return KeyResult::rounded;
-               return result;
-            }
-         }
-         else
-         {
-            return std::visit([&](auto& t) { return sql_to_key(t, key, out); },
-                              member.type->original_type->value);
-         }
-      }
+         return std::visit([&](auto& t) { return sql_to_key(t, key, out); },
+                           type->original_type->value);
       default:
+         if (auto* handler = psibase_to_key_builtins.find(type->custom_id))
+         {
+            return handler->to_key(type, key, out);
+         }
          abortMessage("Not implemented");
+   }
+}
+
+KeyResult sql_to_key(const CompiledMember& member, sqlite3_value* key, std::vector<char>& out)
+{
+   if (member.is_optional)
+   {
+      if (sqlite3_value_type(key) == SQLITE_NULL)
+      {
+         out.push_back(0);
+         return KeyResult::exact;
+      }
+      else
+      {
+         out.push_back(1);
+         auto result = sql_to_key(member.type, key, out);
+         if (result == KeyResult::underflow)
+            return KeyResult::rounded;
+         return result;
+      }
+   }
+   else
+   {
+      return sql_to_key(member.type, key, out);
    }
 }
 

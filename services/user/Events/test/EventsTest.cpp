@@ -54,34 +54,39 @@ void explain(TestChain& chain, std::string_view s)
    }
 }
 
+template <typename T>
+   requires requires { typename T::json_stream_operator; }
+std::ostream& operator<<(std::ostream& os, const T& value)
+{
+   os << psio::convert_to_json(value) << std::endl;
+   return os;
+}
+
+#define REFLECT_EVENT(name, ...)                               \
+   using json_stream_operator                       = void;    \
+   friend bool operator==(const name&, const name&) = default; \
+   PSIO_REFLECT(name, __VA_ARGS__)
+
 struct TestEvent
 {
    int                       i = 0;
    double                    d = 0;
    std::vector<std::int32_t> v;
    std::string               s;
-   friend bool               operator==(const TestEvent&, const TestEvent&) = default;
+   REFLECT_EVENT(TestEvent, i, d, v, s)
 };
-PSIO_REFLECT(TestEvent, i, d, v, s)
-
-std::ostream& operator<<(std::ostream& os, const TestEvent& e)
-{
-   os << psio::convert_to_json(e) << std::endl;
-   return os;
-}
 
 struct Opt
 {
    std::optional<std::int32_t> opt;
-   friend bool                 operator==(const Opt&, const Opt&) = default;
+   REFLECT_EVENT(Opt, opt)
 };
-PSIO_REFLECT(Opt, opt)
 
-std::ostream& operator<<(std::ostream& os, const Opt& e)
+struct Str
 {
-   os << psio::convert_to_json(e) << std::endl;
-   return os;
-}
+   std::string s;
+   REFLECT_EVENT(Str, s)
+};
 
 TEST_CASE("events")
 {
@@ -143,4 +148,18 @@ TEST_CASE("events")
            chain,
            R"""(SELECT * FROM "history.test-service.opt" WHERE opt > 10 AND opt < 100 ORDER BY ROWID)""") ==
        std::vector<Opt>{{42}});
+
+   // string keys
+   expect(testService.to<Events>()
+              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"str"}, 0)
+              .trace());
+   expect(testService.to<TestService>().sendString("").trace());
+   expect(testService.to<TestService>().sendString("a").trace());
+   expect(testService.to<TestService>().sendString("b").trace());
+   CHECK(query<Str>(chain, R"""(SELECT * FROM "history.test-service.str" ORDER BY ROWID)""") ==
+         std::vector<Str>{{""}, {"a"}, {"b"}});
+   CHECK(query<Str>(
+             chain,
+             R"""(SELECT * FROM "history.test-service.str" WHERE s >= 'a' ORDER BY ROWID)""") ==
+         std::vector<Str>{{"a"}, {"b"}});
 }
