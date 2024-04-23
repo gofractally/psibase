@@ -12,6 +12,11 @@ void TestService::sendOptional(std::optional<std::int32_t> opt)
    emit().history().opt(opt);
 }
 
+void TestService::sendOptional8(std::optional<std::uint8_t> opt)
+{
+   emit().history().optb(opt);
+}
+
 void TestService::sendString(const std::string& s)
 {
    emit().history().str(s);

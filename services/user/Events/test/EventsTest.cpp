@@ -139,6 +139,7 @@ TEST_CASE("events")
            R"""(SELECT i FROM "history.test-service.testevent" WHERE i = '"history.unknown.unknown"')""") ==
        std::vector<TestEvent>{});
 
+   // optional
    expect(testService.to<TestService>().sendOptional(std::nullopt).trace());
    expect(testService.to<TestService>().sendOptional(42).trace());
    CHECK(query<Opt>(chain, R"""(SELECT * FROM "history.test-service.opt" ORDER BY ROWID)""") ==
@@ -147,6 +148,24 @@ TEST_CASE("events")
        query<Opt>(
            chain,
            R"""(SELECT * FROM "history.test-service.opt" WHERE opt > 10 AND opt < 100 ORDER BY ROWID)""") ==
+       std::vector<Opt>{{42}});
+
+   // optional with 8-bit value
+   expect(testService.to<Events>()
+              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"optb"}, 0)
+              .trace());
+   expect(testService.to<TestService>().sendOptional8(std::nullopt).trace());
+   expect(testService.to<TestService>().sendOptional8(42).trace());
+
+   explain(
+       chain,
+       R"""(SELECT * FROM "history.test-service.optb" WHERE opt > 10 AND opt < 100 ORDER BY ROWID)""");
+   CHECK(query<Opt>(chain, R"""(SELECT * FROM "history.test-service.optb" ORDER BY ROWID)""") ==
+         std::vector<Opt>{{}, {42}});
+   CHECK(
+       query<Opt>(
+           chain,
+           R"""(SELECT * FROM "history.test-service.optb" WHERE opt > 10 AND opt < 100 ORDER BY ROWID)""") ==
        std::vector<Opt>{{42}});
 
    // string keys

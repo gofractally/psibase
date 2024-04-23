@@ -837,6 +837,35 @@ KeyResult sql_to_key(const CompiledMember& member, sqlite3_value* key, std::vect
 {
    if (member.is_optional)
    {
+      if (isOctet(member.type))
+      {
+         if (sqlite3_value_type(key) == SQLITE_NULL)
+         {
+            out.push_back(0);
+            out.push_back(0);
+            return KeyResult::exact;
+         }
+         else
+         {
+            auto result = sql_to_key(member.type, key, out);
+            switch (result)
+            {
+               case KeyResult::exact:
+               case KeyResult::rounded:
+                  if (out.back() == 0)
+                     out.push_back(1);
+                  break;
+               case KeyResult::overflow:
+                  break;
+               case KeyResult::underflow:
+                  result = KeyResult::rounded;
+                  out.push_back(0);
+                  out.push_back(1);
+                  break;
+            }
+            return result;
+         }
+      }
       if (sqlite3_value_type(key) == SQLITE_NULL)
       {
          out.push_back(0);
@@ -886,10 +915,10 @@ int event_filter(sqlite3_vtab_cursor* cursor,
       {
          if (++k[--i] != 0)
          {
-            break;
+            return true;
          }
       }
-      return i != c->prefixLen;
+      return false;
    };
    auto incExactKey = [&](std::vector<char>& k, KeyResult& adj)
    {
@@ -926,7 +955,7 @@ int event_filter(sqlite3_vtab_cursor* cursor,
          case ')':
             if (adj == KeyResult::underflow)
                return c->setEof();
-            if (adj != KeyResult::overflow && compare_blob(key, c->end) < 0)
+            if (adj != KeyResult::overflow && (c->end.empty() || compare_blob(key, c->end) < 0))
                c->end = key;
             break;
       }
