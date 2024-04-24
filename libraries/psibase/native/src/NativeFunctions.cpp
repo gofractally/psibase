@@ -123,7 +123,12 @@ namespace psibase
             return {(DbId)db, false, false};
 
          if (db == uint32_t(DbId::writeOnly))
+         {
+            check(!(self.code.flags & CodeRow::isSubjective) ||
+                      (self.code.flags & CodeRow::forceReplay),
+                  "subjective services may only write to DbId::subjective");
             return {(DbId)db, !(self.code.flags & CodeRow::isSubjective), false};
+         }
 
          // Prevent poison block; subjective services skip execution during replay
          check(!(self.code.flags & CodeRow::isSubjective),

@@ -353,9 +353,13 @@ namespace psibase
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       // Prevents a poison block
-      if (!(impl->code.flags & CodeRow::isSubjective))
-         check(!(callerFlags & CodeRow::isSubjective),
+      if (callerFlags & CodeRow::isSubjective)
+      {
+         check(impl->code.flags & CodeRow::isSubjective,
                "subjective services may not call non-subjective ones");
+         check((callerFlags & CodeRow::forceReplay) == (impl->code.flags & CodeRow::forceReplay),
+               "subjective services that call each other must have the same replay mode");
+      }
 
       auto& bc = impl->transactionContext.blockContext;
       if ((impl->code.flags & CodeRow::isSubjective) && !bc.isProducing)
@@ -377,6 +381,11 @@ namespace psibase
                impl->initialized = false;
                if (callerFlags & CodeRow::forceReplay)
                   throw;
+            }
+            // Don't override the return value if the caller is also subjective
+            if (callerFlags & CodeRow::isSubjective)
+            {
+               return;
             }
          }
          auto&       ctx = impl->transactionContext;
