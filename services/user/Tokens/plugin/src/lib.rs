@@ -2,16 +2,27 @@
 mod bindings;
 
 use bindings::common::plugin::{server, types as CommonTypes};
-use bindings::Guest as MainInterface;
+
+use bindings::exports::component::tokens::{
+    intf::{Guest as Intf, Precision, Quantity},
+    transfer::{Guest as Transfer, Tid},
+};
+
+use bindings::exports::component::tokens::types as Types;
 
 struct Component;
 
 use psibase::fracpack::Pack;
 
-impl MainInterface for Component {
-    /// Say hello!
-    fn hello_world() -> String {
-        "Hello, World!".to_string()
+impl Intf for Component {
+    fn create(precision: Precision, maxSupply: u64) -> String {
+        "whatever".to_string()
+    }
+}
+
+impl Transfer for Component {
+    fn credit(token: Tid) -> String {
+        "whatever2".to_string()
     }
 }
 

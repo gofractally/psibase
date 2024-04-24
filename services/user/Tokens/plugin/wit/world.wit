@@ -1,7 +1,23 @@
-package component:tokens2;
+package component:tokens;
 
-interface inft {
+
+
+interface types {
+
+    type quantity = u64;
+    type precision = u8;
+    type tid = u32;
+}
+
+interface intf {
     use common:plugin/types.{error};
+    use types.{precision, quantity};
+    create: func(a: precision, b: quantity) -> string;
+}
+
+interface transfer {
+    use types.{tid};
+    credit: func(token: tid) -> string;
 }
 
 /// An example world for the component to target.
@@ -10,5 +26,9 @@ world example {
     import common:plugin/server;
     import common:plugin/client;
 
-    export hello-world: func() -> string;
+    
+    
+    export types;
+    export intf;
+    export transfer;
 }
