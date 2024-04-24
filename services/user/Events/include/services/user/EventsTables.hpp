@@ -190,7 +190,6 @@ namespace UserService
    using PendingIndexTable =
        psibase::Table<PendingIndexRecord, &PendingIndexRecord::seq, &PendingIndexRecord::byIndex>;
    using IndexDirtyTable = psibase::Table<IndexDirtyRecord, &IndexDirtyRecord::primaryKey>;
-   using EventsTables    = psibase::ServiceTables<ServiceSchemaTable, SecondaryIndexTable>;
 
    // These are stored in the writeOnly database
    constexpr std::uint16_t dbIndexStatusTableNum{0};
@@ -198,5 +197,7 @@ namespace UserService
    constexpr std::uint16_t secondaryIndexTableNum{2};
    constexpr std::uint16_t pendingIndexTableNum{3};
    constexpr std::uint16_t indexDirtyTableNum{4};
+   constexpr std::uint16_t secondaryIndexSpecTableNum{5};
+   constexpr std::uint16_t schemaTableNum{6};
 
 }  // namespace UserService

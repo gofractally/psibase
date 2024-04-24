@@ -46,8 +46,11 @@ namespace psibase
             if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
                return (DbId)db;
          }
-         if (db == uint32_t(DbId::writeOnly) && self.allowDbReadSubjective)
-            return (DbId)db;
+         if (db == uint32_t(DbId::writeOnly))
+         {
+            if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
+               return (DbId)db;
+         }
          if (db == uint32_t(DbId::blockLog) && self.allowDbReadSubjective)
             return (DbId)db;
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
@@ -119,14 +122,15 @@ namespace psibase
             // Not chargeable since subjective services are skipped during replay
             return {(DbId)db, false, false};
 
+         if (db == uint32_t(DbId::writeOnly))
+            return {(DbId)db, !(self.code.flags & CodeRow::isSubjective), false};
+
          // Prevent poison block; subjective services skip execution during replay
          check(!(self.code.flags & CodeRow::isSubjective),
                "subjective services may only write to DbId::subjective");
 
          if (db == uint32_t(DbId::service))
             return {(DbId)db, true, true};
-         if (db == uint32_t(DbId::writeOnly))
-            return {(DbId)db, true, false};
          if (db == uint32_t(DbId::nativeConstrained) &&
              (self.code.flags & CodeRow::allowWriteNative))
             return {(DbId)db, true, true};

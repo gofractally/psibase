@@ -348,6 +348,16 @@ namespace SystemService
          }
       }
 
+      // TODO: Figure out a more generic way
+      auto events = AccountNumber{"events"};
+      if (kvGetSize(CodeRow::db, codeKey(events)))
+      {
+         psibase::call(Action{.sender  = Transact::service,
+                              .service = events,
+                              .method  = MethodNumber{"sync"},
+                              .rawData = psio::convert_to_frac(std::tuple())});
+      }
+
       check(!trx.actions().empty(), "transaction must have at least one action");
       if (transactStatus && transactStatus->enforceAuth)
       {

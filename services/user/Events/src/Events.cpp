@@ -17,7 +17,7 @@ using namespace UserService;
 void EventIndex::setSchema(const ServiceSchema& schema)
 {
    check(getSender() == schema.service, "Wrong sender");
-   EventsTables{}.open<ServiceSchemaTable>().put(schema);
+   Events::open<ServiceSchemaTable>(schemaTableNum).put(schema);
 }
 
 void EventIndex::addIndex(psibase::DbId          db,
@@ -25,7 +25,7 @@ void EventIndex::addIndex(psibase::DbId          db,
                           psibase::MethodNumber  event,
                           std::uint8_t           column)
 {
-   auto secondary = EventsTables{getReceiver()}.open<SecondaryIndexTable>();
+   auto secondary = Events::open<SecondaryIndexTable>(secondaryIndexSpecTableNum);
    auto row       = secondary.getIndex<0>().get(std::tuple(db, service, event));
    if (!row)
       row = SecondaryIndexRecord{db, service, event, std::vector{SecondaryIndexInfo{}}};
@@ -260,10 +260,8 @@ bool Events::processQueue(std::uint32_t maxSteps)
 // queues any required index updates.
 void queueIndexChanges()
 {
-   auto objective  = EventsTables{getReceiver()}.open<SecondaryIndexTable>();
-   auto subjective = SecondaryIndexTable{
-       DbId::writeOnly,
-       psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
+   auto objective  = Events::open<SecondaryIndexTable>(secondaryIndexSpecTableNum);
+   auto subjective = Events::open<SecondaryIndexTable>(secondaryIndexTableNum);
    auto dirtyTable = IndexDirtyTable{
        DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, indexDirtyTableNum))};
    auto          queue = PendingIndexTable{DbId::writeOnly, psio::convert_to_key(std::tuple(
@@ -358,10 +356,18 @@ void queueIndexChanges()
    }
 }
 
+void Events::sync()
+{
+   while (indexSome(DbId::historyEvent, 0xffffffffu))
+   {
+   }
+   while (indexSome(DbId::merkleEvent, 0xffffffffu))
+   {
+   }
+}
+
 void Events::onBlock()
 {
-   indexSome(DbId::historyEvent, 1000);
-   indexSome(DbId::merkleEvent, 1000);
    queueIndexChanges();
    processQueue(1000);
 }

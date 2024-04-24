@@ -1,5 +1,6 @@
 #include "SchemaCache.hpp"
 
+#include <services/user/Events.hpp>
 #include "types.hpp"
 
 using namespace psibase;
@@ -37,7 +38,7 @@ namespace UserService
 
    SchemaCache& SchemaCache::instance()
    {
-      static SchemaCache result{EventsTables{AccountNumber{"events"}}.open<ServiceSchemaTable>()};
+      static SchemaCache result{Events::open<ServiceSchemaTable>(schemaTableNum)};
       return result;
    }
 }  // namespace UserService
