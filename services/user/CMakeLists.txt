@@ -2,21 +2,8 @@ function(add_user_service suffix name)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC
         include
-        ../CommonApi/include
-        ../Fractal/include
-        ../Invite/include
-        ../Nft/include
-        ../Sites/include
-        ../Symbol/include
-        ../Tokens/include
-        ../../system/Accounts/include
-        ../../system/AuthK1/include
-        ../../system/AuthAny/include
-        ../../system/SetCode/include
-        ../../system/Transact/include
-        ../../system/VerifyK1/include
     )
-    target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} psibase-service-simple-malloc${suffix})
+    target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} services_user${suffix} psibase-service-simple-malloc${suffix})
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add_user_service)
 
@@ -25,21 +12,8 @@ function(add_user_test_impl suffix name)
     add_executable(${TARGET} ${ARGN})
     target_include_directories(${TARGET} PUBLIC
       ../include
-      ../../CommonApi/include
-      ../../Fractal/include
-      ../../Invite/include
-      ../../Nft/include
-      ../../Sites/include
-      ../../Symbol/include
-      ../../Tokens/include
-      ../../../system/Accounts/include
-      ../../../system/AuthK1/include
-      ../../../system/AuthAny/include
-      ../../../system/SetCode/include
-      ../../../system/Transact/include
-      ../../../system/VerifyK1/include
      ${CMAKE_CURRENT_LIST_DIR})
-    target_link_libraries(${TARGET} services_system${suffix} psitestlib${suffix})
+    target_link_libraries(${TARGET} services_system${suffix} services_user${suffix} psitestlib${suffix})
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 
@@ -64,7 +38,14 @@ endfunction()
 function(add suffix)
     add_library(services_user${suffix} INTERFACE)
     target_include_directories(services_user${suffix} INTERFACE
+        CommonApi/include
+        Events/include
+        Fractal/include
+        Invite/include
         Nft/include
+        Sites/include
+        Symbol/include
+        Tokens/include
     )
 endfunction(add)
 

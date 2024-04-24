@@ -1,4 +1,5 @@
 #include <services/user/Events.hpp>
+#include <services/user/REvents.hpp>
 
 #include <services/system/HttpServer.hpp>
 #include "TestService.hpp"
@@ -92,7 +93,8 @@ TEST_CASE("events")
 {
    DefaultTestChain chain;
    chain.addService<Events>("Events.wasm");
-   expect(chain.from(Events::service).to<HttpServer>().registerServer(Events::service).trace());
+   chain.addService<REvents>("REvents.wasm");
+   expect(chain.from(Events::service).to<HttpServer>().registerServer(REvents::service).trace());
 
    auto testService = chain.from(chain.addService<TestService>("Events-TestService.wasm"));
 
