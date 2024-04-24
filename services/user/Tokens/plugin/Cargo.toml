@@ -9,7 +9,7 @@ edition = "2021"
 bitflags = "2.5.0"
 wit-bindgen-rt = "0.24.0"
 psibase = { path="../../../../rust/psibase/" }
-service = { path="../service" }
+service = { path="../wrapper" }
 
 
 [lib]

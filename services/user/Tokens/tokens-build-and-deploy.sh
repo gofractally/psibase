@@ -1,15 +1,15 @@
 #! /bin/bash
 
-root_dir="/root/psibase/services/user/Tokens2"
-account_name="tokens2"
-rust_name="tokens2"
+root_dir="/root/psibase/services/user/Tokens"
+account_name="tokens"
+rust_name="tokens"
 
 cd $root_dir
 
 
 # Account Creation
-echo "Creating tokens2 account..."
-psibase create -i tokens2
+echo "Creating tokens account..."
+psibase create -i tokens
 
 
 # Build plugin and copy to public dir
