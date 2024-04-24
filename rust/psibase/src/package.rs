@@ -169,6 +169,7 @@ fn translate_flags(flags: &[String]) -> Result<u64, Error> {
             "canNotTimeOut" => 1 << 4,
             "canSetTimeLimit" => 1 << 5,
             "isAuthService" => 1 << 6,
+            "forceReplay" => 1 << 7,
             _ => Err(Error::InvalidFlags)?,
         };
     }

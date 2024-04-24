@@ -105,6 +105,7 @@ namespace psibase
       static constexpr uint64_t canNotTimeOut        = uint64_t(1) << 4;
       static constexpr uint64_t canSetTimeLimit      = uint64_t(1) << 5;
       static constexpr uint64_t isAuthService        = uint64_t(1) << 6;
+      static constexpr uint64_t forceReplay          = uint64_t(1) << 7;
 
       AccountNumber codeNum;
       uint64_t      flags = 0;  // Constants above

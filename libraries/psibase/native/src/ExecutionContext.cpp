@@ -360,6 +360,25 @@ namespace psibase
       auto& bc = impl->transactionContext.blockContext;
       if ((impl->code.flags & CodeRow::isSubjective) && !bc.isProducing)
       {
+         if (impl->code.flags & CodeRow::forceReplay)
+         {
+            try
+            {
+               impl->exec(actionContext, [&] {  //
+                  (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "called",
+                                           actionContext.action.service.value,
+                                           actionContext.action.sender.value);
+               });
+            }
+            catch (...)
+            {
+               // If the service is called again, reinitialize it, to prevent corruption
+               // from resuming after abrupt termination.
+               impl->initialized = false;
+               if (callerFlags & CodeRow::forceReplay)
+                  throw;
+            }
+         }
          auto&       ctx = impl->transactionContext;
          const auto& tx  = ctx.signedTransaction;
          check(ctx.nextSubjectiveRead < tx.subjectiveData->size(), "missing subjective data");

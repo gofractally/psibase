@@ -555,7 +555,7 @@ psibase_package(
     DESCRIPTION "Indexes events and provides querying"
     SERVICE events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
-        FLAGS isSubjective
+        FLAGS isSubjective forceReplay
         SERVER r-events
     SERVICE r-events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm

@@ -15,7 +15,8 @@ namespace UserService
    struct EventIndex : psibase::Service<EventIndex>
    {
       static constexpr psibase::AccountNumber service{"events"};
-      static constexpr auto                   serviceFlags = psibase::CodeRow::isSubjective;
+      static constexpr auto                   serviceFlags =
+          psibase::CodeRow::isSubjective | psibase::CodeRow::forceReplay;
       // Sets the schema associated with a service
       void setSchema(const ServiceSchema& schema);
       // Adds an index.
