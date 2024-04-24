@@ -94,9 +94,10 @@ namespace
             }
          }
 
+         s.regServer(actions);
+
          if (installUI)
          {
-            s.regServer(actions);
             s.storeData(actions);
          }
 
@@ -169,6 +170,13 @@ namespace
       return result;
    }
 }  // namespace
+
+std::vector<std::string> DefaultTestChain::defaultPackages()
+{
+   return {"Accounts",   "AuthAny",  "AuthDelegate", "AuthSig", "AuthK1", "CommonApi", "CpuLimit",
+           "Events",     "Explorer", "Fractal",      "Invite",  "Nft",    "Packages",  "Producers",
+           "HttpServer", "Sites",    "SetCode",      "Symbol",  "Tokens", "Transact"};
+}
 
 DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
                                    bool                            installUI,

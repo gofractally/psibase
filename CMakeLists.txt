@@ -109,6 +109,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CoreFractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Fractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
@@ -121,6 +122,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
@@ -547,6 +549,20 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Events.psi
+    NAME Events
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Indexes events and provides querying"
+    SERVICE events
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
+        SERVER r-events
+    SERVICE r-events
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
+    DEPENDS wasm
+    PACKAGE_DEPENDS  "HttpServer(^${PSIBASE_VERSION})"
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Explorer.psi
     NAME Explorer
     VERSION ${PSIBASE_VERSION}
@@ -667,7 +683,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
-                    Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
 
@@ -695,7 +711,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    Docs Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
+    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
 
 install(
@@ -709,6 +725,7 @@ install(
           ${SERVICE_DIR}/Default.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
+          ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractal.psi
           ${SERVICE_DIR}/Invite.psi

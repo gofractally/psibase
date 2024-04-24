@@ -92,10 +92,6 @@ struct Str
 TEST_CASE("events")
 {
    DefaultTestChain chain;
-   chain.addService<Events>("Events.wasm");
-   chain.addService<REvents>("REvents.wasm");
-   expect(chain.from(Events::service).to<HttpServer>().registerServer(REvents::service).trace());
-
    auto testService = chain.from(chain.addService<TestService>("Events-TestService.wasm"));
 
    auto schema = ServiceSchema::make<TestService>();
