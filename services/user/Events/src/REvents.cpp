@@ -718,7 +718,7 @@ KeyResult sql_to_key(const Float& type, sqlite3_value* key, std::vector<char>& o
 
 KeyResult sql_to_key(const auto& type, sqlite3_value* key, std::vector<char>& out)
 {
-   abortMessage("Not implemented");
+   abortMessage("Not implemented: " + psio::convert_to_json(AnyType{type}));
 }
 
 KeyResult string_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
@@ -761,7 +761,8 @@ KeyResult sql_to_key(const CompiledType* type, sqlite3_value* key, std::vector<c
          {
             return handler->to_key(type, key, out);
          }
-         abortMessage("Not implemented");
+         abortMessage("Not implemented: " + std::to_string(type->custom_id) + " " +
+                      psio::convert_to_json(*type->original_type));
    }
 }
 
