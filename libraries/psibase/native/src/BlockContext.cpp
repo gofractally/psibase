@@ -1,5 +1,6 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psio/finally.hpp>
 
 namespace psibase
 {
@@ -169,6 +170,10 @@ namespace psibase
    {
       checkActive();
       active = false;
+
+      auto oldIsProducing = isProducing;
+      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      isProducing         = true;
 
       Action action{
           .sender = {},
