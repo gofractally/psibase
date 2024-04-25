@@ -18,6 +18,17 @@ namespace psibase
       return {};
    }
 
+   inline bool isUserAction(const Action& action)
+   {
+      if (action.service == AccountNumber{"cpu-limit"})
+         return false;
+      if (action.service == AccountNumber{"accounts"} && action.method == MethodNumber{"billCpu"})
+         return false;
+      if (action.service == AccountNumber{"events"} && action.method == MethodNumber{"sync"})
+         return false;
+      return true;
+   }
+
    inline const ActionTrace& getTopAction(TransactionTrace& t, size_t num)
    {
       // TODO: redesign TransactionTrace to make this easier
@@ -36,9 +47,7 @@ namespace psibase
       std::vector<const ActionTrace*> top_traces;
       for (auto& inner : root.innerTraces)
          if (auto at = std::get_if<ActionTrace>(&inner.inner))
-            if (at->action.service != AccountNumber{"cpu-limit"} &&
-                (at->action.service != AccountNumber{"accounts"} ||
-                 at->action.method != MethodNumber{"billCpu"}))
+            if (isUserAction(at->action))
                top_traces.push_back(at);
       check(!(top_traces.size() & 1), "unexpected number of action traces");
       check(2 * num + 1 < top_traces.size(), "trace not found");
