@@ -366,9 +366,13 @@ int blob_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context*
    }
 }
 
-const ExtraCustom<SqlCustomHandler> psibase_sql_builtins{
-    psibase_builtins,
-    {{"bool", {&bool_to_sql}}, {"string", {&string_to_sql}}, {"hex", {&blob_to_sql}}}};
+const auto& psibase_sql_builtins()
+{
+   static const ExtraCustom<SqlCustomHandler> result{
+       psibase_builtins,
+       {{"bool", {&bool_to_sql}}, {"string", {&string_to_sql}}, {"hex", {&blob_to_sql}}}};
+   return result;
+}
 
 std::string_view jsonPrefix("\x2f\x0a\xc4\x5b\xc1\xe1\x4d\xcc\x60\x02\xd4\xbe\x67\xb9\x06\xd4", 16);
 
@@ -392,7 +396,7 @@ int event_column(sqlite3_vtab_cursor* cursor, sqlite3_context* ctx, int n)
          sqlite3_result_null(ctx);
          return SQLITE_OK;
       case FracParser::custom:
-         if (auto* handler = psibase_sql_builtins.find(item.type->custom_id))
+         if (auto* handler = psibase_sql_builtins().find(item.type->custom_id))
          {
             if (item.data.empty())
             {
@@ -745,9 +749,12 @@ struct ToKeyCustomHandler
    explicit operator bool() const { return to_key != nullptr; }
 };
 
-const ExtraCustom<ToKeyCustomHandler> psibase_to_key_builtins{
-    psibase_builtins,
-    {{"string", {&string_to_key}}, {"hex", {&blob_to_key}}}};
+const auto& psibase_to_key_builtins()
+{
+   static const ExtraCustom<ToKeyCustomHandler> result{
+       psibase_builtins, {{"string", {&string_to_key}}, {"hex", {&blob_to_key}}}};
+   return result;
+}
 
 KeyResult sql_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
@@ -757,7 +764,7 @@ KeyResult sql_to_key(const CompiledType* type, sqlite3_value* key, std::vector<c
          return std::visit([&](auto& t) { return sql_to_key(t, key, out); },
                            type->original_type->value);
       default:
-         if (auto* handler = psibase_to_key_builtins.find(type->custom_id))
+         if (auto* handler = psibase_to_key_builtins().find(type->custom_id))
          {
             return handler->to_key(type, key, out);
          }
