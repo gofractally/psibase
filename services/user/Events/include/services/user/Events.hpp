@@ -25,8 +25,6 @@ namespace UserService
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
-      // returns true if there is more to do
-      bool indexSome(psibase::DbId db, std::uint32_t max);
       // Applies pending index changes
       bool processQueue(std::uint32_t maxSteps);
       // Indexes all new events
@@ -44,7 +42,6 @@ namespace UserService
                 method(init),
                 method(setSchema, schema),
                 method(addIndex, db, service, event, column),
-                method(indexSome, db, maxRows),
                 method(sync),
                 method(onBlock))
 

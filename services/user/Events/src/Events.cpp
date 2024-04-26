@@ -266,34 +266,6 @@ void EventIndex::init()
    }
 }
 
-bool EventIndex::indexSome(psibase::DbId db, std::uint32_t max)
-{
-   const auto dbStatus = psibase::kvGet<psibase::DatabaseStatusRow>(
-       psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
-   check(!!dbStatus, "DatabaseStatusRow not found");
-
-   auto table = DbIndexStatusTable(
-       DbId::writeOnly,
-       psio::convert_to_key(std::tuple(EventIndex::service, dbIndexStatusTableNum)));
-   auto status = table.getIndex<0>().get(db);
-   if (!status)
-      status = DbIndexStatus{db, 1};
-
-   IndexWriter writer;
-   auto        eventNum = status->nextEventNumber;
-   auto        eventEnd = getNextEventNumber(*dbStatus, db);
-   for (; max != 0 && eventNum != eventEnd; --max, ++eventNum)
-   {
-      writer(db, eventNum);
-   }
-   if (eventNum != status->nextEventNumber)
-   {
-      status->nextEventNumber = eventNum;
-      table.put(*status);
-   }
-   return eventNum != eventEnd;
-}
-
 bool Events::processQueue(std::uint32_t maxSteps)
 {
    auto queue = PendingIndexTable{DbId::writeOnly, psio::convert_to_key(std::tuple(
@@ -437,11 +409,29 @@ void queueIndexChanges()
 
 void Events::sync()
 {
-   while (indexSome(DbId::historyEvent, 0xffffffffu))
+   const auto dbStatus = psibase::kvGet<psibase::DatabaseStatusRow>(
+       psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
+   check(!!dbStatus, "DatabaseStatusRow not found");
+
+   auto        table = Events::open<DbIndexStatusTable>(dbIndexStatusTableNum);
+   IndexWriter writer;
+   for (auto db : {DbId::historyEvent, DbId::merkleEvent})
    {
-   }
-   while (indexSome(DbId::merkleEvent, 0xffffffffu))
-   {
+      auto status = table.getIndex<0>().get(db);
+      if (!status)
+         status = DbIndexStatus{db, 1};
+
+      auto eventNum = status->nextEventNumber;
+      auto eventEnd = getNextEventNumber(*dbStatus, db);
+      for (; eventNum != eventEnd; ++eventNum)
+      {
+         writer(db, eventNum);
+      }
+      if (eventNum != status->nextEventNumber)
+      {
+         status->nextEventNumber = eventNum;
+         table.put(*status);
+      }
    }
 }
 
