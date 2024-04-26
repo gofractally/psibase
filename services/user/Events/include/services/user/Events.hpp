@@ -17,11 +17,10 @@ namespace UserService
       static constexpr psibase::AccountNumber service{"events"};
       static constexpr auto                   serviceFlags =
           psibase::CodeRow::isSubjective | psibase::CodeRow::forceReplay;
+      void init();
       // Sets the schema associated with a service
       void setSchema(const ServiceSchema& schema);
       // Adds an index.
-      // TODO: Add existing rows to the index
-      // TODO: There should be a way to construct the index concurrently.
       void addIndex(psibase::DbId          db,
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
@@ -42,6 +41,7 @@ namespace UserService
       }
    };
    PSIO_REFLECT(EventIndex,
+                method(init),
                 method(setSchema, schema),
                 method(addIndex, db, service, event, column),
                 method(indexSome, db, maxRows),

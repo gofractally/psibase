@@ -47,7 +47,7 @@ struct EventVTab : sqlite3_vtab
    {
       auto secondary = SecondaryIndexTable(
           DbId::writeOnly,
-          psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum)));
+          psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum)));
       if (auto row = secondary.getIndex<0>().get(std::tuple(db, service, event)))
          indexes = std::move(row->indexes);
       else

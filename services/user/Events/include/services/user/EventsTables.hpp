@@ -156,11 +156,15 @@ namespace UserService
       psibase::AccountNumber service;
       psibase::MethodNumber  event;
       SecondaryIndexInfo     info;
-      bool                   add;
-      std::vector<char>      nextKey;
-      auto                   byIndex() const { return std::tuple(db, service, event, info); }
+      // There are three different operations that might be queued:
+      // Init: nextKey.size() == 0, endKey > 0, operates in reverse order
+      // Add: nextKey.size() == 8, endKey > 0
+      // Remove: endKey == 0
+      std::vector<char> nextKey;
+      std::uint64_t     endKey;
+      auto              byIndex() const { return std::tuple(db, service, event, info); }
    };
-   PSIO_REFLECT(PendingIndexRecord, seq, db, service, event, info, add, nextKey)
+   PSIO_REFLECT(PendingIndexRecord, seq, db, service, event, info, nextKey, endKey)
 
    // For each db, tracks the lowest event number that has not been indexed.
    struct DbIndexStatus
@@ -194,10 +198,15 @@ namespace UserService
    // These are stored in the writeOnly database
    constexpr std::uint16_t dbIndexStatusTableNum{0};
    constexpr std::uint16_t eventIndexesNum{1};
+   // There are three copies of the list of secondary indexes:
+   // - spec: The indexes requested by services
+   // - all: Derived from spec by applying subjective rules
+   // - ready: A subset of all containing only indexes that are fully synced
    constexpr std::uint16_t secondaryIndexTableNum{2};
    constexpr std::uint16_t pendingIndexTableNum{3};
    constexpr std::uint16_t indexDirtyTableNum{4};
    constexpr std::uint16_t secondaryIndexSpecTableNum{5};
    constexpr std::uint16_t schemaTableNum{6};
+   constexpr std::uint16_t secondaryIndexReadyTableNum{7};
 
 }  // namespace UserService
