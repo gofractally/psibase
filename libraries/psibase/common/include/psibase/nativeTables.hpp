@@ -16,6 +16,7 @@ namespace psibase
    static constexpr NativeTableNum transactionWasmConfigTable = 5;
    static constexpr NativeTableNum proofWasmConfigTable       = 6;  // Also for first auth
    static constexpr NativeTableNum configTable                = 7;
+   static constexpr NativeTableNum notifyTable                = 8;
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -173,5 +174,32 @@ namespace psibase
       static auto           key() { return databaseStatusKey(); }
    };
    PSIO_REFLECT(DatabaseStatusRow, nextHistoryEventNumber, nextUIEventNumber, nextMerkleEventNumber)
+
+   // Notifications are sent by native code
+   //
+   // Each action is run in subjective mode and errors are ignored.
+   //
+   // Because it is subjective, the kinds of notifications that
+   // are sent can be changed without breaking consensus.
+   enum class NotifyType : std::uint32_t
+   {
+      // A block is produced or validated
+      acceptBlock,
+   };
+
+   inline auto notifyKey(NotifyType type)
+   {
+      return std::tuple{notifyTable, nativeTablePrimaryIndex, type};
+   }
+   struct NotifyRow
+   {
+      NotifyType          type;
+      std::vector<Action> actions;
+
+      // TODO: we need a native subjective table
+      static constexpr auto db = psibase::DbId::nativeConstrained;
+      auto                  key() const { return notifyKey(type); }
+   };
+   PSIO_REFLECT(NotifyRow, type, actions)
 
 }  // namespace psibase

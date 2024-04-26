@@ -255,6 +255,11 @@ namespace psibase
                "WasmConfigRow has incorrect key");
       }
 
+      void verifyNotifyTableRow(psio::input_stream key, psio::input_stream value)
+      {
+         // The notifyTable is only processed subjectively
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -272,6 +277,8 @@ namespace psibase
             verifyConfigRow(key, value);
          else if (table == transactionWasmConfigTable || table == proofWasmConfigTable)
             verifyWasmConfigRow(table, key, value);
+         else if (table == notifyTable)
+            verifyNotifyTableRow(key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeConstrained");
       }

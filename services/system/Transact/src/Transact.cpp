@@ -94,6 +94,86 @@ namespace SystemService
       }
    }
 
+   void Transact::addCallback(CallbackType type, bool objective, psibase::Action act)
+   {
+      auto me = getReceiver();
+      check(getSender() == me, "Wrong sender");
+      if (objective)
+      {
+         check(act.sender == me, "Objective callbacks must have 'trasact' as sender");
+         check(type == CallbackType::onTransaction, "Objective block callbacks not supported");
+         Tables tables(me);
+         auto   table = tables.open<CallbacksTable>();
+         auto   index = table.getIndex<0>();
+         auto   value = index.get(type);
+         if (!value)
+         {
+            value = Callbacks{.type = type};
+         }
+         value->actions.push_back(std::move(act));
+         table.put(*value);
+      }
+      else
+      {
+         check(act.sender == AccountNumber{}, "Subjective callbacks must not have a sender");
+         check(type == CallbackType::onBlock, "Subjective transaction callbacks not supported");
+         auto ntype = NotifyType::acceptBlock;
+         auto key   = notifyKey(ntype);
+         auto value = kvGet<NotifyRow>(NotifyRow::db, key);
+         if (!value)
+         {
+            value = NotifyRow{.type = ntype};
+         }
+         value->actions.push_back(std::move(act));
+         kvPut(NotifyRow::db, key, *value);
+      }
+   }
+
+   void Transact::removeCallback(CallbackType type, bool objective, psibase::Action act)
+   {
+      auto me = getReceiver();
+      check(getSender() == me, "Wrong sender");
+      if (objective)
+      {
+         Tables tables(me);
+         auto   table = tables.open<CallbacksTable>();
+         auto   index = table.getIndex<0>();
+         if (auto value = index.get(type))
+         {
+            auto pos = std::ranges::find(value->actions, act);
+            if (pos != value->actions.end())
+            {
+               value->actions.erase(pos);
+               if (value->actions.empty())
+                  table.remove(*value);
+               else
+                  table.put(*value);
+               return;
+            }
+         }
+      }
+      else
+      {
+         check(type == CallbackType::onBlock, "Subjective transaction callbacks not supported");
+         auto ntype = NotifyType::acceptBlock;
+         auto key   = notifyKey(ntype);
+         if (auto value = kvGet<NotifyRow>(NotifyRow::db, key))
+         {
+            auto pos = std::ranges::find(value->actions, act);
+            if (pos != value->actions.end())
+            {
+               value->actions.erase(pos);
+               if (value->actions.empty())
+                  kvRemove(key);
+               else
+                  kvPut(NotifyRow::db, key, *value);
+               return;
+            }
+         }
+      }
+      abortMessage("Callback not found");
+   }
+
    struct RunAsKey
    {
       AccountNumber sender;
@@ -348,14 +428,13 @@ namespace SystemService
          }
       }
 
-      // TODO: Figure out a more generic way
-      auto events = AccountNumber{"events"};
-      if (kvGetSize(CodeRow::db, codeKey(events)))
+      if (auto callbacks =
+              tables.open<CallbacksTable>().getIndex<0>().get(CallbackType::onTransaction))
       {
-         psibase::call(Action{.sender  = Transact::service,
-                              .service = events,
-                              .method  = MethodNumber{"sync"},
-                              .rawData = psio::convert_to_frac(std::tuple())});
+         for (const auto& act : callbacks->actions)
+         {
+            psibase::call(act);
+         }
       }
 
       check(!trx.actions().empty(), "transaction must have at least one action");

@@ -2,6 +2,7 @@
 #include <services/user/REvents.hpp>
 
 #include <services/system/HttpServer.hpp>
+#include <services/system/Transact.hpp>
 #include "TestService.hpp"
 
 #define CATCH_CONFIG_MAIN

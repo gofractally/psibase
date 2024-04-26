@@ -168,38 +168,40 @@ namespace psibase
 
    void BlockContext::callOnBlock()
    {
-      checkActive();
-      active = false;
+      auto notifyData =
+          db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(NotifyType::acceptBlock)));
+      if (!notifyData)
+         return;
+      auto notifySpan = std::span{notifyData->pos, notifyData->end};
+      if (!psio::fracpack_validate<NotifyRow>(notifySpan))
+         return;
+
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions();
 
       auto oldIsProducing = isProducing;
       auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
-      Action action{
-          .sender = {},
-          // TODO: Either pick a better root or allow multiple independent services
-          // to be stored in the database.
-          .service = AccountNumber{"events"},
-          .method  = MethodNumber("onBlock"),
-          .rawData = psio::to_frac(std::tuple()),
-      };
-      SignedTransaction  trx;
-      TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, true, false, true, true};
-      auto&              atrace = trace.actionTraces.emplace_back();
-
-      try
+      for (const Action& action : actions)
       {
-         tc.execNonTrxAction(0, action, atrace);
-         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-         PSIBASE_LOG(trxLogger, info) << "onBlock succeeded";
-      }
-      catch (std::exception& e)
-      {
-         PSIBASE_LOG(trxLogger, info) << "onBlock failed: " << e.what();
-      }
+         if (action.sender != AccountNumber{})
+            continue;
+         SignedTransaction  trx;
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         auto&              atrace = trace.actionTraces.emplace_back();
 
-      active = true;
+         try
+         {
+            tc.execNonTrxAction(0, action, atrace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+            PSIBASE_LOG(trxLogger, info) << "onBlock succeeded";
+         }
+         catch (std::exception& e)
+         {
+            PSIBASE_LOG(trxLogger, info) << "onBlock failed: " << e.what();
+         }
+      }
    }
 
    Checksum256 BlockContext::makeEventMerkleRoot()
@@ -228,7 +230,6 @@ namespace psibase
    std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision(const Prover& prover,
                                                                         const Claim&  claim)
    {
-      callOnBlock();
       checkActive();
       check(!needGenesisAction, "missing genesis action in block");
       active = false;
@@ -328,6 +329,8 @@ namespace psibase
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
       db.kvPut(DbId::blockProof, current.header.blockNum,
                prover.prove(BlockSignatureInfo(*status->head), claim));
+
+      callOnBlock();
 
       return {session.writeRevision(status->head->blockId), status->head->blockId};
    }

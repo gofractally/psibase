@@ -176,6 +176,21 @@ namespace SystemService
    PSIO_REFLECT(IncludedTrx, expiration, id)
    using IncludedTrxTable = psibase::Table<IncludedTrx, &IncludedTrx::key>;
 
+   enum class CallbackType : std::uint32_t
+   {
+      onTransaction,
+      onBlock,
+   };
+
+   struct Callbacks
+   {
+      CallbackType                 type;
+      std::vector<psibase::Action> actions;
+   };
+   PSIO_REFLECT(Callbacks, type, actions)
+
+   using CallbacksTable = psibase::Table<Callbacks, &Callbacks::type>;
+
    /// All transactions enter the chain through this service
    ///
    /// This privileged service dispatches top-level actions to other
@@ -194,8 +209,8 @@ namespace SystemService
       static constexpr uint64_t serviceFlags =
           psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
 
-      using Tables =
-          psibase::ServiceTables<TransactStatusTable, BlockSummaryTable, IncludedTrxTable>;
+      using Tables = psibase::
+          ServiceTables<TransactStatusTable, BlockSummaryTable, IncludedTrxTable, CallbacksTable>;
 
       /// This action enables the boot procedure to be split across multiple blocks
       ///
@@ -217,6 +232,22 @@ namespace SystemService
 
       /// Called by native code at the beginning of each block
       void startBlock();
+
+      /// Adds a callback that will be run whenever the trigger happens.
+      /// - onTransaction is run at the end of every transaction
+      /// - onBlock runs at the end of every block
+      ///
+      /// Objective callbacks are run by the transaction service and
+      /// must have this service as the sender. If an objective callback
+      /// fails, it will abort the block or transaction.
+      ///
+      /// Subjective callbacks are run by native and must have no sender.
+      ///
+      /// TODO: Generalize implementation. Currently the only supported
+      /// combinations are objective+transaction and subjective+block.
+      void addCallback(CallbackType type, bool objective, psibase::Action act);
+      /// Removes an existing callback
+      void removeCallback(CallbackType type, bool objective, psibase::Action act);
 
       /// Run `action` using `action.sender's` authority
       ///
@@ -265,6 +296,8 @@ namespace SystemService
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
+                method(addCallback, type, objective, action),
+                method(removeCallback, type, objective, action),
                 method(runAs, action, allowedActions),
                 method(getTransaction),
                 method(currentBlock),
