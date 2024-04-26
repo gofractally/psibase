@@ -19,13 +19,14 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-
+    "baseUrl": ".",
     "paths": {
       "/common": ["../../CommonApi/common"],
       "@psibase/common-lib": ["../../CommonApi/common/packages/common-lib/src"],
       "@psibase/common-lib/*": [
         "../../CommonApi/common/packages/common-lib/src/*"
-      ]
+      ],
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src"],

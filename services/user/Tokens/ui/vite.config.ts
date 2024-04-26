@@ -13,6 +13,10 @@ export default defineConfig({
           "../../CommonApi/common/packages/common-lib/src"
         ),
       },
+      {
+        find: "@",
+        replacement: path.resolve(__dirname, "./src"),
+      },
     ],
   },
 });
