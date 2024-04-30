@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/formatNumber";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -28,9 +29,9 @@ export function FormCreate() {
       maxSupply: "",
       precision: "4",
     },
-    
     mode: "onChange",
   });
+  const { setError, clearErrors } = form;
 
   const onSubmit = () => {
     console.log("forever, medicine");
@@ -41,7 +42,22 @@ export function FormCreate() {
 
   const precision = form.watch("precision");
   const suggestedPrecision = precision.length > 1 ? 8 : Number(precision) || 0;
-  const label = `Example: ${(1).toFixed(suggestedPrecision)} TOK`;
+  const label = `${(1).toFixed(suggestedPrecision)} TOK`;
+
+  console.log({ precision }, form.formState.errors);
+  useEffect(() => {
+    const num = Number(precision);
+    if (num > 8) {
+      alert("raising error");
+      setError("precision", { type: "custom", message: "bad percisio" });
+    } else {
+      alert("losing error");
+      console.log("cancelling the error...");
+      clearErrors("precision");
+    }
+  }, [precision, setError, clearErrors]);
+
+  console.log(form.formState.errors.precision?.message, "is error");
 
   return (
     <Form {...form}>
@@ -64,26 +80,11 @@ export function FormCreate() {
         <FormField
           control={form.control}
           name="precision"
-          rules={{
-            max: 8,
-            min: 0,
-            validate: (e) => {
-              console.log(";f", e);
-              return false;
-            },
-          }}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Precision</FormLabel>
               <FormControl>
-                <Input
-                  type="number"
-                  placeholder="4"
-                  max={8}
-                  maxLength={1}
-                  min={0}
-                  {...field}
-                />
+                <Input type="number" placeholder="4" {...field} />
               </FormControl>
               <FormDescription>{label}</FormDescription>
               <FormMessage />

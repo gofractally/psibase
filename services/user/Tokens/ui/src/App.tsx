@@ -241,7 +241,12 @@ function App() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create a token</DialogTitle>
-              <DialogDescription>Supply and thing</DialogDescription>
+              <DialogDescription>
+                Lorem ipsum, dolor sit amet consectetur adipisicing elit.
+                Eveniet, beatae autem assumenda nulla, culpa dignissimos aperiam
+                debitis voluptates mollitia a velit. Ducimus impedit esse
+                tempora architecto voluptate sapiente ad quam!
+              </DialogDescription>
               <FormCreate />
             </DialogHeader>
             <DialogFooter>
