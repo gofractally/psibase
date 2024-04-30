@@ -1,6 +1,8 @@
 import "./App.css";
 import { Supervisor } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
+import { fetchAnswers } from "./utils/fetchAnswers";
+import { wait } from "./utils/wait";
 
 const supervisor = new Supervisor();
 
@@ -59,6 +61,25 @@ function App() {
     }
   };
 
+  const run5 = async () => {
+    try {
+      const res = await supervisor.functionCall({
+        service: "demoapp1",
+        intf: "intf",
+        method: "multiply",
+        params: [Number(a), Number(b)],
+      });
+      for (let i = 0; i < 5; i++) {
+        const { answer } = await fetchAnswers();
+        setAnswer(answer.result.toString());
+        await wait(1000);
+      }
+      setRes(res as string);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+  };
+
   const run3 = async () => {
     try {
       const inviteUrl: string = (await supervisor.functionCall({
@@ -109,9 +130,13 @@ function App() {
     }
   };
 
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [answer, setAnswer] = useState("?");
+
   return (
     <>
-      <h1>Psibase Demo App 1</h1>
+      <h1>Psibase Demo App 1 1</h1>
       <h3>{res}</h3>
       <div className="card">
         <button onClick={() => run()}>
@@ -129,6 +154,14 @@ function App() {
 
       <div className="card">
         <button onClick={() => run4()}>{"Just decode"}</button>
+      </div>
+
+      <div className="card">
+        <button onClick={() => run5()}>{"Multiplication on blockchain"}</button>
+        <input type="text" onChange={(e) => setA(e.target.value)} />
+        x
+        <input type="text" onChange={(e) => setB(e.target.value)} />
+        {answer}
       </div>
     </>
   );

@@ -3,11 +3,16 @@ package demoapp1:example;
 interface intf {
     use common:plugin/types.{error};
     helloworld2: func() -> result<string, error>;
+    multiply: func(a: u32, b: u32) -> result<string, error>;
 }
 
 world example {
     import invite:plugin/inviter;
+    import common:plugin/server;
+    import common:plugin/client;
 
     export helloworld: func() -> string;
     export intf;
+
+
 }
