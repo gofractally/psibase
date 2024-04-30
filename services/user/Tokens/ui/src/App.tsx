@@ -1,6 +1,7 @@
+import { FormCreate } from "./components/form-create";
 import { ModeToggle } from "./components/mode-toggle";
 import { Mode, TransferToggle } from "./components/transfer-toggle";
-import { Switch } from "./components/ui/switch";
+import { formatNumber } from "./lib/formatNumber";
 import { placeholders } from "./lib/memoPlaceholders";
 import { randomElement } from "./lib/random";
 import {
@@ -12,9 +13,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -75,11 +83,9 @@ interface TokenBalance {
   label: string;
   amount: number;
   isAdmin: boolean;
+  isGenericToken: boolean;
   id: string;
 }
-
-const formatNumber = (num: number, maximumSignificantDigits = 4) =>
-  new Intl.NumberFormat("en-US", { maximumSignificantDigits }).format(num);
 
 const tokenBalances: TokenBalance[] = [
   {
@@ -87,18 +93,35 @@ const tokenBalances: TokenBalance[] = [
     id: "1",
     label: "DOG",
     isAdmin: false,
+    isGenericToken: false,
   },
   {
     amount: 4,
     id: "2",
     label: "CAT",
     isAdmin: true,
+    isGenericToken: false,
   },
   {
     amount: 4595934,
     id: "3",
     isAdmin: false,
     label: "ABANDON",
+    isGenericToken: false,
+  },
+  {
+    amount: 34,
+    id: "4",
+    isAdmin: false,
+    label: "Token3513",
+    isGenericToken: true,
+  },
+  {
+    amount: 701.43,
+    id: "5",
+    isAdmin: true,
+    label: "Token117",
+    isGenericToken: true,
   },
 ];
 
@@ -129,11 +152,14 @@ function App() {
       to: "e",
       burn: false,
     },
+    mode: "onChange",
   });
+
+  // TODO: Validate overflow balance
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values, "are values");
-    setIsOpen(true);
+    setConfirmationModalOpen(true);
   }
 
   const [memoPlaceholder] = useState(randomElement(placeholders));
@@ -146,7 +172,7 @@ function App() {
     if (!theToken) {
       throw new Error("Selected token not foudn");
     }
-    if (!theToken.isAdmin && mode !== Mode.Transfer) {
+    if (!theToken.isAdmin && mode == Mode.Mint) {
       setMode(Mode.Transfer);
     }
   }, [selectedTokenId, mode]);
@@ -154,17 +180,29 @@ function App() {
   const isBurning = mode == Mode.Burn;
   const isMinting = mode == Mode.Mint;
   const isTransfer = mode == Mode.Transfer;
+
+  const isAmountOperation = isBurning || isMinting || isTransfer;
+  const isMapSymbol = mode == Mode.MapSymbol;
+
   const isAdmin =
     tokenBalances.find((bal) => bal.id == selectedTokenId)?.isAdmin || false;
   const disableTo = !isAdmin && isBurning;
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [isConfirmationModalOpen, setConfirmationModalOpen] = useState(false);
+  const [isNewTokenModalOpen, setNewTokenModalOpen] = useState(false);
 
+  const modalWarning = `This will ${
+    isBurning ? "burn" : isMinting ? "mint" : "transfer"
+  } ${form.watch("amount")} tokens${
+    isBurning && isAdmin && form.watch("from")
+      ? ` from ${form.watch("from")}'s account.`
+      : ""
+  }`;
   console.log(form.formState);
 
   const transfer = async () => {
     console.log("i am ready to transfer");
-    setIsOpen(false);
+    setConfirmationModalOpen(false);
     toast.promise(wait(1000), {
       loading: "Transaction submitting...",
       error: "Transaction failed!",
@@ -183,24 +221,48 @@ function App() {
     }, 1200);
   };
 
+  const addModal = () => {
+    toast("hit");
+    setNewTokenModalOpen(true);
+  };
+
+  const [tokenBalance] = useState(43243.34234);
+
   return (
     <div className="">
       <ModeToggle />
       <div className="max-w-screen-lg mx-auto p-4">
-        <AlertDialog open={isOpen}>
+        <Dialog
+          open={isNewTokenModalOpen}
+          onOpenChange={(e) => {
+            setNewTokenModalOpen(e);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create a token</DialogTitle>
+              <DialogDescription>Supply and thing</DialogDescription>
+              <FormCreate />
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="submit">Confirm</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={isConfirmationModalOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will transfer {form.watch("amount")} {form.watch("token")}{" "}
-                to {form.watch("to")}.
-              </AlertDialogDescription>
+              <AlertDialogDescription>{modalWarning}</AlertDialogDescription>
               <AlertDialogDescription>
                 Please be aware that it is irreversible and cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsOpen(false)}>
+              <AlertDialogCancel
+                onClick={() => setConfirmationModalOpen(false)}
+              >
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction onClick={() => transfer()}>
@@ -223,15 +285,27 @@ function App() {
                     defaultValue={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="No token found" />
-                      </SelectTrigger>
+                      <div className="w-full grid grid-cols-6">
+                        <SelectTrigger className="col-span-5">
+                          <SelectValue placeholder="No token found" />
+                        </SelectTrigger>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            addModal();
+                          }}
+                          variant="secondary"
+                        >
+                          <Plus />
+                        </Button>
+                      </div>
                     </FormControl>
                     <SelectContent>
                       {tokenBalances.map((balance) => (
                         <SelectItem
                           key={balance.id}
                           value={balance.id}
+                          isGeneric={balance.isGenericToken}
                           right={
                             <div className="text-sm text-muted-foreground">
                               Balance: {formatNumber(balance.amount)}
@@ -288,20 +362,33 @@ function App() {
                 )}
               />
             )}
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount</FormLabel>
-                  <FormControl>
-                    <Input placeholder="123" {...field} />
-                  </FormControl>
+            {isAmountOperation && (
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex justify-between w-full">
+                      <div>Amount</div>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:underline hover:bg-red-500"
+                        onClick={() => {
+                          form.setValue("amount", tokenBalance.toString());
+                        }}
+                      >
+                        Balance: {tokenBalance}
+                      </button>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="123" {...field} />
+                    </FormControl>
 
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             {isTransfer && (
               <FormField
                 control={form.control}
@@ -318,7 +405,6 @@ function App() {
                 )}
               />
             )}
-
             <Button
               variant={
                 isBurning ? "destructive" : isMinting ? "secondary" : "default"

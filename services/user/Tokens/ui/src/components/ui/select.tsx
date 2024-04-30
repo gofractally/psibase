@@ -110,18 +110,22 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
 type Item = React.ForwardRefExoticComponent<
   SelectPrimitive.SelectItemProps &
-    React.RefAttributes<HTMLDivElement> & { right?: React.ReactNode }
+    React.RefAttributes<HTMLDivElement> & {
+      isGeneric?: boolean;
+      right?: React.ReactNode;
+    }
 >;
 
 const SelectItem = React.forwardRef<
   React.ElementRef<Item>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, right, ...props }, ref) => (
+>(({ className, children, isGeneric, right, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
       "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
+      className,
+      { "text-muted-foreground": isGeneric }
     )}
     {...props}
   >
