@@ -1,6 +1,6 @@
 import { FormCreate } from "./components/form-create";
 import { ModeToggle } from "./components/mode-toggle";
-import { Mode, TransferToggle } from "./components/transfer-toggle";
+import { Mode } from "./components/transfer-toggle";
 import { formatNumber } from "./lib/formatNumber";
 import { placeholders } from "./lib/memoPlaceholders";
 import { randomElement } from "./lib/random";
@@ -19,7 +19,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -183,7 +182,6 @@ function App() {
   const isTransfer = mode == Mode.Transfer;
 
   const isAmountOperation = isBurning || isMinting || isTransfer;
-  const isMapSymbol = mode == Mode.MapSymbol;
 
   const isAdmin =
     tokenBalances.find((bal) => bal.id == selectedTokenId)?.isAdmin || false;
