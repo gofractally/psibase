@@ -5,13 +5,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowRight, Flame, Plus, Merge } from "lucide-react";
+import { ArrowRight, Flame, Plus } from "lucide-react";
 
 export enum Mode {
-  Transfer = "Transfer",
-  Burn = "Burn",
-  Mint = "Mint",
-  MapSymbol = "MapSymbol",
+  Transfer = "transfer",
+  Burn = "burn",
+  Mint = "mint",
 }
 
 interface TransferProps {
@@ -31,9 +30,6 @@ export function TransferToggle({ mode, setMode, isAdmin }: TransferProps) {
           )}
           {mode == Mode.Burn && <Flame className="h-[1.2rem] w-[1.2rem]" />}
           {mode == Mode.Mint && <Plus className="h-[1.2rem] w-[1.2rem]" />}
-          {mode == Mode.MapSymbol && (
-            <Merge className="h-[1.2rem] w-[1.2rem]" />
-          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Supervisor } from "@psibase/common-lib/messaging";
 import { ArrowRight, Flame, Plus } from "lucide-react";
@@ -228,6 +229,25 @@ function App() {
 
   const [tokenBalance] = useState(43243.34234);
 
+  const menus: { label: string; value: string }[] = [
+    {
+      label: "Transfer",
+      value: "transfer",
+    },
+    {
+      label: "Burn",
+      value: "burn",
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "Mint",
+            value: "mint",
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="">
       <ModeToggle />
@@ -247,11 +267,12 @@ function App() {
                 debitis voluptates mollitia a velit. Ducimus impedit esse
                 tempora architecto voluptate sapiente ad quam!
               </DialogDescription>
-              <FormCreate />
+              <FormCreate
+                onClose={() => {
+                  setNewTokenModalOpen(false);
+                }}
+              />
             </DialogHeader>
-            <DialogFooter>
-              <Button type="submit">Confirm</Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -327,7 +348,19 @@ function App() {
               )}
             />
             <div className="w-full flex justify-between">
-              <TransferToggle isAdmin={isAdmin} mode={mode} setMode={setMode} />
+              <Tabs
+                value={mode}
+                onValueChange={(tab) => setMode(tab as Mode)}
+                className="w-[400px]"
+              >
+                <TabsList>
+                  {menus.map((menu) => (
+                    <TabsTrigger key={menu.value} value={menu.value}>
+                      {menu.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
             </div>
             {isTransfer && (
               <FormField
@@ -377,7 +410,7 @@ function App() {
                       <div>Amount</div>
                       <button
                         type="button"
-                        className="text-muted-foreground hover:underline hover:bg-red-500"
+                        className="text-muted-foreground hover:underline"
                         onClick={() => {
                           form.setValue("amount", tokenBalance.toString());
                         }}

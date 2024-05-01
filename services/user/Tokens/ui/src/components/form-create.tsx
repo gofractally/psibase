@@ -12,17 +12,42 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/formatNumber";
+import { wait } from "@/lib/wait";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 
+const isValidNumber = (str: string): boolean => {
+  if (str == "" || typeof str == "undefined" || str == null) return false;
+  return !Number.isNaN(str);
+};
+
 const formSchema = z.object({
-  maxSupply: z.string(),
-  precision: z.string(),
+  maxSupply: z.string().refine(isValidNumber, "Must be a number"),
+  precision: z
+    .string()
+    .refine(isValidNumber, "Must be a number")
+    .refine(
+      (x) => {
+        const num = Number(x);
+        return num >= 0 && num <= 8;
+      },
+      { message: "Precision must be between 0 and 8" }
+    ),
 });
 
-export function FormCreate() {
+const createTokenDummy = async (message: string): Promise<string> => {
+  await wait();
+  return message;
+};
+
+interface Props {
+  onClose: () => void;
+}
+
+export function FormCreate({ onClose }: Props) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -31,10 +56,22 @@ export function FormCreate() {
     },
     mode: "onChange",
   });
-  const { setError, clearErrors } = form;
 
-  const onSubmit = () => {
-    console.log("forever, medicine");
+  const { mutateAsync: createToken, isPending } = useMutation({
+    mutationFn: createTokenDummy,
+  });
+
+  const onSubmit = (data: z.infer<typeof formSchema>) => {
+    console.log("forever, medicine", data);
+    toast.promise(createToken("derp"), {
+      loading: "Creating token...",
+      description: "Sending transaction",
+      dismissible: false,
+      finally: () => {
+        toast.success("is this better?");
+        onClose();
+      },
+    });
   };
 
   const supply = form.watch("maxSupply");
@@ -43,21 +80,6 @@ export function FormCreate() {
   const precision = form.watch("precision");
   const suggestedPrecision = precision.length > 1 ? 8 : Number(precision) || 0;
   const label = `${(1).toFixed(suggestedPrecision)} TOK`;
-
-  console.log({ precision }, form.formState.errors);
-  useEffect(() => {
-    const num = Number(precision);
-    if (num > 8) {
-      alert("raising error");
-      setError("precision", { type: "custom", message: "bad percisio" });
-    } else {
-      alert("losing error");
-      console.log("cancelling the error...");
-      clearErrors("precision");
-    }
-  }, [precision, setError, clearErrors]);
-
-  console.log(form.formState.errors.precision?.message, "is error");
 
   return (
     <Form {...form}>
@@ -91,7 +113,9 @@ export function FormCreate() {
             </FormItem>
           )}
         />
-        <Button type="submit">Submit</Button>
+        <Button disabled={isPending} type="submit">
+          {isPending ? "Submitting" : "Submit"}
+        </Button>
       </form>
     </Form>
   );
