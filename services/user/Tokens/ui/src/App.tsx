@@ -1,9 +1,6 @@
-import { FormCreate } from "./components/form-create";
-import { ModeToggle } from "./components/mode-toggle";
-import { Mode } from "./components/transfer-toggle";
-import { formatNumber } from "./lib/formatNumber";
-import { placeholders } from "./lib/memoPlaceholders";
-import { randomElement } from "./lib/random";
+import { FormCreate } from "@/components/form-create";
+import { ModeToggle } from "@/components/mode-toggle";
+import { Mode } from "@/components/transfer-toggle";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +37,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatNumber } from "@/lib/formatNumber";
+import { placeholders } from "@/lib/memoPlaceholders";
+import { randomElement } from "@/lib/random";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Supervisor } from "@psibase/common-lib/messaging";
 import { ArrowRight, Flame, Plus } from "lucide-react";
