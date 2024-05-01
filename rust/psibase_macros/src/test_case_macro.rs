@@ -117,10 +117,12 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
                 use psibase::*;
                 use std::io::Cursor;
             
+                println!("\n>>>>\n Instantiating chain");
                 let mut chain = psibase::Chain::new();
             
                 let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
             
+                println!("\n>>>>\nCreating boot transactions");
                 let (boot_tx, subsequent_tx) = psibase::create_boot_transactions(
                     &None,
                     psibase::account!("prod"),
@@ -128,6 +130,8 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
                     psibase::TimePointSec { seconds: 10 },
                     &mut services[..],
                 ).unwrap();
+
+                println!("\n>>>>\nPushing boot transactions to chain");
             
                 for trx in boot_tx {
                     chain.push(&trx).ok()?;
@@ -136,11 +140,18 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
                 for trx in subsequent_tx {
                     chain.push(&trx).ok()?;
                 }
+
+                println!("\n>>>>\nDeploying services...");
             
                 #deploy_services
+
+
+                println!("\n>>>>\nServices deployed!");
                 Ok(chain)
             }
+            println!("\n>>>>\nCreating chain");
             let chain = create_chain();
+            println!("\n>>>>\nChain created!");
             if let Err(e) = chain {
                 panic!("test {} failed with {:?}", #name, e);
             }
