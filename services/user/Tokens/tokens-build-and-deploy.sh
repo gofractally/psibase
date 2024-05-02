@@ -3,6 +3,7 @@
 root_dir="/root/psibase/services/user/Tokens"
 account_name="tokens"
 rust_name="tokens"
+proxy_name="r-tokens"
 
 cd $root_dir
 
@@ -22,9 +23,13 @@ cd ./ui
 rm -rf node_modules
 rm -rf dist
 npm i && npm run build
-psibase upload -r $account_name ./dist / -S $account_name
+# psibase upload -r $account_name ./dist / -S $account_name
+psibase upload -r $proxy_name ./dist / 
 
-cd ../service
+
 # Build service and deploy
-cargo psibase deploy -p -i $account_name
+cd /root/psibase/build
+make install
+psibase deploy tokens Tokens.wasm
+
 

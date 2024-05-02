@@ -149,7 +149,7 @@ function App() {
       amount: "",
       token: tokenBalances[0]?.id,
       memo: "",
-      to: "e",
+      to: "",
       burn: false,
     },
     mode: "onChange",
@@ -232,12 +232,12 @@ function App() {
       label: "Transfer",
       value: "transfer",
     },
-    {
-      label: "Burn",
-      value: "burn",
-    },
     ...(isAdmin
       ? [
+          {
+            label: "Burn",
+            value: "burn",
+          },
           {
             label: "Mint",
             value: "mint",
@@ -329,6 +329,7 @@ function App() {
                         <SelectItem
                           key={balance.id}
                           value={balance.id}
+                          // @ts-expect-error fwe
                           isGeneric={balance.isGenericToken}
                           right={
                             <div className="text-sm text-muted-foreground">
@@ -345,21 +346,23 @@ function App() {
                 </FormItem>
               )}
             />
-            <div className="w-full flex justify-between">
-              <Tabs
-                value={mode}
-                onValueChange={(tab) => setMode(tab as Mode)}
-                className="w-[400px]"
-              >
-                <TabsList>
-                  {menus.map((menu) => (
-                    <TabsTrigger key={menu.value} value={menu.value}>
-                      {menu.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            </div>
+            {menus.length > 1 && (
+              <div className="w-full flex justify-between">
+                <Tabs
+                  value={mode}
+                  onValueChange={(tab) => setMode(tab as Mode)}
+                  className="w-[400px]"
+                >
+                  <TabsList>
+                    {menus.map((menu) => (
+                      <TabsTrigger key={menu.value} value={menu.value}>
+                        {menu.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
+            )}
             {isTransfer && (
               <FormField
                 control={form.control}

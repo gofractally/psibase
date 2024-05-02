@@ -119,6 +119,7 @@ type Item = React.ForwardRefExoticComponent<
 const SelectItem = React.forwardRef<
   React.ElementRef<Item>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
+  // @ts-expect-error fff
 >(({ className, children, isGeneric, right, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
