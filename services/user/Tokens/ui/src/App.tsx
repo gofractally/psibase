@@ -1,3 +1,5 @@
+import { useSupervisor } from "./hooks/useSupervisor";
+import { tokenPlugin } from "./plugin";
 import { FormCreate } from "@/components/form-create";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Mode } from "@/components/transfer-toggle";
@@ -40,8 +42,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatNumber } from "@/lib/formatNumber";
 import { placeholders } from "@/lib/memoPlaceholders";
 import { randomElement } from "@/lib/random";
+import { wait } from "@/lib/wait";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Supervisor } from "@psibase/common-lib/messaging";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -65,8 +67,6 @@ const formSchema = z.object({
   from: z.string().optional(),
   memo: z.string().max(50).optional(),
 });
-
-const supervisor = new Supervisor();
 
 // create - admin
 // mapSymbol - admin
@@ -125,23 +125,25 @@ const tokenBalances: TokenBalance[] = [
   },
 ];
 
-const wait = (ms: number = 1000) =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
 function App() {
-  const init = async () => {
-    await supervisor.onLoaded();
-    supervisor.preLoadPlugins([
+  const supervisor = useSupervisor({
+    preloadPlugins: [
       { service: "invite" },
       { service: "accounts" },
       { service: "auth-sig" },
       { service: "demoapp1" },
-    ]);
+    ],
+  });
+
+  const x = async () => {
+    console.log("did thje job");
+    const res = await supervisor.functionCall(
+      tokenPlugin.intf.createToken(2, 3)
+    );
+    console.log(res, "is the res");
   };
 
-  useEffect(() => {
-    init();
-  }, []);
+  console.log({ supervisor }, "is the supervisor");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -205,19 +207,12 @@ function App() {
     toast.promise(wait(1000), {
       loading: "Transaction submitting...",
       error: "Transaction failed!",
-      success: () => {
-        return (
-          <div>
-            <h1>hello</h1>thanks
-          </div>
-        );
+      finally: () => {
+        toast.success("Transaction accepted", {
+          description: "Sunday, December 03, 2023 at 9:00 AM",
+        });
       },
     });
-    setTimeout(() => {
-      toast.success("Transaction accepted", {
-        description: "Sunday, December 03, 2023 at 9:00 AM",
-      });
-    }, 1200);
   };
 
   const addModal = () => {
@@ -247,7 +242,8 @@ function App() {
   ];
 
   return (
-    <div className="">
+    <div>
+      <Button onClick={() => x()}>Click me</Button>
       <ModeToggle />
       <div className="max-w-screen-lg mx-auto p-4">
         <Dialog
