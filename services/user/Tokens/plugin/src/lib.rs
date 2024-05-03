@@ -4,13 +4,13 @@ mod bindings;
 use bindings::common::plugin::{server, types as CommonTypes};
 
 use bindings::exports::component::tokens::{
-    intf::{Guest as Intf},
+    intf::Guest as Intf,
     transfer::{Guest as Transfer, Tid},
 };
 
 use bindings::exports::component::tokens::types::{Precision, Quantity};
 
-use service::action_structs;
+use psibase::services::tokens as service;
 
 use bindings::exports::component::tokens::types as Types;
 
@@ -19,8 +19,15 @@ struct Component;
 use psibase::fracpack::Pack;
 
 impl Intf for Component {
-    fn create(precision: Precision, maxSupply: u64) -> String {
-        let x = &action_structs::create { 32, 1 }.packed()
+    fn create(precision: Precision, maxSupply: Quantity) -> String {
+        let res = server::add_action_to_transaction(
+            "create",
+            &service::action_structs::create {
+                precision: service::Precision { value: precision },
+                maxSupply: service::Quantity { value: maxSupply },
+            }
+            .packed(),
+        );
         "whatever".to_string()
     }
 }

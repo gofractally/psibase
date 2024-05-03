@@ -18,7 +18,6 @@ pub mod native;
 pub mod native_raw;
 mod native_tables;
 mod package;
-mod quantity;
 pub mod reflect;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
@@ -54,7 +53,6 @@ pub use method_number::*;
 pub use native::*;
 pub use native_tables::*;
 pub use package::*;
-pub use quantity::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use schema::*;

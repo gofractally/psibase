@@ -1,6 +1,3 @@
-// TODO: tables
-// TODO: events
-
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, Unpack};
 use serde::{Deserialize, Serialize};
@@ -14,11 +11,9 @@ pub type NID = u32;
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-#[graphql(input_name = "NftRecordInput")]
-pub struct NftRecord {
-    id: NID,
-    issuer: AccountNumber,
-    owner: AccountNumber,
+#[graphql(input_name = "PrecisionInput")]
+pub struct Precision {
+    pub value: u8,
 }
 
 #[derive(
@@ -26,27 +21,19 @@ pub struct NftRecord {
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-#[graphql(input_name = "NftHolderRecordInput")]
-pub struct NftHolderRecord {
-    account: AccountNumber,
-    config: u8, // todo: Implement Bitset
+#[graphql(input_name = "QuantityInput")]
+pub struct Quantity {
+    pub value: u64,
 }
 
-#[derive(
-    Debug, Copy, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
-)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
-#[graphql(input_name = "CreditRecordInput")]
-pub struct CreditRecord {
-    nftId: NID,
-    debitor: AccountNumber,
-}
+pub type TID = u32;
 
 #[crate::service(name = "tokens", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{AccountNumber, NamedBit};
+
+    use super::{Precision, Quantity, TID};
+    use crate::AccountNumber;
 
     #[action]
     fn init() {
@@ -54,17 +41,15 @@ mod service {
     }
 
     #[action]
-    fn mint() -> crate::services::nft::NID {
+    fn credit(tokenId: TID, receiver: AccountNumber, amount: Quantity, memo: String) {
         unimplemented!()
     }
 
     #[action]
-    fn burn(nftId: crate::services::nft::NID) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn credit(nftId: crate::services::nft::NID, receiver: AccountNumber, memo: String) {
+    fn create(precision: Precision, maxSupply: Quantity) {
         unimplemented!()
     }
 }
+
+// fracpack
+// Canonical ABI

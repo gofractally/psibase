@@ -27,9 +27,9 @@ npm i && npm run build
 psibase upload -r $proxy_name ./dist / 
 
 
-# Build service and deploy
-cd /root/psibase/build
-make install
-psibase deploy tokens Tokens.wasm
+# # Build service and deploy
+# cd /root/psibase/build
+# make install
+# psibase deploy tokens Tokens.wasm
 
 
