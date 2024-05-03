@@ -3,6 +3,8 @@
 mod service {
     use async_graphql::*;
     use psibase::*;
+    use psibase_macros::Reflect as ReflectTwo;
+
     use serde::{Deserialize, Serialize};
 
     // #[table(name = "BalanceTable", index = 0)]
@@ -17,9 +19,10 @@ mod service {
     struct WebContentTable;
 
     #[action]
-    pub fn credit(from: AccountNumber, to: AccountNumber) -> i32 {
-        5
-    }
+    pub fn credit(from: AccountNumber, to: AccountNumber) -> i32 {}
+
+    #[action]
+    pub fn create(precision: Precision, maxSupply: Quantity) {}
 
     #[action]
     #[allow(non_snake_case)]

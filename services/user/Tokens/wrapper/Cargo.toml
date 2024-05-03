@@ -10,4 +10,5 @@ path = "src/lib.rs"
 serde = { version = "1", features = ["derive"] }
 async-graphql = "4.0"
 psibase = { version = "0.8.0", path = "../../../../rust/psibase" }
+psibase_macros = { path = "../../../../rust/psibase_macros" }
 
