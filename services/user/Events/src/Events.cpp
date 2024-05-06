@@ -240,6 +240,34 @@ namespace
              });
       }
    }
+
+   bool processQueue(std::uint32_t maxSteps)
+   {
+      auto queue = PendingIndexTable{
+          DbId::writeOnly,
+          psio::convert_to_key(std::tuple(EventIndex::service, pendingIndexTableNum))};
+
+      auto&             cache = SchemaCache::instance();
+      EventWrapper      wrapper;
+      std::vector<char> data;
+      for (auto item : queue.getIndex<0>())
+      {
+         bool more = (item.endKey != 0 && item.nextKey.empty())
+                         ? processInit(item.db, maxSteps, item.endKey)
+                         : processIndex(maxSteps, item);
+         if (more)
+         {
+            queue.put(item);
+            return true;
+         }
+         else
+         {
+            queue.remove(item);
+         }
+      }
+      return false;
+   }
+
 }  // namespace
 
 void EventIndex::init()
@@ -264,32 +292,6 @@ void EventIndex::init()
           .seq = 1, .db = DbId::merkleEvent, .endKey = dbStatus->nextMerkleEventNumber});
       status.put({.db = DbId::merkleEvent, .nextEventNumber = dbStatus->nextMerkleEventNumber});
    }
-}
-
-bool Events::processQueue(std::uint32_t maxSteps)
-{
-   auto queue = PendingIndexTable{DbId::writeOnly, psio::convert_to_key(std::tuple(
-                                                       EventIndex::service, pendingIndexTableNum))};
-
-   auto&             cache = SchemaCache::instance();
-   EventWrapper      wrapper;
-   std::vector<char> data;
-   for (auto item : queue.getIndex<0>())
-   {
-      bool more = (item.endKey != 0 && item.nextKey.empty())
-                      ? processInit(item.db, maxSteps, item.endKey)
-                      : processIndex(maxSteps, item);
-      if (more)
-      {
-         queue.put(item);
-         return true;
-      }
-      else
-      {
-         queue.remove(item);
-      }
-   }
-   return false;
 }
 
 // Checks event tables that have been marked as dirty and

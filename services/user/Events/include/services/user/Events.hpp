@@ -12,22 +12,45 @@
 namespace UserService
 {
 
+   /// The `events` service maintains indexes for all events.
+   ///
+   /// Queries for events use SQL and are sent to the /sql endpoint with
+   /// `Content-Type: application/sql`
+   ///
+   /// There is one table for each type of event, for example, `"history.tokens.transferred"`.
+   /// Note that double quotes are required because a '.' is not otherwise allowed
+   /// in SQL table names.
+   ///
+   /// Each field of the event is a column in the table. Types that are represented
+   /// in json as a number, string, true, false, or null are represented by an
+   /// appropriate SQL value and can be compared. Types that do not have a
+   /// representation in SQL (reflected structs, arrays, containers) are
+   /// represented by an opaque SQL value. The result of applying any operation
+   /// to an opaque value, other that returning it as a query result is unspecified.
+   ///
+   /// The query result is returned as a JSON array of objects.
    struct EventIndex : psibase::Service<EventIndex>
    {
       static constexpr psibase::AccountNumber service{"events"};
       static constexpr auto                   serviceFlags =
           psibase::CodeRow::isSubjective | psibase::CodeRow::forceReplay;
-      void init();
-      // Sets the schema associated with a service
+      /// Sets the schema associated with a service.
       void setSchema(const ServiceSchema& schema);
-      // Adds an index.
+      /// Requests an index. Indexes can improve the performance of queries involving
+      /// the column. The indexes are subjective and MAY be adjusted by individual nodes.
+      /// Indexes increase the CPU cost of transactions that create events.
+      /// Block producers SHOULD use exactly the indexes requested by services
+      /// to ensure consistent billing.
       void addIndex(psibase::DbId          db,
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
-      // Applies pending index changes
-      bool processQueue(std::uint32_t maxSteps);
-      // Indexes all new events
+
+      // --- Maintenance actions ---
+
+      // Initializes the service
+      void init();
+      // Indexes all new events. This is run automatically at the end of every transaction.
       void sync();
       // Runs in subjective mode at the end of each block
       void onBlock();
