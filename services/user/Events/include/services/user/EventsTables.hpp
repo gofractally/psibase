@@ -15,6 +15,7 @@
 namespace UserService
 {
 
+   /// Represents the schema for a service
    struct ServiceSchema
    {
       psibase::AccountNumber service;
@@ -24,6 +25,7 @@ namespace UserService
       EventMap history;
       EventMap merkle;
 
+     private:
       template <typename T>
       static void makeEvents(psio::SchemaBuilder&                       builder,
                              EventMap&                                  out,
@@ -58,6 +60,8 @@ namespace UserService
              });
       }
 
+     public:
+      /// Constructs a schema for a service.
       template <typename T>
       static ServiceSchema make()
       {
@@ -79,7 +83,8 @@ namespace UserService
          result.schema = std::move(builder).build(eventTypes);
          return result;
       }
-      //
+
+     private:
       const EventMap* getDb(psibase::DbId db) const
       {
          switch (db)
@@ -94,6 +99,8 @@ namespace UserService
                return nullptr;
          }
       }
+
+     public:
       const psio::schema_types::AnyType* getType(psibase::DbId db, psibase::MethodNumber event)
       {
          if (const auto* types = getDb(db))
