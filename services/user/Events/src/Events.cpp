@@ -25,6 +25,10 @@ void EventIndex::addIndex(psibase::DbId          db,
                           psibase::MethodNumber  event,
                           std::uint8_t           column)
 {
+   check(getSender() == service, "Wrong sender");
+   const CompiledType* type = SchemaCache::instance().getSchemaType(db, service, event);
+   check(!!type, "Unknown event");
+   check(column < type->children.size(), "Unknown column");
    auto secondary = Events::open<SecondaryIndexTable>(secondaryIndexSpecTableNum);
    auto row       = secondary.getIndex<0>().get(std::tuple(db, service, event));
    if (!row)

@@ -94,6 +94,7 @@ TEST_CASE("events")
 {
    DefaultTestChain chain;
    auto testService = chain.from(chain.addService<TestService>("Events-TestService.wasm"));
+   auto mallory     = chain.from(chain.addAccount("mallory"));
 
    auto schema = ServiceSchema::make<TestService>();
    std::cout << psio::format_json(schema) << std::endl;
@@ -112,6 +113,16 @@ TEST_CASE("events")
    expect(testService.to<Events>()
               .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"opt"}, 0)
               .trace());
+
+   CHECK(mallory.to<Events>()
+             .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"opt"}, 0)
+             .failed("Wrong sender"));
+   CHECK(testService.to<Events>()
+             .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"missing"}, 0)
+             .failed("Unknown event"));
+   CHECK(testService.to<Events>()
+             .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 42)
+             .failed("Unknown column"));
 
    explain(
        chain,
