@@ -32,7 +32,7 @@ namespace UserService
 
    SchemaCache::CacheEntry::CacheEntry(ServiceSchema&& schema)
        : schema(std::move(schema)),
-         cschema(this->schema.schema, psibase_builtins, this->schema.types())
+         cschema(this->schema.types, psibase_builtins, this->schema.eventTypes())
    {
    }
 

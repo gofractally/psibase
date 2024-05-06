@@ -19,7 +19,7 @@ namespace UserService
    struct ServiceSchema
    {
       psibase::AccountNumber service;
-      psio::Schema           schema;
+      psio::Schema           types;
       using EventMap = std::map<psibase::MethodNumber, psio::schema_types::AnyType>;
       EventMap ui;
       EventMap history;
@@ -80,7 +80,7 @@ namespace UserService
          {
             makeEvents<typename T::Events::Merkle>(builder, result.merkle, eventTypes);
          }
-         result.schema = std::move(builder).build(eventTypes);
+         result.types = std::move(builder).build(eventTypes);
          return result;
       }
 
@@ -103,12 +103,12 @@ namespace UserService
      public:
       const psio::schema_types::AnyType* getType(psibase::DbId db, psibase::MethodNumber event)
       {
-         if (const auto* types = getDb(db))
-            if (auto pos = types->find(event); pos != types->end())
-               return pos->second.resolve(schema);
+         if (const auto* dbTypes = getDb(db))
+            if (auto pos = dbTypes->find(event); pos != dbTypes->end())
+               return pos->second.resolve(types);
          return nullptr;
       }
-      std::vector<const psio::schema_types::AnyType*> types() const
+      std::vector<const psio::schema_types::AnyType*> eventTypes() const
       {
          std::vector<const psio::schema_types::AnyType*> result;
          for (const auto* m : {&ui, &history, &merkle})
@@ -121,7 +121,7 @@ namespace UserService
          return result;
       }
    };
-   PSIO_REFLECT(ServiceSchema, service, schema, ui, history, merkle)
+   PSIO_REFLECT(ServiceSchema, service, types, ui, history, merkle)
 
    struct SecondaryIndexInfo
    {
