@@ -869,15 +869,6 @@ namespace psio
                   start_member(item);
                   break;
                case FracParser::end:
-                  // TODO:
-                  // container with non-optional elements:
-                  // - end = 0, value = 1
-                  // container with optional elements:
-                  // - end = 0, empty optional = 1, value = 2
-                  // container of 8-bit or 1-bit Int
-                  // - end = 00 00,
-                  // - 0 = 00 01
-                  // - x = x
                   switch (item.type->kind)
                   {
                      case CompiledType::container:
