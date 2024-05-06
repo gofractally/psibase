@@ -561,7 +561,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Events/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS  "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
