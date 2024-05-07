@@ -32,7 +32,7 @@ option(ENABLE_SSL "Build psinode with TLS support" ON)
 
 add_subdirectory(native)
 add_subdirectory(rust)
-file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\", \"rust\")\n")
+file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\")\n")
 
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
