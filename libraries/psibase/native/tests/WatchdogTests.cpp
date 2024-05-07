@@ -83,7 +83,6 @@ TEST_CASE("Watchdog required accuracy")
       if (end - start - duration >= std::chrono::milliseconds(5))
       {
          ++failed;
-         INFO("overrun: " << (end - start - duration));
          CHECK(failed <= allowed_failures);
       }
    }
