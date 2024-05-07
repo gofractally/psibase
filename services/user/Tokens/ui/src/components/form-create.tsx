@@ -11,8 +11,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useSupervisor } from "@/hooks/useSupervisor";
 import { formatNumber } from "@/lib/formatNumber";
-import { wait } from "@/lib/wait";
+import { tokenPlugin } from "@/plugin";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -38,14 +39,52 @@ const formSchema = z.object({
     ),
 });
 
-const createTokenDummy = async (message: string): Promise<string> => {
-  await wait();
-  return message;
-};
-
 interface Props {
   onClose: () => void;
 }
+
+// const supervisor = useSupervisor({
+//   preloadPlugins: [
+//     { service: "invite" },
+//     { service: "accounts" },
+//     { service: "auth-sig" },
+//     { service: "demoapp1" },
+//   ],
+// });
+
+// const x = async () => {
+//   console.log("did thje job");
+//   const res = await supervisor.functionCall(
+//     tokenPlugin.intf.createToken(2, 3)
+//   );
+//   console.log(res, "is the res");
+// };
+
+const query = `
+{
+	allBalances {
+		edges {
+			node {
+				key {
+					account
+					tokenId
+				}
+				balance
+			}
+		}
+	}
+
+	userBalances(user: "alice") {
+		user
+		balance
+		precision
+		token
+		symbol
+	}
+}
+`;
+
+console.log(query, 'was query');
 
 export function FormCreate({ onClose }: Props) {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -57,21 +96,51 @@ export function FormCreate({ onClose }: Props) {
     mode: "onChange",
   });
 
-  const { mutateAsync: createToken, isPending } = useMutation({
-    mutationFn: createTokenDummy,
+  const supervisor = useSupervisor({
+    preloadPlugins: [
+      {
+        service: "tokens",
+      },
+    ],
+  });
+
+  const { mutateAsync: createToken, isPending } = useMutation<
+    { name: string },
+    any,
+    { precision: number; maxSupply: string }
+  >({
+    mutationFn: async ({ maxSupply, precision }) => {
+      console.log("attemmpting tx", { maxSupply, precision });
+      try {
+        const res = await supervisor.functionCall(
+          tokenPlugin.intf.create(precision, maxSupply)
+        );
+        console.log(res, "came back on create tx");
+        return res as { name: string };
+      } catch (e) {
+        console.error("van dyke", e);
+        throw new Error("s");
+      }
+    },
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     console.log("forever, medicine", data);
-    toast.promise(createToken("derp"), {
-      loading: "Creating token...",
-      description: "Sending transaction",
-      dismissible: false,
-      finally: () => {
-        toast.success("is this better?");
-        onClose();
-      },
-    });
+    toast.promise(
+      createToken({
+        maxSupply: data.maxSupply,
+        precision: Number(data.precision),
+      }),
+      {
+        loading: "Creating token...",
+        description: "Sending transaction",
+        dismissible: false,
+        finally: () => {
+          toast.success("Transaction successful.");
+          onClose();
+        },
+      }
+    );
   };
 
   const supply = form.watch("maxSupply");

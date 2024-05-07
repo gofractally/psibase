@@ -17,6 +17,16 @@ pub struct Precision {
 }
 
 #[derive(
+    Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
+#[graphql(input_name = "MemoInput")]
+pub struct Memo {
+    pub contents: String,
+}
+
+#[derive(
     Debug, Copy, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -32,7 +42,7 @@ pub type TID = u32;
 #[allow(non_snake_case, unused_variables)]
 mod service {
 
-    use super::{Precision, Quantity, TID};
+    use super::{Memo, Precision, Quantity, TID};
     use crate::AccountNumber;
 
     #[action]
@@ -49,7 +59,14 @@ mod service {
     fn create(precision: Precision, maxSupply: Quantity) {
         unimplemented!()
     }
-}
 
-// fracpack
-// Canonical ABI
+    #[action]
+    fn burn(tokenId: TID, amount: Quantity) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn mint(tokenId: TID, amount: Quantity, memo: Memo) {
+        unimplemented!()
+    }
+}

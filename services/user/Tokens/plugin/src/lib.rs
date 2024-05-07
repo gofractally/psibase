@@ -19,7 +19,7 @@ struct Component;
 use psibase::fracpack::Pack;
 
 impl Intf for Component {
-    fn create(precision: Precision, maxSupply: Quantity) -> String {
+    fn create(precision: Precision, maxSupply: Quantity) -> Result<String, CommonTypes::Error> {
         let res = server::add_action_to_transaction(
             "create",
             &service::action_structs::create {
@@ -28,13 +28,30 @@ impl Intf for Component {
             }
             .packed(),
         );
-        "whatever".to_string()
+        Ok("whatever".to_string())
+    }
+
+    fn burn(tokenId: Tid, amount: Quantity) -> Result<String, CommonTypes::Error> {
+        Ok("thanks".to_string())
+    }
+
+    fn mint(tokenId: Tid, amount: Quantity, memo: String) -> Result<String, CommonTypes::Error> {
+        let res = server::add_action_to_transaction(
+            "mint",
+            &service::action_structs::mint {
+                amount: service::Quantity { value: amount },
+                memo: service::Memo { contents: memo },
+                tokenId: tokenId,
+            }
+            .packed(),
+        );
+        Ok("mint ok".to_string())
     }
 }
 
 impl Transfer for Component {
-    fn credit(token: Tid) -> String {
-        "whatever2".to_string()
+    fn credit(token: Tid) -> Result<String, CommonTypes::Error> {
+        Ok("whatever2".to_string())
     }
 }
 

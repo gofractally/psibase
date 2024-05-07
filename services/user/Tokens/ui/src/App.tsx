@@ -1,5 +1,3 @@
-import { useSupervisor } from "./hooks/useSupervisor";
-import { tokenPlugin } from "./plugin";
 import { FormCreate } from "@/components/form-create";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Mode } from "@/components/transfer-toggle";
@@ -126,24 +124,20 @@ const tokenBalances: TokenBalance[] = [
 ];
 
 function App() {
-  const supervisor = useSupervisor({
-    preloadPlugins: [
-      { service: "invite" },
-      { service: "accounts" },
-      { service: "auth-sig" },
-      { service: "demoapp1" },
-    ],
-  });
+  // const supervisor = useSupervisor({
+  //   preloadPlugins: [
+  //     { service: "invite" },
+  //     { service: "accounts" },
+  //     { service: "auth-sig" },
+  //     { service: "demoapp1" },
+  //   ],
+  // });
 
-  const x = async () => {
-    console.log("did thje job");
-    const res = await supervisor.functionCall(
-      tokenPlugin.intf.createToken(2, 3)
-    );
-    console.log(res, "is the res");
-  };
+  // const x = async () => {
+  //   console.log("gunderson", "is the res");
+  // };
 
-  console.log({ supervisor }, "is the supervisor");
+  // console.log({ supervisor }, "is the supervisor");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -243,7 +237,6 @@ function App() {
 
   return (
     <div>
-      <Button onClick={() => x()}>Click me</Button>
       <ModeToggle />
       <div className="max-w-screen-lg mx-auto p-4">
         <Dialog

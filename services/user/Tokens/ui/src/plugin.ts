@@ -5,10 +5,17 @@ class Intf extends Interface {
     super("intf", service);
   }
 
-  public createToken(precision: number, maxSupply: number) {
+  public create(precision: number, maxSupply: string) {
     return this.addIntf({
       method: "create",
       params: [precision, maxSupply],
+    });
+  }
+
+  public burn(tokenId: string, amount: string) {
+    return this.addIntf({
+      method: "burn",
+      params: [tokenId, amount],
     });
   }
 }

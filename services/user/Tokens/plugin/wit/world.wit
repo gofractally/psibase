@@ -11,13 +11,16 @@ interface types {
 
 interface intf {
     use common:plugin/types.{error};
-    use types.{precision, quantity};
-    create: func(a: precision, b: quantity) -> string;
+    use types.{precision, quantity, tid};
+    create: func(a: precision, b: quantity) -> result<string, error>;
+    burn: func(token-id: tid, amount: quantity) -> result<string, error>;
+    mint: func(token-id: tid, amount: quantity, memo: string) -> result<string, error>;
 }
 
 interface transfer {
+    use common:plugin/types.{error};
     use types.{tid};
-    credit: func(token: tid) -> string;
+    credit: func(token: tid) -> result<string, error>;
 }
 
 /// An example world for the component to target.
