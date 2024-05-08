@@ -328,13 +328,13 @@ fn key_to_string(bytes: &[u8], suffix: &str) -> String {
 }
 
 #[cfg(not(target_family = "wasm"))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PKCS8PrivateKeyK1 {
     key: secp256k1::SecretKey,
 }
 
 #[cfg(not(target_family = "wasm"))]
-pub trait Signer: std::fmt::Debug {
+pub trait Signer: std::fmt::Debug + Sync + Send {
     fn get_claim(&self) -> crate::Claim;
     fn sign(&self, data: &[u8]) -> Vec<u8>;
 }
@@ -396,7 +396,7 @@ impl Signer for PKCS8PrivateKeyK1 {
 }
 
 #[cfg(not(target_family = "wasm"))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PKCS11PrivateKey {
     session: Arc<Mutex<Session>>,
     key: ObjectHandle,
@@ -788,7 +788,7 @@ fn login(
 }
 
 #[cfg(not(target_family = "wasm"))]
-fn load_pkcs11_private_key(key: &str) -> Result<Box<dyn Signer>, anyhow::Error> {
+fn load_pkcs11_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> {
     let mut uri = PKCS11URI::from_str(key)?;
     if let Some(class) = uri.type_ {
         if class != ObjectClass::PRIVATE_KEY {
@@ -814,7 +814,7 @@ fn load_pkcs11_private_key(key: &str) -> Result<Box<dyn Signer>, anyhow::Error> 
                     key: obj,
                     pubkey: get_public_key_der(&session, lookup_public_key(&session, obj)?)?,
                 };
-                return Ok(Box::new(result));
+                return Ok(Arc::new(result));
             }
         }
     }
@@ -822,18 +822,18 @@ fn load_pkcs11_private_key(key: &str) -> Result<Box<dyn Signer>, anyhow::Error> 
 }
 
 #[cfg(not(target_family = "wasm"))]
-pub fn load_private_key(key: &str) -> Result<Box<dyn Signer>, anyhow::Error> {
+pub fn load_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> {
     if key.starts_with("pkcs11:") {
         return load_pkcs11_private_key(key);
     }
     if let Ok(pkey) = PrivateKey::from_str(key) {
-        return Ok(Box::new(pkey));
+        return Ok(Arc::new(pkey));
     }
 
     let data = read_key_file(key, "PRIVATE KEY", Error::ExpectedPrivateKey)?;
     let pkcs8_key = data.decode_msg::<pkcs8::PrivateKeyInfo>()?;
     match pkcs8_key.algorithm.oids()? {
-        (OID_ECDSA, Some(OID_SECP256K1)) => Ok(Box::new(PKCS8PrivateKeyK1 {
+        (OID_ECDSA, Some(OID_SECP256K1)) => Ok(Arc::new(PKCS8PrivateKeyK1 {
             key: secp256k1::SecretKey::from_slice(
                 sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?.private_key,
             )?,
@@ -871,9 +871,9 @@ fn load_pkcs11_public_key(key: &str) -> Result<Vec<u8>, anyhow::Error> {
 }
 
 #[cfg(not(target_family = "wasm"))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AnyPrivateKey {
-    key: Box<dyn Signer>,
+    key: Arc<dyn Signer>,
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -886,7 +886,7 @@ impl FromStr for AnyPrivateKey {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AnyPublicKey {
     pub key: crate::Claim,
 }
