@@ -1,4 +1,4 @@
-export const formatNumber = (num: number) =>
+export const formatNumber = (num: number, precision: number = 4) =>
   new Intl.NumberFormat(undefined, {
-    ...(num > 10000 && { maximumFractionDigits: 0 }),
+    maximumFractionDigits: precision,
   }).format(num);

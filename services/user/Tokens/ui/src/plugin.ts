@@ -21,9 +21,9 @@ class Intf extends Interface {
 
   public mint(tokenId: string, amount: string, memo: string) {
     return this.addIntf({
-      method: 'mint',
-      params: [tokenId, amount, memo]
-    })
+      method: "mint",
+      params: [tokenId, amount, memo],
+    });
   }
 }
 

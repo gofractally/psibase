@@ -28,6 +28,7 @@ const isValidNumber = (str: string): boolean => {
 
 const formSchema = z.object({
   maxSupply: z.string().refine(isValidNumber, "Must be a number"),
+  initialSupply: z.string().refine(isValidNumber, "Must be a number"),
   precision: z
     .string()
     .refine(isValidNumber, "Must be a number")
@@ -91,7 +92,7 @@ export function FormCreate({ onClose }: Props) {
   const { mutateAsync: createToken, isPending } = useMutation<
     { name: string },
     any,
-    { precision: number; maxSupply: string }
+    { precision: number; maxSupply: string; initialSupply: string }
   >({
     mutationFn: async ({ maxSupply, precision }) => {
       console.log("attemmpting tx", { maxSupply, precision });
@@ -120,6 +121,7 @@ export function FormCreate({ onClose }: Props) {
       createToken({
         maxSupply: data.maxSupply,
         precision: Number(data.precision),
+        initialSupply: data.initialSupply,
       }),
       {
         loading: "Creating token...",
@@ -134,9 +136,14 @@ export function FormCreate({ onClose }: Props) {
   };
 
   const supply = form.watch("maxSupply");
-  const supplyLabel = `${formatNumber(Number(supply))}`;
-
   const precision = form.watch("precision");
+  const maxSupplyLabel = `${formatNumber(Number(supply))}`;
+
+  const initialSupplyLabel = formatNumber(
+    Number(form.watch("initialSupply")),
+    Number(precision)
+  );
+
   const suggestedPrecision = precision.length > 1 ? 8 : Number(precision) || 0;
   const label = `${(1).toFixed(suggestedPrecision)} TOK`;
 
@@ -152,7 +159,22 @@ export function FormCreate({ onClose }: Props) {
               <FormControl>
                 <Input type="number" placeholder="21,000,000" {...field} />
               </FormControl>
-              <FormDescription>{supplyLabel}</FormDescription>
+              <FormDescription>{maxSupplyLabel}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="initialSupply"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Initial Supply</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="50" {...field} />
+              </FormControl>
+              <FormDescription>{initialSupplyLabel}</FormDescription>
 
               <FormMessage />
             </FormItem>
