@@ -40,7 +40,7 @@ impl Intf for Component {
             "mint",
             &service::action_structs::mint {
                 amount: service::Quantity { value: amount },
-                memo: service::Memo { contents: memo },
+                memo,
                 tokenId: tokenId,
             }
             .packed(),

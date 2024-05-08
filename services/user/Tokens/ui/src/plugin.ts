@@ -18,6 +18,13 @@ class Intf extends Interface {
       params: [tokenId, amount],
     });
   }
+
+  public mint(tokenId: string, amount: string, memo: string) {
+    return this.addIntf({
+      method: 'mint',
+      params: [tokenId, amount, memo]
+    })
+  }
 }
 
 class Transfer extends Interface {

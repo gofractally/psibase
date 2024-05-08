@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useSupervisor } from "@/hooks/useSupervisor";
 import { formatNumber } from "@/lib/formatNumber";
+import { wait } from "@/lib/wait";
 import { tokenPlugin } from "@/plugin";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -43,23 +44,6 @@ interface Props {
   onClose: () => void;
 }
 
-// const supervisor = useSupervisor({
-//   preloadPlugins: [
-//     { service: "invite" },
-//     { service: "accounts" },
-//     { service: "auth-sig" },
-//     { service: "demoapp1" },
-//   ],
-// });
-
-// const x = async () => {
-//   console.log("did thje job");
-//   const res = await supervisor.functionCall(
-//     tokenPlugin.intf.createToken(2, 3)
-//   );
-//   console.log(res, "is the res");
-// };
-
 const query = `
 {
 	allBalances {
@@ -84,7 +68,7 @@ const query = `
 }
 `;
 
-console.log(query, 'was query');
+console.log(query, "was query");
 
 export function FormCreate({ onClose }: Props) {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -116,6 +100,12 @@ export function FormCreate({ onClose }: Props) {
           tokenPlugin.intf.create(precision, maxSupply)
         );
         console.log(res, "came back on create tx");
+
+        await wait(2000);
+        const res2 = await supervisor.functionCall(
+          tokenPlugin.intf.mint("8", "1000", "hello")
+        );
+        console.log(res2, "brexit was a mistake.");
         return res as { name: string };
       } catch (e) {
         console.error("van dyke", e);

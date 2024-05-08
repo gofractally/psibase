@@ -1,3 +1,5 @@
+import { fetchTokens } from "./lib/graphql/tokens";
+import { Quantity } from "./lib/quantity";
 import { FormCreate } from "@/components/form-create";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Mode } from "@/components/transfer-toggle";
@@ -162,6 +164,20 @@ function App() {
   const [mode, setMode] = useState<Mode>(Mode.Transfer);
 
   const selectedTokenId = form.watch("token");
+
+  const x = async () => {
+    const res = await fetchTokens();
+    const y = res.tokens.edges.map((edge) => edge.node);
+    console.log(res, "breaking bad", y);
+    const xx = y.map((token) =>
+      new Quantity(token.maxSupply.value, token.precision.value).toString()
+    );
+    console.log(xx, "was xx");
+  };
+
+  useEffect(() => {
+    x();
+  }, []);
 
   useEffect(() => {
     const theToken = tokenBalances.find((bal) => bal.id == selectedTokenId);

@@ -42,7 +42,7 @@ pub type TID = u32;
 #[allow(non_snake_case, unused_variables)]
 mod service {
 
-    use super::{Memo, Precision, Quantity, TID};
+    use super::{Precision, Quantity, TID};
     use crate::AccountNumber;
 
     #[action]
@@ -66,7 +66,7 @@ mod service {
     }
 
     #[action]
-    fn mint(tokenId: TID, amount: Quantity, memo: Memo) {
+    fn mint(tokenId: TID, amount: Quantity, memo: String) {
         unimplemented!()
     }
 }
