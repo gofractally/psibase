@@ -100,7 +100,7 @@ namespace SystemService
       check(getSender() == me, "Wrong sender");
       if (objective)
       {
-         check(act.sender == me, "Objective callbacks must have 'trasact' as sender");
+         check(act.sender == me, "Objective callbacks must have 'transact' as sender");
          check(type == CallbackType::onTransaction, "Objective block callbacks not supported");
          Tables tables(me);
          auto   table = tables.open<CallbacksTable>();
