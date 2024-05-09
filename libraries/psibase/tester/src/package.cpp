@@ -38,6 +38,8 @@ namespace psibase
                result |= (1 << 5);
             else if (flag == "isAuthService")
                result |= (1 << 6);
+            else if (flag == "forceReplay")
+               result |= (1 << 7);
             else
                check(false, "Invalid service flags");
          }

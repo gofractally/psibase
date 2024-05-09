@@ -1,5 +1,6 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psio/finally.hpp>
 
 namespace psibase
 {
@@ -165,6 +166,44 @@ namespace psibase
       active = true;
    }
 
+   void BlockContext::callOnBlock()
+   {
+      auto notifyData =
+          db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(NotifyType::acceptBlock)));
+      if (!notifyData)
+         return;
+      auto notifySpan = std::span{notifyData->pos, notifyData->end};
+      if (!psio::fracpack_validate<NotifyRow>(notifySpan))
+         return;
+
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions();
+
+      auto oldIsProducing = isProducing;
+      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      isProducing         = true;
+
+      for (const Action& action : actions)
+      {
+         if (action.sender != AccountNumber{})
+            continue;
+         SignedTransaction  trx;
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         auto&              atrace = trace.actionTraces.emplace_back();
+
+         try
+         {
+            tc.execNonTrxAction(0, action, atrace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+            PSIBASE_LOG(trxLogger, info) << "onBlock succeeded";
+         }
+         catch (std::exception& e)
+         {
+            PSIBASE_LOG(trxLogger, info) << "onBlock failed: " << e.what();
+         }
+      }
+   }
+
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
       Merkle m;
@@ -290,6 +329,8 @@ namespace psibase
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
       db.kvPut(DbId::blockProof, current.header.blockNum,
                prover.prove(BlockSignatureInfo(*status->head), claim));
+
+      callOnBlock();
 
       return {session.writeRevision(status->head->blockId), status->head->blockId};
    }

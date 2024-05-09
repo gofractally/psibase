@@ -24,6 +24,8 @@ namespace psibase
       AccountNumber     service;  ///< Service to execute the action
       MethodNumber      method;   ///< Service method to execute
       std::vector<char> rawData;  ///< Data for the method
+      //
+      friend bool operator==(const Action&, const Action&) = default;
    };
    PSIO_REFLECT(Action, sender, service, method, rawData)
 

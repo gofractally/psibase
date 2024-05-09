@@ -11,13 +11,10 @@ namespace psibase
    {
      public:
       // default excludes Docs and TokenUsers
-      DefaultTestChain(const std::vector<std::string>& packageNames =
-                           {"Accounts", "AuthAny", "AuthDelegate", "AuthSig", "AuthK1", "CommonApi",
-                            "CpuLimit", "Explorer", "Fractal", "Invite", "Nft", "Packages",
-                            "Producers", "HttpServer", "Sites", "SetCode", "Symbol", "Tokens",
-                            "Transact"},
-                       bool                  installUI = false,
-                       const DatabaseConfig& dbconfig  = {});
+      static std::vector<std::string> defaultPackages();
+      DefaultTestChain(const std::vector<std::string>& packageNames = defaultPackages(),
+                       bool                            installUI    = false,
+                       const DatabaseConfig&           dbconfig     = {});
 
       AccountNumber addService(const char* acc, const char* filename, bool show = false);
       AccountNumber addService(AccountNumber acc, const char* filename, bool show = false);

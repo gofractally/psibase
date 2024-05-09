@@ -85,6 +85,7 @@
   - [common-api](default-apps/common-api.md)
   - [cpu-limit]()
   - [docs](default-apps/docs.md)
+  - [events](default-apps/events.md)
   - [explorer]()
   - [fractal]()
   - [invite](default-apps/invite.md)

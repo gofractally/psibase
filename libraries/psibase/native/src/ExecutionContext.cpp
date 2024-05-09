@@ -183,9 +183,12 @@ namespace psibase
                            const VMOptions&    vmOptions,
                            ExecutionMemory&    memory,
                            AccountNumber       service)
-          : NativeFunctions{transactionContext.blockContext.db, transactionContext,
-                            transactionContext.allowDbRead, transactionContext.allowDbWrite,
-                            transactionContext.allowDbReadSubjective},
+          : NativeFunctions{transactionContext.blockContext.db,
+                            transactionContext,
+                            transactionContext.allowDbRead,
+                            transactionContext.allowDbWrite,
+                            transactionContext.allowDbReadSubjective,
+                            transactionContext.allowDbWriteSubjective},
             vmOptions{vmOptions},
             wa{memory.impl->wa}
       {
@@ -350,13 +353,41 @@ namespace psibase
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       // Prevents a poison block
-      if (!(impl->code.flags & CodeRow::isSubjective))
-         check(!(callerFlags & CodeRow::isSubjective),
+      if (callerFlags & CodeRow::isSubjective)
+      {
+         check(impl->code.flags & CodeRow::isSubjective,
                "subjective services may not call non-subjective ones");
+         check((callerFlags & CodeRow::forceReplay) == (impl->code.flags & CodeRow::forceReplay),
+               "subjective services that call each other must have the same replay mode");
+      }
 
       auto& bc = impl->transactionContext.blockContext;
       if ((impl->code.flags & CodeRow::isSubjective) && !bc.isProducing)
       {
+         if (impl->code.flags & CodeRow::forceReplay)
+         {
+            try
+            {
+               impl->exec(actionContext, [&] {  //
+                  (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "called",
+                                           actionContext.action.service.value,
+                                           actionContext.action.sender.value);
+               });
+            }
+            catch (...)
+            {
+               // If the service is called again, reinitialize it, to prevent corruption
+               // from resuming after abrupt termination.
+               impl->initialized = false;
+               if (callerFlags & CodeRow::forceReplay)
+                  throw;
+            }
+            // Don't override the return value if the caller is also subjective
+            if (callerFlags & CodeRow::isSubjective)
+            {
+               return;
+            }
+         }
          auto&       ctx = impl->transactionContext;
          const auto& tx  = ctx.signedTransaction;
          check(ctx.nextSubjectiveRead < tx.subjectiveData->size(), "missing subjective data");

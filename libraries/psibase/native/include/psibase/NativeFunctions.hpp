@@ -12,12 +12,13 @@ namespace psibase
    {
       Database&           database;
       TransactionContext& transactionContext;
-      bool                allowDbRead           = false;
-      bool                allowDbWrite          = false;
-      bool                allowDbReadSubjective = false;
-      CodeRow             code                  = {};
-      ActionContext*      currentActContext     = nullptr;  // Changes during recursion
-      ExecutionContext*   currentExecContext    = nullptr;
+      bool                allowDbRead            = false;
+      bool                allowDbWrite           = false;
+      bool                allowDbReadSubjective  = false;
+      bool                allowDbWriteSubjective = false;
+      CodeRow             code                   = {};
+      ActionContext*      currentActContext      = nullptr;  // Changes during recursion
+      ExecutionContext*   currentExecContext     = nullptr;
 
       std::vector<char> result_key;
       std::vector<char> result_value;
