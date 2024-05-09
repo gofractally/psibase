@@ -1,5 +1,5 @@
 import { fetchTokens } from "./lib/graphql/tokens";
-import { Quantity } from "./lib/quantity";
+import { fetchUserBalances } from "./lib/graphql/userBalances";
 import { FormCreate } from "@/components/form-create";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Mode } from "@/components/transfer-toggle";
@@ -44,6 +44,7 @@ import { placeholders } from "@/lib/memoPlaceholders";
 import { randomElement } from "@/lib/random";
 import { wait } from "@/lib/wait";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -87,65 +88,69 @@ interface TokenBalance {
   id: string;
 }
 
-const tokenBalances: TokenBalance[] = [
-  {
-    amount: 1.242,
-    id: "1",
-    label: "DOG",
-    isAdmin: false,
-    isGenericToken: false,
-  },
-  {
-    amount: 4,
-    id: "2",
-    label: "CAT",
-    isAdmin: true,
-    isGenericToken: false,
-  },
-  {
-    amount: 4595934,
-    id: "3",
-    isAdmin: false,
-    label: "ABANDON",
-    isGenericToken: false,
-  },
-  {
-    amount: 34,
-    id: "4",
-    isAdmin: false,
-    label: "Token3513",
-    isGenericToken: true,
-  },
-  {
-    amount: 701.43,
-    id: "5",
-    isAdmin: true,
-    label: "Token117",
-    isGenericToken: true,
-  },
-];
+// const tokenBalances: TokenBalance[] = [
+//   {
+//     amount: 1.242,
+//     id: "1",
+//     label: "DOG",
+//     isAdmin: false,
+//     isGenericToken: false,
+//   },
+//   {
+//     amount: 4,
+//     id: "2",
+//     label: "CAT",
+//     isAdmin: true,
+//     isGenericToken: false,
+//   },
+//   {
+//     amount: 4595934,
+//     id: "3",
+//     isAdmin: false,
+//     label: "ABANDON",
+//     isGenericToken: false,
+//   },
+//   {
+//     amount: 34,
+//     id: "4",
+//     isAdmin: false,
+//     label: "Token3513",
+//     isGenericToken: true,
+//   },
+//   {
+//     amount: 701.43,
+//     id: "5",
+//     isAdmin: true,
+//     label: "Token117",
+//     isGenericToken: true,
+//   },
+// ];
 
 function App() {
-  // const supervisor = useSupervisor({
-  //   preloadPlugins: [
-  //     { service: "invite" },
-  //     { service: "accounts" },
-  //     { service: "auth-sig" },
-  //     { service: "demoapp1" },
-  //   ],
-  // });
+  const { data: tokenBalances } = useQuery({
+    initialData: [],
+    queryKey: ["balances", "alice"],
+    queryFn: async (): Promise<TokenBalance[]> => {
+      const res = await fetchUserBalances("alice");
+      return res.map(
+        (balance): TokenBalance => ({
+          amount: balance.quantity.toNumber(),
+          id: balance.token.toString(),
+          isAdmin: false,
+          isGenericToken: !balance.symbol,
+          label: `Token${balance.token}`,
+        })
+      );
+    },
+  });
 
-  // const x = async () => {
-  //   console.log("gunderson", "is the res");
-  // };
-
-  // console.log({ supervisor }, "is the supervisor");
+  console.log({ tokenBalances }, "are the balances");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       amount: "",
-      token: tokenBalances[0]?.id,
+      token: "",
       memo: "",
       to: "",
       burn: false,
@@ -167,12 +172,7 @@ function App() {
 
   const x = async () => {
     const res = await fetchTokens();
-    const y = res.tokens.edges.map((edge) => edge.node);
-    console.log(res, "breaking bad", y);
-    const xx = y.map((token) =>
-      new Quantity(token.maxSupply.value, token.precision.value).toString()
-    );
-    console.log(xx, "was xx");
+    console.log(res);
   };
 
   useEffect(() => {
@@ -182,7 +182,8 @@ function App() {
   useEffect(() => {
     const theToken = tokenBalances.find((bal) => bal.id == selectedTokenId);
     if (!theToken) {
-      throw new Error("Selected token not foudn");
+      setMode(Mode.Transfer)
+      return;
     }
     if (!theToken.isAdmin && mode == Mode.Mint) {
       setMode(Mode.Transfer);

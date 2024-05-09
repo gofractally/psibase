@@ -50,4 +50,16 @@ interface GraphQlRes {
   };
 }
 
-export const fetchTokens = () => graphql<GraphQlRes>(queryString());
+const parseValue = <T>(value: Value<T>): T => {
+  return value.value;
+};
+
+export const fetchTokens = async (gt: number = 1) => {
+  const res = await graphql<GraphQlRes>(queryString(gt));
+  return res.tokens.edges.map((token) => ({
+    ...token.node,
+    currentSupply: parseValue(token.node.currentSupply),
+    precision: parseValue(token.node.precision),
+    maxSupply: parseValue(token.node.maxSupply),
+  }));
+};

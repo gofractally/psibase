@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useSupervisor } from "@/hooks/useSupervisor";
 import { formatNumber } from "@/lib/formatNumber";
+import { fetchTokens } from "@/lib/graphql/tokens";
 import { wait } from "@/lib/wait";
 import { tokenPlugin } from "@/plugin";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,32 +46,6 @@ interface Props {
   onClose: () => void;
 }
 
-const query = `
-{
-	allBalances {
-		edges {
-			node {
-				key {
-					account
-					tokenId
-				}
-				balance
-			}
-		}
-	}
-
-	userBalances(user: "alice") {
-		user
-		balance
-		precision
-		token
-		symbol
-	}
-}
-`;
-
-console.log(query, "was query");
-
 export function FormCreate({ onClose }: Props) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -94,17 +69,36 @@ export function FormCreate({ onClose }: Props) {
     any,
     { precision: number; maxSupply: string; initialSupply: string }
   >({
-    mutationFn: async ({ maxSupply, precision }) => {
+    mutationFn: async ({ maxSupply, precision, initialSupply }) => {
       console.log("attemmpting tx", { maxSupply, precision });
       try {
+        const beforeTokens = await fetchTokens();
+
         const res = await supervisor.functionCall(
           tokenPlugin.intf.create(precision, maxSupply)
         );
+
         console.log(res, "came back on create tx");
 
         await wait(2000);
+        const afterTokens = await fetchTokens(beforeTokens.length + 1);
+
+        const createdToken = afterTokens.find(
+          (token) =>
+            token.precision == precision && token.maxSupply == maxSupply
+        );
+        if (!createdToken) {
+          throw new Error(`Failed to find created token.`);
+        }
+
+        console.log({ createdToken, afterTokens }, "werent good");
+
         const res2 = await supervisor.functionCall(
-          tokenPlugin.intf.mint("8", "1000", "hello")
+          tokenPlugin.intf.mint(
+            String(createdToken.id),
+            initialSupply,
+            "Token creation."
+          )
         );
         console.log(res2, "brexit was a mistake.");
         return res as { name: string };

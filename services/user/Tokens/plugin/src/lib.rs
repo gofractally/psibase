@@ -1,47 +1,53 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::wasi::random::random::get_random_u64;
+
 use bindings::common::plugin::{server, types as CommonTypes};
-
-use bindings::exports::component::tokens::{
-    intf::Guest as Intf,
-    transfer::{Guest as Transfer, Tid},
-};
-
-use bindings::exports::component::tokens::types::{Precision, Quantity};
-
-use psibase::services::tokens as service;
-
-use bindings::exports::component::tokens::types as Types;
+use bindings::exports::component::tokens::types as Wit;
+use bindings::exports::component::tokens::{intf::Guest as Intf, transfer::Guest as Transfer};
+use psibase::services::tokens as Wrapper;
 
 struct Component;
 
 use psibase::fracpack::Pack;
 
+mod convert;
+
 impl Intf for Component {
-    fn create(precision: Precision, maxSupply: Quantity) -> Result<String, CommonTypes::Error> {
-        let res = server::add_action_to_transaction(
+    fn create(
+        precision: Wit::Precision,
+        maxSupply: Wit::Quantity,
+    ) -> Result<String, CommonTypes::Error> {
+        // convert::convert_to_u64("number", 4, true);
+
+        let _ = server::add_action_to_transaction(
             "create",
-            &service::action_structs::create {
-                precision: service::Precision { value: precision },
-                maxSupply: service::Quantity { value: maxSupply },
+            &Wrapper::action_structs::create {
+                precision: Wrapper::Precision::from(precision),
+                maxSupply: Wrapper::Quantity::new(maxSupply.as_str(), precision),
             }
             .packed(),
         );
         Ok("whatever".to_string())
     }
 
-    fn burn(tokenId: Tid, amount: Quantity) -> Result<String, CommonTypes::Error> {
+    fn burn(tokenId: Wit::Tid, amount: Wit::Quantity) -> Result<String, CommonTypes::Error> {
         Ok("thanks".to_string())
     }
 
-    fn mint(tokenId: Tid, amount: Quantity, memo: String) -> Result<String, CommonTypes::Error> {
-        let res = server::add_action_to_transaction(
+    fn mint(
+        tokenId: Wit::Tid,
+        amount: Wit::Quantity,
+        memo: String,
+    ) -> Result<String, CommonTypes::Error> {
+        let pretend_looked_up_precision: u8 = 4;
+        let _ = server::add_action_to_transaction(
             "mint",
-            &service::action_structs::mint {
-                amount: service::Quantity { value: amount },
+            &Wrapper::action_structs::mint {
+                amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
                 memo,
-                tokenId: tokenId,
+                tokenId,
             }
             .packed(),
         );
@@ -50,7 +56,7 @@ impl Intf for Component {
 }
 
 impl Transfer for Component {
-    fn credit(token: Tid) -> Result<String, CommonTypes::Error> {
+    fn credit(token: Wit::Tid) -> Result<String, CommonTypes::Error> {
         Ok("whatever2".to_string())
     }
 }

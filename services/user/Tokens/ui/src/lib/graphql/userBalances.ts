@@ -1,3 +1,4 @@
+import { Quantity } from "../quantity";
 import { graphql } from "./index";
 
 const queryString = (username: string) => `
@@ -12,8 +13,8 @@ const queryString = (username: string) => `
 }
 `;
 
-export const fetchUserBalances = (username: string) =>
-  graphql<{
+export const fetchUserBalances = async (username: string) => {
+  const res = await graphql<{
     userBalances: {
       user: string;
       balance: string;
@@ -22,3 +23,9 @@ export const fetchUserBalances = (username: string) =>
       symbol: string;
     }[];
   }>(queryString(username));
+
+  return res.userBalances.map((balance) => ({
+    ...balance,
+    quantity: new Quantity(balance.balance, balance.precision),
+  }));
+};

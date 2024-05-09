@@ -4,7 +4,7 @@ package component:tokens;
 
 interface types {
 
-    type quantity = u64;
+    type quantity = string;
     type precision = u8;
     type tid = u32;
 }
@@ -26,6 +26,7 @@ interface transfer {
 /// An example world for the component to target.
 world example {
 
+    import wasi:random/random;
     import common:plugin/server;
     import common:plugin/client;
 
