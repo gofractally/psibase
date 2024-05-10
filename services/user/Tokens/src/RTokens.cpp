@@ -60,33 +60,13 @@ struct TokenQuery
    {
       return to<Tokens>().getUserConf(user, flag);
    }
-
-   auto events() const
-   {  //
-      return tokenService.allEvents();
-   }
-
-   auto userEvents(AccountNumber           user,
-                   optional<uint32_t>      first,
-                   const optional<string>& after) const
-   {
-      return tokenService.eventIndex<Tokens::UserEvents>(user, first, after);
-   }
-
-   auto tokenEvents(TID tokenId, optional<uint32_t> first, const optional<string>& after) const
-   {
-      return tokenService.eventIndex<Tokens::TokenEvents>(tokenId, first, after);
-   }
 };
 PSIO_REFLECT(TokenQuery,
              method(allBalances),
              method(userBalances, user),
              method(sharedBalances),
              method(tokens),
-             method(userConf, user, flag),
-             method(events),
-             method(userEvents, user, first, after),
-             method(tokenEvents, tokenId, first, after))
+             method(userConf, user, flag))
 
 optional<HttpReply> RTokens::serveSys(HttpRequest request)
 {

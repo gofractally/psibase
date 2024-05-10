@@ -626,7 +626,7 @@ psibase_package(
     NAME Tokens
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Token service"
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})"
     SERVICE tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
         SERVER r-tokens
