@@ -474,6 +474,40 @@ TEST_CASE("new consensus at view change", "[bft]")
       CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
 }
 
+TEST_CASE("new consensus quick recovery")
+{
+   TEST_START(logger);
+   boost::asio::io_context ctx;
+   NodeSet<node_type>      nodes(ctx);
+   setup<BftConsensus>(nodes, {"a"});
+   nodes.add(makeAccounts({"b", "c", "d", "e"}));
+   runFor(nodes.ctx, 1s);
+   setProducers(nodes.getBlockContext(), bft("b", "c", "d", "e"));
+   runFor(nodes.ctx, 1s);
+
+   // propagate to other nodes
+   nodes.partition(NetworkPartition{{"a", "b"}});
+   runFor(nodes.ctx, 60s);
+   nodes.partition(NetworkPartition{{"b", "c"}});
+   runFor(nodes.ctx, 1s);
+   nodes.partition(NetworkPartition{{"c", "d"}});
+   runFor(nodes.ctx, 15s);
+
+   // Check that block productions restarts immediately
+   nodes.partition(NetworkPartition::all());
+   runFor(nodes.ctx, 3s);
+
+   // Check that all nodes are in sync and blocks are being produced
+   auto final_state = nodes[0].chain().get_head_state();
+   for (const auto& node : nodes.nodes)
+      CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
+
+   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   CHECK(final_time <= mock_clock::now());
+   CHECK(final_time >= mock_clock::now() - 2s);
+   CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
+}
+
 // -----------------------------------------------------
 // The following test cases excercise messages sequences
 // in which more than f producers violate the protocol.
