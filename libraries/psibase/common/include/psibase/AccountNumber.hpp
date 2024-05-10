@@ -69,6 +69,11 @@ namespace psibase
       return true;
    }
 
+   inline constexpr bool psio_custom_schema(AccountNumber*)
+   {
+      return true;
+   }
+
    inline namespace literals
    {
       inline constexpr AccountNumber operator""_a(const char* s, unsigned long)

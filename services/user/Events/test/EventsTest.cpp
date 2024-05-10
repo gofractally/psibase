@@ -90,6 +90,12 @@ struct Str
    REFLECT_EVENT(Str, s)
 };
 
+struct Acct
+{
+   AccountNumber a;
+   REFLECT_EVENT(Acct, a)
+};
+
 TEST_CASE("events")
 {
    DefaultTestChain chain;
@@ -191,4 +197,32 @@ TEST_CASE("events")
              chain,
              R"""(SELECT * FROM "history.test-service.str" WHERE s >= 'a' ORDER BY ROWID)""") ==
          std::vector<Str>{{"a"}, {"b"}});
+
+   // account number keys
+   expect(testService.to<TestService>().sendAccount(AccountNumber{"tkucanun"}).trace());
+   expect(testService.to<TestService>().sendAccount(AccountNumber{"t1201"}).trace());
+   expect(testService.to<TestService>().sendAccount(AccountNumber{"s"}).trace());
+   CHECK(query<Acct>(chain, R"""(SELECT * FROM "history.test-service.account" ORDER BY ROWID)""") ==
+         std::vector<Acct>{
+             {AccountNumber{"tkucanun"}}, {AccountNumber{"t1201"}}, {AccountNumber{"s"}}});
+   CHECK(
+       query<Acct>(
+           chain,
+           R"""(SELECT * FROM "history.test-service.account" WHERE a >= 't1201' ORDER BY ROWID)""") ==
+       std::vector<Acct>{{AccountNumber{"t1201"}}, {AccountNumber{"s"}}});
+   // repeat the query using an index
+   expect(testService.to<Events>()
+              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"account"}, 0)
+              .trace());
+   CHECK(
+       query<Acct>(
+           chain,
+           R"""(SELECT * FROM "history.test-service.account" WHERE a >= 't1201' ORDER BY ROWID)""") ==
+       std::vector<Acct>{{AccountNumber{"t1201"}}, {AccountNumber{"s"}}});
+   // Verify that an explicit collate on the comparison works
+   CHECK(
+       query<Acct>(
+           chain,
+           R"""(SELECT * FROM "history.test-service.account" WHERE a >= 't1201' COLLATE BINARY ORDER BY ROWID)""") ==
+       std::vector<Acct>{{AccountNumber{"tkucanun"}}, {AccountNumber{"t1201"}}});
 }

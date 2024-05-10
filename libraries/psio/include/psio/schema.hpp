@@ -3,6 +3,7 @@
 #include <concepts>
 #include <map>
 #include <psio/fracpack.hpp>
+#include <psio/get_type_name.hpp>
 #include <psio/to_json.hpp>
 #include <psio/to_json/map.hpp>
 #include <ranges>
@@ -522,6 +523,7 @@ namespace psio
          std::vector<CompiledMember> children;
          const AnyType*              original_type = nullptr;
          bool is_container() const { return kind == container || kind == nested; }
+         bool matches(const CompiledType* other) const;
       };
 
       CustomTypes standard_types();
@@ -932,6 +934,12 @@ namespace psio
       }
 
       template <typename T>
+      constexpr bool psio_custom_schema(T*)
+      {
+         return false;
+      }
+
+      template <typename T>
       constexpr bool is_shared_view_ptr_v = false;
       template <typename T>
       constexpr bool is_shared_view_ptr_v<shared_view_ptr<T>> = true;
@@ -1121,6 +1129,11 @@ namespace psio
                {
                   static_assert(reflect<T>::is_struct, "Don't know schema representation");
                }
+               if constexpr (psio_custom_schema(static_cast<T*>(nullptr)))
+               {
+                  auto& item = schema.types.find(name)->second;
+                  item       = Custom{.type = std::move(item), .id = psio::get_type_name<T>()};
+               }
             }
             return Type{std::move(name)};
          }
@@ -1157,6 +1170,14 @@ namespace psio
          }
          comma.end(stream);
          stream.write('}');
+      }
+
+      template <typename T>
+      bool matchCustomType(const CompiledType* type, T*)
+      {
+         auto           schema = SchemaBuilder{}.insert<T>("T").build();
+         CompiledSchema cschema{schema};
+         return cschema.get(schema.get("T"))->matches(type);
       }
 
       enum class SchemaDifference : std::uint8_t
