@@ -22,4 +22,9 @@ void TestService::sendString(const std::string& s)
    emit().history().str(s);
 }
 
+void TestService::sendAccount(psibase::AccountNumber a)
+{
+   emit().history().account(a);
+}
+
 PSIBASE_DISPATCH(TestService)
