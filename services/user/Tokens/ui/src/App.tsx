@@ -1,5 +1,9 @@
-import { fetchTokens } from "./lib/graphql/tokens";
-import { fetchUserBalances } from "./lib/graphql/userBalances";
+import { ModalCreateToken } from "./components/modal-create-token";
+import { useMode } from "./hooks/useMode";
+import { usePluginCall } from "./hooks/usePluginCall";
+import { useTokenBalances } from "./hooks/useTokenBalances";
+import { cn } from "./lib/utils";
+import { tokenPlugin } from "./plugin";
 import { FormCreate } from "@/components/form-create";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Mode } from "@/components/transfer-toggle";
@@ -14,13 +18,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -42,14 +39,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatNumber } from "@/lib/formatNumber";
 import { placeholders } from "@/lib/memoPlaceholders";
 import { randomElement } from "@/lib/random";
-import { wait } from "@/lib/wait";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 export function ButtonIcon() {
@@ -80,71 +74,38 @@ const formSchema = z.object({
 // uncredit -  user
 // debit -     user
 
-interface TokenBalance {
-  label: string;
-  amount: number;
-  isAdmin: boolean;
-  isGenericToken: boolean;
-  id: string;
-}
+const memoPlaceholder = randomElement(placeholders);
 
-// const tokenBalances: TokenBalance[] = [
+// toast.promise(
+//   supervisor.functionCall(
+//     tokenPlugin.transfer.credit(Number(tokenId), recipient, amount, memo)
+//   ),
 //   {
-//     amount: 1.242,
-//     id: "1",
-//     label: "DOG",
-//     isAdmin: false,
-//     isGenericToken: false,
-//   },
-//   {
-//     amount: 4,
-//     id: "2",
-//     label: "CAT",
-//     isAdmin: true,
-//     isGenericToken: false,
-//   },
-//   {
-//     amount: 4595934,
-//     id: "3",
-//     isAdmin: false,
-//     label: "ABANDON",
-//     isGenericToken: false,
-//   },
-//   {
-//     amount: 34,
-//     id: "4",
-//     isAdmin: false,
-//     label: "Token3513",
-//     isGenericToken: true,
-//   },
-//   {
-//     amount: 701.43,
-//     id: "5",
-//     isAdmin: true,
-//     label: "Token117",
-//     isGenericToken: true,
-//   },
-// ];
+//     loading: "Transaction submitting...",
+//     error: (error: any) => {
+//       const res = genericErrorSchema.safeParse(error);
+//       return res.success ? (
+//         <div>Error: {res.data.message}</div>
+//       ) : (
+//         <div>Unrecognised Error</div>
+//       );
+//     },
+//     success: () => <div>Transaction successful.</div>,
+//   }
+// );
+
+// export interface FunctionCallArgs {
+//   service: string;
+//   plugin?: string;
+//   intf?: string;
+//   method: string;
+//   params: any[];
+// }
 
 function App() {
-  const { data: tokenBalances } = useQuery({
-    initialData: [],
-    queryKey: ["balances", "alice"],
-    queryFn: async (): Promise<TokenBalance[]> => {
-      const res = await fetchUserBalances("alice");
-      return res.map(
-        (balance): TokenBalance => ({
-          amount: balance.quantity.toNumber(),
-          id: balance.token.toString(),
-          isAdmin: false,
-          isGenericToken: !balance.symbol,
-          label: `Token${balance.token}`,
-        })
-      );
-    },
-  });
+  const { data: tokenBalances } = useTokenBalances("alice");
 
-  console.log({ tokenBalances }, "are the balances");
+  const { mutateAsync: credit } = usePluginCall("credit");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -158,46 +119,30 @@ function App() {
     mode: "onChange",
   });
 
-  // TODO: Validate overflow balance
-
   function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values, "are values");
+    console.log(values, "are the submit values");
     setConfirmationModalOpen(true);
   }
 
-  const [memoPlaceholder] = useState(randomElement(placeholders));
-  const [mode, setMode] = useState<Mode>(Mode.Transfer);
+  const { isBurning, isMinting, isTransfer, setMode, mode } = useMode();
 
   const selectedTokenId = form.watch("token");
-
-  const x = async () => {
-    const res = await fetchTokens();
-    console.log(res);
-  };
+  const selectedToken = tokenBalances.find(
+    (balance) => balance.id == selectedTokenId
+  );
 
   useEffect(() => {
-    x();
-  }, []);
-
-  useEffect(() => {
-    const theToken = tokenBalances.find((bal) => bal.id == selectedTokenId);
-    if (!theToken) {
-      setMode(Mode.Transfer)
+    if (!selectedToken) {
+      setMode(Mode.Transfer);
       return;
     }
-    if (!theToken.isAdmin && mode == Mode.Mint) {
+    if (!selectedToken.isAdmin && isMinting) {
       setMode(Mode.Transfer);
     }
-  }, [selectedTokenId, mode]);
-
-  const isBurning = mode == Mode.Burn;
-  const isMinting = mode == Mode.Mint;
-  const isTransfer = mode == Mode.Transfer;
+  }, [selectedTokenId, selectedToken, mode]);
 
   const isAmountOperation = isBurning || isMinting || isTransfer;
-
-  const isAdmin =
-    tokenBalances.find((bal) => bal.id == selectedTokenId)?.isAdmin || false;
+  const isAdmin = selectedToken?.isAdmin || false;
   const disableTo = !isAdmin && isBurning;
 
   const [isConfirmationModalOpen, setConfirmationModalOpen] = useState(false);
@@ -210,28 +155,21 @@ function App() {
       ? ` from ${form.watch("from")}'s account.`
       : ""
   }`;
-  console.log(form.formState);
 
   const transfer = async () => {
-    console.log("i am ready to transfer");
+    const tokenId = form.watch("token");
+    const recipient = form.watch("to")!;
+    const amount = form.watch("amount");
+    const memo = form.watch("memo")!;
+
+    credit(
+      tokenPlugin.transfer.credit(Number(tokenId), recipient, amount, memo)
+    );
     setConfirmationModalOpen(false);
-    toast.promise(wait(1000), {
-      loading: "Transaction submitting...",
-      error: "Transaction failed!",
-      finally: () => {
-        toast.success("Transaction accepted", {
-          description: "Sunday, December 03, 2023 at 9:00 AM",
-        });
-      },
-    });
   };
 
-  const addModal = () => {
-    toast("hit");
-    setNewTokenModalOpen(true);
-  };
-
-  const [tokenBalance] = useState(43243.34234);
+  const tokenBalance: number = selectedToken?.amount || 0;
+  const tokenBalanceLabel = formatNumber(tokenBalance);
 
   const menus: { label: string; value: string }[] = [
     {
@@ -256,29 +194,16 @@ function App() {
     <div>
       <ModeToggle />
       <div className="max-w-screen-lg mx-auto p-4">
-        <Dialog
+        <ModalCreateToken
           open={isNewTokenModalOpen}
-          onOpenChange={(e) => {
-            setNewTokenModalOpen(e);
-          }}
+          onOpenChange={(e) => setNewTokenModalOpen(e)}
         >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create a token</DialogTitle>
-              <DialogDescription>
-                Lorem ipsum, dolor sit amet consectetur adipisicing elit.
-                Eveniet, beatae autem assumenda nulla, culpa dignissimos aperiam
-                debitis voluptates mollitia a velit. Ducimus impedit esse
-                tempora architecto voluptate sapiente ad quam!
-              </DialogDescription>
-              <FormCreate
-                onClose={() => {
-                  setNewTokenModalOpen(false);
-                }}
-              />
-            </DialogHeader>
-          </DialogContent>
-        </Dialog>
+          <FormCreate
+            onClose={() => {
+              setNewTokenModalOpen(false);
+            }}
+          />
+        </ModalCreateToken>
 
         <AlertDialog open={isConfirmationModalOpen}>
           <AlertDialogContent>
@@ -317,12 +242,12 @@ function App() {
                     <FormControl>
                       <div className="w-full grid grid-cols-6">
                         <SelectTrigger className="col-span-5">
-                          <SelectValue placeholder="No token found" />
+                          <SelectValue placeholder="No token selected." />
                         </SelectTrigger>
                         <Button
                           type="button"
                           onClick={() => {
-                            addModal();
+                            setNewTokenModalOpen(true);
                           }}
                           variant="secondary"
                         >
@@ -334,9 +259,11 @@ function App() {
                       {tokenBalances.map((balance) => (
                         <SelectItem
                           key={balance.id}
+                          className={cn({
+                            "text-muted-foreground": balance.isGenericToken,
+                          })}
                           value={balance.id}
-                          // @ts-expect-error fwe
-                          isGeneric={balance.isGenericToken}
+                          // @ts-ignore
                           right={
                             <div className="text-sm text-muted-foreground">
                               Balance: {formatNumber(balance.amount)}
@@ -382,7 +309,6 @@ function App() {
                     <FormControl>
                       <Input placeholder="Satoshi" {...field} />
                     </FormControl>
-
                     <FormMessage />
                   </FormItem>
                 )}
@@ -415,15 +341,17 @@ function App() {
                   <FormItem>
                     <FormLabel className="flex justify-between w-full">
                       <div>Amount</div>
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:underline"
-                        onClick={() => {
-                          form.setValue("amount", tokenBalance.toString());
-                        }}
-                      >
-                        Balance: {tokenBalance}
-                      </button>
+                      {selectedToken && (
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:underline"
+                          onClick={() => {
+                            form.setValue("amount", tokenBalance.toString());
+                          }}
+                        >
+                          Balance: {tokenBalanceLabel}
+                        </button>
+                      )}
                     </FormLabel>
                     <FormControl>
                       <Input placeholder="123" {...field} />
@@ -457,16 +385,10 @@ function App() {
               type="submit"
               className="flex gap-2"
             >
-              {mode == Mode.Transfer
-                ? "Transfer"
-                : mode == Mode.Mint
-                ? "Mint"
-                : "Burn"}
-              {mode == Mode.Transfer && (
-                <ArrowRight className="h-[1.2rem] w-[1.2rem]" />
-              )}
-              {mode == Mode.Burn && <Flame className="h-[1.2rem] w-[1.2rem]" />}
-              {mode == Mode.Mint && <Plus className="h-[1.2rem] w-[1.2rem]" />}
+              {isTransfer ? "Transfer" : isMinting ? "Mint" : "Burn"}
+              {isTransfer && <ArrowRight className="h-[1.2rem] w-[1.2rem]" />}
+              {isBurning && <Flame className="h-[1.2rem] w-[1.2rem]" />}
+              {isMinting && <Plus className="h-[1.2rem] w-[1.2rem]" />}
             </Button>
           </form>
         </Form>

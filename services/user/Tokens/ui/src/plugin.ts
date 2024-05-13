@@ -1,4 +1,5 @@
 import { Interface } from "./plugin-abstract";
+import { z } from "zod";
 
 class Intf extends Interface {
   constructor(service: string) {
@@ -27,15 +28,27 @@ class Intf extends Interface {
   }
 }
 
+const CreditParams = z.tuple([
+  z.number(),
+  z.string(),
+  z.string(),
+  z.string().default(""),
+]);
+
 class Transfer extends Interface {
   constructor(service: string) {
     super("transfer", service);
   }
 
-  public credit() {
+  public credit(
+    tokenId: number,
+    receiver: string,
+    amount: string,
+    memo: string = ""
+  ) {
     return this.addIntf({
       method: "credit",
-      params: [1],
+      params: CreditParams.parse([tokenId, receiver, amount, memo]),
     });
   }
 }

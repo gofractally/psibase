@@ -7,6 +7,7 @@ use bindings::common::plugin::{server, types as CommonTypes};
 use bindings::exports::component::tokens::types as Wit;
 use bindings::exports::component::tokens::{intf::Guest as Intf, transfer::Guest as Transfer};
 use psibase::services::tokens as Wrapper;
+use psibase::AccountNumber;
 
 struct Component;
 
@@ -18,31 +19,36 @@ impl Intf for Component {
     fn create(
         precision: Wit::Precision,
         maxSupply: Wit::Quantity,
-    ) -> Result<String, CommonTypes::Error> {
-        // convert::convert_to_u64("number", 4, true);
-
-        let _ = server::add_action_to_transaction(
+    ) -> Result<(), CommonTypes::Error> {
+        server::add_action_to_transaction(
             "create",
             &Wrapper::action_structs::create {
                 precision: Wrapper::Precision::from(precision),
                 maxSupply: Wrapper::Quantity::new(maxSupply.as_str(), precision),
             }
             .packed(),
-        );
-        Ok("whatever".to_string())
+        )
     }
 
-    fn burn(tokenId: Wit::Tid, amount: Wit::Quantity) -> Result<String, CommonTypes::Error> {
-        Ok("thanks".to_string())
+    fn burn(tokenId: Wit::Tid, amount: Wit::Quantity) -> Result<(), CommonTypes::Error> {
+        let pretend_looked_up_precision: u8 = 4;
+        server::add_action_to_transaction(
+            "burn",
+            &Wrapper::action_structs::burn {
+                tokenId,
+                amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
+            }
+            .packed(),
+        )
     }
 
     fn mint(
         tokenId: Wit::Tid,
         amount: Wit::Quantity,
         memo: String,
-    ) -> Result<String, CommonTypes::Error> {
+    ) -> Result<(), CommonTypes::Error> {
         let pretend_looked_up_precision: u8 = 4;
-        let _ = server::add_action_to_transaction(
+        server::add_action_to_transaction(
             "mint",
             &Wrapper::action_structs::mint {
                 amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
@@ -50,14 +56,29 @@ impl Intf for Component {
                 tokenId,
             }
             .packed(),
-        );
-        Ok("mint ok".to_string())
+        )
     }
 }
 
 impl Transfer for Component {
-    fn credit(token: Wit::Tid) -> Result<String, CommonTypes::Error> {
-        Ok("whatever2".to_string())
+    fn credit(
+        token: Wit::Tid,
+        receiver: Wit::AccountNumber,
+        amount: Wit::Quantity,
+        memo: String,
+    ) -> Result<(), CommonTypes::Error> {
+        let pretend_looked_up_precision: u8 = 4;
+        let amount = Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision);
+        server::add_action_to_transaction(
+            "credit",
+            &Wrapper::action_structs::credit {
+                amount,
+                memo,
+                receiver: AccountNumber::from(receiver.as_str()),
+                tokenId: token,
+            }
+            .packed(),
+        )
     }
 }
 

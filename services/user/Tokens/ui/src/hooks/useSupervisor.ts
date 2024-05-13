@@ -5,15 +5,17 @@ import { useContext } from "react";
 export const useSupervisor = ({
   preloadPlugins,
 }: {
-  preloadPlugins: PluginId[];
-}) => {
+  preloadPlugins?: PluginId[];
+} = {}) => {
   const supervisorContext = useContext(SupervisorContext);
 
   if (!supervisorContext) {
     throw new Error(`Supervisor context not available`);
   }
   supervisorContext.onLoaded().then(() => {
-    supervisorContext.preLoadPlugins(preloadPlugins);
+    if (preloadPlugins && preloadPlugins.length > 0) {
+      supervisorContext.preLoadPlugins(preloadPlugins);
+    }
   });
 
   return supervisorContext!;
