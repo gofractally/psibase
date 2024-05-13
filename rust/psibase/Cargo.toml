@@ -45,7 +45,7 @@ der = { version = "0.7", features = ["alloc", "pem", "std"] }
 url = "2.4"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-clap = {version = "3.1", features = ["derive", "env"]}
+clap = {version = "4.5", features = ["derive", "env"]}
 hmac = "0.12"
 indicatif = "0.17"
 jwt = "0.16"

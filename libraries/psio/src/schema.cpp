@@ -161,6 +161,40 @@ namespace psio::schema_types
       return result;
    }
 
+   bool CompiledType::matches(const CompiledType* other) const
+   {
+      std::vector<std::pair<const CompiledType*, const CompiledType*>> stack{{this, other}};
+      std::set<std::pair<const CompiledType*, const CompiledType*>>    known;
+      while (!stack.empty())
+      {
+         auto item = stack.back();
+         stack.pop_back();
+         if (!known.insert(item).second)
+         {
+            continue;
+         }
+         auto [lhs, rhs] = item;
+         if (lhs->kind != rhs->kind || lhs->is_variable_size != rhs->is_variable_size ||
+             lhs->fixed_size != rhs->fixed_size)
+         {
+            return false;
+         }
+         if (lhs->children.size() != rhs->children.size())
+         {
+            return false;
+         }
+         for (std::size_t i = 0; i < lhs->children.size(); ++i)
+         {
+            const auto& lm = lhs->children[i];
+            const auto& rm = rhs->children[i];
+            if (lm.is_optional != rm.is_optional)
+               return false;
+            stack.push_back({lm.type, rm.type});
+         }
+      }
+      return true;
+   }
+
    // ------
    namespace
    {

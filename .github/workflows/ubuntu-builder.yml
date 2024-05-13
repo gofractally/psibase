@@ -15,6 +15,8 @@ jobs:
             ubuntu-version: "2004"
           - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:2349333d118ce69f98393d0d2472267a76ca6cb0"
             ubuntu-version: "2204"
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2404:a006ce3b30a89618331462388df8182151037230"
+            ubuntu-version: "2404"
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp

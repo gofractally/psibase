@@ -17,27 +17,95 @@ using namespace psibase;
 using namespace psio::schema_types;
 using namespace UserService;
 
-void getColumns(const Object& type, auto& stream)
+template <typename T>
+struct ExtraCustom
 {
-   bool first = true;
-   for (const auto& member : type.members)
+   ExtraCustom(const CustomTypes& origin, std::initializer_list<std::pair<std::string, T>> v)
    {
-      if (first)
-         first = false;
-      else
-         stream.write(',');
-      stream.write(member.name.data(), member.name.size());
+      for (const auto& [key, value] : v)
+      {
+         add(origin, key, value);
+      }
+   }
+   void add(std::size_t index, T value)
+   {
+      if (index >= values.size())
+         values.resize(index + 1);
+      values[index] = std::move(value);
+   }
+   void add(const CustomTypes& origin, const std::string& name, T value)
+   {
+      if (const std::size_t* idx = origin.find(name))
+      {
+         add(*idx, std::move(value));
+      }
+   }
+   const T* find(std::size_t index) const
+   {
+      if (index >= values.size())
+         return nullptr;
+      if constexpr (requires { !values[index]; })
+      {
+         if (!values[index])
+            return nullptr;
+      }
+      return &values[index];
+   }
+   std::vector<T> values;
+};
+
+int compare_account_number(void*, int lsize, const void* ldata, int rsize, const void* rdata)
+{
+   auto lhs = AccountNumber{std::string_view{(const char*)ldata, static_cast<std::size_t>(lsize)}};
+   auto rhs = AccountNumber{std::string_view{(const char*)rdata, static_cast<std::size_t>(rsize)}};
+   if (lhs < rhs)
+      return -1;
+   else if (rhs < lhs)
+      return 1;
+   else
+      return 0;
+}
+
+const auto& custom_collation()
+{
+   static const ExtraCustom<const char*> result{psibase_builtins, {{"AccountNumber", "ACCOUNT"}}};
+   return result;
+}
+
+void register_collation(void*, sqlite3* db, int eTextRep, const char* name)
+{
+   if (name == std::string_view{"ACCOUNT"})
+   {
+      sqlite3_create_collation(db, name, SQLITE_UTF8, nullptr, compare_account_number);
    }
 }
 
-void getColumns(const auto& type, auto&)
+void getColumns(const CompiledType* ctype, const Object& type, auto& stream)
+{
+   for (std::size_t i = 0; i < ctype->children.size(); ++i)
+   {
+      check(i < type.members.size(), "Internal error: wrong number of members");
+      const auto& member = type.members[i];
+      if (i != 0)
+         stream.write(',');
+      stream.write(member.name.data(), member.name.size());
+      if (const char* const* collate = custom_collation().find(ctype->children[i].type->custom_id))
+      {
+         stream.write(" TEXT COLLATE ", 14);
+         stream.write(*collate, std::strlen(*collate));
+      }
+   }
+}
+
+void getColumns(const CompiledType*, const auto& type, auto&)
 {
    abortMessage("Unsupported row type: " + psio::convert_to_json(AnyType{type}));
 }
 
 void getColumns(const CompiledType* type, auto& stream)
 {
-   std::visit([&](const auto& t) { return getColumns(t, stream); }, type->original_type->value);
+   std::visit([&](const auto& t) { return getColumns(type, t, stream); },
+              type->original_type->value);
 }
 
 struct EventVTab : sqlite3_vtab
@@ -57,6 +125,15 @@ struct EventVTab : sqlite3_vtab
    std::vector<SecondaryIndexInfo> indexes;
    const CompiledType*             rowType;
    std::vector<char>               key() const { return psio::convert_to_key(index); }
+   std::string_view                get_collation(int column) const
+   {
+      if (const char* const* collate =
+              custom_collation().find(rowType->children[column].type->custom_id))
+      {
+         return *collate;
+      }
+      return "BINARY";
+   }
 };
 
 struct EventCursor : sqlite3_vtab_cursor
@@ -258,43 +335,6 @@ struct SqlCustomHandler
    explicit operator bool() const { return to_sql != nullptr; }
 };
 
-template <typename T>
-struct ExtraCustom
-{
-   ExtraCustom(const CustomTypes& origin, std::initializer_list<std::pair<std::string, T>> v)
-   {
-      for (const auto& [key, value] : v)
-      {
-         add(origin, key, value);
-      }
-   }
-   void add(std::size_t index, T value)
-   {
-      if (index >= values.size())
-         values.resize(index + 1);
-      values[index] = std::move(value);
-   }
-   void add(const CustomTypes& origin, const std::string& name, T value)
-   {
-      if (const std::size_t* idx = origin.find(name))
-      {
-         add(*idx, std::move(value));
-      }
-   }
-   const T* find(std::size_t index) const
-   {
-      if (index >= values.size())
-         return nullptr;
-      if constexpr (requires { !values[index]; })
-      {
-         if (!values[index])
-            return nullptr;
-      }
-      return &values[index];
-   }
-   std::vector<T> values;
-};
-
 int bool_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context* ctx)
 {
    bool value;
@@ -366,11 +406,27 @@ int blob_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context*
    }
 }
 
+int account_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context* ctx)
+{
+   AccountNumber value;
+   if (!psio::is_packable<AccountNumber>::unpack<true, true>(&value, in.has_unknown, in.known_end,
+                                                             in.src, in.pos, in.end_pos))
+   {
+      sqlite3_result_text(ctx, "Not a valid AccountNumber", -1, SQLITE_STATIC);
+      return SQLITE_ERROR;
+   }
+   auto s = value.str();
+   sqlite3_result_text64(ctx, s.data(), s.size(), SQLITE_TRANSIENT, SQLITE_UTF8);
+   return SQLITE_OK;
+}
+
 const auto& psibase_sql_builtins()
 {
-   static const ExtraCustom<SqlCustomHandler> result{
-       psibase_builtins,
-       {{"bool", {&bool_to_sql}}, {"string", {&string_to_sql}}, {"hex", {&blob_to_sql}}}};
+   static const ExtraCustom<SqlCustomHandler> result{psibase_builtins,
+                                                     {{"bool", {&bool_to_sql}},
+                                                      {"string", {&string_to_sql}},
+                                                      {"hex", {&blob_to_sql}},
+                                                      {"AccountNumber", {&account_to_sql}}}};
    return result;
 }
 
@@ -521,9 +577,18 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
    {
       constraints[index.getPos()].usable = true;
    }
+   auto usableConstraint = [&](int idx)
+   {
+      if (!info->aConstraint[idx].usable)
+         return false;
+      auto column = info->aConstraint[idx].iColumn;
+      if (column < 0)
+         return true;
+      return sqlite3_vtab_collation(info, idx) == vtab->get_collation(column);
+   };
    for (int i = 0; i < info->nConstraint; ++i)
    {
-      if (info->aConstraint[i].usable && constraints[info->aConstraint[i].iColumn + 1].usable)
+      if (usableConstraint(i) && constraints[info->aConstraint[i].iColumn + 1].usable)
       {
          switch (info->aConstraint[i].op)
          {
@@ -548,12 +613,11 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
    {
       auto appendArg = [&](char type)
       {
-         // TODO: check that the collating sequence matches the index order
          buf[argc]                           = type;
          info->aConstraintUsage[i].argvIndex = argc + 1;
          ++argc;
       };
-      if (info->aConstraint[i].usable && info->aConstraint[i].iColumn == best)
+      if (info->aConstraint[i].iColumn == best && usableConstraint(i))
       {
          switch (info->aConstraint[i].op)
          {
@@ -734,6 +798,15 @@ KeyResult string_to_key(const CompiledType* type, sqlite3_value* key, std::vecto
    return KeyResult::exact;
 }
 
+KeyResult account_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
+{
+   psio::vector_stream stream(out);
+   auto                s = std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
+                             static_cast<std::size_t>(sqlite3_value_bytes(key))};
+   to_key(AccountNumber{s}, stream);
+   return KeyResult::exact;
+}
+
 KeyResult blob_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
    psio::vector_stream stream(out);
@@ -751,8 +824,10 @@ struct ToKeyCustomHandler
 
 const auto& psibase_to_key_builtins()
 {
-   static const ExtraCustom<ToKeyCustomHandler> result{
-       psibase_builtins, {{"string", {&string_to_key}}, {"hex", {&blob_to_key}}}};
+   static const ExtraCustom<ToKeyCustomHandler> result{psibase_builtins,
+                                                       {{"string", {&string_to_key}},
+                                                        {"hex", {&blob_to_key}},
+                                                        {"AccountNumber", {&account_to_key}}}};
    return result;
 }
 
@@ -1000,6 +1075,10 @@ std::optional<HttpReply> serveSql(const HttpRequest& request)
    if (int err = sqlite3_create_module(db, "events", &eventModule, nullptr))
    {
       abortMessage(std::string("sqlite3_create_module: ") + sqlite3_errstr(err));
+   }
+   if (int err = sqlite3_collation_needed(db, nullptr, &register_collation))
+   {
+      abortMessage(std::string("sqlite3_collation_needed: ") + sqlite3_errstr(err));
    }
    load_tables(db, {request.body.data(), request.body.size()});
    std::vector<char> result;

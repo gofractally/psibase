@@ -1,11 +1,13 @@
 #include "types.hpp"
 
+#include <psibase/schema.hpp>
+
 using namespace psio::schema_types;
 
 namespace UserService
 {
 
-   const CustomTypes psibase_builtins = standard_types();
+   const CustomTypes psibase_builtins = psibase::psibase_types();
 
    const AnyType u64Type = Int{.bits = 64, .isSigned = false};
 
