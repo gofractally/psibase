@@ -137,4 +137,9 @@ mod service {
     fn mint(tokenId: TID, amount: Quantity, memo: String) {
         unimplemented!()
     }
+
+    #[action]
+    fn recall(tokenId: TID, from: AccountNumber, amount: Quantity, memo: String) {
+        unimplemented!()
+    }
 }

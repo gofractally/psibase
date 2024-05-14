@@ -13,10 +13,22 @@ class Intf extends Interface {
     });
   }
 
-  public burn(tokenId: number, amount: string) {
+  public burn(
+    tokenId: number,
+    amount: string,
+    memo?: string,
+    account?: string
+  ) {
     return this.addIntf({
       method: "burn",
-      params: z.tuple([z.number(), z.string()]).parse([tokenId, amount]),
+      params: z
+        .tuple([
+          z.number(),
+          z.string(),
+          z.string().default(""),
+          z.string().default(""),
+        ])
+        .parse([tokenId, amount, memo, account]),
     });
   }
 

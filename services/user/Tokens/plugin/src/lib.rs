@@ -30,16 +30,35 @@ impl Intf for Component {
         )
     }
 
-    fn burn(tokenId: Wit::Tid, amount: Wit::Quantity) -> Result<(), CommonTypes::Error> {
+    fn burn(
+        tokenId: Wit::Tid,
+        amount: Wit::Quantity,
+        memo: String,
+        account: Wit::AccountNumber,
+    ) -> Result<(), CommonTypes::Error> {
         let pretend_looked_up_precision: u8 = 4;
-        server::add_action_to_transaction(
-            "burn",
-            &Wrapper::action_structs::burn {
-                tokenId,
-                amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
-            }
-            .packed(),
-        )
+
+        if (account.len() as u8) == 0 {
+            server::add_action_to_transaction(
+                "burn",
+                &Wrapper::action_structs::burn {
+                    tokenId,
+                    amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
+                }
+                .packed(),
+            )
+        } else {
+            server::add_action_to_transaction(
+                "recall",
+                &Wrapper::action_structs::recall {
+                    tokenId,
+                    amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
+                    from: AccountNumber::from(account.as_str()),
+                    memo,
+                }
+                .packed(),
+            )
+        }
     }
 
     fn mint(
