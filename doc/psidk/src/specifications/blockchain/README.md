@@ -13,7 +13,7 @@ There are many goals for the psibase blockchain protocol design. Here are some o
 ### Responsive web apps
 
 Psibase apps should be able to at least meet and in some cases exceed the expectations of users who are familiar with extremely fast traditional web apps.
-To achieve goal #1, the psibase blockchain is designed to produce at least one block per second, and to reach block finality within three seconds. Furthermore, the protocol defines several custom high-performance data formats used by the blockchain to accelerate data reads, transfer, storage, and retrieval. It defines a custom high-performance database protocol ([Triedent](./triedent.md)) that is significantly more performant than alternative industry standard databases.
+To achieve goal #1, the psibase blockchain is designed to produce at least one block per second, and to reach block finality within three seconds. Furthermore, the protocol defines several custom high-performance data formats used by the blockchain to accelerate data reads, transfer, storage, and retrieval. It defines a custom high-performance [database](./database.md) protocol that is significantly more performant than alternative industry standard databases.
 
 Furthermore, interactions with smart contracts on other platforms often require immersion-breaking prompts for use authorization. When the front-end of a psibase app interacts with its own blockchain service, it should not prompt for user authorization. This allows for greater immersion than other decentralized app architectures.
 
@@ -25,7 +25,7 @@ Application upgradeability is functionally always available on a network. Some n
 
 ### Social consensus
 
-Technical blockchain consensus is always downstream of social consensus. There always exist desireable features of a network (expectations, cultural norms, etc.) that are unable to be deterministically verified and are therefore unable to be deterministically enforced. This implies that networks must plan to be able to reach consensus on subjective matters in order to maintain the values that matter to them. Unspecified "off-chain" consensus is not a plan and will result in covert control and increased dependence.
+Technical blockchain consensus is always downstream of social consensus. There always exist desirable features of a network (expectations, cultural norms, etc.) that are unable to be deterministically verified and are therefore unable to be deterministically enforced. This implies that networks must plan to be able to reach consensus on subjective matters in order to maintain the values that matter to them. Unspecified "off-chain" consensus is not a plan and will result in covert control and increased dependence.
 
 The psibase blockchain protocol defines a mechanism by which a community can use psibase as a tool for measuring social consensus. This allows it to be a social consensus process, rather than a technical consensus process (as in traditional Proof of Work or Proof of Stake consensus), which provides the security guarantees for the network. This innovation in social consensus allows for even very small communities to enjoy extremely high levels of security and independence.
 

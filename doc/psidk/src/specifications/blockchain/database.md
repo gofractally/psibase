@@ -1,4 +1,4 @@
-# Triedent
+# Database
 
 Blockchains coordinate shared state between different nodes. But within a single node, there is still an underlying database technology used to store, cache, and retrieve data from the device storage disk and/or RAM. Psibase also specifies the design and characteristics of this underlying database technology in order to maximize its throughput by working with the unique constraints of a blockchain use case. 
 
@@ -8,4 +8,4 @@ Blockchains coordinate shared state between different nodes. But within a single
 
 ## Design
 
-> The Triedent database design specification has not yet been documented. Currently, to learn more, see the reference implementation found [here](https://github.com/gofractally/psibase/tree/main/libraries/triedent).
+> The database design specification has not yet been documented. Currently, to learn more, see the reference implementation found [here](https://github.com/gofractally/psibase/tree/main/libraries/triedent).

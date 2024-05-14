@@ -64,11 +64,9 @@ According to the [Window.postMessage documentation](https://developer.mozilla.or
 
 Therefore `postMessage` does not immediately (synchronously) post to the other domain. Instead it schedules a payload to be dispatched after the completion of all remaining execution contexts. In order for cross-domain calls to appear synchronous, the caller should await the asynchronous call.
 
-## Cross-domain security considerations
+## Plugin isolation
 
-Cross-domain messaging can be dangerous if the proper checks are not in place to ensure that the messages are going to/from whoever is intended. 
-
-The supervisor listens for cross-domain messages from its parent window and from the plugins it instantiates, and plugins will only listen for messages that come directly from the supervisor.
+It is important that plugins are sandboxed on the client-side. To communicate with each other, they should use a middleware layer that enforces the identity of the caller is accurately reported to the callee, allowing identity-based permissions. This middleware is called the supervisor. The supervisor listens for cross-domain messages from its parent window and from the plugins it instantiates, and plugins will only listen for messages that come directly from the supervisor.
 
 If plugins make use of the standard psibase development libraries, then many of the security concerns are handled automatically. For example, it is automatically enforced that messages into your plugin are only allowed to come from the supervisor.
 
@@ -257,14 +255,13 @@ TokenCreator app->>Token plugin: CreateToken
 
 As you can see, someone creating an app to facilitate the creation of tokens would simply need to call the correct Token plugin action. The Token plugin allows you to specify a symbol and will automatically purchase a symbol from a symbol market and map it to the new token. All of the various interactions result in calling three separate actions in psibase services. Those three actions will automatically be packaged into one single transaction, enabling maximally efficient processing of the action on the server (authentication logic only runs once to verify the sender is authorized for the whole transaction, rather than authorization logic executing once for each action submitted in separate transactions).
 
-
 # Plugin developers
 
 Although the code executes client-side, plugins are very similar to services. For example, just as in the context of the execution of a service action the service has full control over its own database, plugins are permitted to silently call actions on their own service (Without additional confirmation prompts to the end user). Therefore, failing to include the proper security checks in the plugin could allow the service to be exploited, corrupting shared data. This is unlike the more familiar concerns of UI developers which are traditionally much more limited. 
 
 Furthermore, writing a plugin often requires detailed knowledge about how to correctly call service actions, and in what order. 
 
-For these reasons, plugins should be thought of as the responsibility of the back-end / service developer. Correspondingly, they can be written in the same programming language as services.
+For these reasons, plugins should be thought of as the responsibility of the back-end / service developer.
 
 # Updating plugins
 

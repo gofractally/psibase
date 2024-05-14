@@ -7,7 +7,7 @@
     - [Services](specifications/blockchain/services.md)
     - [TaPoS](specifications/blockchain/tapos.md)
     - [Smart authorization](specifications/blockchain/smart-authorization.md)
-    - [Triedent](specifications/blockchain/triedent.md)
+    - [Database](specifications/blockchain/database.md)
     - [Validation](specifications/blockchain/validation.md)
     - [Wasm runtime](specifications/blockchain/wasm-runtime.md)
     - [Peer consensus algorithms](specifications/blockchain/peer-consensus/README.md)
