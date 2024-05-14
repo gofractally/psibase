@@ -102,10 +102,32 @@ const memoPlaceholder = randomElement(placeholders);
 //   params: any[];
 // }
 
-function App() {
-  const { data: tokenBalances } = useTokenBalances("alice");
+export interface TrackedToken {
+  id: string;
+  label: string;
+  amount: number;
+  isAdmin: boolean;
+  isGenericToken: boolean;
+}
 
-  const { mutateAsync: credit } = usePluginCall("credit");
+const useUser = (): string => "alice";
+
+function App() {
+  const currentUser = useUser();
+  const { data: tokenBalances, refetch } = useTokenBalances(currentUser);
+  // const [trackedTokens, setTrackedTokens] = useState();
+
+  const tokens: TrackedToken[] = tokenBalances.map(
+    (token): TrackedToken => ({
+      isAdmin: token.user == currentUser,
+      amount: token.quantity.toNumber(),
+      id: token.token.toString(),
+      isGenericToken: !token.symbol,
+      label: `Token${token.token}`,
+    })
+  );
+
+  const { mutateAsync: pluginCall } = usePluginCall();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -127,9 +149,7 @@ function App() {
   const { isBurning, isMinting, isTransfer, setMode, mode } = useMode();
 
   const selectedTokenId = form.watch("token");
-  const selectedToken = tokenBalances.find(
-    (balance) => balance.id == selectedTokenId
-  );
+  const selectedToken = tokens.find((balance) => balance.id == selectedTokenId);
 
   useEffect(() => {
     if (!selectedToken) {
@@ -156,15 +176,24 @@ function App() {
       : ""
   }`;
 
-  const transfer = async () => {
-    const tokenId = form.watch("token");
-    const recipient = form.watch("to")!;
+  const performTx = async () => {
+    const tokenId = Number(form.watch("token"));
     const amount = form.watch("amount");
     const memo = form.watch("memo")!;
+    if (isTransfer) {
+      const recipient = form.watch("to")!;
 
-    credit(
-      tokenPlugin.transfer.credit(Number(tokenId), recipient, amount, memo)
-    );
+      await pluginCall(
+        tokenPlugin.transfer.credit(tokenId, recipient, amount, memo)
+      );
+      refetch();
+    } else if (isBurning) {
+      await pluginCall(tokenPlugin.intf.burn(tokenId, amount));
+      refetch();
+    } else if (isMinting) {
+      await pluginCall(tokenPlugin.intf.mint(tokenId, amount, memo));
+      refetch();
+    }
     setConfirmationModalOpen(false);
   };
 
@@ -220,7 +249,7 @@ function App() {
               >
                 Cancel
               </AlertDialogCancel>
-              <AlertDialogAction onClick={() => transfer()}>
+              <AlertDialogAction onClick={() => performTx()}>
                 Continue
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -256,7 +285,7 @@ function App() {
                       </div>
                     </FormControl>
                     <SelectContent>
-                      {tokenBalances.map((balance) => (
+                      {tokens.map((balance) => (
                         <SelectItem
                           key={balance.id}
                           className={cn({

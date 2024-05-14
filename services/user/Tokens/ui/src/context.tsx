@@ -1,5 +1,6 @@
-import { Supervisor } from "@psibase/common-lib/messaging";
+import { Supervisor } from "@psibase/common-lib";
 import { createContext } from "react";
 
-
-export const SupervisorContext = createContext<Supervisor | undefined>(undefined);
+export const SupervisorContext = createContext<Supervisor | undefined>(
+  undefined
+);

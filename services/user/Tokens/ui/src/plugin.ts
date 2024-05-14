@@ -13,27 +13,22 @@ class Intf extends Interface {
     });
   }
 
-  public burn(tokenId: string, amount: string) {
+  public burn(tokenId: number, amount: string) {
     return this.addIntf({
       method: "burn",
-      params: [tokenId, amount],
+      params: z.tuple([z.number(), z.string()]).parse([tokenId, amount]),
     });
   }
 
-  public mint(tokenId: string, amount: string, memo: string) {
+  public mint(tokenId: number, amount: string, memo: string) {
     return this.addIntf({
       method: "mint",
-      params: [tokenId, amount, memo],
+      params: z
+        .tuple([z.number(), z.string(), z.string()])
+        .parse([tokenId, amount, memo]),
     });
   }
 }
-
-const CreditParams = z.tuple([
-  z.number(),
-  z.string(),
-  z.string(),
-  z.string().default(""),
-]);
 
 class Transfer extends Interface {
   constructor(service: string) {
@@ -48,7 +43,9 @@ class Transfer extends Interface {
   ) {
     return this.addIntf({
       method: "credit",
-      params: CreditParams.parse([tokenId, receiver, amount, memo]),
+      params: z
+        .tuple([z.number(), z.string(), z.string(), z.string().default("")])
+        .parse([tokenId, receiver, amount, memo]),
     });
   }
 }

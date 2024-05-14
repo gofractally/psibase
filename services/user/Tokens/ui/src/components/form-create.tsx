@@ -95,7 +95,7 @@ export function FormCreate({ onClose }: Props) {
 
         const res2 = await supervisor.functionCall(
           tokenPlugin.intf.mint(
-            String(createdToken.id),
+            createdToken.id,
             initialSupply,
             "Token creation."
           )

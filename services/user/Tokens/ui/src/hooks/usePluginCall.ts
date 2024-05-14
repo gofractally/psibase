@@ -12,11 +12,11 @@ const functionArgsSchema = z.object({
   params: z.any().array(),
 });
 
-export const usePluginCall = (name: string) => {
+export const usePluginCall = () => {
   const supervisor = useSupervisor();
 
   return useMutation<unknown, unknown, FunctionCallArgs>({
-    mutationKey: ["transaction", name],
+    mutationKey: ["pluginCall"],
     mutationFn: (args) =>
       supervisor.functionCall(functionArgsSchema.parse(args)),
     onMutate: () => {

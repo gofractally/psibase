@@ -3,7 +3,7 @@ import { SupervisorContext } from "./context.tsx";
 import "./index.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { Supervisor } from "@psibase/common-lib/messaging/supervisor.ts";
+import { Supervisor } from "@psibase/common-lib";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import ReactDOM from "react-dom/client";
