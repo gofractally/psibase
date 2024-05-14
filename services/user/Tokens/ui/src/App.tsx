@@ -136,13 +136,11 @@ function App() {
       token: "",
       memo: "",
       to: "",
-      burn: false,
     },
     mode: "onChange",
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values, "are the submit values");
+  function onSubmit() {
     setConfirmationModalOpen(true);
   }
 
