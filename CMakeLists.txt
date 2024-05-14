@@ -32,7 +32,7 @@ option(ENABLE_SSL "Build psinode with TLS support" ON)
 
 add_subdirectory(native)
 add_subdirectory(rust)
-file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\", \"rust\")\n")
+file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\")\n")
 
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
@@ -109,6 +109,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CoreFractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Fractal.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
@@ -121,6 +122,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
@@ -223,12 +225,14 @@ set(JS_DIRS
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
 set(COMMON_LOADER_DIR services/user/CommonApi/common/packages/wasm-loader/:CommonApiLoaderLib_js)
+set(SUPERVISOR_LIB_DIR services/user/Supervisor/lib/:SupervisorLib_js)
 
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
     file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
+    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/package.json ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/yarn.lock)
 
     # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
     add_custom_command(
@@ -249,12 +253,13 @@ file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/servic
 
 # Builds the Common files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP})
+add_js_target(${SUPERVISOR_LIB_DIR} supervisor-lib.js ${CommonApiCommonLib_js_DEP})
+add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP} ${SupervisorLib_js_DEP})
 
 # Build each UI
 # Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
 foreach(ROW ${JS_DIRS})
-    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP} ${CommonApiLoaderLib_js_DEP})
+    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP})
 endforeach()
 
 # A function that can be used to add a new target that builds a wasm component from rust
@@ -301,7 +306,7 @@ set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.d.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.js
 )
-add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS})
+add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS} ${CommonApiCommonLib_js_DEP})
 add_custom_command(
     OUTPUT ${WASM_PSIBASE_BYPRODUCTS}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
@@ -340,7 +345,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.8.0")
+set(PSIBASE_VERSION "0.9.0")
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
@@ -547,6 +552,22 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Events.psi
+    NAME Events
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Indexes events and provides querying"
+    SERVICE events
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
+        FLAGS isSubjective forceReplay
+        SERVER r-events
+    SERVICE r-events
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Events/src/postinstall.json
+    DEPENDS wasm
+    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Explorer.psi
     NAME Explorer
     VERSION ${PSIBASE_VERSION}
@@ -592,10 +613,12 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
     NAME Supervisor
     VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS Nft HttpServer Accounts
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist /
+    DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
+    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/lib/dist/supervisor-lib.js /supervisor-lib.js
     DEPENDS ${Supervisor_js_DEP}
+    DEPENDS ${SupervisorLib_js_DEP}
 )
 
 psibase_package(
@@ -667,7 +690,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
-                    Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
 
@@ -695,7 +718,7 @@ endfunction()
 
 write_package_index(${SERVICE_DIR}/index.json
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
-    Docs Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
+    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
 
 install(
@@ -709,6 +732,7 @@ install(
           ${SERVICE_DIR}/Default.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
+          ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractal.psi
           ${SERVICE_DIR}/Invite.psi

@@ -58,7 +58,7 @@ struct Args {
     trace: TraceFormat,
 
     /// Controls whether the transaction's console output is shown
-    #[clap(long, action=clap::ArgAction::Set, min_values=0, require_equals=true, default_value="true", default_missing_value="true")]
+    #[clap(long, action=clap::ArgAction::Set, num_args=0..=1, require_equals=true, default_value="true", default_missing_value="true")]
     console: bool,
 
     #[clap(subcommand)]

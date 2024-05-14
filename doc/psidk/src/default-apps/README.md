@@ -10,6 +10,7 @@ System apps are the applications responsible for the core functionality of the n
 - [auth-sig]()
 - [common-api](common-api.md)
 - [cpu-limit]()
+- [events](events.md)
 - [producers]()
 - [http-server](http-server.md)
 - [setcode](setcode.md)

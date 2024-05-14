@@ -16,6 +16,7 @@ extern "C"
    [[clang::import_name("testerFinishBlock")]]      void     testerFinishBlock(uint32_t chain_index);
    [[clang::import_name("testerGetChainPath")]]     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
    [[clang::import_name("testerPushTransaction")]]  uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
+   [[clang::import_name("testerHttpRequest")]]      uint32_t testerHttpRequest(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
    [[clang::import_name("testerSelectChainForDb")]] void     testerSelectChainForDb(uint32_t chain_index);
    [[clang::import_name("testerShutdownChain")]]    void     testerShutdownChain(uint32_t chain);
    [[clang::import_name("testerStartBlock")]]       void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
@@ -234,4 +235,27 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    for (auto& [pub, priv] : keys)
       signedTrx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
    return pushTransaction(signedTrx);
+}
+
+psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
+{
+   if (producing && isAutoBlockStart)
+      finishBlock();
+
+   std::vector<char> packed_request = psio::convert_to_frac(request);
+   auto              size  = ::testerHttpRequest(id, packed_request.data(), packed_request.size());
+   auto              trace = psio::from_frac<TransactionTrace>(getResult(size));
+
+   if (trace.error)
+   {
+      check(false, "http request failed: " + *trace.error);
+   }
+
+   check(trace.actionTraces.size() == 1, "Expected exactly one action trace");
+   const auto& actionTrace = trace.actionTraces.front();
+   auto        response    = psio::from_frac<std::optional<HttpReply>>(actionTrace.rawRetval);
+   if (!response)
+      check(false, "404 Not Found");
+
+   return std::move(*response);
 }

@@ -3,8 +3,10 @@
 #include <concepts>
 #include <map>
 #include <psio/fracpack.hpp>
+#include <psio/get_type_name.hpp>
 #include <psio/to_json.hpp>
 #include <psio/to_json/map.hpp>
+#include <ranges>
 #include <variant>
 
 namespace psio
@@ -26,6 +28,13 @@ namespace psio
       std::uint32_t end_pos;
       bool          has_unknown = false;
       bool          known_end   = true;
+
+      template <bool Unpack, bool Verify, typename T>
+      bool unpack(T* value)
+      {
+         return is_packable<T>::template unpack<Unpack, Verify>(value, has_unknown, known_end, src,
+                                                                pos, end_pos);
+      }
    };
 
    class StreamBase
@@ -72,6 +81,7 @@ namespace psio
       template <typename T>
       struct Box
       {
+         Box() : value(new T()) {}
          template <std::convertible_to<T> U>
          Box(U&& value) : value(new T(std::forward<U>(value)))
          {
@@ -93,6 +103,18 @@ namespace psio
       void to_json(const Box<T>& wrapper, Stream& stream)
       {
          to_json(*wrapper.value, stream);
+      }
+
+      template <typename T>
+      T& clio_unwrap_packable(Box<T>& box)
+      {
+         return *box;
+      }
+
+      template <typename T>
+      const T& clio_unwrap_packable(const Box<T>& box)
+      {
+         return *box;
       }
 
       struct Function;
@@ -124,6 +146,16 @@ namespace psio
          to_json_members(type.members, stream);
       }
 
+      inline auto& clio_unwrap_packable(Object& type)
+      {
+         return type.members;
+      }
+
+      inline auto& clio_unwrap_packable(const Object& type)
+      {
+         return type.members;
+      }
+
       struct Struct
       {
          std::vector<Member> members;
@@ -133,6 +165,16 @@ namespace psio
       void to_json(const Struct& type, auto& stream)
       {
          to_json_members(type.members, stream);
+      }
+
+      inline auto& clio_unwrap_packable(Struct& type)
+      {
+         return type.members;
+      }
+
+      inline auto& clio_unwrap_packable(const Struct& type)
+      {
+         return type.members;
       }
 
       struct Array
@@ -153,6 +195,15 @@ namespace psio
          to_json(*type.type, stream);
       }
 
+      inline auto& clio_unwrap_packable(List& type)
+      {
+         return *type.type;
+      }
+      inline auto& clio_unwrap_packable(const List& type)
+      {
+         return *type.type;
+      }
+
       struct Option
       {
          Box<AnyType> type;
@@ -162,6 +213,15 @@ namespace psio
       void to_json(const Option& type, auto& stream)
       {
          to_json(*type.type, stream);
+      }
+
+      inline auto& clio_unwrap_packable(Option& type)
+      {
+         return *type.type;
+      }
+      inline auto& clio_unwrap_packable(const Option& type)
+      {
+         return *type.type;
       }
 
       struct Custom
@@ -198,6 +258,16 @@ namespace psio
          to_json_members(type.members, stream);
       }
 
+      inline auto& clio_unwrap_packable(Variant& type)
+      {
+         return type.members;
+      }
+
+      inline auto& clio_unwrap_packable(const Variant& type)
+      {
+         return type.members;
+      }
+
       struct Tuple
       {
          std::vector<AnyType> members;
@@ -207,6 +277,16 @@ namespace psio
       void to_json(const Tuple& type, auto& stream)
       {
          to_json(type.members, stream);
+      }
+
+      inline auto& clio_unwrap_packable(Tuple& type)
+      {
+         return type.members;
+      }
+
+      inline auto& clio_unwrap_packable(const Tuple& type)
+      {
+         return type.members;
       }
 
       struct FracPack
@@ -220,6 +300,15 @@ namespace psio
          to_json(type.type, stream);
       }
 
+      inline auto& clio_unwrap_packable(FracPack& type)
+      {
+         return *type.type;
+      }
+      inline auto& clio_unwrap_packable(const FracPack& type)
+      {
+         return *type.type;
+      }
+
       struct Type
       {
          std::string type;
@@ -231,8 +320,18 @@ namespace psio
          to_json(type.type, stream);
       }
 
+      inline auto& clio_unwrap_packable(Type& type)
+      {
+         return type.type;
+      }
+      inline auto& clio_unwrap_packable(const Type& type)
+      {
+         return type.type;
+      }
+
       struct AnyType
       {
+         AnyType();
          AnyType(Int type);
          AnyType(Float type);
          AnyType(Object type);
@@ -276,6 +375,16 @@ namespace psio
          }
       }
 
+      inline auto& clio_unwrap_packable(AnyType& type)
+      {
+         return type.value;
+      }
+      template <std::same_as<AnyType> T>
+      auto& clio_unwrap_packable(const T& type)
+      {
+         return type.value;
+      }
+
       struct Function
       {
          AnyType params;
@@ -290,6 +399,7 @@ namespace psio
       };
       PSIO_REFLECT(Member, name, type)
 
+      inline AnyType::AnyType() {}
       inline AnyType::AnyType(Int type) : value(std::move(type)) {}
       inline AnyType::AnyType(Float type) : value(std::move(type)) {}
       inline AnyType::AnyType(Object type) : value(std::move(type)) {}
@@ -366,13 +476,13 @@ namespace psio
          {
             insert(std::move(name), DefaultCustomHandler<T>());
          }
-         void         insert(std::string name, const CustomHandler& t);
-         std::size_t* find(const std::string& name);
-         bool         match(std::size_t index, const CompiledType* type);
-         bool         frac2json(const CompiledType* type,
-                                std::size_t         index,
-                                FracStream&         in,
-                                auto&               out) const
+         void               insert(std::string name, const CustomHandler& t);
+         const std::size_t* find(const std::string& name) const;
+         bool               match(std::size_t index, const CompiledType* type) const;
+         bool               frac2json(const CompiledType* type,
+                                      std::size_t         index,
+                                      FracStream&         in,
+                                      auto&               out) const
          {
             StreamRef stream{out};
             return impl[index].frac2json(type, in, stream);
@@ -413,13 +523,16 @@ namespace psio
          std::vector<CompiledMember> children;
          const AnyType*              original_type = nullptr;
          bool is_container() const { return kind == container || kind == nested; }
+         bool matches(const CompiledType* other) const;
       };
 
       CustomTypes standard_types();
 
       struct CompiledSchema
       {
-         CompiledSchema(const Schema& schema, CustomTypes builtin = standard_types());
+         CompiledSchema(const Schema&               schema,
+                        CustomTypes                 builtin    = standard_types(),
+                        std::vector<const AnyType*> extraTypes = {});
          CompiledType*       get(const AnyType* type);
          const CompiledType* get(const AnyType* type) const;
          //
@@ -460,12 +573,21 @@ namespace psio
             ItemKind              kind;
             std::span<const char> data;
             const CompiledType*   type;
-            const AnyType*        parent;
+            const CompiledType*   parent;
             std::uint32_t         index;
             explicit              operator bool() const { return type != nullptr; }
             Item                  next(FracParser&) { return *this; }
          };
          Item next();
+         Item select_child(std::uint32_t index);
+         void push(const Item&);
+         // Returns the position that the item starts at. The item must
+         // be the most recent item, and must be one of start, scalar, or custom
+         // - empty elements are not necessarily represented in the packed data
+         // - I'm not sure what the position of an end element should mean
+         std::uint32_t get_pos(const Item&) const;
+         // Sets the current position to pos and clears the parse stack
+         void set_pos(std::uint32_t pos);
          // Starts parsing the given type at the current pos
          Item parse(const CompiledType* ctype);
          void parse_fixed(Item& result, const CompiledType* ctype, std::uint32_t offset);
@@ -618,7 +740,8 @@ namespace psio
             if (!groups.empty())
             {
                groups.back().next(stream);
-               if (auto* name = std::visit(MemberName{item.index}, item.parent->value))
+               if (auto* name =
+                       std::visit(MemberName{item.index}, item.parent->original_type->value))
                {
                   to_json(*name, stream);
                   write_colon(stream);
@@ -677,6 +800,143 @@ namespace psio
                   check(false, std::string_view(item.data.data(), item.data.size()));
             }
          }
+      }
+
+      void scalar_to_key(const Int& type, std::span<const char> data, auto& stream)
+      {
+         if (type.isSigned)
+         {
+            stream.write(data.back() ^ 0x80);
+            data = data.first(data.size() - 1);
+         }
+         for (char ch : std::ranges::reverse_view{data})
+            stream.write(ch);
+      }
+      void scalar_to_key(const Float& type, std::span<const char> data, auto& stream)
+      {
+         // check for zero
+         bool is_minus_zero =
+             data.back() == static_cast<char>(0x80) &&
+             std::ranges::all_of(data.first(data.size() - 1), [](char ch) { return ch == 0; });
+         if ((data.back() & 0x80) && !is_minus_zero)
+         {
+            for (char ch : data | std::views::reverse)
+               stream.write(ch ^ 0xff);
+         }
+         else
+         {
+            stream.write(data.back() | 0x80);
+            data = data.first(data.size() - 1);
+            for (char ch : std::ranges::reverse_view{data})
+               stream.write(ch);
+         }
+      }
+      void scalar_to_key(const auto& type, std::span<const char>, auto& stream)
+      {
+         check(false, "Not a scalar type");
+      }
+
+      inline bool isOctet(const CompiledType* type)
+      {
+         if (const auto* intType = std::get_if<Int>(&type->original_type->value))
+         {
+            return intType->bits <= 8;
+         }
+         return false;
+      }
+
+      inline bool isOctet(const CompiledMember& member)
+      {
+         return !member.is_optional && isOctet(member.type);
+      }
+
+      // TODO: Allow extensions without breaking key ordering
+      void to_key(FracParser& parser, auto& stream)
+      {
+         auto start_member = [&](const auto& item)
+         {
+            if (item.parent)
+            {
+               if (item.parent->kind == CompiledType::optional)
+                  stream.write('\1');
+               if (item.parent->children[item.index].is_optional)
+                  stream.write('\1');
+            }
+         };
+         while (auto item = parser.next())
+         {
+            switch (item.kind)
+            {
+               case FracParser::start:
+                  start_member(item);
+                  break;
+               case FracParser::end:
+                  switch (item.type->kind)
+                  {
+                     case CompiledType::container:
+                        if (isOctet(item.type->children[0]))
+                        {
+                           stream.write("\0", 2);
+                        }
+                        else
+                        {
+                           stream.write('\0');
+                        }
+                        break;
+                     default:
+                        break;
+                  }
+                  break;
+               case FracParser::scalar:
+                  if (item.parent)
+                  {
+                     auto optionalCount = (item.parent->kind == CompiledType::container) +
+                                          (item.parent->children[item.index].is_optional ||
+                                           item.parent->kind == CompiledType::optional);
+                     if (optionalCount == 2)
+                        stream.write('\1');
+                     if (optionalCount != 0)
+                     {
+                        if (isOctet(item.parent->children[0].type))
+                        {
+                           char             buf[1];
+                           fixed_buf_stream tmp_stream(buf, 1);
+                           std::visit([&](const auto& type)
+                                      { scalar_to_key(type, item.data, tmp_stream); },
+                                      item.type->original_type->value);
+                           stream.write(buf[0]);
+                           if (buf[0] == '\0')
+                              stream.write('\1');
+                           break;
+                        }
+                        stream.write('\1');
+                     }
+                  }
+                  std::visit([&](const auto& type) { scalar_to_key(type, item.data, stream); },
+                             item.type->original_type->value);
+                  break;
+               case FracParser::empty:
+                  if (item.parent)
+                  {
+                     if (item.parent->kind == CompiledType::container)
+                        stream.write('\1');
+                     if (isOctet(item.parent->children[item.index].type))
+                        stream.write('\0');
+                  }
+                  stream.write('\0');
+                  break;
+               case FracParser::custom:
+                  check(false, "to_key does not handle custom types");
+               case FracParser::error:
+                  check(false, std::string_view(item.data.data(), item.data.size()));
+            }
+         }
+      }
+
+      template <typename T>
+      constexpr bool psio_custom_schema(T*)
+      {
+         return false;
       }
 
       template <typename T>
@@ -869,17 +1129,22 @@ namespace psio
                {
                   static_assert(reflect<T>::is_struct, "Don't know schema representation");
                }
+               if constexpr (psio_custom_schema(static_cast<T*>(nullptr)))
+               {
+                  auto& item = schema.types.find(name)->second;
+                  item       = Custom{.type = std::move(item), .id = psio::get_type_name<T>()};
+               }
             }
             return Type{std::move(name)};
          }
-         Schema build() &&
+         Schema build(std::span<AnyType* const> ext = {}) &&
          {
-            optimize();
+            optimize(ext);
             ids.clear();
             return std::move(schema);
          }
 
-         void optimize();
+         void optimize(std::span<AnyType* const> ext = {});
 
         private:
          bool                               expandNested_ = false;
@@ -905,6 +1170,14 @@ namespace psio
          }
          comma.end(stream);
          stream.write('}');
+      }
+
+      template <typename T>
+      bool matchCustomType(const CompiledType* type, T*)
+      {
+         auto           schema = SchemaBuilder{}.insert<T>("T").build();
+         CompiledSchema cschema{schema};
+         return cschema.get(schema.get("T"))->matches(type);
       }
 
       enum class SchemaDifference : std::uint8_t

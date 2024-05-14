@@ -33,6 +33,7 @@ namespace psibase
       bool                                allowDbRead;
       bool                                allowDbWrite;
       bool                                allowDbReadSubjective;
+      bool                                allowDbWriteSubjective;
       std::vector<std::vector<char>>      subjectiveData;
       size_t                              nextSubjectiveRead = 0;
 
@@ -41,7 +42,8 @@ namespace psibase
                          TransactionTrace&        transactionTrace,
                          bool                     allowDbRead,
                          bool                     allowDbWrite,
-                         bool                     allowDbReadSubjective);
+                         bool                     allowDbReadSubjective,
+                         bool                     allowDbWriteSubjective = false);
       ~TransactionContext();
 
       // Caution: each call to exec*(), except execCalledAction(),

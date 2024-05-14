@@ -42,13 +42,13 @@ namespace psio::schema_types
       impl.push_back(t);
       names.insert({std::move(name), index});
    }
-   std::size_t* CustomTypes::find(const std::string& name)
+   const std::size_t* CustomTypes::find(const std::string& name) const
    {
       if (auto pos = names.find(name); pos != names.end())
          return &pos->second;
       return nullptr;
    }
-   bool CustomTypes::match(std::size_t index, const CompiledType* type)
+   bool CustomTypes::match(std::size_t index, const CompiledType* type) const
    {
       return impl[index].match(type);
    }
@@ -159,6 +159,40 @@ namespace psio::schema_types
       result.insert("string", BlobImpl<StringImpl>());
       result.insert("hex", BlobImpl<OctetStringImpl>());
       return result;
+   }
+
+   bool CompiledType::matches(const CompiledType* other) const
+   {
+      std::vector<std::pair<const CompiledType*, const CompiledType*>> stack{{this, other}};
+      std::set<std::pair<const CompiledType*, const CompiledType*>>    known;
+      while (!stack.empty())
+      {
+         auto item = stack.back();
+         stack.pop_back();
+         if (!known.insert(item).second)
+         {
+            continue;
+         }
+         auto [lhs, rhs] = item;
+         if (lhs->kind != rhs->kind || lhs->is_variable_size != rhs->is_variable_size ||
+             lhs->fixed_size != rhs->fixed_size)
+         {
+            return false;
+         }
+         if (lhs->children.size() != rhs->children.size())
+         {
+            return false;
+         }
+         for (std::size_t i = 0; i < lhs->children.size(); ++i)
+         {
+            const auto& lm = lhs->children[i];
+            const auto& rm = rhs->children[i];
+            if (lm.is_optional != rm.is_optional)
+               return false;
+            stack.push_back({lm.type, rm.type});
+         }
+      }
+      return true;
    }
 
    // ------
@@ -473,12 +507,19 @@ namespace psio::schema_types
 
    }  // namespace
 
-   CompiledSchema::CompiledSchema(const Schema& schema, CustomTypes builtin)
+   CompiledSchema::CompiledSchema(const Schema&               schema,
+                                  CustomTypes                 builtin,
+                                  std::vector<const AnyType*> extraTypes)
        : schema(schema), builtin(std::move(builtin))
    {
       // collect root types
       std::vector<const AnyType*> stack;
       std::vector<const AnyType*> queue;
+      for (const auto* type : extraTypes)
+      {
+         if (!std::holds_alternative<Type>(type->value))
+            queue.push_back(type);
+      }
       for (const auto& [name, type] : schema.types)
       {
          if (!std::holds_alternative<Type>(type.value))
@@ -496,6 +537,19 @@ namespace psio::schema_types
             auto top = stack.back();
             stack.pop_back();
             std::visit([&](const auto& t) { add_impl(this, top, t, stack, queue); }, top->value);
+         }
+      }
+      // Resolve optional elements of containers
+      for (auto& [type, ctype] : types)
+      {
+         if (ctype.kind == CompiledType::container)
+         {
+            CompiledMember& member = ctype.children[0];
+            if (member.type->kind == CompiledType::optional)
+            {
+               member.is_optional = true;
+               member.type        = member.type->children[0].type;
+            }
          }
       }
       // Custom types need to be resolved last, so the full object graph
@@ -561,10 +615,12 @@ namespace psio::schema_types
                                       std::uint32_t       offset)
       {
          if (parser.in.known_end)
+         {
             if (parser.in.pos != offset)
                return makeError(type, "wrong offset");
             else if (parser.in.pos > offset)
                return makeError(type, "offset moved backwards");
+         }
          return {};
       }
 
@@ -629,8 +685,7 @@ namespace psio::schema_types
             return {.kind = FracParser::end, .type = type};
          }
          const auto&      member = type->children[index];
-         FracParser::Item result{
-             .type = member.type, .parent = type->original_type, .index = index};
+         FracParser::Item result{.type = member.type, .parent = type, .index = index};
          ++index;
          auto fixed_end = fixed_pos + fixed_size;
          fixed_pos += member.fixed_offset;
@@ -667,7 +722,7 @@ namespace psio::schema_types
          else
             completed = true;
          const CompiledType* nested = type->children[0].type;
-         FracParser::Item    result{.type = nested, .parent = type->original_type};
+         FracParser::Item    result{.type = nested, .parent = type};
          auto                start_pos = parser.in.pos;
          parser.in.pos += 4;
          parser.deref(start_pos, parser.in.end_pos, nested, true, result);
@@ -687,7 +742,7 @@ namespace psio::schema_types
             return {.kind = FracParser::end, .type = type};
          }
          const CompiledMember& member = type->children[0];
-         FracParser::Item      result{.type = member.type, .parent = type->original_type};
+         FracParser::Item      result{.type = member.type, .parent = type};
          if (!member.is_optional && !member.type->is_variable_size)
          {
             parser.parse_fixed(result, member.type, pos);
@@ -733,7 +788,7 @@ namespace psio::schema_types
          if (tag >= type->children.size())
             return makeError(type, "Variant tag out-of-range");
          auto result   = parser.parse(type->children[tag].type);
-         result.parent = type->original_type;
+         result.parent = type;
          result.index  = tag;
          return result;
       }
@@ -772,7 +827,7 @@ namespace psio::schema_types
             parser.in.end_pos = new_end;
          }
          auto result   = parser.parse(type->children[0].type);
-         result.parent = type->original_type;
+         result.parent = type;
          return result;
       }
    };
@@ -868,8 +923,7 @@ namespace psio::schema_types
       }
       else if (ctype->kind == CompiledType::optional)
       {
-         result        = OptionReader{ctype}.next(*this);
-         result.parent = nullptr;
+         result = OptionReader{ctype}.next(*this);
       }
       else
       {
@@ -922,6 +976,111 @@ namespace psio::schema_types
          stack.pop_back();
       }
       return result;
+   }
+
+   FracParser::Item FracParser::select_child(std::uint32_t index)
+   {
+      if (stack.empty())
+         return makeError(nullptr, "Parse stack is empty");
+      if (auto* item = std::get_if<Item>(&stack.back()))
+      {
+         if (item->kind == start)
+         {
+            stack.pop_back();
+         }
+      }
+      if (auto* reader = std::get_if<ObjectReader>(&stack.back()))
+      {
+         auto copy    = std::move(*reader);
+         copy.index   = index;
+         in.known_end = false;
+         stack.clear();
+         return copy.next(*this);
+      }
+      else
+      {
+         return makeError(std::visit([](auto& item) { return item.type; }, stack.back()),
+                          "Can only select child of object types");
+      }
+   }
+
+   void FracParser::push(const Item& item)
+   {
+      stack.push_back(item);
+   }
+
+   namespace
+   {
+
+      struct StartPos
+      {
+         std::uint32_t operator()(const ObjectReader& reader, const FracParser&) const
+         {
+            return reader.start_pos;
+         }
+         std::uint32_t operator()(const ArrayReader& reader, const FracParser&) const
+         {
+            if (reader.type->kind == CompiledType::container)
+            {
+               return reader.pos - 4;
+            }
+            else
+            {
+               return reader.pos;
+            }
+         }
+         std::uint32_t operator()(const OptionReader&, const FracParser& parser) const
+         {
+            return parser.in.pos;
+         }
+         std::uint32_t operator()(const VariantReader&, const FracParser& parser) const
+         {
+            return parser.in.pos;
+         }
+         std::uint32_t operator()(const NestedReader&, const FracParser& parser) const
+         {
+            return parser.in.pos;
+         }
+         std::uint32_t operator()(const FracParser::Item& reader, const FracParser& parser) const
+         {
+            check(false, "Only single item put back is supported");
+            return 0;
+         }
+      };
+
+   }  // namespace
+
+   std::uint32_t FracParser::get_pos(const Item& item) const
+   {
+      switch (item.kind)
+      {
+         case FracParser::start:
+            // peek at the top of the stack
+            return std::visit([&](auto& r) { return StartPos{}(r, *this); }, stack.back());
+         case FracParser::scalar:
+            return static_cast<std::uint32_t>(item.data.data() - in.src);
+         case FracParser::custom:
+            if (item.data.empty())
+            {
+               return in.pos;
+            }
+            else
+            {
+               return static_cast<std::uint32_t>(item.data.data() - in.src);
+            }
+         case FracParser::end:
+         case FracParser::empty:
+         case FracParser::error:
+            check(false, "Cannot get start pos");
+      }
+      return 0;
+   }
+
+   void FracParser::set_pos(std::uint32_t pos)
+   {
+      in.pos       = pos;
+      in.known_end = true;
+      stack.clear();
    }
 
    FracParser::Item FracParser::push(const CompiledType* type, std::uint32_t offset, bool pointer)
@@ -1166,12 +1325,16 @@ namespace psio::schema_types
       }
    }  // namespace
 
-   void SchemaBuilder::optimize()
+   void SchemaBuilder::optimize(std::span<AnyType* const> ext)
    {
       std::map<std::string, std::vector<AnyType*>> refs;
       // Group all aliases, user defined types are not replaced
       // lower numbered aliases are preferred.
       std::map<std::string, std::string> resolved;
+      for (AnyType* type : ext)
+      {
+         addRef(refs, *type);
+      }
       for (auto& [name, type] : schema.types)
       {
          if (auto* alias = std::get_if<Type>(&type.value))

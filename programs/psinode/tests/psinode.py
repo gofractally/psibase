@@ -307,6 +307,8 @@ admin    = static:*
 admin-authz = r:any
 admin-authz = rw:loopback
 
+http-timeout = 4
+
 [logger.stderr]
 type   = console
 filter = %s
@@ -395,7 +397,12 @@ class Node(API):
         with self.post('/native/admin/shutdown', service='x-admin', json={}):
             pass
         self.session.close()
-        self.child.wait()
+        try:
+            self.child.wait(timeout=10)
+        except:
+            self.child.kill()
+            self.child.wait()
+        del self.child
     def wait(self, cond, timeout=10):
         '''
         Wait until cond(self) is true.

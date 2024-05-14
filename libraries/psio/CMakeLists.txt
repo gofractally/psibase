@@ -42,6 +42,8 @@ add_subdirectory( consthash )
 add_subdirectory(tests)
 
 if(IS_WASM)
+    target_link_libraries(psio PUBLIC wasm-base)
+    target_include_directories(psio PUBLIC ../psibase/common/include)
     install(DIRECTORY consthash/include/consthash TYPE INCLUDE COMPONENT libpsibase)
     install(FILES consthash/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.consthash COMPONENT libpsibase)
     install(DIRECTORY include/psio TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")

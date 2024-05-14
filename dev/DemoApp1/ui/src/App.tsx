@@ -1,5 +1,5 @@
 import "./App.css";
-import { Supervisor } from "@psibase/common-lib/messaging";
+import { Supervisor } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
 import { fetchAnswers } from "./utils/fetchAnswers";
 import { wait } from "./utils/wait";
@@ -39,7 +39,11 @@ function App() {
       });
       setRes(res as string);
     } catch (e) {
-      console.error(`${JSON.stringify(e, null, 2)}`);
+      if (e instanceof Error) {
+        console.error(`Error: ${e.message}\nStack: ${e.stack}`);
+      } else {
+        console.error(`Caught exception: ${JSON.stringify(e, null, 2)}`);
+      }
     }
   };
 

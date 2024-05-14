@@ -33,7 +33,7 @@ This will deploy the service to the chain:
 psibase deploy -ip example example.wasm
 ```
 
-The `-p` option will register the service with the [`http-server` service](../../../../default-apps/http-server.md). This allows the service to handle web requests. See the [`registerServer`](../../../../default-apps/http-server.md#systemserviceproxysysregisterserver) docs for more details.
+The `-p` option will register the service with the [`http-server` service](../../../../default-apps/http-server.md). This allows the service to handle web requests. See the [`registerServer`](../../../../default-apps/http-server.md) docs for more details.
 
 ## Trying the service
 

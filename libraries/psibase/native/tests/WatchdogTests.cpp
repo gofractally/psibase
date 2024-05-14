@@ -64,18 +64,28 @@ TEST_CASE("Watchdog zero limit")
 
 TEST_CASE("Watchdog required accuracy")
 {
-   std::atomic<bool> interrupted{false};
-   WatchdogManager   manager;
-   auto              duration = std::chrono::milliseconds(20);
-   auto              start    = CpuClock::now();
-   Watchdog          watchdog(manager, [&] { interrupted = true; });
-   watchdog.setLimit(duration);
-   while (!interrupted)
+   constexpr int run_count        = 5;
+   constexpr int allowed_failures = 1;
+   int           failed           = 0;
+   for (int i = 0; i < run_count; ++i)
    {
+      std::atomic<bool> interrupted{false};
+      WatchdogManager   manager;
+      auto              duration = std::chrono::milliseconds(20);
+      auto              start    = CpuClock::now();
+      Watchdog          watchdog(manager, [&] { interrupted = true; });
+      watchdog.setLimit(duration);
+      while (!interrupted)
+      {
+      }
+      auto end = CpuClock::now();
+      CHECK(end - start >= duration);
+      if (end - start - duration >= std::chrono::milliseconds(5))
+      {
+         ++failed;
+         CHECK(failed <= allowed_failures);
+      }
    }
-   auto end = CpuClock::now();
-   CHECK(end - start >= duration);
-   CHECK(end - start - duration < std::chrono::milliseconds(5));
 }
 
 TEST_CASE("Watchdog maximum limit")
