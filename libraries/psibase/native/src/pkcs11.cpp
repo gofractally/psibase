@@ -1173,7 +1173,8 @@ namespace psibase::pkcs11
 
    URI::URI(std::string_view uri)
    {
-      check(parseLiteral(uri, "pkcs11:"), "Expected PKCS #11 URI");
+      check(parseLiteral(uri, "pkcs11:"),
+            "Invalid PKCS #11 URI, expected 'pkcs11:...', got: '" + std::string(uri) + "'");
       // path
       if (!uri.empty() && !uri.starts_with('?'))
       {
