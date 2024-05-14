@@ -66,7 +66,7 @@ Therefore `postMessage` does not immediately (synchronously) post to the other d
 
 ## Plugin isolation
 
-It is important that plugins are sandboxed on the client-side. To communicate with each other, they should use a middleware layer that enforces the identity of the caller is accurately reported to the callee, allowing identity-based permissions. This middleware is called the supervisor. The supervisor listens for cross-domain messages from its parent window and from the plugins it instantiates, and plugins will only listen for messages that come directly from the supervisor.
+It is important that plugins are sandboxed on the client-side. To communicate with each other, they must use a middleware layer that enforces that the identity of the caller is accurately reported to the callee, allowing identity-based permissions. This middleware, known as the supervisor, listens for messages from its parent window and from the plugins it instantiates. Plugins must only listen for messages that come directly from the supervisor.
 
 If plugins make use of the standard psibase development libraries, then many of the security concerns are handled automatically. For example, it is automatically enforced that messages into your plugin are only allowed to come from the supervisor.
 
