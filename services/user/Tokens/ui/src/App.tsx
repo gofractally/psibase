@@ -57,7 +57,6 @@ export function ButtonIcon() {
 const formSchema = z.object({
   token: z.string(),
   to: z.string().max(50).optional(),
-  burn: z.boolean(),
   amount: z.string(),
   from: z.string().optional(),
   memo: z.string().max(50).optional(),
@@ -114,6 +113,7 @@ const useUser = (): string => "alice";
 
 function App() {
   const currentUser = useUser();
+  console.count("render");
   const { data: tokenBalances, refetch } = useTokenBalances(currentUser);
   // const [trackedTokens, setTrackedTokens] = useState();
 
@@ -132,15 +132,16 @@ function App() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      amount: "",
+      amount: "2",
       token: "",
       memo: "",
-      to: "",
+      to: "tokens",
     },
-    mode: "onChange",
+    // mode: "",
   });
 
-  function onSubmit() {
+  function onSubmit(params: z.infer<typeof formSchema>) {
+    console.log("on submit was hit", params);
     setConfirmationModalOpen(true);
   }
 
@@ -216,6 +217,10 @@ function App() {
         ]
       : []),
   ];
+
+  useEffect(() => {
+    console.log("Donna got off.");
+  }, []);
 
   return (
     <div>

@@ -1,19 +1,26 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::wasi::random::random::get_random_u64;
-
-use bindings::common::plugin::{server, types as CommonTypes};
+use bindings::common::plugin::{client, server, types as CommonTypes};
 use bindings::exports::component::tokens::types as Wit;
 use bindings::exports::component::tokens::{intf::Guest as Intf, transfer::Guest as Transfer};
 use psibase::services::tokens as Wrapper;
 use psibase::AccountNumber;
+use serde::{Deserialize, Serialize};
+
+mod errors;
 
 struct Component;
 
 use psibase::fracpack::Pack;
 
 mod convert;
+
+mod query {
+    pub mod token;
+}
+
+use query::token::{fetch_precision, Node, ResponseRoot, Token};
 
 impl Intf for Component {
     fn create(
@@ -86,15 +93,15 @@ impl Transfer for Component {
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), CommonTypes::Error> {
-        let pretend_looked_up_precision: u8 = 4;
-        let amount = Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision);
+        let precision = fetch_precision(token).expect("failed to fetch precision");
+
         server::add_action_to_transaction(
             "credit",
             &Wrapper::action_structs::credit {
-                amount,
-                memo,
+                amount: Wrapper::Quantity::new(amount.as_str(), precision),
                 receiver: AccountNumber::from(receiver.as_str()),
                 tokenId: token,
+                memo,
             }
             .packed(),
         )
