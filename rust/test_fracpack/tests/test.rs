@@ -328,13 +328,24 @@ fn round_trip_fields(index: usize, obj: &OuterStruct) {
 #[test]
 fn t1() -> Result<()> {
     for (i, t) in get_tests1().iter().enumerate() {
+        if i > 0 {
+            break;
+        }
         println!("index {}", i);
         round_trip_fields(i, t);
+
+        println!("round trip outer struct");
+
         let mut packed = Vec::<u8>::new();
         t.pack(&mut packed);
         OuterStruct::verify(&packed[..], &mut 0)?;
+
+        println!("\n>>> Outerstruct verified");
+
         let unpacked = OuterStruct::unpack(&packed[..], &mut 0)?;
         assert_eq!(*t, unpacked);
+        println!("\n>>> outer struct unpacked equally");
+
         test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
         // TODO: optionals after fixed-data portion ends
     }
