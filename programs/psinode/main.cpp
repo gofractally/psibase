@@ -483,12 +483,12 @@ namespace psibase
          auto                    key = psio::convert_from_json<ClaimKey>(s);
          std::shared_ptr<Prover> result;
 
-         if (key.service.str() == "verifyec-sys")
+         if (key.service.str() == "verifyk1")
          {
             result = std::make_shared<EcdsaSecp256K1Sha256Prover>(
                 key.service, psio::from_frac<PrivateKey>(key.rawData));
          }
-         else if (key.service.str() == "verify-sys")
+         else if (key.service.str() == "verify-sig")
          {
             result = std::make_shared<OpenSSLProver>(key.service, key.rawData);
          }
@@ -500,7 +500,7 @@ namespace psibase
       }
       else
       {
-         auto result = std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"},
+         auto result = std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyk1"},
                                                                     privateKeyFromString(s));
          v           = std::shared_ptr<Prover>(std::move(result));
       }
@@ -730,7 +730,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             // the transaction being rejected because it passes on one fork but not
             // another, potentially charging the user for the failed transaction. The
             // first auth check, when not part of the main execution, runs in read-only
-            // mode. TransactionSys lets the account's auth service know it's in a
+            // mode. Transact lets the account's auth service know it's in a
             // read-only mode so it doesn't fail the transaction trying to update its
             // tables.
             //
@@ -2169,7 +2169,7 @@ void run(const std::string&              db_path,
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    key = psio::from_json<NewKeyRequest>(stream);
-         if (key.service.str() != "verifyec-sys" && key.service.str() != "verify-sys")
+         if (key.service.str() != "verifyk1" && key.service.str() != "verify-sig")
          {
             throw std::runtime_error("Not implemented for native signing: " + key.service.str());
          }
@@ -2199,7 +2199,7 @@ void run(const std::string&              db_path,
                       pos->second.sessionProver->add(result);
                       storeConfig = false;
                    }
-                   else if (key.service == AccountNumber{"verifyec-sys"})
+                   else if (key.service == AccountNumber{"verifyk1"})
                    {
                       if (key.rawData)
                       {
@@ -2211,7 +2211,7 @@ void run(const std::string&              db_path,
                          result = std::make_shared<EcdsaSecp256K1Sha256Prover>(key.service);
                       }
                    }
-                   else if (key.service == AccountNumber{"verify-sys"})
+                   else if (key.service == AccountNumber{"verify-sig"})
                    {
                       if (key.rawData)
                       {

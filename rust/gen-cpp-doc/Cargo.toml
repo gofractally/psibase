@@ -11,7 +11,7 @@ description = "Generate C++ documentation; supports the psibase repo only"
 [dependencies]
 anyhow = "1.0"
 clang = {version = "1", features = ["clang_10_0"]}
-clap = {version = "3.1", features = ["derive"]}
+clap = {version = "4.5", features = ["derive"]}
 mdbook = "0.4"
 pulldown-cmark = "0.9"
 regex = "1"

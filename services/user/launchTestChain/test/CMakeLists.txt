@@ -1,1 +1,0 @@
-add_user_test_debug(launchTestChain src/launchTestChain.cpp)

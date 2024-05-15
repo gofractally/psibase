@@ -5,8 +5,8 @@
 mod service {
     use psibase::{
         check, check_none, check_some, get_sender, get_service, serve_content, serve_simple_ui,
-        services::transaction_sys, store_content, AccountNumber, HexBytes, HttpReply, HttpRequest,
-        Pack, Reflect, Table, TimePointSec, ToKey, Unpack, WebContentRow,
+        services::transact, store_content, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack,
+        Reflect, Table, TimePointSec, ToKey, Unpack, WebContentRow,
     };
     use serde::{Deserialize, Serialize};
 
@@ -76,7 +76,7 @@ mod service {
     struct WebContentTable;
 
     fn get_current_time() -> TimePointSec {
-        transaction_sys::Wrapper::call().currentBlock().time
+        transact::Wrapper::call().currentBlock().time
     }
 
     #[action]

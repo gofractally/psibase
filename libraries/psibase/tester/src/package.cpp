@@ -2,9 +2,9 @@
 #include <psibase/check.hpp>
 #include <psibase/package.hpp>
 #include <psibase/semver.hpp>
-#include <services/system/ProxySys.hpp>
-#include <services/user/PackageSys.hpp>
-#include <services/user/PsiSpaceSys.hpp>
+#include <services/system/HttpServer.hpp>
+#include <services/user/Packages.hpp>
+#include <services/user/Sites.hpp>
 
 #include <zlib.h>
 
@@ -38,6 +38,8 @@ namespace psibase
                result |= (1 << 5);
             else if (flag == "isAuthService")
                result |= (1 << 6);
+            else if (flag == "forceReplay")
+               result |= (1 << 7);
             else
                check(false, "Invalid service flags");
          }
@@ -161,6 +163,12 @@ namespace psibase
    {
       for (const auto& [account, index, info] : services)
       {
+         if (account.value == 0)
+         {
+            std::string filename = std::string(archive.getEntry(index).filename());
+            abortMessage("Service with filename: " + filename + " has invalid account name");
+         }
+
          out.push_back(GenesisService{
              .service   = account,
              .flags     = translateFlags(info.flags),
@@ -185,7 +193,7 @@ namespace psibase
    {
       for (const auto& [sender, index] : data)
       {
-         AccountNumber service = PsiSpaceSys::service;
+         AccountNumber service = Sites::service;
          if (hasService(sender))
          {
             service = sender;
@@ -194,7 +202,7 @@ namespace psibase
          auto pos  = path.find('/');
          assert(pos != std::string::npos);
          path = path.substr(pos);
-         actions.push_back(transactor<PsiSpaceSys>{sender, service}.storeSys(
+         actions.push_back(transactor<Sites>{sender, service}.storeSys(
              path, guessMimeType(path), archive.getEntry(index).read()));
       }
    }
@@ -205,7 +213,7 @@ namespace psibase
          if (info.server)
          {
             actions.push_back(
-                transactor<ProxySys>{account, ProxySys::service}.registerServer(*info.server));
+                transactor<HttpServer>{account, HttpServer::service}.registerServer(*info.server));
          }
       }
    }
@@ -280,7 +288,7 @@ namespace psibase
       first = true;
       for (const auto& [sender, index] : data)
       {
-         AccountNumber service = PsiSpaceSys::service;
+         AccountNumber service = Sites::service;
          if (hasService(sender))
          {
             service = sender;
@@ -314,7 +322,7 @@ namespace psibase
       stream.write('}');
       manifest = gzip(std::move(manifest));
       actions.push_back(
-          transactor<PackageSys>{sender, PackageSys::service}.postinstall(meta, manifest));
+          transactor<Packages>{sender, Packages::service}.postinstall(meta, manifest));
    }
 
    const PackageInfo& get(const std::vector<PackageInfo>& index, const PackageRef& ref)

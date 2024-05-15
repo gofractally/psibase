@@ -459,14 +459,13 @@ namespace psibase::net
          if (new_producers || active_producers[1] != prods.second)
          {
             PSIBASE_LOG(logger, info) << "Active producers: " << *prods.first
-                                      << print_function{
-                                             [&](std::ostream& os)
-                                             {
-                                                if (prods.second)
-                                                {
-                                                   os << ", " << *prods.second;
-                                                }
-                                             }};
+                                      << print_function{[&](std::ostream& os)
+                                                        {
+                                                           if (prods.second)
+                                                           {
+                                                              os << ", " << *prods.second;
+                                                           }
+                                                        }};
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
@@ -798,6 +797,11 @@ namespace psibase::net
                            state            = check_state;
                         }
                      }
+                     else
+                     {
+                        PSIBASE_LOG(logger, debug)
+                            << "Cannot find subtree associated with view change";
+                     }
                   }
                }
             }
@@ -1020,13 +1024,20 @@ namespace psibase::net
             }
             if (_state == producer_state::follower)
             {
-               if (is_leader() && is_term_ready())
+               if (is_leader())
                {
-                  _state = producer_state::leader;
+                  if (is_term_ready())
+                  {
+                     _state = producer_state::leader;
 
-                  PSIBASE_LOG(logger, info) << "Starting block production for term " << current_term
-                                            << " as " << self.str();
-                  start_leader();
+                     PSIBASE_LOG(logger, info) << "Starting block production for term "
+                                               << current_term << " as " << self.str();
+                     start_leader();
+                  }
+                  else
+                  {
+                     PSIBASE_LOG(logger, debug) << "Cannot start block production";
+                  }
                }
             }
             else if (_state == producer_state::leader)
@@ -1066,18 +1077,29 @@ namespace psibase::net
          }
       }
 
-      void check_view_change_threshold()
+      TermNum minimum_viable_view(int group) const
       {
+         if (producer_views[group].empty())
+            return 0;
          std::vector<TermNum> view_copy;
-         for (const auto& [term, _] : producer_views[0])
+         for (const auto& [term, _] : producer_views[group])
          {
             view_copy.push_back(term);
          }
-         auto offset = active_producers[0]->size() * 2 / 3;
+         auto offset = active_producers[group]->size() * 2 / 3;
          // if > 1/3 are ahead of current view trigger view change
          std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
-         auto new_term = std::max(view_copy[offset], current_term);
-         new_term      = skip_advanced_leaders(new_term);
+         return view_copy[offset];
+      }
+
+      TermNum minimum_viable_view() const
+      {
+         return std::max({minimum_viable_view(0), minimum_viable_view(1), current_term});
+      }
+
+      void check_view_change_threshold()
+      {
+         auto new_term = skip_advanced_leaders(minimum_viable_view());
          if (new_term > current_term)
          {
             set_view(new_term);

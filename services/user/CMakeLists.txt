@@ -2,21 +2,8 @@ function(add_user_service suffix name)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC
         include
-        ../CommonSys/include
-        ../FractalSys/include
-        ../InviteSys/include
-        ../NftSys/include
-        ../PsiSpaceSys/include
-        ../SymbolSys/include
-        ../TokenSys/include
-        ../../system/AccountSys/include
-        ../../system/AuthEcSys/include
-        ../../system/AuthAnySys/include
-        ../../system/SetCodeSys/include
-        ../../system/TransactionSys/include
-        ../../system/VerifyEcSys/include
     )
-    target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} psibase-service-simple-malloc${suffix})
+    target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} services_user${suffix} psibase-service-simple-malloc${suffix})
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add_user_service)
 
@@ -25,21 +12,8 @@ function(add_user_test_impl suffix name)
     add_executable(${TARGET} ${ARGN})
     target_include_directories(${TARGET} PUBLIC
       ../include
-      ../../CommonSys/include
-      ../../FractalSys/include
-      ../../InviteSys/include
-      ../../NftSys/include
-      ../../PsiSpaceSys/include
-      ../../SymbolSys/include
-      ../../TokenSys/include
-      ../../../system/AccountSys/include
-      ../../../system/AuthEcSys/include
-      ../../../system/AuthAnySys/include
-      ../../../system/SetCodeSys/include
-      ../../../system/TransactionSys/include
-      ../../../system/VerifyEcSys/include
      ${CMAKE_CURRENT_LIST_DIR})
-    target_link_libraries(${TARGET} services_system${suffix} psitestlib${suffix})
+    target_link_libraries(${TARGET} services_system${suffix} services_user${suffix} psitestlib${suffix})
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 
@@ -64,7 +38,14 @@ endfunction()
 function(add suffix)
     add_library(services_user${suffix} INTERFACE)
     target_include_directories(services_user${suffix} INTERFACE
-        NftSys/include
+        CommonApi/include
+        Events/include
+        Fractal/include
+        Invite/include
+        Nft/include
+        Sites/include
+        Symbol/include
+        Tokens/include
     )
 endfunction(add)
 
@@ -72,18 +53,18 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
-    add_subdirectory(CommonSys)
-    add_subdirectory(InviteSys)
-    add_subdirectory(ExploreSys)
-    add_subdirectory(FractalSys)
-    add_subdirectory(launchTestChain)
-    add_subdirectory(mincon)
-    add_subdirectory(NftSys)
-    add_subdirectory(NopSys)
-    add_subdirectory(PackageSys)
-    add_subdirectory(PsiSpaceSys)
-    add_subdirectory(SymbolSys)
-    add_subdirectory(TokenSys)
+    add_subdirectory(CommonApi)
+    add_subdirectory(Invite)
+    add_subdirectory(Explorer)
+    add_subdirectory(Events)
+    add_subdirectory(Fractal)
+    add_subdirectory(SimpleService)
+    add_subdirectory(Nft)
+    add_subdirectory(Nop)
+    add_subdirectory(Packages)
+    add_subdirectory(Sites)
+    add_subdirectory(Symbol)
+    add_subdirectory(Tokens)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

@@ -26,8 +26,8 @@ Configure a reverse proxy to forward https traffic to your instance of `psinode`
 
 It is recommended that you don't publicly expose the port on which `psinode` is listening. All requests should go through the reverse proxy. 
 
-Access to the [admin-sys](../../default-apps/admin-sys.md) default app should be carefully restricted, as it essentially provides full admin access to the node.
+Access to the [x-admin](../../default-apps/x-admin.md) default app should be carefully restricted, as it essentially provides full admin access to the node.
 
 ## Configure psinode host
 
-Web requests are going to be forwarded from the reverse proxy into the psinode process, so make sure psinode is also configured with the correct host. This can either be done at the time you launch psinode using the [-o option](../cli/psinode.md#general-options) (e.g. `-o psibase.io`) or by using the `host` configuration option in the [admin-sys](../../default-apps/admin-sys.md#host) default app.
+Web requests are going to be forwarded from the reverse proxy into the psinode process, so make sure psinode is also configured with the correct host. This can either be done at the time you launch psinode using the [-o option](../cli/psinode.md#general-options) (e.g. `-o psibase.io`) or by using the `host` configuration option in the [x-admin](../../default-apps/x-admin.md#host) default app.

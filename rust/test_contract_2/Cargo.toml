@@ -13,7 +13,7 @@ crate-type = ["cdylib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-psibase_macros = { version = "0.7.0", path = "../psibase_macros" }
-psibase = { version = "0.7.0", path = "../psibase" }
+psibase_macros = { version = "0.9.0", path = "../psibase_macros" }
+psibase = { version = "0.9.0", path = "../psibase" }
 serde = { version = "1", features = ["derive"] }
 async-graphql = "4.0"

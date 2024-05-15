@@ -1,6 +1,8 @@
 import "./App.css";
-import { Supervisor } from "@psibase/common-lib/messaging";
+import { Supervisor } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
+import { fetchAnswers } from "./utils/fetchAnswers";
+import { wait } from "./utils/wait";
 
 const supervisor = new Supervisor();
 
@@ -16,9 +18,9 @@ function App() {
   const init = async () => {
     await supervisor.onLoaded();
     supervisor.preLoadPlugins([
-      { service: "invite-sys" },
-      { service: "account-sys" },
-      { service: "auth-sys" },
+      { service: "invite" },
+      { service: "accounts" },
+      { service: "auth-sig" },
       { service: "demoapp1" },
     ]);
   };
@@ -30,14 +32,18 @@ function App() {
   const run = async () => {
     try {
       const res = await supervisor.functionCall({
-        service: "auth-sys",
+        service: "auth-sig",
         intf: "keyvault",
         method: "generateKeypair",
         params: [],
       });
       setRes(res as string);
     } catch (e) {
-      console.error(`${JSON.stringify(e, null, 2)}`);
+      if (e instanceof Error) {
+        console.error(`Error: ${e.message}\nStack: ${e.stack}`);
+      } else {
+        console.error(`Caught exception: ${JSON.stringify(e, null, 2)}`);
+      }
     }
   };
 
@@ -55,10 +61,29 @@ function App() {
     }
   };
 
+  const run5 = async () => {
+    try {
+      const res = await supervisor.functionCall({
+        service: "demoapp1",
+        intf: "intf",
+        method: "multiply",
+        params: [Number(a), Number(b)],
+      });
+      for (let i = 0; i < 5; i++) {
+        const { answer } = await fetchAnswers();
+        setAnswer(answer.result.toString());
+        await wait(1000);
+      }
+      setRes(res as string);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+  };
+
   const run3 = async () => {
     try {
       const inviteUrl: string = (await supervisor.functionCall({
-        service: "invite-sys",
+        service: "invite",
         intf: "inviter",
         method: "generateInvite",
         params: ["/subpath"],
@@ -67,7 +92,7 @@ function App() {
       const id: string | null = new URL(inviteUrl).searchParams.get("id");
       if (id !== null) {
         const inviteObject: Invite = (await supervisor.functionCall({
-          service: "invite-sys",
+          service: "invite",
           intf: "invitee",
           method: "decodeInvite",
           params: [id as string],
@@ -91,7 +116,7 @@ function App() {
       "eyJpbnZpdGVyIjoiYWxpY2UiLCJhcHAiOiJkZW1vYXBwMSIsInBrIjoiUFVCX0sxXzdqVGRNWUVhSGk2NlpFY3JoN1RvOVhLaW5nVmtSZEJ1ejZhYm0zbWVGYkd3OHpGRnZlIiwiY2IiOiJodHRwczovL2RlbW9hcHAxLnBzaWJhc2UuMTI3LjAuMC4xLnNzbGlwLmlvOjgwOTAvc3VicGF0aCJ9";
     try {
       const inviteObject: Invite = (await supervisor.functionCall({
-        service: "invite-sys",
+        service: "invite",
         intf: "invitee",
         method: "decodeInvite",
         params: [inviteId],
@@ -105,13 +130,17 @@ function App() {
     }
   };
 
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [answer, setAnswer] = useState("?");
+
   return (
     <>
-      <h1>Psibase Demo App 1</h1>
+      <h1>Psibase Demo App 1 1</h1>
       <h3>{res}</h3>
       <div className="card">
         <button onClick={() => run()}>
-          {"auth-sys:plugin->generateKeypair"}
+          {"auth-sig:plugin->generateKeypair"}
         </button>
       </div>
 
@@ -125,6 +154,14 @@ function App() {
 
       <div className="card">
         <button onClick={() => run4()}>{"Just decode"}</button>
+      </div>
+
+      <div className="card">
+        <button onClick={() => run5()}>{"Multiplication on blockchain"}</button>
+        <input type="text" onChange={(e) => setA(e.target.value)} />
+        x
+        <input type="text" onChange={(e) => setB(e.target.value)} />
+        {answer}
       </div>
     </>
   );

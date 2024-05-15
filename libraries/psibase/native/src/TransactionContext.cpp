@@ -34,13 +34,15 @@ namespace psibase
                                           TransactionTrace&        transactionTrace,
                                           bool                     allowDbRead,
                                           bool                     allowDbWrite,
-                                          bool                     allowDbReadSubjective)
+                                          bool                     allowDbReadSubjective,
+                                          bool                     allowDbWriteSubjective)
        : blockContext{blockContext},
          signedTransaction{signedTransaction},
          transactionTrace{transactionTrace},
          allowDbRead{allowDbRead},
          allowDbWrite{allowDbWrite},
          allowDbReadSubjective{allowDbReadSubjective},
+         allowDbWriteSubjective{allowDbWriteSubjective},
          impl{std::make_unique<TransactionContextImpl>(blockContext.systemContext)}
    {
    }

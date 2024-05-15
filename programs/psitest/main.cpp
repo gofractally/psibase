@@ -7,9 +7,12 @@
 #include <psibase/Watchdog.hpp>
 #include <psibase/log.hpp>
 #include <psibase/prefix.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
+#include <psio/finally.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
+#include <psio/view.hpp>
 
 #include <stdio.h>
 #include <bitset>
@@ -308,6 +311,7 @@ struct test_chain
                                       true,
                                       false,
                                       true,
+                                      false,
                                       {},
                                       &*nativeFunctionsActionContext});
       }
@@ -894,6 +898,110 @@ struct callbacks
       return state.result_value.size();
    }
 
+   std::uint32_t testerHttpRequest(uint32_t chain_index, span<const char> args_packed)
+   {
+      auto& chain = assert_chain(chain_index);
+
+      auto startTime = std::chrono::steady_clock::now();
+      auto req       = psio::view<const psibase::HttpRequest>(args_packed);
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestMethod", req.method().unpack());
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestTarget", req.target().unpack());
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestHost", req.host().unpack());
+
+      BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
+      BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
+
+      psibase::TransactionTrace trace;
+      psibase::ActionTrace      atrace;
+
+      constexpr auto nullTime      = std::chrono::steady_clock::time_point::min();
+      auto           startExecTime = nullTime;
+      auto           endExecTime   = nullTime;
+      unsigned       status        = 500;
+      std::uint64_t  nBytes        = 0;
+      auto           billableTime  = std::chrono::nanoseconds(0);
+      auto           databaseTime  = std::chrono::steady_clock::duration(0);
+      try
+      {
+         psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead()};
+         bc.start();
+         psibase::check(!bc.needGenesisAction,
+                        "Need genesis block; use 'psibase boot' to boot chain");
+         psibase::SignedTransaction trx;
+         psibase::Action            action{
+                        .sender  = psibase::AccountNumber(),
+                        .service = psibase::proxyServiceNum,
+                        .rawData = std::vector(args_packed.begin(), args_packed.end()),
+         };
+         psibase::TransactionContext tc{bc, trx, trace, true, false, true};
+         psio::finally               recordBillableTime{[&]()
+                                          {
+                                             billableTime = tc.getBillableTime();
+                                             databaseTime = tc.databaseTime;
+                                          }};
+         startExecTime = std::chrono::steady_clock::now();
+         tc.execServe(action, atrace);
+         endExecTime = std::chrono::steady_clock::now();
+         if (psio::fracpack_validate<std::optional<psibase::HttpReply>>(atrace.rawRetval))
+         {
+            auto result =
+                psio::view<std::optional<psibase::HttpReply>>(psio::prevalidated{atrace.rawRetval});
+            if (result)
+            {
+               status = 200;
+               nBytes = result->body().size();
+            }
+            else
+            {
+               status = 404;
+            }
+         }
+      }
+      catch (std::exception& e)
+      {
+         if (!trace.error)
+         {
+            trace.error = e.what();
+         }
+      }
+      auto endTime = std::chrono::steady_clock::now();
+      if (startExecTime == nullTime)
+         startExecTime = endTime;
+      if (endExecTime == nullTime)
+         endExecTime = endTime;
+
+      trace.actionTraces.push_back(std::move(atrace));
+
+      state.result_value = psio::convert_to_frac(trace);
+      state.result_key.clear();
+      psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
+
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "Trace", std::move(trace));
+
+      BOOST_LOG_SCOPED_LOGGER_TAG(
+          chain.logger, "PackTime",
+          std::chrono::duration_cast<std::chrono::microseconds>(startExecTime - startTime));
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "ServiceLoadTime",
+                                  std::chrono::duration_cast<std::chrono::microseconds>(
+                                      endExecTime - startExecTime - billableTime));
+      BOOST_LOG_SCOPED_LOGGER_TAG(
+          chain.logger, "DatabaseTime",
+          std::chrono::duration_cast<std::chrono::microseconds>(databaseTime));
+      BOOST_LOG_SCOPED_LOGGER_TAG(
+          chain.logger, "WasmExecTime",
+          std::chrono::duration_cast<std::chrono::microseconds>(billableTime - databaseTime));
+      BOOST_LOG_SCOPED_LOGGER_TAG(
+          chain.logger, "ResponseTime",
+          std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime));
+
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "ResponseStatus", status);
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "ReponseBytes", nBytes);
+
+      PSIBASE_LOG(chain.logger, info) << "Handled HTTP request";
+
+      return state.result_value.size();
+   }
+
    void testerSelectChainForDb(uint32_t chain_index)
    {
       assert_chain(chain_index);
@@ -1012,6 +1120,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerStartBlock>("env", "testerStartBlock");
    rhf_t::add<&callbacks::testerFinishBlock>("env", "testerFinishBlock");
    rhf_t::add<&callbacks::testerPushTransaction>("env", "testerPushTransaction");
+   rhf_t::add<&callbacks::testerHttpRequest>("env", "testerHttpRequest");
    rhf_t::add<&callbacks::testerSelectChainForDb>("env", "testerSelectChainForDb");
    rhf_t::add<&callbacks::getResult>("env", "getResult");
    rhf_t::add<&callbacks::getKey>("env", "getKey");
@@ -1088,7 +1197,8 @@ struct ConsoleLog
    std::string filter = "Severity > critical";
    std::string format =
        "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {TransactionId}}{?: {BlockId}: "
-       "{BlockHeader}}";
+       "{BlockHeader}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: "
+       "{ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}";
 };
 PSIO_REFLECT(ConsoleLog, type, filter, format);
 

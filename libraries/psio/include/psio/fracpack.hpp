@@ -20,9 +20,9 @@ namespace psio
    // the returned reference instead.
    template <typename T>
    concept PackableWrapper = requires(T& x, const T& cx) {
-                                clio_unwrap_packable(x);
-                                clio_unwrap_packable(cx);
-                             };
+      clio_unwrap_packable(x);
+      clio_unwrap_packable(cx);
+   };
 
    template <typename T, bool Reflected>
    struct is_packable_reflected;
@@ -82,6 +82,12 @@ namespace psio
    concept PackableMemcpy = is_packable_memcpy<T>::value;
 
    template <PackableNumeric T>
+   struct is_packable_memcpy<T> : std::bool_constant<true>
+   {
+   };
+
+   template <typename T>
+      requires(!PackableNumeric<T> && PackableNumeric<std::underlying_type_t<T>>)
    struct is_packable_memcpy<T> : std::bool_constant<true>
    {
    };
@@ -528,35 +534,61 @@ namespace psio
    {
    };
 
-   template <Packable T>
-      requires(!is_packable_memcpy<T>::value)
-   struct is_packable<std::vector<T>>
-       : base_packable_impl<std::vector<T>, is_packable<std::vector<T>>>
+   template <typename T>
+   struct make_mutable
+   {
+      using type = T;
+   };
+   template <typename T>
+   using make_mutable_t = typename make_mutable<T>::type;
+   template <typename T>
+   struct make_mutable<const T> : make_mutable<T>
+   {
+   };
+   template <typename T, typename U>
+   struct make_mutable<std::pair<T, U>>
+   {
+      using type = std::pair<make_mutable_t<T>, make_mutable_t<U>>;
+   };
+
+   template <typename T>
+   concept PackableAssociativeContainer = requires(T& t, const typename T::value_type& v) {
+      t.begin();
+      t.end();
+      typename T::value_type;
+      requires Packable<typename T::value_type>;
+      requires requires(const typename T::value_type& v) { t.insert(v); };
+   };
+
+   template <typename T, typename Derived>
+   struct packable_container_impl : base_packable_impl<T, Derived>
    {
       static constexpr uint32_t fixed_size        = 4;
       static constexpr bool     is_variable_size  = true;
       static constexpr bool     is_optional       = false;
       static constexpr bool     supports_0_offset = true;
 
+      using value_type = typename T::value_type;
+
       template <typename S>
-      static void pack(const std::vector<T>& value, S& stream)
+      static void pack(const T& value, S& stream)
       {
-         uint32_t num_bytes = value.size() * is_packable<T>::fixed_size;
-         assert(num_bytes == value.size() * is_packable<T>::fixed_size);
+         uint32_t num_bytes = value.size() * is_packable<value_type>::fixed_size;
+         assert(num_bytes == value.size() * is_packable<value_type>::fixed_size);
          is_packable<uint32_t>::pack(num_bytes, stream);
          stream.about_to_write(num_bytes);
          uint32_t fixed_pos = stream.written();
          for (const auto& x : value)
-            is_packable<T>::embedded_fixed_pack(x, stream);
+            is_packable<value_type>::embedded_fixed_pack(x, stream);
          for (const auto& x : value)
          {
-            is_packable<T>::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
-            is_packable<T>::embedded_variable_pack(x, stream);
+            is_packable<value_type>::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
+            is_packable<value_type>::embedded_variable_pack(x, stream);
             fixed_pos += is_packable<T>::fixed_size;
          }
       }
 
-      static bool is_empty_container(const std::vector<T>& value) { return value.empty(); }
+      static bool is_empty_container(const T& value) { return value.empty(); }
       static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
       {
          uint32_t fixed_size;
@@ -566,39 +598,39 @@ namespace psio
       }
 
       template <bool Unpack, bool Verify>
-      [[nodiscard]] static bool unpack(std::vector<T>* value,
-                                       bool&           has_unknown,
-                                       bool&           known_end,
-                                       const char*     src,
-                                       uint32_t&       pos,
-                                       uint32_t        end_pos)
+      [[nodiscard]] static bool unpack(T*          value,
+                                       bool&       has_unknown,
+                                       bool&       known_end,
+                                       const char* src,
+                                       uint32_t&   pos,
+                                       uint32_t    end_pos)
       {
          uint32_t fixed_size;
          if (!unpack_numeric<Verify>(&fixed_size, src, pos, end_pos))
             return false;
-         uint32_t size          = fixed_size / is_packable<T>::fixed_size;
+         uint32_t size          = fixed_size / is_packable<value_type>::fixed_size;
          uint32_t fixed_pos     = pos;
          uint32_t heap_pos      = pos + fixed_size;
          uint32_t end_fixed_pos = heap_pos;
          if constexpr (Verify)
          {
             known_end = true;
-            if ((fixed_size % is_packable<T>::fixed_size) || heap_pos < pos || heap_pos > end_pos)
+            if ((fixed_size % is_packable<value_type>::fixed_size) || heap_pos < pos ||
+                heap_pos > end_pos)
                return false;
          }
          if constexpr (Unpack)
          {
-            value->resize(size);
-            for (auto& x : *value)
-               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
-                       &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
-                       end_pos))
-                  return false;
+            if (!Derived::template unpack_items<Verify>(value, size, has_unknown, known_end, src,
+                                                        fixed_pos, end_fixed_pos, heap_pos,
+                                                        end_pos))
+               return false;
          }
          else
          {
             for (uint32_t i = 0; i < size; ++i)
-               if (!is_packable<T>::template embedded_unpack<Unpack, Verify>(
+               if (!is_packable<make_mutable_t<value_type>>::template embedded_unpack<Unpack,
+                                                                                      Verify>(
                        nullptr, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
                        end_pos))
                   return false;
@@ -606,7 +638,72 @@ namespace psio
          pos = heap_pos;
          return true;
       }  // unpack
-   };    // is_packable<std::vector<T>> (!memcpy)
+   };
+
+   template <typename T, typename Derived>
+   struct packable_associative_container_impl : packable_container_impl<T, Derived>
+   {
+      using value_type = typename T::value_type;
+      template <bool Verify>
+      [[nodiscard]] static bool unpack_items(T*             value,
+                                             std::uint32_t  size,
+                                             bool&          has_unknown,
+                                             bool&          known_end,
+                                             const char*    src,
+                                             std::uint32_t  fixed_pos,
+                                             std::uint32_t  end_fixed_pos,
+                                             std::uint32_t& heap_pos,
+                                             std::uint32_t  end_pos)
+      {
+         value->clear();
+         for (std::size_t i = 0; i < size; ++i)
+         {
+            make_mutable_t<value_type> item;
+            if (!is_packable<make_mutable_t<value_type>>::template embedded_unpack<true, Verify>(
+                    &item, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos,
+                    end_pos))
+               return false;
+            value->insert(std::move(item));
+         }
+         return true;
+      }
+   };
+
+   template <typename T, typename Derived>
+   struct packable_sequence_container_impl : packable_container_impl<T, Derived>
+   {
+      using value_type = typename T::value_type;
+      template <bool Verify>
+      [[nodiscard]] static bool unpack_items(T*             value,
+                                             std::uint32_t  size,
+                                             bool&          has_unknown,
+                                             bool&          known_end,
+                                             const char*    src,
+                                             std::uint32_t  fixed_pos,
+                                             std::uint32_t  end_fixed_pos,
+                                             std::uint32_t& heap_pos,
+                                             std::uint32_t  end_pos)
+      {
+         value->resize(size);
+         for (auto& x : *value)
+            if (!is_packable<value_type>::template embedded_unpack<true, Verify>(
+                    &x, has_unknown, known_end, src, fixed_pos, end_fixed_pos, heap_pos, end_pos))
+               return false;
+         return true;
+      }
+   };
+
+   template <Packable T>
+      requires(!is_packable_memcpy<T>::value)
+   struct is_packable<std::vector<T>>
+       : packable_sequence_container_impl<std::vector<T>, is_packable<std::vector<T>>>
+   {
+   };
+
+   template <PackableAssociativeContainer T>
+   struct is_packable<T> : packable_associative_container_impl<T, is_packable<T>>
+   {
+   };
 
    template <Packable T, std::size_t N>
       requires(!is_packable_memcpy<T>::value)
@@ -1097,7 +1194,7 @@ namespace psio
              {
                 using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
                 if constexpr (!m::isFunction)
-                   size += is_packable<typename m::ValueType>::fixed_size;
+                   size += is_packable<std::remove_cvref_t<typename m::ValueType>>::fixed_size;
              });
          return size;
       }
@@ -1112,7 +1209,8 @@ namespace psio
              {
                 using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
                 if constexpr (!m::isFunction)
-                   is_var |= is_packable<typename m::ValueType>::is_variable_size;
+                   is_var |=
+                       is_packable<std::remove_cvref_t<typename m::ValueType>>::is_variable_size;
              });
          return is_var;
       }
@@ -1138,11 +1236,12 @@ namespace psio
                    using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
                    if constexpr (!m::isFunction)
                    {
+                      using value_type = std::remove_cvref_t<typename m::ValueType>;
                       ++i;
-                      if constexpr (is_packable<typename m::ValueType>::is_optional &&
+                      if constexpr (is_packable<value_type>::is_optional &&
                                     !reflect<T>::definitionWillNotChange)
                       {
-                         if (is_packable<typename m::ValueType>::has_value(value.*member(&value)))
+                         if (is_packable<value_type>::has_value(value.*member(&value)))
                             num_present = i;
                       }
                       else
@@ -1159,8 +1258,9 @@ namespace psio
                    using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
                    if constexpr (!m::isFunction)
                    {
+                      using value_type = std::remove_cvref_t<typename m::ValueType>;
                       if (i < num_present)
-                         fixed_size += is_packable<typename m::ValueType>::fixed_size;
+                         fixed_size += is_packable<value_type>::fixed_size;
                       ++i;
                    }
                 });
@@ -1174,9 +1274,10 @@ namespace psio
                    using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
                    if constexpr (!m::isFunction)
                    {
+                      using value_type = std::remove_cvref_t<typename m::ValueType>;
                       if (i < num_present)
-                         is_packable<typename m::ValueType>::embedded_fixed_pack(
-                             value.*member(&value), stream);
+                         is_packable<value_type>::embedded_fixed_pack(value.*member(&value),
+                                                                      stream);
                       ++i;
                    }
                 });
@@ -1187,9 +1288,10 @@ namespace psio
                    using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
                    if constexpr (!m::isFunction)
                    {
+                      using value_type = std::remove_cvref_t<typename m::ValueType>;
                       if (i < num_present)
                       {
-                         using is_p = is_packable<typename m::ValueType>;
+                         using is_p = is_packable<value_type>;
                          is_p::embedded_fixed_repack(value.*member(&value), fixed_pos,
                                                      stream.written(), stream);
                          is_p::embedded_variable_pack(value.*member(&value), stream);
@@ -1206,7 +1308,8 @@ namespace psio
                 {
                    using m = MemberPtrType<decltype(member(std::declval<T*>()))>;
                    if constexpr (!m::isFunction)
-                      is_packable<typename m::ValueType>::pack(value.*member(&value), stream);
+                      is_packable<std::remove_cvref_t<typename m::ValueType>>::pack(
+                          value.*member(&value), stream);
                 });
          }
       }  // pack
@@ -1396,7 +1499,7 @@ namespace psio
    prevalidated(T&& t, U&& u)
        -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
    struct input_stream;
-   prevalidated(input_stream)->prevalidated<std::span<const char>>;
+   prevalidated(input_stream) -> prevalidated<std::span<const char>>;
 
    template <bool Unpack, bool Pointer, typename T>
    bool user_validate(T* value, const char* src, std::uint32_t orig_pos)

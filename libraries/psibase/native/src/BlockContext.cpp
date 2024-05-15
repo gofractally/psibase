@@ -1,5 +1,6 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psio/finally.hpp>
 
 namespace psibase
 {
@@ -153,16 +154,54 @@ namespace psibase
       TransactionContext tc{*this, trx, trace, true, true, false};
       auto&              atrace = trace.actionTraces.emplace_back();
 
-      // Failure here aborts the block since transaction-sys relies on startBlock
+      // Failure here aborts the block since Transact relies on startBlock
       // functioning correctly. Fixing this type of failure requires forking
       // the chain, just like fixing bugs which block transactions within
-      // transaction-sys's processTransaction may require forking the chain.
+      // Transact's processTransaction may require forking the chain.
       //
       // TODO: log failure
       tc.execNonTrxAction(0, action, atrace);
       // printf("%s\n", prettyTrace(atrace).c_str());
 
       active = true;
+   }
+
+   void BlockContext::callOnBlock()
+   {
+      auto notifyData =
+          db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(NotifyType::acceptBlock)));
+      if (!notifyData)
+         return;
+      auto notifySpan = std::span{notifyData->pos, notifyData->end};
+      if (!psio::fracpack_validate<NotifyRow>(notifySpan))
+         return;
+
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions();
+
+      auto oldIsProducing = isProducing;
+      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      isProducing         = true;
+
+      for (const Action& action : actions)
+      {
+         if (action.sender != AccountNumber{})
+            continue;
+         SignedTransaction  trx;
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         auto&              atrace = trace.actionTraces.emplace_back();
+
+         try
+         {
+            tc.execNonTrxAction(0, action, atrace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+            PSIBASE_LOG(trxLogger, info) << "onBlock succeeded";
+         }
+         catch (std::exception& e)
+         {
+            PSIBASE_LOG(trxLogger, info) << "onBlock failed: " << e.what();
+         }
+      }
    }
 
    Checksum256 BlockContext::makeEventMerkleRoot()
@@ -265,6 +304,9 @@ namespace psibase
       }
 
       status->head = current;  // Also calculates blockId
+      // authCode can be loaded from the database. We don't need an
+      // extra copy in the status table.
+      status->head->header.authCode.reset();
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
 
@@ -287,6 +329,8 @@ namespace psibase
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
       db.kvPut(DbId::blockProof, current.header.blockNum,
                prover.prove(BlockSignatureInfo(*status->head), claim));
+
+      callOnBlock();
 
       return {session.writeRevision(status->head->blockId), status->head->blockId};
    }

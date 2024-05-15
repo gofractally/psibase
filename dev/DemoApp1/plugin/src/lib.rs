@@ -1,10 +1,13 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::common::plugin::types as CommonTypes;
+use bindings::common::plugin::{server, types as CommonTypes};
 use bindings::exports::demoapp1::example::intf::Guest as Intf;
-use bindings::invite_sys;
+use bindings::invite;
 use bindings::Guest as MainInterface;
+
+use psibase::fracpack::Pack;
+use service::action_structs;
 
 struct Component;
 
@@ -16,7 +19,16 @@ impl MainInterface for Component {
 
 impl Intf for Component {
     fn helloworld2() -> Result<String, CommonTypes::Error> {
-        Ok(invite_sys::plugin::inviter::generate_invite("/subpath")?)
+        Ok(invite::plugin::inviter::generate_invite("/subpath")?)
+    }
+
+    fn multiply(a: u32, b: u32) -> Result<String, CommonTypes::Error> {
+        let res = server::add_action_to_transaction(
+            "multiply",
+            &action_structs::multiply { a, b }.packed(),
+        );
+
+        Ok(format!("Mutliply res is {:?}", res))
     }
 }
 

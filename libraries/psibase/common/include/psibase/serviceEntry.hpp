@@ -5,8 +5,8 @@
 
 namespace psibase
 {
-   static constexpr auto transactionServiceNum = AccountNumber("transact-sys");
-   static constexpr auto proxyServiceNum       = AccountNumber("proxy-sys");
+   static constexpr auto transactionServiceNum = AccountNumber("transact");
+   static constexpr auto proxyServiceNum       = AccountNumber("http-server");
 
    struct ProcessTransactionArgs
    {

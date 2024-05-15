@@ -159,28 +159,28 @@ function(add suffix)
         target_mapped_include_directories(psitestlib${suffix} PUBLIC
             service/include
             tester/include
-            ../../services/system/AccountSys/include
-            ../../services/system/ProducerSys/include
-            ../../services/system/AuthDelegateSys/include
-            ../../services/system/AuthEcSys/include
-            ../../services/system/AuthAnySys/include
-            ../../services/system/CpuSys/include
-            ../../services/system/ProxySys/include
-            ../../services/system/SetCodeSys/include
-            ../../services/system/TransactionSys/include
-            ../../services/system/VerifyEcSys/include
-            ../../services/user/CommonSys/include
-            ../../services/user/ExploreSys/include
-            ../../services/user/FractalSys/include
-            ../../services/user/InviteSys/include
-            ../../services/user/NftSys/include
-            ../../services/user/PackageSys/include
-            ../../services/user/PsiSpaceSys/include
-            ../../services/user/SymbolSys/include
-            ../../services/user/TokenSys/include
+            ../../services/system/Accounts/include
+            ../../services/system/Producers/include
+            ../../services/system/AuthDelegate/include
+            ../../services/system/AuthK1/include
+            ../../services/system/AuthAny/include
+            ../../services/system/CpuLimit/include
+            ../../services/system/HttpServer/include
+            ../../services/system/SetCode/include
+            ../../services/system/Transact/include
+            ../../services/system/VerifyK1/include
+            ../../services/user/CommonApi/include
+            ../../services/user/Explorer/include
+            ../../services/user/Fractal/include
+            ../../services/user/Invite/include
+            ../../services/user/Nft/include
+            ../../services/user/Packages/include
+            ../../services/user/Sites/include
+            ../../services/user/Symbol/include
+            ../../services/user/Tokens/include
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE
-            ../../services/system/VerifyEcSys/include
+            ../../services/system/VerifyK1/include
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start

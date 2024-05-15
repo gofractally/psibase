@@ -1,0 +1,27 @@
+[package]
+name = "invite"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitflags = "2.4.2"
+wit-bindgen-rt = "0.22.0"
+psibase = { path="../../../../rust/psibase/" }
+urlencoding = "2.1.3"
+fracpack =  { path="../../../../rust/fracpack" }
+serde = "1.0"
+serde_json = "1.0"
+base64 = "0.22"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "invite:plugin"
+
+[package.metadata.component.target.dependencies]
+"common:plugin" = { path = "../../CommonApi/common/packages/wit/plugin.wit" }
+"auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }

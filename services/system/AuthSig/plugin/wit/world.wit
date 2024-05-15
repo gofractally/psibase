@@ -1,0 +1,86 @@
+package auth-sig:plugin;
+
+/// Common types used when dealing with auth service plugins
+interface types {
+
+    /// Supported key types
+    enum key-type {
+        /// An secp256k1 key
+        k1,
+        /// An secp256r1 key
+        r1
+    }
+
+    /// A list of `claim` objects is added to every submitted transaction.
+    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
+    record claim {
+        /// The name of the service used to verify the claim is valid
+        verify-service: string,
+        /// The raw claim data
+        raw-data: list<u8>,
+    }
+
+    /// A list of `proof` is attached
+    record proof {
+        %type: key-type,
+        signature: list<u8>,
+    }
+
+    type pubkey = string;
+    type privkey = string;
+
+    // Todo - this should be some standard representation, JWK maybe?
+    record keypair {
+        %type: key-type,
+        pub: pubkey,
+        priv: privkey,
+    }
+}
+
+/// Methods related to psibase smart authorization
+/// Every auth service must export this interface
+interface smart-auth {
+    use common:plugin/types.{error};
+    use types.{claim, proof};
+
+    /// Gets the claim needed for this user to satisfy the authorization check
+    get-claim: func() -> result<claim, error>;
+
+    /// Provides proof of the claim. 
+    /// 
+    /// Parameters
+    /// * `message`: A message that usually needs to be signed as
+    ///   proof of the claim.
+    get-proof: func(message: list<u8>) -> result<proof, error>;
+}
+
+/// Methods related to key management
+interface keyvault {
+    use common:plugin/types.{error};
+    use types.{keypair, pubkey};
+
+    /// Generates a new keypair managed by this auth plugin.
+    /// It stores the private key and returns the public key.
+    generate-keypair: func() -> result<pubkey, error>;
+
+    /// Generates a new keypair that is unmanaged (nothing is stored).
+    /// The full keypair is returned to the caller.
+    generate-unmanaged-keypair: func() -> result<keypair, error>;
+}
+
+interface actions {
+    use common:plugin/types.{error};
+    use types.{pubkey};
+
+    /// Updates the key used by the current user to the specified public key
+    set-key: func(public-key: pubkey) -> result<_, error>;
+}
+
+world psibase-plugin {
+    import accounts:plugin/accounts;
+    import common:plugin/server;
+
+    export smart-auth;
+    export keyvault;
+    export actions;
+}

@@ -10,14 +10,11 @@ namespace psibase
    class DefaultTestChain : public TestChain
    {
      public:
-      // default excludes DocSys and TokenUsers
-      DefaultTestChain(const std::vector<std::string>& packageNames =
-                           {"AccountSys", "AuthAnySys", "AuthDelegateSys", "AuthSys", "AuthEcSys",
-                            "CommonSys", "CpuSys", "ExploreSys", "FractalSys", "InviteSys",
-                            "NftSys", "PackageSys", "ProducerSys", "ProxySys", "PsiSpaceSys",
-                            "SetCodeSys", "SymbolSys", "TokenSys", "TransactionSys"},
-                       bool                  installUI = false,
-                       const DatabaseConfig& dbconfig  = {});
+      // default excludes Docs and TokenUsers
+      static std::vector<std::string> defaultPackages();
+      DefaultTestChain(const std::vector<std::string>& packageNames = defaultPackages(),
+                       bool                            installUI    = false,
+                       const DatabaseConfig&           dbconfig     = {});
 
       AccountNumber addService(const char* acc, const char* filename, bool show = false);
       AccountNumber addService(AccountNumber acc, const char* filename, bool show = false);
@@ -41,14 +38,14 @@ namespace psibase
       AccountNumber addAccount(const char* name, const PublicKey& public_key, bool show = false);
       AccountNumber addAccount(AccountNumber name, const PublicKey& public_key, bool show = false);
 
-      void setAuthEc(AccountNumber name, const PublicKey& pubkey, bool show = false);
+      void setAuthK1(AccountNumber name, const PublicKey& pubkey, bool show = false);
 
       AccountNumber addAccount(const char*   acc,
-                               AccountNumber authService = AccountNumber("auth-any-sys"),
+                               AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
 
       AccountNumber addAccount(AccountNumber acc,
-                               AccountNumber authService = AccountNumber("auth-any-sys"),
+                               AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
    };
 }  // namespace psibase

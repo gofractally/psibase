@@ -12,19 +12,20 @@ namespace psibase
    {
       Database&           database;
       TransactionContext& transactionContext;
-      bool                allowDbRead           = false;
-      bool                allowDbWrite          = false;
-      bool                allowDbReadSubjective = false;
-      CodeRow             code                  = {};
-      ActionContext*      currentActContext     = nullptr;  // Changes during recursion
-      ExecutionContext*   currentExecContext    = nullptr;
+      bool                allowDbRead            = false;
+      bool                allowDbWrite           = false;
+      bool                allowDbReadSubjective  = false;
+      bool                allowDbWriteSubjective = false;
+      CodeRow             code                   = {};
+      ActionContext*      currentActContext      = nullptr;  // Changes during recursion
+      ExecutionContext*   currentExecContext     = nullptr;
 
       std::vector<char> result_key;
       std::vector<char> result_value;
 
       // TODO: delete range. Need some way for system services to enable/disable it
       //       since it's only compatible with some resource models
-      // TODO: some way for transaction-sys to indicate auth failures.
+      // TODO: some way for Transact to indicate auth failures.
       //       Maybe not an intrinsic? Is there a way to tie this into the
       //       subjective mechanics?
       // TODO: related to ^. Some way to bill failed transactions after the first

@@ -210,6 +210,7 @@ endif()
 
 add_subdirectory(../external external)
 add_subdirectory(boost)
+add_subdirectory(sqlite3)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../services services)
 add_subdirectory(../programs programs)

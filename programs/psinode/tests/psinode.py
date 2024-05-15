@@ -229,12 +229,12 @@ class API:
         '''
         producers = [_get_producer_claim(p) for p in prods]
         if algorithm is None:
-            return self.push_action('producer-sys', 'producer-sys', 'setProducers', {'producers': producers})
+            return self.push_action('producers', 'producers', 'setProducers', {'producers': producers})
         elif algorithm == 'cft':
             mode = 'CftConsensus'
         elif algorithm == 'bft':
             mode = 'BftConsensus'
-        return self.push_action('producer-sys', 'producer-sys', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
+        return self.push_action('producers', 'producers', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
 
     # Queries
     def graphql(self, service, query):
@@ -260,7 +260,7 @@ class API:
         '''Returns a tuple of (current producers, next producers). The next producers are empty except when the chain is in the process of changing block producers.'''
         def flatten(producers):
             return [p['name'] for p in producers]
-        result = self.graphql('producer-sys', 'query { producers { name } nextProducers { name } }')
+        result = self.graphql('producers', 'query { producers { name } nextProducers { name } }')
         return (flatten(result['producers']), flatten(result['nextProducers']))
 
     def get_block_header(self, num=-1):
@@ -273,7 +273,7 @@ class API:
                 if num < 0:
                     return None
             args = 'first:1 ge:%d' % num
-        result = self.graphql('explore-sys', '''
+        result = self.graphql('explorer', '''
             query {
                 blocks(%s) {
                     edges {
@@ -298,14 +298,16 @@ class API:
             return edges[0]['node']['header']
 
 _default_config = '''# psinode config
-service  = localhost:$PSIBASE_DATADIR/services/admin-sys
-service  = 127.0.0.1:$PSIBASE_DATADIR/services/admin-sys
-service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
-service  = admin-sys.:$PSIBASE_DATADIR/services/admin-sys
+service  = localhost:$PSIBASE_DATADIR/services/x-admin
+service  = 127.0.0.1:$PSIBASE_DATADIR/services/x-admin
+service  = [::1]:$PSIBASE_DATADIR/services/x-admin
+service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
 admin    = static:*
 
 admin-authz = r:any
 admin-authz = rw:loopback
+
+http-timeout = 4
 
 [logger.stderr]
 type   = console
@@ -392,10 +394,15 @@ class Node(API):
             self.tempdir.cleanup()
     def shutdown(self):
         '''Stop the server and wait for the server process to exit'''
-        with self.post('/native/admin/shutdown', service='admin-sys', json={}):
+        with self.post('/native/admin/shutdown', service='x-admin', json={}):
             pass
         self.session.close()
-        self.child.wait()
+        try:
+            self.child.wait(timeout=10)
+        except:
+            self.child.kill()
+            self.child.wait()
+        del self.child
     def wait(self, cond, timeout=10):
         '''
         Wait until cond(self) is true.
@@ -413,16 +420,16 @@ class Node(API):
             url = other.socketpath
         else:
             url = other
-        with self.post('/native/admin/connect', service='admin-sys', json={'url':url}):
+        with self.post('/native/admin/connect', service='x-admin', json={'url':url}):
             pass
     def disconnect(self, other):
         '''Disconnects a peer. other can be a peer id, a URL, or a Node object.'''
         if isinstance(other, int):
-            result = self.post('/native/admin/disconnect', service='admin-sys', json={'id': other})
+            result = self.post('/native/admin/disconnect', service='x-admin', json={'id': other})
             result.raise_for_status()
             return True
         elif isinstance(other, str):
-            with self.get('/native/admin/peers', service='admin-sys') as peers:
+            with self.get('/native/admin/peers', service='x-admin') as peers:
                 peers.raise_for_status()
                 for peer in peers.json():
                     if peer['url'] == other:
@@ -473,7 +480,7 @@ class Node(API):
             time.sleep(0.1)
     def _is_ready(self):
         try:
-            with self.get('/native/admin/status', service='admin-sys') as result:
+            with self.get('/native/admin/status', service='x-admin') as result:
                 return result.status_code == requests.codes.ok and 'startup' not in result.json()
         except requests.exceptions.ConnectionError as e:
             return False
