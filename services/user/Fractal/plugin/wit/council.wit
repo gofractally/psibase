@@ -1,22 +1,18 @@
 package fractal:plugin;
 
-interface council-types {
-    enum petition-vote-type {
-        approve,
-        reject
-    }
-}
-
-interface council {
-    use fractal-types.{fractal-id, account, report-id};
-    use council-types.{petition-vote-type};
-    use social-types.{post-id};
+interface council-actions {
+    use fractal:plugin/types.{account, fractal-id};
     use common:plugin/types.{error};
 
-    get-council-members: func(fractal-id: fractal-id) -> result<list<account>, error>;
+    appoint-ambassador: func(fractal-id: fractal-id, ambassador: account) -> result<_, error>;
 
-    vote-petition: func(id: post-id, vote: petition-vote-type);
-    appoint-ambassador: func(ambassador: account, to-fractal: account);
+    // For holidays
+    skip-next-evaluation-day: func(fractal-id: fractal-id);
 
-    resolve-report: func(id: report-id, resolution: string) -> result<_, error>;
+    // Removes members, member fractals, or their invites from membership and/or waitlist
+    remove-member: func(fractal-id: fractal-id, member: account);
+    remove-member-fractal: func(fractal-id: fractal-id, member: fractal-id);
+    // Removes member and all members they invited, recursively
+    remove-member-tree: func(fractal-id: fractal-id, member: account); 
+    remove-member-fractal-tree: func(fractal-id: fractal-id, member: fractal-id);
 }

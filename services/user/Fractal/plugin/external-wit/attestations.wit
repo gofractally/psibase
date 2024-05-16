@@ -1,0 +1,23 @@
+package attestation:plugin;
+
+interface attestation-types {
+    record attestation {
+        rater: account,
+        rating: f32,
+        category: string,
+        datetime: string,
+    }
+    
+    record summary {
+        total-attestations: u16,
+        total-attesters: u16,
+        avg: f32,
+        variance: f32,
+    }
+}
+
+interface attestations {
+    use attestation-types.{summary};
+    attest: func(to: account, category: string, rating: f32);
+    get-summary: func(account: account, category: string) -> summary;
+}
