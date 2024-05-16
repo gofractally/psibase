@@ -10,11 +10,12 @@ interface parameters {
 }
 
 interface fractal-types {
-    use identity:plugin/types.{};
+    use accounts:plugin/types.{account};
+    use common:plugin/types.{error};
 
-    type account = string;
     type fractal-id = account;
     type report-id = u64;
+    type invite-id = u64;
 
     record ambassador-relationship {
         ambassador: account,
@@ -98,20 +99,17 @@ interface fractal-types {
         recent-history: list<bool>,
     }
 
-    use fractal:plugin/social-types.{post};
-    use fractal:plugin/identity-types.{identity-summary};
+    use attestation:plugin/types.{summary};
 
     type member-stats = list<digital-property-stat>;
     record public-profile {
         account: account,
         name: string,
         description: string,
-        identity-summary: identity-summary,
+        identity-summary: summary,
         is-delegate: bool,
-        is-council-member: bool,
         member-stats: member-stats,
         attendance: attendance-stats,
-        status-post: post,
         fractal-membership: list<fractal>,
     }
     record profile-flags {
@@ -132,23 +130,32 @@ interface fractal-types {
         emission-rate-annual: float32,
         pools: list<tokenomic-pool>,
     }
+
+    enum rules-context {
+        fractal, // global / bylaws / rules
+        attestation,
+        invitation,
+    }
 }
 
-interface fractal-as-monolith {
+interface fractal-api {
     use common:plugin/types.{error};
-    use fractal-types.{fractal-id, account, fractal-params, fractal-creation-info, report-id, public-profile, profile-details-update, meeting-info, tokenomic-params, profile-flags, evaluation-type};
-    use fractal:plugin/social-types.{post-id};
+    use accounts:plugin/types.{account};
+    use fractal-types.{fractal-id, fractal-params, fractal-creation-info, report-id, public-profile, profile-details-update, meeting-info, tokenomic-params, profile-flags, evaluation-type, invite-id, rules-context};
     // get-ambassador: func(for-fractal: account);
 
     // fractal founder admin
     create: func(fractal-details: fractal-creation-info) -> result<fractal-id, error>;
-    add-members: func(fractal-id: fractal-id, members: list<account>);
+    invite: func(fractal-id: fractal-id) -> result<invite-id, error>;
+    accept-invite-with-new-account: func(id: invite-id, account-name: string) -> result<account, error>;
+    accept-invite-with-existing-account: func(id: invite-id) -> result<_, error>;
+    reject-invite: func(id: invite-id) -> result<_, error>;
+
       // following are accessible to the founder while solid-state, then Council when liquid
-    set-rules: func(rules: post-id) -> result<_, error>;
+    set-rules: func(context: rules-context, rules: string) -> result<_, error>;
+      // related to waitlist and attestations, etc.
     get-params: func(fractal-id: fractal-id) -> result<fractal-params, error>;
     set-params: func(fractal-id: fractal-id, params: fractal-params) -> result<_, error>;
-    get-tokenomic-params: func(fractal-id: fractal-id) -> result<tokenomic-params, error>;
-    set-tokenomic-params: func(fractal-id: fractal-id, params: tokenomic-params) -> result<_, error>;
     
     // member or account on waitlist
     remove-member: func(fractal-id: fractal-id, member: account);
@@ -156,33 +163,16 @@ interface fractal-as-monolith {
     accept-member: func(fractal-id: fractal-id, member: account);
 
     // fractal member interactions with the fractal
-    apply-to: func(id: fractal-id, memo: string);
-    report-member: func(member: account, id: post-id) -> result<report-id, error>;
-    report: func(id: post-id) -> result<report-id, error>;
+    join-waitlist: func(id: fractal-id); // details on a member are in their profile; can accounts have profiles before joining a fractal? Yes, a chain-level profile
 
     // profile
+    update-member-properties: func(fractal-id: fractal-id, details: profile-details-update) -> result<_, error>;
+
+    // rpc REST calls
     get-my-profile: func(fractal-id: fractal-id) -> result<public-profile, error>;
-    update-my-profile: func(fractal-id: fractal-id, details: profile-details-update) -> result<_, error>;
-    update-profile-flags: func(profile-flags: profile-flags) -> result<_, error>;
     get-profiles: func(fractal-id: fractal-id, members: list<account>) -> result<list<public-profile>, error>;
-
-    //participation
-    register: func(fractal-id: fractal-id, evaluation-type: evaluation-type) -> result<_, error>;
-    // meeting link, schedule, other members in your slate
-    get-meeting-info: func(fractal-id: fractal-id, evaluation-type: evaluation-type) -> result<meeting-info, error>;
-
-    // evaluations
-    share-ordering: func(fractal-id: fractal-id, evaluation-type: evaluation-type, ranking: list<account>);
-    submit-group-ordering: func(fractal-id: fractal-id, evaluation-type: evaluation-type, ranking: list<account>);
 }
 
-// interface evaluations {
-//     member-eval: evaluation,
-//     delegate-eval: evaluation,
-//     member-fractal-eval: evaluation,
-//     fractal-delegate-eval: evaluation,
-// }
-
 world fractal-plugin {
-    export fractal-as-monolith;
+    export fractal-api;
 }

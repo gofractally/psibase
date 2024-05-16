@@ -1,5 +1,9 @@
 package accounts:plugin;
 
+interface types {
+    type account = string;
+}
+
 interface accounts {
     use common:plugin/types.{error};
 
@@ -16,6 +20,7 @@ interface accounts {
 }
 
 world psibase-plugin {
+    export types;
     export accounts;
 }
 
