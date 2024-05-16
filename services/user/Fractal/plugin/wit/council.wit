@@ -4,15 +4,10 @@ interface council-actions {
     use fractal:plugin/types.{account, fractal-id};
     use common:plugin/types.{error};
 
-    appoint-ambassador: func(fractal-id: fractal-id, ambassador: account) -> result<_, error>;
-
-    // For holidays
-    skip-next-evaluation-day: func(fractal-id: fractal-id);
-
     // Removes members, member fractals, or their invites from membership and/or waitlist
     remove-member: func(fractal-id: fractal-id, member: account);
-    remove-member-fractal: func(fractal-id: fractal-id, member: fractal-id);
     // Removes member and all members they invited, recursively
     remove-member-tree: func(fractal-id: fractal-id, member: account); 
-    remove-member-fractal-tree: func(fractal-id: fractal-id, member: fractal-id);
+
+    add-priority-member: func(fractal-id: fractal-id, member: account);
 }

@@ -1,11 +1,5 @@
 package fractal:plugin;
 
-interface parameters {
-    get-max-group-size: func() -> u8;
-    get-min-group-size: func() -> u8;
-    get-max-rounds: func() -> u8;
-}
-
 interface types {
     type account = string;
     type fractal-id = account;
@@ -16,86 +10,24 @@ interface types {
         description: string,
         region: string,
         language-code: string,
-        meeting-frequency: string,
-        meeting-datetime: string,
-        ambassadors: list<account>,
         council: list<account>,
-    }
-
-    record fractal {
-        fractal-profile: fractal-profile,
-        members: list<account>,
-        member-fractals: list<fractal-id>,
-    }
-
-    enum evaluation-type {
-        member-contribution,
-        delegate,
-    }
-
-    enum house {
-        people,
-        fractal,
-    }
-
-    record meeting-info {
-        room-url: string,
-        schedule: schedule,
-        members: list<account>,
-    }
-
-
-    //      |-------------------|----------------------------|----------------------------|---|--------------------------------------|
-    //   registration-start   registration-end               |                            |   |                                      |
-    //                        deliberation-start             |                            |  deliberation-end                        |
-    //                                                       |                            |  submission-start                       submission-end
-    //                                                      sync-up-start                sync-up-end                                registration-start...
-    record eval-schedule {
-        first-eval-datetime: string,
-        eval-interval-days: u8,
-
-        // All start/end elements are measured in minutes, and are offsets from the eval start-time
-        deliberation-start: u32, // Before this is the registration window
-        submission-start: u32,
-        submission-end: u32,
-        sync-up-start: u32,
-        sync-up-duration-minutes: u32,
     }
 
     record fractal-creation-info {
         name: string,
         description: string,
-        eval-schedule: eval-schedule,
-        language: string,
         region: string,
-    }
-    
-    record profile-details-update {
-        display-name: string,
-        description: string,
+        language-code: string,
     }
 
-    enum score-type {
-        reputation,
-        favor,
-    }
-
-    record score-stat {
-        type: score-type,
-        value: f32,
+    record fractal {
+        fractal-profile: fractal-profile,
+        members: list<account>,
     }
 
     type member-stats = list<score-stat>;
     record public-profile {
         account: account,
-        house: house,
-
-        // Calculated properties
-        is-elected-delegate: bool,
-        is-elected-councilor: bool,
-
-        // Controlled by council
-        is-appointed-ambassador: bool,
 
         // Mutable by account
         member-flags: member-flags,
@@ -104,10 +36,6 @@ interface types {
     record member-flags {
         display-name: string,
         description: string,
-        is-councilor-candidate: bool,
-        willing-ambassador-fractals: list<fractal>,
-        registered-member-eval: bool,
-        registered-delegate-eval: bool,
     }
 }
 
@@ -115,29 +43,21 @@ interface intf {
     use common:plugin/types.{error};
     use types.{
         fractal-id, 
-        account, 
-        fractal-creation-info, 
+        fractal-creation-info,
+        account,  
         public-profile,
         member-flags,
-        meeting-info,
-        evaluation-type,
-        house
     };
 
     // Called by: Fractal founder admin
     create: func(fractal-details: fractal-creation-info) -> result<fractal-id, error>;
 
     // Called by: Non-members
-    apply: func(fractal-id: fractal-id, house: house);
+    apply: func(fractal-id: fractal-id);
 
     // Called by: Members
     invite: func(fractal-id: fractal-id, prospective: account);
     update-member-flags: func(fractal-id: fractal-id, member-flags: member-flags);
-    //      Related to evaluations
-    register: func(fractal-id: fractal-id, evaluation-type: evaluation-type) -> result<_, error>;
-    get-my-eval-info: func(fractal-id: fractal-id) -> result<meeting-info, error>;
-    share-ordering: func(fractal-id: fractal-id, evaluation-type: evaluation-type, ranking: list<account>);
-    submit-group-ordering: func(fractal-id: fractal-id, evaluation-type: evaluation-type, ranking: list<account>);
 }
 
 world fractal-plugin {
