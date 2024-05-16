@@ -9,5 +9,5 @@ interface council-actions {
     // Removes member and all members they invited, recursively
     remove-member-tree: func(fractal-id: fractal-id, member: account); 
 
-    add-priority-member: func(fractal-id: fractal-id, member: account);
+    skip-the-line: func(fractal-id: fractal-id, member: account);
 }
