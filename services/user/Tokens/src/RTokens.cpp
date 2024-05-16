@@ -46,6 +46,18 @@ struct TokenQuery
       return balances;
    }
 
+   auto getTokenDetails(TID tokenId) const
+   {
+      for (auto token : tokenService.index<TokenTable, 0>())
+      {
+         if (token.id == tokenId)
+         {
+            return token;
+         }
+      }
+      return TokenRecord{};
+   }
+
    auto sharedBalances() const
    {  //
       return tokenService.index<SharedBalanceTable, 0>();
