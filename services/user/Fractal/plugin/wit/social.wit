@@ -1,0 +1,36 @@
+package social:plugin;
+
+interface types {
+    type post-id = u64;
+
+    record post-options {
+        is-petition: bool,
+        is-contribution-status: bool,
+    }
+
+    record post {
+        title: string,
+        post: string,
+        options: post-options,
+    }
+
+    record comment {
+        author: account,
+        comment: string
+    }
+}
+
+interface social {
+    create-post: func(title: string, post: string, options: post-options) -> result<id: post-id, err>;
+    edit-post: func(id: post-id, title: string, post: string, options: create-post-options) -> result<_, err>;
+    delete-post: func(id: post-id);
+
+    upvote: func(id: post-id);
+    downvote: func(id: post-id);
+
+    comment: func(id: post-id, comment: string) -> result<id: post-id, err>;
+}
+
+world social {
+    export types;
+}

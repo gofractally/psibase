@@ -1,0 +1,35 @@
+package identity:plugin;
+
+interface types {
+    enum rating {
+        confident-not-who-they-claim,
+        likely-not-who-they-claim,
+        likely-who-they-claim,
+        confident-who-they-claim,
+    }
+
+    record identity-attestation {
+        rater: account,
+        rating: rating,
+        datetime: string,
+    }
+    
+    record identity-summary {
+        total-attestations: u16,
+        total-attesters: u16,
+        perc-confident: u8,
+        perc-likely: u8,
+        perc-likely-not: u8,
+        perc-confident-not: u8,
+    }
+}
+
+interface identity {
+    attest: func(to: account, rating: rating);
+    get-identity-stats: func(account: account);
+}
+
+world indentity {
+    export types;
+    export identity;
+}

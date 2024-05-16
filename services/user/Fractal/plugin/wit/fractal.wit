@@ -1,0 +1,206 @@
+package fractal:plugin;
+
+interface parameters {
+    type members-per-slate-max = u8;
+    type members-per-slate-min = u8,
+    type number-rounds-max = u8,
+
+    get-parameters: func();
+    get-parameter: func(param-name: string);
+}
+
+interface types {
+    use identity:plugin/types;
+
+    type account = string;
+    type fractal = account
+
+    record ambassador-relationship {
+        ambassador: account,
+        to-fractal: account,
+    }
+
+    record fractal-profile {
+        account: account,
+        founder: account,
+        name: string,
+        description: string,
+        region: string,
+        language-code: string,
+        meeting-frequency: string,
+        meeting-datetime: string,
+        ambassadors: list<ambassador-profile>,
+    }
+
+    record identity-attestation {
+        attestations: u16,
+        avg-score: float32,
+    }
+
+    record member-stats {
+        get-identity-info: func() -> list<identity-attestation>
+        get-identity-summary: func() -> <identity-summary>
+    }
+
+    record member-profile {
+        account: account,
+        name: string,
+        description: string,
+        stats: member-stats,
+    }
+
+    record fractal {
+        fractal-profile: fractal-profile,
+        members: list<account>,
+        member-fractals: list<account>,
+    }
+
+    enum evaluation-type {
+        member-contribution,
+        delegate,
+        member-fractal-contribution,
+        member-fractal-delegate,
+    }
+
+    record meeting-info {
+        room-url: string,
+        schedule: schedule,
+        members: list<account>,
+    }
+
+    record fractal-params {
+        // all configurable fractal params
+    }
+
+    record schedule {
+        evalution-start-datetime: string,
+        evalution-end-datetime: string,
+        sync-up-start-datetime: string,
+        sync-up-duration-minutes: u16,
+    }
+
+    record fractal-creation-info {
+        name: string,
+        description: string,
+        member-schedule: schedule,
+        delegate-schedule: schedule,
+        member-fractal-schedule: schedule,
+        fractal-delegate-schedule: schedule,
+        language: string,
+        region: string,
+    }
+    
+    record profile-details-update {
+        name: string,
+        description: string,
+    }
+
+    enum digital-property {
+        Reputation,
+        Favor,
+        Fractal-Repuation,
+        Fractal-Favor,
+    }
+
+    record digital-property-stat {
+        digital-property: digital-property,
+        average: float32,
+        recent-history: list<float32>,
+    }
+
+    record attendance-stats {
+        all-time-attendance-perc: u8,
+        recent-average: float32,
+        recent-history: list<bool>,
+    }
+
+    type member-stats = list<digital-property-stat>;
+
+    use social:plugin/types.{post};
+
+    record public-profile {
+        name: string,
+        description: string,
+        identity-summary: identity-summary,
+        is-delegate: bool,
+        is-council-member: bool,
+        member-stats: member-stats,
+        attendance: attendance-stats,
+        status-post: post,
+        fractal-membership: list<fractal>,
+    }
+    record profile-flags {
+        registered-member-eval: bool,
+        registered-member-fractal: bool,
+        registered-delegate-eval: bool,
+        registered-member-delegate-eval: bool,
+        willing-ambassador: bool,
+        willing-ambassador-fractals: list<fractal>,
+    }
+
+    record tokenomic-pool {
+        name: string,
+        perc-of-emission: float32,
+    }
+
+    record tokenomic-params {
+        emission-rate-annual: float32,
+        pools: list<tokenomic-pool>,
+    }
+}
+
+interface fractal {
+    // get-ambassador: func(for-fractal: account);
+
+    // fractal founder admin
+    create: func(fractal-details: fractal-creation-info) -> result<id: u64, err>;
+    add-members: func(fractal-id: fractal-id, members: list<account>);
+      // following are accessible to the founder while solid-state, then Council when liquid
+    set-rules: func(rules: post-id) -> result<_, err>;
+    get-params: func(fractal-id: fractal-id) -> result<params: fractal-params, err>;
+    set-params: func(fractal-id: fractal-id, params: fractal-params) -> result<_, err>;
+    get-tokenomic-params: func(fractal-id: fractal-id) -> result<params: tokenomic-params, err>;
+    set-tokenomic-params: func(fractal-id: fractal-id, params: tokenomic-params) -> result<_, err>;
+    
+    // member or account on waitlist
+    remove-member: func(fractal-id: fractal-id, member: account);
+      // founder / Council
+    accept-member: func(fractal-id: fractal-id, member: account);
+
+    // fractal member interactions with the fractal
+    apply-to: func(id: fractal-id, memo: string);
+    report-member: func(member: account, id: post-id) -> result<_, err>;
+
+    // profile
+    get-my-profile: func(fractal-id: fractal-id) -> result<public-profile, err>;
+    update-my-profile: func(fractal-id: fractal-id, details: profile-details-update) -> result<_, err>;
+    update-profile-flags: func(flags: profile-flags) -> result<_, err>;
+    get-profiles: func(fractal-id: fractal-id, members: list<account>) -> result<list<public-profile>, err>;
+
+    //participation
+    register: func(fractal-id: fractal-id, evaluation-type: evaluation-type) -> result<_, err>;
+    // meeting link, schedule, other members in your slate
+    get-meeting-info: func(fractal-id: fractal-id, evaluation-type: evaluation-type) -> result<meeting-info, err>;
+
+    // evaluations
+    share-ordering: func(fractal-id: fractal-id, evaluation-type: evaluation-type, ranking: list<account>);
+    submit-group-ordering: func(fractal-id: fractal-id, evaluation-type: evaluation-type, ranking: list<account>);
+}
+
+interface evaluations {
+    member-eval: evaluation,
+    delegate-eval: evaluation,
+    member-fractal-eval: evaluation,
+    fractal-delegate-eval: evaluation,
+}
+
+world fractal {
+    use types.{fractal};
+
+    import evaluation:plugin/evaluation
+
+
+    export fractal-profile;
+    export members;
+    export member-fractals;
+}
