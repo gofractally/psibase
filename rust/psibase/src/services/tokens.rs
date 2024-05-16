@@ -124,6 +124,16 @@ mod service {
     }
 
     #[action]
+    fn uncredit(tokenId: TID, receiver: AccountNumber, maxAmount: Quantity, memo: String) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn debit(tokenId: TID, sender: AccountNumber, amount: Quantity, memo: String) {
+        unimplemented!()
+    }
+
+    #[action]
     fn create(precision: Precision, maxSupply: Quantity) {
         unimplemented!()
     }

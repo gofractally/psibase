@@ -8,6 +8,13 @@ interface types {
     type precision = u8;
     type tid = u32;
     type account-number = string;
+
+    record balance {
+        balance: string,
+        creditor: string,
+        debitor: string,
+        token-id: u32,
+    }
 }
 
 interface intf {
@@ -20,8 +27,13 @@ interface intf {
 
 interface transfer {
     use common:plugin/types.{error};
-    use types.{tid, account-number, quantity};
+    use types.{tid, account-number, quantity, balance};
+
+    uncredit: func(token: tid, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
+
+
     credit: func(token: tid, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
+    balances: func() -> result<list<balance>, error>;
     // credit: func(memo: string) -> result<string, error>;
 }
 

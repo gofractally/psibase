@@ -60,6 +60,34 @@ class Transfer extends Interface {
         .parse([tokenId, receiver, amount, memo]),
     });
   }
+
+  public uncredit(
+    tokenId: number,
+    receiver: string,
+    amount: string,
+    memo: string = ""
+  ) {
+    return this.addIntf({
+      method: "uncredit",
+      params: z
+        .tuple([z.number(), z.string(), z.string(), z.string()])
+        .parse([tokenId, receiver, amount, memo]),
+    });
+  }
+
+  public debit(
+    tokenId: number,
+    sender: string,
+    amount: string,
+    memo: string = ""
+  ) {
+    return this.addIntf({
+      method: "debit",
+      params: z
+        .tuple([z.number(), z.string(), z.string(), z.string()])
+        .parse([tokenId, sender, amount, memo]),
+    });
+  }
 }
 
 class Plugin {

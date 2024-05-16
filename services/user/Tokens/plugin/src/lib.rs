@@ -6,6 +6,7 @@ use bindings::exports::component::tokens::types as Wit;
 use bindings::exports::component::tokens::{intf::Guest as Intf, transfer::Guest as Transfer};
 use psibase::services::tokens as Wrapper;
 use psibase::AccountNumber;
+use query::shared_balance::fetch_balances;
 use serde::{Deserialize, Serialize};
 
 mod errors;
@@ -17,6 +18,7 @@ use psibase::fracpack::Pack;
 mod convert;
 
 mod query {
+    pub mod shared_balance;
     pub mod token;
 }
 
@@ -87,6 +89,41 @@ impl Intf for Component {
 }
 
 impl Transfer for Component {
+    fn balances() -> Result<Vec<Wit::Balance>, CommonTypes::Error> {
+        let x: Vec<Wit::Balance> = fetch_balances()
+            .unwrap()
+            .into_iter()
+            .map(|balance| Wit::Balance {
+                balance: balance.balance,
+                creditor: balance.key.creditor,
+                debitor: balance.key.debitor,
+                token_id: balance.key.tokenId,
+            })
+            .collect();
+        Ok(x)
+    }
+
+    fn uncredit(
+        token: Wit::Tid,
+        debitor: Wit::AccountNumber,
+        amount: Wit::Quantity,
+        memo: String,
+    ) -> Result<(), CommonTypes::Error> {
+        let precision = fetch_precision(token).expect("failed to fetch precision");
+        let quantity = Wrapper::Quantity::new(amount.as_str(), precision);
+        server::add_action_to_transaction(
+            "uncredit",
+            &Wrapper::action_structs::uncredit {
+                tokenId: token,
+                memo,
+                maxAmount: quantity,
+                receiver: AccountNumber::from(debitor.as_str()),
+            }
+            .packed(),
+        );
+        Ok(())
+    }
+
     fn credit(
         token: Wit::Tid,
         receiver: Wit::AccountNumber,

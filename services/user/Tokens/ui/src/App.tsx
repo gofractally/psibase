@@ -1,7 +1,10 @@
+import { CreditTable } from "./components/credit-table";
 import { ModalCreateToken } from "./components/modal-create-token";
+import { useCreditBalances } from "./hooks/useCreditBalances";
 import { useMode } from "./hooks/useMode";
 import { usePluginCall } from "./hooks/usePluginCall";
 import { useTokenBalances } from "./hooks/useTokenBalances";
+import { useUi } from "./hooks/useUi";
 import { cn } from "./lib/utils";
 import { tokenPlugin } from "./plugin";
 import { FormCreate } from "@/components/form-create";
@@ -40,6 +43,7 @@ import { formatNumber } from "@/lib/formatNumber";
 import { placeholders } from "@/lib/memoPlaceholders";
 import { randomElement } from "@/lib/random";
 import { zodResolver } from "@hookform/resolvers/zod";
+// import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -115,7 +119,13 @@ function App() {
   const currentUser = useUser();
   console.count("render");
   const { data: tokenBalances, refetch } = useTokenBalances(currentUser);
-  // const [trackedTokens, setTrackedTokens] = useState();
+
+  const { data: balances } = useCreditBalances();
+
+  const { data: ui } = useUi(currentUser);
+
+  console.log({ balances }, "out of my salary");
+  console.log({ ui }, "SUITS");
 
   const tokens: TrackedToken[] = tokenBalances.map(
     (token): TrackedToken => ({
@@ -424,6 +434,20 @@ function App() {
             </Button>
           </form>
         </Form>
+        <div className="mb-4">
+          <CreditTable
+            user={currentUser}
+            balances={
+              ui?.sharedBalances.map((x) => ({
+                balance: x.quantity ? x.quantity.toString() : "",
+                creditor: x.creditor,
+                debitor: x.debitor,
+                id: x.id,
+                tokenId: x.tokenId,
+              })) || []
+            }
+          />
+        </div>
       </div>
     </div>
   );
