@@ -1,6 +1,6 @@
 package fractal:plugin;
 
-interface types {
+interface council-types {
     enum petition-vote-type {
         approve,
         reject
@@ -8,12 +8,15 @@ interface types {
 }
 
 interface council {
-    use types.{petition-vote-type};
+    use fractal-types.{fractal-id, account, report-id};
+    use council-types.{petition-vote-type};
+    use social-types.{post-id};
+    use common:plugin/types.{error};
 
-    get-council-members: func(fractal-id: fractal-id) -> result<list<account>, err>;
+    get-council-members: func(fractal-id: fractal-id) -> result<list<account>, error>;
 
     vote-petition: func(id: post-id, vote: petition-vote-type);
     appoint-ambassador: func(ambassador: account, to-fractal: account);
 
-    resolve-report: func(id: report-id, resolution: string) -> result<_, err>;
+    resolve-report: func(id: report-id, resolution: string) -> result<_, error>;
 }

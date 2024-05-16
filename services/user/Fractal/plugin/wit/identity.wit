@@ -1,6 +1,8 @@
-package identity:plugin;
+package fractal:plugin;
 
-interface types {
+interface identity-types {
+    use fractal-types.{account};
+
     enum rating {
         confident-not-who-they-claim,
         likely-not-who-they-claim,
@@ -21,15 +23,14 @@ interface types {
         perc-likely: u8,
         perc-likely-not: u8,
         perc-confident-not: u8,
+        avg-score: float32, // ?
     }
 }
 
 interface identity {
+    use fractal-types.{account};
+    use fractal:plugin/social-types.{rating};
+
     attest: func(to: account, rating: rating);
     get-identity-stats: func(account: account);
-}
-
-world indentity {
-    export types;
-    export identity;
 }

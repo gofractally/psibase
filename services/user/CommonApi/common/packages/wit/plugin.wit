@@ -3,6 +3,8 @@ package common:plugin;
 /// Common types used by plugins
 interface types {
 
+    type account = string;
+
     /// A standard error type plugins can use to propagate errors
     /// back up the callchain.
     /// 
