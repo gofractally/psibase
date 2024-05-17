@@ -13,21 +13,17 @@ import {
     Users2,
 } from "lucide-react";
 
-import { cn } from "../lib/utils";
-import { Input } from "../shad/components/ui/input";
+import { cn } from "@lib/utils";
+import { Input } from "@shadcn/input";
 import {
     ResizableHandle,
     ResizablePanel,
     ResizablePanelGroup,
-} from "../shad/components/ui/resizable";
-import { Separator } from "../shad/components/ui/separator";
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from "../shad/components/ui/tabs";
-import { TooltipProvider } from "../shad/components/ui/tooltip";
+} from "@shadcn/resizable";
+import { Separator } from "@shadcn/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shadcn/tabs";
+import { TooltipProvider } from "@shadcn/tooltip";
+
 import { AccountSwitcher } from "./account-switcher";
 import { MailDisplay } from "./mail-display";
 import { MailList } from "./mail-list";
@@ -39,47 +35,29 @@ interface MailProps {
     accounts: {
         label: string;
         email: string;
-        icon: React.ReactNode;
     }[];
     mails: Mail[];
-    defaultLayout: number[] | undefined;
-    defaultCollapsed?: boolean;
     navCollapsedSize: number;
 }
 
-export function Mail({
-    accounts,
-    mails,
-    defaultLayout = [265, 440, 655],
-    defaultCollapsed = false,
-    navCollapsedSize,
-}: MailProps) {
-    const [isCollapsed, setIsCollapsed] = React.useState(defaultCollapsed);
+export function Mail({ accounts, mails, navCollapsedSize }: MailProps) {
     const [mail] = useMail();
+    const [isCollapsed, setIsCollapsed] = React.useState(false);
 
     return (
         <TooltipProvider delayDuration={0}>
             <ResizablePanelGroup
                 direction="horizontal"
-                onLayout={(sizes: number[]) => {
-                    document.cookie = `react-resizable-panels:layout=${JSON.stringify(
-                        sizes,
-                    )}`;
-                }}
                 className="max-h-screen items-stretch"
+                autoSaveId="react-resizable-panels"
             >
                 <ResizablePanel
-                    defaultSize={defaultLayout[0]}
                     collapsedSize={navCollapsedSize}
                     collapsible={true}
                     minSize={15}
                     maxSize={20}
-                    // onCollapse={(collapsed) => {
-                    //     setIsCollapsed(collapsed);
-                    //     document.cookie = `react-resizable-panels:collapsed=${JSON.stringify(
-                    //         collapsed,
-                    //     )}`;
-                    // }}
+                    onCollapse={() => setIsCollapsed(true)}
+                    onExpand={() => setIsCollapsed(false)}
                     className={cn(
                         isCollapsed &&
                             "min-w-[50px] transition-all duration-300 ease-in-out",
@@ -176,7 +154,7 @@ export function Mail({
                     />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={defaultLayout[1]} minSize={30}>
+                <ResizablePanel minSize={30}>
                     <Tabs defaultValue="all">
                         <div className="flex items-center px-4 py-2">
                             <h1 className="text-xl font-bold">Inbox</h1>
@@ -218,7 +196,7 @@ export function Mail({
                     </Tabs>
                 </ResizablePanel>
                 <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={defaultLayout[2]}>
+                <ResizablePanel>
                     <MailDisplay
                         mail={
                             mails.find((item) => item.id === mail.selected) ||

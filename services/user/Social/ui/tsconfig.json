@@ -14,7 +14,8 @@
             ],
             "@components/*": ["src/components/*"],
             "@shadcn/*": ["src/shad/components/ui/*"],
-            "@lib/*": ["src/lib/*"]
+            "@lib/*": ["src/lib/*"],
+            "@hooks/*": ["src/hooks/*"]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,

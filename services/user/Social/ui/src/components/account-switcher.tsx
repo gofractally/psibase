@@ -14,7 +14,6 @@ interface AccountSwitcherProps {
     accounts: {
         label: string;
         email: string;
-        icon: React.ReactNode;
     }[];
 }
 
@@ -40,11 +39,6 @@ export function AccountSwitcher({
                 aria-label="Select account"
             >
                 <SelectValue placeholder="Select an account">
-                    {
-                        accounts.find(
-                            (account) => account.email === selectedAccount,
-                        )?.icon
-                    }
                     <span className={cn("ml-2", isCollapsed && "hidden")}>
                         {
                             accounts.find(
@@ -58,7 +52,6 @@ export function AccountSwitcher({
                 {accounts.map((account) => (
                     <SelectItem key={account.email} value={account.email}>
                         <div className="[&_svg]:text-foreground flex items-center gap-3 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0">
-                            {account.icon}
                             {account.email}
                         </div>
                     </SelectItem>

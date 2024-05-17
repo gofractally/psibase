@@ -19,6 +19,7 @@ interface NavProps {
 }
 
 export function Nav({ links, isCollapsed }: NavProps) {
+    console.log(links);
     return (
         <div
             data-collapsed={isCollapsed}
@@ -29,7 +30,7 @@ export function Nav({ links, isCollapsed }: NavProps) {
                     isCollapsed ? (
                         <Tooltip key={index} delayDuration={0}>
                             <TooltipTrigger asChild>
-                                {/* <Link
+                                <a
                                     href="#"
                                     className={cn(
                                         buttonVariants({
@@ -40,10 +41,12 @@ export function Nav({ links, isCollapsed }: NavProps) {
                                         link.variant === "default" &&
                                             "dark:bg-muted dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-white",
                                     )}
-                                > */}
-                                <link.icon className="h-4 w-4" />
-                                <span className="sr-only">{link.title}</span>
-                                {/* </Link> */}
+                                >
+                                    <link.icon className="h-4 w-4" />
+                                    <span className="sr-only">
+                                        {link.title}
+                                    </span>
+                                </a>
                             </TooltipTrigger>
                             <TooltipContent
                                 side="right"
@@ -58,20 +61,19 @@ export function Nav({ links, isCollapsed }: NavProps) {
                             </TooltipContent>
                         </Tooltip>
                     ) : (
-                        // <Link
-                        //     key={index}
-                        //     href="#"
-                        //     className={cn(
-                        //         buttonVariants({
-                        //             variant: link.variant,
-                        //             size: "sm",
-                        //         }),
-                        //         link.variant === "default" &&
-                        //             "dark:bg-muted dark:hover:bg-muted dark:text-white dark:hover:text-white",
-                        //         "justify-start",
-                        //     )}
-                        // >
-                        <>
+                        <a
+                            key={index}
+                            href="#"
+                            className={cn(
+                                buttonVariants({
+                                    variant: link.variant,
+                                    size: "sm",
+                                }),
+                                link.variant === "default" &&
+                                    "dark:bg-muted dark:hover:bg-muted dark:text-white dark:hover:text-white",
+                                "justify-start",
+                            )}
+                        >
                             <link.icon className="mr-2 h-4 w-4" />
                             {link.title}
                             {link.label && (
@@ -85,8 +87,7 @@ export function Nav({ links, isCollapsed }: NavProps) {
                                     {link.label}
                                 </span>
                             )}
-                        </>
-                        // </Link>
+                        </a>
                     ),
                 )}
             </nav>
