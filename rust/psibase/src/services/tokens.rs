@@ -30,7 +30,6 @@ pub fn convert_to_u64(
             .collect::<String>();
 
         if validate_precision {
-            println!("validate precision: {} {}", parts[1].len(), precision);
             if (parts[1].len() as u8) > precision {
                 return Err(ConversionError::PrecisionOverflow);
             };

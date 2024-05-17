@@ -43,14 +43,14 @@ impl Intf for Component {
         memo: String,
         account: Wit::AccountNumber,
     ) -> Result<(), CommonTypes::Error> {
-        let pretend_looked_up_precision: u8 = 4;
+        let precision = fetch_precision(tokenId).expect("failed to fetch precision");
 
         if (account.len() as u8) == 0 {
             server::add_action_to_transaction(
                 "burn",
                 &Wrapper::action_structs::burn {
                     tokenId,
-                    amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
+                    amount: Wrapper::Quantity::new(amount.as_str(), precision),
                 }
                 .packed(),
             )
@@ -59,7 +59,7 @@ impl Intf for Component {
                 "recall",
                 &Wrapper::action_structs::recall {
                     tokenId,
-                    amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
+                    amount: Wrapper::Quantity::new(amount.as_str(), precision),
                     from: AccountNumber::from(account.as_str()),
                     memo,
                 }
@@ -73,11 +73,11 @@ impl Intf for Component {
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), CommonTypes::Error> {
-        let pretend_looked_up_precision: u8 = 4;
+        let precision = fetch_precision(tokenId).expect("failed to fetch precision");
         server::add_action_to_transaction(
             "mint",
             &Wrapper::action_structs::mint {
-                amount: Wrapper::Quantity::new(amount.as_str(), pretend_looked_up_precision),
+                amount: Wrapper::Quantity::new(amount.as_str(), precision),
                 memo,
                 tokenId,
             }

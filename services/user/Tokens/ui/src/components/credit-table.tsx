@@ -31,7 +31,6 @@ export function CreditTable({ balances, user }: Props) {
   const { mutate } = usePluginCall();
 
   const handle = (id: string, action: z.infer<typeof ActionType>) => {
-    console.log(id, "is the id to handle");
     const parsedAction = ActionType.parse(action);
     if (parsedAction == ActionType.Enum.Uncredit) {
       const balance = balances.find((bal) => bal.id == id);
