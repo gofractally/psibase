@@ -9,7 +9,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePluginCall } from "@/hooks/usePluginCall";
+import QueryKey from "@/lib/queryKeys";
 import { tokenPlugin } from "@/plugin";
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 interface SharedBalance {
@@ -28,13 +30,19 @@ interface Props {
 const ActionType = z.enum(["Uncredit", "Debit"]);
 
 export function CreditTable({ balances, user }: Props) {
-  const { mutate } = usePluginCall();
+  const queryClient = useQueryClient();
+
+  const { mutate } = usePluginCall({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QueryKey.tokenBalances(user) });
+    },
+  });
 
   const handle = (id: string, action: z.infer<typeof ActionType>) => {
     const parsedAction = ActionType.parse(action);
+    const balance = balances.find((bal) => bal.id == id);
+    if (!balance) throw new Error(`Failed to find balance`);
     if (parsedAction == ActionType.Enum.Uncredit) {
-      const balance = balances.find((bal) => bal.id == id);
-      if (!balance) throw new Error(`Failed to find balance`);
       mutate(
         tokenPlugin.transfer.uncredit(
           balance.tokenId,
@@ -42,8 +50,15 @@ export function CreditTable({ balances, user }: Props) {
           balance.balance
         )
       );
-    } else {
-    }
+    } else if (parsedAction == ActionType.Enum.Debit) {
+      mutate(
+        tokenPlugin.transfer.debit(
+          balance.tokenId,
+          balance.debitor,
+          balance.balance
+        )
+      );
+    } else throw new Error(`Unhandled action`);
   };
 
   return (

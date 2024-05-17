@@ -1,13 +1,12 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::common::plugin::{client, server, types as CommonTypes};
+use bindings::common::plugin::{server, types as CommonTypes};
 use bindings::exports::component::tokens::types as Wit;
 use bindings::exports::component::tokens::{intf::Guest as Intf, transfer::Guest as Transfer};
 use psibase::services::tokens as Wrapper;
 use psibase::AccountNumber;
 use query::shared_balance::fetch_balances;
-use serde::{Deserialize, Serialize};
 
 mod errors;
 
@@ -20,7 +19,7 @@ mod query {
     pub mod token;
 }
 
-use query::token::{fetch_precision, Node, ResponseRoot, Token};
+use query::token::fetch_precision;
 
 impl Intf for Component {
     fn create(

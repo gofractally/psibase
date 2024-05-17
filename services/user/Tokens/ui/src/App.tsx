@@ -1,13 +1,6 @@
-import { CreditTable } from "./components/credit-table";
-import { ModalCreateToken } from "./components/modal-create-token";
-import { useCreditBalances } from "./hooks/useCreditBalances";
-import { useMode } from "./hooks/useMode";
-import { usePluginCall } from "./hooks/usePluginCall";
-import { useTokenBalances } from "./hooks/useTokenBalances";
-import { useUi } from "./hooks/useUi";
-import { cn } from "./lib/utils";
-import { tokenPlugin } from "./plugin";
+import { CreditTable } from "@/components/credit-table";
 import { FormCreate } from "@/components/form-create";
+import { ModalCreateToken } from "@/components/modal-create-token";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Mode } from "@/components/transfer-toggle";
 import {
@@ -39,24 +32,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMode } from "@/hooks/useMode";
+import { usePluginCall } from "@/hooks/usePluginCall";
+import { useTokenBalances } from "@/hooks/useTokenBalances";
+import { useUi } from "@/hooks/useUi";
+import { useUser } from "@/hooks/useUser";
 import { formatNumber } from "@/lib/formatNumber";
 import { placeholders } from "@/lib/memoPlaceholders";
 import { randomElement } from "@/lib/random";
+import { cn } from "@/lib/utils";
+import { tokenPlugin } from "@/plugin";
 import { zodResolver } from "@hookform/resolvers/zod";
-// import { useQuery } from "@tanstack/react-query";
+import { FunctionCallArgs } from "@psibase/common-lib";
 import { ArrowRight, Flame, Plus } from "lucide-react";
-import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-
-export function ButtonIcon() {
-  return (
-    <Button variant="outline" size="icon">
-      <ChevronRight className="h-4 w-4" />
-    </Button>
-  );
-}
 
 const formSchema = z.object({
   token: z.string(),
@@ -66,44 +57,7 @@ const formSchema = z.object({
   memo: z.string().max(50).optional(),
 });
 
-// create - admin
-// mapSymbol - admin
-// mint -token - admin
-// recall -token -    admin, allows burning from remote balances,
-// burn - admin and user ...?, should allow for remote burning if admin
-// setUserConf - dunno
-// setTokenConf - dunno
-// credit -    user
-// uncredit -  user
-// debit -     user
-
 const memoPlaceholder = randomElement(placeholders);
-
-// toast.promise(
-//   supervisor.functionCall(
-//     tokenPlugin.transfer.credit(Number(tokenId), recipient, amount, memo)
-//   ),
-//   {
-//     loading: "Transaction submitting...",
-//     error: (error: any) => {
-//       const res = genericErrorSchema.safeParse(error);
-//       return res.success ? (
-//         <div>Error: {res.data.message}</div>
-//       ) : (
-//         <div>Unrecognised Error</div>
-//       );
-//     },
-//     success: () => <div>Transaction successful.</div>,
-//   }
-// );
-
-// export interface FunctionCallArgs {
-//   service: string;
-//   plugin?: string;
-//   intf?: string;
-//   method: string;
-//   params: any[];
-// }
 
 export interface TrackedToken {
   id: string;
@@ -113,19 +67,10 @@ export interface TrackedToken {
   isGenericToken: boolean;
 }
 
-const useUser = (): string => "alice";
-
 function App() {
   const currentUser = useUser();
-  console.count("render");
   const { data: tokenBalances, refetch } = useTokenBalances(currentUser);
-
-  const { data: balances } = useCreditBalances();
-
   const { data: ui } = useUi(currentUser);
-
-  console.log({ balances }, "out of my salary");
-  console.log({ ui }, "SUITS");
 
   const tokens: TrackedToken[] = tokenBalances.map(
     (token): TrackedToken => ({
@@ -142,16 +87,15 @@ function App() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      amount: "2",
+      amount: "",
       token: "",
       memo: "",
-      to: "tokens",
+      to: "",
     },
-    // mode: "",
+    mode: "all",
   });
 
-  function onSubmit(params: z.infer<typeof formSchema>) {
-    console.log("on submit was hit", params);
+  function onSubmit() {
     setConfirmationModalOpen(true);
   }
 
@@ -189,20 +133,20 @@ function App() {
     const tokenId = Number(form.watch("token"));
     const amount = form.watch("amount");
     const memo = form.watch("memo")!;
+    let args: FunctionCallArgs;
+
     if (isTransfer) {
       const recipient = form.watch("to")!;
-
-      await pluginCall(
-        tokenPlugin.transfer.credit(tokenId, recipient, amount, memo)
-      );
-      refetch();
+      args = tokenPlugin.transfer.credit(tokenId, recipient, amount, memo);
     } else if (isBurning) {
-      await pluginCall(tokenPlugin.intf.burn(tokenId, amount));
-      refetch();
+      args = tokenPlugin.intf.burn(tokenId, amount);
     } else if (isMinting) {
-      await pluginCall(tokenPlugin.intf.mint(tokenId, amount, memo));
-      refetch();
+      args = tokenPlugin.intf.mint(tokenId, amount, memo);
+    } else {
+      throw new Error(`Failed to identify args`);
     }
+    await pluginCall(args);
+    refetch();
     setConfirmationModalOpen(false);
   };
 
@@ -227,10 +171,6 @@ function App() {
         ]
       : []),
   ];
-
-  useEffect(() => {
-    console.log("Donna got off.");
-  }, []);
 
   return (
     <div>

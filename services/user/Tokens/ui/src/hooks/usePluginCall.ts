@@ -12,7 +12,11 @@ const functionArgsSchema = z.object({
   params: z.any().array(),
 });
 
-export const usePluginCall = () => {
+interface Options {
+  onSuccess?: () => void;
+}
+
+export const usePluginCall = (options?: Options) => {
   const supervisor = useSupervisor();
 
   return useMutation<unknown, unknown, FunctionCallArgs>({
@@ -27,6 +31,9 @@ export const usePluginCall = () => {
       toast.error("Transaction error.");
     },
     onSuccess: () => {
+      if (options?.onSuccess) {
+        options.onSuccess();
+      }
       toast.success("Transaction success.");
     },
   });
