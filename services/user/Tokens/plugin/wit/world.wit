@@ -40,7 +40,6 @@ interface transfer {
 /// An example world for the component to target.
 world example {
 
-    import wasi:random/random;
     import common:plugin/server;
     import common:plugin/client;
 

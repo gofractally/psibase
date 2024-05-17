@@ -15,8 +15,6 @@ struct Component;
 
 use psibase::fracpack::Pack;
 
-mod convert;
-
 mod query {
     pub mod shared_balance;
     pub mod token;
@@ -119,7 +117,8 @@ impl Transfer for Component {
                 receiver: AccountNumber::from(debitor.as_str()),
             }
             .packed(),
-        );
+        )
+        .expect("failed to add action to tx");
         Ok(())
     }
 

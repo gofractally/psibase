@@ -28,7 +28,6 @@ pub fn convert_to_u64(
             .chars()
             .take(precision as usize)
             .collect::<String>();
-        // "24";
 
         if validate_precision {
             println!("validate precision: {} {}", parts[1].len(), precision);
@@ -47,9 +46,8 @@ pub fn convert_to_u64(
     };
 
     let integer_value = integer_part * (10 as u64).pow(precision as u32);
-    let the_num: u64 = integer_value + (fractional_value);
 
-    return Ok(the_num);
+    return Ok(integer_value + fractional_value);
 }
 
 use async_graphql::{InputObject, SimpleObject};
