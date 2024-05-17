@@ -90,7 +90,7 @@ impl Intf for Component {
 
 impl Transfer for Component {
     fn balances() -> Result<Vec<Wit::Balance>, CommonTypes::Error> {
-        let x: Vec<Wit::Balance> = fetch_balances()
+        Ok(fetch_balances()
             .unwrap()
             .into_iter()
             .map(|balance| Wit::Balance {
@@ -99,8 +99,7 @@ impl Transfer for Component {
                 debitor: balance.key.debitor,
                 token_id: balance.key.tokenId,
             })
-            .collect();
-        Ok(x)
+            .collect())
     }
 
     fn uncredit(
