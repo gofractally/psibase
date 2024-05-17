@@ -83,23 +83,21 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void created(uint64_t prevEvent, TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
-            void minted(uint64_t prevEvent, TID tokenId, Account minter, Quantity amount, MemoView memo) {}
-            void burned(uint64_t prevEvent, TID tokenId, Account burner, Quantity amount) {}
-            void userConfSet(uint64_t prevEvent, Account account, psibase::EnumElement flag, bool enable) {}
-            void tokenConfSet(uint64_t prevEvent, TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
-            void symbolMapped(uint64_t prevEvent, TID tokenId, Account account, SID symbolId) {}
+            void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
+            void minted(TID tokenId, Account minter, Quantity amount, MemoView memo) {}
+            void burned(TID tokenId, Account burner, Quantity amount) {}
+            void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
+            void tokenConfSet(TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
+            void symbolMapped(TID tokenId, Account account, SID symbolId) {}
             // TODO: time is redundant with which block the event was written in
-            void transferred(uint64_t prevEvent, TID tokenId, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, MemoView memo) {}
-            void recalled(uint64_t prevEvent, TID tokenId, psibase::TimePointSec time, Account from, Quantity amount, MemoView memo) {}
+            void transferred(TID tokenId, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, MemoView memo) {}
+            void recalled(TID tokenId, psibase::TimePointSec time, Account from, Quantity amount, MemoView memo) {}
          };
 
          struct Ui {};
 
          struct Merkle{};
       };
-      using UserEvents = psibase::EventIndex<&TokenHolderRecord::eventHead, "prevEvent">;
-      using TokenEvents = psibase::EventIndex<&TokenRecord::eventHead, "prevEvent">;
       // clang-format on
    };
 
@@ -127,14 +125,14 @@ namespace UserService
     );
    PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
-      method(created, prevEvent, tokenId, creator, precision, maxSupply),
-      method(minted, prevEvent, tokenId, minter, amount, memo),
-      method(burned, prevEvent, tokenId, burner, amount),
-      method(userConfSet, prevEvent, account, flag, enable),
-      method(tokenConfSet, prevEvent, tokenId, setter, flag, enable),
-      method(symbolMapped, prevEvent, tokenId, account, symbolId),
-      method(transferred, prevEvent, tokenId, time, sender, receiver, amount, memo),
-      method(recalled, prevEvent, tokenId, time, from, amount, memo),
+      method(created, tokenId, creator, precision, maxSupply),
+      method(minted, tokenId, minter, amount, memo),
+      method(burned, tokenId, burner, amount),
+      method(userConfSet, account, flag, enable),
+      method(tokenConfSet, tokenId, setter, flag, enable),
+      method(symbolMapped, tokenId, account, symbolId),
+      method(transferred, tokenId, time, sender, receiver, amount, memo),
+      method(recalled, tokenId, time, from, amount, memo),
    );
    PSIBASE_REFLECT_UI_EVENTS(Tokens);
    PSIBASE_REFLECT_MERKLE_EVENTS(Tokens);

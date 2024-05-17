@@ -193,7 +193,7 @@ namespace psibase
             wa{memory.impl->wa}
       {
          auto ca = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
-         check(ca.has_value(), "unknown service account");
+         check(ca.has_value(), "unknown service account: " + service.str());
          check(ca->codeHash != Checksum256{}, "service account has no code");
          code   = std::move(*ca);
          auto c = database.kvGet<CodeByHashRow>(
