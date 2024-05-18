@@ -37,7 +37,8 @@ pub struct DefWontChangeInnerStruct {
     pub field_i32: i32,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Pack, PartialEq, Eq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct InnerStruct {
     pub inner_u32: u32,
     pub var: Option<Variant>,
@@ -47,139 +48,144 @@ pub struct InnerStruct {
     pub inner_o_vec_o_u16: Option<Vec<Option<u16>>>,
 }
 
-impl fracpack::Pack for InnerStruct {
-    const VARIABLE_SIZE: bool = true;
-    const FIXED_SIZE: u32 = 4;
+// impl fracpack::Pack for InnerStruct {
+//     const VARIABLE_SIZE: bool = true;
+//     const FIXED_SIZE: u32 = 4;
 
-    fn pack(&self, dest: &mut Vec<u8>) {
-        // Determine the index of the last non-empty field
-        let non_empty_fields: Vec<bool> = vec![
-            true, // inner_u32 is always non-empty
-            self.var.is_some(),
-            self.inner_option_u32.is_some(),
-            self.inner_option_str.is_some(),
-            self.inner_option_vec_u16.is_some(),
-            self.inner_o_vec_o_u16.is_some(),
-        ];
-        let last_non_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).unwrap_or(0);
-        println!(">>> last_non_empty_index: {}", last_non_empty_index);
+//     fn pack(&self, dest: &mut Vec<u8>) {
 
-        // Calculate heap size considering all fields up to the last non-empty field
-        let heap = 0
-            + <u32 as fracpack::Pack>::FIXED_SIZE
-            + if last_non_empty_index >= 1 { <Option<Variant> as fracpack::Pack>::FIXED_SIZE } else { 0 }
-            + if last_non_empty_index >= 2 { <Option<u32> as fracpack::Pack>::FIXED_SIZE } else { 0 }
-            + if last_non_empty_index >= 3 { <Option<String> as fracpack::Pack>::FIXED_SIZE } else { 0 }
-            + if last_non_empty_index >= 4 { <Option<Vec<u16>> as fracpack::Pack>::FIXED_SIZE } else { 0 }
-            + if last_non_empty_index >= 5 { <Option<Vec<Option<u16>>> as fracpack::Pack>::FIXED_SIZE } else { 0 };
+//         if <Option<Variant> as fracpack::Pack>::IS_OPTIONAL {
+//             println!(">>> var is optional");
+//         }
 
-        <u16 as fracpack::Pack>::pack(&(heap as u16), dest);
-        println!(">>> heap: {}", heap);
+//         // Determine the index of the last non-empty field
+//         let non_empty_fields = vec![
+//             !<u32 as fracpack::Pack>::IS_OPTIONAL || !<u32 as fracpack::Pack>::is_empty_container(&self.inner_u32),
+//             !<Option<Variant>>::IS_OPTIONAL || !<Option<Variant>>::is_empty_container(&self.var),
+//             !<Option<u32>>::IS_OPTIONAL || !<Option<u32>>::is_empty_container(&self.inner_option_u32),
+//             !<Option<String>>::IS_OPTIONAL || !<Option<String>>::is_empty_container(&self.inner_option_str),
+//             !<Option<Vec<u16>>>::IS_OPTIONAL || !<Option<Vec<u16>>>::is_empty_container(&self.inner_option_vec_u16),
+//             !<Option<Vec<Option<u16>>>>::IS_OPTIONAL || !<Option<Vec<Option<u16>>>>::is_empty_container(&self.inner_o_vec_o_u16),
+//         ];
+//         let last_non_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).unwrap_or(0);
+//         println!(">>> last_non_empty_index: {}", last_non_empty_index);
+
+//         // Calculate heap size considering all fields up to the last non-empty field
+//         let heap = 0
+//             + <u32 as fracpack::Pack>::FIXED_SIZE
+//             + if last_non_empty_index >= 1 { <Option<Variant> as fracpack::Pack>::FIXED_SIZE } else { 0 }
+//             + if last_non_empty_index >= 2 { <Option<u32> as fracpack::Pack>::FIXED_SIZE } else { 0 }
+//             + if last_non_empty_index >= 3 { <Option<String> as fracpack::Pack>::FIXED_SIZE } else { 0 }
+//             + if last_non_empty_index >= 4 { <Option<Vec<u16>> as fracpack::Pack>::FIXED_SIZE } else { 0 }
+//             + if last_non_empty_index >= 5 { <Option<Vec<Option<u16>>> as fracpack::Pack>::FIXED_SIZE } else { 0 };
+
+//         <u16 as fracpack::Pack>::pack(&(heap as u16), dest);
+//         println!(">>> heap: {}", heap);
 
 
-        // Pack fixed members up to the last non-empty field
-        let mut positions = vec![];
+//         // Pack fixed members up to the last non-empty field
+//         let mut positions = vec![];
 
-        let pos_inner_u32 = dest.len() as u32;
-        <u32 as fracpack::Pack>::embedded_fixed_pack(&self.inner_u32, dest);
-        positions.push(pos_inner_u32);
+//         let pos_inner_u32 = dest.len() as u32;
+//         <u32 as fracpack::Pack>::embedded_fixed_pack(&self.inner_u32, dest);
+//         positions.push(pos_inner_u32);
 
-        if last_non_empty_index >= 1 {
-            let pos_var = dest.len() as u32;
-            <Option<Variant> as fracpack::Pack>::embedded_fixed_pack(&self.var, dest);
-            positions.push(pos_var);
-        }
+//         let pos_var = dest.len() as u32;
+//         if last_non_empty_index >= 1 {
+//             <Option<Variant> as fracpack::Pack>::embedded_fixed_pack(&self.var, dest);
+//             positions.push(pos_var);
+//         }
 
-        if last_non_empty_index >= 2 {
-            let pos_inner_option_u32 = dest.len() as u32;
-            <Option<u32> as fracpack::Pack>::embedded_fixed_pack(&self.inner_option_u32, dest);
-            positions.push(pos_inner_option_u32);
-        }
+//         let pos_inner_option_u32 = dest.len() as u32;
+//         if last_non_empty_index >= 2 {
+//             <Option<u32> as fracpack::Pack>::embedded_fixed_pack(&self.inner_option_u32, dest);
+//             positions.push(pos_inner_option_u32);
+//         }
 
-        if last_non_empty_index >= 3 {
-            let pos_inner_option_str = dest.len() as u32;
-            <Option<String> as fracpack::Pack>::embedded_fixed_pack(&self.inner_option_str, dest);
-            positions.push(pos_inner_option_str);
-        }
+//         let pos_inner_option_str = dest.len() as u32;
+//         if last_non_empty_index >= 3 {
+//             <Option<String> as fracpack::Pack>::embedded_fixed_pack(&self.inner_option_str, dest);
+//             positions.push(pos_inner_option_str);
+//         }
 
-        if last_non_empty_index >= 4 {
-            let pos_inner_option_vec_u16 = dest.len() as u32;
-            <Option<Vec<u16>> as fracpack::Pack>::embedded_fixed_pack(&self.inner_option_vec_u16, dest);
-            positions.push(pos_inner_option_vec_u16);
-        }
+//         let pos_inner_option_vec_u16 = dest.len() as u32;
+//         if last_non_empty_index >= 4 {
+//             <Option<Vec<u16>> as fracpack::Pack>::embedded_fixed_pack(&self.inner_option_vec_u16, dest);
+//             positions.push(pos_inner_option_vec_u16);
+//         }
 
-        if last_non_empty_index >= 5 {
-            let pos_inner_o_vec_o_u16 = dest.len() as u32;
-            <Option<Vec<Option<u16>>> as fracpack::Pack>::embedded_fixed_pack(&self.inner_o_vec_o_u16, dest);
-            positions.push(pos_inner_o_vec_o_u16);
-        }
+//         let pos_inner_o_vec_o_u16 = dest.len() as u32;
+//         if last_non_empty_index >= 5 {
+//             <Option<Vec<Option<u16>>> as fracpack::Pack>::embedded_fixed_pack(&self.inner_o_vec_o_u16, dest);
+//             positions.push(pos_inner_o_vec_o_u16);
+//         }
 
-        // Pack variable members up to the last non-empty field
-        <u32 as fracpack::Pack>::embedded_fixed_repack(
-            &self.inner_u32,
-            positions[0],
-            dest.len() as u32,
-            dest,
-        );
-        <u32 as fracpack::Pack>::embedded_variable_pack(&self.inner_u32, dest);
+//         // Pack variable members up to the last non-empty field
+//         <u32 as fracpack::Pack>::embedded_fixed_repack(
+//             &self.inner_u32,
+//             positions[0],
+//             dest.len() as u32,
+//             dest,
+//         );
+//         <u32 as fracpack::Pack>::embedded_variable_pack(&self.inner_u32, dest);
 
-        let mut pos_index = 1;
+//         let mut pos_index = 1;
 
-        if last_non_empty_index >= 1 {
-            <Option<Variant> as fracpack::Pack>::embedded_fixed_repack(
-                &self.var,
-                positions[pos_index],
-                dest.len() as u32,
-                dest,
-            );
-            <Option<Variant> as fracpack::Pack>::embedded_variable_pack(&self.var, dest);
-            pos_index += 1;
-        }
+//         if last_non_empty_index >= 1 {
+//             <Option<Variant> as fracpack::Pack>::embedded_fixed_repack(
+//                 &self.var,
+//                 positions[pos_index],
+//                 dest.len() as u32,
+//                 dest,
+//             );
+//             <Option<Variant> as fracpack::Pack>::embedded_variable_pack(&self.var, dest);
+//             pos_index += 1;
+//         }
 
-        if last_non_empty_index >= 2 {
-            <Option<u32> as fracpack::Pack>::embedded_fixed_repack(
-                &self.inner_option_u32,
-                positions[pos_index],
-                dest.len() as u32,
-                dest,
-            );
-            <Option<u32> as fracpack::Pack>::embedded_variable_pack(&self.inner_option_u32, dest);
-            pos_index += 1;
-        }
+//         if last_non_empty_index >= 2 {
+//             <Option<u32> as fracpack::Pack>::embedded_fixed_repack(
+//                 &self.inner_option_u32,
+//                 positions[pos_index],
+//                 dest.len() as u32,
+//                 dest,
+//             );
+//             <Option<u32> as fracpack::Pack>::embedded_variable_pack(&self.inner_option_u32, dest);
+//             pos_index += 1;
+//         }
 
-        if last_non_empty_index >= 3 {
-            <Option<String> as fracpack::Pack>::embedded_fixed_repack(
-                &self.inner_option_str,
-                positions[pos_index],
-                dest.len() as u32,
-                dest,
-            );
-            <Option<String> as fracpack::Pack>::embedded_variable_pack(&self.inner_option_str, dest);
-            pos_index += 1;
-        }
+//         if last_non_empty_index >= 3 {
+//             <Option<String> as fracpack::Pack>::embedded_fixed_repack(
+//                 &self.inner_option_str,
+//                 positions[pos_index],
+//                 dest.len() as u32,
+//                 dest,
+//             );
+//             <Option<String> as fracpack::Pack>::embedded_variable_pack(&self.inner_option_str, dest);
+//             pos_index += 1;
+//         }
 
-        if last_non_empty_index >= 4 {
-            <Option<Vec<u16>> as fracpack::Pack>::embedded_fixed_repack(
-                &self.inner_option_vec_u16,
-                positions[pos_index],
-                dest.len() as u32,
-                dest,
-            );
-            <Option<Vec<u16>> as fracpack::Pack>::embedded_variable_pack(&self.inner_option_vec_u16, dest);
-            pos_index += 1;
-        }
+//         if last_non_empty_index >= 4 {
+//             <Option<Vec<u16>> as fracpack::Pack>::embedded_fixed_repack(
+//                 &self.inner_option_vec_u16,
+//                 positions[pos_index],
+//                 dest.len() as u32,
+//                 dest,
+//             );
+//             <Option<Vec<u16>> as fracpack::Pack>::embedded_variable_pack(&self.inner_option_vec_u16, dest);
+//             pos_index += 1;
+//         }
 
-        if last_non_empty_index >= 5 {
-            <Option<Vec<Option<u16>>> as fracpack::Pack>::embedded_fixed_repack(
-                &self.inner_o_vec_o_u16,
-                positions[pos_index],
-                dest.len() as u32,
-                dest,
-            );
-            <Option<Vec<Option<u16>>> as fracpack::Pack>::embedded_variable_pack(&self.inner_o_vec_o_u16, dest);
-        }
-    }
-}
+//         if last_non_empty_index >= 5 {
+//             <Option<Vec<Option<u16>>> as fracpack::Pack>::embedded_fixed_repack(
+//                 &self.inner_o_vec_o_u16,
+//                 positions[pos_index],
+//                 dest.len() as u32,
+//                 dest,
+//             );
+//             <Option<Vec<Option<u16>>> as fracpack::Pack>::embedded_variable_pack(&self.inner_o_vec_o_u16, dest);
+//         }
+//     }
+// }
 
 // // manual working one
 // impl fracpack::Pack for InnerStruct {
@@ -367,14 +373,16 @@ impl<'a> fracpack::Unpack<'a> for InnerStruct {
 
     fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
         let fixed_size = <u16 as fracpack::Unpack>::unpack(src, pos)?;
-        println!(">>> verify fixed_size: {}", fixed_size);
+        println!(">>> inner verify fixed_size: {}", fixed_size);
+        println!(">>> inner verify pos: {}", *pos);
 
         let mut heap_pos = *pos + fixed_size as u32;
+        println!(">>> inner verify heap_pos: {}", heap_pos);
+
         if heap_pos < *pos {
             return Err(fracpack::Error::BadOffset);
         }
-        println!(">>> verify heap_pos: {}", heap_pos);
-        println!(">>> verify pos: {}", pos);
+        println!("inner verified!");
 
         // Verify fixed members
         <u32 as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
@@ -508,6 +516,37 @@ pub struct UnextensibleWithOptions {
     pub opt_s: Option<String>,
     pub f: f32,
     pub opt_f: Option<f32>,
+}
+
+#[derive(Pack, Unpack,  Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct MultipleTrailingOptions {
+    pub a: u32,
+    pub b: u64,
+    pub s: String,
+    pub opt_x: Option<u32>,
+    pub opt_y: Option<String>,
+    pub opt_z: Option<u64>,
+}
+
+#[derive(Pack, Unpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(definition_will_not_change)]
+pub struct UnextensibleMultipleTrailingOptions {
+    pub a: u32,
+    pub b: u64,
+    pub s: String,
+    pub opt_x: Option<u32>,
+    pub opt_y: Option<String>,
+    pub opt_z: Option<u64>,
+}
+
+#[derive(Pack, Unpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct OptionInTheMiddle {
+    pub a: u32,
+    pub opt_b: Option<String>,
+    pub c: u32,
 }
 
 #[derive(Pack, Unpack, Debug, PartialEq, Eq)]

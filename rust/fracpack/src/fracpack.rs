@@ -487,6 +487,10 @@ impl<T: Pack> Pack for Option<T> {
         Self::embedded_variable_pack(self, dest);
     }
 
+    fn is_empty_container(&self) -> bool {
+        self.is_none()
+    }
+
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
         if T::IS_OPTIONAL || !T::VARIABLE_SIZE {
             dest.extend_from_slice(&1u32.to_le_bytes())
