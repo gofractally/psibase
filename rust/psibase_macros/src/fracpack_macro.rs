@@ -296,15 +296,19 @@ fn process_struct(
     let fields = struct_fields(data);
 
     // Identify trailing empty optionals
+    let last_possible_trailing_optional_field_idx = find_last_possible_trailing_optional_field_idx(&fields, opts.definition_will_not_change);
     let check_optional_fields  = fields
     .iter()
-    .map(|field| {
+    .enumerate()
+    .map(|(i, field)| {
         let ty = &field.ty;
         let name = &field.name;
-        quote! {!<#ty as fracpack::Pack>::IS_OPTIONAL || !<#ty as fracpack::Pack>::is_empty_container(&self.#name)}
+        if i < last_possible_trailing_optional_field_idx {
+            quote! {true}
+        } else {
+            quote! {!<#ty as fracpack::Pack>::IS_OPTIONAL || !<#ty as fracpack::Pack>::is_empty_container(&self.#name)}
+        }
     });
-
-    let last_possible_trailing_optional_field_idx = find_last_possible_trailing_optional_field_idx(&fields, opts.definition_will_not_change);
     
     let use_heap = if !opts.definition_will_not_change {
         quote! {true}
@@ -446,14 +450,23 @@ fn process_struct(
     // TODO: option to verify no unknown members
     let verify = fields
         .iter()
-        .map(|field| {
+        .enumerate()
+        .map(|(i, field)| {
             let ty = &field.ty;
-            quote! { 
-                if !<#ty as fracpack::Pack>::IS_OPTIONAL || *pos < fixed_size as u32 {
-                    println!("verifying field: {} - pos: {} - heap_pos: {}", stringify!(#ty), pos, heap_pos);
-                    <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?; 
+            let name = &field.name;
+            if i >= last_possible_trailing_optional_field_idx {
+                quote! { 
+                    if !<#ty as fracpack::Pack>::IS_OPTIONAL || *pos < fixed_size as u32 {
+                        println!("verifying field: {} ({}) - pos: {} - heap_pos: {}", stringify!(#name), stringify!(#ty), pos, heap_pos);
+                        <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?; 
+                    }
                 }
-            }
+            } else {
+                quote! {
+                    println!("verifying FIXED field: {} ({}) - pos: {} - heap_pos: {}", stringify!(#name), stringify!(#ty), pos, heap_pos);
+                    <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+                }
+            }            
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
 
@@ -464,7 +477,6 @@ fn process_struct(
                 const FIXED_SIZE: u32 =
                     if <Self as #fracpack_mod::Pack>::VARIABLE_SIZE { 4 } else { #fixed_size };
                 fn pack(&self, dest: &mut Vec<u8>) {
-
                     let non_empty_fields = vec![
                         #(#check_optional_fields),*
                     ];
