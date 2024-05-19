@@ -304,7 +304,7 @@ fn process_struct(
         quote! {!<#ty as fracpack::Pack>::IS_OPTIONAL || !<#ty as fracpack::Pack>::is_empty_container(&self.#name)}
     });
 
-    let last_possible_trailing_optional_field_idx = find_last_possible_trailing_optional_field_idx(&fields);    
+    let last_possible_trailing_optional_field_idx = find_last_possible_trailing_optional_field_idx(&fields, opts.definition_will_not_change);
     
     let use_heap = if !opts.definition_will_not_change {
         quote! {true}
@@ -839,7 +839,11 @@ fn is_option_type(ty: &syn::Type) -> bool {
     false
 }
 
-fn find_last_possible_trailing_optional_field_idx(fields: &Vec<StructField>) -> usize {
+fn find_last_possible_trailing_optional_field_idx(fields: &Vec<StructField>, definition_will_not_change: bool) -> usize {
+    if definition_will_not_change {
+        return fields.len();
+    }
+
     let mut last_non_optional_idx = 0;
 
     for (i, field) in fields.iter().enumerate().rev() {

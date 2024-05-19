@@ -539,61 +539,60 @@ fn middle_empty_option() {
     );
 }
 
-// TODO: fix!
-// #[test]
-// fn test_trailing_options_unextensible() {
-//     let all_values_present = UnextensibleMultipleTrailingOptions {
-//         a: 1,
-//         b: 2,
-//         s: "hi".to_string(),
-//         opt_x: Some(3),
-//         opt_y: Some("bye".to_string()),
-//         opt_z: Some(4),
-//     };
-//     pack_and_compare(
-//         &all_values_present,
-//         "0100000002000000000000001000000012000000120000001500000002000000686903000000030000006279650400000000000000",
-//     );
+#[test]
+fn test_trailing_options_unextensible() {
+    let all_values_present = UnextensibleMultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: Some(4),
+    };
+    pack_and_compare(
+        &all_values_present,
+        "0100000002000000000000001000000012000000120000001500000002000000686903000000030000006279650400000000000000",
+    );
 
-//     let empty_last_option = UnextensibleMultipleTrailingOptions {
-//         a: 1,
-//         b: 2,
-//         s: "hi".to_string(),
-//         opt_x: Some(3),
-//         opt_y: Some("bye".to_string()),
-//         opt_z: None,
-//     };
-//     pack_and_compare(
-//         &empty_last_option,
-//         "010000000200000000000000100000001200000012000000010000000200000068690300000003000000627965",
-//     );
+    let empty_last_option = UnextensibleMultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_option,
+        "010000000200000000000000100000001200000012000000010000000200000068690300000003000000627965",
+    );
 
-//     let empty_last_two_options = UnextensibleMultipleTrailingOptions {
-//         a: 1,
-//         b: 2,
-//         s: "hi".to_string(),
-//         opt_x: Some(3),
-//         opt_y: None,
-//         opt_z: None,
-//     };
-//     pack_and_compare(
-//         &empty_last_two_options,
-//         "0100000002000000000000001000000012000000010000000100000002000000686903000000",
-//     );
+    let empty_last_two_options = UnextensibleMultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_two_options,
+        "0100000002000000000000001000000012000000010000000100000002000000686903000000",
+    );
 
-//     let empty_trailing_options = UnextensibleMultipleTrailingOptions {
-//         a: 1,
-//         b: 2,
-//         s: "hi".to_string(),
-//         opt_x: None,
-//         opt_y: None,
-//         opt_z: None,
-//     };
-//     pack_and_compare(
-//         &empty_trailing_options,
-//         "01000000020000000000000010000000010000000100000001000000020000006869",
-//     );
-// }
+    let empty_trailing_options = UnextensibleMultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: None,
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_trailing_options,
+        "01000000020000000000000010000000010000000100000001000000020000006869",
+    );
+}
 
 fn pack_and_compare<T>(src_struct: &T, expected_hex: &str) -> Vec<u8>
 where
