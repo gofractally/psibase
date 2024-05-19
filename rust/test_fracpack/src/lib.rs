@@ -37,7 +37,7 @@ pub struct DefWontChangeInnerStruct {
     pub field_i32: i32,
 }
 
-#[derive(Pack, PartialEq, Eq, Debug)]
+#[derive(Pack, Unpack, PartialEq, Eq, Debug)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct InnerStruct {
     pub inner_u32: u32,
@@ -312,107 +312,176 @@ pub struct InnerStruct {
     // }
 // }
 
-impl<'a> fracpack::Unpack<'a> for InnerStruct {
-    const VARIABLE_SIZE: bool = true;
-    const FIXED_SIZE: u32 = 4;
+// impl<'a> fracpack::Unpack<'a> for InnerStruct {
+//     const VARIABLE_SIZE: bool = true;
+//     const FIXED_SIZE: u32 = 4;
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-        let fixed_size = <u16 as fracpack::Unpack>::unpack(src, pos)?;
-        println!(">>> unpack fixed_size: {}", fixed_size);
+//     fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
+//         let fixed_size = <u16 as fracpack::Unpack>::unpack(src, pos)?;
+//         println!(">>> unpack fixed_size: {}", fixed_size);
 
-        let mut heap_pos = *pos + fixed_size as u32;
-        if heap_pos < *pos {
-            return Err(fracpack::Error::BadOffset);
-        }
-        println!(">>> unpack heap_pos: {}", heap_pos);
-        println!(">>> unpack pos: {}", pos);
+//         let mut heap_pos = *pos + fixed_size as u32;
+//         if heap_pos < *pos {
+//             return Err(fracpack::Error::BadOffset);
+//         }
+//         println!(">>> unpack heap_pos: {}", heap_pos);
+//         println!(">>> unpack pos: {}", pos);
 
-        // Unpack fixed members
-        let inner_u32 = <u32 as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
+//         println!(">>> Unpack InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+
+//         let initial_pos = *pos;
+
+//         // Unpack fixed members
+//         let inner_u32 = <u32 as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
+//         println!(">>> Unpack InnerStruct inner_u32 unpacked!");
+//         println!(">>> Unpack InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
         
-        // Prepare option variables
-        let mut var = None;
-        let mut inner_option_u32 = None;
-        let mut inner_option_str = None;
-        let mut inner_option_vec_u16 = None;
-        let mut inner_o_vec_o_u16 = None;
+//         // Prepare option variables
+//         let mut var = None;
+//         let mut inner_option_u32 = None;
+//         let mut inner_option_str = None;
+//         let mut inner_option_vec_u16 = None;
+//         let mut inner_o_vec_o_u16 = None;
 
-        if *pos < heap_pos {
-            var = <Option<Variant> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
-        }
+//         if *pos - initial_pos < fixed_size as u32 {
+//             var = <Option<Variant> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
+//             println!(">>> Unpack InnerStruct var unpacked!");
+//             println!(">>> Unpack InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> Unpack InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
 
-        if *pos < heap_pos {
-            inner_option_u32 = <Option<u32> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
-        }
+//         if *pos - initial_pos < fixed_size as u32 {
+//             inner_option_u32 = <Option<u32> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
+//             println!(">>> Unpack InnerStruct inner_option_u32 unpacked!");
+//             println!(">>> Unpack InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> Unpack InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
 
-        if *pos < heap_pos {
-            inner_option_str = <Option<String> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
-        }
+//         if *pos - initial_pos < fixed_size as u32 {
+//             inner_option_str = <Option<String> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
+//             println!(">>> Unpack InnerStruct inner_option_str unpacked!");
+//             println!(">>> Unpack InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> Unpack InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
 
-        if *pos < heap_pos {
-            inner_option_vec_u16 = <Option<Vec<u16>> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
-        }
+//         if *pos - initial_pos < fixed_size as u32 {
+//             inner_option_vec_u16 = <Option<Vec<u16>> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
+//             println!(">>> Unpack InnerStruct inner_option_vec_u16 unpacked!");
+//             println!(">>> Unpack InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> Unpack InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
 
-        if *pos < heap_pos {
-            inner_o_vec_o_u16 = <Option<Vec<Option<u16>>> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
-        }        
+//         if *pos - initial_pos < fixed_size as u32 {
+//             inner_o_vec_o_u16 = <Option<Vec<Option<u16>>> as fracpack::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
+//             println!(">>> Unpack InnerStruct inner_o_vec_o_u16 unpacked!");
+//             println!(">>> Unpack InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> Unpack InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }        
 
-        let result = Self {
-            inner_u32,
-            var,
-            inner_option_u32,
-            inner_option_str,
-            inner_option_vec_u16,
-            inner_o_vec_o_u16,
-        };
+//         let result = Self {
+//             inner_u32,
+//             var,
+//             inner_option_u32,
+//             inner_option_str,
+//             inner_option_vec_u16,
+//             inner_o_vec_o_u16,
+//         };
 
-        *pos = heap_pos;
+//         *pos = heap_pos;
         
-        Ok(result)
-    }
+//         Ok(result)
+//     }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-        let fixed_size = <u16 as fracpack::Unpack>::unpack(src, pos)?;
-        println!(">>> inner verify fixed_size: {}", fixed_size);
-        println!(">>> inner verify pos: {}", *pos);
+//     fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
+//         // pos = current fixed pos in the stream
+//         // eg: 0 if its reading this struct from the root
+//         // eg: 132 if its reading this struct from another struct nested field
+//         // assume innerstruct is reading a stream that is at pos 48, heap_pos 132
+//         // pos = 132 in this case
+//         println!(">>> inner verify ini pre-pos: {}", *pos);
 
-        let mut heap_pos = *pos + fixed_size as u32;
-        println!(">>> inner verify heap_pos: {}", heap_pos);
-
-        if heap_pos < *pos {
-            return Err(fracpack::Error::BadOffset);
-        }
-        println!("inner verified!");
-
-        // Verify fixed members
-        <u32 as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
-
-        if *pos < heap_pos {
-            <Option<Variant> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
-        }
-
-        if *pos < heap_pos {
-            <Option<u32> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
-        }
-
-        if *pos < heap_pos {
-            <Option<String> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
-        }
-
-        if *pos < heap_pos {
-            <Option<Vec<u16>> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
-        }
-
-        if *pos < heap_pos {
-            <Option<Vec<Option<u16>>> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
-        }
+//         // first step is to know the current size of the current struct, which is variable based on trailing optionals
         
-        // Reset pos
-        *pos = heap_pos;
+//         // assuming fixed_size = 16 
+//         // heapsize u16 = 2 bytes
+//         // u32 value 1234 = 4 bytes
+//         // Option<Variant> value None = 2 bytes
+//         // Option<u32> value None = 2 bytes
+//         // Option<String> value Some("") = 6 bytes
+//         let fixed_size = <u16 as fracpack::Unpack>::unpack(src, pos)?;
+//         println!(">>> inner verify fixed_size: {}", fixed_size);
 
-        Ok(())
-    }
-}
+//         // since we read the fixed size, pos is now at pos + 2
+//         // pos = 134 in this case
+//         println!(">>> inner verify pos: {}", *pos);
+
+//         // now we need to calculate the heap pos
+//         // heap pos = pos + fixed size
+//         // heap pos = 134 + 16 = 150
+//         let initial_pos = *pos;
+//         let mut heap_pos = *pos + fixed_size as u32;
+//         println!(">>> inner verify heap_pos: {}", heap_pos);
+
+//         // if heap pos is less than pos, then the heap pos is invalid
+//         if heap_pos < *pos {
+//             return Err(fracpack::Error::BadOffset);
+//         }
+//         println!(">>> InnerStruct heap_pos verified!");
+//         println!(">>> InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+
+//         // Verify fixed members
+//         println!(">>> InnerStruct verifying inner_u32");
+//         <u32 as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+//         println!(">>> InnerStruct inner_u32 verified!");
+//         println!(">>> InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//         println!(">>> InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+        
+//         if *pos - initial_pos < fixed_size as u32 {
+//             println!(">>> InnerStruct verifying var");
+//             <Option<Variant> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+//             println!(">>> InnerStruct var verified!");
+//             println!(">>> InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
+
+//         if *pos - initial_pos < fixed_size as u32 {
+//             println!(">>> InnerStruct verifying inner_option_u32");
+//             <Option<u32> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+//             println!(">>> InnerStruct inner_option_u32 verified!");
+//             println!(">>> InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
+
+//         if *pos - initial_pos < fixed_size as u32 {
+//             println!(">>> InnerStruct verifying inner_option_str");
+//             <Option<String> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+//             println!(">>> InnerStruct inner_option_str verified!");
+//             println!(">>> InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
+
+//         if *pos - initial_pos < fixed_size as u32 {
+//             println!(">>> InnerStruct verifying inner_option_vec_u16");
+//             <Option<Vec<u16>> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+//             println!(">>> InnerStruct inner_option_vec_u16 verified!");
+//             println!(">>> InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
+
+//         if *pos - initial_pos < fixed_size as u32 {
+//             println!(">>> InnerStruct verifying inner_o_vec_o_u16");
+//             <Option<Vec<Option<u16>>> as fracpack::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+//             println!(">>> InnerStruct inner_o_vec_o_u16 verified!");
+//             println!(">>> InnerStruct pos: {} - heap_pos: {} - fixed_size: {}", *pos, heap_pos, fixed_size);
+//             println!(">>> InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+//         }
+
+//         // Reset pos
+//         *pos = heap_pos;
+
+//         Ok(())
+//     }
+// }
 
 #[derive(Pack, Unpack, PartialEq, Debug)]
 #[fracpack(fracpack_mod = "fracpack")]

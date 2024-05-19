@@ -319,6 +319,7 @@ fn round_trip_fields(index: usize, obj: &OuterStruct) {
     do_rt!(index, obj, field_option_sns);
     println!("compared sns");
     do_rt!(index, obj, field_option_inner);
+    do_rt!(index, obj, field_option_u_inner);
     do_rt!(index, obj, field_o_o_i8);
     do_rt!(index, obj, field_o_o_str);
     do_rt!(index, obj, field_o_o_str2);
@@ -328,12 +329,14 @@ fn round_trip_fields(index: usize, obj: &OuterStruct) {
 #[test]
 fn t1() -> Result<()> {
     for (i, t) in get_tests1().iter().enumerate() {
+        println!("\n\n\n=============================================");
         println!("***** index {} *****", i);
         round_trip_fields(i, t);
 
         println!("\n\n>>> round trip outer struct");
 
         let mut packed = Vec::<u8>::new();
+
         t.pack(&mut packed);
         println!("\n\n>>> packed > {}", hex::encode(&packed[..]).to_uppercase());
 
@@ -343,13 +346,14 @@ fn t1() -> Result<()> {
         println!("\n\n>>>  Outerstruct verified");
 
         let unpacked = OuterStruct::unpack(&packed[..], &mut 0)?;
+        println!(">>> unpacked > {:?}", unpacked);
+
         assert_eq!(*t, unpacked);
         println!("\n\n>>>  outer struct unpacked equally!!!");
 
         println!("\n\n>>>  begin cpp round_trip_outer_struct");
         test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
         println!("\n\n>>>  cpp round_trip_outer_struct COMPLETED!!!");
-
         // TODO: optionals after fixed-data portion ends
     }
     Ok(())
@@ -530,6 +534,16 @@ fn test_trailing_options() {
         &empty_trailing_options,
         "100001000000020000000000000004000000020000006869",
     );
+
+    let inner_struct = InnerStruct {
+        inner_u32: 1234,
+        var: None,
+        inner_option_u32: None,
+        inner_option_str: Some("".to_string()),
+        inner_option_vec_u16: None,
+        inner_o_vec_o_u16: None,
+    };
+    pack_and_compare(&inner_struct, "1000D2040000010000000100000000000000");
 }
 
 #[test]

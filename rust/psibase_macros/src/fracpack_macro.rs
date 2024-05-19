@@ -301,12 +301,11 @@ fn process_struct(
     .iter()
     .enumerate()
     .map(|(i, field)| {
-        let ty = &field.ty;
         let name = &field.name;
         if i < last_possible_trailing_optional_field_idx {
             quote! {true}
         } else {
-            quote! {!<#ty as fracpack::Pack>::IS_OPTIONAL || !<#ty as fracpack::Pack>::is_empty_container(&self.#name)}
+            quote! {!self.#name.is_none()}
         }
     });
     
@@ -398,12 +397,14 @@ fn process_struct(
             let pos = &positions[i];
             if i < last_possible_trailing_optional_field_idx {
                 quote! {
+                    println!("packing NON-OPTIONAL field: {} ({})", stringify!(#name), stringify!(#ty));
                     <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
                     <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
                 }
             } else {
                 quote! {
                     if last_non_empty_index >= #i {
+                        println!("packing OPTIONAL field: {} ({}) - last_non_empty_index: {}", stringify!(#name), stringify!(#ty), last_non_empty_index);
                         <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
                         <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
                     }
@@ -418,18 +419,19 @@ fn process_struct(
         .map(|(i, field)| {
             let name = &field.name;
             let ty = &field.ty;
-            if i >= last_possible_trailing_optional_field_idx && is_option_type(ty) {
+            if i >= last_possible_trailing_optional_field_idx {
                 quote! {
-                    println!("unpacking field: {} - pos: {} - heap_pos: {}", stringify!(#ty), pos, heap_pos);
-                    let #name = if *pos < fixed_size as u32 {
-                        <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?
-                    } else {
-                        None
-                    };
+                    let mut #name = None;
+                    if *pos - initial_pos < fixed_size as u32 {
+                        println!("unpacking field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
+                        #name = <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
+                        println!(">>> verify InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
+                    }
+                    
                 }
             } else {
                 quote ! {
-                    println!("unpacking FIXED field: {} - pos: {} - heap_pos: {}", stringify!(#ty), pos, heap_pos);
+                    println!("unpacking FIXED field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
                     let #name = <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
                 }
             }
@@ -456,14 +458,15 @@ fn process_struct(
             let name = &field.name;
             if i >= last_possible_trailing_optional_field_idx {
                 quote! { 
-                    if !<#ty as fracpack::Pack>::IS_OPTIONAL || *pos < fixed_size as u32 {
-                        println!("verifying field: {} ({}) - pos: {} - heap_pos: {}", stringify!(#name), stringify!(#ty), pos, heap_pos);
-                        <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?; 
+                    if *pos - initial_pos < fixed_size as u32 {
+                        println!("verifying field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
+                        <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+                        println!(">>> verify InnerStruct consumed pos (pos-ini) = {}", *pos - initial_pos);
                     }
                 }
             } else {
                 quote! {
-                    println!("verifying FIXED field: {} ({}) - pos: {} - heap_pos: {}", stringify!(#name), stringify!(#ty), pos, heap_pos);
+                    println!("verifying FIXED field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
                     <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
                 }
             }            
@@ -481,10 +484,13 @@ fn process_struct(
                         #(#check_optional_fields),*
                     ];
                     let last_non_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).unwrap_or(usize::MAX);
-                    println!("last_non_empty_index: {}", last_non_empty_index);
+                    println!("Struct {} - last_non_empty_index: {}", stringify!(#name),  last_non_empty_index);
 
                     let heap = #heap_size;
                     assert!(heap as u16 as u32 == heap); // TODO: return error
+
+                    println!("heap size is: {}", heap);
+
                     #pack_heap
                     #pack_fixed_members
                     #pack_variable_members
@@ -511,6 +517,7 @@ fn process_struct(
                         println!(">>> UNPACK PANIC! INVALID POS! heap_pos: {} - pos: {} - fixed_size: {}", heap_pos, *pos, fixed_size);
                         return Err(#fracpack_mod::Error::BadOffset);
                     }
+                    let initial_pos = *pos;
                     #unpack
                     let result = Self {
                         #field_names
@@ -528,6 +535,7 @@ fn process_struct(
                         println!(">>> PANIC! INVALID POS! heap_pos: {} - pos: {} - fixed_size: {}", heap_pos, *pos, fixed_size);
                         return Err(#fracpack_mod::Error::BadOffset);
                     }
+                    let initial_pos = *pos;
                     #verify
                     println!(">>> all fields verified! resetting position to heap_pos: {}", heap_pos);
                     *pos = heap_pos;
