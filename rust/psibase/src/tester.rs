@@ -99,6 +99,8 @@ impl Chain {
     /// TODO: Support sub-second block times
     pub fn start_block_at(&self, time: TimePointSec) {
         let status = &mut *self.status.borrow_mut();
+        println!(">>> Chain::start_block_at -> Starting block at status: {:?}", status);
+
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
             if status.current.time.seconds + 1 < time.seconds {
@@ -106,7 +108,12 @@ impl Chain {
             }
         }
         unsafe { tester_raw::testerStartBlock(self.chain_handle, time.seconds) }
+
+        println!(">>> Chain::start_block_at -> Unpacking status...");
         *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
+
+
+        println!(">>> Chain::start_block_at -> Starting block at status: {:?}", status);
         self.producing.replace(true);
     }
 
@@ -149,23 +156,30 @@ impl Chain {
     /// including whether it succeeded, and the cause if it failed.
     pub fn push(&self, transaction: &SignedTransaction) -> TransactionTrace {
         if !self.producing.get() {
+            println!(">>> Chain::push -> Starting block...");
             self.start_block();
         }
 
+        println!("\n\n>>> Chain::push -> Packing transaction: {:?}", transaction);
         let transaction = transaction.packed();
-        unsafe {
+        println!(">>> Chain::push -> Packed transaction!: {} bytes", transaction.len());
+        let size = unsafe {
             // unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
             //     let context = &mut *(alloc_context as *mut Context);
             //     context.size = size;
             //     context.bytes.reserve(size);
             //     context.bytes.as_mut_ptr()
             // }
-            let size = tester_raw::testerPushTransaction(
+            tester_raw::testerPushTransaction(
                 self.chain_handle,
                 transaction.as_ptr(),
-                transaction.len());
-            TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
-        }
+                transaction.len())
+        };
+        println!(">>> Chain::push -> Pushed transaction!: {} bytes; unpacking...", size);
+        println!(">>> Chain::push -> Unpacking trace result...");
+        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
+        println!(">>> Chain::push -> Unpacked trace result!: {:?}", trace);
+        trace
     }
 
     /// Copy database to `path`

@@ -364,7 +364,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
     }
 
     for test in tests {
-        pretty_path("Running", &test);
+        pretty_path(">>> NEEEEWW!!! Running", &test);
         let args = [test.to_str().unwrap(), "--nocapture"];
         let msg = format!("Failed running: psitest {}", args.join(" "));
         if !std::process::Command::new("psitest")

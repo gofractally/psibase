@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{AccountNumber, Hex, MethodNumber, Pack, Reflect, TimePointSec, ToKey, Unpack};
-use async_graphql::{InputObject, SimpleObject};
+use async_graphql::{InputObject, SimpleObject, Union};
 use serde::{Deserialize, Serialize};
 
 // TODO: move
@@ -255,6 +255,117 @@ pub struct Producer {
     Pack,
     Unpack,
     Reflect,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
+struct CftConsensus {
+    pub producers: Vec<Producer>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Pack,
+    Unpack,
+    Reflect,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
+struct BftConsensus {
+    pub producers: Vec<Producer>,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, Union)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
+pub enum Consensus {
+    BftConsensus(BftConsensus),
+    CftConsensus(CftConsensus),
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Pack,
+    Unpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(definition_will_not_change)]
+#[reflect(psibase_mod = "crate")]
+#[to_key(psibase_mod = "crate")]
+pub struct ConsensusBytes {
+    pub consensusVariantIdx: u8,
+    pub consensusData: Vec<u8>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Pack,
+    Unpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
+#[to_key(psibase_mod = "crate")]
+pub struct BlockHeaderAuthAccount {
+    pub codeNum: AccountNumber,
+    pub codeHash: Checksum256,
+    pub vmType: u8,
+    pub vmVersion: u8,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Pack,
+    Unpack,
+    Reflect,
+    ToKey,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[reflect(psibase_mod = "crate")]
+#[to_key(psibase_mod = "crate")]
+pub struct BlockHeaderCode {
+    pub vmType: u8,
+    pub vmVersion: u8,
+    pub code: Vec<u8>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    Pack,
+    Unpack,
+    Reflect,
     ToKey,
     Serialize,
     Deserialize,
@@ -273,13 +384,42 @@ pub struct BlockHeader {
     pub term: TermNum,
     pub commitNum: BlockNum,
 
-    // If newProducers is set, activates joint consensus when
-    // this block becomes irreversible.  If joint consensus
-    // was already active, replaces newProducers instead.
-    // Joint consensus exits when either the most recent
-    // block to change producers becomes irreversible or
-    // the newProducers are set to the existing producers.
-    pub newProducers: Option<Vec<Producer>>,
+    // // If newProducers is set, activates joint consensus when
+    // // this block becomes irreversible.  If joint consensus
+    // // was already active, replaces newProducers instead.
+    // // Joint consensus exits when either the most recent
+    // // block to change producers becomes irreversible or
+    // // the newProducers are set to the existing producers.
+    // pub newProducers: Option<Vec<Producer>>,
+
+    
+
+    // Holds a merkle root of the transactions in the block.
+    // This does not depend on execution, so that it can be
+    // verified early. The leaves of the tree have type
+    // TransactionInfo.
+    trxMerkleRoot: Checksum256,
+
+    // The merkle root of events generated while processing the block.
+    // The leaves have type EventInfo.
+    eventMerkleRoot: Checksum256,
+
+    // If newConsensus is set, activates joint consensus on
+    // this block. Joint consensus must not be active already.
+    // Joint consensus ends after this block becomes irreversible.
+    // TODO: newConsensus: Option<Consensus>, // FIX: Does not work with GraphQL
+    newConsensus: Option<ConsensusBytes>,
+
+    // If this is specified, it should should contain the full set of
+    // of services that can be used for verifying block signatures.
+    authServices: Option<Vec<BlockHeaderAuthAccount>>,
+
+    // This contains the code for authServices
+    // It MUST contain all code that was added in this block
+    // It MUST NOT contain code that is not in authServices
+    // It MAY contain code that is unchanged from the previous block
+    // authCode MUST NOT be included when calculating a block hash.
+    authCode: Option<Vec<BlockHeaderCode>>,
 }
 
 #[derive(
