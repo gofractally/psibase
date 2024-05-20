@@ -108,10 +108,8 @@ TEST_CASE("events")
    expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
    expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 0)
-              .trace());
-   expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 1)
+              .addIndices(DbId::historyEvent, TestService::service, MethodNumber{"testevent"},
+                          std::vector<uint8_t>{0, 1})
               .trace());
    expect(testService.to<TestService>().send(42, 2.718, std::vector{3}, "c").trace());
    expect(testService.to<TestService>().send(91, 1.618, std::vector{4}, "d").trace());
