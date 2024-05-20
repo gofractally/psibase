@@ -15,6 +15,21 @@
                 }
             }
         }
+        // Keeping the below example to show how to run service unit tests:
+        // {
+        //     "label": "Test NFT",
+        //     "type": "shell",
+        //     "command": "cd build && psitest Nft-test-debug.wasm -s -r compact",
+        //     "group": {
+        //         "kind": "test",
+        //         "isDefault": false
+        //     },
+        //     "options": {
+        //         "statusbar": {
+        //             "label": "$(beaker) Test Nft"
+        //         }
+        //     }
+        // },
     ],
     "inputs": [
         {
