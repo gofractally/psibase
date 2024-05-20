@@ -55,13 +55,37 @@ namespace TokenQueryTypes
       auto getKey() const { return realBalance(balance, precision); }
    };
    PSIO_REFLECT(TokenBalance, symbolId, tokenId, precision, balance);
-   struct AllBalances
+
+   struct TokenOwnerDetails
    {
-      vector<Balance> balances;
-      vector<Credit>  credits;
-      vector<Debit>   debits;
+      AccountNumber account;
+      AccountNumber authService;
    };
-   PSIO_REFLECT(AllBalances, balances, credits, debits);
+   PSIO_REFLECT(TokenOwnerDetails, account, authService);
+
+   // Removed inflation details because the inflation params aren't yet supported
+   //   in the service.
+   struct TokenDetail
+   {
+      TID                id;
+      NID                ownerNft;
+      TokenOwnerDetails  ownerDetails;
+      psibase::Bitset<8> config;
+      Precision          precision;
+      SID                symbolId;
+      Quantity           currentSupply;
+      Quantity           maxSupply;
+   };
+   PSIO_REFLECT(TokenDetail,
+                id,
+                ownerNft,
+                ownerDetails,
+                config,
+                precision,
+                symbolId,
+                currentSupply,
+                maxSupply);
+
 }  // namespace TokenQueryTypes
 
 using namespace TokenQueryTypes;
@@ -162,6 +186,36 @@ struct TokenQuery
       return tokenService.open<TokenTable>().getIndex<0>();
    }
 
+   auto tokenDetails(TID tokenId) const
+   {
+      auto token = tokenService.open<TokenTable>().getIndex<0>().get(tokenId);
+      check(token.has_value(), "Token DNE");
+
+      auto nft   = to<Nft>().getNft(token->ownerNft);
+      auto owner = SystemService::Accounts::Tables{SystemService::Accounts::service}
+                       .open<SystemService::AccountTable>()
+                       .getIndex<0>()
+                       .get(nft.owner);
+      check(owner.has_value(), "Account DNE. Should never happen.");
+
+      // clang-format off
+      return TokenDetail
+      {
+         .id = token->id, 
+         .ownerNft = token->ownerNft,
+         .ownerDetails = TokenOwnerDetails{
+            .account     = nft.owner,
+            .authService = owner->authService,
+         },
+         .config        = token->config,
+         .precision     = token->precision,
+         .symbolId      = token->symbolId,
+         .currentSupply = token->currentSupply,
+         .maxSupply     = token->maxSupply,
+      };
+      // clang-format on
+   }
+
    auto userConf(AccountNumber user, psibase::EnumElement flag) const
    {
       auto holder = tokenService.open<TokenHolderTable>().getIndex<0>().get(user);
@@ -177,6 +231,7 @@ PSIO_REFLECT(TokenQuery,
              method(userCredits, user, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after),
              method(userDebits, user, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after),
              method(tokens),
+             method(tokenDetails, tokenId),
              method(userConf, user, flag))
 // clang-format on
 
