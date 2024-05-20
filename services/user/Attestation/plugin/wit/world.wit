@@ -19,7 +19,7 @@ interface types {
     }
 }
 
-interface attestation-api {
+interface api {
     use accounts:plugin/types.{account};
     use types.{summary};
 
@@ -29,5 +29,5 @@ interface attestation-api {
 
 world attestation {
     export types;
-    export attestation-api;
+    export api;
 }

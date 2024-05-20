@@ -9,7 +9,7 @@ interface parameters {
     get-parameter: func(param-name: string);
 }
 
-interface fractal-types {
+interface types {
     use accounts:plugin/types.{account};
     use common:plugin/types.{error};
 
@@ -130,41 +130,27 @@ interface fractal-types {
         emission-rate-annual: float32,
         pools: list<tokenomic-pool>,
     }
-
-    enum rules-context {
-        fractal, // global / bylaws / rules
-        attestation,
-        invitation,
-    }
 }
 
-interface fractal-api {
+interface api {
     use common:plugin/types.{error};
     use accounts:plugin/types.{account};
-    use fractal-types.{fractal-id, fractal-params, fractal-creation-info, report-id, public-profile, profile-details-update, meeting-info, tokenomic-params, profile-flags, evaluation-type, invite-id, rules-context};
+    use types.{fractal-id, fractal-params, fractal-creation-info, report-id, public-profile, profile-details-update, meeting-info, tokenomic-params, profile-flags, evaluation-type, invite-id};
     // get-ambassador: func(for-fractal: account);
 
-    // fractal founder admin
+    // Called by: Fractal founder/admin
     create: func(fractal-details: fractal-creation-info) -> result<fractal-id, error>;
-    invite: func(fractal-id: fractal-id) -> result<invite-id, error>;
+
+    // Called by: Non-members
+    apply-for-membership: func(fractal-id: fractal-id);
+    
+    // member joining fractal
     accept-invite-with-new-account: func(id: invite-id, account-name: string) -> result<account, error>;
     accept-invite-with-existing-account: func(id: invite-id) -> result<_, error>;
     reject-invite: func(id: invite-id) -> result<_, error>;
 
-      // following are accessible to the founder while solid-state, then Council when liquid
-    set-rules: func(context: rules-context, rules: string) -> result<_, error>;
-      // related to waitlist and attestations, etc.
-    get-params: func(fractal-id: fractal-id) -> result<fractal-params, error>;
-    set-params: func(fractal-id: fractal-id, params: fractal-params) -> result<_, error>;
-    
-    // member or account on waitlist
-    remove-member: func(fractal-id: fractal-id, member: account);
-      // founder / Council
-    accept-member: func(fractal-id: fractal-id, member: account);
-
-    // fractal member interactions with the fractal
-    join-waitlist: func(id: fractal-id); // details on a member are in their profile; can accounts have profiles before joining a fractal? Yes, a chain-level profile
-
+    // Called by: Member
+    invite: func(fractal-id: fractal-id) -> result<invite-id, error>;
     // profile
     update-member-properties: func(fractal-id: fractal-id, details: profile-details-update) -> result<_, error>;
 
@@ -174,5 +160,6 @@ interface fractal-api {
 }
 
 world fractal-plugin {
-    export fractal-api;
+    export types;
+    export api;
 }

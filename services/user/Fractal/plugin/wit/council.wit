@@ -1,0 +1,30 @@
+package fractal:plugin;
+
+interface council-types {
+    enum rules-context {
+        fractal, // global / bylaws / rules
+        attestation,
+        invitation,
+    }
+}
+
+interface council-api {
+    use accounts:plugin/types.{account};
+    use council-types.{rules-context};
+    use common:plugin/types.{error};
+    use types.{fractal-id, fractal-params};
+
+    // Removes members, member fractals, or their invites from membership and/or waitlist
+    remove-member: func(fractal-id: fractal-id, member: account);
+    // Removes member and all members they invited, recursively
+    remove-member-tree: func(fractal-id: fractal-id, member: account);
+    // "fasttracks" a member by explicitly pulling them from the waitlist into the community
+    // (rather than automatic rate limiting algo adding them)
+    accept-member-from-waitlist: func(fractal-id: fractal-id, member: account);
+
+    // fractal admin
+    set-rules: func(context: rules-context, rules: string) -> result<_, error>;
+    get-params: func(fractal-id: fractal-id) -> result<fractal-params, error>;
+    set-params: func(fractal-id: fractal-id, params: fractal-params) -> result<_, error>;
+
+}
