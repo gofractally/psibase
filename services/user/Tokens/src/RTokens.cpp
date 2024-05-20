@@ -1,7 +1,9 @@
+#include <cmath>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/CommonApi.hpp>
 #include <services/user/RTokens.hpp>
 #include <services/user/Symbol.hpp>
@@ -16,35 +18,43 @@ using namespace psibase;
 auto tokenService = Tokens::Tables{Tokens::service};
 namespace TokenQueryTypes
 {
-   struct Balance
-   {
-      TID       id;
-      Precision precision;
-      SID       symbolId;
-      uint64_t  balance;
-   };
-   PSIO_REFLECT(Balance, id, precision, symbolId, balance);
+   auto realBalance = [](uint64_t bal, const Precision& p) -> uint64_t
+   { return static_cast<uint64_t>(bal / pow(10, p.value)); };
 
    struct Credit
    {
-      TID           id;
-      Precision     precision;
       SID           symbolId;
+      TID           tokenId;
+      Precision     precision;
       uint64_t      balance;
       AccountNumber creditedTo;
+
+      auto getKey() const { return realBalance(balance, precision); }
    };
-   PSIO_REFLECT(Credit, id, precision, symbolId, balance, creditedTo);
+   PSIO_REFLECT(Credit, symbolId, tokenId, precision, balance, creditedTo);
 
    struct Debit
    {
-      TID           id;
-      Precision     precision;
       SID           symbolId;
+      TID           tokenId;
+      Precision     precision;
       uint64_t      balance;
       AccountNumber debitableFrom;
-   };
-   PSIO_REFLECT(Debit, id, precision, symbolId, balance, debitableFrom);
 
+      auto getKey() const { return realBalance(balance, precision); }
+   };
+   PSIO_REFLECT(Debit, symbolId, tokenId, precision, balance, debitableFrom);
+
+   struct TokenBalance
+   {
+      SID       symbolId;
+      TID       tokenId;
+      Precision precision;
+      uint64_t  balance;
+
+      auto getKey() const { return realBalance(balance, precision); }
+   };
+   PSIO_REFLECT(TokenBalance, symbolId, tokenId, precision, balance);
    struct AllBalances
    {
       vector<Balance> balances;
@@ -62,48 +72,89 @@ struct TokenQuery
       return tokenService.open<BalanceTable>().getIndex<0>();
    }
 
-   auto userBalances(AccountNumber user) const
+   /// Provides a way to query all balances for a given user.
+   /// Further filtering can be done to restrict the results by balance.
+   auto userBalances(AccountNumber         user,
+                     optional<uint64_t>    balance_gt,
+                     optional<uint64_t>    balance_ge,
+                     optional<uint64_t>    balance_lt,
+                     optional<uint64_t>    balance_le,
+                     optional<uint32_t>    first,
+                     optional<uint32_t>    last,
+                     optional<std::string> before,
+                     optional<std::string> after) const
    {
-      AllBalances balances;
+      vector<TokenBalance> balances;
 
-      auto tokenTypes = tokenService.open<TokenTable>().getIndex<0>();
+      auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
+      auto balanceIdx   = tokenService.open<BalanceTable>().getIndex<1>().subindex(user);
 
       // Balances of this user
-      auto balanceIdx = tokenService.open<BalanceTable>().getIndex<1>().subindex(user);
       for (auto balance : balanceIdx)
       {
-         auto tokenOpt = tokenTypes.get(balance.key.tokenId);
+         auto tokenOpt = tokenTypeIdx.get(balance.key.tokenId);
          check(tokenOpt.has_value(), "Invalid token type");
-         balances.balances.push_back(Balance{balance.key.tokenId, tokenOpt->precision,
-                                             tokenOpt->symbolId, balance.balance});
+         balances.push_back(TokenBalance{tokenOpt->symbolId, balance.key.tokenId,
+                                         tokenOpt->precision, balance.balance});
       }
 
-      // Credit balances for this user
-      auto creditIdx = tokenService.open<SharedBalanceTable>().getIndex<1>();
-      for (auto credit : creditIdx)
-      {
-         auto tokenOpt = tokenTypes.get(credit.key.tokenId);
-         check(tokenOpt.has_value(), "Invalid token type");
-         balances.credits.push_back(Credit{credit.key.tokenId, tokenOpt->precision,
-                                           tokenOpt->symbolId, credit.balance, credit.key.debitor});
-      }
-
-      // Debit balances for this user
-      auto debitIdx = tokenService.open<SharedBalanceTable>().getIndex<2>();
-      for (auto debit : debitIdx)
-      {
-         auto tokenOpt = tokenTypes.get(debit.key.tokenId);
-         check(tokenOpt.has_value(), "Invalid token type");
-         balances.debits.push_back(Debit{debit.key.tokenId, tokenOpt->precision, tokenOpt->symbolId,
-                                         debit.balance, debit.key.creditor});
-      }
-
-      return balances;
+      return makeVirtualConnection<
+          Connection<TokenBalance, "UserBalanceConnection", "UserBalanceEdge">>(
+          balances, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after);
    }
 
-   auto sharedBalances() const
-   {  //
-      return tokenService.open<SharedBalanceTable>().getIndex<0>();
+   auto userCredits(AccountNumber         user,
+                    optional<uint64_t>    balance_gt,
+                    optional<uint64_t>    balance_ge,
+                    optional<uint64_t>    balance_lt,
+                    optional<uint64_t>    balance_le,
+                    optional<uint32_t>    first,
+                    optional<uint32_t>    last,
+                    optional<std::string> before,
+                    optional<std::string> after) const
+   {
+      vector<Credit> credits;
+
+      auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
+      auto creditIdx    = tokenService.open<SharedBalanceTable>().getIndex<1>();
+
+      for (auto credit : creditIdx)
+      {
+         auto tokenOpt = tokenTypeIdx.get(credit.key.tokenId);
+         check(tokenOpt.has_value(), "Invalid token type");
+         credits.push_back(Credit{tokenOpt->symbolId, credit.key.tokenId, tokenOpt->precision,
+                                  credit.balance, credit.key.debitor});
+      }
+
+      return makeVirtualConnection<Connection<Credit, "UserCreditConnection", "UserCreditEdge">>(
+          credits, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after);
+   }
+
+   auto userDebits(AccountNumber         user,
+                   optional<uint64_t>    balance_gt,
+                   optional<uint64_t>    balance_ge,
+                   optional<uint64_t>    balance_lt,
+                   optional<uint64_t>    balance_le,
+                   optional<uint32_t>    first,
+                   optional<uint32_t>    last,
+                   optional<std::string> before,
+                   optional<std::string> after) const
+   {
+      vector<Debit> debits;
+
+      auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
+      auto debitIdx     = tokenService.open<SharedBalanceTable>().getIndex<2>();
+
+      for (auto debit : debitIdx)
+      {
+         auto tokenOpt = tokenTypeIdx.get(debit.key.tokenId);
+         check(tokenOpt.has_value(), "Invalid token type");
+         debits.push_back(Debit{tokenOpt->symbolId, debit.key.tokenId, tokenOpt->precision,
+                                debit.balance, debit.key.creditor});
+      }
+
+      return makeVirtualConnection<Connection<Debit, "UserDebitConnection", "UserDebitEdge">>(
+          debits, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after);
    }
 
    auto tokens() const
@@ -113,16 +164,21 @@ struct TokenQuery
 
    auto userConf(AccountNumber user, psibase::EnumElement flag) const
    {
-      return to<Tokens>().getUserConf(user, flag);
+      auto holder = tokenService.open<TokenHolderTable>().getIndex<0>().get(user);
+      check(holder.has_value(), "Specified user does not hold any tokens");
+      return holder->config.get(TokenHolderRecord::Configurations::value(flag));
    }
 };
 
+// clang-format off
 PSIO_REFLECT(TokenQuery,
              method(allBalances),
-             method(userBalances, user),
-             method(sharedBalances),
+             method(userBalances, user, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after),
+             method(userCredits, user, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after),
+             method(userDebits, user, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after),
              method(tokens),
              method(userConf, user, flag))
+// clang-format on
 
 optional<HttpReply> RTokens::serveSys(HttpRequest request)
 {

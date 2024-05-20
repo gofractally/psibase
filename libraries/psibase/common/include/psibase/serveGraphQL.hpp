@@ -349,6 +349,120 @@ namespace psibase
       return result;
    }  // makeConnection
 
+   template <typename T, typename Key>
+   concept HasGetKey = requires(T t) {
+      {
+         t.getKey()
+      } -> std::same_as<Key>;
+   };
+
+   /// Similar to makeConnection, except that it allows pagination through a virtual table index.
+   /// A virtual table index is a dynamically constructed vector of objects.
+   template <typename Connection, typename T, typename Key>
+      requires HasGetKey<T, Key>
+   Connection makeVirtualConnection(const std::vector<T>&             elements,
+                                    const std::optional<Key>&         gt,
+                                    const std::optional<Key>&         ge,
+                                    const std::optional<Key>&         lt,
+                                    const std::optional<Key>&         le,
+                                    std::optional<uint32_t>           first,
+                                    std::optional<uint32_t>           last,
+                                    const std::optional<std::string>& before,
+                                    const std::optional<std::string>& after)
+   {
+      auto indexFromString = [&](const std::string& str, size_t& index) -> bool
+      {
+         char*         end;
+         unsigned long result = std::strtoul(str.c_str(), &end, 10);
+         if (end == str.c_str() || *end != '\0' || result == std::numeric_limits<size_t>::max())
+         {
+            return false;
+         }
+         index = static_cast<size_t>(result);
+         return true;
+      };
+
+      auto lower_bound = [&](const Key& key)
+      {
+         return std::lower_bound(elements.begin(), elements.end(), key,
+                                 [&](const T& elem, const Key& key)
+                                 { return elem.getKey() < key; });
+      };
+
+      auto upper_bound = [&](const Key& key)
+      {
+         return std::upper_bound(elements.begin(), elements.end(), key,
+                                 [&](const Key& key, const T& elem)
+                                 { return key < elem.getKey(); });
+      };
+
+      auto rangeBegin = elements.begin();
+      auto rangeEnd   = elements.end();
+      if (ge)
+         rangeBegin = std::max(rangeBegin, lower_bound(*ge));
+      if (gt)
+         rangeBegin = std::max(rangeBegin, upper_bound(*gt));
+      if (le)
+         rangeEnd = std::min(rangeEnd, upper_bound(*le));
+      if (lt)
+         rangeEnd = std::min(rangeEnd, lower_bound(*lt));
+      rangeEnd = std::max(rangeBegin, rangeEnd);
+
+      auto it  = rangeBegin;
+      auto end = rangeEnd;
+      if (after)
+      {
+         size_t index = 0;
+         if (indexFromString(*after, index))
+            it = std::clamp(elements.begin() + index + 1, rangeBegin, rangeEnd);
+      }
+      if (before)
+      {
+         size_t index = 0;
+         if (indexFromString(*before, index))
+            end = std::clamp(elements.begin() + index, rangeBegin, rangeEnd);
+      }
+
+      end = std::max(it, end);
+
+      Connection result;
+      auto       add_edge = [&](const auto& it)
+      {
+         size_t index  = std::distance(elements.begin(), it);
+         auto   cursor = std::to_string(index);
+         result.edges.push_back(typename Connection::Edge{*it, std::move(cursor)});
+      };
+
+      if (last && !first)
+      {
+         result.pageInfo.hasNextPage = end != rangeEnd;
+         while (it != end && (*last)-- > 0)
+            add_edge(--end);
+         result.pageInfo.hasPreviousPage = end != rangeBegin;
+         std::reverse(result.edges.begin(), result.edges.end());
+      }
+      else
+      {
+         result.pageInfo.hasPreviousPage = it != rangeBegin;
+         for (; it != end && (!first || (*first)-- > 0); ++it)
+            add_edge(it);
+         result.pageInfo.hasNextPage = it != rangeEnd;
+         if (last && *last < result.edges.size())
+         {
+            result.pageInfo.hasPreviousPage = true;
+            result.edges.erase(result.edges.begin(),
+                               result.edges.begin() + (result.edges.size() - *last));
+         }
+      }
+
+      if (!result.edges.empty())
+      {
+         result.pageInfo.startCursor = result.edges.front().cursor;
+         result.pageInfo.endCursor   = result.edges.back().cursor;
+      }
+      return result;
+   }  // makeConnection
+
    template <typename T, typename K>
    constexpr std::optional<std::array<const char*, 8>> gql_callable_args(TableIndex<T, K>*)
    {
