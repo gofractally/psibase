@@ -62,6 +62,12 @@ namespace UserService
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
 
+      // Same as `addIndex` except that multiple columns can be specified at the same time.
+      void addIndices(psibase::DbId                    db,
+                      psibase::AccountNumber           service,
+                      psibase::MethodNumber            event,
+                      const std::vector<std::uint8_t>& columns);
+
       /// Initializes the service
       void init();
       /// Indexes all new events. This is run automatically at the end of every transaction.
@@ -81,6 +87,7 @@ namespace UserService
                 method(init),
                 method(setSchema, schema),
                 method(addIndex, db, service, event, column),
+                method(addIndices, db, service, event, columns),
                 method(sync),
                 method(onBlock))
 

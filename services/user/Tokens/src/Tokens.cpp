@@ -104,17 +104,15 @@ void Tokens::init()
    to<EventIndex>().setSchema(ServiceSchema::make<Tokens>());
 
    // Event indices:
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"created"}, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"created"}, 1);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"minted"}, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"burned"}, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"userConfSet"}, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"tokenConfSet"}, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"symbolMapped"}, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"transferred"}, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"transferred"}, 2);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"transferred"}, 3);
-   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"recalled"}, 0);
+   using Col = std::vector<uint8_t>;
+   to<EventIndex>().addIndices(DbId::historyEvent, Tokens::service, "created"_m, Col{0, 1});
+   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, "minted"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, "burned"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, "userConfSet"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, "tokenConfSet"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, "symbolMapped"_m, 0);
+   to<EventIndex>().addIndices(DbId::historyEvent, Tokens::service, "transferred"_m, Col{0, 2, 3});
+   to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, "recalled"_m, 0);
 }
 
 TID Tokens::create(Precision precision, Quantity maxSupply)

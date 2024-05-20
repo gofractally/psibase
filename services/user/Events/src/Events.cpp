@@ -47,6 +47,47 @@ void EventIndex::addIndex(psibase::DbId          db,
    dirtyTable.put(IndexDirtyRecord{db, service, event});
 }
 
+void EventIndex::addIndices(psibase::DbId                    db,
+                            psibase::AccountNumber           service,
+                            psibase::MethodNumber            event,
+                            const std::vector<std::uint8_t>& columns)
+{
+   check(getSender() == service, "Wrong sender");
+   const CompiledType* type = SchemaCache::instance().getSchemaType(db, service, event);
+   check(!!type, "Unknown event");
+   auto secondary = Events::open<SecondaryIndexTable>(secondaryIndexSpecTableNum);
+   auto row       = secondary.getIndex<0>().get(std::tuple(db, service, event));
+   if (!row)
+      row = SecondaryIndexRecord{db, service, event, std::vector{SecondaryIndexInfo{}}};
+
+   for (auto column : columns)
+   {
+      check(column < type->children.size(), "Unknown column");
+
+      // Don't add duplicate indexes
+      bool duplicate = false;
+      for (const auto& index : row->indexes)
+      {
+         if (index.indexNum == column)
+         {
+            duplicate = true;
+            break;
+         }
+      }
+      if (duplicate)
+         continue;
+
+      row->indexes.push_back(SecondaryIndexInfo{column});
+   }
+
+   secondary.put(*row);
+
+   // mark the table as dirty
+   auto dirtyTable = IndexDirtyTable{
+       DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, indexDirtyTableNum))};
+   dirtyTable.put(IndexDirtyRecord{db, service, event});
+}
+
 namespace
 {
    std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, DbId db)
