@@ -2,14 +2,13 @@ import * as React from "react";
 import {
     AlertCircle,
     Archive,
-    ArchiveX,
-    File,
-    Inbox,
+    User,
+    CheckSquare,
+    List,
     MessagesSquare,
     Search,
-    Send,
+    Gavel,
     ShoppingCart,
-    Trash2,
     Users2,
 } from "lucide-react";
 
@@ -65,8 +64,8 @@ export function Mail({ accounts, mails, navCollapsedSize }: MailProps) {
                 >
                     <div
                         className={cn(
-                            "flex h-[52px] items-center justify-center",
-                            isCollapsed ? "h-[52px]" : "px-2",
+                            "flex h-14 items-center justify-center",
+                            isCollapsed ? "h-14" : "px-2",
                         )}
                     >
                         <AccountSwitcher
@@ -79,39 +78,27 @@ export function Mail({ accounts, mails, navCollapsedSize }: MailProps) {
                         isCollapsed={isCollapsed}
                         links={[
                             {
-                                title: "Inbox",
+                                title: "Feed",
                                 label: "128",
-                                icon: Inbox,
+                                icon: List,
                                 variant: "default",
                             },
                             {
-                                title: "Drafts",
+                                title: "Participate",
                                 label: "9",
-                                icon: File,
+                                icon: CheckSquare,
                                 variant: "ghost",
                             },
                             {
-                                title: "Sent",
+                                title: "Govern",
                                 label: "",
-                                icon: Send,
+                                icon: Gavel,
                                 variant: "ghost",
                             },
                             {
-                                title: "Junk",
+                                title: "Membership",
                                 label: "23",
-                                icon: ArchiveX,
-                                variant: "ghost",
-                            },
-                            {
-                                title: "Trash",
-                                label: "",
-                                icon: Trash2,
-                                variant: "ghost",
-                            },
-                            {
-                                title: "Archive",
-                                label: "",
-                                icon: Archive,
+                                icon: User,
                                 variant: "ghost",
                             },
                         ]}
@@ -121,31 +108,31 @@ export function Mail({ accounts, mails, navCollapsedSize }: MailProps) {
                         isCollapsed={isCollapsed}
                         links={[
                             {
-                                title: "Social",
+                                title: "All",
                                 label: "972",
                                 icon: Users2,
                                 variant: "ghost",
                             },
                             {
-                                title: "Updates",
+                                title: "Contributions",
                                 label: "342",
                                 icon: AlertCircle,
                                 variant: "ghost",
                             },
                             {
-                                title: "Forums",
+                                title: "Petitions",
                                 label: "128",
                                 icon: MessagesSquare,
                                 variant: "ghost",
                             },
                             {
-                                title: "Shopping",
+                                title: "Council",
                                 label: "8",
                                 icon: ShoppingCart,
                                 variant: "ghost",
                             },
                             {
-                                title: "Promotions",
+                                title: "Foreign Relations",
                                 label: "21",
                                 icon: Archive,
                                 variant: "ghost",
@@ -157,27 +144,33 @@ export function Mail({ accounts, mails, navCollapsedSize }: MailProps) {
                 <ResizablePanel minSize={30}>
                     <Tabs defaultValue="all">
                         <div className="flex items-center px-4 py-2">
-                            <h1 className="text-xl font-bold">Inbox</h1>
+                            <h1 className="text-xl font-bold">Feed</h1>
                             <TabsList className="ml-auto">
                                 <TabsTrigger
                                     value="all"
                                     className="text-zinc-600 dark:text-zinc-200"
                                 >
-                                    All mail
+                                    All
                                 </TabsTrigger>
                                 <TabsTrigger
-                                    value="unread"
+                                    value="members"
                                     className="text-zinc-600 dark:text-zinc-200"
                                 >
-                                    Unread
+                                    Members
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="non-members"
+                                    className="text-zinc-600 dark:text-zinc-200"
+                                >
+                                    Non-members
                                 </TabsTrigger>
                             </TabsList>
                         </div>
                         <Separator />
-                        <div className="bg-background/95 supports-[backdrop-filter]:bg-background/60 p-4 backdrop-blur">
+                        <div className="bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                             <form>
                                 <div className="relative">
-                                    <Search className="text-muted-foreground absolute left-2 top-2.5 h-4 w-4" />
+                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         placeholder="Search"
                                         className="pl-8"
@@ -188,7 +181,7 @@ export function Mail({ accounts, mails, navCollapsedSize }: MailProps) {
                         <TabsContent value="all" className="m-0">
                             <MailList items={mails} />
                         </TabsContent>
-                        <TabsContent value="unread" className="m-0">
+                        <TabsContent value="members" className="m-0">
                             <MailList
                                 items={mails.filter((item) => !item.read)}
                             />
