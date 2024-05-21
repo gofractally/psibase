@@ -1,7 +1,6 @@
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -26,12 +25,6 @@ export const ModalCreateToken = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create a token</DialogTitle>
-          <DialogDescription>
-            Lorem ipsum, dolor sit amet consectetur adipisicing elit. Eveniet,
-            beatae autem assumenda nulla, culpa dignissimos aperiam debitis
-            voluptates mollitia a velit. Ducimus impedit esse tempora architecto
-            voluptate sapiente ad quam!
-          </DialogDescription>
           {children}
         </DialogHeader>
       </DialogContent>
