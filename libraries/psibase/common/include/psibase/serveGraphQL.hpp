@@ -349,17 +349,14 @@ namespace psibase
       return result;
    }  // makeConnection
 
-   template <typename T, typename Key>
-   concept HasGetKey = requires(T t) {
-      {
-         t.getKey()
-      } -> std::same_as<Key>;
-   };
-
    /// Similar to makeConnection, except that it allows pagination through a virtual table index.
+   ///
    /// A virtual table index is a dynamically constructed vector of objects.
+   ///
+   /// Allows for a user-provided projection function that transforms elements from type T to Key
+   /// before isolating a range within the container.
+   ///
    template <typename Connection, typename T, typename Key>
-      requires HasGetKey<T, Key>
    Connection makeVirtualConnection(const std::vector<T>&             elements,
                                     const std::optional<Key>&         gt,
                                     const std::optional<Key>&         ge,
@@ -368,7 +365,8 @@ namespace psibase
                                     std::optional<uint32_t>           first,
                                     std::optional<uint32_t>           last,
                                     const std::optional<std::string>& before,
-                                    const std::optional<std::string>& after)
+                                    const std::optional<std::string>& after,
+                                    std::function<Key(T)>             projection = {})
    {
       auto indexFromString = [&](const std::string& str, size_t& index) -> bool
       {
@@ -383,21 +381,20 @@ namespace psibase
       };
 
       auto lower_bound = [&](const Key& key)
-      {
-         return std::lower_bound(elements.begin(), elements.end(), key,
-                                 [&](const T& elem, const Key& key)
-                                 { return elem.getKey() < key; });
-      };
+      { return std::ranges::lower_bound(elements, key, {}, projection); };
 
       auto upper_bound = [&](const Key& key)
-      {
-         return std::upper_bound(elements.begin(), elements.end(), key,
-                                 [&](const Key& key, const T& elem)
-                                 { return key < elem.getKey(); });
-      };
+      { return std::ranges::upper_bound(elements, key, {}, projection); };
 
       auto rangeBegin = elements.begin();
       auto rangeEnd   = elements.end();
+      if (ge || gt || le || lt)
+      {
+         if (!projection)
+         {
+            psibase::check(false, "makeVirtualConnection: missing projection function");
+         }
+      }
       if (ge)
          rangeBegin = std::max(rangeBegin, lower_bound(*ge));
       if (gt)

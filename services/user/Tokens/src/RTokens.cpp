@@ -18,9 +18,6 @@ using namespace psibase;
 auto tokenService = Tokens::Tables{Tokens::service};
 namespace TokenQueryTypes
 {
-   auto realBalance = [](uint64_t bal, const Precision& p) -> uint64_t
-   { return static_cast<uint64_t>(bal / pow(10, p.value)); };
-
    struct Credit
    {
       SID           symbolId;
@@ -28,8 +25,6 @@ namespace TokenQueryTypes
       Precision     precision;
       uint64_t      balance;
       AccountNumber creditedTo;
-
-      auto getKey() const { return realBalance(balance, precision); }
    };
    PSIO_REFLECT(Credit, symbolId, tokenId, precision, balance, creditedTo);
 
@@ -40,8 +35,6 @@ namespace TokenQueryTypes
       Precision     precision;
       uint64_t      balance;
       AccountNumber debitableFrom;
-
-      auto getKey() const { return realBalance(balance, precision); }
    };
    PSIO_REFLECT(Debit, symbolId, tokenId, precision, balance, debitableFrom);
 
@@ -51,8 +44,6 @@ namespace TokenQueryTypes
       TID       tokenId;
       Precision precision;
       uint64_t  balance;
-
-      auto getKey() const { return realBalance(balance, precision); }
    };
    PSIO_REFLECT(TokenBalance, symbolId, tokenId, precision, balance);
 
@@ -99,10 +90,6 @@ struct TokenQuery
    /// Provides a way to query all balances for a given user.
    /// Further filtering can be done to restrict the results by balance.
    auto userBalances(AccountNumber         user,
-                     optional<uint64_t>    balance_gt,
-                     optional<uint64_t>    balance_ge,
-                     optional<uint64_t>    balance_lt,
-                     optional<uint64_t>    balance_le,
                      optional<uint32_t>    first,
                      optional<uint32_t>    last,
                      optional<std::string> before,
@@ -123,15 +110,12 @@ struct TokenQuery
       }
 
       return makeVirtualConnection<
-          Connection<TokenBalance, "UserBalanceConnection", "UserBalanceEdge">>(
-          balances, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after);
+          Connection<TokenBalance, "UserBalanceConnection", "UserBalanceEdge">, TokenBalance, SID>(
+          balances, {std::nullopt}, {std::nullopt}, {std::nullopt}, {std::nullopt}, first, last,
+          before, after);
    }
 
    auto userCredits(AccountNumber         user,
-                    optional<uint64_t>    balance_gt,
-                    optional<uint64_t>    balance_ge,
-                    optional<uint64_t>    balance_lt,
-                    optional<uint64_t>    balance_le,
                     optional<uint32_t>    first,
                     optional<uint32_t>    last,
                     optional<std::string> before,
@@ -150,15 +134,13 @@ struct TokenQuery
                                   credit.balance, credit.key.debitor});
       }
 
-      return makeVirtualConnection<Connection<Credit, "UserCreditConnection", "UserCreditEdge">>(
-          credits, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after);
+      return makeVirtualConnection<Connection<Credit, "UserCreditConnection", "UserCreditEdge">,
+                                   Credit, SID>(credits, {std::nullopt}, {std::nullopt},
+                                                {std::nullopt}, {std::nullopt}, first, last, before,
+                                                after);
    }
 
    auto userDebits(AccountNumber         user,
-                   optional<uint64_t>    balance_gt,
-                   optional<uint64_t>    balance_ge,
-                   optional<uint64_t>    balance_lt,
-                   optional<uint64_t>    balance_le,
                    optional<uint32_t>    first,
                    optional<uint32_t>    last,
                    optional<std::string> before,
@@ -177,8 +159,9 @@ struct TokenQuery
                                 debit.balance, debit.key.creditor});
       }
 
-      return makeVirtualConnection<Connection<Debit, "UserDebitConnection", "UserDebitEdge">>(
-          debits, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after);
+      return makeVirtualConnection<Connection<Debit, "UserDebitConnection", "UserDebitEdge">, Debit,
+                                   SID>(debits, {std::nullopt}, {std::nullopt}, {std::nullopt},
+                                        {std::nullopt}, first, last, before, after);
    }
 
    auto tokens() const
@@ -227,9 +210,9 @@ struct TokenQuery
 // clang-format off
 PSIO_REFLECT(TokenQuery,
              method(allBalances),
-             method(userBalances, user, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after),
-             method(userCredits, user, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after),
-             method(userDebits, user, balance_gt, balance_ge, balance_lt, balance_le, first, last, before, after),
+             method(userBalances, user, first, last, before, after),
+             method(userCredits, user, first, last, before, after),
+             method(userDebits, user, first, last, before, after),
              method(tokens),
              method(tokenDetails, tokenId),
              method(userConf, user, flag))

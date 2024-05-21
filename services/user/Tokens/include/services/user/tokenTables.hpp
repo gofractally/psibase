@@ -91,7 +91,7 @@ namespace UserService
       BalanceKey key;
       uint64_t   balance;
 
-      auto byUserToken() const { return key.account; }
+      auto byUserToken() const { return std::tuple{key.account, key.tokenId}; }
 
       auto operator<=>(const BalanceRecord&) const = default;
    };
@@ -114,8 +114,8 @@ namespace UserService
       SharedBalanceKey key;
       uint64_t         balance;
 
-      auto byCreditor() const { return key.creditor; }
-      auto byDebitor() const { return key.debitor; }
+      auto byCreditor() const { return std::tuple{key.creditor, key.debitor, key.tokenId}; }
+      auto byDebitor() const { return std::tuple{key.debitor, key.creditor, key.tokenId}; }
 
       auto operator<=>(const SharedBalanceRecord&) const = default;
    };
