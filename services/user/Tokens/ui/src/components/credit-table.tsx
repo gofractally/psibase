@@ -63,11 +63,12 @@ export function CreditTable({ balances, user }: Props) {
 
   return (
     <Table>
-      <TableCaption>A list of your recent invoices.</TableCaption>
+      <TableCaption>A list of your credit and debits.</TableCaption>
       <TableHeader>
         <TableRow>
           <TableHead className="w-[100px]">Creditor</TableHead>
           <TableHead>Debitor</TableHead>
+          <TableHead>Token</TableHead>
           <TableHead>Amount</TableHead>
           <TableHead className="text-right">Action</TableHead>
         </TableRow>
@@ -83,9 +84,15 @@ export function CreditTable({ balances, user }: Props) {
             <TableRow key={balance.id}>
               <TableCell className="font-medium">{balance.creditor}</TableCell>
               <TableCell>{balance.debitor}</TableCell>
+              <TableCell>{balance.tokenId}</TableCell>
               <TableCell>{balance.balance}</TableCell>
               <TableCell className="text-right">
-                <Button onClick={() => handle(balance.id, type)}>{type}</Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => handle(balance.id, type)}
+                >
+                  {type}
+                </Button>
               </TableCell>
             </TableRow>
           );

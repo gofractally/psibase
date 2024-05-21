@@ -7,4 +7,9 @@ export const useUi = (username: string | undefined) =>
     queryKey: QueryKey.ui(username),
     enabled: !!username,
     queryFn: () => fetchUi(username!),
+    initialData: {
+      sharedBalances: [],
+      tokens: [],
+      userBalances: [],
+    },
   });

@@ -70,7 +70,6 @@ export function FormCreate({ onClose }: Props) {
     { precision: number; maxSupply: string; initialSupply: string }
   >({
     mutationFn: async ({ maxSupply, precision, initialSupply }) => {
-      console.log("attemmpting tx", { maxSupply, precision });
       try {
         const beforeTokens = await fetchTokens();
 
@@ -78,39 +77,32 @@ export function FormCreate({ onClose }: Props) {
           tokenPlugin.intf.create(precision, maxSupply)
         );
 
-        console.log(res, "came back on create tx");
-
         await wait(2000);
         const afterTokens = await fetchTokens(beforeTokens.length + 1);
 
         const createdToken = afterTokens.find(
-          (token) =>
-            token.precision == precision && token.maxSupply == maxSupply
+          (token) => token.precision == precision
         );
         if (!createdToken) {
           throw new Error(`Failed to find created token.`);
         }
 
-        console.log({ createdToken, afterTokens }, "werent good");
-
-        const res2 = await supervisor.functionCall(
+        await supervisor.functionCall(
           tokenPlugin.intf.mint(
             createdToken.id,
             initialSupply,
             "Token creation."
           )
         );
-        console.log(res2, "brexit was a mistake.");
         return res as { name: string };
       } catch (e) {
-        console.error("van dyke", e);
-        throw new Error("s");
+        console.error(e);
+        throw new Error("Failed creating token");
       }
     },
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log("forever, medicine", data);
     toast.promise(
       createToken({
         maxSupply: data.maxSupply,

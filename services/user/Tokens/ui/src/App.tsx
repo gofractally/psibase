@@ -34,30 +34,16 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMode } from "@/hooks/useMode";
 import { usePluginCall } from "@/hooks/usePluginCall";
-import { useTokenBalances } from "@/hooks/useTokenBalances";
+import { useTokenForm } from "@/hooks/useTokenForm";
 import { useUi } from "@/hooks/useUi";
 import { useUser } from "@/hooks/useUser";
 import { formatNumber } from "@/lib/formatNumber";
-import { placeholders } from "@/lib/memoPlaceholders";
-import { randomElement } from "@/lib/random";
 import { cn } from "@/lib/utils";
+import { wait } from "@/lib/wait";
 import { tokenPlugin } from "@/plugin";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { FunctionCallArgs } from "@psibase/common-lib";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-
-const formSchema = z.object({
-  token: z.string(),
-  to: z.string().max(50).optional(),
-  amount: z.string(),
-  from: z.string().optional(),
-  memo: z.string().max(50).optional(),
-});
-
-const memoPlaceholder = randomElement(placeholders);
 
 export interface TrackedToken {
   id: string;
@@ -69,31 +55,21 @@ export interface TrackedToken {
 
 function App() {
   const currentUser = useUser();
-  const { data: tokenBalances, refetch } = useTokenBalances(currentUser);
-  const { data: ui } = useUi(currentUser);
+  const { data: ui, refetch } = useUi(currentUser);
 
-  const tokens: TrackedToken[] = tokenBalances.map(
+  const tokens: TrackedToken[] = ui?.userBalances.map(
     (token): TrackedToken => ({
-      isAdmin: token.user == currentUser,
+      isAdmin: true,
       amount: token.quantity.toNumber(),
-      id: token.token.toString(),
+      id: token.tokenId.toString(),
       isGenericToken: !token.symbol,
-      label: `Token${token.token}`,
+      label: token.symbol ? token.symbol : `Token${token.tokenId}`,
     })
   );
 
   const { mutateAsync: pluginCall } = usePluginCall();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      amount: "",
-      token: "",
-      memo: "",
-      to: "",
-    },
-    mode: "all",
-  });
+  const form = useTokenForm();
 
   function onSubmit() {
     setConfirmationModalOpen(true);
@@ -145,9 +121,18 @@ function App() {
     } else {
       throw new Error(`Failed to identify args`);
     }
-    await pluginCall(args);
-    refetch();
-    setConfirmationModalOpen(false);
+    try {
+      await pluginCall(args);
+      form.setValue("amount", "");
+      setConfirmationModalOpen(false);
+    } catch (e) {
+      console.error(e, "caught error");
+    } finally {
+      refetch();
+      wait(3000).then(() => {
+        refetch();
+      });
+    }
   };
 
   const tokenBalance: number = selectedToken?.amount || 0;
@@ -182,6 +167,9 @@ function App() {
         >
           <FormCreate
             onClose={() => {
+              wait(3000).then(() => {
+                refetch();
+              });
               setNewTokenModalOpen(false);
             }}
           />
@@ -353,7 +341,7 @@ function App() {
                   <FormItem>
                     <FormLabel>Memo</FormLabel>
                     <FormControl>
-                      <Input placeholder={memoPlaceholder} {...field} />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -379,7 +367,7 @@ function App() {
             user={currentUser}
             balances={
               ui?.sharedBalances.map((x) => ({
-                balance: x.quantity ? x.quantity.toString() : "",
+                balance: x.quantity ? x.quantity.toString() : x.balance,
                 creditor: x.creditor,
                 debitor: x.debitor,
                 id: x.id,
