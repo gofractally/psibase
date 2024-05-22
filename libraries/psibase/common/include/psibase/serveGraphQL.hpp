@@ -355,7 +355,6 @@ namespace psibase
    ///
    /// Allows for a user-provided projection function that transforms elements from type T to Key
    /// before isolating a range within the container.
-   ///
    template <typename Connection, typename T, typename Key>
    Connection makeVirtualConnection(const std::vector<T>&             elements,
                                     const std::optional<Key>&         gt,

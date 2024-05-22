@@ -89,7 +89,7 @@ class TestPsibase(unittest.TestCase):
         a.boot(packages=['Minimal', 'Explorer'])
         a.run_psibase(['install', 'Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
-        a.graphql('tokens', '''query { userBalances(user: "alice") { user balance precision token symbol } }''')
+        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
 
     @testutil.psinode_test
     def test_upgrade(self, cluster):
