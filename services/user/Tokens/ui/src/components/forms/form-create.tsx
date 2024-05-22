@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 const isValidNumber = (str: string): boolean => {
-  if (str == "" || typeof str == "undefined" || str == null) return false;
+  if (str == "") return false;
   return !Number.isNaN(str);
 };
 
@@ -121,17 +121,23 @@ export function FormCreate({ onClose }: Props) {
     );
   };
 
-  const supply = form.watch("maxSupply");
+  const supply = form.watch("maxSupply") || 0;
   const precision = form.watch("precision");
-  const maxSupplyLabel = `${formatNumber(Number(supply))}`;
-
-  const initialSupplyLabel = formatNumber(
-    Number(form.watch("initialSupply")),
-    Number(precision)
-  );
 
   const suggestedPrecision = precision.length > 1 ? 8 : Number(precision) || 0;
-  const label = `${(1).toFixed(suggestedPrecision)} TOK`;
+
+  const initialSupplyLabel = formatNumber(
+    Number(form.watch("initialSupply") || 0),
+    Number(suggestedPrecision)
+  );
+
+  const exampleSymbol = "TOK";
+  const maxSupplyLabel = formatNumber(
+    supply,
+    suggestedPrecision,
+    exampleSymbol
+  );
+  const label = formatNumber(1, suggestedPrecision, exampleSymbol);
 
   return (
     <Form {...form}>

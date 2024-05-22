@@ -10,8 +10,10 @@ const formSchema = z.object({
   memo: z.string().max(50).optional(),
 });
 
+export type FormSchema = z.infer<typeof formSchema>;
+
 export const useTokenForm = () =>
-  useForm<z.infer<typeof formSchema>>({
+  useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       amount: "",
