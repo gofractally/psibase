@@ -87,7 +87,7 @@ void Tokens::init()
    }
 
    // Create system token
-   auto tid = tokService.create(Precision{4}, Quantity{1'000'000'000e8});
+   auto tid = tokService.create(Precision{4}, Quantity{1'000'000'000e4});
    check(tid == TID{1}, wrongSysTokenId);
 
    // Make system token default untradeable
