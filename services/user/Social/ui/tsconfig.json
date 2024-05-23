@@ -12,10 +12,16 @@
             "@psibase/common-lib/*": [
                 "../../CommonApi/common/packages/common-lib/src/*"
             ],
+            "@components": ["src/components"],
             "@components/*": ["src/components/*"],
+            "@shadcn": ["src/shad/components/ui"],
             "@shadcn/*": ["src/shad/components/ui/*"],
+            "@lib": ["src/lib"],
             "@lib/*": ["src/lib/*"],
-            "@hooks/*": ["src/hooks/*"]
+            "@hooks": ["src/hooks"],
+            "@hooks/*": ["src/hooks/*"],
+            "@routes": ["src/routes"],
+            "@routes/*": ["src/routes/*"]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,

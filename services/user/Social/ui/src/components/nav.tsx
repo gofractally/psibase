@@ -19,7 +19,6 @@ interface NavProps {
 }
 
 export function Nav({ links, isCollapsed }: NavProps) {
-    console.log(links);
     return (
         <div
             data-collapsed={isCollapsed}
@@ -54,7 +53,7 @@ export function Nav({ links, isCollapsed }: NavProps) {
                             >
                                 {link.title}
                                 {link.label && (
-                                    <span className="text-muted-foreground ml-auto">
+                                    <span className="ml-auto text-muted-foreground">
                                         {link.label}
                                     </span>
                                 )}
@@ -70,7 +69,7 @@ export function Nav({ links, isCollapsed }: NavProps) {
                                     size: "sm",
                                 }),
                                 link.variant === "default" &&
-                                    "dark:bg-muted dark:hover:bg-muted dark:text-white dark:hover:text-white",
+                                    "dark:bg-muted dark:text-white dark:hover:bg-muted dark:hover:text-white",
                                 "justify-start",
                             )}
                         >
