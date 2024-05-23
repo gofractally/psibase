@@ -35,6 +35,11 @@ namespace UserService
    };
    PSIO_REFLECT(Precision, value);
 
+   inline bool clio_validate_packable(const Precision& p)
+   {
+      return Precision::validate(p.value);
+   }
+
    void from_json(Precision& p, auto& stream)
    {
       from_json_object(stream,
@@ -53,12 +58,7 @@ namespace UserService
                           }
                        });
 
-      Precision::validate(p.value);
-   }
-
-   inline bool clio_validate_packable(const Precision& p)
-   {
-      return Precision::validate(p.value);
+      clio_validate_packable(p);
    }
 
    struct Quantity
