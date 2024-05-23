@@ -6,8 +6,15 @@ interface types {
 
     type quantity = string;
     type precision = u8;
-    type tid = u32;
+    type token-code = string;
     type account-number = string;
+
+    record token-detail {
+        id: u32,
+        owner: string,
+        precision: u8,
+        symbol-id: string,
+    }
 
     record balance {
         balance: string,
@@ -17,21 +24,24 @@ interface types {
     }
 }
 
+
+
 interface intf {
     use common:plugin/types.{error};
-    use types.{precision, quantity, tid, account-number};
+    use types.{precision, quantity, token-code, account-number};
     
     create: func(a: precision, b: quantity) -> result<_, error>;
-    burn: func(token-id: tid, amount: quantity, memo: string, account: account-number) -> result<_, error>;
-    mint: func(token-id: tid, amount: quantity, memo: string) -> result<_, error>;
+    burn: func(code: token-code, amount: quantity, memo: string, account: account-number) -> result<_, error>;
+    mint: func(code: token-code, amount: quantity, memo: string) -> result<_, error>;
 }
 
 interface transfer {
     use common:plugin/types.{error};
-    use types.{tid, account-number, quantity, balance};
+    use types.{token-code, account-number, quantity, balance, token-detail};
 
-    uncredit: func(token: tid, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
-    credit: func(token: tid, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
+    token-owner: func(code: token-code) -> result<token-detail, error>;
+    uncredit: func(code: token-code, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    credit: func(code: token-code, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
     balances: func() -> result<list<balance>, error>;
 }
 
