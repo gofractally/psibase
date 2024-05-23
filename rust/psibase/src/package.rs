@@ -554,7 +554,7 @@ pub fn validate_dependencies<T: Read + Seek>(
     packages: &mut [PackagedService<T>],
 ) -> Result<(), anyhow::Error> {
     println!("\n>>>>\n valdeps");
-    
+
     println!("\n>>>>\n valdeps2");
     let mut accounts: HashMap<AccountNumber, String> = HashMap::new();
     println!("\n>>>>\n valdeps222");
@@ -646,6 +646,33 @@ pub struct DirectoryRegistry {
 impl DirectoryRegistry {
     pub fn new(dir: PathBuf) -> Self {
         DirectoryRegistry { dir }
+    }
+
+    // TODO: extract sync methods to a proper TestDirectoryRegistry?
+    fn sync_get_by_info(
+        &self,
+        info: &PackageInfo,
+    ) -> Result<PackagedService<BufReader<File>>, anyhow::Error> {
+        let path = self.dir.join(&info.file);
+        let f =
+            File::open(&path).with_context(|| format!("Cannot open {}", path.to_string_lossy()))?;
+        PackagedService::new(BufReader::new(f))
+    }
+
+    pub fn sync_resolve(
+        &self,
+        packages: &[String],
+    ) -> Result<Vec<PackagedService<BufReader<File>>>, anyhow::Error> {
+        let mut result = vec![];
+        for op in solve_dependencies(self.index()?, make_refs(packages)?, vec![], false)? {
+            let PackageOp::Install(info) = op else {
+                panic!("Only install is expected when there are no existing packages");
+            };
+            println!("Package Info: {:?}", info);
+            result.push(self.sync_get_by_info(&info)?);
+        }
+
+        Ok(result)
     }
 }
 

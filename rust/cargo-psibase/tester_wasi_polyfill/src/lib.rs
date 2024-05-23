@@ -8,10 +8,13 @@ type Errno = u16;
 
 const POLYFILL_ROOT_DIR_FD: u32 = 3;
 
+/// WASM IMPORTS
 extern "C" {
     fn testerExit(rval: u32) -> !;
     fn testerGetArgCounts(argc: *mut Size, argv_buf_size: *mut Size);
     fn testerGetArgs(argv: *mut *mut u8, argv_buf: *mut u8);
+    fn testerGetEnvironCounts(environc: *mut Size, environc_buf_size: *mut Size) -> Errno;
+    fn testerGetEnviron(env: *mut *mut u8, buf: *mut u8) -> Errno;
     fn testerClockTimeGet(id: u32, precision: u64, time: *mut u64) -> Errno;
     fn testerOpenFile(
         path: *const u8,
@@ -53,15 +56,16 @@ pub unsafe extern "C" fn sched_yield() -> Errno {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn environ_sizes_get(ptr0: *mut Size, ptr1: *mut Size) -> Errno {
-    *ptr0 = 0;
-    *ptr1 = 0;
-    0
+pub unsafe extern "C" fn environ_sizes_get(
+    environc: *mut Size,
+    environc_buf_size: *mut Size,
+) -> Errno {
+    testerGetEnvironCounts(environc, environc_buf_size)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn environ_get(_environ: *mut *mut u8, _environ_buf: *mut u8) -> Errno {
-    0
+pub unsafe extern "C" fn environ_get(env: *mut *mut u8, buf: *mut u8) -> Errno {
+    testerGetEnviron(env, buf)
 }
 
 #[no_mangle]

@@ -71,7 +71,7 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
     if func.sig.inputs.len() > 1 {
         abort!(func.sig.inputs, "test_case has more than 1 argument")
     }
-    
+
     let inputs = func.sig.inputs;
     let output = func.sig.output;
     func.sig.inputs = Default::default();
@@ -115,43 +115,22 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
             fn with_chain(#inputs) #output #block
             fn create_chain() -> Result<psibase::Chain, psibase::Error> {
                 use psibase::*;
-                use std::io::Cursor;
-            
+
                 println!("\n>>>>\n Instantiating chain");
                 let mut chain = psibase::Chain::new();
-            
-                let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
-            
-                println!("\n>>>>\nCreating boot transactions");
-                let (boot_tx, subsequent_tx) = psibase::create_boot_transactions(
-                    &None,
-                    psibase::account!("prod"),
-                    false,
-                    psibase::TimePointSec { seconds: 10 },
-                    &mut services[..],
-                ).unwrap();
 
-                println!("\n>>>>\nPushing boot transactions to chain");
-            
-                for trx in boot_tx {
-                    chain.push(&trx).ok()?;
-                }
-            
-                for trx in subsequent_tx {
-                    chain.push(&trx).ok()?;
-                }
+                println!("\n>>>>\n Boot test chain...");
+                chain.boot()?;
 
                 println!("\n>>>>\nDeploying services...");
-            
-                #deploy_services
 
+                #deploy_services
 
                 println!("\n>>>>\nServices deployed!");
                 Ok(chain)
             }
             println!("\n>>>>\nCreating chain");
             let chain = create_chain();
-            println!("\n>>>>\nChain created!");
             if let Err(e) = chain {
                 panic!("test {} failed with {:?}", #name, e);
             }

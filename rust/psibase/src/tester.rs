@@ -7,16 +7,18 @@
 //! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
 
 use crate::{
-    get_result_bytes, kv_get, services, status_key, tester_raw, AccountNumber, Action, Caller, InnerTraceEnum, Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace
+    create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
+    AccountNumber, Action, Caller, DirectoryRegistry, Error, InnerTraceEnum, Reflect,
+    SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
 use psibase_macros::account_raw;
 use std::cell::{Cell, RefCell};
-use std::{marker::PhantomData, ptr::null_mut};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::{marker::PhantomData, ptr::null_mut};
 
 /// Execute a shell command
 ///
@@ -67,23 +69,87 @@ impl Chain {
         Self::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)
     }
 
+    /// Boot the tester chain with default services being deployed
+    pub fn boot(&self) -> Result<(), Error> {
+        let default_services: Vec<String> = vec![
+            // "Accounts".to_string(),
+            // "AuthAny".to_string(),
+            // "AuthDelegate".to_string(),
+            // "AuthSig".to_string(),
+            // "AuthK1".to_string(),
+            // "CommonApi".to_string(),
+            // "CpuLimit".to_string(),
+            // "Events".to_string(), // TODO: MISSING
+            // "Explorer".to_string(),
+            // "Fractal".to_string(),
+            // "Invite".to_string(),
+            // "Nft".to_string(),
+            // "Packages".to_string(),
+            // "Producers".to_string(),
+            // "HttpServer".to_string(),
+            // "Sites".to_string(),
+            // "SetCode".to_string(),
+            // "Symbol".to_string(),
+            // "Tokens".to_string(),
+            // "Transact".to_string(),
+            "Default".to_string(),
+            // TODO: >>> Default Extra:
+            // Supervisor
+            // Docs
+            // Nop
+            // TokenUsers
+        ];
+
+        // get from env PSIBASE_DATADIR
+        let psibase_data_dir = std::env::var("PSIBASE_DATADIR")
+            .expect("Cannot find package directory: PSIBASE_DATADIR not defined");
+        // let psibase_data_dir = "/home/sohdev/Workspace/fractally/new-psibase/build/share/psibase".to_string();
+        let packages_dir = Path::new(&psibase_data_dir).join("packages");
+        println!(">>> Chain::boot -> Packages dir: {:?}", packages_dir);
+
+        let mut result = DirectoryRegistry::new(packages_dir);
+        let mut services = result.sync_resolve(&default_services[..])?;
+        println!(
+            ">>> Chain::boot -> Resolved first service: {:?}",
+            services[0].name()
+        );
+
+        println!("\n>>>>\nCreating boot transactions");
+        let (boot_tx, subsequent_tx) = create_boot_transactions(
+            &None,
+            AccountNumber::new(account_raw!("prod")),
+            false,
+            TimePointSec { seconds: 10 },
+            &mut services[..],
+        )
+        .unwrap();
+
+        println!("\n>>>>\nPushing boot transactions to chain");
+
+        for trx in boot_tx {
+            println!("\n\n>>> Pushing boot transaction item");
+            self.push(&trx).ok()?;
+        }
+
+        for trx in subsequent_tx {
+            println!("\n\n>>> Pushing subsequent tx item");
+            self.push(&trx).ok()?;
+        }
+
+        println!(">>> Chain::boot -> Booted chain successfully!");
+
+        Ok(())
+    }
+
     /// Create a new chain and make it active for database native functions.
     ///
     /// The arguments are the file sizes in bytes for the database's
     /// various files.
-    pub fn create(
-        hot_bytes: u64,
-        warm_bytes: u64,
-        cool_bytes: u64,
-        cold_bytes: u64,
-    ) -> Chain {
+    pub fn create(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> Chain {
         unsafe {
             Chain {
                 chain_handle: tester_raw::testerCreateChain(
-                    hot_bytes,
-                    warm_bytes,
-                    cool_bytes,
-                    cold_bytes,
+                    hot_bytes, warm_bytes, cool_bytes, cold_bytes,
                 ),
                 status: None.into(),
                 producing: false.into(),
@@ -99,7 +165,10 @@ impl Chain {
     /// TODO: Support sub-second block times
     pub fn start_block_at(&self, time: TimePointSec) {
         let status = &mut *self.status.borrow_mut();
-        println!(">>> Chain::start_block_at -> Starting block at status: {:?}", status);
+        println!(
+            ">>> Chain::start_block_at -> Starting block at status: {:?}",
+            status
+        );
 
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
@@ -112,8 +181,10 @@ impl Chain {
         println!(">>> Chain::start_block_at -> Unpacking status...");
         *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
 
-
-        println!(">>> Chain::start_block_at -> Starting block at status: {:?}", status);
+        println!(
+            ">>> Chain::start_block_at -> Starting block at status: {:?}",
+            status
+        );
         self.producing.replace(true);
     }
 
@@ -160,9 +231,15 @@ impl Chain {
             self.start_block();
         }
 
-        println!("\n\n>>> Chain::push -> Packing transaction: {:?}", transaction);
+        println!(
+            "\n\n>>> Chain::push -> Packing transaction: {:?}",
+            transaction
+        );
         let transaction = transaction.packed();
-        println!(">>> Chain::push -> Packed transaction!: {} bytes", transaction.len());
+        println!(
+            ">>> Chain::push -> Packed transaction!: {} bytes",
+            transaction.len()
+        );
         let size = unsafe {
             // unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
             //     let context = &mut *(alloc_context as *mut Context);
@@ -173,12 +250,27 @@ impl Chain {
             tester_raw::testerPushTransaction(
                 self.chain_handle,
                 transaction.as_ptr(),
-                transaction.len())
+                transaction.len(),
+            )
         };
-        println!(">>> Chain::push -> Pushed transaction!: {} bytes; unpacking...", size);
+        println!(
+            ">>> Chain::push -> Pushed transaction!: {} bytes; unpacking...",
+            size
+        );
         println!(">>> Chain::push -> Unpacking trace result...");
         let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
         println!(">>> Chain::push -> Unpacked trace result!: {:?}", trace);
+
+        for action in &trace.action_traces {
+            println!(">>> Chain::push -> Action trace: {:?}", action);
+            let action = &action.action;
+            println!(
+                ">>> Chain::push -> Action Trace Service.Method: {}.{}",
+                action.service.to_string(),
+                action.method.to_string()
+            );
+        }
+
         trace
     }
 
