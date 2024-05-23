@@ -98,7 +98,8 @@ struct TokenQuery
       vector<TokenBalance> balances;
 
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
-      auto balanceIdx   = tokenService.open<BalanceTable>().getIndex<1>().subindex(user);
+      auto balanceIdx   = tokenService.open<BalanceTable>().getIndex<0>().subindex(
+          SplitKey<TID, AccountNumber>{user});
 
       // Balances of this user
       for (auto balance : balanceIdx)
@@ -124,7 +125,8 @@ struct TokenQuery
       vector<Credit> credits;
 
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
-      auto creditIdx    = tokenService.open<SharedBalanceTable>().getIndex<1>();
+      auto creditIdx    = tokenService.open<SharedBalanceTable>().getIndex<0>().subindex(
+          SplitKey<std::tuple<TID, AccountNumber>, AccountNumber>{user});
 
       for (auto credit : creditIdx)
       {
@@ -149,7 +151,7 @@ struct TokenQuery
       vector<Debit> debits;
 
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
-      auto debitIdx     = tokenService.open<SharedBalanceTable>().getIndex<2>();
+      auto debitIdx     = tokenService.open<SharedBalanceTable>().getIndex<1>().subindex(user);
 
       for (auto debit : debitIdx)
       {
