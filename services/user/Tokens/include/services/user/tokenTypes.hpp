@@ -12,25 +12,54 @@ namespace UserService
 
    struct Precision
    {
-      static constexpr uint8_t          precisionMin = 0;
-      static constexpr uint8_t          precisionMax = 16;
-      static constexpr std::string_view errorInvalid = "Value exceeds allowed Precision range";
+      static constexpr uint8_t precisionMin = 0;
+      static constexpr uint8_t precisionMax = 8;
 
       uint8_t value;
 
-      Precision(uint8_t p) : value{p} {}
+      Precision(uint8_t p) : value{p} { validate(p); }
       Precision() : Precision(0) {}
 
-      // TODO: fracpack doesn't enforce yet
-      // TODO: from_json doesn't enforce yet
-      static void fracpack_validate(Precision p)
+      static bool validate(const uint8_t& p)
       {
-         psibase::check(precisionMin <= p.value && p.value <= precisionMax, errorInvalid);
+         if (precisionMin > p || p > precisionMax)
+         {
+            psibase::check(
+                false, "Value " + std::to_string(p) + " outside allowed Precision range: " +
+                           std::to_string(precisionMin) + " to " + std::to_string(precisionMax));
+         }
+         return true;
       }
 
       friend std::strong_ordering operator<=>(const Precision&, const Precision&) = default;
    };
    PSIO_REFLECT(Precision, value);
+
+   void from_json(Precision& p, auto& stream)
+   {
+      from_json_object(stream,
+                       [&](std::string_view key) -> void
+                       {
+                          bool found = false;
+                          psio::reflect<Precision>::get(key,
+                                                        [&](auto member)
+                                                        {
+                                                           from_json(p.*member, stream);
+                                                           found = true;
+                                                        });
+                          if (not found)
+                          {
+                             from_json_skip_value(stream);
+                          }
+                       });
+
+      Precision::validate(p.value);
+   }
+
+   inline bool clio_validate_packable(const Precision& p)
+   {
+      return Precision::validate(p.value);
+   }
 
    struct Quantity
    {
