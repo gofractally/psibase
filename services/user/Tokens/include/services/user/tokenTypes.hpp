@@ -40,27 +40,6 @@ namespace UserService
       return Precision::validate(p.value);
    }
 
-   void from_json(Precision& p, auto& stream)
-   {
-      from_json_object(stream,
-                       [&](std::string_view key) -> void
-                       {
-                          bool found = false;
-                          psio::reflect<Precision>::get(key,
-                                                        [&](auto member)
-                                                        {
-                                                           from_json(p.*member, stream);
-                                                           found = true;
-                                                        });
-                          if (not found)
-                          {
-                             from_json_skip_value(stream);
-                          }
-                       });
-
-      clio_validate_packable(p);
-   }
-
    struct Quantity
    {
       using Quantity_t = uint64_t;
