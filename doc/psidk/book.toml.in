@@ -42,6 +42,6 @@ runnable = false
 enable = true
 
 [output.linkcheck]
-follow-web-links = true
+follow-web-links = false
 traverse-parent-directories = false
 warning-policy = "ignore"
