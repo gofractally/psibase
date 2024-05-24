@@ -10,13 +10,24 @@ export class Quantity {
     private amount: string,
     private precision: number,
     private symbol?: string
-  ) {}
+  ) {
+    if (amount.includes("."))
+      throw new Error(`Expected integer, e.g. 10000 not 1.0000`);
+  }
+
+  public containsSymbol(): boolean {
+    return !!this.symbol;
+  }
 
   public toNumber(): number {
     return Number(this.amount) / Math.pow(10, this.precision);
   }
 
   public toString(): string {
+    return this.toNumber().toString();
+  }
+
+  public format(): string {
     return `${formatTrailingZeros(this.toNumber(), this.precision)}${
       this.symbol ? ` ${this.symbol}` : ""
     }`;

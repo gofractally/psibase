@@ -21,31 +21,33 @@ mod query {
 }
 
 enum TokenType {
-    id(u32),
+    number(u32),
     symbol(String),
 }
 
-fn identify_token_type(token_code: String) -> Result<TokenType, CommonTypes::Error> {
-    use TokenType::{id, symbol};
+fn identify_token_type(token_id: String) -> Result<TokenType, CommonTypes::Error> {
+    use TokenType::{number, symbol};
 
-    let first_char = token_code
+    let first_char = token_id
         .chars()
         .next()
-        .ok_or(ErrorType::InvalidTokenCode.err("token code is empty"))?;
+        .ok_or(ErrorType::InvalidTokenId.err("token code is empty"))?;
 
     Ok(if first_char.is_ascii_digit() {
-        id(token_code
-            .parse::<u32>()
-            .map_err(|_| ErrorType::InvalidTokenCode.err("failed to parse token_code to u32"))?)
+        number(
+            token_id
+                .parse::<u32>()
+                .map_err(|_| ErrorType::InvalidTokenId.err("failed to parse token_id to u32"))?,
+        )
     } else {
-        symbol(token_code)
+        symbol(token_id)
     })
 }
 
-fn token_code_to_id(token_id: Wit::TokenCode) -> Result<u32, CommonTypes::Error> {
+fn token_code_to_id(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error> {
     let parsed = identify_token_type(token_id)?;
     match parsed {
-        TokenType::id(id) => Ok(id),
+        TokenType::number(number) => Ok(number),
         TokenType::symbol(_) => {
             unimplemented!("Dunno how to lookup a token by symbol")
         }
@@ -68,7 +70,7 @@ impl Intf for Component {
     }
 
     fn burn(
-        code: Wit::TokenCode,
+        code: Wit::TokenId,
         amount: Wit::Quantity,
         memo: String,
         account: Wit::AccountNumber,
@@ -99,7 +101,7 @@ impl Intf for Component {
     }
 
     fn mint(
-        code: Wit::TokenCode,
+        code: Wit::TokenId,
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), CommonTypes::Error> {
@@ -118,7 +120,7 @@ impl Intf for Component {
 }
 
 impl Transfer for Component {
-    fn token_owner(code: Wit::TokenCode) -> Result<Wit::TokenDetail, CommonTypes::Error> {
+    fn token_owner(code: Wit::TokenId) -> Result<Wit::TokenDetail, CommonTypes::Error> {
         let token_id = token_code_to_id(code)?;
         let res = fetch_token(token_id)?;
 
@@ -138,13 +140,13 @@ impl Transfer for Component {
                 balance: balance.balance,
                 creditor: balance.key.creditor,
                 debitor: balance.key.debitor,
-                token_id: balance.key.tokenId,
+                token_number: balance.key.tokenId,
             })
             .collect())
     }
 
     fn uncredit(
-        code: Wit::TokenCode,
+        code: Wit::TokenId,
         debitor: Wit::AccountNumber,
         amount: Wit::Quantity,
         memo: String,
@@ -168,7 +170,7 @@ impl Transfer for Component {
     }
 
     fn credit(
-        code: Wit::TokenCode,
+        code: Wit::TokenId,
         receiver: Wit::AccountNumber,
         amount: Wit::Quantity,
         memo: String,

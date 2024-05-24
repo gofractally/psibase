@@ -13,22 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Token } from "@/hooks/useUi";
 import { formatThousands } from "@/lib/formatNumber";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
 
-export interface TrackedToken {
-  id: string;
-  label: string;
-  amount: number;
-  isAdmin: boolean;
-  isGenericToken: boolean;
-}
-
 interface Props {
-  tokens: TrackedToken[];
+  tokens: Token[];
   form: UseFormReturn<any>;
   setNewTokenModalOpen: (open: boolean) => void;
 }
@@ -60,13 +53,16 @@ const TokenSelection: FC<Props> = ({ tokens, form, setNewTokenModalOpen }) => (
               <SelectItem
                 key={balance.id}
                 className={cn({
-                  "text-muted-foreground": balance.isGenericToken,
+                  "text-muted-foreground": !!balance.symbol,
                 })}
-                value={balance.id}
+                value={balance.id.toString()}
                 // @ts-ignore
                 right={
                   <div className="text-sm text-muted-foreground">
-                    Balance: {formatThousands(balance.amount)}
+                    {balance.balance &&
+                      `Balance: ${formatThousands(
+                        balance.balance?.toNumber()
+                      )}`}
                   </div>
                 }
               >

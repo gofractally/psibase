@@ -81,6 +81,6 @@ pub fn fetch_token(token_id: u32) -> Result<TokenDetail, CommonTypes::Error> {
     if res.id == token_id {
         Ok(res)
     } else {
-        Err(ErrorType::TokenIdMismatch.err("token_id requested does not match response"))
+        Err(ErrorType::TokenNumberMismatch.err("token_id requested does not match response"))
     }
 }

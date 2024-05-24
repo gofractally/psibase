@@ -6,11 +6,12 @@ interface types {
 
     type quantity = string;
     type precision = u8;
-    type token-code = string;
+    type token-id = string;
+    type token-number = u32;
     type account-number = string;
 
     record token-detail {
-        id: u32,
+        id: token-number,
         owner: string,
         precision: u8,
         symbol-id: string,
@@ -20,7 +21,7 @@ interface types {
         balance: string,
         creditor: string,
         debitor: string,
-        token-id: u32,
+        token-number: token-number,
     }
 }
 
@@ -28,20 +29,20 @@ interface types {
 
 interface intf {
     use common:plugin/types.{error};
-    use types.{precision, quantity, token-code, account-number};
+    use types.{precision, quantity, token-id, account-number};
     
     create: func(a: precision, b: quantity) -> result<_, error>;
-    burn: func(code: token-code, amount: quantity, memo: string, account: account-number) -> result<_, error>;
-    mint: func(code: token-code, amount: quantity, memo: string) -> result<_, error>;
+    burn: func(code: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
+    mint: func(code: token-id, amount: quantity, memo: string) -> result<_, error>;
 }
 
 interface transfer {
     use common:plugin/types.{error};
-    use types.{token-code, account-number, quantity, balance, token-detail};
+    use types.{token-id, account-number, quantity, balance, token-detail};
 
-    token-owner: func(code: token-code) -> result<token-detail, error>;
-    uncredit: func(code: token-code, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
-    credit: func(code: token-code, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
+    token-owner: func(code: token-id) -> result<token-detail, error>;
+    uncredit: func(code: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    credit: func(code: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
     balances: func() -> result<list<balance>, error>;
 }
 

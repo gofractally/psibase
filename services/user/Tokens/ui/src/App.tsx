@@ -15,27 +15,12 @@ import { tokenPlugin } from "@/plugin";
 import { FunctionCallArgs } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
 
-export interface TrackedToken {
-  id: string;
-  label: string;
-  amount: number;
-  isAdmin: boolean;
-  isGenericToken: boolean;
-}
-
 function App() {
   const currentUser = useUser();
-  const { data: ui, refetch } = useUi(currentUser);
-
-  const tokens: TrackedToken[] = ui?.userBalances.map(
-    (token): TrackedToken => ({
-      isAdmin: true,
-      amount: token.quantity.toNumber(),
-      id: token.tokenId.toString(),
-      isGenericToken: !token.symbol,
-      label: token.symbol ? token.symbol : `Token${token.tokenId}`,
-    })
-  );
+  const {
+    data: { sharedBalances, tokens },
+    refetch,
+  } = useUi(currentUser);
 
   const { mutateAsync: pluginCall } = usePluginCall();
 
@@ -49,7 +34,9 @@ function App() {
   const { isBurning, isMinting, isTransfer } = m(mode);
 
   const selectedTokenId = form.watch("token");
-  const selectedToken = tokens.find((balance) => balance.id == selectedTokenId);
+  const selectedToken = tokens.find(
+    (balance) => balance.id == Number(selectedTokenId)
+  );
 
   useEffect(() => {
     if (!selectedToken) {
@@ -77,7 +64,7 @@ function App() {
   }`;
 
   const performTx = async () => {
-    const tokenId = Number(form.watch("token"));
+    const tokenId = form.watch("token");
     const amount = form.watch("amount");
     const memo = form.watch("memo")!;
     let args: FunctionCallArgs;
@@ -147,15 +134,8 @@ function App() {
         <div className="mb-4">
           <CreditTable
             user={currentUser}
-            balances={
-              ui?.sharedBalances.map((x) => ({
-                balance: x.quantity ? x.quantity.toString() : x.balance,
-                creditor: x.creditor,
-                debitor: x.debitor,
-                id: x.id,
-                tokenId: x.tokenId,
-              })) || []
-            }
+            // @ts-ignore
+            balances={sharedBalances}
           />
         </div>
       </div>

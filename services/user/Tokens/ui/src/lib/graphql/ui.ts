@@ -1,132 +1,94 @@
-import { Quantity } from "../quantity";
 import { graphql } from "./index";
+import { z } from "zod";
 
-export interface Data {
-  sharedBalances: SharedBalances;
-  tokens: Tokens;
-  userBalances: UserBalance[];
-}
+export const PrecisionSchema = z.object({
+  value: z.number(),
+});
+export type Precision = z.infer<typeof PrecisionSchema>;
 
-export interface SharedBalances {
-  edges: SharedBalancesEdge[];
-}
+export const NodeSchema = z.object({
+  tokenId: z.number(),
+  balance: z.string(),
+  symbolId: z.string(),
+  precision: PrecisionSchema,
+  creditedTo: z.string().optional(),
+  debitableFrom: z.string().optional(),
+});
+export type Node = z.infer<typeof NodeSchema>;
 
-export interface SharedBalancesEdge {
-  node: PurpleNode;
-}
+export const EdgeSchema = z.object({
+  node: NodeSchema,
+});
+export type Edge = z.infer<typeof EdgeSchema>;
 
-export interface PurpleNode {
-  balance: string;
-  key: Key;
-}
+export const UserSchema = z.object({
+  edges: z.array(EdgeSchema),
+});
+export type User = z.infer<typeof UserSchema>;
 
-export interface Key {
-  creditor: string;
-  debitor: string;
-  tokenId: number;
-}
-
-export interface Tokens {
-  edges: TokensEdge[];
-}
-
-export interface TokensEdge {
-  node: FluffyNode;
-}
-
-export interface FluffyNode {
-  id: number;
-  ownerNft: number;
-  precision: Precision;
-  symbolId: string;
-}
-
-export interface Precision {
-  value: number;
-}
-
-export interface UserBalance {
-  user: string;
-  balance: string;
-  precision: number;
-  token: number;
-  symbol: string;
-}
+export const DataSchema = z.object({
+  userBalances: UserSchema,
+  userCredits: UserSchema,
+  userDebits: UserSchema,
+});
+export type Data = z.infer<typeof DataSchema>;
 
 const queryString = (username: string) => `
 {
-	sharedBalances(first: 500) {
+	
+	userBalances(user: "${username}") {
 		edges {
 			node {
+				tokenId
 				balance
-				key {
-					creditor
-					debitor
-					tokenId
-				}
-			}
-		}
-	}
-
-	tokens(gt: 1) {
-		edges {
-			node {
-				id
-				ownerNft
+				symbolId
 				precision {
 					value
 				}
-				symbolId
 			}
 		}
 	}
-
-	userBalances(user: "${username}") {
-		user
-		balance
-		precision
-		token
-		symbol
+	
+	userCredits(user: "${username}") {
+		edges {
+			node {
+				symbolId
+				tokenId
+				precision {
+					value
+				}
+				balance
+				creditedTo
+			}
+		}
 	}
+	
+	userDebits(user: "${username}") {
+		edges {
+			node {
+				symbolId
+				tokenId
+				precision {
+					value
+				}
+				balance
+				debitableFrom
+			}
+		}
+	}
+	
 }
 
 `;
 
 export const fetchUi = async (username: string) => {
-  const res = await graphql<Data>(queryString(username));
+  const res = await graphql<z.infer<typeof DataSchema>>(queryString(username));
 
-  console.log(res, "is the big query");
-
-  const tokens = res.tokens.edges.map((edge) => ({
-    symbol: edge.node.symbolId,
-    id: edge.node.id,
-    precision: edge.node.precision.value,
-  }));
+  console.log(res, "is the big query fetchUi");
 
   return {
-    sharedBalances: res.sharedBalances.edges.map((edge) => {
-      const foundToken = tokens.find(
-        (token) => token.id == edge.node.key.tokenId
-      );
-      const { creditor, debitor, tokenId } = edge.node.key;
-
-      return {
-        id: `${creditor}-${debitor}-${tokenId}`,
-        tokenId: edge.node.key.tokenId,
-        creditor,
-        debitor,
-        balance: edge.node.balance,
-        ...(foundToken && {
-          quantity: new Quantity(edge.node.balance, foundToken.precision),
-        }),
-      };
-    }),
-    tokens,
-    userBalances: res.userBalances.map((balance) => ({
-      quantity: new Quantity(balance.balance, balance.precision),
-      tokenId: balance.token,
-      user: balance.user,
-      symbol: balance.symbol,
-    })),
+    userDebits: res.userDebits.edges.map(({ node }) => node),
+    userCredits: res.userCredits.edges.map(({ node }) => node),
+    userBalances: res.userBalances.edges.map(({ node }) => node),
   };
 };

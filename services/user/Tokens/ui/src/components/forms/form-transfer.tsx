@@ -4,7 +4,6 @@ import {
   FromInput,
   AmountInput,
 } from "./fields";
-import { TrackedToken } from "@/App";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mode, m } from "@/hooks/useMode";
 import { FormSchema } from "@/hooks/useTokenForm";
+import { Token } from "@/hooks/useUi";
 import { formatThousands } from "@/lib/formatNumber";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { FC } from "react";
@@ -25,10 +25,10 @@ import { UseFormReturn } from "react-hook-form";
 
 interface Props {
   form: UseFormReturn<FormSchema>;
-  tokens: TrackedToken[];
+  tokens: Token[];
   mode: Mode;
   setMode: (mode: Mode) => void;
-  selectedToken: TrackedToken | undefined;
+  selectedToken: Token | undefined;
   setNewTokenModalOpen: (open: boolean) => void;
   onSubmit: () => void;
 }
@@ -47,7 +47,7 @@ const FormTransfer: FC<Props> = ({
   const isAdmin = selectedToken?.isAdmin || false;
   const disableTo = !isAdmin && isBurning;
   const isAmountOperation = isBurning || isMinting || isTransfer;
-  const tokenBalance: number = selectedToken?.amount || 0;
+  const tokenBalance: number = selectedToken?.balance?.toNumber() || 0;
   const tokenBalanceLabel = formatThousands(tokenBalance);
 
   const menus: { label: string; value: string }[] = [

@@ -3,8 +3,8 @@ use crate::bindings::common::plugin::types::{Error, PluginId};
 #[derive(PartialEq, Eq, Hash)]
 pub enum ErrorType {
     QueryError,
-    InvalidTokenCode,
-    TokenIdMismatch,
+    InvalidTokenId,
+    TokenNumberMismatch,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -22,15 +22,15 @@ impl ErrorType {
                 producer: my_plugin_id(),
                 message: format!("Failed to post graphql query: {}", msg),
             },
-            ErrorType::InvalidTokenCode => Error {
+            ErrorType::InvalidTokenId => Error {
                 code: self as u32,
                 producer: my_plugin_id(),
-                message: format!("Invalid token code: {}", msg),
+                message: format!("Invalid token ID: {}", msg),
             },
-            ErrorType::TokenIdMismatch => Error {
+            ErrorType::TokenNumberMismatch => Error {
                 code: self as u32,
                 producer: my_plugin_id(),
-                message: format!("Token IDs do not match: {}", msg),
+                message: format!("Token number mismatch: {}", msg),
             },
         }
     }

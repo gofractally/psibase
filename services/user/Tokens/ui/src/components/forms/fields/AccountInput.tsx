@@ -1,4 +1,3 @@
-import { TrackedToken } from "@/App";
 import {
   FormField,
   FormItem,
@@ -8,12 +7,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { FormSchema } from "@/hooks/useTokenForm";
+import { Token } from "@/hooks/useUi";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
 
 interface Props {
   form: UseFormReturn<FormSchema>;
-  selectedToken: TrackedToken | undefined;
+  selectedToken: Token | undefined;
   tokenBalance: number;
   tokenBalanceLabel: string;
 }

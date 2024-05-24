@@ -9,18 +9,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePluginCall } from "@/hooks/usePluginCall";
+import { SharedBalance } from "@/hooks/useUi";
 import QueryKey from "@/lib/queryKeys";
 import { tokenPlugin } from "@/plugin";
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-
-interface SharedBalance {
-  creditor: string;
-  debitor: string;
-  balance: string;
-  tokenId: number;
-  id: string;
-}
 
 interface Props {
   balances: SharedBalance[];
@@ -47,7 +40,7 @@ export function CreditTable({ balances, user }: Props) {
         tokenPlugin.transfer.uncredit(
           balance.tokenId,
           balance.debitor,
-          balance.balance
+          balance.amount.toString()
         )
       );
     } else if (parsedAction == ActionType.Enum.Debit) {
@@ -55,7 +48,7 @@ export function CreditTable({ balances, user }: Props) {
         tokenPlugin.transfer.debit(
           balance.tokenId,
           balance.debitor,
-          balance.balance
+          balance.amount.toString()
         )
       );
     } else throw new Error(`Unhandled action`);
@@ -84,8 +77,8 @@ export function CreditTable({ balances, user }: Props) {
             <TableRow key={balance.id}>
               <TableCell className="font-medium">{balance.creditor}</TableCell>
               <TableCell>{balance.debitor}</TableCell>
-              <TableCell>{balance.tokenId}</TableCell>
-              <TableCell>{balance.balance}</TableCell>
+              <TableCell>{balance.label}</TableCell>
+              <TableCell>{balance.amount.toString()}</TableCell>
               <TableCell className="text-right">
                 <Button
                   variant="secondary"

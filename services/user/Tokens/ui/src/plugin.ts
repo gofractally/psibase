@@ -14,7 +14,7 @@ class Intf extends Interface {
   }
 
   public burn(
-    tokenId: number,
+    tokenId: string | number,
     amount: string,
     memo?: string,
     account?: string
@@ -23,21 +23,21 @@ class Intf extends Interface {
       method: "burn",
       params: z
         .tuple([
-          z.number(),
+          z.string(),
           z.string(),
           z.string().default(""),
           z.string().default(""),
         ])
-        .parse([tokenId, amount, memo, account]),
+        .parse([tokenId.toString(), amount, memo, account]),
     });
   }
 
-  public mint(tokenId: number, amount: string, memo: string) {
+  public mint(tokenId: string | number, amount: string, memo: string) {
     return this.addIntf({
       method: "mint",
       params: z
-        .tuple([z.number(), z.string(), z.string()])
-        .parse([tokenId, amount, memo]),
+        .tuple([z.string(), z.string(), z.string()])
+        .parse([tokenId.toString(), amount, memo]),
     });
   }
 }
@@ -48,7 +48,7 @@ class Transfer extends Interface {
   }
 
   public credit(
-    tokenId: number,
+    tokenId: string | number,
     receiver: string,
     amount: string,
     memo: string = ""
@@ -56,13 +56,13 @@ class Transfer extends Interface {
     return this.addIntf({
       method: "credit",
       params: z
-        .tuple([z.number(), z.string(), z.string(), z.string().default("")])
-        .parse([tokenId, receiver, amount, memo]),
+        .tuple([z.string(), z.string(), z.string(), z.string().default("")])
+        .parse([tokenId.toString(), receiver, amount, memo]),
     });
   }
 
   public uncredit(
-    tokenId: number,
+    tokenId: string | number,
     receiver: string,
     amount: string,
     memo: string = ""
@@ -70,13 +70,13 @@ class Transfer extends Interface {
     return this.addIntf({
       method: "uncredit",
       params: z
-        .tuple([z.number(), z.string(), z.string(), z.string()])
-        .parse([tokenId, receiver, amount, memo]),
+        .tuple([z.string(), z.string(), z.string(), z.string()])
+        .parse([tokenId.toString(), receiver, amount, memo]),
     });
   }
 
   public debit(
-    tokenId: number,
+    tokenId: string | number,
     sender: string,
     amount: string,
     memo: string = ""
@@ -84,8 +84,8 @@ class Transfer extends Interface {
     return this.addIntf({
       method: "debit",
       params: z
-        .tuple([z.number(), z.string(), z.string(), z.string()])
-        .parse([tokenId, sender, amount, memo]),
+        .tuple([z.string(), z.string(), z.string(), z.string()])
+        .parse([tokenId.toString(), sender, amount, memo]),
     });
   }
 }
