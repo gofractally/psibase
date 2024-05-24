@@ -43,12 +43,11 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void minted(uint64_t prevEvent, NID nftId, Account issuer) {}
-            void burned(uint64_t prevEvent, NID nftId) {}
-            void userConfSet(uint64_t prevEvent, Account account, psibase::EnumElement flag, bool enable) {}
-            void credited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, MemoView memo) {}
-            void uncredited(uint64_t prevEvent, NID nftId, Account sender, Account receiver, MemoView memo) {}
-            void transferred(uint64_t prevEvent, NID nftId, Account creditor, Account debitor, MemoView memo) {}
+            void minted(NID nftId, Account issuer) {}
+            void burned(NID nftId, Account owner) {}
+            void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
+            void credited(NID nftId, Account sender, Account receiver, MemoView memo) {}
+            void uncredited(NID nftId, Account sender, Account receiver, MemoView memo) {}
          };
          // clang-format on
 
@@ -57,10 +56,9 @@ namespace UserService
          };
          struct Merkle
          {
+            void transferred(NID nftId, Account creditor, Account debitor, MemoView memo) {}
          };
       };
-      using NftEvents  = psibase::EventIndex<&NftRecord::eventHead, "prevEvent">;
-      using UserEvents = psibase::EventIndex<&NftHolderRecord::eventHead, "prevEvent">;
    };
 
    // clang-format off
@@ -82,16 +80,15 @@ namespace UserService
    );
    PSIBASE_REFLECT_EVENTS(Nft);
    PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
-      method(minted, prevEvent, nftId, issuer),
-      method(burned, prevEvent, nftId),
-      method(userConfSet, prevEvent, account, flag, enable),
-      method(credited, prevEvent, nftId, sender, receiver, memo),
-      method(uncredited, prevEvent, nftId, sender, receiver, memo),
-      method(transferred, prevEvent, nftId, creditor, debitor, memo)
+      method(minted, nftId, issuer),
+      method(burned, nftId, owner),
+      method(userConfSet, account, flag, enable),
+      method(credited, nftId, sender, receiver, memo),
+      method(uncredited, nftId, sender, receiver, memo)
    );
    PSIBASE_REFLECT_UI_EVENTS(Nft);
-   PSIBASE_REFLECT_MERKLE_EVENTS(Nft);
-
+   PSIBASE_REFLECT_MERKLE_EVENTS(Nft,
+      method(transferred, nftId, creditor, debitor, memo)
+   );
    // clang-format on
-
 }  // namespace UserService

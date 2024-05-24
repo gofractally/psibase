@@ -15,7 +15,6 @@ using std::optional;
 using std::pair;
 using std::string;
 using std::vector;
-using UserService::NftRecord;
 
 namespace
 {

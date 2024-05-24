@@ -4,6 +4,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/commonErrors.hpp>
+#include <services/user/Events.hpp>
 
 #include <psibase/serveSimpleUI.hpp>
 
@@ -46,6 +47,24 @@ void Nft::init()
 
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Nft::service);
+
+   // Register event schema
+   to<EventIndex>().setSchema(ServiceSchema::make<Nft>());
+   // Event indices:
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "minted"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "minted"_m, 1);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "burned"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "burned"_m, 1);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "userConfSet"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 1);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 2);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 1);
+   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 2);
+   to<EventIndex>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 0);
+   to<EventIndex>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 1);
+   to<EventIndex>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 2);
 }
 
 NID Nft::mint()
@@ -66,11 +85,10 @@ NID Nft::mint()
        .owner  = issuer   //
    };
 
-   newRecord.eventHead = emit().history().minted(0, newId, issuer);
-   holder.eventHead    = emit().history().minted(0, newId, issuer);
-
    Tables().open<NftHolderTable>().put(holder);
    nftTable.put(newRecord);
+
+   emit().history().minted(newId, issuer);
 
    return newId;
 }
@@ -78,14 +96,10 @@ NID Nft::mint()
 void Nft::burn(NID nftId)
 {
    auto record = getNft(nftId);
-
    check(record.owner == getSender(), missingRequiredAuth);
 
-   auto holder      = getNftHolder(record.owner);
-   holder.eventHead = emit().history().burned(holder.eventHead, nftId);
-
    Tables().open<NftTable>().erase(nftId);
-   Tables().open<NftHolderTable>().put(holder);
+   emit().history().burned(nftId, record.owner);
 }
 
 void Nft::credit(NID nftId, psibase::AccountNumber receiver, view<const Memo> memo)
@@ -102,35 +116,21 @@ void Nft::credit(NID nftId, psibase::AccountNumber receiver, view<const Memo> me
    check(receiver != record.owner, creditorIsDebitor);
    check(creditRecord.debitor == Accounts::nullAccount, alreadyCredited);
 
-   senderHolder.eventHead =
-       emit().history().credited(senderHolder.eventHead, nftId, sender, receiver, memo);
-   receiverHolder.eventHead =
-       emit().history().credited(receiverHolder.eventHead, nftId, sender, receiver, memo);
-   record.eventHead =  //
-       emit().history().credited(record.eventHead, nftId, sender, receiver, memo);
-
-   if (isTransfer)
-   {
-      senderHolder.eventHead =
-          emit().history().transferred(senderHolder.eventHead, nftId, sender, receiver, memo);
-      receiverHolder.eventHead =
-          emit().history().transferred(receiverHolder.eventHead, nftId, sender, receiver, memo);
-      record.eventHead =
-          emit().history().transferred(record.eventHead, nftId, sender, receiver, memo);
-   }
+   emit().history().credited(nftId, sender, receiver, memo);
 
    if (isTransfer)
    {
       record.owner = receiver;
+      emit().merkle().transferred(nftId, sender, receiver, memo);
    }
    else
    {
-      creditRecord.debitor = receiver;
+      creditRecord.creditor = sender;
+      creditRecord.debitor  = receiver;
       Tables().open<CreditTable>().put(creditRecord);
    }
 
    Tables().open<NftTable>().put(record);
-   Tables().open<NftHolderTable>().put(senderHolder);
    Tables().open<NftHolderTable>().put(receiverHolder);
 }
 
@@ -143,19 +143,8 @@ void Nft::uncredit(NID nftId, view<const Memo> memo)
    check(creditRecord.debitor != Accounts::nullAccount, uncreditRequiresCredit);
    check(record.owner == sender, creditorAction);
 
-   auto senderHolder   = getNftHolder(sender);
-   auto receiverHolder = getNftHolder(creditRecord.debitor);
-
-   record.eventHead         = emit().history().uncredited(record.eventHead, nftId, sender,  //
-                                                          creditRecord.debitor, memo);
-   senderHolder.eventHead   = emit().history().uncredited(senderHolder.eventHead, nftId, sender,
-                                                          creditRecord.debitor, memo);
-   receiverHolder.eventHead = emit().history().uncredited(receiverHolder.eventHead, nftId, sender,
-                                                          creditRecord.debitor, memo);
-   Tables().open<NftTable>().put(record);
-   Tables().open<NftHolderTable>().put(senderHolder);
-   Tables().open<NftHolderTable>().put(receiverHolder);
    Tables().open<CreditTable>().erase(nftId);
+   emit().history().uncredited(nftId, sender, creditRecord.debitor, memo);
 }
 
 void Nft::debit(NID nftId, view<const Memo> memo)
@@ -169,20 +158,10 @@ void Nft::debit(NID nftId, view<const Memo> memo)
    check(creditRecord.debitor == debitor, missingRequiredAuth);
 
    record.owner = debitor;
-
-   auto creditorHolder = getNftHolder(creditor);
-   auto debitorHolder  = getNftHolder(debitor);
-   record.eventHead =
-       emit().history().transferred(record.eventHead, nftId, creditor, debitor, memo);
-   creditorHolder.eventHead =
-       emit().history().transferred(creditorHolder.eventHead, nftId, creditor, debitor, memo);
-   debitorHolder.eventHead =
-       emit().history().transferred(debitorHolder.eventHead, nftId, creditor, debitor, memo);
-
    Tables().open<NftTable>().put(record);
-   Tables().open<NftHolderRecord>().put(creditorHolder);
-   Tables().open<NftHolderRecord>().put(debitorHolder);
    Tables().open<CreditTable>().erase(nftId);
+
+   emit().merkle().transferred(nftId, creditor, debitor, memo);
 }
 
 void Nft::setUserConf(psibase::EnumElement flag, bool enable)
@@ -195,9 +174,9 @@ void Nft::setUserConf(psibase::EnumElement flag, bool enable)
    check(flagSet != enable, redundantUpdate);
 
    record.config.set(bit, enable);
-   record.eventHead = emit().history().userConfSet(record.eventHead, sender, flag, enable);
-
    Tables().open<NftHolderTable>().put(record);
+
+   emit().history().userConfSet(sender, flag, enable);
 }
 
 NftRecord Nft::getNft(NID nftId)
@@ -254,7 +233,11 @@ CreditRecord Nft::getCredRecord(NID nftId)
    {
       check(exists(nftId), nftDNE);
 
-      return CreditRecord{nftId, Accounts::nullAccount};
+      return CreditRecord{
+          .nftId    = nftId,
+          .creditor = Accounts::nullAccount,
+          .debitor  = Accounts::nullAccount  //
+      };
    }
 }
 
@@ -277,35 +260,126 @@ bool Nft::getUserConf(psibase::AccountNumber account, psibase::EnumElement flag)
    }
 }
 
-auto nftService = QueryableService<Nft::Tables, Nft::Events>{Nft::service};
+struct UserDetail
+{
+   psibase::AccountNumber account;
+   psibase::AccountNumber authService;
+};
+PSIO_REFLECT(UserDetail, account, authService);
+
+struct NftDetail
+{
+   NID        id;
+   UserDetail owner;
+   UserDetail issuer;
+};
+PSIO_REFLECT(NftDetail, id, owner, issuer);
+
+auto nftService = Nft::Tables{Nft::service};
 struct NftQuery
 {
-   auto events() const
-   {  //
-      return nftService.allEvents();
-   }
-   auto nftEvents(NID nftId, optional<uint32_t> first, const optional<string>& after) const
+   auto allNfts() const
    {
-      return nftService.eventIndex<Nft::NftEvents>(nftId, first, after);
-   }
-   auto userEvents(AccountNumber           user,
-                   optional<uint32_t>      first,
-                   const optional<string>& after) const
-   {
-      return nftService.eventIndex<Nft::UserEvents>(user, first, after);
+      return nftService.open<NftTable>().getIndex<0>();  //
    }
 
-   auto nftHolders() const { return nftService.index<NftHolderTable, 0>(); }
-   auto nfts() const { return nftService.index<NftTable, 0>(); }
-   auto nftCredits() const { return nftService.index<CreditTable, 0>(); }
+   auto userNfts(AccountNumber         user,
+                 optional<uint32_t>    first,
+                 optional<uint32_t>    last,
+                 optional<std::string> before,
+                 optional<std::string> after) const
+   {
+      auto idx = nftService.open<NftTable>().getIndex<1>().subindex(user);
+
+      return makeConnection<Connection<NftRecord, "UserNftConnection", "UserNftEdge">>(
+          idx, {std::nullopt}, {std::nullopt}, {std::nullopt}, {std::nullopt}, first, last, before,
+          after);
+   }
+
+   auto userCredits(AccountNumber         user,
+                    optional<uint32_t>    first,
+                    optional<uint32_t>    last,
+                    optional<std::string> before,
+                    optional<std::string> after) const
+   {
+      auto idx = nftService.open<UserService::CreditTable>().getIndex<1>().subindex(user);
+
+      return psibase::makeConnection<
+          Connection<CreditRecord, "UserCreditConnection", "UserCreditEdge">>(
+          idx, {std::nullopt}, {std::nullopt}, {std::nullopt}, {std::nullopt}, first, last, before,
+          after);
+   }
+
+   auto userDebits(AccountNumber         user,
+                   optional<uint32_t>    first,
+                   optional<uint32_t>    last,
+                   optional<std::string> before,
+                   optional<std::string> after) const
+   {
+      auto idx = nftService.open<UserService::CreditTable>().getIndex<2>().subindex(user);
+
+      return psibase::makeConnection<
+          Connection<CreditRecord, "UserCreditConnection", "UserCreditEdge">>(
+          idx, {std::nullopt}, {std::nullopt}, {std::nullopt}, {std::nullopt}, first, last, before,
+          after);
+   }
+
+   auto nftDetails(NID nftId) const
+   {  //
+      auto nft = nftService.open<NftTable>().getIndex<0>().get(nftId);
+      check(nft.has_value(), "NFT DNE");
+
+      auto accountsIdx = SystemService::Accounts::Tables{SystemService::Accounts::service}
+                             .open<SystemService::AccountTable>()
+                             .getIndex<0>();
+      auto owner  = accountsIdx.get(nft->owner);
+      auto issuer = accountsIdx.get(nft->issuer);
+      check(owner.has_value(), "Account DNE. Should never happen.");
+
+      // clang-format off
+      return NftDetail
+      {
+         .id = nft->id,
+         .issuer = UserDetail{
+            .account     = nft->issuer,
+            .authService = issuer->authService,
+         },
+         .owner = UserDetail{
+            .account     = nft->owner,
+            .authService = owner->authService,
+         }
+      };
+      // clang-format on
+   }
+
+   auto issuerNfts(AccountNumber         issuer,
+                   optional<uint32_t>    first,
+                   optional<uint32_t>    last,
+                   optional<std::string> before,
+                   optional<std::string> after) const
+   {
+      auto idx = nftService.open<NftTable>().getIndex<2>().subindex(issuer);
+
+      return makeConnection<Connection<NftRecord, "UserNftConnection", "UserNftEdge">>(
+          idx, {std::nullopt}, {std::nullopt}, {std::nullopt}, {std::nullopt}, first, last, before,
+          after);
+   }
+
+   auto userConf(AccountNumber user, psibase::EnumElement flag) const
+   {
+      auto holder = nftService.open<NftHolderTable>().getIndex<0>().get(user);
+      check(holder.has_value(), "NFT service has no record of user account");
+      return holder->config.get(NftHolderRecord::Configurations::value(flag));
+   }
 };
 PSIO_REFLECT(NftQuery,
-             method(events),
-             method(nftEvents, nftId, first, after),
-             method(userEvents, user, first, after),
-             method(nftHolders),
-             method(nfts),
-             method(nftCredits));
+             method(allNfts),
+             method(userNfts, user, first, last, before, after),
+             method(userCredits, user, first, last, before, after),
+             method(userDebits, user, first, last, before, after),
+             method(nftDetails, nftId),
+             method(issuerNfts, issuer, first, last, before, after),
+             method(userConf, user, flag));
 
 std::optional<psibase::HttpReply> Nft::serveSys(psibase::HttpRequest request)
 {

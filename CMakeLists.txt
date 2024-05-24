@@ -603,7 +603,7 @@ psibase_package(
     NAME Nft
     VERSION ${PSIBASE_VERSION}
     SERVICE nft
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})"
     WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
     INIT
     DEPENDS wasm
