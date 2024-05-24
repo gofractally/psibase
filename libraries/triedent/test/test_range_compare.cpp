@@ -1,25 +1,10 @@
 #include <triedent/database.hpp>
 
-#include "temp_directory.hpp"
+#include "temp_database.hpp"
 
 #include <catch2/catch.hpp>
 
 using namespace triedent;
-
-namespace
-{
-   auto createDb(const database::config& cfg = database::config{
-                     .hot_bytes  = 1ull << 30,
-                     .warm_bytes = 1ull << 30,
-                     .cool_bytes = 1ull << 30,
-                     .cold_bytes = 1ull << 30,
-                 })
-   {
-      temp_directory dir("triedent-test");
-      database::create(dir.path, cfg);
-      return std::make_shared<database>(dir.path, cfg, access_mode::read_write);
-   }
-}  // namespace
 
 template <typename T, typename U>
 struct key_range

@@ -14,6 +14,7 @@ add_library(triedent-fuzz
     ../../src/region_allocator.cpp
     ../../src/ring_allocator.cpp
     ../temp_directory.cpp
+    ../temp_database.cpp
     main.cpp
 )
 target_include_directories(triedent-fuzz PUBLIC ../../include)

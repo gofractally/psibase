@@ -1,5 +1,6 @@
 #include <triedent/database.hpp>
 
+#include "temp_database.hpp"
 #include "temp_directory.hpp"
 
 #include <random>
@@ -30,18 +31,6 @@ std::optional<std::string_view> osv(const std::optional<std::vector<char>>& v)
 std::optional<std::string_view> osv(std::string_view s)
 {
    return std::optional{s};
-}
-
-auto createDb(const database::config& cfg = database::config{
-                  .hot_bytes  = 1ull << 30,
-                  .warm_bytes = 1ull << 30,
-                  .cool_bytes = 1ull << 30,
-                  .cold_bytes = 1ull << 30,
-              })
-{
-   temp_directory dir("triedent-test");
-   database::create(dir.path, cfg);
-   return std::make_shared<database>(dir.path, cfg, access_mode::read_write);
 }
 
 bool next_key(std::string& buf, std::size_t max_len)
