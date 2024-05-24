@@ -22,7 +22,6 @@ using psio::view;
 using std::begin;
 using std::end;
 using std::find;
-using std::move;
 using std::optional;
 using std::string;
 using std::vector;
@@ -165,13 +164,13 @@ void Invite::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, PublicK
                                 .service = AuthK1::service,
                                 .method  = "setKey"_m,
                                 .rawData = psio::convert_to_frac(params)};
-   to<Transact>().runAs(move(setKey), vector<ServiceMethod>{});
+   to<Transact>().runAs(std::move(setKey), vector<ServiceMethod>{});
    std::tuple<AccountNumber> params2{AuthK1::service};
    Action                    setAuth{.sender  = acceptedBy,
                                      .service = Accounts::service,
                                      .method  = "setAuthServ"_m,
                                      .rawData = psio::convert_to_frac(params2)};
-   to<Transact>().runAs(move(setAuth), vector<ServiceMethod>{});
+   to<Transact>().runAs(std::move(setAuth), vector<ServiceMethod>{});
 
    invite->state = InviteStates::accepted;
    invite->actor = acceptedBy;
@@ -463,7 +462,7 @@ auto Invite::serveSys(HttpRequest request) -> std::optional<HttpReply>
 void Invite::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content), Tables());
+   storeContent(std::move(path), std::move(contentType), std::move(content), Tables());
 }
 
 PSIBASE_DISPATCH(UserService::InviteNs::Invite)

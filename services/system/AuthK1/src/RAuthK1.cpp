@@ -10,7 +10,6 @@
 #include <string_view>
 
 using namespace psibase;
-using std::move;
 using std::optional;
 using std::string;
 using std::string_view;
@@ -79,7 +78,8 @@ namespace SystemService
    void RAuthK1::storeSys(std::string path, std::string contentType, std::vector<char> content)
    {
       check(getSender() == getReceiver(), "wrong sender");
-      storeContent(move(path), move(contentType), move(content), Tables{getReceiver()});
+      storeContent(std::move(path), std::move(contentType), std::move(content),
+                   Tables{getReceiver()});
    }
 
    // getKeys
