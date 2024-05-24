@@ -100,9 +100,6 @@ mod service {
 
 #[psibase::test_case(services("example"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let result = Wrapper::push(&chain).add(3, 4);
-    assert_eq!(result.get()?, 7);
-    println!("\n\nTrace:\n{}", result.trace);
-
+    assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
     Ok(())
 }
