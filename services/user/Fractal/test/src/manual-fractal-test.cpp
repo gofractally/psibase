@@ -35,10 +35,10 @@ SCENARIO("Testing default psibase chain")
    sysIssuer.setTokenConf(sysToken, "untradeable"_m, false);
 
    // Distribute a few tokens
-   auto userBalance = 1'000'000e8;
+   auto userBalance = 1'000'000e4;
    sysIssuer.mint(sysToken, userBalance, memo);
-   sysIssuer.credit(sysToken, alice, 1'000e8, memo);
-   sysIssuer.credit(sysToken, bob, 1'000e8, memo);
+   sysIssuer.credit(sysToken, alice, 1'000e4, memo);
+   sysIssuer.credit(sysToken, bob, 1'000e4, memo);
 
    auto create = alice.to<Tokens>().create(4, 1'000'000e4);
    alice.to<Tokens>().mint(create.returnVal(), 100e4, memo);
