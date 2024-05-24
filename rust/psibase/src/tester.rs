@@ -72,27 +72,9 @@ impl Chain {
     /// Boot the tester chain with default services being deployed
     pub fn boot(&self) -> Result<(), Error> {
         let default_services: Vec<String> = vec![
-            // "Accounts".to_string(),
-            // "AuthAny".to_string(),
-            // "AuthDelegate".to_string(),
-            // "AuthSig".to_string(),
-            // "AuthK1".to_string(),
-            // "CommonApi".to_string(),
-            // "CpuLimit".to_string(),
-            // "Events".to_string(), // TODO: MISSING
-            // "Explorer".to_string(),
-            // "Fractal".to_string(),
-            // "Invite".to_string(),
-            // "Nft".to_string(),
-            // "Packages".to_string(),
-            // "Producers".to_string(),
-            // "HttpServer".to_string(),
-            // "Sites".to_string(),
-            // "SetCode".to_string(),
-            // "Symbol".to_string(),
-            // "Tokens".to_string(),
-            // "Transact".to_string(),
             "Default".to_string(),
+            // TODO: MISSING
+            // Events
             // TODO: >>> Default Extra:
             // Supervisor
             // Docs
@@ -100,21 +82,13 @@ impl Chain {
             // TokenUsers
         ];
 
-        // get from env PSIBASE_DATADIR
         let psibase_data_dir = std::env::var("PSIBASE_DATADIR")
             .expect("Cannot find package directory: PSIBASE_DATADIR not defined");
-        // let psibase_data_dir = "/home/sohdev/Workspace/fractally/new-psibase/build/share/psibase".to_string();
         let packages_dir = Path::new(&psibase_data_dir).join("packages");
-        println!(">>> Chain::boot -> Packages dir: {:?}", packages_dir);
 
-        let mut result = DirectoryRegistry::new(packages_dir);
+        let result = DirectoryRegistry::new(packages_dir);
         let mut services = result.sync_resolve(&default_services[..])?;
-        println!(
-            ">>> Chain::boot -> Resolved first service: {:?}",
-            services[0].name()
-        );
 
-        println!("\n>>>>\nCreating boot transactions");
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
             AccountNumber::new(account_raw!("prod")),
@@ -124,19 +98,13 @@ impl Chain {
         )
         .unwrap();
 
-        println!("\n>>>>\nPushing boot transactions to chain");
-
         for trx in boot_tx {
-            println!("\n\n>>> Pushing boot transaction item");
             self.push(&trx).ok()?;
         }
 
         for trx in subsequent_tx {
-            println!("\n\n>>> Pushing subsequent tx item");
             self.push(&trx).ok()?;
         }
-
-        println!(">>> Chain::boot -> Booted chain successfully!");
 
         Ok(())
     }
@@ -165,10 +133,6 @@ impl Chain {
     /// TODO: Support sub-second block times
     pub fn start_block_at(&self, time: TimePointSec) {
         let status = &mut *self.status.borrow_mut();
-        println!(
-            ">>> Chain::start_block_at -> Starting block at status: {:?}",
-            status
-        );
 
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
@@ -177,14 +141,7 @@ impl Chain {
             }
         }
         unsafe { tester_raw::testerStartBlock(self.chain_handle, time.seconds) }
-
-        println!(">>> Chain::start_block_at -> Unpacking status...");
         *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
-
-        println!(
-            ">>> Chain::start_block_at -> Starting block at status: {:?}",
-            status
-        );
         self.producing.replace(true);
     }
 
@@ -227,48 +184,18 @@ impl Chain {
     /// including whether it succeeded, and the cause if it failed.
     pub fn push(&self, transaction: &SignedTransaction) -> TransactionTrace {
         if !self.producing.get() {
-            println!(">>> Chain::push -> Starting block...");
             self.start_block();
         }
 
-        println!("\n\n>>> Chain::push -> Packing transaction...");
         let transaction = transaction.packed();
-        println!(
-            ">>> Chain::push -> Packed transaction!: {} bytes",
-            transaction.len()
-        );
         let size = unsafe {
-            // unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-            //     let context = &mut *(alloc_context as *mut Context);
-            //     context.size = size;
-            //     context.bytes.reserve(size);
-            //     context.bytes.as_mut_ptr()
-            // }
             tester_raw::testerPushTransaction(
                 self.chain_handle,
                 transaction.as_ptr(),
                 transaction.len(),
             )
         };
-        println!(
-            ">>> Chain::push -> Pushed transaction!: {} bytes; unpacking...",
-            size
-        );
-        println!(">>> Chain::push -> Unpacking trace result...");
-        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
-        println!(">>> Chain::push -> Unpacked trace result!: {}", trace);
-
-        for action in &trace.action_traces {
-            println!(">>> Chain::push -> Action trace: {}", action);
-            let action = &action.action;
-            println!(
-                ">>> Chain::push -> Action Trace Service.Method: {}.{}",
-                action.service.to_string(),
-                action.method.to_string()
-            );
-        }
-
-        trace
+        TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
 
     /// Copy database to `path`
@@ -361,25 +288,32 @@ pub struct ChainResult<T: fracpack::UnpackOwned> {
 
 impl<T: fracpack::UnpackOwned> ChainResult<T> {
     pub fn get(&self) -> Result<T, anyhow::Error> {
-        println!(">>> ChainResult::get -> Getting result...");
         if let Some(e) = &self.trace.error {
             return Err(anyhow!("{}", e));
         }
-        println!(">>> ChainResult::get -> Getting action traces...");
         if let Some(transact) = self.trace.action_traces.last() {
             let ret = transact
                 .inner_traces
                 .iter()
+                // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
-                        Some(&at.raw_retval)
+                        println!(
+                            "inner action trace: {} - {:?}",
+                            at.action.method, at.raw_retval
+                        );
+                        if at.raw_retval.is_empty() {
+                            return None;
+                        } else {
+                            Some(&at.raw_retval)
+                        }
                     } else {
                         None
                     }
                 })
-                .last();
+                .next();
             if let Some(ret) = ret {
-                println!(">>> unpacking ret...");
+                println!(">>> unpacking ret... `{}` -- vec: [{:?}]", ret, ret.0);
                 let unpacked_ret = T::unpacked(ret)?;
                 println!(">>> unpacked ret successfully!");
                 return Ok(unpacked_ret);
@@ -434,10 +368,6 @@ impl<'a> Caller for ChainPusher<'a> {
         method: crate::MethodNumber,
         args: Args,
     ) -> Self::ReturnType<Ret> {
-        println!(
-            ">>> ChainPusher::call -> Calling method: {}",
-            method.to_string()
-        );
         let mut trx = Transaction {
             tapos: Default::default(),
             actions: vec![Action {
@@ -448,25 +378,15 @@ impl<'a> Caller for ChainPusher<'a> {
             }],
             claims: vec![],
         };
-        println!(">>> ChainPusher::call -> Filling tapos...");
         self.chain.fill_tapos(&mut trx, 2);
-        println!(">>> ChainPusher::call -> Pushing transaction...");
         let trace = self.chain.push(&SignedTransaction {
             transaction: trx.packed().into(),
             proofs: Default::default(),
         });
-        println!(
-            ">>> ChainPusher::call -> Pushed transaction! trace:\n {} \n\n<<<<<",
-            trace
-        );
         let ret = ChainResult::<Ret> {
             trace,
             _marker: Default::default(),
         };
-        println!(
-            ">>> ChainPusher::call -> Returning result trace: {}",
-            ret.trace
-        );
         ret
     }
 }

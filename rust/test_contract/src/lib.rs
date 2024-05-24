@@ -34,23 +34,18 @@ mod service {
 
 #[psibase::test_case(services("test_contract"))]
 fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    println!("Running test1 add");
     assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
-    println!("Running test1 multiply");
     assert_eq!(Wrapper::push(&chain).multiply(3, 4).get()?, 12);
-
-    println!("{}", Wrapper::push(&chain).add(9, 8).trace);
-
     Ok(())
 }
 
 #[test]
 fn dump_schema() {
     // use psibase::*;
-    
+
     // TODO: fix this
     // let x = create_schema::<Wrapper>();
-    
+
     // temp bypass
     let x = r#"{"hello": "world"}"#;
     let s = serde_json::to_string_pretty(&x).unwrap();

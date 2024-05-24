@@ -423,15 +423,15 @@ fn process_struct(
                 quote! {
                     let mut #name = None;
                     if *pos - initial_pos < fixed_size as u32 {
-                        println!("unpacking field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
+                        // println!("unpacking field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
                         #name = <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
-                        println!(">>> unpacked consumed pos (pos-ini) = {}", *pos - initial_pos);
+                        // println!(">>> unpacked consumed pos (pos-ini) = {}", *pos - initial_pos);
                     }
                     
                 }
             } else {
                 quote ! {
-                    println!("unpacking FIXED field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
+                    // println!("unpacking FIXED field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
                     let #name = <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
                 }
             }
@@ -455,18 +455,18 @@ fn process_struct(
         .enumerate()
         .map(|(i, field)| {
             let ty = &field.ty;
-            let name = &field.name;
+            // let name = &field.name;
             if i >= last_possible_trailing_optional_field_idx {
                 quote! { 
                     if *pos - initial_pos < fixed_size as u32 {
-                        println!("verifying field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
+                        // println!("verifying field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
                         <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
-                        println!(">>> verify consumed pos (pos-ini) = {}", *pos - initial_pos);
+                        // println!(">>> verify consumed pos (pos-ini) = {}", *pos - initial_pos);
                     }
                 }
             } else {
                 quote! {
-                    println!("verifying FIXED field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
+                    // println!("verifying FIXED field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
                     <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
                 }
             }            
@@ -509,12 +509,12 @@ fn process_struct(
                     if <Self as #fracpack_mod::Unpack>::VARIABLE_SIZE { 4 } else { #fixed_size };
                 fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
                     #unpack_heap_size
-                    println!(">>> unpack fixed_size: {}", fixed_size);
-                    println!(">>> unpack pos: {}", *pos);
+                    // println!(">>> unpack fixed_size: {}", fixed_size);
+                    // println!(">>> unpack pos: {}", *pos);
                     let mut heap_pos = *pos + fixed_size as u32;
-                    println!(">>> unpack heap_pos: {}", heap_pos);
+                    // println!(">>> unpack heap_pos: {}", heap_pos);
                     if heap_pos < *pos {
-                        println!(">>> UNPACK PANIC! INVALID POS! heap_pos: {} - pos: {} - fixed_size: {}", heap_pos, *pos, fixed_size);
+                        // println!(">>> UNPACK PANIC! INVALID POS! heap_pos: {} - pos: {} - fixed_size: {}", heap_pos, *pos, fixed_size);
                         return Err(#fracpack_mod::Error::BadOffset);
                     }
                     let initial_pos = *pos;
@@ -527,17 +527,17 @@ fn process_struct(
                 }
                 fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
                     #unpack_heap_size
-                    println!(">>> verify fixed_size: {}", fixed_size);
-                    println!(">>> verify pos: {}", *pos);
+                    // println!(">>> verify fixed_size: {}", fixed_size);
+                    // println!(">>> verify pos: {}", *pos);
                     let mut heap_pos = *pos + fixed_size as u32;
-                    println!(">>> verify heap_pos: {}", heap_pos);
+                    // println!(">>> verify heap_pos: {}", heap_pos);
                     if heap_pos < *pos {
-                        println!(">>> PANIC! INVALID POS! heap_pos: {} - pos: {} - fixed_size: {}", heap_pos, *pos, fixed_size);
+                        // println!(">>> PANIC! INVALID POS! heap_pos: {} - pos: {} - fixed_size: {}", heap_pos, *pos, fixed_size);
                         return Err(#fracpack_mod::Error::BadOffset);
                     }
                     let initial_pos = *pos;
                     #verify
-                    println!(">>> all fields verified! resetting position to heap_pos: {}", heap_pos);
+                    // println!(">>> all fields verified! resetting position to heap_pos: {}", heap_pos);
                     *pos = heap_pos;
                     Ok(())
                 }
