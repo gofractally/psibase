@@ -14,6 +14,8 @@
 using namespace UserService;
 using namespace std;
 using namespace psibase;
+using SystemService::Accounts;
+using SystemService::AccountTable;
 
 auto tokenService = Tokens::Tables{Tokens::service};
 namespace TokenQueryTypes
@@ -58,14 +60,14 @@ namespace TokenQueryTypes
    //   in the service.
    struct TokenDetail
    {
-      TID                id;
-      NID                ownerNft;
-      TokenOwnerDetails  ownerDetails;
-      psibase::Bitset<8> config;
-      Precision          precision;
-      SID                symbolId;
-      Quantity           currentSupply;
-      Quantity           maxSupply;
+      TID                              id;
+      NID                              ownerNft;
+      std::optional<TokenOwnerDetails> ownerDetails;
+      psibase::Bitset<8>               config;
+      Precision                        precision;
+      SID                              symbolId;
+      Quantity                         currentSupply;
+      Quantity                         maxSupply;
    };
    PSIO_REFLECT(TokenDetail,
                 id,
@@ -164,6 +166,34 @@ struct TokenQuery
                                         {std::nullopt}, first, last, before, after);
    }
 
+   auto userTokens(AccountNumber         user,
+                   optional<uint32_t>    first,
+                   optional<uint32_t>    last,
+                   optional<std::string> before,
+                   optional<std::string> after) const
+   {
+      std::vector<TokenRecord> tokens;
+
+      auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
+      for (auto token : tokenTypeIdx)
+      {
+         token.ownerNft;
+         auto nft = Nft::Tables{Nft::service}.open<NftTable>().getIndex<0>().get(token.ownerNft);
+         if (not nft.has_value())
+            continue;
+
+         if (nft->owner == user)
+         {
+            tokens.push_back(token);
+         }
+      }
+
+      return makeVirtualConnection<Connection<TokenRecord, "UserTokenConnection", "UserTokenEdge">,
+                                   TokenRecord, TID>(tokens, {std::nullopt}, {std::nullopt},
+                                                     {std::nullopt}, {std::nullopt}, first, last,
+                                                     before, after);
+   }
+
    auto tokens() const
    {  //
       return tokenService.open<TokenTable>().getIndex<0>();
@@ -174,22 +204,27 @@ struct TokenQuery
       auto token = tokenService.open<TokenTable>().getIndex<0>().get(tokenId);
       check(token.has_value(), "Token DNE");
 
-      auto nft   = to<Nft>().getNft(token->ownerNft);
-      auto owner = SystemService::Accounts::Tables{SystemService::Accounts::service}
-                       .open<SystemService::AccountTable>()
-                       .getIndex<0>()
-                       .get(nft.owner);
-      check(owner.has_value(), "Account DNE. Should never happen.");
+      auto nft = Nft::Tables{Nft::service}.open<NftTable>().getIndex<0>().get(token->ownerNft);
+      std::optional<TokenOwnerDetails> ownerDetails = std::nullopt;
+
+      if (nft.has_value())
+      {
+         auto owner =
+             Accounts::Tables{Accounts::service}.open<AccountTable>().getIndex<0>().get(nft->owner);
+         check(owner.has_value(), "Account DNE. Should never happen.");
+
+         ownerDetails = TokenOwnerDetails{
+             .account     = nft->owner,
+             .authService = owner->authService,
+         };
+      }
 
       // clang-format off
       return TokenDetail
       {
-         .id = token->id, 
-         .ownerNft = token->ownerNft,
-         .ownerDetails = TokenOwnerDetails{
-            .account     = nft.owner,
-            .authService = owner->authService,
-         },
+         .id            = token->id, 
+         .ownerNft      = token->ownerNft,
+         .ownerDetails  = ownerDetails,
          .config        = token->config,
          .precision     = token->precision,
          .symbolId      = token->symbolId,
@@ -213,6 +248,7 @@ PSIO_REFLECT(TokenQuery,
              method(userBalances, user, first, last, before, after),
              method(userCredits, user, first, last, before, after),
              method(userDebits, user, first, last, before, after),
+             method(userTokens, user, first, last, before, after),
              method(tokens),
              method(tokenDetails, tokenId),
              method(userConf, user, flag))
