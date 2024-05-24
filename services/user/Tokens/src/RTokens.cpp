@@ -79,6 +79,34 @@ namespace TokenQueryTypes
 
 }  // namespace TokenQueryTypes
 
+/// A split key is used to specify a subindex on indices with a struct key.
+///
+/// Warning: No type checking! It's up to the user to ensure that T + Rest
+///   is equivalent to the primary key)
+template <typename Rest, typename T>
+struct SplitKey
+{
+   T value;
+};
+
+template <typename Rest, typename T>
+void to_key(SplitKey<Rest, T>& obj, auto& stream)
+{
+   to_key(obj.value, stream);
+}
+
+template <typename Rest, typename T, typename S>
+struct compatible_tuple_prefix<SplitKey<Rest, T>, S>
+{
+   static constexpr bool value = true;
+};
+
+template <typename Rest, typename T, typename S>
+struct key_suffix_unqual<SplitKey<Rest, T>, S>
+{
+   using type = Rest;
+};
+
 using namespace TokenQueryTypes;
 struct TokenQuery
 {
