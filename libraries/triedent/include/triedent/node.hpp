@@ -192,6 +192,9 @@ namespace triedent
          return ((1ull << bit_num) | ...);
       }
 
+      static uint64_t mask_lt(uint8_t b) { return ~(~0ull << b); }
+      static uint64_t mask_gt(uint8_t b) { return ~1ull << b; }
+
       inline uint8_t lower_bound(uint8_t b) const;
       inline int8_t  reverse_lower_bound(uint8_t b) const;
       inline uint8_t upper_bound(uint8_t b) const;
@@ -225,6 +228,8 @@ namespace triedent
       {
          return reinterpret_cast<const char*>(children() + num_branches());
       }
+
+      object_id maybe_branch(uint8_t b) const { return has_branch(b) ? branch(b) : object_id{}; }
 
      private:
       static inner_node* get(cache_allocator& a, session_lock_ref<> session, object_id id)

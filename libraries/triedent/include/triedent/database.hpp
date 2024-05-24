@@ -27,6 +27,7 @@ namespace triedent
    struct mutable_deref;
 
    inline key_type from_key6(const key_view sixb);
+   inline key_view to_key6(key_type& key_buf, key_view v);
 
    // Write thread usage notes:
    // * To create a new tree, default-initialize a shared_ptr<root>
@@ -184,20 +185,40 @@ namespace triedent
                    std::vector<char>*                  result_bytes,
                    std::vector<std::shared_ptr<root>>* result_roots) const;
 
+      // Returns true iff r does not have any keys in the range [lower, upper)
+      //
+      // If upper is empty, it is considered greater than any key.
+      bool is_empty(const std::shared_ptr<root>& r,
+                    std::span<const char>        lower,
+                    std::span<const char>        upper) const;
+
+      // Returns true if r1 and r2 have a common ancestor and the sequence
+      //   of operations used to create r1 and r2 from the nearest common ancestor
+      //   did not modify any keys in the range [lower, upper)
+      // Returns false if r1 and r2 are different over the range [lower, upper)
+      // Otherwise the result is unspecified
+      //
+      // If upper is empty it is considered greater than any key.
+      bool is_equal_weak(const std::shared_ptr<root>& r1,
+                         const std::shared_ptr<root>& r2,
+                         std::span<const char>        lower,
+                         std::span<const char>        upper) const;
+
       void print(const std::shared_ptr<root>& r);
       void validate(const std::shared_ptr<root>& r);
 
       session(std::shared_ptr<database> db);
       ~session();
 
+      inline deref<node> get_by_id(session_lock_ref<> l, object_id i) const;
+      inline deref<node> get_by_id(session_lock_ref<> l, object_id i, bool& unique) const;
+
      protected:
       session(const session&) = delete;
 
-      inline object_id   get_id(const std::shared_ptr<root>& r) const;
-      void               validate(session_lock_ref<> l, id);
-      void               print(id n, string_view prefix = "", std::string k = "");
-      inline deref<node> get_by_id(session_lock_ref<> l, object_id i) const;
-      inline deref<node> get_by_id(session_lock_ref<> l, object_id i, bool& unique) const;
+      inline object_id get_id(const std::shared_ptr<root>& r) const;
+      void             validate(session_lock_ref<> l, id);
+      void             print(id n, string_view prefix = "", std::string k = "");
 
       bool unguarded_get(session_lock_ref<>                            l,
                          const std::shared_ptr<triedent::root>&        ancestor,
@@ -459,12 +480,17 @@ namespace triedent
       deref(id i, void* p, node_type t) : _id(i), ptr(p), _type(t) {}
 
       explicit inline operator bool() const { return bool(_id); }
-      inline operator id() const { return _id; }
+      inline          operator id() const { return _id; }
 
       auto         type() const { return _type; }
       bool         is_leaf_node() const { return _type != node_type::inner; }
       inline auto& as_value_node() const { return *reinterpret_cast<const value_node*>(ptr); }
       inline auto& as_inner_node() const { return *reinterpret_cast<const inner_node*>(ptr); }
+
+      std::string_view get_key() const
+      {
+         return is_leaf_node() ? as_value_node().key() : as_inner_node().key();
+      }
 
       inline const T* operator->() const { return reinterpret_cast<const T*>(ptr); }
       inline const T& operator*() const { return *reinterpret_cast<const T*>(ptr); }
@@ -1431,6 +1457,628 @@ namespace triedent
          root = in.branch(b);
       }
    }  // unguarded_get_max
+
+   namespace detail
+   {
+
+      struct static_key_base
+      {
+         bool starts_with(const std::string_view&) const { return false; }
+         char operator[](std::size_t) const
+         {
+            assert(!"operator[] should be gated on starts_with");
+            __builtin_unreachable();
+         }
+         void remove_prefix(std::size_t) const
+         {
+            assert(!"remove_prefix should be gated on starts_with");
+            __builtin_unreachable();
+         }
+         std::string_view substr(std::size_t, std::size_t = 0) const
+         {
+            assert(!"substr should be gated on starts_with");
+            __builtin_unreachable();
+         }
+      };
+
+      struct lowest_key : static_key_base
+      {
+      };
+      inline auto operator<=>(const lowest_key&, const std::string_view&)
+      {
+         return std::strong_ordering::less;
+      }
+      struct highest_key : static_key_base
+      {
+      };
+      inline auto operator<=>(const highest_key&, const std::string_view&)
+      {
+         return std::strong_ordering::greater;
+      }
+
+      template <typename T>
+      concept extended_key_type = std::same_as<T, std::string_view> ||
+                                  std::same_as<T, lowest_key> || std::same_as<T, highest_key>;
+
+      inline bool is_empty_in_range(const read_session&    session,
+                                    session_lock_ref<>     l,
+                                    database::id           id,
+                                    extended_key_type auto lower,
+                                    extended_key_type auto upper);
+
+      // key represents the key of in. key, lower, and upper should all start
+      // at the same position.
+      inline bool is_empty_in_range(const read_session&    session,
+                                    session_lock_ref<>     l,
+                                    const inner_node&      in,
+                                    std::string_view       key,
+                                    extended_key_type auto lower,
+                                    extended_key_type auto upper)
+      {
+         if (key >= upper)
+         {
+            return true;
+         }
+         if (key >= lower)
+         {
+            if (in.value())
+               return false;
+            if (upper.starts_with(key))
+            {
+               upper.remove_prefix(key.size());
+               if (in.branches() & inner_node::mask_lt(upper[0]))
+                  return false;
+               return !in.has_branch(upper[0]) || is_empty_in_range(session, l, in.branch(upper[0]),
+                                                                    lowest_key{}, upper.substr(1));
+            }
+            else
+            {
+               return false;
+            }
+         }
+         if (lower.starts_with(key))
+         {
+            if (upper.starts_with(key))
+            {
+               lower.remove_prefix(key.size());
+               upper.remove_prefix(key.size());
+               if (upper[0] == lower[0])
+               {
+                  return !in.has_branch(lower[0]) ||
+                         is_empty_in_range(session, l, in.branch(lower[0]), lower.substr(1),
+                                           upper.substr(1));
+               }
+               else
+               {
+                  if (in.branches() & inner_node::mask_gt(lower[0]) & inner_node::mask_lt(upper[0]))
+                     return false;
+                  if (in.has_branch(lower[0]) && !is_empty_in_range(session, l, in.branch(lower[0]),
+                                                                    lower.substr(1), highest_key{}))
+                     return false;
+                  if (in.has_branch(upper[0]) && !is_empty_in_range(session, l, in.branch(upper[0]),
+                                                                    lowest_key{}, upper.substr(1)))
+                     return false;
+                  return true;
+               }
+            }
+            else
+            {
+               lower.remove_prefix(key.size());
+               if (in.branches() & inner_node::mask_gt(lower[0]))
+                  return false;
+               return !in.has_branch(lower[0]) || is_empty_in_range(session, l, in.branch(lower[0]),
+                                                                    lower.substr(1), highest_key{});
+            }
+         }
+         else
+         {
+            return true;
+         }
+      }
+
+      inline bool is_empty_in_range(const read_session&    session,
+                                    session_lock_ref<>     l,
+                                    database::id           id,
+                                    extended_key_type auto lower,
+                                    extended_key_type auto upper)
+      {
+         if (!id)
+            return true;
+         auto n = session.get_by_id(l, id);
+         if (n.is_leaf_node())
+         {
+            auto key = n.as_value_node().key();
+            return key < lower || key >= upper;
+         }
+         else
+         {
+            auto& in  = n.as_inner_node();
+            auto  key = in.key();
+            return is_empty_in_range(session, l, in, key, lower, upper);
+         }
+      }
+
+   }  // namespace detail
+
+   template <typename AccessMode>
+   bool session<AccessMode>::is_empty(const std::shared_ptr<root>& r,
+                                      std::span<const char>        lower,
+                                      std::span<const char>        upper) const
+   {
+      swap_guard g(*this);
+      auto       lower6 = to_key6({lower.data(), lower.size()});
+      if (upper.empty())
+      {
+         return detail::is_empty_in_range(*this, g, get_id(r), lower6, detail::highest_key{});
+      }
+      key_type upper_buf;
+      auto     upper6 = triedent::to_key6(upper_buf, {upper.data(), upper.size()});
+      return detail::is_empty_in_range(*this, g, get_id(r), lower6, upper6);
+   }
+
+   namespace detail
+   {
+      // represents a subtree with a specific prefix
+      // The prefix might not correspond exactly to a node due to prefix compression
+      struct subtree_t
+      {
+         database::id id;
+         std::size_t  skip_prefix = 0;
+         // returns false if there were keys in [lower, upper) that do not start with prefix
+         bool set_subtree(const read_session&    session,
+                          session_lock_ref<>     l,
+                          std::string_view       prefix,
+                          extended_key_type auto lower,
+                          extended_key_type auto upper)
+         {
+            assert(prefix < upper);
+            assert(prefix >= lower || lower.starts_with(prefix));
+            if (!id)
+               return true;
+            auto n = session.get_by_id(l, id);
+            if (n.is_leaf_node())
+            {
+               auto& vn     = n.as_value_node();
+               auto  vn_key = vn.key().substr(skip_prefix);
+               if (vn_key.starts_with(prefix))
+               {
+                  skip_prefix += prefix.size();
+                  return true;
+               }
+               else
+               {
+                  *this = {};
+                  return vn_key < lower || vn_key >= upper;
+               }
+            }
+            else
+            {
+               auto& in     = n.as_inner_node();
+               auto  in_key = in.key().substr(skip_prefix);
+               if (in_key.size() >= prefix.size())  // prefix is fully consumed
+               {
+                  if (in_key.starts_with(prefix))
+                  {
+                     skip_prefix += prefix.size();
+                     return true;
+                  }
+                  else
+                  {
+                     *this = {};
+                     return detail::is_empty_in_range(session, l, in, in_key, lower, upper);
+                  }
+               }
+               else  // recurse to use the rest of the prefix
+               {
+                  if (prefix.starts_with(in_key))
+                  {
+                     prefix.remove_prefix(in_key.size());
+                     return set_subtree(session, l, in, in_key, prefix, lower, upper);
+                  }
+                  else
+                  {
+                     *this = {};
+                     return detail::is_empty_in_range(session, l, in, in_key, lower, upper);
+                  }
+               }
+            }
+         }
+         // in_key, lower, and upper start at the same point
+         // prefix starts at the end of in_key.
+         bool set_subtree(const read_session&    session,
+                          session_lock_ref<>     l,
+                          const inner_node&      in,
+                          std::string_view       in_key,
+                          std::string_view       prefix,
+                          extended_key_type auto lower,
+                          extended_key_type auto upper)
+         {
+            assert(!prefix.empty());
+            assert(lower <= in_key || lower.starts_with(in_key));
+            assert(upper > in_key);
+            // check lower bound
+            bool has_lower = false;
+            if (lower <= in_key)
+            {
+               if (in.value())
+                  return false;
+               if (in.branches() & inner_node::mask_lt(prefix[0]))
+                  return false;
+            }
+            else
+            {
+               lower.remove_prefix(in_key.size());
+               if (lower[0] == prefix[0])
+                  has_lower = true;
+               else
+               {
+                  if (in.branches() & inner_node::mask_gt(lower[0]) &
+                      inner_node::mask_lt(prefix[0]))
+                     return false;
+                  if (!detail::is_empty_in_range(session, l, in.maybe_branch(lower[0]),
+                                                 lower.substr(1), highest_key{}))
+                     return false;
+               }
+            }
+            // check upper bound
+            bool has_upper = false;
+            if (upper.starts_with(in_key))
+            {
+               upper.remove_prefix(in_key.size());
+               if (upper[0] == prefix[0])
+                  has_upper = true;
+               else
+               {
+                  if (in.branches() & inner_node::mask_lt(upper[0]) &
+                      inner_node::mask_gt(prefix[0]))
+                     return false;
+                  if (!detail::is_empty_in_range(session, l, in.maybe_branch(upper[0]),
+                                                 lowest_key{}, upper.substr(1)))
+                     return false;
+               }
+            }
+            else
+            {
+               if (in.branches() & inner_node::mask_gt(prefix[0]))
+                  return false;
+            }
+
+            *this = {in.maybe_branch(prefix[0])};
+            if (has_lower && has_upper)
+               return set_subtree(session, l, prefix.substr(1), lower.substr(1), upper.substr(1));
+            else if (has_lower && !has_upper)
+               return set_subtree(session, l, prefix.substr(1), lower.substr(1), highest_key{});
+            else if (!has_lower && has_upper)
+               return set_subtree(session, l, prefix.substr(1), lowest_key{}, upper.substr(1));
+            else /*(!has_lower && !has_upper)*/
+               return set_subtree(session, l, prefix.substr(1), lowest_key{}, highest_key{});
+         }
+      };
+      inline bool operator==(const subtree_t& lhs, const database::id& rhs)
+      {
+         return lhs.id == rhs && lhs.skip_prefix == 0;
+      }
+
+      inline bool is_empty_in_range(const read_session&    session,
+                                    session_lock_ref<>     l,
+                                    subtree_t              tree,
+                                    extended_key_type auto lower,
+                                    extended_key_type auto upper)
+      {
+         if (!tree.id)
+            return true;
+         auto n = session.get_by_id(l, tree.id);
+         if (n.is_leaf_node())
+         {
+            auto key = n.as_value_node().key().substr(tree.skip_prefix);
+            return key < lower || key >= upper;
+         }
+         else
+         {
+            auto& in  = n.as_inner_node();
+            auto  key = in.key().substr(tree.skip_prefix);
+            return detail::is_empty_in_range(session, l, in, key, lower, upper);
+         }
+      }
+
+      inline bool is_equal_in_range_weak(const read_session&    session,
+                                         session_lock_ref<>     l,
+                                         database::id           original,
+                                         subtree_t              expected,
+                                         extended_key_type auto lower,
+                                         extended_key_type auto upper);
+
+      // Does not handle the case of lower[0] == upper[0]
+      inline bool is_equal_children_in_range_weak(const read_session&    session,
+                                                  session_lock_ref<>     l,
+                                                  const inner_node&      lhs,
+                                                  const inner_node&      rhs,
+                                                  extended_key_type auto lower,
+                                                  extended_key_type auto upper)
+      {
+         constexpr bool has_lower = !std::is_same_v<decltype(lower), lowest_key>;
+         constexpr bool has_upper = !std::is_same_v<decltype(upper), highest_key>;
+         // check child containing lower bound
+         if (has_lower &&
+             !is_equal_in_range_weak(session, l, lhs.maybe_branch(lower[0]),
+                                     {rhs.maybe_branch(lower[0])}, lower.substr(1), highest_key{}))
+            return false;
+         // check child containing upper bound
+         if (has_upper &&
+             !is_equal_in_range_weak(session, l, lhs.maybe_branch(upper[0]),
+                                     {rhs.maybe_branch(upper[0])}, lowest_key{}, upper.substr(1)))
+            return false;
+         // check branches between bounds
+         auto lmask = has_lower ? inner_node::mask_gt(lower[0]) : ~0ull;
+         auto umask = has_upper ? inner_node::mask_lt(upper[0]) : ~0ull;
+         auto mask  = lmask & umask;
+         if ((lhs.branches() & mask) != (rhs.branches() & mask))
+            return false;
+         auto        lhs_offset = std::popcount(lhs.branches() & ~lmask);
+         auto        rhs_offset = std::popcount(rhs.branches() & ~lmask);
+         std::size_t count      = std::popcount(lhs.branches() & mask);
+         if constexpr (!has_lower)
+         {
+            if (count == 0)
+            {
+               // This could be transformed into a value node and back,
+               // so we need to compare the value, not just the pointers
+               if (lhs.value() && rhs.value())
+               {
+                  if (session.get_by_id(l, lhs.value()).as_value_node().data() !=
+                      session.get_by_id(l, rhs.value()).as_value_node().data())
+                     return false;
+               }
+               else if (lhs.value() != rhs.value())
+               {
+                  return false;
+               }
+            }
+            else
+            {
+               if (lhs.value() != rhs.value())
+                  return false;
+            }
+         }
+         if (count == 1)
+         {
+            // special case because changes to children ouside [lower, upper) can
+            // remove and re-add this node, which will create new child nodes.
+            return is_equal_in_range_weak(session, l, lhs.children()[lhs_offset],
+                                          {rhs.children()[rhs_offset]}, lowest_key{},
+                                          highest_key{});
+         }
+         return std::ranges::equal(std::span{lhs.children() + lhs_offset, count},
+                                   std::span{rhs.children() + rhs_offset, count});
+      }
+
+      inline bool is_equal_in_range_weak(const read_session&    session,
+                                         session_lock_ref<>     l,
+                                         database::id           original,
+                                         subtree_t              expected,
+                                         extended_key_type auto lower,
+                                         extended_key_type auto upper)
+      {
+         if (original == expected)
+            return true;
+
+         if (!original)
+            return detail::is_empty_in_range(session, l, expected, lower, upper);
+
+         auto n_orig = session.get_by_id(l, original);
+         if (n_orig.is_leaf_node())
+         {
+            auto& vn     = n_orig.as_value_node();
+            auto  vn_key = vn.key();
+            if (vn_key < lower || vn_key >= upper)
+            {
+               return is_empty_in_range(session, l, expected, lower, upper);
+            }
+            else
+            {
+               if (!expected.set_subtree(session, l, vn_key, lower, upper))
+                  return false;
+               if (!expected.id)
+                  return false;
+               auto n_expected = session.get_by_id(l, expected.id);
+               // Check that the key matches exactly
+               if (n_expected->key_size() != expected.skip_prefix)
+                  return false;
+               if (n_expected.is_leaf_node())
+               {
+                  return vn.data() == n_expected.as_value_node().data();
+               }
+               else
+               {
+                  auto& in = n_expected.as_inner_node();
+                  // check value
+                  if (object_id v = in.value())
+                  {
+                     if (session.get_by_id(l, v).as_value_node().data() != vn.data())
+                        return false;
+                  }
+                  else
+                  {
+                     return false;
+                  }
+                  // check that there are no children below the upper bound
+                  if (upper.starts_with(vn_key))
+                  {
+                     upper.remove_prefix(vn_key.size());
+                     if (in.branches() & inner_node::mask_lt(upper[0]))
+                     {
+                        return false;
+                     }
+                     return detail::is_empty_in_range(session, l, in.maybe_branch(upper[0]),
+                                                      lowest_key{}, upper.substr(1));
+                  }
+                  else
+                  {
+                     return false;
+                  }
+               }
+            }
+         }
+         else
+         {
+            auto& in     = n_orig.as_inner_node();
+            auto  in_key = in.key();
+            if ((in_key < lower && !lower.starts_with(in_key)) || in_key >= upper)
+            {
+               // The subtree is entirely outside [lower, upper)
+               return detail::is_empty_in_range(session, l, expected, lower, upper);
+            }
+            else
+            {
+               if (!expected.set_subtree(session, l, in_key, lower, upper))
+                  return false;
+               if (!expected.id)
+               {
+                  return detail::is_empty_in_range(session, l, in, in_key, lower, upper);
+               }
+               auto n_expected = session.get_by_id(l, expected.id);
+               // if original and expected do not have nodes with same prefix, leap frog until they do
+               if (n_expected->key_size() > expected.skip_prefix)
+               {
+                  auto prefix = n_expected.get_key().substr(expected.skip_prefix);
+                  bool in_range;
+                  bool has_lower = false;
+                  // check if the subtree at in_key+prefix intersects the range [lower, upper)
+                  if (lower.starts_with(in_key))
+                  {
+                     auto lower_rest = lower.substr(in_key.size());
+                     if (lower_rest.starts_with(prefix))
+                        in_range = has_lower = true;
+                     else
+                        in_range = prefix >= lower_rest;
+                  }
+                  else
+                  {
+                     in_range = lower < in_key;
+                  }
+                  bool has_upper = false;
+                  if (in_range)
+                  {
+                     if (upper.starts_with(in_key))
+                     {
+                        auto upper_rest = upper.substr(in_key.size());
+                        has_upper       = upper_rest.starts_with(prefix);
+                        in_range        = prefix < upper_rest;
+                     }
+                     else
+                     {
+                        in_range = in_key < upper;
+                     }
+                  }
+                  if (!in_range)
+                     return detail::is_empty_in_range(session, l, in, in_key, lower, upper);
+                  subtree_t original_subtree{};
+                  if (!original_subtree.set_subtree(session, l, in, in_key, prefix, lower, upper))
+                     return false;
+                  auto prefix_consumed = prefix.size() - original_subtree.skip_prefix;
+                  expected.skip_prefix += prefix_consumed;
+                  auto bounds_consumed = in_key.size() + prefix_consumed;
+                  if (has_lower && has_upper)
+                     return is_equal_in_range_weak(session, l, original_subtree.id, expected,
+                                                   lower.substr(bounds_consumed),
+                                                   upper.substr(bounds_consumed));
+                  else if (has_lower && !has_upper)
+                     return is_equal_in_range_weak(session, l, original_subtree.id, expected,
+                                                   lower.substr(bounds_consumed), highest_key{});
+                  else if (!has_lower && has_upper)
+                     return is_equal_in_range_weak(session, l, original_subtree.id, expected,
+                                                   lowest_key{}, upper.substr(bounds_consumed));
+                  else /* !has_lower && !has_upper */
+                     return is_equal_in_range_weak(session, l, original_subtree.id, expected,
+                                                   lowest_key{}, highest_key{});
+               }
+               // The two nodes have the same prefix
+               if (lower <= in_key)
+               {
+                  if (upper.starts_with(in_key))
+                  {
+                     upper.remove_prefix(in_key.size());
+                     if (n_expected.is_leaf_node())
+                     {
+                        if (in.branches() & inner_node::mask_lt(upper[0]))
+                           return false;
+                        if (!is_empty_in_range(session, l, in.maybe_branch(upper[0]), lowest_key{},
+                                               upper.substr(1)))
+                           return false;
+                        auto val = in.value();
+                        if (!val)
+                           return false;
+                        return session.get_by_id(l, val).as_value_node().data() ==
+                               n_expected.as_value_node().data();
+                     }
+                     else
+                     {
+                        auto& in_expected = n_expected.as_inner_node();
+                        return is_equal_children_in_range_weak(session, l, in, in_expected,
+                                                               lowest_key{}, upper);
+                     }
+                  }
+                  else
+                  {
+                     // nodes must be equal except that their prefixes might
+                     // start at different places
+                     if (n_expected.is_leaf_node())
+                        return false;
+                     auto& in_expected = n_expected.as_inner_node();
+                     return detail::is_equal_children_in_range_weak(session, l, in, in_expected,
+                                                                    lowest_key{}, highest_key{});
+                  }
+               }
+               else  // in_key is a prefix of lower
+               {
+                  // If expected is a leaf node, it corresponds to in_key, which is excluded because in_key < lower
+                  if (n_expected.is_leaf_node())
+                     return is_empty_in_range(session, l, original, lower, upper);
+                  lower.remove_prefix(in_key.size());
+                  auto& in_expected = n_expected.as_inner_node();
+                  if (upper.starts_with(in_key))
+                  {
+                     upper.remove_prefix(in_key.size());
+                     if (lower[0] == upper[0])
+                     {
+                        return is_equal_in_range_weak(session, l, in.maybe_branch(lower[0]),
+                                                      {in_expected.maybe_branch(lower[0])},
+                                                      lower.substr(1), upper.substr(1));
+                     }
+                     else
+                     {
+                        return is_equal_children_in_range_weak(session, l, in, in_expected, lower,
+                                                               upper);
+                     }
+                  }
+                  else  // lower bound only
+                  {
+                     return is_equal_children_in_range_weak(session, l, in, in_expected, lower,
+                                                            highest_key{});
+                  }
+               }
+            }
+         }
+      }
+
+   }  // namespace detail
+   template <typename AccessMode>
+   bool session<AccessMode>::is_equal_weak(const std::shared_ptr<root>& r1,
+                                           const std::shared_ptr<root>& r2,
+                                           std::span<const char>        lower,
+                                           std::span<const char>        upper) const
+   {
+      swap_guard g(*this);
+      auto       lower6 = to_key6({lower.data(), lower.size()});
+      if (upper.empty())
+      {
+         return detail::is_equal_in_range_weak(*this, g, get_id(r1), {get_id(r2)}, lower6,
+                                               detail::highest_key{});
+      }
+      key_type upper_buf;
+      auto     upper6 = triedent::to_key6(upper_buf, {upper.data(), upper.size()});
+      return detail::is_equal_in_range_weak(*this, g, get_id(r1), {get_id(r2)}, lower6, upper6);
+   }
 
    inline int write_session::remove(std::shared_ptr<root>& r, std::span<const char> key)
    {
