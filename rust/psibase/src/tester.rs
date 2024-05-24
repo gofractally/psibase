@@ -231,10 +231,7 @@ impl Chain {
             self.start_block();
         }
 
-        println!(
-            "\n\n>>> Chain::push -> Packing transaction: {:?}",
-            transaction
-        );
+        println!("\n\n>>> Chain::push -> Packing transaction...");
         let transaction = transaction.packed();
         println!(
             ">>> Chain::push -> Packed transaction!: {} bytes",
@@ -259,10 +256,10 @@ impl Chain {
         );
         println!(">>> Chain::push -> Unpacking trace result...");
         let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
-        println!(">>> Chain::push -> Unpacked trace result!: {:?}", trace);
+        println!(">>> Chain::push -> Unpacked trace result!: {}", trace);
 
         for action in &trace.action_traces {
-            println!(">>> Chain::push -> Action trace: {:?}", action);
+            println!(">>> Chain::push -> Action trace: {}", action);
             let action = &action.action;
             println!(
                 ">>> Chain::push -> Action Trace Service.Method: {}.{}",
@@ -364,9 +361,11 @@ pub struct ChainResult<T: fracpack::UnpackOwned> {
 
 impl<T: fracpack::UnpackOwned> ChainResult<T> {
     pub fn get(&self) -> Result<T, anyhow::Error> {
+        println!(">>> ChainResult::get -> Getting result...");
         if let Some(e) = &self.trace.error {
             return Err(anyhow!("{}", e));
         }
+        println!(">>> ChainResult::get -> Getting action traces...");
         if let Some(transact) = self.trace.action_traces.last() {
             let ret = transact
                 .inner_traces
@@ -380,7 +379,10 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 })
                 .last();
             if let Some(ret) = ret {
-                return Ok(T::unpacked(ret)?);
+                println!(">>> unpacking ret...");
+                let unpacked_ret = T::unpacked(ret)?;
+                println!(">>> unpacked ret successfully!");
+                return Ok(unpacked_ret);
             }
         }
         Err(anyhow!("Can't find action in trace"))
@@ -432,6 +434,10 @@ impl<'a> Caller for ChainPusher<'a> {
         method: crate::MethodNumber,
         args: Args,
     ) -> Self::ReturnType<Ret> {
+        println!(
+            ">>> ChainPusher::call -> Calling method: {}",
+            method.to_string()
+        );
         let mut trx = Transaction {
             tapos: Default::default(),
             actions: vec![Action {
@@ -442,14 +448,25 @@ impl<'a> Caller for ChainPusher<'a> {
             }],
             claims: vec![],
         };
+        println!(">>> ChainPusher::call -> Filling tapos...");
         self.chain.fill_tapos(&mut trx, 2);
+        println!(">>> ChainPusher::call -> Pushing transaction...");
         let trace = self.chain.push(&SignedTransaction {
             transaction: trx.packed().into(),
             proofs: Default::default(),
         });
-        ChainResult::<Ret> {
+        println!(
+            ">>> ChainPusher::call -> Pushed transaction! trace:\n {} \n\n<<<<<",
+            trace
+        );
+        let ret = ChainResult::<Ret> {
             trace,
             _marker: Default::default(),
-        }
+        };
+        println!(
+            ">>> ChainPusher::call -> Returning result trace: {}",
+            ret.trace
+        );
+        ret
     }
 }

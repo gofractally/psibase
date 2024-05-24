@@ -174,7 +174,6 @@ pub fn create_boot_transactions<R: Read + Seek>(
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
 ) -> Result<(Vec<SignedTransaction>, Vec<SignedTransaction>), anyhow::Error> {
-
     println!("\n>>>>\n Validating dependencies");
     validate_dependencies(service_packages)?;
 
@@ -183,7 +182,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     let mut actions =
         get_initial_actions(initial_key, initial_producer, install_ui, service_packages)?;
 
-    println!("\n>>>>\n Got initial actions: {:?}", actions);
+    println!("\n>>>>\n Got initial {} actions", actions.len());
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -200,7 +199,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         });
     }
 
-    println!("\n>>>>\n Got transactions: {:?}", transactions);
+    println!("\n>>>>\n Got {} transactions", transactions.len());
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
     for trx in &transactions {
         transaction_ids.push(crate::Checksum256::from(<[u8; 32]>::from(Sha256::digest(
