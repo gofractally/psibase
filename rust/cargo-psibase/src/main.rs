@@ -147,11 +147,16 @@ fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), Error> {
     let mut config = walrus::ModuleConfig::new();
     config.generate_name_section(debug_build);
     config.generate_producers_section(false);
-    let source_module = config.parse(polyfill)?;
-    let mut dest_module = config.parse(code)?;
 
-    pretty_path("Polyfilling", filename);
-    link_module(&source_module, &mut dest_module)?;
+    let mut dest_module = config.parse(code)?;
+    let polyfill_source_module = config.parse(polyfill)?;
+
+    if polyfill_source_module.funcs.iter().next().is_some() {
+        pretty_path("Polyfilling", filename);
+        link_module(&polyfill_source_module, &mut dest_module)?;
+    } else {
+        pretty("Polyfilling", "[SKIPPED!]: No polyfill functions found");
+    }
 
     pretty_path("Reoptimizing", filename);
     optimize(&mut dest_module)?;

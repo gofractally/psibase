@@ -553,13 +553,8 @@ impl PackageManifest {
 pub fn validate_dependencies<T: Read + Seek>(
     packages: &mut [PackagedService<T>],
 ) -> Result<(), anyhow::Error> {
-    println!("\n>>>>\n valdeps");
-
-    println!("\n>>>>\n valdeps2");
     let mut accounts: HashMap<AccountNumber, String> = HashMap::new();
-    println!("\n>>>>\n valdeps222");
     for p in &packages[..] {
-        println!("\n>>>>\n Getting accounts for package: {:?}", p.name());
         for account in p.get_accounts() {
             match accounts.entry(*account) {
                 hash_map::Entry::Occupied(entry) => Err(Error::AccountConflict {
@@ -571,9 +566,6 @@ pub fn validate_dependencies<T: Read + Seek>(
             };
         }
     }
-
-    println!("\n>>>>\n Got accounts: {:?}", accounts);
-
     for p in &mut packages[..] {
         for account in p.get_required_accounts()? {
             if let Some(package) = accounts.get(&account) {
@@ -668,7 +660,6 @@ impl DirectoryRegistry {
             let PackageOp::Install(info) = op else {
                 panic!("Only install is expected when there are no existing packages");
             };
-            println!("Package Info: {:?}", info);
             result.push(self.sync_get_by_info(&info)?);
         }
 

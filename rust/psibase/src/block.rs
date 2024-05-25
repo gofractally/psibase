@@ -249,38 +249,20 @@ pub struct Producer {
 }
 
 #[derive(
-    Debug,
-    Clone,
-    Default,
-    Pack,
-    Unpack,
-    Reflect,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
+    Debug, Clone, Default, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-struct CftConsensus {
+pub struct CftConsensus {
     pub producers: Vec<Producer>,
 }
 
 #[derive(
-    Debug,
-    Clone,
-    Default,
-    Pack,
-    Unpack,
-    Reflect,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
+    Debug, Clone, Default, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-struct BftConsensus {
+pub struct BftConsensus {
     pub producers: Vec<Producer>,
 }
 
@@ -391,8 +373,6 @@ pub struct BlockHeader {
     // // block to change producers becomes irreversible or
     // // the newProducers are set to the existing producers.
     // pub newProducers: Option<Vec<Producer>>,
-
-    
 
     // Holds a merkle root of the transactions in the block.
     // This does not depend on execution, so that it can be

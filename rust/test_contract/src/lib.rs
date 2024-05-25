@@ -39,21 +39,22 @@ fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
     Ok(())
 }
 
+#[psibase::test_case(services("test_contract"))]
+fn test2(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    assert_eq!(Wrapper::push(&chain).add(9, 4).get()?, 13);
+    assert_eq!(Wrapper::push(&chain).multiply(17, 0).get()?, 0);
+    Ok(())
+}
+
 #[test]
 fn dump_schema() {
-    // use psibase::*;
-
-    // TODO: fix this
-    // let x = create_schema::<Wrapper>();
-
-    // temp bypass
-    let x = r#"{"hello": "world"}"#;
-    let s = serde_json::to_string_pretty(&x).unwrap();
+    use psibase::create_schema;
+    let s = serde_json::to_string_pretty(&create_schema::<Wrapper>()).unwrap();
     println!("{}", s);
 }
 
 #[test]
 fn dump_templates() {
-    use psibase::*;
+    use psibase::generate_action_templates;
     println!("{}", generate_action_templates::<Wrapper>());
 }

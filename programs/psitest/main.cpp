@@ -537,6 +537,16 @@ struct callbacks
       return 0;
    }
 
+   // Unfortunately it looks like we have to lie instead of returning an error
+   // to not break some Rust libraries and even standard ones like HashMap
+   uint32_t testerWasi_random_get(wasm_ptr<uint8_t> buf, __wasi_size_t buf_len)
+   {
+      if (buf_len > 0) {
+         *buf = 0;
+      }
+      return 0;
+   }
+
    void abortMessage(span<const char> msg)
    {
       backtrace();
@@ -1343,6 +1353,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerWasi_path_filestat_get>("wasi_snapshot_preview1", "path_filestat_get");
    rhf_t::add<&callbacks::testerWasi_path_open>("wasi_snapshot_preview1", "path_open");
    rhf_t::add<&callbacks::testerWasi_proc_exit>("wasi_snapshot_preview1", "proc_exit");
+   rhf_t::add<&callbacks::testerWasi_random_get>("wasi_snapshot_preview1", "random_get");
    rhf_t::add<&callbacks::testerWasi_sched_yield>("wasi_snapshot_preview1", "sched_yield");
 }
 

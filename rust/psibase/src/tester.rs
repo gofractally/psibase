@@ -299,7 +299,7 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
                         println!(
-                            "inner action trace: {} - {:?}",
+                            ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
                             at.action.method, at.raw_retval
                         );
                         if at.raw_retval.is_empty() {
@@ -313,9 +313,8 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 })
                 .next();
             if let Some(ret) = ret {
-                println!(">>> unpacking ret... `{}` -- vec: [{:?}]", ret, ret.0);
+                println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
                 let unpacked_ret = T::unpacked(ret)?;
-                println!(">>> unpacked ret successfully!");
                 return Ok(unpacked_ret);
             }
         }

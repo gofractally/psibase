@@ -115,21 +115,13 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
             fn with_chain(#inputs) #output #block
             fn create_chain() -> Result<psibase::Chain, psibase::Error> {
                 use psibase::*;
-
-                println!("\n>>>>\n Instantiating chain");
                 let mut chain = psibase::Chain::new();
-
-                println!("\n>>>>\n Boot test chain...");
                 chain.boot()?;
-
-                println!("\n>>>>\nDeploying services...");
-
                 #deploy_services
 
-                println!("\n>>>>\nServices deployed!");
+                println!("\n\n>>> {}: Chain Tester Booted & Services Deployed - Running test...", #name);
                 Ok(chain)
             }
-            println!("\n>>>>\nCreating chain");
             let chain = create_chain();
             if let Err(e) = chain {
                 panic!("test {} failed with {:?}", #name, e);
