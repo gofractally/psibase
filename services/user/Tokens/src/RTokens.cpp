@@ -177,12 +177,8 @@ struct TokenQuery
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
       for (auto token : tokenTypeIdx)
       {
-         token.ownerNft;
          auto nft = Nft::Tables{Nft::service}.open<NftTable>().getIndex<0>().get(token.ownerNft);
-         if (not nft.has_value())
-            continue;
-
-         if (nft->owner == user)
+         if (nft.has_value() && nft->owner == user)
          {
             tokens.push_back(token);
          }
