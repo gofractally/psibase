@@ -28,18 +28,33 @@ export const useUi = (username: string | undefined) =>
     queryFn: async () => {
       const res = await fetchUi(username!);
 
-      // TODO: check variables and rename creditor / debitor fields.
       const creditBalances = res.userCredits.map(
         (credit): SharedBalance => ({
           amount: new Quantity(credit.balance, credit.precision.value),
-          creditor: credit.creditedTo!,
-          debitor: "jj",
-          id: credit.symbolId,
-          label: "",
+          creditor: username || "",
+          debitor: credit.creditedTo!,
+          id: credit.tokenId.toString() + credit.creditedTo! + username || "",
+          label: credit.symbolId || `Token ${credit.tokenId}`,
           tokenId: credit.tokenId,
         })
       );
-      const sharedBalances: SharedBalance[] = [...creditBalances];
+
+      const debitBalances = res.userDebits.map(
+        (debit): SharedBalance => ({
+          amount: new Quantity(debit.balance, debit.precision.value),
+          creditor: debit.debitableFrom!,
+          debitor: username || "",
+          id: debit.tokenId.toString() + debit.debitableFrom! + username || "",
+          label: debit.symbolId || `Token ${debit.tokenId}`,
+          tokenId: debit.tokenId,
+        })
+      );
+
+      const sharedBalances: SharedBalance[] = [
+        ...creditBalances,
+        ...debitBalances,
+      ];
+
       const tokens: Token[] = res.userBalances.map(
         (balance): Token => ({
           id: balance.tokenId,
