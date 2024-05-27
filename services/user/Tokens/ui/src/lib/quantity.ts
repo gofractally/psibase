@@ -23,13 +23,9 @@ export class Quantity {
     return Number(this.amount) / Math.pow(10, this.precision);
   }
 
-  public toString(): string {
-    return this.toNumber().toString();
-  }
-
-  public format(): string {
+  public format(includeSymbol = true): string {
     return `${formatTrailingZeros(this.toNumber(), this.precision)}${
-      this.symbol ? ` ${this.symbol}` : ""
+      this.symbol && includeSymbol ? ` ${this.symbol}` : ""
     }`;
   }
 

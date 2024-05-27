@@ -78,7 +78,7 @@ export function CreditTable({ balances, user }: Props) {
               <TableCell className="font-medium">{balance.creditor}</TableCell>
               <TableCell>{balance.debitor}</TableCell>
               <TableCell>{balance.label}</TableCell>
-              <TableCell>{balance.amount.toString()}</TableCell>
+              <TableCell>{balance.amount.format(false)}</TableCell>
               <TableCell className="text-right">
                 <Button
                   variant="secondary"
