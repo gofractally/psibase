@@ -26,6 +26,11 @@ export const fetchUserBalances = async (username: string) => {
 
   return res.userBalances.map((balance) => ({
     ...balance,
-    quantity: new Quantity(balance.balance, balance.precision),
+    quantity: new Quantity(
+      balance.balance,
+      balance.precision,
+      balance.token,
+      balance.symbol
+    ),
   }));
 };

@@ -25,48 +25,66 @@ export const useUi = (username: string | undefined) =>
   useQuery({
     queryKey: QueryKey.ui(username),
     enabled: !!username,
+    refetchInterval: 10000,
     queryFn: async () => {
       const res = await fetchUi(username!);
 
-      const creditBalances = res.userCredits.map(
-        (credit): SharedBalance => ({
-          amount: new Quantity(credit.balance, credit.precision.value),
+      const creditBalances = res.userCredits.map((credit): SharedBalance => {
+        const amount = new Quantity(
+          credit.balance,
+          credit.precision.value,
+          credit.tokenId,
+          credit.symbolId
+        );
+        return {
+          amount,
           creditor: username || "",
           debitor: credit.creditedTo!,
           id: credit.tokenId.toString() + credit.creditedTo! + username || "",
-          label: credit.symbolId || `Token ${credit.tokenId}`,
+          label: amount.label(),
           tokenId: credit.tokenId,
-        })
-      );
+        };
+      });
 
-      const debitBalances = res.userDebits.map(
-        (debit): SharedBalance => ({
-          amount: new Quantity(debit.balance, debit.precision.value),
+      const debitBalances = res.userDebits.map((debit): SharedBalance => {
+        const amount = new Quantity(
+          debit.balance,
+          debit.precision.value,
+          debit.tokenId,
+          debit.symbolId
+        );
+        return {
+          amount,
           creditor: debit.debitableFrom!,
           debitor: username || "",
           id: debit.tokenId.toString() + debit.debitableFrom! + username || "",
-          label: debit.symbolId || `Token ${debit.tokenId}`,
+          label: amount.label(),
           tokenId: debit.tokenId,
-        })
-      );
+        };
+      });
 
       const sharedBalances: SharedBalance[] = [
         ...creditBalances,
         ...debitBalances,
       ];
 
-      const tokens: Token[] = res.userBalances.map(
-        (balance): Token => ({
+      const tokens: Token[] = res.userBalances.map((balance): Token => {
+        const quan = new Quantity(
+          balance.balance,
+          balance.precision.value,
+          balance.tokenId,
+          balance.symbolId
+        );
+
+        return {
           id: balance.tokenId,
           owner: "",
           isAdmin: true,
           symbol: balance.symbolId,
-          label: balance.symbolId
-            ? balance.symbolId
-            : `Token${balance.tokenId}`,
-          balance: new Quantity(balance.balance, balance.precision.value),
-        })
-      );
+          label: quan.label(),
+          balance: quan,
+        };
+      });
 
       return { tokens, sharedBalances };
     },

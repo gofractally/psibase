@@ -27,7 +27,9 @@ export function CreditTable({ balances, user }: Props) {
 
   const { mutate } = usePluginCall({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QueryKey.tokenBalances(user) });
+      const queryKey = QueryKey.tokenBalances(user);
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.refetchQueries({ queryKey });
     },
   });
 
@@ -40,7 +42,7 @@ export function CreditTable({ balances, user }: Props) {
         tokenPlugin.transfer.uncredit(
           balance.tokenId,
           balance.debitor,
-          balance.amount.toString()
+          balance.amount.toNumber().toString()
         )
       );
     } else if (parsedAction == ActionType.Enum.Debit) {
@@ -48,7 +50,7 @@ export function CreditTable({ balances, user }: Props) {
         tokenPlugin.transfer.debit(
           balance.tokenId,
           balance.debitor,
-          balance.amount.toString()
+          balance.amount.toNumber().toString()
         )
       );
     } else throw new Error(`Unhandled action`);
