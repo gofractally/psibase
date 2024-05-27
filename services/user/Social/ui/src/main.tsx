@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { createHashRouter, RouterProvider } from "react-router-dom";
 
-import { Home, homeLoader, Post, postLoader } from "@routes";
+import { Editor, Home, homeLoader, Post, postLoader } from "@routes";
 import { TooltipProvider } from "@shadcn/tooltip";
 
 import DefaultLayout, { accountsLoader } from "./layouts/default";
@@ -26,6 +26,10 @@ const router = createHashRouter([
                 loader: postLoader,
             },
         ],
+    },
+    {
+        path: "editor",
+        element: <Editor />,
     },
 ]);
 
