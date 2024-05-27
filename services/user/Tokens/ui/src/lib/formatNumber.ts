@@ -1,5 +1,7 @@
-export const formatThousands = (num: number) =>
-  new Intl.NumberFormat("en-US").format(Number.isNaN(num) ? 0 : num);
+export const formatThousands = (num: number, precision: number) =>
+  new Intl.NumberFormat("en-US", { maximumFractionDigits: precision }).format(
+    Number.isNaN(num) ? 0 : num
+  );
 
 const parseIntegerAndDecimalPart = (
   str: string,
@@ -7,7 +9,7 @@ const parseIntegerAndDecimalPart = (
 ): [integer: string, decimal: string] => {
   const isPrecision = str.includes(".");
   const [integerPart, decimalPart] = str.split(".");
-  const calculatedInteger = formatThousands(Number(integerPart));
+  const calculatedInteger = formatThousands(Number(integerPart), 0);
   const calculatedDecimal = (isPrecision ? decimalPart : "")
     .padEnd(precision, "0")
     .slice(0, precision);

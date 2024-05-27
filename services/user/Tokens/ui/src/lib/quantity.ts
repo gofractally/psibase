@@ -1,9 +1,6 @@
-const formatTrailingZeros = (num: number, precision: number) =>
-  new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: precision,
-    maximumFractionDigits: precision,
-    useGrouping: false,
-  }).format(num);
+import { formatThousands } from "./formatNumber";
+
+
 
 export class Quantity {
   constructor(
@@ -29,7 +26,7 @@ export class Quantity {
   }
 
   public format(includeLabel = true): string {
-    return `${formatTrailingZeros(this.toNumber(), this.precision)}${
+    return `${formatThousands(this.toNumber(), this.precision)}${
       includeLabel ? ` ${this.label()}` : ""
     }`;
   }

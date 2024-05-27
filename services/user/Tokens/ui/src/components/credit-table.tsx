@@ -1,3 +1,4 @@
+import { AnimateNumber } from "./AnimateNumber";
 import { Button } from "./ui/button";
 import {
   Table,
@@ -80,7 +81,13 @@ export function CreditTable({ balances, user }: Props) {
               <TableCell className="font-medium">{balance.creditor}</TableCell>
               <TableCell>{balance.debitor}</TableCell>
               <TableCell>{balance.label}</TableCell>
-              <TableCell>{balance.amount.format(false)}</TableCell>
+              <TableCell>
+                {" "}
+                <AnimateNumber
+                  n={balance.amount.toNumber()}
+                  precision={balance.amount.getPrecision()}
+                />
+              </TableCell>
               <TableCell className="text-right">
                 <Button
                   variant="secondary"

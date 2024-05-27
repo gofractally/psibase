@@ -18,7 +18,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mode, m } from "@/hooks/useMode";
 import { FormSchema } from "@/hooks/useTokenForm";
 import { Token } from "@/hooks/useUi";
-import { formatThousands } from "@/lib/formatNumber";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
@@ -48,7 +47,6 @@ const FormTransfer: FC<Props> = ({
   const disableTo = !isAdmin && isBurning;
   const isAmountOperation = isBurning || isMinting || isTransfer;
   const tokenBalance: number = selectedToken?.balance?.toNumber() || 0;
-  const tokenBalanceLabel = formatThousands(tokenBalance);
 
   const menus: { label: string; value: string }[] = [
     {
@@ -101,7 +99,6 @@ const FormTransfer: FC<Props> = ({
             form={form}
             selectedToken={selectedToken}
             tokenBalance={tokenBalance}
-            tokenBalanceLabel={tokenBalanceLabel}
           />
         )}
         {isTransfer && (

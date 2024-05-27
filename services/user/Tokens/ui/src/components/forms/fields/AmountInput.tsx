@@ -1,3 +1,4 @@
+import { AnimateNumber } from "@/components/AnimateNumber";
 import {
   FormField,
   FormItem,
@@ -15,41 +16,41 @@ interface Props {
   form: UseFormReturn<FormSchema>;
   selectedToken: Token | undefined;
   tokenBalance: number;
-  tokenBalanceLabel: string;
 }
 
-const AmountInput: FC<Props> = ({
-  form,
-  selectedToken,
-  tokenBalance,
-  tokenBalanceLabel,
-}) => (
-  <FormField
-    control={form.control}
-    name="amount"
-    render={({ field }) => (
-      <FormItem>
-        <FormLabel className="flex justify-between w-full">
-          <div>Amount</div>
-          {selectedToken && (
-            <button
-              type="button"
-              className="text-muted-foreground hover:underline"
-              onClick={() => {
-                form.setValue("amount", tokenBalance.toString());
-              }}
-            >
-              Balance: {tokenBalanceLabel}
-            </button>
-          )}
-        </FormLabel>
-        <FormControl>
-          <Input placeholder="123" {...field} />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-);
+const AmountInput: FC<Props> = ({ form, selectedToken, tokenBalance }) => {
+  return (
+    <FormField
+      control={form.control}
+      name="amount"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel className="flex justify-between w-full">
+            <div>Amount</div>
+            {selectedToken && (
+              <button
+                type="button"
+                className="text-muted-foreground hover:underline"
+                onClick={() => {
+                  form.setValue("amount", tokenBalance.toString());
+                }}
+              >
+                Balance{" "}
+                <AnimateNumber
+                  n={tokenBalance}
+                  precision={selectedToken.balance?.getPrecision() ?? 0}
+                />
+              </button>
+            )}
+          </FormLabel>
+          <FormControl>
+            <Input placeholder="123" {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+};
 
 export default AmountInput;
