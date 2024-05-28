@@ -68,7 +68,7 @@ export const useUi = (username: string | undefined) =>
         ...debitBalances,
       ];
 
-      const tokens: Token[] = res.userBalances.map((balance): Token => {
+      const userBalanceTokens: Token[] = res.userBalances.map((balance): Token => {
         const quan = new Quantity(
           balance.balance,
           balance.precision.value,
@@ -79,12 +79,25 @@ export const useUi = (username: string | undefined) =>
         return {
           id: balance.tokenId,
           owner: "",
-          isAdmin: true,
+          isAdmin: res.userTokens.some(user => user.id == balance.tokenId),
           symbol: balance.symbolId,
           label: quan.label(),
           balance: quan,
         };
       });
+
+
+      const userTokens = res.userTokens.map((userToken): Token => {
+        const quan = new Quantity('1', userToken.precision.value, userToken.id, userToken.symbolId)
+        return {
+          id: userToken.id,
+          isAdmin: true,
+          label: quan.label(),
+          owner: username || '',
+          symbol: userToken.symbolId,
+        }
+    })
+      const tokens = [...userBalanceTokens, ...userTokens].filter((token, index, arr) => arr.findIndex(t => t.id == token.id) == index);
 
       return { tokens, sharedBalances };
     },

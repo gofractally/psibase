@@ -13,8 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { useSupervisor } from "@/hooks/useSupervisor";
 import { formatNumber } from "@/lib/formatNumber";
-import { fetchTokens } from "@/lib/graphql/tokens";
-import { wait } from "@/lib/wait";
 import { tokenPlugin } from "@/plugin";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -29,7 +27,6 @@ const isValidNumber = (str: string): boolean => {
 
 const formSchema = z.object({
   maxSupply: z.string().refine(isValidNumber, "Must be a number"),
-  initialSupply: z.string().refine(isValidNumber, "Must be a number"),
   precision: z
     .string()
     .refine(isValidNumber, "Must be a number")
@@ -67,33 +64,14 @@ export function FormCreate({ onClose }: Props) {
   const { mutateAsync: createToken, isPending } = useMutation<
     { name: string },
     any,
-    { precision: number; maxSupply: string; initialSupply: string }
+    { precision: number; maxSupply: string }
   >({
-    mutationFn: async ({ maxSupply, precision, initialSupply }) => {
+    mutationFn: async ({ maxSupply, precision }) => {
       try {
-        const beforeTokens = await fetchTokens();
-
         const res = await supervisor.functionCall(
           tokenPlugin.intf.create(precision, maxSupply)
         );
 
-        await wait(2000);
-        const afterTokens = await fetchTokens(beforeTokens.length + 1);
-
-        const createdToken = afterTokens.find(
-          (token) => token.precision == precision
-        );
-        if (!createdToken) {
-          throw new Error(`Failed to find created token.`);
-        }
-
-        await supervisor.functionCall(
-          tokenPlugin.intf.mint(
-            createdToken.id,
-            initialSupply,
-            "Token creation."
-          )
-        );
         return res as { name: string };
       } catch (e) {
         console.error(e);
@@ -107,7 +85,6 @@ export function FormCreate({ onClose }: Props) {
       createToken({
         maxSupply: data.maxSupply,
         precision: Number(data.precision),
-        initialSupply: data.initialSupply,
       }),
       {
         loading: "Creating token...",
@@ -125,11 +102,6 @@ export function FormCreate({ onClose }: Props) {
   const precision = form.watch("precision");
 
   const suggestedPrecision = precision.length > 1 ? 8 : Number(precision) || 0;
-
-  const initialSupplyLabel = formatNumber(
-    Number(form.watch("initialSupply") || 0),
-    Number(suggestedPrecision)
-  );
 
   const exampleSymbol = "TOK";
   const maxSupplyLabel = formatNumber(
@@ -157,21 +129,6 @@ export function FormCreate({ onClose }: Props) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="initialSupply"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Initial Supply</FormLabel>
-              <FormControl>
-                <Input type="number" placeholder="50" {...field} />
-              </FormControl>
-              <FormDescription>{initialSupplyLabel}</FormDescription>
-
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <FormField
           control={form.control}
           name="precision"

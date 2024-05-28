@@ -1,37 +1,49 @@
 import { graphql } from "./index";
-import { z } from "zod";
+export interface Root {
+  data: Data;
+}
 
-export const PrecisionSchema = z.object({
-  value: z.number(),
-});
-export type Precision = z.infer<typeof PrecisionSchema>;
+export interface Data {
+  userBalances: User;
+  userTokens: UserTokens;
+  userCredits: User;
+  userDebits: User;
+}
 
-export const NodeSchema = z.object({
-  tokenId: z.number(),
-  balance: z.string(),
-  symbolId: z.string(),
-  precision: PrecisionSchema,
-  creditedTo: z.string().optional(),
-  debitableFrom: z.string().optional(),
-});
-export type Node = z.infer<typeof NodeSchema>;
+export interface User {
+  edges: UserBalancesEdge[];
+}
 
-export const EdgeSchema = z.object({
-  node: NodeSchema,
-});
-export type Edge = z.infer<typeof EdgeSchema>;
+export interface UserBalancesEdge {
+  node: SharedBalanceNode;
+}
 
-export const UserSchema = z.object({
-  edges: z.array(EdgeSchema),
-});
-export type User = z.infer<typeof UserSchema>;
+export interface SharedBalanceNode {
+  tokenId: number;
+  balance: string;
+  symbolId: string;
+  precision: Precision;
+  creditedTo?: string;
+  debitableFrom?: string;
+}
 
-export const DataSchema = z.object({
-  userBalances: UserSchema,
-  userCredits: UserSchema,
-  userDebits: UserSchema,
-});
-export type Data = z.infer<typeof DataSchema>;
+export interface Precision {
+  value: number;
+}
+
+export interface UserTokens {
+  edges: UserTokensEdge[];
+}
+
+export interface UserTokensEdge {
+  node: UserBalanceToken;
+}
+
+export interface UserBalanceToken {
+  id: number;
+  precision: Precision;
+  symbolId: string;
+}
 
 const queryString = (username: string) => `
 {
@@ -45,6 +57,18 @@ const queryString = (username: string) => `
 				precision {
 					value
 				}
+			}
+		}
+	}
+
+	userTokens(user: "${username}") {
+		edges {
+			node {
+				id
+				precision { 
+				  value
+				}
+				symbolId
 			}
 		}
 	}
@@ -82,7 +106,7 @@ const queryString = (username: string) => `
 `;
 
 export const fetchUi = async (username: string) => {
-  const res = await graphql<z.infer<typeof DataSchema>>(queryString(username));
+  const res = await graphql<Data>(queryString(username));
 
   console.log(res, "is the big query fetchUi");
 
@@ -90,5 +114,6 @@ export const fetchUi = async (username: string) => {
     userDebits: res.userDebits.edges.map(({ node }) => node),
     userCredits: res.userCredits.edges.map(({ node }) => node),
     userBalances: res.userBalances.edges.map(({ node }) => node),
+    userTokens: res.userTokens.edges.map(({ node }) => node),
   };
 };
