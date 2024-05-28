@@ -110,9 +110,12 @@ fn pretty_path(label: &str, filename: &Path) {
 }
 
 fn optimize(code: &mut Module) -> Result<(), Error> {
+    println!(">>> Optimizing");
     let file = tempfile::NamedTempFile::new()?;
     code.emit_wasm_file(file.path())?;
 
+    println!(">>> Running wasm-opt");
+    let time = std::time::Instant::now();
     let debug_build = false;
     OptimizationOptions::new_opt_level_2()
         .shrink_level(wasm_opt::ShrinkLevel::Level1)
@@ -121,11 +124,21 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
         .enable_feature(wasm_opt::Feature::Simd)
         .debug_info(debug_build)
         .run(file.path(), file.path())?;
+    let elapsed_wasmopt_exec_time = time.elapsed();
+    println!(
+        ">>> wasm-opt Done in {}s",
+        elapsed_wasmopt_exec_time.as_secs_f64()
+    );
 
+    println!("prep config");
     let mut config = walrus::ModuleConfig::new();
     config.generate_name_section(false);
     config.generate_producers_section(false);
+    println!("config prepped");
+
+    println!("parse file");
     *code = config.parse_file(file.path().to_path_buf())?;
+    println!("parsed file");
 
     Ok(())
 }

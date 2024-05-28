@@ -270,8 +270,8 @@ pub struct BftConsensus {
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
 pub enum Consensus {
-    BftConsensus(BftConsensus),
-    CftConsensus(CftConsensus),
+    CFT(CftConsensus),
+    BFT(BftConsensus),
 }
 
 #[derive(
@@ -348,16 +348,16 @@ pub struct BlockHeaderCode {
     Pack,
     Unpack,
     Reflect,
-    ToKey,
+    // ToKey,
     Serialize,
     Deserialize,
-    SimpleObject,
-    InputObject,
+    // SimpleObject,
+    // InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-#[to_key(psibase_mod = "crate")]
-#[graphql(input_name = "BlockHeaderInput")]
+// #[to_key(psibase_mod = "crate")]
+// #[graphql(input_name = "BlockHeaderInput")]
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
@@ -365,14 +365,6 @@ pub struct BlockHeader {
     pub producer: AccountNumber,
     pub term: TermNum,
     pub commitNum: BlockNum,
-
-    // // If newProducers is set, activates joint consensus when
-    // // this block becomes irreversible.  If joint consensus
-    // // was already active, replaces newProducers instead.
-    // // Joint consensus exits when either the most recent
-    // // block to change producers becomes irreversible or
-    // // the newProducers are set to the existing producers.
-    // pub newProducers: Option<Vec<Producer>>,
 
     // Holds a merkle root of the transactions in the block.
     // This does not depend on execution, so that it can be
@@ -387,8 +379,7 @@ pub struct BlockHeader {
     // If newConsensus is set, activates joint consensus on
     // this block. Joint consensus must not be active already.
     // Joint consensus ends after this block becomes irreversible.
-    // TODO: newConsensus: Option<Consensus>, // FIX: Does not work with GraphQL
-    newConsensus: Option<ConsensusBytes>,
+    newConsensus: Option<Consensus>,
 
     // If this is specified, it should should contain the full set of
     // of services that can be used for verifying block signatures.
@@ -409,16 +400,16 @@ pub struct BlockHeader {
     Pack,
     Unpack,
     Reflect,
-    ToKey,
+    // ToKey,
     Serialize,
     Deserialize,
-    SimpleObject,
-    InputObject,
+    // SimpleObject,
+    // InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-#[to_key(psibase_mod = "crate")]
-#[graphql(input_name = "BlockInput")]
+// #[to_key(psibase_mod = "crate")]
+// #[graphql(input_name = "BlockInput")]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
@@ -432,16 +423,16 @@ pub struct Block {
     Pack,
     Unpack,
     Reflect,
-    ToKey,
+    // ToKey,
     Serialize,
     Deserialize,
-    SimpleObject,
-    InputObject,
+    // SimpleObject,
+    // InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-#[to_key(psibase_mod = "crate")]
-#[graphql(input_name = "SignedBlockInput")]
+// #[to_key(psibase_mod = "crate")]
+// #[graphql(input_name = "SignedBlockInput")]
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Hex<Vec<u8>>,
@@ -454,16 +445,16 @@ pub struct SignedBlock {
     Pack,
     Unpack,
     Reflect,
-    ToKey,
+    // ToKey,
     Serialize,
     Deserialize,
-    SimpleObject,
-    InputObject,
+    // SimpleObject,
+    // InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-#[to_key(psibase_mod = "crate")]
-#[graphql(input_name = "BlockInfoInput")]
+// #[to_key(psibase_mod = "crate")]
+// #[graphql(input_name = "BlockInfoInput")]
 pub struct BlockInfo {
     pub header: BlockHeader,
     pub blockId: Checksum256,
