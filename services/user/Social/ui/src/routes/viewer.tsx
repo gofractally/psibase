@@ -2,7 +2,7 @@ import { MilkdownProvider } from "@milkdown/react";
 
 import { useLocalStorage } from "@hooks";
 
-import { MilkdownEditorComponent } from "./editor";
+import { MarkdownEditor } from "@components";
 
 export function Viewer() {
     const [markdown, setMarkdown] = useLocalStorage("markdown", "");
@@ -10,7 +10,7 @@ export function Viewer() {
     return (
         <MilkdownProvider>
             {markdown ? (
-                <MilkdownEditorComponent
+                <MarkdownEditor
                     initialValue={markdown}
                     updateMarkdown={setMarkdown}
                     readOnly
