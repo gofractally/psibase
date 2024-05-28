@@ -17,11 +17,10 @@ extern "C" {
     ///
     /// Returns a chain handle
     pub fn testerCreateChain(
-        max_objects: u64,
-        hot_addr_bits: u64,
-        warm_addr_bits: u64,
-        cool_addr_bits: u64,
-        cold_addr_bits: u64,
+        hot_bytes: u64,
+        warm_bytes: u64,
+        cool_bytes: u64,
+        cold_bytes: u64,
     ) -> u32;
 
     /// Destroy chain
@@ -64,25 +63,7 @@ extern "C" {
         chain_handle: u32,
         transaction: *const u8,
         transaction_size: usize,
-        alloc_context: *mut u8,
-        cb_alloc: unsafe extern "C" fn(alloc_context: *mut u8, size: usize) -> *mut u8,
-    );
-
-    /// Read a file into memory
-    ///
-    /// Returns true if successful.
-    ///
-    /// The callback `cb_alloc` must allocate `size` bytes and return a pointer to it.
-    /// If it can't allocate the memory, then it must abort, either by `panic`,
-    /// [`raw::abortMessage`](crate::native_raw::abortMessage), or the `unreachable` instruction.
-    /// `testerReadWholeFile` does not hold onto the pointer; it fills it then returns.
-    /// `testerReadWholeFile` passes `alloc_context` to `cb_alloc`.
-    pub fn testerReadWholeFile(
-        filename: *const u8,
-        filename_size: usize,
-        alloc_context: *mut u8,
-        cb_alloc: unsafe extern "C" fn(alloc_context: *mut u8, size: usize) -> *mut u8,
-    ) -> bool;
+    ) -> u32;
 
     /// Select chain for database native functions
     ///
