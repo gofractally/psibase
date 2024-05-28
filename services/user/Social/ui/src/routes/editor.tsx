@@ -1,5 +1,6 @@
 import {
     defaultValueCtx,
+    editorViewOptionsCtx,
     Editor as MilkdownEditor,
     rootCtx,
 } from "@milkdown/core";
@@ -129,12 +130,14 @@ Have fun!
 
 `;
 
-const MilkdownEditorComponent = ({
+export const MilkdownEditorComponent = ({
     initialValue,
     updateMarkdown,
+    readOnly = false,
 }: {
     initialValue: string;
     updateMarkdown: (value: string) => void;
+    readOnly?: boolean;
 }) => {
     const { get } = useEditor((root) =>
         MilkdownEditor.make()
@@ -149,6 +152,12 @@ const MilkdownEditorComponent = ({
                     if (md === prevMd) return;
                     updateMarkdown(md);
                 });
+            })
+            .config((ctx) => {
+                ctx.update(editorViewOptionsCtx, (prev) => ({
+                    ...prev,
+                    editable: () => !readOnly,
+                }));
             })
             .use(listener)
             .use(commonmark)
