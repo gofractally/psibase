@@ -7,7 +7,6 @@
 using namespace UserService;
 using namespace UserService::FractalNs;
 using namespace psibase;
-using std::move;
 using std::nullopt;
 using std::optional;
 using std::string;
@@ -433,7 +432,7 @@ optional<HttpReply> Fractal::serveSys(HttpRequest request)
 void Fractal::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content), Tables());
+   storeContent(std::move(path), std::move(contentType), std::move(content), Tables());
 }
 
 PSIBASE_DISPATCH(UserService::FractalNs::Fractal)
