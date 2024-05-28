@@ -1,4 +1,3 @@
-import React from "react";
 import {
     defaultValueCtx,
     Editor as MilkdownEditor,
@@ -9,11 +8,13 @@ import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
 import { listItemBlockComponent } from "@milkdown/components/list-item-block";
+import { listener, listenerCtx } from "@milkdown/plugin-listener";
 
 import "@milkdown/theme-nord/style.css";
 import "../styles/editor.css";
+import { useLocalStorage } from "@hooks";
 
-const markdown = `# Milkdown
+const defaultMarkdown = `# Milkdown
 
 We want to implement all the features in this document.
 - These are from the Milkdown documentation [Playground](https://milkdown.dev/playground)
@@ -128,14 +129,28 @@ Have fun!
 
 `;
 
-const MilkdownEditorComponent: React.FC = () => {
+const MilkdownEditorComponent = ({
+    initialValue,
+    updateMarkdown,
+}: {
+    initialValue: string;
+    updateMarkdown: (value: string) => void;
+}) => {
     const { get } = useEditor((root) =>
         MilkdownEditor.make()
             .config(nord)
             .config((ctx) => {
                 ctx.set(rootCtx, root);
-                ctx.set(defaultValueCtx, markdown);
+                ctx.set(defaultValueCtx, initialValue);
             })
+            .config((ctx) => {
+                const listener = ctx.get(listenerCtx);
+                listener.markdownUpdated((_ctx, md, prevMd) => {
+                    if (md === prevMd) return;
+                    updateMarkdown(md);
+                });
+            })
+            .use(listener)
             .use(commonmark)
             .use(gfm)
             .use(listItemBlockComponent),
@@ -145,9 +160,19 @@ const MilkdownEditorComponent: React.FC = () => {
 };
 
 export function Editor() {
+    const [markdown, setMarkdown] = useLocalStorage(
+        "markdown",
+        defaultMarkdown,
+    );
+
     return (
         <MilkdownProvider>
-            <MilkdownEditorComponent />
+            {markdown ? (
+                <MilkdownEditorComponent
+                    initialValue={markdown}
+                    updateMarkdown={setMarkdown}
+                />
+            ) : null}
         </MilkdownProvider>
     );
 }
