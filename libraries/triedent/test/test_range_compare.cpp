@@ -6,69 +6,91 @@
 
 using namespace triedent;
 
-template <typename T, typename U>
-struct key_range
+std::string to_hex(std::string_view data)
 {
-   [[no_unique_address]] T lower;
-   [[no_unique_address]] U upper;
-};
-
-bool is_empty(const std::vector<std::string_view>& contents,
-              std::string_view                     lower,
-              std::string_view                     upper)
-{
-   return std::ranges::lower_bound(contents, lower) == std::ranges::lower_bound(contents, upper);
-}
-
-template <typename L, typename U>
-bool compare_equal(read_session&         session,
-                   std::shared_ptr<root> lhs,
-                   std::shared_ptr<root> rhs,
-                   key_range<L, U>       range)
-{
-   std::vector<char> lkey, lvalue, rkey, rvalue;
-   bool              lfound = session.get_greater_equal(lhs, range.lower, &lkey, &lvalue, nullptr);
-   bool              rfound = session.get_greater_equal(rhs, range.lower, &rkey, &rvalue, nullptr);
-   while (true)
+   constexpr const char* digits = "0123456789ABCDEF";
+   std::string           result;
+   for (std::uint8_t ch : data)
    {
-      if (lfound && std::string_view{lkey.data(), lkey.size()} >= range.upper)
-         lfound = false;
-      if (rfound && std::string_view{rkey.data(), rkey.size()} >= range.upper)
-         rfound = false;
-      if (lfound != rfound)
-         return false;
-      if (!lfound)
-         return true;
-      if (lkey != rkey || lvalue != rvalue)
-         return false;
-      if (!lfound)
-         return true;
-      lkey.push_back(0);
-      rkey.push_back(0);
-      lfound = session.get_greater_equal(lhs, lkey, &lkey, &lvalue, nullptr);
-      rfound = session.get_greater_equal(rhs, rkey, &rkey, &rvalue, nullptr);
+      result.push_back(digits[ch >> 4]);
+      result.push_back(digits[ch & 0xF]);
    }
+   return result;
 }
+
+std::string to_hex(std::vector<std::string_view> data)
+{
+   std::string result;
+   for (auto s : data)
+   {
+      result += " ";
+      result += to_hex(s);
+   }
+   return result;
+}
+
+struct is_empty_data
+{
+   std::vector<std::string_view> rows;
+   std::string_view              lower;
+   std::string_view              upper;
+   bool                          expected;
+};
 
 TEST_CASE("test is_empty")
 {
-   static std::vector<std::vector<std::string_view>>          data{{"b"}};
-   std::vector<key_range<std::string_view, std::string_view>> ranges{{"a", "c"}};
-   auto                                                       contents = GENERATE(from_range(data));
-   auto                                                       db       = createDb();
-   auto                                                       session  = db->start_write_session();
-   auto                                                       r        = std::shared_ptr<root>{};
-   for (std::string_view row : contents)
+   using namespace std::literals::string_view_literals;
+   static std::vector<is_empty_data> data{
+       //
+       {{}, ""sv, ""sv, true},
+       {{}, ""sv, "\x00"sv, true},
+       {{}, "\x00"sv, ""sv, true},
+       {{}, "\x00"sv, "\x01"sv, true},
+       {{""sv}, ""sv, ""sv, false},
+       {{""sv}, ""sv, "\x00"sv, false},
+       {{""sv}, "\x00"sv, ""sv, true},
+       {{""sv}, "\x00"sv, "\x01"sv, true},
+       {{"\x01"sv}, ""sv, ""sv, false},
+       {{"\x01"sv}, ""sv, "\x02"sv, false},
+       {{"\x01"sv}, ""sv, "\x01"sv, true},
+       {{"\x01"sv}, "\x01"sv, "\x02"sv, false},
+       {{"\x01"sv}, "\x00"sv, "\x01"sv, true},
+       {{""sv, "\x00"sv}, ""sv, ""sv, false},
+       {{""sv, "\x00"sv}, ""sv, "\x00"sv, false},
+       {{""sv, "\x00"sv}, ""sv, "\x00\x00"sv, false},
+       {{""sv, "\x00"sv}, ""sv, "\x01"sv, false},
+       {{""sv, "\x00"sv}, "\x00"sv, ""sv, false},
+       {{""sv, "\x00"sv}, "\x00"sv, "\x00\x00"sv, false},
+       {{""sv, "\x00"sv}, "\x00\x00"sv, ""sv, true},
+       {{""sv, "\x00"sv}, "\x00\x00"sv, "\x01"sv, true},
+       {{""sv, "\x00"sv}, "\x01"sv, ""sv, true},
+       {{""sv, "\x00"sv}, "\x01"sv, "\x02"sv, true},
+       {{"\x00"sv, "\xFF"sv}, "\xAA\x00"sv, "\xCC\x00"sv, true},
+       {{"\x00"sv, "\xFF"sv}, "\xAA\x00"sv, "\xAA\x01"sv, true},
+       {{"\x00"sv, "\xFF"sv}, "\x00\x00"sv, "\xCC\x00"sv, true},
+       {{"\x00"sv, "\xFF"sv}, "\xAA\x00"sv, "\xFF"sv, true},
+       {{"\xAA\x05"sv, "\xFF"sv}, "\xAA"sv, "\xFF"sv, false},
+       {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x04"sv, "\xFF"sv, false},
+       {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x05"sv, "\xFF"sv, false},
+       {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x05\x00"sv, "\xFF"sv, true},
+       {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x05\x00"sv, "\xFF\x00"sv, false},
+       {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x05"sv, ""sv, false},
+       {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x05\x00"sv, ""sv, false},
+       {{"\xAA\x05"sv, "\xFF"sv}, "sv", "\xAA\x05"sv, true},
+       {{"\xAA\x05"sv, "\xFF"sv}, "sv", "\xAA\x05\x00"sv, false},
+   };
+   auto contents = GENERATE(from_range(data));
+   auto db       = createDb();
+   auto session  = db->start_write_session();
+   auto r        = std::shared_ptr<root>{};
+   for (std::string_view row : contents.rows)
    {
       session->upsert(r, row, "");
    }
-   for (auto range : ranges)
-   {
-      INFO("lower: " << range.lower);
-      INFO("upper: " << range.upper);
-      CHECK(session->is_empty(r, range.lower, range.upper) ==
-            is_empty(contents, range.lower, range.upper));
-   }
+   INFO("rows:" << to_hex(contents.rows));
+   INFO("lower: " << to_hex(contents.lower));
+   INFO("upper: " << to_hex(contents.upper));
+   CHECK(session->is_empty(r, contents.lower, contents.upper) == contents.expected);
 }
 
 struct is_equal_data
