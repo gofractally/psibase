@@ -43,7 +43,6 @@ interface transfer {
     token-owner: func(code: token-id) -> result<token-detail, error>;
     uncredit: func(code: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
     credit: func(code: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
-    balances: func() -> result<list<balance>, error>;
 }
 
 /// An example world for the component to target.

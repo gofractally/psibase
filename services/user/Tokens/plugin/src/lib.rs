@@ -6,7 +6,6 @@ use bindings::exports::component::tokens::types as Wit;
 use bindings::exports::component::tokens::{intf::Guest as Intf, transfer::Guest as Transfer};
 use psibase::services::tokens as Wrapper;
 use psibase::AccountNumber;
-use query::shared_balance::fetch_balances;
 use query::token_detail::fetch_token;
 
 mod errors;
@@ -16,7 +15,6 @@ struct Component;
 use psibase::fracpack::Pack;
 
 mod query {
-    pub mod shared_balance;
     pub mod token_detail;
 }
 
@@ -130,19 +128,6 @@ impl Transfer for Component {
             precision: res.precision,
             symbol_id: res.symbol_id,
         })
-    }
-
-    fn balances() -> Result<Vec<Wit::Balance>, CommonTypes::Error> {
-        Ok(fetch_balances()
-            .unwrap()
-            .into_iter()
-            .map(|balance| Wit::Balance {
-                balance: balance.balance,
-                creditor: balance.key.creditor,
-                debitor: balance.key.debitor,
-                token_number: balance.key.tokenId,
-            })
-            .collect())
     }
 
     fn uncredit(
