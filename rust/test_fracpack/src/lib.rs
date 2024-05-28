@@ -160,3 +160,34 @@ pub struct ThreeElementsFixedStruct {
     pub element_2: i16,
     pub element_3: i16,
 }
+
+#[derive(Pack, Unpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct MultipleTrailingOptions {
+    pub a: u32,
+    pub b: u64,
+    pub s: String,
+    pub opt_x: Option<u32>,
+    pub opt_y: Option<String>,
+    pub opt_z: Option<u64>,
+}
+
+#[derive(Pack, Unpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(definition_will_not_change)]
+pub struct UnextensibleMultipleTrailingOptions {
+    pub a: u32,
+    pub b: u64,
+    pub s: String,
+    pub opt_x: Option<u32>,
+    pub opt_y: Option<String>,
+    pub opt_z: Option<u64>,
+}
+
+#[derive(Pack, Unpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct OptionInTheMiddle {
+    pub a: u32,
+    pub opt_b: Option<String>,
+    pub c: u32,
+}
