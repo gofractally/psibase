@@ -19,12 +19,12 @@ mod query {
 }
 
 enum TokenType {
-    number(u32),
-    symbol(String),
+    Number(u32),
+    Symbol(String),
 }
 
 fn identify_token_type(token_id: String) -> Result<TokenType, CommonTypes::Error> {
-    use TokenType::{number, symbol};
+    use TokenType::{Number, Symbol};
 
     let first_char = token_id
         .chars()
@@ -32,21 +32,21 @@ fn identify_token_type(token_id: String) -> Result<TokenType, CommonTypes::Error
         .ok_or(ErrorType::InvalidTokenId.err("token code is empty"))?;
 
     Ok(if first_char.is_ascii_digit() {
-        number(
+        Number(
             token_id
                 .parse::<u32>()
                 .map_err(|_| ErrorType::InvalidTokenId.err("failed to parse token_id to u32"))?,
         )
     } else {
-        symbol(token_id)
+        Symbol(token_id)
     })
 }
 
 fn token_code_to_id(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error> {
     let parsed = identify_token_type(token_id)?;
     match parsed {
-        TokenType::number(number) => Ok(number),
-        TokenType::symbol(_) => {
+        TokenType::Number(number) => Ok(number),
+        TokenType::Symbol(_) => {
             unimplemented!("Dunno how to lookup a token by symbol")
         }
     }
@@ -55,13 +55,13 @@ fn token_code_to_id(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error> {
 impl Intf for Component {
     fn create(
         precision: Wit::Precision,
-        maxSupply: Wit::Quantity,
+        max_supply: Wit::Quantity,
     ) -> Result<(), CommonTypes::Error> {
         server::add_action_to_transaction(
             "create",
             &Wrapper::action_structs::create {
                 precision: Wrapper::Precision::from(precision),
-                maxSupply: Wrapper::Quantity::new(maxSupply.as_str(), precision),
+                maxSupply: Wrapper::Quantity::new(max_supply.as_str(), precision),
             }
             .packed(),
         )

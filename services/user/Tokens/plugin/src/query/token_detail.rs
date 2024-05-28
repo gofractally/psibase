@@ -40,7 +40,7 @@ pub struct TokenDetail {
     pub symbol_id: String,
 }
 
-pub fn fetch_token(token_id: u32) -> Result<TokenDetail, CommonTypes::Error> {
+pub fn fetch_token(token_number: u32) -> Result<TokenDetail, CommonTypes::Error> {
     let url = format!(
         "{}/graphql",
         client::my_service_origin().expect("origin failure")
@@ -60,7 +60,7 @@ pub fn fetch_token(token_id: u32) -> Result<TokenDetail, CommonTypes::Error> {
               }}
             
         }}"#,
-        token_id = token_id
+        token_id = token_number
     );
 
     let res = server::post_graphql_get_json(&url, &query)
@@ -78,9 +78,10 @@ pub fn fetch_token(token_id: u32) -> Result<TokenDetail, CommonTypes::Error> {
             })
         })?;
 
-    if res.id == token_id {
+    if res.id == token_number {
         Ok(res)
     } else {
-        Err(ErrorType::TokenNumberMismatch.err("token_id requested does not match response"))
+        Err(ErrorType::TokenNumberMismatch
+            .err("token_number requested does not match response token_id"))
     }
 }
