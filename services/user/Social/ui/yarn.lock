@@ -731,6 +731,16 @@
   dependencies:
     tslib "^2.5.0"
 
+"@milkdown/plugin-listener@^7.3.6":
+  version "7.3.6"
+  resolved "https://registry.yarnpkg.com/@milkdown/plugin-listener/-/plugin-listener-7.3.6.tgz#352b6241ca71233521bae599357b13d7da8e806d"
+  integrity sha512-sp9w36Vn/XLSCKl/4fqUIz2NNJnU1hXzX5X/XHH3WXCszqs6cJPRTtR6k8wAoTG2le0sW8EOdmptdjEsC2w5+Q==
+  dependencies:
+    "@milkdown/utils" "7.3.6"
+    "@types/lodash.debounce" "^4.0.7"
+    lodash.debounce "^4.0.8"
+    tslib "^2.5.0"
+
 "@milkdown/preset-commonmark@^7.3.6":
   version "7.3.6"
   resolved "https://registry.yarnpkg.com/@milkdown/preset-commonmark/-/preset-commonmark-7.3.6.tgz#301ba09478c30acba4a8b05d1b81aebcbcc7c002"
