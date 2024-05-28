@@ -14,6 +14,7 @@ interface Props {
   onContinue: () => void;
   onClose: () => void;
   descriptions: string[];
+  isPending: boolean;
   title?: string;
 }
 
@@ -23,7 +24,9 @@ export const ConfirmationModal = ({
   descriptions,
   onClose,
   title,
+  isPending,
 }: Props) => {
+  console.log({ isPending });
   return (
     <AlertDialog open={open}>
       <AlertDialogContent>
@@ -39,8 +42,8 @@ export const ConfirmationModal = ({
           <AlertDialogCancel onClick={() => onClose()}>
             Cancel
           </AlertDialogCancel>
-          <AlertDialogAction onClick={() => onContinue()}>
-            Continue
+          <AlertDialogAction disabled={isPending} onClick={() => onContinue()}>
+            {isPending ? "Loading" : "Continue"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -33,7 +33,7 @@ const TokenSelection: FC<Props> = ({ tokens, form, setNewTokenModalOpen }) => (
     render={({ field }) => (
       <FormItem>
         <FormLabel>Token</FormLabel>
-        <Select onValueChange={field.onChange} defaultValue={field.value}>
+        <Select value={field.value} onValueChange={field.onChange} defaultValue={field.value}>
           <FormControl>
             <div className="w-full grid grid-cols-6">
               <SelectTrigger className="col-span-5">

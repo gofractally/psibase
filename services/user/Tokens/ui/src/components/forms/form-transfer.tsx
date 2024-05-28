@@ -53,12 +53,13 @@ const FormTransfer: FC<Props> = ({
       label: "Transfer",
       value: "transfer",
     },
+    {
+      label: "Burn",
+      value: "burn",
+    },
     ...(isAdmin
       ? [
-          {
-            label: "Burn",
-            value: "burn",
-          },
+       
           {
             label: "Mint",
             value: "mint",

@@ -22,7 +22,7 @@ function App() {
     refetch,
   } = useUi(currentUser);
 
-  const { mutateAsync: pluginCall } = usePluginCall();
+  const { mutateAsync: pluginCall, isPending } = usePluginCall();
 
   const form = useTokenForm();
 
@@ -39,6 +39,10 @@ function App() {
   );
 
   useEffect(() => {
+    if (!selectedTokenId && tokens.length > 0) {
+      form.setValue("token", tokens[0].id.toString());
+      return;
+    }
     if (!selectedToken) {
       setMode(Mode.Transfer);
       return;
@@ -46,7 +50,7 @@ function App() {
     if (!selectedToken.isAdmin && isMinting) {
       setMode(Mode.Transfer);
     }
-  }, [selectedTokenId, selectedToken, mode]);
+  }, [selectedTokenId, selectedToken, mode, tokens]);
 
   const [isConfirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [isNewTokenModalOpen, setNewTokenModalOpen] = useState(false);
@@ -116,6 +120,7 @@ function App() {
             modalWarning,
             "Please be aware that it is irreversible and cannot be undone.",
           ]}
+          isPending={isPending}
           onClose={() => setConfirmationModalOpen(false)}
           onContinue={() => performTx()}
           open={isConfirmationModalOpen}
