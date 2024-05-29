@@ -31,16 +31,21 @@ interface intf {
     use common:plugin/types.{error};
     use types.{precision, quantity, token-id, account-number};
     
-    create: func(a: precision, b: quantity) -> result<_, error>;
+    create: func(precision: precision, max-supply: quantity) -> result<_, error>;
     burn: func(code: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
     mint: func(code: token-id, amount: quantity, memo: string) -> result<_, error>;
+}
+
+interface queries {
+    use common:plugin/types.{error};
+    use types.{token-id, token-detail};
+    token-owner: func(code: token-id) -> result<token-detail, error>;
 }
 
 interface transfer {
     use common:plugin/types.{error};
     use types.{token-id, account-number, quantity, balance, token-detail};
 
-    token-owner: func(code: token-id) -> result<token-detail, error>;
     uncredit: func(code: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
     credit: func(code: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
 }
@@ -56,4 +61,5 @@ world example {
     export types;
     export intf;
     export transfer;
+    export queries;
 }

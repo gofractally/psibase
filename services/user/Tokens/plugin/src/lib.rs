@@ -3,7 +3,9 @@ mod bindings;
 
 use bindings::common::plugin::{server, types as CommonTypes};
 use bindings::exports::component::tokens::types as Wit;
-use bindings::exports::component::tokens::{intf::Guest as Intf, transfer::Guest as Transfer};
+use bindings::exports::component::tokens::{
+    intf::Guest as Intf, queries::Guest as Queries, transfer::Guest as Transfer,
+};
 use psibase::services::tokens as Wrapper;
 use psibase::AccountNumber;
 use query::token_detail::fetch_token;
@@ -117,7 +119,7 @@ impl Intf for Component {
     }
 }
 
-impl Transfer for Component {
+impl Queries for Component {
     fn token_owner(code: Wit::TokenId) -> Result<Wit::TokenDetail, CommonTypes::Error> {
         let token_id = token_code_to_id(code)?;
         let res = fetch_token(token_id)?;
@@ -129,7 +131,9 @@ impl Transfer for Component {
             symbol_id: res.symbol_id,
         })
     }
+}
 
+impl Transfer for Component {
     fn uncredit(
         code: Wit::TokenId,
         debitor: Wit::AccountNumber,
