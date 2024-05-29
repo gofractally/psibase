@@ -1,6 +1,9 @@
 import { formatThousands } from "@/lib/formatNumber";
 import { useSpring, animated } from "react-spring";
 
+const getDecimals = (formatted: string): number =>
+  formatted.includes(".") ? formatted.split(".")[1].length : 0;
+
 export const AnimateNumber = ({
   n,
   precision,
@@ -15,9 +18,13 @@ export const AnimateNumber = ({
     config: { mass: 1, tension: 300, friction: 50 },
   });
 
+  const finalPrecision = getDecimals(formatThousands(n, precision));
+
   return (
     <animated.span>
-      {number.to((animatedNumber) =>   formatThousands(animatedNumber, precision))}
+      {number.to((animatedNumber) =>
+        formatThousands(animatedNumber, finalPrecision)
+      )}
     </animated.span>
   );
 };
