@@ -36,9 +36,7 @@ pub fn convert_to_u64(
         }
 
         let remaining_precision = precision - (fraction.len() as u8);
-
         let fraction_num: u64 = fraction.parse().expect("expected number");
-
         fraction_num * (10 as u64).pow(remaining_precision as u32)
     } else {
         0

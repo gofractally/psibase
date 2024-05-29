@@ -55,9 +55,7 @@ function App() {
   const [isConfirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [isNewTokenModalOpen, setNewTokenModalOpen] = useState(false);
 
-  // TODO: Use graphql query to figure out admin of token,
-  //  for now, the user is just gonna have to learn or remember their limitations over tokens they don't have access to.
-  const isAdmin = true;
+  const isAdmin = selectedToken?.isAdmin || false;
 
   const modalWarning = `This will ${
     isBurning ? "burn" : isMinting ? "mint" : "transfer"
