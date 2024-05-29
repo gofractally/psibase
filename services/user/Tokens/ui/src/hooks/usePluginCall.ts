@@ -22,11 +22,10 @@ export const usePluginCall = (options?: Options) => {
   return useMutation<unknown, unknown, FunctionCallArgs>({
     mutationKey: ["pluginCall"],
     mutationFn: (args) => {
-      console.log("UI function call:", args);
       return supervisor.functionCall(functionArgsSchema.parse(args));
     },
     onMutate: () => {
-      toast.message("Pushing transaction...");
+      toast.message("Sending plugin call...");
     },
     onError: (error) => {
       console.error(error, "onError");

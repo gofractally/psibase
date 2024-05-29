@@ -26,7 +26,6 @@ export const ConfirmationModal = ({
   title,
   isPending,
 }: Props) => {
-  console.log({ isPending });
   return (
     <AlertDialog open={open}>
       <AlertDialogContent>

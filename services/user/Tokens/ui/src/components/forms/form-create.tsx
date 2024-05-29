@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useSupervisor } from "@/hooks/useSupervisor";
-import { formatNumber } from "@/lib/formatNumber";
+import { Quantity } from "@/lib/quantity";
 import { tokenPlugin } from "@/plugin";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -98,18 +98,26 @@ export function FormCreate({ onClose }: Props) {
     );
   };
 
-  const supply = form.watch("maxSupply") || 0;
+  const supply = form.watch("maxSupply") || "0";
   const precision = form.watch("precision");
 
   const suggestedPrecision = precision.length > 1 ? 8 : Number(precision) || 0;
 
   const exampleSymbol = "TOK";
-  const maxSupplyLabel = formatNumber(
-    supply,
+  const expo = Math.pow(10, suggestedPrecision);
+  const suggestedInteger = Number(supply) * expo;
+  const maxSupplyLabel = new Quantity(
+    suggestedInteger.toString(),
     suggestedPrecision,
+    1,
     exampleSymbol
-  );
-  const label = formatNumber(1, suggestedPrecision, exampleSymbol);
+  ).format(true, true);
+  const label = new Quantity(
+    (1 * expo).toString(),
+    suggestedPrecision,
+    1,
+    exampleSymbol
+  ).format(true, true);
 
   return (
     <Form {...form}>

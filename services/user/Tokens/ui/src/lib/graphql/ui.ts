@@ -108,8 +108,6 @@ const queryString = (username: string) => `
 export const fetchUi = async (username: string) => {
   const res = await graphql<Data>(queryString(username));
 
-  console.log(res, "is the big query fetchUi");
-
   return {
     userDebits: res.userDebits.edges.map(({ node }) => node),
     userCredits: res.userCredits.edges.map(({ node }) => node),

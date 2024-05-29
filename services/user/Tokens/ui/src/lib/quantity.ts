@@ -1,7 +1,5 @@
 import { formatThousands } from "./formatNumber";
 
-
-
 export class Quantity {
   constructor(
     private amount: string,
@@ -25,8 +23,8 @@ export class Quantity {
     return this.tokenSymbol || `#${this.tokenNumber}`;
   }
 
-  public format(includeLabel = true): string {
-    return `${formatThousands(this.toNumber(), this.precision)}${
+  public format(includeLabel = true, full = false): string {
+    return `${formatThousands(this.toNumber(), this.precision, full)}${
       includeLabel ? ` ${this.label()}` : ""
     }`;
   }
