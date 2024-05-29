@@ -1,7 +1,6 @@
 #[derive(Debug, PartialEq)]
 pub enum ConversionError {
     InvalidNumber,
-    InvalidPrecision,
     PrecisionOverflow,
 }
 
@@ -14,9 +13,6 @@ pub fn convert_to_u64(
 
     if parts.len() > 2 {
         return Err(ConversionError::InvalidNumber);
-    }
-    if precision > 8 {
-        return Err(ConversionError::InvalidPrecision);
     }
 
     let integer_part: u64 = parts[0]
