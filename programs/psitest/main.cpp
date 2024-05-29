@@ -14,6 +14,7 @@
 #include <psio/to_json.hpp>
 #include <psio/view.hpp>
 
+#include <random>
 #include <stdio.h>
 #include <bitset>
 #include <chrono>
@@ -135,16 +136,6 @@ using wasi_filetype_t = uint8_t;
 using wasi_linkcount_t = uint64_t;
 using wasi_filesize_t = uint64_t;
 using wasi_timestamp_t = uint64_t;
-struct wasi_filestat_t {
-  wasi_device_t dev;
-  wasi_inode_t ino;
-  wasi_filetype_t filetype;
-  wasi_linkcount_t nlink;
-  wasi_filesize_t size;
-  wasi_timestamp_t atim;
-  wasi_timestamp_t mtim;
-  wasi_timestamp_t ctim;
-};
 
 using wasi_preopentype_t = uint8_t;
 struct wasi_prestat_dir_t {
@@ -442,11 +433,11 @@ struct file
    }
 };
 
-struct wasi_stat
+struct wasi_filestat_t
 {
-   static wasi_stat from_stat(struct stat& stat)
+   static wasi_filestat_t from_stat(struct stat& stat)
    {
-      wasi_stat result;
+      wasi_filestat_t result;
       auto      to_nsec = [](const timespec& t) { return t.tv_sec * 1000000000ull + t.tv_nsec; };
       result.dev        = stat.st_dev;
       result.ino        = stat.st_ino;
@@ -475,9 +466,16 @@ struct wasi_stat
 #endif  // apple
       return result;
    }
-   uint64_t dev, ino, filetype, nlink, size, atim, mtim, ctim;
+   wasi_device_t dev;
+   wasi_inode_t ino;
+   wasi_filetype_t filetype;
+   wasi_linkcount_t nlink;
+   wasi_filesize_t size;
+   wasi_timestamp_t atim;
+   wasi_timestamp_t mtim;
+   wasi_timestamp_t ctim;
 };
-static_assert(sizeof(wasi_stat) == 64);
+static_assert(sizeof(wasi_filestat_t) == 64);
 
 struct callbacks
 {
@@ -525,24 +523,23 @@ struct callbacks
       throw std::runtime_error("called testerAbort");
    }
 
-   void testerWasi_proc_exit(int32_t code)
+   void wasi_proc_exit(int32_t code)
    {
       backtrace();
       throw std::runtime_error("called testerExit");
    }
 
-   int32_t testerWasi_sched_yield()
+   int32_t wasi_sched_yield()
    {
       return 0;
    }
 
    // Unfortunately it looks like we have to lie instead of returning an error
    // to not break some Rust libraries and even standard ones like HashMap
-   uint32_t testerWasi_random_get(wasm_ptr<uint8_t> buf, wasi_size_t buf_len)
+   uint32_t wasi_random_get(span<uint8_t> buf)
    {
-      if (buf_len > 0) {
-         *buf = 0;
-      }
+      std::random_device rng;
+      std::ranges::generate(buf, [&]{ return rng(); });
       return 0;
    }
 
@@ -554,7 +551,7 @@ struct callbacks
 
    void writeConsole(span<const char> str) { std::cout.write(str.data(), str.size()); }
 
-   int32_t testerWasi_args_sizes_get(wasm_ptr<wasi_size_t> argc, wasm_ptr<wasi_size_t> argv_buf_size)
+   int32_t wasi_args_sizes_get(wasm_ptr<wasi_size_t> argc, wasm_ptr<wasi_size_t> argv_buf_size)
    {
       uint32_t size = 0;
       for (auto& a : state.args)
@@ -565,7 +562,7 @@ struct callbacks
    };
 
    // uint8_t** argv, uint8_t* argv_buf
-   int32_t testerWasi_args_get(uint32_t argv, uint32_t argv_buf)
+   int32_t wasi_args_get(uint32_t argv, uint32_t argv_buf)
    {
       auto* memory   = state.backend.get_context().linear_memory();
       auto  get_argv = [&]() -> uint32_t& { return *reinterpret_cast<uint32_t*>(memory + argv); };
@@ -587,7 +584,7 @@ struct callbacks
       return 0;
    };
 
-   int32_t testerWasi_environ_sizes_get(wasm_ptr<uint32_t> environc, wasm_ptr<uint32_t> bufsize)
+   int32_t wasi_environ_sizes_get(wasm_ptr<uint32_t> environc, wasm_ptr<uint32_t> bufsize)
    {
       std::size_t totalSize = 0;
       char**      p         = environ;
@@ -605,7 +602,7 @@ struct callbacks
       return 0;
    }
 
-   int32_t testerWasi_environ_get(uint32_t env, uint32_t buf)
+   int32_t wasi_environ_get(uint32_t env, uint32_t buf)
    {
       auto pages = state.backend.get_context().current_linear_memory();
       if (pages < 0)
@@ -628,7 +625,7 @@ struct callbacks
       return 0;
    }
 
-   int32_t testerWasi_clock_time_get(uint32_t id, uint64_t precision, wasm_ptr<uint64_t> time)
+   int32_t wasi_clock_time_get(uint32_t id, uint64_t precision, wasm_ptr<uint64_t> time)
    {
       std::chrono::nanoseconds result;
       if (id == 0)
@@ -655,7 +652,7 @@ struct callbacks
       return &state.files[file_index];
    }
 
-   uint32_t testerWasi_fd_fdstat_get(wasi_fd_t fd, wasm_ptr<wasi_fdstat_t> stat)
+   uint32_t wasi_fd_fdstat_get(wasi_fd_t fd, wasm_ptr<wasi_fdstat_t> stat)
    {
       if (fd == STDIN_FILENO)
       {
@@ -693,25 +690,24 @@ struct callbacks
    }
 
    // TODO: flags should be uint16_t but there's a EOSVM compilation issue?
-   uint32_t testerWasi_fd_fdstat_set_flags(wasi_fd_t fd, uint32_t flags)
+   uint32_t wasi_fd_fdstat_set_flags(wasi_fd_t fd, uint32_t flags)
    {
       // TODO: Implement
       return 0;
    }
 
-   uint32_t testerWasi_fd_readdir(wasi_fd_t fd,
-                                wasm_ptr<uint8_t> buf,
-                                wasi_size_t buf_len,
-                                wasi_dircookie_t cookie,
-                                wasm_ptr<wasi_size_t> retptr0)
+   uint32_t wasi_fd_readdir(wasi_fd_t fd,
+                            wasm_ptr<uint8_t> buf,
+                            wasi_dircookie_t cookie,
+                            wasm_ptr<wasi_size_t> retptr0)
    {
       throw std::runtime_error("WASI fd_readdir not implemented");
    }
 
-   uint32_t testerWasi_fd_seek(wasi_fd_t fd,
-                               wasi_filedelta_t offset,
-                               uint32_t whence, // uint8_t in WASI
-                               wasm_ptr<wasi_filesize_t> newoffset)
+   uint32_t wasi_fd_seek(wasi_fd_t fd,
+                         wasi_filedelta_t offset,
+                         uint32_t whence, // uint8_t in WASI
+                         wasm_ptr<wasi_filesize_t> newoffset)
    {
       // Validate file descriptor
       auto* file = get_file(fd);
@@ -746,18 +742,15 @@ struct callbacks
       }
 
       // Store the new position in the provided wasm_ptr<wasi_filesize_t>
-      if (newoffset != 0) {
-         *newoffset = new_position;
-      }
+      *newoffset = new_position;
 
       return 0;
    }
 
-   uint32_t testerWasi_fd_filestat_get(wasi_fd_t fd, wasm_ptr<wasi_filestat_t> stat_ptr)
+   uint32_t wasi_fd_filestat_get(wasi_fd_t fd, wasm_ptr<wasi_filestat_t> stat_ptr)
    {
-      wasi_stat result = {};
-      if (sizeof(stat_ptr) < sizeof(result))
-         return wasi_errno_fault;
+      wasi_filestat_t result = {};
+
       if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO)
       {
          result.filetype = wasi_filetype_character_device;
@@ -773,7 +766,7 @@ struct callbacks
          if (::fstat(fd, &stat) < 0)
             return wasi_errno_badf;
 
-         result = wasi_stat::from_stat(stat);
+         result = wasi_filestat_t::from_stat(stat);
       }
       else
       {
@@ -791,16 +784,16 @@ struct callbacks
       return 0;
    }
 
-   uint32_t testerWasi_fd_prestat_dir_name(wasi_fd_t fd, wasm_ptr<uint8_t> path, wasi_size_t path_len)
+   uint32_t wasi_fd_prestat_dir_name(wasi_fd_t fd, span<uint8_t> path)
    {
       if (fd != polyfill_root_dir_fd)
          return wasi_errno_badf;
-      if (path_len > 0)
-         *path = '/';
+      if (!path.empty())
+         path[0] = '/';
       return 0;
    }
 
-   uint32_t testerWasi_fd_prestat_get(wasi_fd_t fd, wasm_ptr<wasi_prestat_t> buf)
+   uint32_t wasi_fd_prestat_get(wasi_fd_t fd, wasm_ptr<wasi_prestat_t> buf)
    {
       if (fd != polyfill_root_dir_fd)
          return wasi_errno_badf;
@@ -811,7 +804,7 @@ struct callbacks
       return 0;
    }
 
-   uint32_t testerWasi_path_filestat_get(wasi_fd_t          fd,
+   uint32_t wasi_path_filestat_get(wasi_fd_t          fd,
                                       wasi_lookupflags_t flags,
                                       span<const char> path,
                                       wasm_ptr<wasi_filestat_t> stat_ptr)
@@ -830,10 +823,7 @@ struct callbacks
          if (::stat(cPath.c_str(), &stat) < 0)
             return wasi_errno_noent;
       }
-      auto result = wasi_stat::from_stat(stat);
-      if (sizeof(stat_ptr) < sizeof(result))
-         return wasi_errno_fault;
-      
+      auto result = wasi_filestat_t::from_stat(stat);      
       stat_ptr->dev = result.dev;
       stat_ptr->ino = result.ino;
       stat_ptr->filetype = result.filetype;
@@ -845,7 +835,7 @@ struct callbacks
       return 0;
    }
 
-   uint32_t testerWasi_path_open(wasi_fd_t fd,
+   uint32_t wasi_path_open(wasi_fd_t fd,
                                  wasi_lookupflags_t dirflags,
                                  span<const char>  path,
                                  wasi_oflags_t   oflags,
@@ -924,7 +914,7 @@ struct callbacks
       return 0;
    }
 
-   uint32_t testerWasi_fd_close(wasi_fd_t fd)
+   uint32_t wasi_fd_close(wasi_fd_t fd)
    {
       auto* file = get_file(fd);
       if (!file)
@@ -933,17 +923,18 @@ struct callbacks
       return 0;
    }
 
-   uint32_t testerWasi_fd_write(wasi_fd_t fd, 
-                                span<const wasi_iovec_t> iovs, 
-                                wasm_ptr<wasi_size_t> nwritten)
+   uint32_t wasi_fd_write(wasi_fd_t fd, 
+                          span<const wasi_iovec_t> iovs, 
+                          wasm_ptr<wasi_size_t> nwritten)
    {
+      auto* file = get_file(fd);
+      if (!file || iovs.empty())
+         return wasi_errno_badf;
+
       *nwritten = 0;
 
       for (auto iovs_item : iovs)
       {
-         auto* file = get_file(fd);
-         if (!file)
-            return wasi_errno_badf;
 
          char* memory   = state.backend.get_context().linear_memory();
          void* iovs_buf = memory + iovs_item.buf;
@@ -951,7 +942,6 @@ struct callbacks
          check_bounds(iovs_buf, iovs_item.buf_len);
 
          if (iovs_item.buf_len && fwrite(iovs_buf, iovs_item.buf_len, 1, file->f) != 1) {
-            std::cout << "testerWasi_fd_write failed to write to file" << std::endl;
             return wasi_errno_io;
          }
 
@@ -961,18 +951,18 @@ struct callbacks
       return 0;
    }
 
-   uint32_t testerWasi_fd_read(wasi_fd_t fd, 
-                               span<const wasi_iovec_t> iovs, 
-                               wasm_ptr<wasi_size_t> nread)
-   {
+   uint32_t wasi_fd_read(wasi_fd_t fd, 
+                         span<const wasi_iovec_t> iovs,
+                         wasm_ptr<wasi_size_t> nread)
+   {         
+      auto* file = get_file(fd);
+      if (!file || iovs.empty())
+         return wasi_errno_badf;
+
       *nread = 0;
 
       for (auto iovs_item : iovs)
-      {         
-         auto* file = get_file(fd);
-         if (!file)
-            return wasi_errno_badf;
-
+      {
          char* memory   = state.backend.get_context().linear_memory();
          void* iovs_buf = memory + iovs_item.buf;
 
@@ -1334,26 +1324,26 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
 
    // WASI functions
-   rhf_t::add<&callbacks::testerWasi_args_get>("wasi_snapshot_preview1", "args_get");
-   rhf_t::add<&callbacks::testerWasi_args_sizes_get>("wasi_snapshot_preview1", "args_sizes_get");
-   rhf_t::add<&callbacks::testerWasi_clock_time_get>("wasi_snapshot_preview1", "clock_time_get");
-   rhf_t::add<&callbacks::testerWasi_environ_get>("wasi_snapshot_preview1", "environ_get");
-   rhf_t::add<&callbacks::testerWasi_environ_sizes_get>("wasi_snapshot_preview1", "environ_sizes_get");
-   rhf_t::add<&callbacks::testerWasi_fd_close>("wasi_snapshot_preview1", "fd_close");
-   rhf_t::add<&callbacks::testerWasi_fd_fdstat_get>("wasi_snapshot_preview1", "fd_fdstat_get");
-   rhf_t::add<&callbacks::testerWasi_fd_fdstat_set_flags>("wasi_snapshot_preview1", "fd_fdstat_set_flags");
-   rhf_t::add<&callbacks::testerWasi_fd_filestat_get>("wasi_snapshot_preview1", "fd_filestat_get");
-   rhf_t::add<&callbacks::testerWasi_fd_prestat_dir_name>("wasi_snapshot_preview1", "fd_prestat_dir_name");
-   rhf_t::add<&callbacks::testerWasi_fd_prestat_get>("wasi_snapshot_preview1", "fd_prestat_get");
-   rhf_t::add<&callbacks::testerWasi_fd_read>("wasi_snapshot_preview1", "fd_read");
-   rhf_t::add<&callbacks::testerWasi_fd_readdir>("wasi_snapshot_preview1", "fd_readdir");
-   rhf_t::add<&callbacks::testerWasi_fd_seek>("wasi_snapshot_preview1", "fd_seek");
-   rhf_t::add<&callbacks::testerWasi_fd_write>("wasi_snapshot_preview1", "fd_write");
-   rhf_t::add<&callbacks::testerWasi_path_filestat_get>("wasi_snapshot_preview1", "path_filestat_get");
-   rhf_t::add<&callbacks::testerWasi_path_open>("wasi_snapshot_preview1", "path_open");
-   rhf_t::add<&callbacks::testerWasi_proc_exit>("wasi_snapshot_preview1", "proc_exit");
-   rhf_t::add<&callbacks::testerWasi_random_get>("wasi_snapshot_preview1", "random_get");
-   rhf_t::add<&callbacks::testerWasi_sched_yield>("wasi_snapshot_preview1", "sched_yield");
+   rhf_t::add<&callbacks::wasi_args_get>("wasi_snapshot_preview1", "args_get");
+   rhf_t::add<&callbacks::wasi_args_sizes_get>("wasi_snapshot_preview1", "args_sizes_get");
+   rhf_t::add<&callbacks::wasi_clock_time_get>("wasi_snapshot_preview1", "clock_time_get");
+   rhf_t::add<&callbacks::wasi_environ_get>("wasi_snapshot_preview1", "environ_get");
+   rhf_t::add<&callbacks::wasi_environ_sizes_get>("wasi_snapshot_preview1", "environ_sizes_get");
+   rhf_t::add<&callbacks::wasi_fd_close>("wasi_snapshot_preview1", "fd_close");
+   rhf_t::add<&callbacks::wasi_fd_fdstat_get>("wasi_snapshot_preview1", "fd_fdstat_get");
+   rhf_t::add<&callbacks::wasi_fd_fdstat_set_flags>("wasi_snapshot_preview1", "fd_fdstat_set_flags");
+   rhf_t::add<&callbacks::wasi_fd_filestat_get>("wasi_snapshot_preview1", "fd_filestat_get");
+   rhf_t::add<&callbacks::wasi_fd_prestat_dir_name>("wasi_snapshot_preview1", "fd_prestat_dir_name");
+   rhf_t::add<&callbacks::wasi_fd_prestat_get>("wasi_snapshot_preview1", "fd_prestat_get");
+   rhf_t::add<&callbacks::wasi_fd_read>("wasi_snapshot_preview1", "fd_read");
+   rhf_t::add<&callbacks::wasi_fd_readdir>("wasi_snapshot_preview1", "fd_readdir");
+   rhf_t::add<&callbacks::wasi_fd_seek>("wasi_snapshot_preview1", "fd_seek");
+   rhf_t::add<&callbacks::wasi_fd_write>("wasi_snapshot_preview1", "fd_write");
+   rhf_t::add<&callbacks::wasi_path_filestat_get>("wasi_snapshot_preview1", "path_filestat_get");
+   rhf_t::add<&callbacks::wasi_path_open>("wasi_snapshot_preview1", "path_open");
+   rhf_t::add<&callbacks::wasi_proc_exit>("wasi_snapshot_preview1", "proc_exit");
+   rhf_t::add<&callbacks::wasi_random_get>("wasi_snapshot_preview1", "random_get");
+   rhf_t::add<&callbacks::wasi_sched_yield>("wasi_snapshot_preview1", "sched_yield");
 }
 
 void fill_substitutions(::state& state, const std::map<std::string, std::string>& substitutions)
