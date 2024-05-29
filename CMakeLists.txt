@@ -635,7 +635,7 @@ psibase_package(
     SERVICE r-tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist /
-        DEPENDS Tokens_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/index.html
+    DEPENDS ${Tokens_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/index.html
     DEPENDS wasm
 )
 
