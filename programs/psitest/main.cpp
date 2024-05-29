@@ -14,11 +14,11 @@
 #include <psio/to_json.hpp>
 #include <psio/view.hpp>
 
-#include <random>
 #include <stdio.h>
 #include <bitset>
 #include <chrono>
 #include <optional>
+#include <random>
 
 #include <sys/stat.h>
 
@@ -76,13 +76,13 @@ inline constexpr uint32_t billed_cpu_time_use = 2000;
 inline constexpr int32_t polyfill_root_dir_fd = 3;
 
 /** WASI Types */
-using wasi_errno_t = uint16_t;
-inline constexpr uint16_t wasi_errno_badf     = 8;
-inline constexpr uint16_t wasi_errno_fault    = 21;
-inline constexpr uint16_t wasi_errno_inval    = 28;
-inline constexpr uint16_t wasi_errno_io       = 29;
-inline constexpr uint16_t wasi_errno_noent    = 44;
-inline constexpr uint16_t wasi_errno_overflow = 61;
+using wasi_errno_t                                = uint16_t;
+inline constexpr wasi_errno_t wasi_errno_badf     = 8;
+inline constexpr wasi_errno_t wasi_errno_fault    = 21;
+inline constexpr wasi_errno_t wasi_errno_inval    = 28;
+inline constexpr wasi_errno_t wasi_errno_io       = 29;
+inline constexpr wasi_errno_t wasi_errno_noent    = 44;
+inline constexpr wasi_errno_t wasi_errno_overflow = 61;
 
 inline constexpr uint8_t wasi_filetype_unknown          = 0;
 inline constexpr uint8_t wasi_filetype_block_device     = 1;
@@ -109,49 +109,54 @@ inline constexpr uint16_t wasi_preopentype_dir = 0;
 
 inline constexpr std::uint32_t wasi_lookupflags_symlink_follow = 1;
 
-using wasi_size_t = uint32_t;
-using wasi_ptr_t = uint32_t;
-using wasi_fd_t = uint32_t;
-using wasi_dircookie_t = uint64_t;
-using wasi_whence_t = uint8_t;
-using wasi_filedelta_t = int64_t;
-using wasi_oflags_t = uint32_t; // uint16_t;
-using wasi_filesize_t = uint64_t;
-using wasi_exitcode_t = uint32_t;
+using wasi_size_t        = uint32_t;
+using wasi_ptr_t         = uint32_t;
+using wasi_fd_t          = uint32_t;
+using wasi_dircookie_t   = uint64_t;
+using wasi_whence_t      = uint8_t;
+using wasi_filedelta_t   = int64_t;
+using wasi_oflags_t      = uint32_t;  // uint16_t;
+using wasi_filesize_t    = uint64_t;
+using wasi_exitcode_t    = uint32_t;
 using wasi_lookupflags_t = uint32_t;
 
-using wasi_rights_t = uint64_t;
-using wasi_fdflags_t = uint16_t;
+using wasi_rights_t   = uint64_t;
+using wasi_fdflags_t  = uint16_t;
 using wasi_filetype_t = uint8_t;
-struct wasi_fdstat_t {
-  wasi_filetype_t fs_filetype;
-  wasi_fdflags_t fs_flags;
-  wasi_rights_t fs_rights_base;
-  wasi_rights_t fs_rights_inheriting;
+struct wasi_fdstat_t
+{
+   wasi_filetype_t fs_filetype;
+   wasi_fdflags_t  fs_flags;
+   wasi_rights_t   fs_rights_base;
+   wasi_rights_t   fs_rights_inheriting;
 };
 
-using wasi_device_t = uint64_t;
-using wasi_inode_t = uint64_t;
-using wasi_filetype_t = uint8_t;
+using wasi_device_t    = uint64_t;
+using wasi_inode_t     = uint64_t;
+using wasi_filetype_t  = uint8_t;
 using wasi_linkcount_t = uint64_t;
-using wasi_filesize_t = uint64_t;
+using wasi_filesize_t  = uint64_t;
 using wasi_timestamp_t = uint64_t;
 
 using wasi_preopentype_t = uint8_t;
-struct wasi_prestat_dir_t {
-  wasi_size_t pr_name_len;
+struct wasi_prestat_dir_t
+{
+   wasi_size_t pr_name_len;
 };
-union wasi_prestat_u_t {
-  wasi_prestat_dir_t dir;
+union wasi_prestat_u_t
+{
+   wasi_prestat_dir_t dir;
 };
-struct wasi_prestat_t {
-  wasi_preopentype_t tag;
-  wasi_prestat_u_t u;
+struct wasi_prestat_t
+{
+   wasi_preopentype_t tag;
+   wasi_prestat_u_t   u;
 };
 
-struct wasi_iovec_t {
-  wasi_ptr_t buf;
-  wasi_size_t buf_len;
+struct wasi_iovec_t
+{
+   wasi_ptr_t  buf;
+   wasi_size_t buf_len;
 };
 // End of WASI Types
 
@@ -438,9 +443,9 @@ struct wasi_filestat_t
    static wasi_filestat_t from_stat(struct stat& stat)
    {
       wasi_filestat_t result;
-      auto      to_nsec = [](const timespec& t) { return t.tv_sec * 1000000000ull + t.tv_nsec; };
-      result.dev        = stat.st_dev;
-      result.ino        = stat.st_ino;
+      auto to_nsec = [](const timespec& t) { return t.tv_sec * 1000000000ull + t.tv_nsec; };
+      result.dev   = stat.st_dev;
+      result.ino   = stat.st_ino;
       if (S_ISREG(stat.st_mode))
          result.filetype = wasi_filetype_regular_file;
       else if (S_ISDIR(stat.st_mode))
@@ -466,11 +471,11 @@ struct wasi_filestat_t
 #endif  // apple
       return result;
    }
-   wasi_device_t dev;
-   wasi_inode_t ino;
-   wasi_filetype_t filetype;
+   wasi_device_t    dev;
+   wasi_inode_t     ino;
+   wasi_filetype_t  filetype;
    wasi_linkcount_t nlink;
-   wasi_filesize_t size;
+   wasi_filesize_t  size;
    wasi_timestamp_t atim;
    wasi_timestamp_t mtim;
    wasi_timestamp_t ctim;
@@ -529,17 +534,14 @@ struct callbacks
       throw std::runtime_error("called testerExit");
    }
 
-   int32_t wasi_sched_yield()
-   {
-      return 0;
-   }
+   int32_t wasi_sched_yield() { return 0; }
 
    // Unfortunately it looks like we have to lie instead of returning an error
    // to not break some Rust libraries and even standard ones like HashMap
    uint32_t wasi_random_get(span<uint8_t> buf)
    {
       std::random_device rng;
-      std::ranges::generate(buf, [&]{ return rng(); });
+      std::ranges::generate(buf, [&] { return rng(); });
       return 0;
    }
 
@@ -696,17 +698,17 @@ struct callbacks
       return 0;
    }
 
-   uint32_t wasi_fd_readdir(wasi_fd_t fd,
-                            wasm_ptr<uint8_t> buf,
-                            wasi_dircookie_t cookie,
+   uint32_t wasi_fd_readdir(wasi_fd_t             fd,
+                            wasm_ptr<uint8_t>     buf,
+                            wasi_dircookie_t      cookie,
                             wasm_ptr<wasi_size_t> retptr0)
    {
       throw std::runtime_error("WASI fd_readdir not implemented");
    }
 
-   uint32_t wasi_fd_seek(wasi_fd_t fd,
-                         wasi_filedelta_t offset,
-                         uint32_t whence, // uint8_t in WASI
+   uint32_t wasi_fd_seek(wasi_fd_t                 fd,
+                         wasi_filedelta_t          offset,
+                         uint32_t                  whence,  // uint8_t in WASI
                          wasm_ptr<wasi_filesize_t> newoffset)
    {
       // Validate file descriptor
@@ -716,14 +718,15 @@ struct callbacks
 
       // Determine the equivalent POSIX whence value
       int posix_whence;
-      switch (whence) {
-         case 0: // SEEK_SET
+      switch (whence)
+      {
+         case 0:  // SEEK_SET
             posix_whence = SEEK_SET;
             break;
-         case 1: // SEEK_CUR
+         case 1:  // SEEK_CUR
             posix_whence = SEEK_CUR;
             break;
-         case 2: // SEEK_END
+         case 2:  // SEEK_END
             posix_whence = SEEK_END;
             break;
          default:
@@ -731,13 +734,15 @@ struct callbacks
       }
 
       // Perform the seek operation using fseek
-      if (fseek(file->f, offset, posix_whence) != 0) {
+      if (fseek(file->f, offset, posix_whence) != 0)
+      {
          return wasi_errno_io;
       }
 
       // Get the new file position using ftell
       auto new_position = ftell(file->f);
-      if (new_position < 0) {
+      if (new_position < 0)
+      {
          return wasi_errno_io;
       }
 
@@ -773,14 +778,14 @@ struct callbacks
          return wasi_errno_badf;
       }
 
-      stat_ptr->dev = result.dev;
-      stat_ptr->ino = result.ino;
+      stat_ptr->dev      = result.dev;
+      stat_ptr->ino      = result.ino;
       stat_ptr->filetype = result.filetype;
-      stat_ptr->nlink = result.nlink;
-      stat_ptr->size = result.size;
-      stat_ptr->atim = result.atim;
-      stat_ptr->mtim = result.mtim;
-      stat_ptr->ctim = result.ctim;
+      stat_ptr->nlink    = result.nlink;
+      stat_ptr->size     = result.size;
+      stat_ptr->atim     = result.atim;
+      stat_ptr->mtim     = result.mtim;
+      stat_ptr->ctim     = result.ctim;
       return 0;
    }
 
@@ -804,10 +809,10 @@ struct callbacks
       return 0;
    }
 
-   uint32_t wasi_path_filestat_get(wasi_fd_t          fd,
-                                      wasi_lookupflags_t flags,
-                                      span<const char> path,
-                                      wasm_ptr<wasi_filestat_t> stat_ptr)
+   uint32_t wasi_path_filestat_get(wasi_fd_t                 fd,
+                                   wasi_lookupflags_t        flags,
+                                   span<const char>          path,
+                                   wasm_ptr<wasi_filestat_t> stat_ptr)
    {
       if (fd != polyfill_root_dir_fd)
          return wasi_errno_badf;
@@ -823,26 +828,26 @@ struct callbacks
          if (::stat(cPath.c_str(), &stat) < 0)
             return wasi_errno_noent;
       }
-      auto result = wasi_filestat_t::from_stat(stat);      
-      stat_ptr->dev = result.dev;
-      stat_ptr->ino = result.ino;
+      auto result        = wasi_filestat_t::from_stat(stat);
+      stat_ptr->dev      = result.dev;
+      stat_ptr->ino      = result.ino;
       stat_ptr->filetype = result.filetype;
-      stat_ptr->nlink = result.nlink;
-      stat_ptr->size = result.size;
-      stat_ptr->atim = result.atim;
-      stat_ptr->mtim = result.mtim;
-      stat_ptr->ctim = result.ctim;
+      stat_ptr->nlink    = result.nlink;
+      stat_ptr->size     = result.size;
+      stat_ptr->atim     = result.atim;
+      stat_ptr->mtim     = result.mtim;
+      stat_ptr->ctim     = result.ctim;
       return 0;
    }
 
-   uint32_t wasi_path_open(wasi_fd_t fd,
-                                 wasi_lookupflags_t dirflags,
-                                 span<const char>  path,
-                                 wasi_oflags_t   oflags,
-                                 wasi_rights_t   fs_rights_base,
-                                 wasi_rights_t   fs_rights_inherting,
-                                 uint32_t  fdflags, // wasi_fdflags_t u16
-                                 wasm_ptr<int32_t> opened_fd)
+   uint32_t wasi_path_open(wasi_fd_t          fd,
+                           wasi_lookupflags_t dirflags,
+                           span<const char>   path,
+                           wasi_oflags_t      oflags,
+                           wasi_rights_t      fs_rights_base,
+                           wasi_rights_t      fs_rights_inherting,
+                           uint32_t           fdflags,  // wasi_fdflags_t u16
+                           wasm_ptr<int32_t>  opened_fd)
    {
       if (fd != polyfill_root_dir_fd)
          return wasi_errno_badf;
@@ -923,9 +928,9 @@ struct callbacks
       return 0;
    }
 
-   uint32_t wasi_fd_write(wasi_fd_t fd, 
-                          span<const wasi_iovec_t> iovs, 
-                          wasm_ptr<wasi_size_t> nwritten)
+   uint32_t wasi_fd_write(wasi_fd_t                fd,
+                          span<const wasi_iovec_t> iovs,
+                          wasm_ptr<wasi_size_t>    nwritten)
    {
       auto* file = get_file(fd);
       if (!file || iovs.empty())
@@ -935,26 +940,24 @@ struct callbacks
 
       for (auto iovs_item : iovs)
       {
-
          char* memory   = state.backend.get_context().linear_memory();
          void* iovs_buf = memory + iovs_item.buf;
 
          check_bounds(iovs_buf, iovs_item.buf_len);
 
-         if (iovs_item.buf_len && fwrite(iovs_buf, iovs_item.buf_len, 1, file->f) != 1) {
+         if (iovs_item.buf_len && fwrite(iovs_buf, iovs_item.buf_len, 1, file->f) != 1)
+         {
             return wasi_errno_io;
          }
 
          *nwritten += iovs_item.buf_len;
       }
-      
+
       return 0;
    }
 
-   uint32_t wasi_fd_read(wasi_fd_t fd, 
-                         span<const wasi_iovec_t> iovs,
-                         wasm_ptr<wasi_size_t> nread)
-   {         
+   uint32_t wasi_fd_read(wasi_fd_t fd, span<const wasi_iovec_t> iovs, wasm_ptr<wasi_size_t> nread)
+   {
       auto* file = get_file(fd);
       if (!file || iovs.empty())
          return wasi_errno_badf;
@@ -970,7 +973,7 @@ struct callbacks
 
          size_t bytes_read = fread(iovs_buf, 1, iovs_item.buf_len, file->f);
          *nread += bytes_read;
-      
+
          if (bytes_read < iovs_item.buf_len)
             return 0;
       }
@@ -1331,9 +1334,11 @@ void register_callbacks()
    rhf_t::add<&callbacks::wasi_environ_sizes_get>("wasi_snapshot_preview1", "environ_sizes_get");
    rhf_t::add<&callbacks::wasi_fd_close>("wasi_snapshot_preview1", "fd_close");
    rhf_t::add<&callbacks::wasi_fd_fdstat_get>("wasi_snapshot_preview1", "fd_fdstat_get");
-   rhf_t::add<&callbacks::wasi_fd_fdstat_set_flags>("wasi_snapshot_preview1", "fd_fdstat_set_flags");
+   rhf_t::add<&callbacks::wasi_fd_fdstat_set_flags>("wasi_snapshot_preview1",
+                                                    "fd_fdstat_set_flags");
    rhf_t::add<&callbacks::wasi_fd_filestat_get>("wasi_snapshot_preview1", "fd_filestat_get");
-   rhf_t::add<&callbacks::wasi_fd_prestat_dir_name>("wasi_snapshot_preview1", "fd_prestat_dir_name");
+   rhf_t::add<&callbacks::wasi_fd_prestat_dir_name>("wasi_snapshot_preview1",
+                                                    "fd_prestat_dir_name");
    rhf_t::add<&callbacks::wasi_fd_prestat_get>("wasi_snapshot_preview1", "fd_prestat_get");
    rhf_t::add<&callbacks::wasi_fd_read>("wasi_snapshot_preview1", "fd_read");
    rhf_t::add<&callbacks::wasi_fd_readdir>("wasi_snapshot_preview1", "fd_readdir");
