@@ -5,6 +5,7 @@
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
 
+#include <cmath>
 #include <psibase/serveSimpleUI.hpp>
 #include "services/user/Nft.hpp"
 #include "services/user/Tokens.hpp"
@@ -68,12 +69,17 @@ void Symbol::init()
       s.activePrice = s.activePrice * 2 / 3;
       return s;
    };
-   auto       symLengthTable = Tables().open<SymbolLengthTable>();
-   Quantity_t initialPrice   = (Quantity_t)1000e8;
-   auto       s              = SymbolLengthRecord{.symbolLength        = 3,
-                                                  .targetCreatedPerDay = 24,
-                                                  .floorPrice{(Quantity_t)100e8},
-                                                  .activePrice{initialPrice}};
+
+   auto precision   = to<Tokens>().getToken(Tokens::sysToken).precision;
+   auto getQuantity = [precision](Quantity_t q)
+   { return (Quantity_t)(q * std::pow(10, precision.value)); };
+   auto symLengthTable = Tables().open<SymbolLengthTable>();
+
+   Quantity_t initialPrice = getQuantity(1000);
+   auto       s            = SymbolLengthRecord{.symbolLength        = 3,
+                                                .targetCreatedPerDay = 24,
+                                                .floorPrice{getQuantity(100)},
+                                                .activePrice{initialPrice}};
    symLengthTable.put(s);           // Length 3
    symLengthTable.put(nextSym(s));  // Length 4
    symLengthTable.put(nextSym(s));  // Length 5

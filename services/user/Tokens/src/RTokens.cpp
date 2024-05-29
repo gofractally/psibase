@@ -233,7 +233,7 @@ struct TokenQuery
    auto userConf(AccountNumber user, psibase::EnumElement flag) const
    {
       auto holder = tokenService.open<TokenHolderTable>().getIndex<0>().get(user);
-      check(holder.has_value(), "Specified user does not hold any tokens");
+      check(holder.has_value(), "Token service has no record of user account");
       return holder->config.get(TokenHolderRecord::Configurations::value(flag));
    }
 };

@@ -1,6 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include <psio/fracpack.hpp>
 
+#include <cmath>
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/commonErrors.hpp>
@@ -23,11 +24,13 @@ namespace
 
    namespace SymbolPricing
    {
-      const auto initialPrice          = static_cast<Quantity_t>(1'000e8);
+      const auto initialPrice          = static_cast<Quantity_t>(1'000);
       const int  increaseRatePct       = 5;
       const int  decreaseRatePct       = 5;
       const int  targetNrSymbolsPerDay = 24;
    }  // namespace SymbolPricing
+
+   auto q = [](Quantity_t amt, Precision p) { return Quantity{amt * std::pow(10, p.value)}; };
 
 }  // namespace
 
@@ -43,14 +46,17 @@ SCENARIO("Buying a symbol")
       auto b     = bob.to<Symbol>();
 
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
+      auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
+
       sysIssuer.setTokenConf(sysToken, untradeable, false);
-      sysIssuer.mint(sysToken, 20'000e8, memo);
-      sysIssuer.credit(sysToken, alice, 10'000e8, memo);
-      sysIssuer.credit(sysToken, bob, 10'000e8, memo);
+      sysIssuer.mint(sysToken, q(20'000, precision), memo);
+      sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
+      sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+
+      const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
       THEN("Alice cannot create a symbol with numbers")
       {
-         Quantity quantity{SymbolPricing::initialPrice};
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = AccountNumber{"ab1"};
          CHECK(AccountNumber{"ab1"}.value != 0);
@@ -59,29 +65,25 @@ SCENARIO("Buying a symbol")
       }
       THEN("Alice cannot create a symbol with uppercase letters")
       {
-         Quantity quantity{SymbolPricing::initialPrice};
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"aBc"};
          CHECK(a.create(symbolId, quantity).failed(invalidSymbol));
       }
       THEN("Alice cannot create a symbol with fewer than 3 characters")
       {
-         Quantity quantity{SymbolPricing::initialPrice};
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"ab"};
          CHECK(a.create(symbolId, quantity).failed(invalidSymbol));
       }
       THEN("Alice cannot create a symbol with greater than 7 characters")
       {
-         Quantity quantity{SymbolPricing::initialPrice};
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"abcdefgh"};
          CHECK(a.create(symbolId, quantity).failed(invalidSymbol));
       }
       THEN("Alice can create a symbol")
       {
-         Quantity quantity{SymbolPricing::initialPrice};
-         auto     credit = alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
+         auto credit = alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          CHECK(credit.succeeded());
 
          CHECK(quantity == a.getPrice(3).returnVal());
@@ -123,7 +125,6 @@ SCENARIO("Buying a symbol")
       }
       WHEN("Alice creates a symbol")
       {
-         auto quantity{SymbolPricing::initialPrice};
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"abc"};
          a.create(symbolId, quantity);
@@ -164,11 +165,16 @@ SCENARIO("Measuring price increases")
       auto alice = t.from(t.addAccount("alice"_a));
       auto a     = alice.to<Symbol>();
 
-      auto aliceBalance = 1'000'000e8;
-      auto sysIssuer    = t.from(Symbol::service).to<Tokens>();
+      auto sysIssuer = t.from(Symbol::service).to<Tokens>();
+      auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
+
+      auto aliceBalance = q(1'000'000, precision);
+
       sysIssuer.setTokenConf(sysToken, untradeable, false);
       sysIssuer.mint(sysToken, aliceBalance, memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
+
+      const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
       std::vector<SID> tickers{
           // 25 tickers
@@ -193,18 +199,16 @@ SCENARIO("Measuring price increases")
 
       THEN("Alice can buy the first symbol for initialPrice tokens")
       {
-         auto quantity{SymbolPricing::initialPrice};
+         alice.to<Tokens>().credit(sysToken, Symbol::service, 2 * quantity.value, memo);
 
-         alice.to<Tokens>().credit(sysToken, Symbol::service, 2 * quantity, memo);
-
-         CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
+         CHECK(a.getPrice(3).returnVal() == q(SymbolPricing::initialPrice, precision));
 
          auto create = a.create(SID{"abc"}, quantity);
          CHECK(create.succeeded());
 
          AND_THEN("Buying another symbol is the same price")
          {
-            CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
+            CHECK(a.getPrice(3).returnVal() == q(SymbolPricing::initialPrice, precision));
             a.create(SID{"bcd"}, quantity);
             auto balance =
                 alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service).returnVal().balance;
@@ -214,7 +218,7 @@ SCENARIO("Measuring price increases")
       THEN("The price remains stable if sold symbols per day is targetNrSymbolsPerDay")
       {
          t.startBlock(secondsInDay + 10'000);  // Start a new day (price will drop once)
-         auto cost{decrementPrice(SymbolPricing::initialPrice)};
+         auto cost{decrementPrice(q(SymbolPricing::initialPrice, precision))};
 
          auto symbolDetails = a.getSymbolType(3).returnVal();
          CHECK(symbolDetails.createCounter == 0);
@@ -251,10 +255,10 @@ SCENARIO("Measuring price increases")
       }
       THEN("The price decreases if less than x are sold over 24 hours")
       {
-         CHECK(a.getPrice(3).returnVal() == SymbolPricing::initialPrice);
+         CHECK(a.getPrice(3).returnVal() == q(SymbolPricing::initialPrice, precision));
          t.startBlock(secondsInDay + 10'000);  // 10 seconds more than a full day has passed
 
-         auto nextPrice = decrementPrice(SymbolPricing::initialPrice);
+         auto nextPrice = decrementPrice(q(SymbolPricing::initialPrice, precision));
          CHECK(a.getPrice(3).returnVal() == nextPrice);
 
          AND_THEN("The price decreases even more if too few are sold over 48 hours")
@@ -279,10 +283,12 @@ SCENARIO("Using symbol ownership NFT")
       auto a     = alice.to<Symbol>();
 
       // Mint token used for purchasing symbols
-      auto aliceBalance = 1'000'000e8;
       auto sysIssuer    = t.from(Symbol::service).to<Tokens>();
+      auto precision    = sysIssuer.getToken(sysToken).returnVal().precision;
+      auto aliceBalance = q(1'000'000, precision);
+
       sysIssuer.setTokenConf(sysToken, untradeable, false);
-      sysIssuer.mint(sysToken, 20'000e8, memo);
+      sysIssuer.mint(sysToken, q(20'000, precision), memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
       // Create the symbol and claim the owner NFT
@@ -330,10 +336,12 @@ SCENARIO("Buying and selling symbols")
       auto bob   = t.from(t.addAccount("bob"_a));
 
       // Fund Alice and Bob with the system token
-      auto userBalance = 1'000'000e8;
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
+      auto precision   = sysIssuer.getToken(sysToken).returnVal().precision;
+      auto userBalance = q(1'000'000, precision);
+
       sysIssuer.setTokenConf(sysToken, untradeable, false);
-      sysIssuer.mint(sysToken, 2 * userBalance, memo);
+      sysIssuer.mint(sysToken, 2 * userBalance.value, memo);
       sysIssuer.credit(sysToken, alice, userBalance, memo);
       sysIssuer.credit(sysToken, bob, userBalance, memo);
 
@@ -361,7 +369,7 @@ SCENARIO("Buying and selling symbols")
          THEN("Alice can list it for sale")
          {
             alice.to<Nft>().credit(symbolNft, Symbol::service, memo);
-            CHECK(alice.to<Symbol>().listSymbol(symbol, Quantity{1'000e8}).succeeded());
+            CHECK(alice.to<Symbol>().listSymbol(symbol, q(1'000, precision)).succeeded());
 
             AND_THEN("Alice no longer owns the symbol")
             {
@@ -379,7 +387,7 @@ SCENARIO("Buying and selling symbols")
          }
          THEN("Alice cannot list it below the floor price")
          {
-            auto listPrice = Quantity{0e8};
+            auto listPrice = q(0, precision);
             CHECK(alice.to<Symbol>().listSymbol(symbol, listPrice).failed(priceTooLow));
          }
          WHEN("The symbol is mapped to a token")
@@ -392,13 +400,13 @@ SCENARIO("Buying and selling symbols")
             THEN("The symbol cannot be sold")
             {
                CHECK(alice.to<Symbol>()
-                         .listSymbol(symbol, Quantity{1'000e8})
+                         .listSymbol(symbol, q(1'000, precision))
                          .failed(creditSymbolRequired));
             }
          }
          WHEN("The symbol is for sale")
          {
-            auto listPrice = Quantity{1'000e8};
+            auto listPrice = q(1'000, precision);
             alice.to<Nft>().credit(symbolNft, Symbol::service, memo);
             alice.to<Symbol>().listSymbol(symbol, listPrice);
 
@@ -417,7 +425,7 @@ SCENARIO("Buying and selling symbols")
             }
             THEN("Bob cannot buy the symbol for less than the list price")
             {
-               bob.to<Tokens>().credit(sysToken, Symbol::service, listPrice / 2, memo);
+               bob.to<Tokens>().credit(sysToken, Symbol::service, listPrice.value / 2, memo);
                auto buySymbol = bob.to<Symbol>().buySymbol(symbol);
                CHECK(buySymbol.failed(insufficientBalance));
             }
@@ -446,7 +454,7 @@ SCENARIO("Buying and selling symbols")
                THEN("The symbol is no longer for sale")
                {
                   auto symbolRecord = alice.to<Symbol>().getSymbol(symbol).returnVal();
-                  CHECK(symbolRecord.saleDetails.salePrice == 0e8);
+                  CHECK(symbolRecord.saleDetails.salePrice == q(0, precision));
                }
                THEN("Bob can reslist the symbol")
                {

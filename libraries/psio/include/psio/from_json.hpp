@@ -738,6 +738,13 @@ namespace psio
       } while (depth);
    }
 
+   template <typename T>
+   concept PackValidatable = requires(T obj) {
+      {
+         clio_validate_packable(obj)
+      } -> std::same_as<bool>;
+   };
+
    /// \output_section Parse JSON (Reflected Objects)
    /// Parse JSON and convert to `obj`. This overload works with
    /// [reflected objects](standardese://reflection/).
@@ -769,6 +776,14 @@ namespace psio
                    from_json_skip_value(stream);
                 }
              });
+
+         if constexpr (PackValidatable<T>)
+         {
+            if (!clio_validate_packable(obj))
+            {
+               check(false, std::string(psio::reflect<T>::name) + " failed unpack validation.");
+            }
+         }
       }
       else
       {
