@@ -46,6 +46,8 @@ export const useUi = (username: string | undefined) =>
         };
       });
 
+      // TODO: the response seems to be the same as credit balances
+      // @ts-ignore
       const debitBalances = res.userDebits.map((debit): SharedBalance => {
         const amount = new Quantity(
           debit.balance,
@@ -63,41 +65,46 @@ export const useUi = (username: string | undefined) =>
         };
       });
 
-      const sharedBalances: SharedBalance[] = [
-        ...creditBalances,
-        ...debitBalances,
-      ];
+      const sharedBalances: SharedBalance[] = [...creditBalances, ...[]];
 
-      const userBalanceTokens: Token[] = res.userBalances.map((balance): Token => {
-        const quan = new Quantity(
-          balance.balance,
-          balance.precision.value,
-          balance.tokenId,
-          balance.symbolId
-        );
+      const userBalanceTokens: Token[] = res.userBalances.map(
+        (balance): Token => {
+          const quan = new Quantity(
+            balance.balance,
+            balance.precision.value,
+            balance.tokenId,
+            balance.symbolId
+          );
 
-        return {
-          id: balance.tokenId,
-          owner: "",
-          isAdmin: res.userTokens.some(user => user.id == balance.tokenId),
-          symbol: balance.symbolId,
-          label: quan.label(),
-          balance: quan,
-        };
-      });
-
+          return {
+            id: balance.tokenId,
+            owner: "",
+            isAdmin: res.userTokens.some((user) => user.id == balance.tokenId),
+            symbol: balance.symbolId,
+            label: quan.label(),
+            balance: quan,
+          };
+        }
+      );
 
       const userTokens = res.userTokens.map((userToken): Token => {
-        const quan = new Quantity('1', userToken.precision.value, userToken.id, userToken.symbolId)
+        const quan = new Quantity(
+          "1",
+          userToken.precision.value,
+          userToken.id,
+          userToken.symbolId
+        );
         return {
           id: userToken.id,
           isAdmin: true,
           label: quan.label(),
-          owner: username || '',
+          owner: username || "",
           symbol: userToken.symbolId,
-        }
-    })
-      const tokens = [...userBalanceTokens, ...userTokens].filter((token, index, arr) => arr.findIndex(t => t.id == token.id) == index);
+        };
+      });
+      const tokens = [...userBalanceTokens, ...userTokens].filter(
+        (token, index, arr) => arr.findIndex((t) => t.id == token.id) == index
+      );
 
       return { tokens, sharedBalances };
     },

@@ -20,7 +20,7 @@ export class Quantity {
   }
 
   public label(): string {
-    return this.tokenSymbol || `#${this.tokenNumber}`;
+    return this.tokenSymbol?.toUpperCase() || `#${this.tokenNumber}`;
   }
 
   public format(includeLabel = true, full = false): string {

@@ -35,7 +35,7 @@ const AmountInput: FC<Props> = ({ form, selectedToken, tokenBalance }) => {
                   form.setValue("amount", tokenBalance.toString());
                 }}
               >
-                Balance{" "}
+                Balance:{" "}
                 <AnimateNumber
                   n={tokenBalance}
                   precision={selectedToken.balance?.getPrecision() ?? 0}

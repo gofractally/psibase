@@ -20,6 +20,7 @@ function App() {
   const {
     data: { sharedBalances, tokens },
     refetch,
+    isLoading,
   } = useUi(currentUser);
 
   const { mutateAsync: pluginCall, isPending } = usePluginCall();
@@ -98,7 +99,7 @@ function App() {
   return (
     <div className="mx-auto h-screen w-screen max-w-screen-lg">
       <Nav title="Tokens" />
-      <div className="max-w-screen-lg mx-auto p-4">
+      <div className="max-w-screen-lg mx-auto p-4 flex flex-col gap-3">
         <ModalCreateToken
           open={isNewTokenModalOpen}
           onOpenChange={(e) => setNewTokenModalOpen(e)}
@@ -134,8 +135,9 @@ function App() {
           onSubmit={onSubmit}
         />
 
-        <div className="mb-4">
+        <div className="my-4">
           <CreditTable
+            isLoading={isLoading}
             user={currentUser}
             // @ts-ignore
             balances={sharedBalances}

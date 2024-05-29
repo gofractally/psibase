@@ -19,11 +19,12 @@ import { z } from "zod";
 interface Props {
   balances: SharedBalance[];
   user: string;
+  isLoading: boolean;
 }
 
 const ActionType = z.enum(["Uncredit", "Debit"]);
 
-export function CreditTable({ balances, user }: Props) {
+export function CreditTable({ balances, user, isLoading }: Props) {
   const queryClient = useQueryClient();
 
   const { mutate } = usePluginCall({
@@ -57,15 +58,20 @@ export function CreditTable({ balances, user }: Props) {
     } else throw new Error(`Unhandled action`);
   };
 
+  if (balances.length == 0) {
+    return (
+      <div className="text-sm text-muted-foreground">
+        {isLoading ? "Loading..." : "No credits or debits found."}
+      </div>
+    );
+  }
   return (
     <Table>
       <TableCaption>A list of your credit and debits.</TableCaption>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[100px]">Creditor</TableHead>
-          <TableHead>Debitor</TableHead>
+          <TableHead className="w-[100px]">Creditor / Debitor</TableHead>
           <TableHead>Token</TableHead>
-          <TableHead>Amount</TableHead>
           <TableHead className="text-right">Action</TableHead>
         </TableRow>
       </TableHeader>
@@ -78,15 +84,16 @@ export function CreditTable({ balances, user }: Props) {
 
           return (
             <TableRow key={balance.id}>
-              <TableCell className="font-medium">{balance.creditor}</TableCell>
-              <TableCell>{balance.debitor}</TableCell>
-              <TableCell>{balance.label}</TableCell>
+              <TableCell className="font-medium">
+                {balance.creditor == user ? balance.debitor : balance.creditor}
+              </TableCell>
               <TableCell>
                 {" "}
                 <AnimateNumber
                   n={balance.amount.toNumber()}
                   precision={balance.amount.getPrecision()}
                 />
+                {" " + balance.amount.format(true).split(" ")[1]}
               </TableCell>
               <TableCell className="text-right">
                 <Button
