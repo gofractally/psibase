@@ -8,7 +8,7 @@ const App = () => {
             <div className="flex flex-col sm:flex-row">
                 <AppItem
                     name="Tokens"
-                    description="Explore recent transactions and chain history."
+                    description="Create, burn and send tokens."
                     service="tokens"
                 />
                 <AppItem
