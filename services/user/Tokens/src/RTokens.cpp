@@ -81,6 +81,34 @@ namespace TokenQueryTypes
 
 }  // namespace TokenQueryTypes
 
+/// A split key is used to specify a subindex on indices with a struct key.
+///
+/// Warning: No type checking! It's up to the user to ensure that T + Rest
+///   is equivalent to the primary key)
+template <typename Rest, typename T>
+struct SplitKey
+{
+   T value;
+};
+
+template <typename Rest, typename T>
+void to_key(SplitKey<Rest, T>& obj, auto& stream)
+{
+   to_key(obj.value, stream);
+}
+
+template <typename Rest, typename T, typename S>
+struct compatible_tuple_prefix<SplitKey<Rest, T>, S>
+{
+   static constexpr bool value = true;
+};
+
+template <typename Rest, typename T, typename S>
+struct key_suffix_unqual<SplitKey<Rest, T>, S>
+{
+   using type = Rest;
+};
+
 using namespace TokenQueryTypes;
 struct TokenQuery
 {
@@ -100,7 +128,8 @@ struct TokenQuery
       vector<TokenBalance> balances;
 
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
-      auto balanceIdx   = tokenService.open<BalanceTable>().getIndex<1>().subindex(user);
+      auto balanceIdx   = tokenService.open<BalanceTable>().getIndex<0>().subindex(
+          SplitKey<TID, AccountNumber>{user});
 
       // Balances of this user
       for (auto balance : balanceIdx)
@@ -126,7 +155,8 @@ struct TokenQuery
       vector<Credit> credits;
 
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
-      auto creditIdx    = tokenService.open<SharedBalanceTable>().getIndex<1>();
+      auto creditIdx    = tokenService.open<SharedBalanceTable>().getIndex<0>().subindex(
+          SplitKey<std::tuple<TID, AccountNumber>, AccountNumber>{user});
 
       for (auto credit : creditIdx)
       {
@@ -151,7 +181,7 @@ struct TokenQuery
       vector<Debit> debits;
 
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
-      auto debitIdx     = tokenService.open<SharedBalanceTable>().getIndex<2>();
+      auto debitIdx     = tokenService.open<SharedBalanceTable>().getIndex<1>().subindex(user);
 
       for (auto debit : debitIdx)
       {
@@ -233,7 +263,7 @@ struct TokenQuery
    auto userConf(AccountNumber user, psibase::EnumElement flag) const
    {
       auto holder = tokenService.open<TokenHolderTable>().getIndex<0>().get(user);
-      check(holder.has_value(), "Specified user does not hold any tokens");
+      check(holder.has_value(), "Token service has no record of user account");
       return holder->config.get(TokenHolderRecord::Configurations::value(flag));
    }
 };
