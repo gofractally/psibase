@@ -536,8 +536,6 @@ struct callbacks
 
    int32_t wasi_sched_yield() { return 0; }
 
-   // Unfortunately it looks like we have to lie instead of returning an error
-   // to not break some Rust libraries and even standard ones like HashMap
    uint32_t wasi_random_get(span<uint8_t> buf)
    {
       std::random_device rng;
@@ -699,7 +697,7 @@ struct callbacks
    }
 
    uint32_t wasi_fd_readdir(wasi_fd_t             fd,
-                            wasm_ptr<uint8_t>     buf,
+                            span<uint8_t>         buf,
                             wasi_dircookie_t      cookie,
                             wasm_ptr<wasi_size_t> retptr0)
    {
@@ -777,15 +775,7 @@ struct callbacks
       {
          return wasi_errno_badf;
       }
-
-      stat_ptr->dev      = result.dev;
-      stat_ptr->ino      = result.ino;
-      stat_ptr->filetype = result.filetype;
-      stat_ptr->nlink    = result.nlink;
-      stat_ptr->size     = result.size;
-      stat_ptr->atim     = result.atim;
-      stat_ptr->mtim     = result.mtim;
-      stat_ptr->ctim     = result.ctim;
+      *stat_ptr = result;
       return 0;
    }
 
@@ -828,15 +818,8 @@ struct callbacks
          if (::stat(cPath.c_str(), &stat) < 0)
             return wasi_errno_noent;
       }
-      auto result        = wasi_filestat_t::from_stat(stat);
-      stat_ptr->dev      = result.dev;
-      stat_ptr->ino      = result.ino;
-      stat_ptr->filetype = result.filetype;
-      stat_ptr->nlink    = result.nlink;
-      stat_ptr->size     = result.size;
-      stat_ptr->atim     = result.atim;
-      stat_ptr->mtim     = result.mtim;
-      stat_ptr->ctim     = result.ctim;
+      auto result = wasi_filestat_t::from_stat(stat);
+      *stat_ptr   = result;
       return 0;
    }
 
@@ -933,7 +916,7 @@ struct callbacks
                           wasm_ptr<wasi_size_t>    nwritten)
    {
       auto* file = get_file(fd);
-      if (!file || iovs.empty())
+      if (!file)
          return wasi_errno_badf;
 
       *nwritten = 0;
@@ -959,7 +942,7 @@ struct callbacks
    uint32_t wasi_fd_read(wasi_fd_t fd, span<const wasi_iovec_t> iovs, wasm_ptr<wasi_size_t> nread)
    {
       auto* file = get_file(fd);
-      if (!file || iovs.empty())
+      if (!file)
          return wasi_errno_badf;
 
       *nread = 0;
