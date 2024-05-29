@@ -221,6 +221,7 @@ set(JS_DIRS
     services/user/CommonApi/ui:CommonApi_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
+    services/user/Tokens/ui:Tokens_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -633,6 +634,8 @@ psibase_package(
         INIT
     SERVICE r-tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
+        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist /
+        DEPENDS Tokens_js ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/index.html
     DEPENDS wasm
 )
 
