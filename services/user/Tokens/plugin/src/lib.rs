@@ -2,8 +2,8 @@
 mod bindings;
 
 use bindings::common::plugin::{server, types as CommonTypes};
-use bindings::exports::component::tokens::types as Wit;
-use bindings::exports::component::tokens::{
+use bindings::exports::tokens::plugin::types as Wit;
+use bindings::exports::tokens::plugin::{
     intf::Guest as Intf, queries::Guest as Queries, transfer::Guest as Transfer,
 };
 use psibase::services::tokens as Wrapper;

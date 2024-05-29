@@ -17,7 +17,7 @@ serde_json = "1.0.117"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "component:tokens"
+package = "tokens:plugin"
 
 
 [package.metadata.component.target.dependencies]
