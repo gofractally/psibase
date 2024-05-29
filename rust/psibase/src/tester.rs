@@ -8,11 +8,13 @@
 
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
-    AccountNumber, Action, Caller, DirectoryRegistry, Error, InnerTraceEnum, Reflect,
-    SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace,
+    AccountNumber, Action, Caller, DirectoryRegistry, Error, InnerTraceEnum, JointRegistry,
+    PackageRegistry, Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction,
+    TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
+use futures::executor::block_on;
 use psibase_macros::account_raw;
 use std::cell::{Cell, RefCell};
 use std::path::Path;
@@ -61,8 +63,9 @@ impl Chain {
             .expect("Cannot find package directory: PSIBASE_DATADIR not defined");
         let packages_dir = Path::new(&psibase_data_dir).join("packages");
 
-        let result = DirectoryRegistry::new(packages_dir);
-        let mut services = result.sync_resolve(&default_services[..])?;
+        let mut result = JointRegistry::new();
+        result.push(DirectoryRegistry::new(packages_dir))?;
+        let mut services = block_on(result.resolve(&default_services[..]))?;
 
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
