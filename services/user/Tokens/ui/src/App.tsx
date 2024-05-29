@@ -3,7 +3,6 @@ import { CreditTable } from "@/components/credit-table";
 import { FormCreate } from "@/components/forms/form-create";
 import FormTransfer from "@/components/forms/form-transfer";
 import { ModalCreateToken } from "@/components/modal-create-token";
-import { ModeToggle } from "@/components/mode-toggle";
 import { Mode } from "@/components/transfer-toggle";
 import { m, useMode } from "@/hooks/useMode";
 import { usePluginCall } from "@/hooks/usePluginCall";
@@ -14,6 +13,7 @@ import { wait } from "@/lib/wait";
 import { tokenPlugin } from "@/plugin";
 import { FunctionCallArgs } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
+import { Nav } from "@/components/nav";
 
 function App() {
   const currentUser = useUser();
@@ -96,8 +96,8 @@ function App() {
   };
 
   return (
-    <div>
-      <ModeToggle />
+    <div className="mx-auto h-screen w-screen max-w-screen-lg">
+      <Nav title="Tokens" />
       <div className="max-w-screen-lg mx-auto p-4">
         <ModalCreateToken
           open={isNewTokenModalOpen}
