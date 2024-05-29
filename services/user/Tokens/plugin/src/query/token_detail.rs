@@ -4,7 +4,7 @@ use crate::errors::ErrorType;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-pub struct Welcome {
+pub struct Response {
     pub data: Data,
 }
 
@@ -68,7 +68,7 @@ pub fn fetch_token(token_number: u32) -> Result<TokenDetail, CommonTypes::Error>
         .and_then(|result| {
             serde_json::from_str(&result).map_err(|e| ErrorType::QueryError.err(&e.to_string()))
         })
-        .and_then(|response_root: Welcome| Ok(response_root.data.token_details))
+        .and_then(|response_root: Response| Ok(response_root.data.token_details))
         .and_then(|token_details| {
             Ok(TokenDetail {
                 id: token_details.id,
