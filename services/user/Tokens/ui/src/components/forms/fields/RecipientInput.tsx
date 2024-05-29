@@ -23,7 +23,7 @@ const RecipientInput: FC<Props> = ({ form, disableTo }) => (
       <FormItem>
         <FormLabel className="flex justify-between">Recipient</FormLabel>
         <FormControl>
-          <Input placeholder="Satoshi" {...field} disabled={disableTo} />
+          <Input {...field} disabled={disableTo} />
         </FormControl>
         <FormMessage />
       </FormItem>
