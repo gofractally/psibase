@@ -46,8 +46,6 @@ export const useUi = (username: string | undefined) =>
         };
       });
 
-      // TODO: the response seems to be the same as credit balances
-      // @ts-ignore
       const debitBalances = res.userDebits.map((debit): SharedBalance => {
         const amount = new Quantity(
           debit.balance,
@@ -65,7 +63,10 @@ export const useUi = (username: string | undefined) =>
         };
       });
 
-      const sharedBalances: SharedBalance[] = [...creditBalances, ...[]];
+      const sharedBalances: SharedBalance[] = [
+        ...creditBalances,
+        ...debitBalances,
+      ];
 
       const userBalanceTokens: Token[] = res.userBalances.map(
         (balance): Token => {
