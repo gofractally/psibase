@@ -40,7 +40,7 @@ export const MarkdownEditor = ({
         return [
             $view(mathBlockSchema.node, () =>
                 nodeViewFactory({
-                    component: MathBlock,
+                    component: () => <MathBlock readOnly={readOnly} />,
                     stopEvent: () => true,
                 }),
             ),
@@ -56,6 +56,7 @@ export const MarkdownEditor = ({
                 ctx.set(defaultValueCtx, initialValue);
             })
             .config((ctx) => {
+                if (readOnly) return;
                 const listener = ctx.get(listenerCtx);
                 listener.markdownUpdated((_ctx, md, prevMd) => {
                     if (md === prevMd) return;

@@ -1,17 +1,22 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import { katexOptionsCtx } from "@milkdown/plugin-math";
 import { useInstance } from "@milkdown/react";
 import { useNodeViewContext } from "@prosemirror-adapter/react";
-import * as Tabs from "@radix-ui/react-tabs";
 import katex from "katex";
-import type { FC } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
 
-export const MathBlock: FC = () => {
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shadcn/tabs";
+import { Button } from "@shadcn/button";
+
+export const MathBlock = ({ readOnly = false }: { readOnly?: boolean }) => {
     const { node, setAttrs, selected } = useNodeViewContext();
+
     const code = useMemo(() => node.attrs.value, [node.attrs.value]);
     const codePanel = useRef<HTMLDivElement>(null);
     const codeInput = useRef<HTMLTextAreaElement>(null);
-    const [value, setValue] = useState("preview");
+
+    const defaultTab = readOnly ? "preview" : "source";
+    const [value, setValue] = useState(defaultTab);
     const [loading, getEditor] = useInstance();
 
     useEffect(() => {
@@ -28,56 +33,42 @@ export const MathBlock: FC = () => {
         });
     }, [code, getEditor, loading, value]);
 
+    if (readOnly) {
+        return <div className="py-3 text-center" ref={codePanel} />;
+    }
+
     return (
-        <Tabs.Root
-            contentEditable={false}
-            className={selected ? "ring-2 ring-offset-2" : ""}
-            value={value}
-            onValueChange={(value) => {
-                setValue(value);
-            }}
-        >
-            <Tabs.List className="border-b border-gray-200 text-center text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                <div className="-mb-px flex flex-wrap">
-                    <Tabs.Trigger
-                        value="preview"
-                        className={[
-                            "inline-block rounded-t-lg border-b-2 border-transparent p-4 hover:border-gray-300 hover:text-gray-600 dark:hover:text-gray-300",
-                            value === "preview" ? "text-nord9" : "",
-                        ].join(" ")}
+        <div className="rounded-lg border-2 border-dashed border-gray-300 p-2.5">
+            <Tabs
+                contentEditable={false}
+                className={selected ? "ring-2 ring-offset-2" : ""}
+                onValueChange={setValue}
+                value={value}
+            >
+                <TabsList>
+                    <TabsTrigger value="preview">Preview</TabsTrigger>
+                    <TabsTrigger value="source">Source</TabsTrigger>
+                </TabsList>
+                <TabsContent value="preview">
+                    <div className="py-3 text-center" ref={codePanel} />
+                </TabsContent>
+                <TabsContent value="source" className="relative">
+                    <textarea
+                        className="block h-48 w-full bg-slate-800 font-mono text-gray-50"
+                        ref={codeInput}
+                        defaultValue={code}
+                    />
+                    <Button
+                        className="absolute bottom-full right-0 mb-1.5"
+                        onClick={() => {
+                            setAttrs({ value: codeInput.current?.value || "" });
+                            setValue("preview");
+                        }}
                     >
-                        Preview
-                    </Tabs.Trigger>
-                    <Tabs.Trigger
-                        value="source"
-                        className={[
-                            "inline-block rounded-t-lg border-b-2 border-transparent p-4 hover:border-gray-300 hover:text-gray-600 dark:hover:text-gray-300",
-                            value === "source" ? "text-nord9" : "",
-                        ].join(" ")}
-                    >
-                        Source
-                    </Tabs.Trigger>
-                </div>
-            </Tabs.List>
-            <Tabs.Content value="preview">
-                <div className="py-3 text-center" ref={codePanel} />
-            </Tabs.Content>
-            <Tabs.Content value="source" className="relative">
-                <textarea
-                    className="block h-48 w-full bg-slate-800 font-mono text-gray-50"
-                    ref={codeInput}
-                    defaultValue={code}
-                />
-                <button
-                    className="bg-nord8 dark:bg-nord9 absolute bottom-full right-0 mb-1 inline-flex items-center justify-center rounded border border-gray-600 px-6 py-2 text-base font-medium leading-6 text-gray-50 shadow-sm hover:bg-blue-200 focus:ring-2 focus:ring-offset-2"
-                    onClick={() => {
-                        setAttrs({ value: codeInput.current?.value || "" });
-                        setValue("preview");
-                    }}
-                >
-                    OK
-                </button>
-            </Tabs.Content>
-        </Tabs.Root>
+                        Save
+                    </Button>
+                </TabsContent>
+            </Tabs>
+        </div>
     );
 };
