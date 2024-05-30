@@ -423,6 +423,9 @@ namespace triedent
       bool is_slow() const { return _ring.is_slow(); }
       auto span() const { return _ring.span(); }
 
+      // returns true if there are no allocated nodes.
+      bool is_empty() const { return _ring.is_empty(); }
+
      private:
       inline void release(session_lock_ref<> l, id);
 

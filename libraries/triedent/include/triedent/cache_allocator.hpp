@@ -83,6 +83,8 @@ namespace triedent
          return {_obj_ids.span(), hot().span(), warm().span(), cool().span(), cold().span()};
       }
 
+      bool is_empty() const { return _obj_ids.is_empty(); }
+
       bool gc_retain(object_id i) { return _obj_ids.gc_retain(i); }
       void gc_start() { _obj_ids.gc_start(); }
       void gc_finish() { _obj_ids.gc_finish(); }
@@ -172,8 +174,8 @@ namespace triedent
             {
                if constexpr (debug_cache)
                {
-           //       std::osyncstream(std::cout)
-           //           << "copied to hot: " << loc.cache << ":" << loc.offset() << std::endl;
+                  //       std::osyncstream(std::cout)
+                  //           << "copied to hot: " << loc.cache << ":" << loc.offset() << std::endl;
                }
                return {copy, {loc.type()}, static_cast<std::uint16_t>(loc.ref)};
             }
@@ -182,7 +184,7 @@ namespace triedent
 
       if constexpr (debug_cache)
       {
-       //  std::osyncstream(std::cout) << "read: " << loc.cache << ":" << loc.offset() << std::endl;
+         //  std::osyncstream(std::cout) << "read: " << loc.cache << ":" << loc.offset() << std::endl;
       }
       return {obj->data(), {loc.type()}, static_cast<std::uint16_t>(loc.ref)};
    }

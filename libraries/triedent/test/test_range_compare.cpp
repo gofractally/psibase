@@ -274,4 +274,8 @@ TEST_CASE("test take")
       CHECK(session->is_empty(r, ""sv, contents.lower));
    if (!contents.upper.empty())
       CHECK(session->is_empty(r, contents.upper, ""sv));
+   // make sure that reference counts were decremented correctly
+   r.reset();
+   original.reset();
+   CHECK(db->is_empty());
 }
