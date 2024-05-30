@@ -115,10 +115,7 @@ function App() {
         </ModalCreateToken>
 
         <ConfirmationModal
-          descriptions={[
-            modalWarning,
-            "Please be aware that it is irreversible and cannot be undone.",
-          ]}
+          descriptions={[modalWarning]}
           isPending={isPending}
           onClose={() => setConfirmationModalOpen(false)}
           onContinue={() => performTx()}
