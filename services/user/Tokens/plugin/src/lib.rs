@@ -31,7 +31,7 @@ fn identify_token_type(token_id: String) -> Result<TokenType, CommonTypes::Error
     let first_char = token_id
         .chars()
         .next()
-        .ok_or(ErrorType::InvalidTokenId.err("token code is empty"))?;
+        .ok_or(ErrorType::InvalidTokenId.err("token id is empty"))?;
 
     Ok(if first_char.is_ascii_digit() {
         Number(
@@ -44,7 +44,7 @@ fn identify_token_type(token_id: String) -> Result<TokenType, CommonTypes::Error
     })
 }
 
-fn token_code_to_id(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error> {
+fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error> {
     let parsed = identify_token_type(token_id)?;
     match parsed {
         TokenType::Number(number) => Ok(number),
@@ -70,12 +70,12 @@ impl Intf for Component {
     }
 
     fn burn(
-        code: Wit::TokenId,
+        token_id: Wit::TokenId,
         amount: Wit::Quantity,
         memo: String,
         account: Wit::AccountNumber,
     ) -> Result<(), CommonTypes::Error> {
-        let token = fetch_token(token_code_to_id(code)?)?;
+        let token = fetch_token(token_id_to_number(token_id)?)?;
 
         if (account.len() as u8) == 0 {
             server::add_action_to_transaction(
@@ -101,11 +101,11 @@ impl Intf for Component {
     }
 
     fn mint(
-        code: Wit::TokenId,
+        token_id: Wit::TokenId,
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), CommonTypes::Error> {
-        let token = fetch_token(token_code_to_id(code)?)?;
+        let token = fetch_token(token_id_to_number(token_id)?)?;
 
         server::add_action_to_transaction(
             "mint",
@@ -120,8 +120,8 @@ impl Intf for Component {
 }
 
 impl Queries for Component {
-    fn token_owner(code: Wit::TokenId) -> Result<Wit::TokenDetail, CommonTypes::Error> {
-        let token_id = token_code_to_id(code)?;
+    fn token_owner(token_id: Wit::TokenId) -> Result<Wit::TokenDetail, CommonTypes::Error> {
+        let token_id = token_id_to_number(token_id)?;
         let res = fetch_token(token_id)?;
 
         Ok(Wit::TokenDetail {
@@ -135,12 +135,12 @@ impl Queries for Component {
 
 impl Transfer for Component {
     fn uncredit(
-        code: Wit::TokenId,
+        token_id: Wit::TokenId,
         debitor: Wit::AccountNumber,
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), CommonTypes::Error> {
-        let fetched_token = fetch_token(token_code_to_id(code)?)?;
+        let fetched_token = fetch_token(token_id_to_number(token_id)?)?;
         let quantity = Wrapper::Quantity::new(amount.as_str(), fetched_token.precision);
 
         server::add_action_to_transaction(
@@ -159,12 +159,12 @@ impl Transfer for Component {
     }
 
     fn credit(
-        code: Wit::TokenId,
+        token_id: Wit::TokenId,
         receiver: Wit::AccountNumber,
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), CommonTypes::Error> {
-        let fetched_token = fetch_token(token_code_to_id(code)?)?;
+        let fetched_token = fetch_token(token_id_to_number(token_id)?)?;
 
         server::add_action_to_transaction(
             "credit",

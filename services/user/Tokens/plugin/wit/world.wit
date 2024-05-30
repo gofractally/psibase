@@ -31,22 +31,22 @@ interface intf {
     use types.{precision, quantity, token-id, account-number};
     
     create: func(precision: precision, max-supply: quantity) -> result<_, error>;
-    burn: func(code: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
-    mint: func(code: token-id, amount: quantity, memo: string) -> result<_, error>;
+    burn: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
+    mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
 }
 
 interface queries {
     use common:plugin/types.{error};
     use types.{token-id, token-detail};
-    token-owner: func(code: token-id) -> result<token-detail, error>;
+    token-owner: func(token-id: token-id) -> result<token-detail, error>;
 }
 
 interface transfer {
     use common:plugin/types.{error};
     use types.{token-id, account-number, quantity, balance, token-detail};
 
-    uncredit: func(code: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
-    credit: func(code: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
+    uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
 }
 
 /// An example world for the component to target.
