@@ -5,6 +5,7 @@ pub enum ErrorType {
     QueryError,
     InvalidTokenId,
     TokenNumberMismatch,
+    NotImplemented,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -31,6 +32,11 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("Token number mismatch: {}", msg),
+            },
+            ErrorType::NotImplemented => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Feature not implemented: {}", msg),
             },
         }
     }

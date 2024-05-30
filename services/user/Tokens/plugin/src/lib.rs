@@ -49,7 +49,7 @@ fn token_code_to_id(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error> {
     match parsed {
         TokenType::Number(number) => Ok(number),
         TokenType::Symbol(_) => {
-            unimplemented!("Dunno how to lookup a token by symbol")
+            Err(ErrorType::NotImplemented.err("Symbol to token number not ready"))
         }
     }
 }
