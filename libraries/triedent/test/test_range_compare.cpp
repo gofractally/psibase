@@ -253,6 +253,7 @@ TEST_CASE("test take")
        {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x01\x00"sv},
        {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x05"sv},
        {{""sv, "\x00", "\x01"sv, "\x01\x02"sv, "\x05"sv}, ""sv, "\x01\x03"sv},
+       {{""sv, "\x00", "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x00"sv, "\x07"sv},
        {{""sv, "\x00", "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x01\x02"sv, "\x01\x03"sv},
    };
    auto contents = GENERATE(from_range(data));
