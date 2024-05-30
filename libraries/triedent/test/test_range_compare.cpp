@@ -219,3 +219,57 @@ TEST_CASE("test is_equal_weak")
    INFO("upper: " << to_hex(contents.upper));
    CHECK(session->is_equal_weak(lhs, rhs, contents.lower, contents.upper) == contents.expected);
 }
+
+struct take_data
+{
+   std::vector<std::string_view> rows;
+   std::string_view              lower;
+   std::string_view              upper;
+};
+
+TEST_CASE("test take")
+{
+   using namespace std::literals::string_view_literals;
+   static std::vector<take_data> data{
+       //
+       {{}, ""sv, ""sv},
+       {{}, "\x00"sv, ""sv},
+       {{}, ""sv, "\x05"sv},
+       {{}, "\x00"sv, "\x05"sv},
+       {{""sv}, ""sv, ""sv},
+       {{""sv}, "\x00"sv, ""sv},
+       {{""sv}, ""sv, "\x05"sv},
+       {{""sv}, "\x00"sv, "\x05"sv},
+       {{"\x00"sv, "\x01"sv}, ""sv, ""sv},
+       {{"\x00"sv, "\x01"sv}, ""sv, "\x01"sv},
+       {{"\x00"sv, "\x01"sv}, ""sv, "\x01\x00"sv},
+       {{"\x00"sv, "\x01"sv}, ""sv, "\x05"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00"sv, ""sv},
+       {{"\x00"sv, "\x01"sv}, "\x00"sv, "\x01"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00"sv, "\x01\x00"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00"sv, "\x05"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, ""sv},
+       {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x01"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x01\x00"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x05"sv},
+       {{""sv, "\x00", "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x01\x02"sv, "\x01\x03"sv},
+   };
+   auto contents = GENERATE(from_range(data));
+   auto db       = createDb();
+   auto session  = db->start_write_session();
+   auto r        = std::shared_ptr<root>{};
+   for (std::string_view row : contents.rows)
+   {
+      session->upsert(r, row, "");
+   }
+   auto original = r;
+   session->take(r, contents.lower, contents.upper);
+   INFO("rows:" << to_hex(contents.rows));
+   INFO("lower: " << to_hex(contents.lower));
+   INFO("upper: " << to_hex(contents.upper));
+   CHECK(session->is_equal_weak(r, original, contents.lower, contents.upper));
+   if (!contents.lower.empty())
+      CHECK(session->is_empty(r, ""sv, contents.lower));
+   if (!contents.upper.empty())
+      CHECK(session->is_empty(r, contents.upper, ""sv));
+}

@@ -194,6 +194,7 @@ namespace triedent
 
       static uint64_t mask_lt(uint8_t b) { return ~(~0ull << b); }
       static uint64_t mask_gt(uint8_t b) { return ~1ull << b; }
+      static uint64_t mask_eq(uint8_t b) { return 1ull << b; }
 
       inline uint8_t lower_bound(uint8_t b) const;
       inline int8_t  reverse_lower_bound(uint8_t b) const;
