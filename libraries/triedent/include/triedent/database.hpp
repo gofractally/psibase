@@ -2282,11 +2282,21 @@ namespace triedent
                                              vn.as_value_node().data());
                }
                else if (new_lower_child)
-                  return clone_with_prefix(session, l, new_lower_child,
-                                           lower.substr(0, offset + 1));
+               {
+                  auto result =
+                      clone_with_prefix(session, l, new_lower_child, lower.substr(0, offset + 1));
+                  if (new_lower_child != lower_child)
+                     session.release(l, new_lower_child);
+                  return result;
+               }
                else if (new_upper_child)
-                  return clone_with_prefix(session, l, new_upper_child,
-                                           upper.substr(0, offset + 1));
+               {
+                  auto result =
+                      clone_with_prefix(session, l, new_upper_child, upper.substr(0, offset + 1));
+                  if (new_upper_child != upper_child)
+                     session.release(l, new_upper_child);
+                  return result;
+               }
                else
                {
                   auto prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
@@ -2296,9 +2306,15 @@ namespace triedent
             }
             else
             {
+               // Make sure that the child refcounts are incremented
+               if (new_lower_child && new_lower_child == lower_child)
+                  new_lower_child = bump_refcount_or_copy(session.ring(), l, new_lower_child);
+               if (new_upper_child && new_upper_child == upper_child)
+                  new_upper_child = bump_refcount_or_copy(session.ring(), l, new_upper_child);
                // clone the node and replace upper child and lower child if needed
-               auto result = session.clone_inner(l, id, n.as_inner_node(), lower.substr(0, offset),
-                                                 -1, database::id{}, branches);
+               auto  prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
+               auto& in     = n.as_inner_node();
+               auto  result = session.clone_inner(l, id, in, prefix, -1, in.value(), branches);
                if (new_lower_child)
                   set_branch(session, l, result, lower[offset], new_lower_child);
                if (new_upper_child)
