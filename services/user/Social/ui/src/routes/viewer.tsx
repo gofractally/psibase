@@ -1,4 +1,5 @@
 import { MilkdownProvider } from "@milkdown/react";
+import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 
 import { useLocalStorage } from "@hooks";
 
@@ -9,13 +10,15 @@ export function Viewer() {
 
     return (
         <MilkdownProvider>
-            {markdown ? (
-                <MarkdownEditor
-                    initialValue={markdown}
-                    updateMarkdown={setMarkdown}
-                    readOnly
-                />
-            ) : null}
+            <ProsemirrorAdapterProvider>
+                {markdown ? (
+                    <MarkdownEditor
+                        initialValue={markdown}
+                        updateMarkdown={setMarkdown}
+                        readOnly
+                    />
+                ) : null}
+            </ProsemirrorAdapterProvider>
         </MilkdownProvider>
     );
 }
