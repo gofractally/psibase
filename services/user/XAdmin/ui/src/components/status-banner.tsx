@@ -1,5 +1,7 @@
 import { usePollJson } from "../hooks";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 interface StatusBannerProps {
     peersError?: string;
     configError?: string;
@@ -51,29 +53,11 @@ export const StatusBanner = ({
         : "⚠️ Warning";
 
     return (
-        <Banner disconnected={disconnected}>
-            <div className="text-lg font-semibold">{statusTitle}</div>
-            <div>
-                {serverStatus.map((status, idx) => (
-                    <StatusMessage key={idx}>{status}</StatusMessage>
-                ))}
-            </div>
-        </Banner>
+        <Alert variant={disconnected ? "destructive" : "default"}>
+            <AlertTitle>{statusTitle}</AlertTitle>
+            {serverStatus.map((status, idx) => (
+                <AlertDescription key={idx}>{status}</AlertDescription>
+            ))}
+        </Alert>
     );
 };
-
-interface BannerProps {
-    children: React.ReactNode;
-    disconnected?: boolean;
-}
-
-const Banner = ({ children, disconnected }: BannerProps) => {
-    const classBase = "max-w-7x mx-auto my-8 p-4 text-left";
-    const className =
-        classBase + (disconnected ? " bg-red-100" : " bg-orange-100");
-    return <div className={className}>{children}</div>;
-};
-
-const StatusMessage = ({ children }: { children: React.ReactNode }) => (
-    <div className="ml-2 mt-2 text-sm">{children}</div>
-);

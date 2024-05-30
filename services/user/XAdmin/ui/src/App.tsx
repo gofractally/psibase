@@ -55,8 +55,10 @@ function App() {
     }
 
     return (
-        <>
+            <div className="mx-auto max-w-screen-xl">
             <NavHeader menuItems={activeMenuItems} activeItem={activeItem} />
+
+          
             <StatusBanner
                 status={status}
                 statusError={statusError}
@@ -84,8 +86,7 @@ function App() {
             ) : activeItem === "Boot" ? (
                 <BootPage config={config} refetchConfig={refetchConfig} />
             ) : null}
-        </>
-    );
+  </div>    );
 }
 
 export default App;
