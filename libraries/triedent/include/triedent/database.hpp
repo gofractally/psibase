@@ -2314,7 +2314,8 @@ namespace triedent
                // clone the node and replace upper child and lower child if needed
                auto  prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
                auto& in     = n.as_inner_node();
-               auto  result = session.clone_inner(l, id, in, prefix, -1, in.value(), branches);
+               auto  result = session.clone_inner(l, id, in, prefix, -1,
+                                                 has_lower ? database::id{} : in.value(), branches);
                if (new_lower_child)
                   set_branch(session, l, result, lower[offset], new_lower_child);
                if (new_upper_child)
