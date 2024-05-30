@@ -1,8 +1,9 @@
 import React, { forwardRef, HTMLProps } from "react";
 
-import { Text } from ".";
-import "../styles/inputs.css";
-import Button from "./button";
+import { Text } from "./text";
+import {
+    
+    Button} from "@/components/ui/button";
 import { Icon, IconType } from "./icon";
 
 export const Label: React.FC<{
@@ -116,9 +117,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps & SubText>(
                 />
                 {rightIcon && (
                     <Button
-                        type="icon"
-                        onClick={onClickRightIcon}
-                        className="absolute top-[18px] right-3"
+                        onClick={() => {onClickRightIcon && onClickRightIcon()}}
+                        className="absolute right-3 top-[18px]"
                     >
                         <Icon
                             type={rightIcon}
@@ -197,7 +197,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaWithLabelProps>(
             <textarea
                 rows={3}
                 name={props.id}
-                className={`h-32 w-full resize-none border border-gray-300 bg-white py-1 px-3 text-base leading-6 text-gray-700 outline-none transition-colors duration-200 ease-in-out focus:border-orange-500 focus:ring-2 focus:ring-orange-200 ${
+                className={`h-32 w-full resize-none border border-gray-300 bg-white px-3 py-1 text-base leading-6 text-gray-700 outline-none transition-colors duration-200 ease-in-out focus:border-orange-500 focus:ring-2 focus:ring-orange-200 ${
                     props.disabled ? "bg-gray-50" : ""
                 }`}
                 ref={ref}

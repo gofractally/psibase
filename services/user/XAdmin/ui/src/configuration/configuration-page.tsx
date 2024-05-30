@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { RegisterOptions, useFieldArray, useForm } from "react-hook-form";
 
-import { Button, Form, Service } from "../components";
+import { Button } from "@/components/ui/button";
+import { Form, Service } from "../components";
 import { PsinodeConfig, ServiceConfig } from "./interfaces";
 import {
     defaultService,
@@ -172,48 +173,50 @@ export const ConfigurationPage = ({
                             </tr>
                         </thead>
                         <tbody>
-                        {listeners.fields.map((l, idx: number) => (
-                            <tr key={l.key}>
-                                <td>
-                                    <input
-                                        className="w-full border bg-white px-3 py-2 text-base text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500"
-                                        {...configForm.register(
-                                            `listen.${idx}.text`
-                                        )}
-                                    />
-                                </td>
-                                <td>
-                                    <select
-                                        {...configForm.register(
-                                            `listen.${idx}.protocol`
-                                        )}
-                                    >
-                                        <option value="http">HTTP</option>
-                                        <option value="https">HTTPS</option>
-                                        <option value="local">
-                                            Local Socket
-                                        </option>
-                                    </select>
-                                </td>
+                            {listeners.fields.map((l, idx: number) => (
+                                <tr key={l.key}>
+                                    <td>
+                                        <input
+                                            className="w-full border bg-white px-3 py-2 text-base text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500"
+                                            {...configForm.register(
+                                                `listen.${idx}.text`
+                                            )}
+                                        />
+                                    </td>
+                                    <td>
+                                        <select
+                                            {...configForm.register(
+                                                `listen.${idx}.protocol`
+                                            )}
+                                        >
+                                            <option value="http">HTTP</option>
+                                            <option value="https">HTTPS</option>
+                                            <option value="local">
+                                                Local Socket
+                                            </option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <Button
+                                            onClick={() =>
+                                                listeners.remove(idx)
+                                            }
+                                        >
+                                            Remove
+                                        </Button>
+                                    </td>
+                                </tr>
+                            ))}
+                            <tr>
                                 <td>
                                     <Button
-                                        onClick={() => listeners.remove(idx)}
+                                        className="mt-4"
+                                        onClick={onAddNewListenerClick}
                                     >
-                                        Remove
+                                        New Listener
                                     </Button>
                                 </td>
                             </tr>
-                        ))}
-                        <tr>
-                            <td>
-                                <Button
-                                    className="mt-4"
-                                    onClick={onAddNewListenerClick}
-                                >
-                                    New Listener
-                                </Button>
-                            </td>
-                        </tr>
                         </tbody>
                     </table>
 
@@ -297,8 +300,8 @@ export const ConfigurationPage = ({
 
                     <Button
                         className="my-4"
-                        size="xl"
-                        isSubmit
+                        size="lg"
+                        type="submit"
                         disabled={!configForm.formState.isDirty}
                     >
                         Save Changes

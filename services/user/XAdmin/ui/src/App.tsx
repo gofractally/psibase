@@ -12,8 +12,6 @@ import { PowerPage } from "./power-control/power-page";
 import { PeersPage } from "./peers/peers-page";
 import { Peer } from "./peers/interfaces";
 
-import "./App.css";
-
 const MENU_ITEMS = [
     "Dashboard",
     "Peers",

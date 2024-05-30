@@ -1,6 +1,5 @@
 import { RegisterOptions } from "react-hook-form";
-import Button from "./button";
-import "../styles/service.css";
+import {Button} from "@/components/ui/button";
 import { newId } from "../configuration/utils";
 
 type ServiceConfig = {

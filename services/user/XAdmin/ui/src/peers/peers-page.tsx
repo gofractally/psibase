@@ -1,7 +1,8 @@
 import { postJson } from "@psibase/common-lib";
 import { useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
-import { Button, Form } from "../components";
+import { Button } from "@/components/ui/button";
+import { Form } from "../components";
 import { PsinodeConfig } from "../configuration/interfaces";
 import { putJson } from "../helpers";
 import {
@@ -226,7 +227,7 @@ export const PeersPage = ({
                             </Form.Select>
                         </td>
                         <td>
-                            <Button isSubmit form="new-connection">
+                            <Button type="submit" form="new-connection">
                                 Add Connection
                             </Button>
                         </td>

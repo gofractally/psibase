@@ -1,5 +1,5 @@
 import { postJson } from "@psibase/common-lib";
-import { Button } from "../components";
+import { Button } from "@/components/ui/button";
 import { Divider } from "../components/divider";
 
 export const PowerPage = () => {

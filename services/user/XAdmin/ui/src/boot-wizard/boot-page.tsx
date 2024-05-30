@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm, UseFormReturn } from "react-hook-form";
-import { Button, Form } from "../components";
+import { Form } from "../components";
+import { Button } from "@/components/ui/button";
 import { PsinodeConfig } from "../configuration/interfaces";
 import { putJson } from "../helpers";
 import {
@@ -146,7 +147,7 @@ export const TypeForm = ({
                     label="Choose services to install"
                 />
             </fieldset>
-            <Button className="mt-4" isSubmit>
+            <Button className="mt-4" type="submit">
                 Next
             </Button>
         </form>
@@ -231,7 +232,7 @@ export const ServicesForm = ({
             >
                 Back
             </Button>
-            <Button className="mt-4" isSubmit>
+            <Button className="mt-4" type="submit">
                 Next
             </Button>
         </form>
@@ -268,7 +269,7 @@ export const ProducerForm = ({
                 </Button>
                 <Button
                     className="mt-4"
-                    isSubmit
+                    type="submit"
                     disabled={!producerForm.formState.isValid}
                 >
                     Next
@@ -418,7 +419,7 @@ export const InstallForm = ({
                 >
                     Back
                 </Button>
-                <Button className="mt-4" isSubmit>
+                <Button className="mt-4" type="submit">
                     Install
                 </Button>
             </form>

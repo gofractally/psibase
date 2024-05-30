@@ -1,4 +1,3 @@
-export { Button } from "./button";
 export { Form } from "./form";
 export { Heading } from "./heading";
 export { Icon } from "./icon";

@@ -1,5 +1,4 @@
 import { Icon, IconSize } from "./icon";
-import "../styles/loader.css";
 
 export interface LoaderProps {
     size?: IconSize;

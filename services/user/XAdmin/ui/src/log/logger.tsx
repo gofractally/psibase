@@ -1,7 +1,6 @@
 import { RegisterOptions } from "react-hook-form";
 import { Form } from "../components/form";
-import { Button } from "../components/button";
-import "../styles/logger.css";
+// import { Button } from "@/components/ui/button";
 import { LogConfig } from "./interfaces";
 
 interface LoggerProps {
@@ -17,7 +16,7 @@ export const Logger = ({ loggerKey, register, watch, remove }: LoggerProps) => {
         <fieldset className="logger-control p-2">
             <div className="flex justify-between">
                 <legend className="text-2xl">{loggerKey}</legend>
-                <Button onClick={remove}>Remove</Button>
+                {/* <Button onClick={remove}>Remove</Button> */}
             </div>
 
             <Form.Select label="Type" {...register("type")}>
