@@ -122,24 +122,6 @@ function(add suffix)
             service/src/ossl.c
             service/src/time.c
             tester/src/tester_intrinsics.cpp
-            tester/src/wasi_polyfill/__wasi_args_get.cpp
-            tester/src/wasi_polyfill/__wasi_args_sizes_get.cpp
-            tester/src/wasi_polyfill/__wasi_clock_time_get.cpp
-            tester/src/wasi_polyfill/__wasi_environ_get.cpp
-            tester/src/wasi_polyfill/__wasi_environ_sizes_get.cpp
-            tester/src/wasi_polyfill/__wasi_fd_close.cpp
-            tester/src/wasi_polyfill/__wasi_fd_fdstat_get.cpp
-            tester/src/wasi_polyfill/__wasi_fd_fdstat_set_flags.cpp
-            tester/src/wasi_polyfill/__wasi_fd_filestat_get.cpp
-            tester/src/wasi_polyfill/__wasi_fd_prestat_dir_name.cpp
-            tester/src/wasi_polyfill/__wasi_fd_prestat_get.cpp
-            tester/src/wasi_polyfill/__wasi_fd_read.cpp
-            tester/src/wasi_polyfill/__wasi_fd_readdir.cpp
-            tester/src/wasi_polyfill/__wasi_fd_seek.cpp
-            tester/src/wasi_polyfill/__wasi_fd_write.cpp
-            tester/src/wasi_polyfill/__wasi_path_filestat_get.cpp
-            tester/src/wasi_polyfill/__wasi_path_open.cpp
-            tester/src/wasi_polyfill/__wasi_proc_exit.cpp
             tester/src/wasi_polyfill/system.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
