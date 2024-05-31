@@ -15,4 +15,5 @@ pub mod packages;
 pub mod producers;
 pub mod setcode;
 pub mod sites;
+pub mod tokens;
 pub mod transact;

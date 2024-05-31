@@ -7,6 +7,11 @@ const App = () => {
             <Nav />
             <div className="flex flex-col sm:flex-row">
                 <AppItem
+                    name="Tokens"
+                    description="Create, burn and send tokens."
+                    service="tokens"
+                />
+                <AppItem
                     name="Explorer"
                     description="Explore recent transactions and chain history."
                     service="explorer"
