@@ -341,23 +341,9 @@ pub struct BlockHeaderCode {
     pub code: Vec<u8>,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Default,
-    Pack,
-    Unpack,
-    Reflect,
-    // ToKey,
-    Serialize,
-    Deserialize,
-    // SimpleObject,
-    // InputObject,
-)]
+#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-// #[to_key(psibase_mod = "crate")]
-// #[graphql(input_name = "BlockHeaderInput")]
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
@@ -393,68 +379,26 @@ pub struct BlockHeader {
     authCode: Option<Vec<BlockHeaderCode>>,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Default,
-    Pack,
-    Unpack,
-    Reflect,
-    // ToKey,
-    Serialize,
-    Deserialize,
-    // SimpleObject,
-    // InputObject,
-)]
+#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-// #[to_key(psibase_mod = "crate")]
-// #[graphql(input_name = "BlockInput")]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
     pub subjectiveData: Vec<Hex<Vec<u8>>>,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Default,
-    Pack,
-    Unpack,
-    Reflect,
-    // ToKey,
-    Serialize,
-    Deserialize,
-    // SimpleObject,
-    // InputObject,
-)]
+#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-// #[to_key(psibase_mod = "crate")]
-// #[graphql(input_name = "SignedBlockInput")]
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Hex<Vec<u8>>,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Default,
-    Pack,
-    Unpack,
-    Reflect,
-    // ToKey,
-    Serialize,
-    Deserialize,
-    // SimpleObject,
-    // InputObject,
-)]
+#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
-// #[to_key(psibase_mod = "crate")]
-// #[graphql(input_name = "BlockInfoInput")]
 pub struct BlockInfo {
     pub header: BlockHeader,
     pub blockId: Checksum256,

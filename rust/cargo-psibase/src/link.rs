@@ -55,7 +55,7 @@ fn validate_polyfill(polyfill: &walrus::Module) -> Result<(), anyhow::Error> {
         return Err(anyhow!("Polyfill has unexpected section"));
     }
     if polyfill.types.iter().next().is_none()
-        // || polyfill.imports.iter().next().is_none() // Not required for tester
+        || polyfill.imports.iter().next().is_none()
         || polyfill.funcs.iter().next().is_none()
         || polyfill
             .funcs
