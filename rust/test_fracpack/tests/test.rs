@@ -337,6 +337,7 @@ fn t1() -> Result<()> {
         let unpacked = OuterStruct::unpack(&packed[..], &mut 0)?;
         assert_eq!(*t, unpacked);
         test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
+        // TODO: optionals after fixed-data portion ends
     }
     Ok(())
 }
@@ -529,7 +530,101 @@ fn test_trailing_options() {
 }
 
 #[test]
+fn test_aliased_trailing_options() {
+    let all_values_present = TrailingWithAliasedOptionType {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: Some(4),
+    };
+    pack_and_compare(
+        &all_values_present,
+        "1C000100000002000000000000001000000012000000120000001500000002000000686903000000030000006279650400000000000000",
+    );
+
+    let empty_last_option = TrailingWithAliasedOptionType {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_option,
+        "18000100000002000000000000000C0000000E0000000E0000000200000068690300000003000000627965",
+    );
+
+    let empty_last_two_options = TrailingWithAliasedOptionType {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_two_options,
+        "1400010000000200000000000000080000000A00000002000000686903000000",
+    );
+
+    let empty_trailing_options = TrailingWithAliasedOptionType {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: None,
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_trailing_options,
+        "100001000000020000000000000004000000020000006869",
+    );
+}
+
+#[test]
 fn options_but_not_trailing() {
+    let x = vec![
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+    ];
+    let last_non_optional_index = x
+        .iter()
+        .rposition(|&is_optional| !is_optional)
+        .unwrap_or(usize::MAX);
+    assert_eq!(last_non_optional_index, 1);
+    let x = vec![
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+    ];
+    let last_non_optional_index = x
+        .iter()
+        .rposition(|&is_optional| !is_optional)
+        .unwrap_or(usize::MAX);
+    assert_eq!(last_non_optional_index, usize::MAX);
+    let x = vec![
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+    ];
+    let last_non_optional_index = x
+        .iter()
+        .rposition(|&is_optional| !is_optional)
+        .unwrap_or(usize::MAX);
+    assert_eq!(last_non_optional_index, 0);
+    let x = vec![
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+    ];
+    let last_non_optional_index = x
+        .iter()
+        .rposition(|&is_optional| !is_optional)
+        .unwrap_or(usize::MAX);
+    assert_eq!(last_non_optional_index, 1);
+
     let empty_middle_option = OptionInTheMiddle {
         a: 1,
         opt_b: None,

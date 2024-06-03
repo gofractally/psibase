@@ -191,3 +191,16 @@ pub struct OptionInTheMiddle {
     pub opt_b: Option<String>,
     pub c: u32,
 }
+
+type MyOpt<T> = Option<T>;
+
+#[derive(Pack, Unpack, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct TrailingWithAliasedOptionType {
+    pub a: u32,
+    pub b: u64,
+    pub s: String,
+    pub opt_x: MyOpt<u32>,
+    pub opt_y: MyOpt<String>,
+    pub opt_z: MyOpt<u64>,
+}

@@ -295,20 +295,21 @@ fn process_struct(
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let fields = struct_fields(data);
 
-    // Identify trailing empty optionals
-    let last_possible_trailing_optional_field_idx = find_last_possible_trailing_optional_field_idx(&fields, opts.definition_will_not_change);
-    let check_optional_fields  = fields
-    .iter()
-    .enumerate()
-    .map(|(i, field)| {
+    let optional_fields = fields.iter().map(|field| {
+        let ty = &field.ty;
+        quote! {<#ty as #fracpack_mod::Pack>::IS_OPTIONAL}
+    });
+
+    let check_optional_fields = fields.iter().map(|field| {
         let name = &field.name;
-        if i < last_possible_trailing_optional_field_idx {
+        let ty = &field.ty;
+        if opts.definition_will_not_change {
             quote! {true}
         } else {
-            quote! {!self.#name.is_none()}
+            quote! {!<#ty as #fracpack_mod::Pack>::IS_OPTIONAL || !self.#name.is_empty_optional()}
         }
     });
-    
+
     let use_heap = if !opts.definition_will_not_change {
         quote! {true}
     } else {
@@ -328,17 +329,13 @@ fn process_struct(
             quote! {<#ty as #fracpack_mod::Pack>::FIXED_SIZE}
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
-    
+
     let heap_size = fields
         .iter()
         .enumerate()
         .map(|(i, field)| {
             let ty = &field.ty;
-            if i < last_possible_trailing_optional_field_idx {
-                quote! { <#ty as #fracpack_mod::Pack>::FIXED_SIZE }
-            } else {
-                quote! { if last_non_empty_index >= #i { <#ty as #fracpack_mod::Pack>::FIXED_SIZE } else { 0 } }
-            }
+            quote! { if last_non_empty_index >= #i { <#ty as #fracpack_mod::Pack>::FIXED_SIZE } else { 0 } }
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
 
@@ -368,21 +365,14 @@ fn process_struct(
             let name = &field.name;
             let ty = &field.ty;
             let pos = &positions[i];
-            let pos_quote = quote! { 
+            let pos_quote = quote! {
                 #[allow(non_snake_case)]
                 let #pos = dest.len() as u32;
             };
-            if i < last_possible_trailing_optional_field_idx {
-                quote! {
-                    #pos_quote
+            quote! {
+                #pos_quote
+                if last_non_empty_index >= #i {
                     <#ty as #fracpack_mod::Pack>::embedded_fixed_pack(&self.#name, dest);
-                }
-            } else {
-                quote! {
-                    #pos_quote
-                    if last_non_empty_index >= #i {
-                        <#ty as #fracpack_mod::Pack>::embedded_fixed_pack(&self.#name, dest);
-                    }
                 }
             }
         })
@@ -395,19 +385,11 @@ fn process_struct(
             let name = &field.name;
             let ty = &field.ty;
             let pos = &positions[i];
-            if i < last_possible_trailing_optional_field_idx {
-                quote! {
-                    // println!("packing NON-OPTIONAL field: {} ({})", stringify!(#name), stringify!(#ty));
+            quote! {
+                if last_non_empty_index >= #i {
+                    // println!("packing OPTIONAL field: {} ({}) - last_non_empty_index: {}", stringify!(#name), stringify!(#ty), last_non_empty_index);
                     <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
                     <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
-                }
-            } else {
-                quote! {
-                    if last_non_empty_index >= #i {
-                        // println!("packing OPTIONAL field: {} ({}) - last_non_empty_index: {}", stringify!(#name), stringify!(#ty), last_non_empty_index);
-                        <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
-                        <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
-                    }
                 }
             }
         })
@@ -419,26 +401,19 @@ fn process_struct(
         .map(|(i, field)| {
             let name = &field.name;
             let ty = &field.ty;
-            if i >= last_possible_trailing_optional_field_idx {
-                quote! {
-                    let mut #name = None;
-                    if *pos - initial_pos < fixed_size as u32 {
-                        // println!("unpacking field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
-                        #name = <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
-                        // println!(">>> unpacked consumed pos (pos-ini) = {}", *pos - initial_pos);
-                    }
-                    
-                }
-            } else {
-                quote ! {
-                    // println!("unpacking FIXED field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
-                    let #name = <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?;
-                }
+            let is_def_wont_change = opts.definition_will_not_change;
+            quote! {
+                // println!("unpacking field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
+                let #name = <#ty as #fracpack_mod::Unpack>::check_opt_embedded_unpack(
+                    src, pos, &mut heap_pos,
+                    #is_def_wont_change || #i <= last_non_optional_index,
+                    *pos - initial_pos < fixed_size as u32)?;
+                // println!(">>> unpacked consumed pos (pos-ini) = {}", *pos - initial_pos);
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
 
-    let field_names = fields
+    let field_names_assignment = fields
         .iter()
         .map(|field| {
             let name = &field.name;
@@ -456,9 +431,9 @@ fn process_struct(
         .map(|(i, field)| {
             let ty = &field.ty;
             // let name = &field.name;
-            if i >= last_possible_trailing_optional_field_idx {
-                quote! { 
-                    if *pos - initial_pos < fixed_size as u32 {
+            if !opts.definition_will_not_change {
+                quote! {
+                    if !<#ty as #fracpack_mod::Pack>::IS_OPTIONAL || #i <= last_non_optional_index || *pos - initial_pos < fixed_size as u32 {
                         // println!("verifying field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
                         <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
                         // println!(">>> verify consumed pos (pos-ini) = {}", *pos - initial_pos);
@@ -469,7 +444,7 @@ fn process_struct(
                     // println!("verifying FIXED field: {} ({}) - pos: {} - heap_pos: {} - fixed_size: {}", stringify!(#name), stringify!(#ty), pos, heap_pos, fixed_size);
                     <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
                 }
-            }            
+            }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
 
@@ -501,6 +476,13 @@ fn process_struct(
         quote! {}
     };
 
+    let unpack_last_non_optional_index = quote! {
+        let optional_fields: Vec<bool> = vec![
+            #(#optional_fields),*
+        ];
+        let last_non_optional_index = optional_fields.iter().rposition(|&is_optional| !is_optional).unwrap_or(usize::MAX);
+    };
+
     let unpack_impl = if impl_unpack {
         quote! {
             impl<'a> #fracpack_mod::Unpack<'a> for #name #generics {
@@ -511,6 +493,9 @@ fn process_struct(
                     #unpack_heap_size
                     // println!(">>> unpack fixed_size: {}", fixed_size);
                     // println!(">>> unpack pos: {}", *pos);
+
+                    #unpack_last_non_optional_index
+
                     let mut heap_pos = *pos + fixed_size as u32;
                     // println!(">>> unpack heap_pos: {}", heap_pos);
                     if heap_pos < *pos {
@@ -520,7 +505,7 @@ fn process_struct(
                     let initial_pos = *pos;
                     #unpack
                     let result = Self {
-                        #field_names
+                        #field_names_assignment
                     };
                     *pos = heap_pos;
                     Ok(result)
@@ -529,6 +514,9 @@ fn process_struct(
                     #unpack_heap_size
                     // println!(">>> verify fixed_size: {}", fixed_size);
                     // println!(">>> verify pos: {}", *pos);
+
+                    #unpack_last_non_optional_index
+
                     let mut heap_pos = *pos + fixed_size as u32;
                     // println!(">>> verify heap_pos: {}", heap_pos);
                     if heap_pos < *pos {
@@ -859,7 +847,10 @@ fn is_option_type(ty: &syn::Type) -> bool {
     false
 }
 
-fn find_last_possible_trailing_optional_field_idx(fields: &Vec<StructField>, definition_will_not_change: bool) -> usize {
+fn find_last_possible_trailing_optional_field_idx(
+    fields: &Vec<StructField>,
+    definition_will_not_change: bool,
+) -> usize {
     if definition_will_not_change {
         return fields.len();
     }
