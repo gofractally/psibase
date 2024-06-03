@@ -16,9 +16,10 @@ import { listItemBlockComponent } from "@milkdown/components/list-item-block";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
 import { math, mathBlockSchema } from "@milkdown/plugin-math";
+import { diagram, diagramSchema } from "@milkdown/plugin-diagram";
 import { useNodeViewFactory } from "@prosemirror-adapter/react";
 
-import { MathBlock } from "./editor";
+import { MathBlock, MermaidDiagram } from "./editor";
 
 import "@milkdown/theme-nord/style.css";
 import "katex/dist/katex.min.css";
@@ -48,6 +49,18 @@ export const MarkdownEditor = ({
         ].flat();
     }, [nodeViewFactory]);
 
+    const diagramPlugins: MilkdownPlugin[] = useMemo(() => {
+        return [
+            diagram,
+            $view(diagramSchema.node, () =>
+                nodeViewFactory({
+                    component: () => <MermaidDiagram readOnly={readOnly} />,
+                    stopEvent: () => true,
+                }),
+            ),
+        ].flat();
+    }, [nodeViewFactory]);
+
     const { get } = useEditor((root) =>
         MilkdownEditor.make()
             .config(nord)
@@ -74,7 +87,8 @@ export const MarkdownEditor = ({
             .use(gfm)
             .use(history)
             .use(listItemBlockComponent)
-            .use(mathPlugins),
+            .use(mathPlugins)
+            .use(diagramPlugins),
     );
 
     return <Milkdown />;
