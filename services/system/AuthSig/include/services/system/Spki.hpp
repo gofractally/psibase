@@ -5,6 +5,23 @@
 
 namespace SystemService
 {
+   /// The private key type used by this library.
+   /// It is encoded as a PKCS8 PrivateKeyInfo.
+   struct PrivateKeyInfo
+   {
+      std::vector<unsigned char> data;
+
+      friend bool operator==(const PrivateKeyInfo&, const PrivateKeyInfo&) = default;
+      friend auto operator<=>(const PrivateKeyInfo& lhs, const PrivateKeyInfo& rhs)
+      {
+         return psibase::compare_wknd(lhs.data, rhs.data);
+      };
+   };
+   std::vector<unsigned char>&       clio_unwrap_packable(PrivateKeyInfo& obj);
+   const std::vector<unsigned char>& clio_unwrap_packable(const PrivateKeyInfo& obj);
+   // Takes a private key in PEM format encoded as a PKCS8 PrivateKeyInfo
+   std::vector<unsigned char> parsePrivateKeyInfoFromPem(std::string_view s);
+   std::string                to_string(const PrivateKeyInfo&);
 
    /// The public key type used by this library.
    /// It is encoded as an X.509 SubjectPublicKeyInfo.

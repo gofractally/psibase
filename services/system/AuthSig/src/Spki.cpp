@@ -7,6 +7,31 @@
 
 namespace SystemService
 {
+   std::vector<unsigned char> parsePrivateKeyInfoFromPem(std::string_view s)
+   {
+      Botan::AlgorithmIdentifier algorithm;
+      std::vector<std::uint8_t>  key;
+      auto                       ber = Botan::PEM_Code::decode_check_label(s, "PRIVATE KEY");
+      Botan::BER_Decoder(ber)
+          .start_sequence()
+          .decode(algorithm)
+          .decode(key, Botan::ASN1_Type::OctetString)
+          .end_cons();
+      return std::vector<unsigned char>(ber.begin(), ber.end());
+   }
+   std::vector<unsigned char>& clio_unwrap_packable(PrivateKeyInfo& obj)
+   {
+      return obj.data;
+   }
+   const std::vector<unsigned char>& clio_unwrap_packable(const PrivateKeyInfo& obj)
+   {
+      return obj.data;
+   }
+   std::string to_string(const PrivateKeyInfo& key)
+   {
+      return Botan::PEM_Code::encode(reinterpret_cast<const std::uint8_t*>(key.data.data()),
+                                     key.data.size(), "PRIVATE KEY");
+   }
 
    std::vector<unsigned char> parseSubjectPublicKeyInfoFromPem(std::string_view s)
    {
