@@ -1,6 +1,6 @@
-import type { Ctx, MilkdownPlugin } from "@milkdown/ctx";
+import type { MilkdownPlugin } from "@milkdown/ctx";
 
-import { forwardRef, useImperativeHandle, useMemo } from "react";
+import { useMemo } from "react";
 import {
     defaultValueCtx,
     editorViewOptionsCtx,
@@ -35,84 +35,71 @@ interface EditorProps {
     readOnly?: boolean;
 }
 
-export interface EditorRef {
-    action: (fn: (ctx: Ctx) => unknown) => void;
-}
-
 // NOTE: This should only be used within a <MilkdownProvider /> context
-export const MarkdownEditor = forwardRef<EditorRef | undefined, EditorProps>(
-    ({ initialValue, updateMarkdown, readOnly = false }, editorRef) => {
-        const nodeViewFactory = useNodeViewFactory();
+export const MarkdownEditor = ({
+    initialValue,
+    updateMarkdown,
+    readOnly = false,
+}: EditorProps) => {
+    const nodeViewFactory = useNodeViewFactory();
 
-        const mathPlugins: MilkdownPlugin[] = useMemo(() => {
-            return [
-                $view(mathBlockSchema.node, () =>
-                    nodeViewFactory({
-                        component: () => <MathBlock readOnly={readOnly} />,
-                        stopEvent: () => true,
-                    }),
-                ),
-                math,
-            ].flat();
-        }, [nodeViewFactory]);
+    const mathPlugins: MilkdownPlugin[] = useMemo(() => {
+        return [
+            $view(mathBlockSchema.node, () =>
+                nodeViewFactory({
+                    component: () => <MathBlock readOnly={readOnly} />,
+                    stopEvent: () => true,
+                }),
+            ),
+            math,
+        ].flat();
+    }, [nodeViewFactory]);
 
-        const diagramPlugins: MilkdownPlugin[] = useMemo(() => {
-            return [
-                diagram,
-                $view(diagramSchema.node, () =>
-                    nodeViewFactory({
-                        component: () => <MermaidDiagram readOnly={readOnly} />,
-                        stopEvent: () => true,
-                    }),
-                ),
-            ].flat();
-        }, [nodeViewFactory]);
+    const diagramPlugins: MilkdownPlugin[] = useMemo(() => {
+        return [
+            diagram,
+            $view(diagramSchema.node, () =>
+                nodeViewFactory({
+                    component: () => <MermaidDiagram readOnly={readOnly} />,
+                    stopEvent: () => true,
+                }),
+            ),
+        ].flat();
+    }, [nodeViewFactory]);
 
-        const { get } = useEditor((root) =>
-            MilkdownEditor.make()
-                .config(nord)
-                .config((ctx) => {
-                    ctx.set(rootCtx, root);
-                    ctx.set(defaultValueCtx, initialValue);
-                    configureLinkTooltip(ctx);
-                })
-                .config((ctx) => {
-                    if (readOnly) return;
-                    const listener = ctx.get(listenerCtx);
-                    listener.markdownUpdated((_ctx, md, prevMd) => {
-                        if (md === prevMd) return;
-                        updateMarkdown(md);
-                    });
-                })
-                .config((ctx) => {
-                    ctx.update(editorViewOptionsCtx, (prev) => ({
-                        ...prev,
-                        editable: () => !readOnly,
-                    }));
-                })
-                .use(listener)
-                .use(commonmark)
-                .use(gfm)
-                .use(history)
-                .use(listItemBlockComponent)
-                .use(mathPlugins)
-                .use(diagramPlugins)
-                .use(linkTooltipPlugin),
-        );
+    const { get } = useEditor((root) =>
+        MilkdownEditor.make()
+            .config(nord)
+            .config((ctx) => {
+                ctx.set(rootCtx, root);
+                ctx.set(defaultValueCtx, initialValue);
+                configureLinkTooltip(ctx);
+            })
+            .config((ctx) => {
+                if (readOnly) return;
+                const listener = ctx.get(listenerCtx);
+                listener.markdownUpdated((_ctx, md, prevMd) => {
+                    if (md === prevMd) return;
+                    updateMarkdown(md);
+                });
+            })
+            .config((ctx) => {
+                ctx.update(editorViewOptionsCtx, (prev) => ({
+                    ...prev,
+                    editable: () => !readOnly,
+                }));
+            })
+            .use(listener)
+            .use(commonmark)
+            .use(gfm)
+            .use(history)
+            .use(listItemBlockComponent)
+            .use(mathPlugins)
+            .use(diagramPlugins)
+            .use(linkTooltipPlugin),
+    );
 
-        useImperativeHandle(
-            editorRef,
-            (): EditorRef => ({
-                action: (fn) => {
-                    const editor = get();
-                    if (!editor) return;
-                    return editor.action(fn);
-                },
-            }),
-        );
-
-        return <Milkdown />;
-    },
-);
+    return <Milkdown />;
+};
 
 export default MarkdownEditor;
