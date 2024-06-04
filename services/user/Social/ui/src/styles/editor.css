@@ -65,19 +65,14 @@ milkdown-list-item-block .label-wrapper {
     color: darkcyan;
 }
 
-.insert-link-button {
-    @apply mx-5 mt-2 h-12 w-12 rounded-full bg-blue-100 p-2 hover:bg-blue-400;
-}
-
 milkdown-link-preview {
     & > .link-preview {
-        @apply bg-blue-50;
+        @apply rounded-md border bg-white;
         height: 42px;
         display: flex;
         justify-content: center;
         padding: 8px;
         gap: 8px;
-        border-radius: 16px;
         cursor: pointer;
 
         & > .link-display:hover:before {
@@ -123,9 +118,9 @@ milkdown-link-preview {
                 height: 14px;
             }
             padding: 5px;
-            border-radius: 99px;
+            @apply rounded-md;
             &:hover {
-                @apply bg-blue-400;
+                @apply bg-accent;
             }
         }
     }
@@ -133,13 +128,8 @@ milkdown-link-preview {
 
 milkdown-link-edit {
     & > .link-edit {
-        @apply bg-blue-50;
+        @apply flex justify-center gap-2 rounded-md border bg-white px-3 py-2;
         height: 42px;
-        display: flex;
-        justify-content: center;
-        padding: 8px 12px;
-        gap: 8px;
-        border-radius: 16px;
 
         & > .input-area {
             outline: none;
@@ -149,12 +139,10 @@ milkdown-link-edit {
         }
 
         & > .button {
-            cursor: pointer;
-            border-radius: 8px;
+            @apply flex cursor-pointer items-center rounded-md px-1.5;
             font-size: 12px;
-            padding: 4px;
             &:hover {
-                @apply bg-blue-400;
+                @apply bg-accent;
             }
             &.hidden {
                 visibility: hidden;
