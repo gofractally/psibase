@@ -236,13 +236,13 @@ AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
                                            const PublicKey& public_key,
                                            bool             show /* = false */)
 {
-   transactor<Accounts> asys(Accounts::service, Accounts::service);
-   transactor<AuthK1>   ecsys(AuthK1::service, AuthK1::service);
+   transactor<Accounts>       asys(Accounts::service, Accounts::service);
+   transactor<AuthK1::AuthK1> ecsys(AuthK1::AuthK1::service, AuthK1::AuthK1::service);
 
    auto trace = pushTransaction(makeTransaction({
        asys.newAccount(name, AuthAny::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthServ(AuthK1::service),
+       asys.from(name).setAuthServ(AuthK1::AuthK1::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");

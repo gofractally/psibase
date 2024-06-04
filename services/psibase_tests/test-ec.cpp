@@ -25,8 +25,8 @@ TEST_CASE("ec")
    DefaultTestChain t;
    auto             test_service = t.addService("test-service"_a, "test-service.wasm");
 
-   transactor<SystemService::AuthK1> ecsys(SystemService::AuthK1::service,
-                                           SystemService::AuthK1::service);
+   transactor<SystemService::AuthK1::AuthK1> ecsys(SystemService::AuthK1::AuthK1::service,
+                                                   SystemService::AuthK1::AuthK1::service);
 
    auto alice = t.from(t.addAccount(AccountNumber("alice")));
    auto bob   = t.from(t.addAccount(AccountNumber("bob"), AccountNumber("auth-k1")));
