@@ -1,6 +1,3 @@
-import type { EditorRef } from "@components";
-
-import { useRef } from "react";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 
@@ -130,21 +127,18 @@ export function Editor() {
         defaultMarkdown,
     );
 
-    const editorRef = useRef<EditorRef>();
-
     return (
         <MilkdownProvider>
             <ProsemirrorAdapterProvider>
                 {markdown ? (
                     <>
                         <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
-                            <ControlBar editorRef={editorRef} />
+                            <ControlBar />
                             <Separator />
                         </div>
                         <MarkdownEditor
                             initialValue={markdown}
                             updateMarkdown={setMarkdown}
-                            ref={editorRef}
                         />
                     </>
                 ) : null}

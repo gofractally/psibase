@@ -1,7 +1,7 @@
 import type { Ctx } from "@milkdown/ctx";
-import type { EditorRef } from "@components";
 
 import { editorViewCtx } from "@milkdown/core";
+import { useInstance } from "@milkdown/react";
 import { linkSchema } from "@milkdown/preset-commonmark";
 import {
     linkTooltipAPI,
@@ -33,12 +33,10 @@ const insertLink = (ctx: Ctx) => {
     ctx.get(linkTooltipAPI.key).addLink(selection.from, selection.to);
 };
 
-interface Props {
-    editorRef: React.MutableRefObject<EditorRef | undefined>;
-}
-
-export const ControlBar = ({ editorRef }: Props) => {
-    const linkHandler = () => editorRef.current?.action?.(insertLink);
+export const ControlBar = () => {
+    const [_, getEditor] = useInstance();
+    const editor = getEditor();
+    const linkHandler = () => editor?.action?.(insertLink);
 
     return (
         <div className="flex justify-center p-2">
@@ -60,8 +58,6 @@ export const ControlBar = ({ editorRef }: Props) => {
             </div>
         </div>
     );
-
-    return <Button onClick={linkHandler}>LINK</Button>;
 };
 
 export default ControlBar;
