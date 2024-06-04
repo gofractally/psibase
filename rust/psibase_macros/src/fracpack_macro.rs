@@ -302,11 +302,10 @@ fn process_struct(
 
     let check_optional_fields = fields.iter().map(|field| {
         let name = &field.name;
-        let ty = &field.ty;
         if opts.definition_will_not_change {
             quote! {true}
         } else {
-            quote! {!<#ty as #fracpack_mod::Pack>::IS_OPTIONAL || !self.#name.is_empty_optional()}
+            quote! {!self.#name.is_empty_optional()}
         }
     });
 
@@ -831,39 +830,3 @@ fn process_enum(
         #unpack_impl
     })
 } // process_enum
-
-// Helper function to determine if a type is Option<T>
-fn is_option_type(ty: &syn::Type) -> bool {
-    if let syn::Type::Path(type_path) = ty {
-        if type_path.qself.is_none() && type_path.path.segments.len() == 1 {
-            let segment = &type_path.path.segments[0];
-            if segment.ident == "Option" {
-                if let syn::PathArguments::AngleBracketed(_) = &segment.arguments {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-fn find_last_possible_trailing_optional_field_idx(
-    fields: &Vec<StructField>,
-    definition_will_not_change: bool,
-) -> usize {
-    if definition_will_not_change {
-        return fields.len();
-    }
-
-    let mut last_non_optional_idx = 0;
-
-    for (i, field) in fields.iter().enumerate().rev() {
-        let ty = &field.ty;
-        if !is_option_type(ty) {
-            last_non_optional_idx = i + 1; // First non-optional field from the end
-            break;
-        }
-    }
-
-    last_non_optional_idx
-}
