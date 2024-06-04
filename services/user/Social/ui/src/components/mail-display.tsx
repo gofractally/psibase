@@ -211,21 +211,23 @@ const ActionBar = ({ mail }: MailDisplayProps) => {
                     <TooltipContent>Full screen</TooltipContent>
                 </Tooltip>
             </div>
-            <Separator orientation="vertical" className="mx-2 h-6" />
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={!mail}>
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">More</span>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Mark as unread</DropdownMenuItem>
-                    <DropdownMenuItem>Star thread</DropdownMenuItem>
-                    <DropdownMenuItem>Add label</DropdownMenuItem>
-                    <DropdownMenuItem>Mute thread</DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+                <Separator orientation="vertical" className="mx-2 h-6" />
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={!mail}>
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">More</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem>Mark as unread</DropdownMenuItem>
+                        <DropdownMenuItem>Star thread</DropdownMenuItem>
+                        <DropdownMenuItem>Add label</DropdownMenuItem>
+                        <DropdownMenuItem>Mute thread</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
     );
 };
