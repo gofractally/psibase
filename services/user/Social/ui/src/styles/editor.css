@@ -1,5 +1,5 @@
 .milkdown {
-    @apply m-5 rounded border bg-slate-50 px-2 py-4;
+    @apply m-5;
 }
 
 .editor {

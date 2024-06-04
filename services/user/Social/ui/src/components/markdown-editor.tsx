@@ -36,7 +36,7 @@ interface EditorProps {
 }
 
 export interface EditorRef {
-    action: (theAction: (ctx: Ctx) => unknown) => void;
+    action: (fn: (ctx: Ctx) => unknown) => void;
 }
 
 // NOTE: This should only be used within a <MilkdownProvider /> context
@@ -103,10 +103,10 @@ export const MarkdownEditor = forwardRef<EditorRef | undefined, EditorProps>(
         useImperativeHandle(
             editorRef,
             (): EditorRef => ({
-                action: (theAction) => {
+                action: (fn) => {
                     const editor = get();
                     if (!editor) return;
-                    return editor.action(theAction);
+                    return editor.action(fn);
                 },
             }),
         );

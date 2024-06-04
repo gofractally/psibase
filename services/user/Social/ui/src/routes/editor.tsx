@@ -1,10 +1,13 @@
+import type { EditorRef } from "@components";
+
+import { useRef } from "react";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 
-import { EditorRef, MarkdownEditor } from "@components";
+import { MarkdownEditor } from "@components";
+import { ControlBar } from "@components/editor";
 import { useLocalStorage } from "@hooks";
-import { useRef } from "react";
-import { Button } from "@shadcn/button";
+import { Separator } from "@shadcn/separator";
 
 const defaultMarkdown = `# Milkdown
 
@@ -121,46 +124,6 @@ Have fun!
 
 `;
 
-import type { Ctx } from "@milkdown/ctx";
-import { editorViewCtx } from "@milkdown/core";
-import { linkSchema } from "@milkdown/preset-commonmark";
-import {
-    linkTooltipAPI,
-    linkTooltipState,
-} from "@milkdown/components/link-tooltip";
-
-const insertLink = (ctx: Ctx) => {
-    const view = ctx.get(editorViewCtx);
-    const { selection, doc } = view.state;
-
-    if (selection.empty) return;
-
-    // already in edit mode
-    if (ctx.get(linkTooltipState.key).mode === "edit") return;
-
-    const has = doc.rangeHasMark(
-        selection.from,
-        selection.to,
-        linkSchema.type(ctx),
-    );
-    // range already has link
-    if (has) return;
-
-    ctx.get(linkTooltipAPI.key).addLink(selection.from, selection.to);
-};
-
-const ControlBar = ({
-    editorRef,
-}: {
-    editorRef: React.MutableRefObject<EditorRef | undefined>;
-}) => {
-    return (
-        <Button onClick={() => editorRef.current?.action?.(insertLink)}>
-            LINK
-        </Button>
-    );
-};
-
 export function Editor() {
     const [markdown, setMarkdown] = useLocalStorage(
         "markdown",
@@ -174,7 +137,10 @@ export function Editor() {
             <ProsemirrorAdapterProvider>
                 {markdown ? (
                     <>
-                        <ControlBar editorRef={editorRef} />
+                        <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
+                            <ControlBar editorRef={editorRef} />
+                            <Separator />
+                        </div>
                         <MarkdownEditor
                             initialValue={markdown}
                             updateMarkdown={setMarkdown}
