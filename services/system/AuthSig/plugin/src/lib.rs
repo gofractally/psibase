@@ -1,7 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::auth_sig::plugin::types::{KeyType, Keypair, Pubkey};
+use bindings::auth_sig::plugin::types::Keypair;
+use bindings::common::plugin::server as Server;
 use bindings::common::plugin::types as CommonTypes;
 use bindings::exports::auth_sig::plugin::smart_auth;
 use bindings::exports::auth_sig::plugin::{
@@ -11,9 +12,13 @@ use bindings::exports::auth_sig::plugin::{
 mod errors;
 use errors::ErrorType::*;
 
-use p256::ecdsa::SigningKey;
+use p256::ecdsa::{SigningKey, VerifyingKey};
+use p256::pkcs8::Document;
 use p256::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
 use rand_core::OsRng;
+
+use psibase::fracpack::Pack;
+use psibase::services::auth_sig::action_structs as MyService;
 
 struct Component;
 
@@ -43,13 +48,14 @@ impl SmartAuth for Component {
 
 impl KeyVault for Component {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
-        // Mock data for now
-        Ok("PUB_K1_7jTdMYEaHi66ZEcrh7To9XKingVkRdBuz6abm3meFbGw8zFFve".to_string())
+        // Mock data:
+        //Ok("PUB_K1_7jTdMYEaHi66ZEcrh7To9XKingVkRdBuz6abm3meFbGw8zFFve".to_string())
+        Err(NotYetImplemented.err("generate_keypair"))
     }
 
     fn generate_unmanaged_keypair() -> Result<Keypair, CommonTypes::Error> {
         let signing_key = SigningKey::random(&mut OsRng);
-        let verifying_key = signing_key.verifying_key();
+        let verifying_key: &VerifyingKey = signing_key.verifying_key();
 
         let priv_pem = signing_key
             .to_pkcs8_pem(LineEnding::LF)
@@ -60,16 +66,25 @@ impl KeyVault for Component {
             .map_err(|e| CryptoError.err(&e.to_string()))?;
 
         Ok(Keypair {
-            type_: KeyType::R1,
-            pub_: pub_pem,
-            priv_: priv_pem,
+            pub_pem: pub_pem,
+            priv_pem: priv_pem,
         })
     }
 }
 
 impl Actions for Component {
-    fn set_key(_public_key: Pubkey) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("set_key"))
+    fn set_key(pub_pem: String) -> Result<(), CommonTypes::Error> {
+        let (_, doc) = Document::from_pem(&pub_pem).map_err(|e| CryptoError.err(&e.to_string()))?;
+
+        Server::add_action_to_transaction(
+            "setKey",
+            &MyService::setKey {
+                key: doc.into_vec(),
+            }
+            .packed(),
+        )?;
+
+        Ok(())
     }
 }
 

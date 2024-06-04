@@ -5,10 +5,12 @@ edition = "2021"
 
 [dependencies]
 bitflags = "2.4.2"
-wit-bindgen-rt = "0.23.0"
+wit-bindgen-rt = "0.26.0"
 #ecdsa = {version = "0.16", features = ["verifying"] }
 p256 = { version = "0.13", features = ["ecdsa", "pem"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
+psibase = { path="../../../../rust/psibase" }
+
 
 [lib]
 crate-type = ["cdylib"]
