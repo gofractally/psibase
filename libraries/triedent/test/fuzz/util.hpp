@@ -8,7 +8,7 @@ std::string wrap_input(void*, std::string&& arg, int)
 template <typename T>
 std::pair<std::string, T> wrap_input(T*, std::string&& arg, int n)
 {
-   return {std::move(arg), n % T::num};
+   return {std::move(arg), static_cast<T>(n % static_cast<int>(T::num))};
 }
 
 template <typename T = void>

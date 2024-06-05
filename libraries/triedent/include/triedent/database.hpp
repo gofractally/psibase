@@ -2982,7 +2982,7 @@ namespace triedent
       }
 
       // new_root == r2 need its refcount bumped
-      if (r2 && r2->db && r2->id == new_root)
+      if (r1 != r2 && r2 && r2->db && r2->id == new_root)
          new_root = bump_refcount_or_copy(ring(), l, new_root);
       update_root(l, r1, new_root);
    }

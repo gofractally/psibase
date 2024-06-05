@@ -32,3 +32,6 @@ target_link_libraries(fuzz_is_equal_weak PUBLIC triedent-fuzz)
 
 add_executable(fuzz_take take.cpp)
 target_link_libraries(fuzz_take PUBLIC triedent-fuzz)
+
+add_executable(fuzz_splice splice.cpp)
+target_link_libraries(fuzz_splice PUBLIC triedent-fuzz)
