@@ -294,13 +294,22 @@ fn process_struct(
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let fields = struct_fields(data);
-    let fixed_size = fields
-        .iter()
-        .map(|field| {
-            let ty = &field.ty;
-            quote! {<#ty as #fracpack_mod::Pack>::FIXED_SIZE}
-        })
-        .fold(quote! {0}, |acc, new| quote! {#acc + #new});
+
+    let optional_fields = fields.iter().map(|field| {
+        let ty = &field.ty;
+        quote! {<#ty as #fracpack_mod::Pack>::IS_OPTIONAL}
+    });
+
+    let check_optional_fields = fields.iter().map(|field| {
+        let name = &field.name;
+        let ty = &field.ty;
+        if opts.definition_will_not_change {
+            quote! {true}
+        } else {
+            quote! {!<#ty as #fracpack_mod::Pack>::is_empty_optional(&self.#name)}
+        }
+    });
+
     let use_heap = if !opts.definition_will_not_change {
         quote! {true}
     } else {
@@ -312,6 +321,24 @@ fn process_struct(
             })
             .fold(quote! {false}, |acc, new| quote! {#acc || #new})
     };
+
+    let fixed_size = fields
+        .iter()
+        .map(|field| {
+            let ty = &field.ty;
+            quote! {<#ty as #fracpack_mod::Pack>::FIXED_SIZE}
+        })
+        .fold(quote! {0}, |acc, new| quote! {#acc + #new});
+
+    let fixed_data_size = fields
+        .iter()
+        .enumerate()
+        .map(|(i, field)| {
+            let ty = &field.ty;
+            quote! { if last_non_empty_index >= #i { <#ty as #fracpack_mod::Pack>::FIXED_SIZE } else { 0 } }
+        })
+        .fold(quote! {0}, |acc, new| quote! {#acc + #new});
+
     let positions: Vec<syn::Ident> = fields
         .iter()
         .map(|field| {
@@ -330,6 +357,7 @@ fn process_struct(
     } else {
         quote! { let fixed_size = #fixed_size; }
     };
+
     let pack_fixed_members = fields
         .iter()
         .enumerate()
@@ -337,13 +365,19 @@ fn process_struct(
             let name = &field.name;
             let ty = &field.ty;
             let pos = &positions[i];
-            quote! {
+            let pos_quote = quote! {
                 #[allow(non_snake_case)]
                 let #pos = dest.len() as u32;
-                <#ty as #fracpack_mod::Pack>::embedded_fixed_pack(&self.#name, dest);
+            };
+            quote! {
+                #pos_quote
+                if last_non_empty_index >= #i {
+                    <#ty as #fracpack_mod::Pack>::embedded_fixed_pack(&self.#name, dest);
+                }
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
+
     let pack_variable_members = fields
         .iter()
         .enumerate()
@@ -352,28 +386,59 @@ fn process_struct(
             let ty = &field.ty;
             let pos = &positions[i];
             quote! {
-                <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
-                <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
+                if last_non_empty_index >= #i {
+                    <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
+                    <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
+                }
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
+
     let unpack = fields
+        .iter()
+        .enumerate()
+        .map(|(i, field)| {
+            let name = &field.name;
+            let ty = &field.ty;
+            let is_def_wont_change = opts.definition_will_not_change;
+            quote! {
+                let #name = <#ty as #fracpack_mod::Unpack>::check_opt_embedded_unpack(
+                    src, pos, &mut heap_pos,
+                    #is_def_wont_change || #i <= last_non_optional_index,
+                    *pos - initial_pos < fixed_size as u32)?;
+            }
+        })
+        .fold(quote! {}, |acc, new| quote! {#acc #new});
+
+    let field_names_assignment = fields
         .iter()
         .map(|field| {
             let name = &field.name;
-            let ty = &field.ty;
             quote! {
-                #name: <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, pos, &mut heap_pos)?,
+                #name,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
+
     // TODO: skip unknown members
     // TODO: option to verify no unknown members
     let verify = fields
         .iter()
-        .map(|field| {
+        .enumerate()
+        .map(|(i, field)| {
             let ty = &field.ty;
-            quote! { <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?; }
+            // let name = &field.name;
+            if !opts.definition_will_not_change {
+                quote! {
+                    if !<#ty as #fracpack_mod::Pack>::IS_OPTIONAL || #i <= last_non_optional_index || *pos - initial_pos < fixed_size as u32 {
+                        <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+                    }
+                }
+            } else {
+                quote! {
+                    <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+                }
+            }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
 
@@ -384,8 +449,15 @@ fn process_struct(
                 const FIXED_SIZE: u32 =
                     if <Self as #fracpack_mod::Pack>::VARIABLE_SIZE { 4 } else { #fixed_size };
                 fn pack(&self, dest: &mut Vec<u8>) {
-                    let heap = #fixed_size;
+                    let non_empty_fields = vec![
+                        #(#check_optional_fields),*
+                    ];
+                    let last_non_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).unwrap_or(usize::MAX);
+
+                    let heap = #fixed_data_size;
                     assert!(heap as u16 as u32 == heap); // TODO: return error
+
+
                     #pack_heap
                     #pack_fixed_members
                     #pack_variable_members
@@ -396,6 +468,13 @@ fn process_struct(
         quote! {}
     };
 
+    let unpack_last_non_optional_index = quote! {
+        let optional_fields: Vec<bool> = vec![
+            #(#optional_fields),*
+        ];
+        let last_non_optional_index = optional_fields.iter().rposition(|&is_optional| !is_optional).unwrap_or(usize::MAX);
+    };
+
     let unpack_impl = if impl_unpack {
         quote! {
             impl<'a> #fracpack_mod::Unpack<'a> for #name #generics {
@@ -404,22 +483,31 @@ fn process_struct(
                     if <Self as #fracpack_mod::Unpack>::VARIABLE_SIZE { 4 } else { #fixed_size };
                 fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
                     #unpack_heap_size
+
+                    #unpack_last_non_optional_index
+
                     let mut heap_pos = *pos + fixed_size as u32;
                     if heap_pos < *pos {
                         return Err(#fracpack_mod::Error::BadOffset);
                     }
+                    let initial_pos = *pos;
+                    #unpack
                     let result = Self {
-                        #unpack
+                        #field_names_assignment
                     };
                     *pos = heap_pos;
                     Ok(result)
                 }
                 fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
                     #unpack_heap_size
+
+                    #unpack_last_non_optional_index
+
                     let mut heap_pos = *pos + fixed_size as u32;
                     if heap_pos < *pos {
                         return Err(#fracpack_mod::Error::BadOffset);
                     }
+                    let initial_pos = *pos;
                     #verify
                     *pos = heap_pos;
                     Ok(())

@@ -136,6 +136,11 @@ pub trait Pack {
     }
 
     #[doc(hidden)]
+    fn is_empty_optional(&self) -> bool {
+        false
+    }
+
+    #[doc(hidden)]
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
         if Self::VARIABLE_SIZE {
             dest.extend_from_slice(&0_u32.to_le_bytes());
@@ -245,6 +250,17 @@ pub trait Unpack<'a>: Sized {
             return Err(Error::BadOffset);
         }
         Self::unpack(src, heap_pos)
+    }
+
+    #[doc(hidden)]
+    fn check_opt_embedded_unpack(
+        src: &'a [u8],
+        fixed_pos: &mut u32,
+        heap_pos: &mut u32,
+        _not_trailing: bool,
+        _has_opt_bytes: bool,
+    ) -> Result<Self> {
+        Self::embedded_unpack(src, fixed_pos, heap_pos)
     }
 
     #[doc(hidden)]
@@ -487,6 +503,10 @@ impl<T: Pack> Pack for Option<T> {
         Self::embedded_variable_pack(self, dest);
     }
 
+    fn is_empty_optional(&self) -> bool {
+        self.is_none()
+    }
+
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
         if T::IS_OPTIONAL || !T::VARIABLE_SIZE {
             dest.extend_from_slice(&1u32.to_le_bytes())
@@ -533,6 +553,20 @@ impl<'a, T: Unpack<'a>> Unpack<'a> for Option<T> {
         let mut fixed_pos = *pos;
         *pos += 4;
         Self::embedded_verify(src, &mut fixed_pos, pos)
+    }
+
+    fn check_opt_embedded_unpack(
+        src: &'a [u8],
+        fixed_pos: &mut u32,
+        heap_pos: &mut u32,
+        not_trailing: bool,
+        has_opt_bytes: bool,
+    ) -> Result<Self> {
+        if not_trailing || has_opt_bytes {
+            Self::embedded_unpack(src, fixed_pos, heap_pos)
+        } else {
+            Ok(None)
+        }
     }
 
     fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
