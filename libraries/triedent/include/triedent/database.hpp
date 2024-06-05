@@ -2110,25 +2110,15 @@ namespace triedent
          {
             auto lhs_val = n_lhs.value();
             auto rhs_val = n_rhs.value();
-            if (count == 0)
+            if (count == 0 && lhs_val && rhs_val)
             {
                // This could be transformed into a value node and back,
                // so we need to compare the value, not just the pointers
-               if (lhs_val && rhs_val)
-               {
-                  return session.get_by_id(l, lhs_val).as_value_node().data() ==
-                         session.get_by_id(l, rhs_val).as_value_node().data();
-               }
-               else
-               {
-                  return lhs_val == rhs_val;
-               }
+               return session.get_by_id(l, lhs_val).as_value_node().data() ==
+                      session.get_by_id(l, rhs_val).as_value_node().data();
             }
-            else
-            {
-               if (lhs_val != rhs_val)
-                  return false;
-            }
+            if (lhs_val != rhs_val)
+               return false;
          }
          if (count == 0)
             return true;
