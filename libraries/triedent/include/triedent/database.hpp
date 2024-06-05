@@ -1522,6 +1522,32 @@ namespace triedent
       concept extended_key_type = std::same_as<T, std::string_view> ||
                                   std::same_as<T, lowest_key> || std::same_as<T, highest_key>;
 
+      struct range_info
+      {
+         bool intersects;
+         bool has_lower;
+         bool has_upper;
+      };
+
+      inline range_info prefix_overlap(std::string_view       prefix,
+                                       extended_key_type auto lower,
+                                       extended_key_type auto upper,
+                                       std::size_t            offset = 0)
+      {
+         if constexpr (std::is_same_v<decltype(lower), std::string_view>)
+            lower.remove_prefix(offset);
+         if constexpr (std::is_same_v<decltype(upper), std::string_view>)
+            upper.remove_prefix(offset);
+         if (prefix < lower && !lower.starts_with(prefix) || prefix >= upper)
+            return {false, false, false};
+         range_info result = {true};
+         if (prefix < lower)
+            result.has_lower = true;
+         if (upper.starts_with(prefix))
+            result.has_upper = true;
+         return result;
+      }
+
       inline bool is_empty_in_range(const read_session&    session,
                                     session_lock_ref<>     l,
                                     database::id           id,
@@ -1537,65 +1563,32 @@ namespace triedent
                                     extended_key_type auto lower,
                                     extended_key_type auto upper)
       {
-         if (key >= upper)
-         {
+         auto [intersects, has_lower, has_upper] = prefix_overlap(key, lower, upper);
+         if (!intersects)
             return true;
-         }
-         if (key >= lower)
-         {
-            if (in.value())
-               return false;
-            if (upper.starts_with(key))
-            {
-               upper.remove_prefix(key.size());
-               if (in.branches() & inner_node::mask_lt(upper[0]))
-                  return false;
-               return !in.has_branch(upper[0]) || is_empty_in_range(session, l, in.branch(upper[0]),
-                                                                    lowest_key{}, upper.substr(1));
-            }
-            else
-            {
-               return false;
-            }
-         }
-         if (lower.starts_with(key))
-         {
-            if (upper.starts_with(key))
-            {
-               lower.remove_prefix(key.size());
-               upper.remove_prefix(key.size());
-               if (upper[0] == lower[0])
-               {
-                  return !in.has_branch(lower[0]) ||
-                         is_empty_in_range(session, l, in.branch(lower[0]), lower.substr(1),
-                                           upper.substr(1));
-               }
-               else
-               {
-                  if (in.branches() & inner_node::mask_gt(lower[0]) & inner_node::mask_lt(upper[0]))
-                     return false;
-                  if (in.has_branch(lower[0]) && !is_empty_in_range(session, l, in.branch(lower[0]),
-                                                                    lower.substr(1), highest_key{}))
-                     return false;
-                  if (in.has_branch(upper[0]) && !is_empty_in_range(session, l, in.branch(upper[0]),
-                                                                    lowest_key{}, upper.substr(1)))
-                     return false;
-                  return true;
-               }
-            }
-            else
-            {
-               lower.remove_prefix(key.size());
-               if (in.branches() & inner_node::mask_gt(lower[0]))
-                  return false;
-               return !in.has_branch(lower[0]) || is_empty_in_range(session, l, in.branch(lower[0]),
-                                                                    lower.substr(1), highest_key{});
-            }
-         }
-         else
-         {
-            return true;
-         }
+         auto offset = key.size();
+
+         if (has_lower && has_upper && lower[offset] == upper[offset])
+            return is_empty_in_range(session, l, in.maybe_branch(lower[offset]),
+                                     lower.substr(offset + 1), upper.substr(offset + 1));
+
+         auto lmask = has_lower ? inner_node::mask_gt(lower[offset]) : ~0ull;
+         auto umask = has_upper ? inner_node::mask_lt(upper[offset]) : ~0ull;
+         auto mask  = lmask & umask;
+
+         if (in.branches() & mask)
+            return false;
+
+         if (!has_lower && in.value())
+            return false;
+
+         if (has_lower && !is_empty_in_range(session, l, in.maybe_branch(lower[offset]),
+                                             lower.substr(offset + 1), highest_key{}))
+            return false;
+         if (has_upper && !is_empty_in_range(session, l, in.maybe_branch(upper[offset]),
+                                             lowest_key{}, upper.substr(offset + 1)))
+            return false;
+         return true;
       }
 
       inline bool is_empty_in_range(const read_session&    session,
@@ -2492,32 +2485,6 @@ namespace triedent
          auto& new_br = result->branch(b);
          session.release(l, new_br);
          new_br = id;
-      }
-
-      struct range_info
-      {
-         bool intersects;
-         bool has_lower;
-         bool has_upper;
-      };
-
-      inline range_info prefix_overlap(std::string_view       prefix,
-                                       extended_key_type auto lower,
-                                       extended_key_type auto upper,
-                                       std::size_t            offset = 0)
-      {
-         if constexpr (std::is_same_v<decltype(lower), std::string_view>)
-            lower.remove_prefix(offset);
-         if constexpr (std::is_same_v<decltype(upper), std::string_view>)
-            upper.remove_prefix(offset);
-         if (prefix < lower && !lower.starts_with(prefix) || prefix >= upper)
-            return {false, false, false};
-         range_info result = {true};
-         if (prefix < lower)
-            result.has_lower = true;
-         if (upper.starts_with(prefix))
-            result.has_upper = true;
-         return result;
       }
 
       // lower and upper are only used to derive the key prefix

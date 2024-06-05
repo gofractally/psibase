@@ -83,8 +83,11 @@ TEST_CASE("test is_empty")
        {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x05\x00"sv, "\xFF\x00"sv, false},
        {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x05"sv, ""sv, false},
        {{"\xAA\x05"sv, "\xFF"sv}, "\xAA\x05\x00"sv, ""sv, false},
-       {{"\xAA\x05"sv, "\xFF"sv}, "sv", "\xAA\x05"sv, true},
-       {{"\xAA\x05"sv, "\xFF"sv}, "sv", "\xAA\x05\x00"sv, false},
+       {{"\xAA\x05"sv, "\xFF"sv}, ""sv, "\xAA\x05"sv, true},
+       {{"\xAA\x05"sv, "\xFF"sv}, ""sv, "\xAA\x05\x00"sv, false},
+       {{"\x01\x01"sv, "\x02"sv}, "\x01\x00"sv, "\x01\x02"sv, false},
+       {{"\x01"sv, "\x02"sv, "\x03"sv}, "\x01\x00"sv, "\x03", false},
+       {{"\xF1"sv, "\xF2"sv, "\xF3"sv}, "\xF1\x00"sv, "\xF3", false},
    };
    auto contents = GENERATE(from_range(data));
    auto db       = createDb();
