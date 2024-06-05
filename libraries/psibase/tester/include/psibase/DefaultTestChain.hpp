@@ -35,6 +35,16 @@ namespace psibase
          }
       }
 
+      template <typename AuthService, typename AccountsService>
+      void setAuth(AccountNumber name, const auto& pubkey)
+      {
+         auto n  = name.str();
+         auto t1 = this->from(name).to<AuthService>().setKey(pubkey);
+         check(psibase::show(false, t1.trace()) == "", "Failed to setkey for " + n);
+         auto t2 = this->from(name).to<AccountsService>().setAuthServ(AuthService::service);
+         check(psibase::show(false, t2.trace()) == "", "Failed to setAuthServ for " + n);
+      }
+
       AccountNumber addAccount(const char* name, const PublicKey& public_key, bool show = false);
       AccountNumber addAccount(AccountNumber name, const PublicKey& public_key, bool show = false);
 
@@ -46,14 +56,4 @@ namespace psibase
                                AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
    };
-
-   template <typename AuthService, typename AccountsService>
-   void setAuth(AccountNumber name, const auto& pubkey)
-   {
-      auto n  = name.str();
-      auto t1 = from(name).to<AuthService>().setKey(pubkey);
-      check(psibase::show(false, t1.trace()) == "", "Failed to setkey for " + n);
-      auto t2 = from(name).to<AccountsService>().setAuthServ(AuthService::service);
-      check(psibase::show(false, t2.trace()) == "", "Failed to setAuthServ for " + n);
-   }
 }  // namespace psibase

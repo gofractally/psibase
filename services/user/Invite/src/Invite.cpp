@@ -161,12 +161,12 @@ void Invite::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, PublicK
    // Create new account, and set key & auth
    to<Accounts>().newAccount(acceptedBy, AuthAny::service, true);
    std::tuple<PublicKey> params{newAccountKey};
-   Action                setKey{.sender  = acceptedBy,
-                                .service = AuthK1::service,
-                                .method  = "setKey"_m,
-                                .rawData = psio::convert_to_frac(params)};
-   to<Transact>().runAs(move(setKey), vector<ServiceMethod>{});
-   std::tuple<AccountNumber> params2{AuthK1::service};
+   Action           setKey{.sender  = acceptedBy,
+                           .service = AuthK1::AuthK1::service,
+                           .method  = "setKey"_m,
+                           .rawData = psio::convert_to_frac(params)};
+   to<Transact>().runAs(std::move(setKey), vector<ServiceMethod>{});
+   std::tuple<AccountNumber> params2{AuthK1::AuthK1::service};
    Action                    setAuth{.sender  = acceptedBy,
                                      .service = Accounts::service,
                                      .method  = "setAuthServ"_m,
