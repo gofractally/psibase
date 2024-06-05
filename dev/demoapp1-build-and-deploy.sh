@@ -26,5 +26,8 @@ psibase upload -r $account_name ./dist / -S $account_name
 
 cd ../service
 # Build service and deploy
-cargo psibase deploy -p -i $account_name
+/root/psibase/rust/target/release/cargo-psibase deploy -p -i $account_name
 
+
+# let (_, doc) = Document::from_pem(&pub_pem)
+#             .map_err(|e| CryptoError.err(&(e.to_string() + ": " + &pub_pem)))?;

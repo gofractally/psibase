@@ -1,5 +1,5 @@
 #include <services/system/Transact.hpp>
-#include <services/system/VerifyK1.hpp>
+#include <services/system/VerifySig.hpp>
 #include <services/user/AuthInvite.hpp>
 #include <services/user/Invite.hpp>
 
@@ -56,15 +56,17 @@ namespace UserService
       check(user == Invite::payerAccount, notWhitelisted.data());
    }
 
-   void AuthInvite::requireAuth(const PublicKey& pubkey)
+   void AuthInvite::requireAuth(const SystemService::AuthSig::SubjectPublicKeyInfo& pubkey)
    {
       auto claims = to<SystemService::Transact>().getTransaction().claims;
-      bool found  = std::find_if(claims.begin(), claims.end(),
-                                 [&](auto claim)
-                                 {
-                                   return claim.service == SystemService::VerifyK1::service &&
-                                          psio::from_frac<PublicKey>(claim.rawData) == pubkey;
-                                }) != claims.end();
+      bool found =
+          std::find_if(claims.begin(), claims.end(),
+                       [&](auto claim)
+                       {
+                          return claim.service == SystemService::VerifySig::service &&
+                                 psio::from_frac<SystemService::AuthSig::SubjectPublicKeyInfo>(
+                                     claim.rawData) == pubkey;
+                       }) != claims.end();
 
       std::string err = "requireAuth: ";
       err += missingInviteSig;

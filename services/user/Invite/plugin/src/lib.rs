@@ -125,6 +125,7 @@ impl Inviter for Component {
         //         while public is pushed in a tx to add the invite to the chain.
         //       When I do this, also update decode.
         //let keypair = keyvault::generate_unmanaged_keypair()?;
+        //let pubkey: psibase::PublicKey = keypair.pub_;
         let pubkey_str = keyvault::generate_keypair()?;
         let pubkey: psibase::PublicKey = pubkey_str
             .parse()
