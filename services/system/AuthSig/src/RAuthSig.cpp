@@ -17,71 +17,73 @@ using std::tuple;
 
 namespace SystemService
 {
-   struct AuthQuery
+   namespace AuthSig
    {
-      auto accWithKey(SubjectPublicKeyInfo    key,
-                      optional<AccountNumber> gt,
-                      optional<AccountNumber> ge,
-                      optional<AccountNumber> lt,
-                      optional<AccountNumber> le,
-                      optional<uint32_t>      first,
-                      optional<uint32_t>      last,
-                      optional<string>        before,
-                      optional<string>        after) const
+      struct AuthQuery
       {
-         auto idx =
-             AuthSig::Tables{AuthSig::service}.open<AuthSig::AuthTable>().getIndex<1>().subindex(
-                 key);
-
-         auto convert = [](const auto& opt)
+         auto accWithKey(SubjectPublicKeyInfo    key,
+                         optional<AccountNumber> gt,
+                         optional<AccountNumber> ge,
+                         optional<AccountNumber> lt,
+                         optional<AccountNumber> le,
+                         optional<uint32_t>      first,
+                         optional<uint32_t>      last,
+                         optional<string>        before,
+                         optional<string>        after) const
          {
-            optional<tuple<AccountNumber>> ret;
-            if (opt)
-               ret.emplace(std::make_tuple(opt.value()));
-            return ret;
-         };
+            auto idx =
+                AuthSig::Tables{AuthSig::service}.open<AuthSig::AuthTable>().getIndex<1>().subindex(
+                    key);
 
-         return makeConnection<Connection<AuthRecord, "AuthConnection", "AuthEdge">>(
-             idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last, before,
-             after);
-      }
+            auto convert = [](const auto& opt)
+            {
+               optional<tuple<AccountNumber>> ret;
+               if (opt)
+                  ret.emplace(std::make_tuple(opt.value()));
+               return ret;
+            };
 
-      auto account(AccountNumber name) const
+            return makeConnection<Connection<AuthRecord, "AuthConnection", "AuthEdge">>(
+                idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last,
+                before, after);
+         }
+
+         auto account(AccountNumber name) const
+         {
+            AuthSig::Tables db{AuthSig::service};
+            auto            account = db.open<AuthSig::AuthTable>().get(name);
+
+            return account;
+         }
+      };
+      PSIO_REFLECT(AuthQuery,
+                   method(accWithKey, key, gt, ge, lt, le, first, last, before, after),
+                   method(account, name)
+                   //
+      );
+
+      std::optional<HttpReply> RAuthSig::serveSys(HttpRequest request)
       {
-         AuthSig::Tables db{AuthSig::service};
-         auto            account = db.open<AuthSig::AuthTable>().get(name);
+         if (auto result = serveContent(request, Tables{getReceiver()}))
+            return result;
 
-         return account;
+         if (auto result = serveGraphQL(request, AuthQuery{}))
+            return result;
+
+         if (auto result = serveSimpleUI<AuthSig, true>(request))
+            return result;
+
+         return std::nullopt;
+
+      }  // serveSys
+
+      void RAuthSig::storeSys(std::string path, std::string contentType, std::vector<char> content)
+      {
+         check(getSender() == getReceiver(), "wrong sender");
+         storeContent(std::move(path), std::move(contentType), std::move(content),
+                      Tables{getReceiver()});
       }
-   };
-   PSIO_REFLECT(AuthQuery,
-                method(accWithKey, key, gt, ge, lt, le, first, last, before, after),
-                method(account, name)
-                //
-   );
-
-   std::optional<HttpReply> RAuthSig::serveSys(HttpRequest request)
-   {
-      if (auto result = serveContent(request, Tables{getReceiver()}))
-         return result;
-
-      if (auto result = serveGraphQL(request, AuthQuery{}))
-         return result;
-
-      if (auto result = serveSimpleUI<AuthSig, true>(request))
-         return result;
-
-      return std::nullopt;
-
-   }  // serveSys
-
-   void RAuthSig::storeSys(std::string path, std::string contentType, std::vector<char> content)
-   {
-      check(getSender() == getReceiver(), "wrong sender");
-      storeContent(std::move(path), std::move(contentType), std::move(content),
-                   Tables{getReceiver()});
-   }
-
+   }  // namespace AuthSig
 }  // namespace SystemService
 
-PSIBASE_DISPATCH(SystemService::RAuthSig)
+PSIBASE_DISPATCH(SystemService::AuthSig::RAuthSig)
