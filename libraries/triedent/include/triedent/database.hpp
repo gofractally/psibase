@@ -2176,17 +2176,6 @@ namespace triedent
 
    namespace detail
    {
-      inline void set_branch(write_session&                session,
-                             std::unique_lock<gc_session>& l,
-                             mutable_deref<inner_node>&    result,
-                             std::uint8_t                  b,
-                             database::id                  id)
-      {
-         auto& new_br = result->branch(b);
-         session.release(l, new_br);
-         new_br = id;
-      }
-
       // lower and upper are only used to derive the key prefix
       inline database::id take_all(write_session&                session,
                                    std::unique_lock<gc_session>& l,
