@@ -2811,20 +2811,15 @@ namespace triedent
             }
          }
 
-         if (new_lower_child)
-            branches |= inner_node::mask_eq(lower[offset]);
-         if (new_upper_child)
-            branches |= inner_node::mask_eq(upper[offset]);
-
          n_src.reload(session, l);
          n_dest.reload(session, l);
 
          // check whether the result is equivalent to one of the inputs
-         if (offset == src.skip_prefix + prefix.size() && n_src.branches() == branches &&
+         if (offset == src.skip_prefix + prefix.size() && !(n_src.branches() & outer_mask) &&
              !(branches & outer_mask) && value == n_src.value() &&
              new_lower_child == lower_child_src && new_upper_child == upper_child_src)
             return src.id;
-         if (offset == dest.skip_prefix + prefix.size() && n_dest.branches() == branches &&
+         if (offset == dest.skip_prefix + prefix.size() && !(n_dest.branches() & inner_mask) &&
              !(branches & inner_mask) && value == n_dest.value() &&
              new_lower_child == lower_child_dest && new_upper_child == upper_child_dest)
             return dest.id;
