@@ -17,6 +17,21 @@ namespace triedent
                                    std::unique_lock<gc_session>&,
                                    object_id id);
 
+   inline void reload_key(cache_allocator&              a,
+                          std::unique_lock<gc_session>& session,
+                          std::string_view&)
+   {
+   }
+
+   template <typename T>
+   concept key_builder = requires(T& t, cache_allocator& a, std::unique_lock<gc_session>& session) {
+      reload_key(a, session, t);
+      {
+         t.size()
+      } -> std::convertible_to<std::size_t>;
+      requires std::convertible_to<T, std::string_view>;
+   };
+
    class node
    {
      public:
@@ -217,6 +232,14 @@ namespace triedent
           object_id                     val,
           uint64_t                      branches);
 
+      inline static std::pair<location_lock, inner_node*> make(
+          cache_allocator&              a,
+          std::unique_lock<gc_session>& session,
+          key_builder auto              key,
+          object_id                     value,
+          uint64_t                      branches,
+          const object_id*              children);
+
       inline bool has_branch(uint32_t b) const { return _present_bits & (1ull << b); }
 
       inline key_view key() const { return key_view(key_ptr(), key_size()); }
@@ -238,11 +261,11 @@ namespace triedent
          auto [ptr, type, ref] = a.get_cache<false>(session, id);
          return reinterpret_cast<inner_node*>(ptr);
       }
-      inner_node(object_id  id,
-                 key_view   prefix,
-                 object_id  val,
-                 uint64_t   branches,
-                 object_id* children);
+      inner_node(object_id        id,
+                 key_view         prefix,
+                 object_id        val,
+                 uint64_t         branches,
+                 const object_id* children);
       inner_node(object_id id, key_view prefix, object_id val, uint64_t branches);
 
       uint8_t   _prefix_length = 0;  // mirrors value nodes to signal type and prefix length
@@ -309,6 +332,27 @@ namespace triedent
    inline std::pair<location_lock, inner_node*> inner_node::make(
        cache_allocator&              a,
        std::unique_lock<gc_session>& session,
+       key_builder auto              key,
+       object_id                     value,
+       uint64_t                      branches,
+       const object_id*              children)
+   {
+      auto     n          = std::popcount(branches);
+      uint32_t alloc_size = sizeof(inner_node) + key.size() + n * sizeof(object_id);
+      // allocate a new node
+      auto p = a.alloc(session, alloc_size, node_type::inner);
+      reload_key(a, session, key);
+
+      auto newid = p.first.get_id();
+      if constexpr (debug_nodes)
+         std::cout << newid.id << ": construct inner_node" << std::endl;
+      return std::make_pair(std::move(p.first),
+                            new (p.second) inner_node(newid, key, value, branches, children));
+   }
+
+   inline std::pair<location_lock, inner_node*> inner_node::make(
+       cache_allocator&              a,
+       std::unique_lock<gc_session>& session,
        key_view                      prefix,
        object_id                     val,
        uint64_t                      branches)
@@ -338,11 +382,11 @@ namespace triedent
    /*
     *  Constructs a copy of in with the branches selected by 'branches'
     */
-   inline inner_node::inner_node(object_id  id,
-                                 key_view   prefix,
-                                 object_id  val,
-                                 uint64_t   branches,
-                                 object_id* new_children)
+   inline inner_node::inner_node(object_id        id,
+                                 key_view         prefix,
+                                 object_id        val,
+                                 uint64_t         branches,
+                                 const object_id* new_children)
        : _prefix_length(prefix.size()),
          _reserved_a(0),
          _reserved_b(0),

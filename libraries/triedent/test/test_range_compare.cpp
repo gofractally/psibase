@@ -6,10 +6,16 @@
 
 using namespace triedent;
 
+template <bool C = false>
 std::string to_hex(std::string_view data)
 {
    constexpr const char* digits = "0123456789ABCDEF";
    std::string           result;
+   if constexpr (C)
+   {
+      result.push_back(data[0]);
+      data.remove_prefix(1);
+   }
    for (std::uint8_t ch : data)
    {
       result.push_back(digits[ch >> 4]);
@@ -18,13 +24,14 @@ std::string to_hex(std::string_view data)
    return result;
 }
 
+template <bool C = false>
 std::string to_hex(std::vector<std::string_view> data)
 {
    std::string result;
    for (auto s : data)
    {
       result += " ";
-      result += to_hex(s);
+      result += to_hex<C>(s);
    }
    return result;
 }
@@ -252,9 +259,9 @@ TEST_CASE("test take")
        {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x01"sv},
        {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x01\x00"sv},
        {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x05"sv},
-       {{""sv, "\x00", "\x01"sv, "\x01\x02"sv, "\x05"sv}, ""sv, "\x01\x03"sv},
-       {{""sv, "\x00", "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x00"sv, "\x07"sv},
-       {{""sv, "\x00", "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x01\x02"sv, "\x01\x03"sv},
+       {{""sv, "\x00"sv, "\x01"sv, "\x01\x02"sv, "\x05"sv}, ""sv, "\x01\x03"sv},
+       {{""sv, "\x00"sv, "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x00"sv, "\x07"sv},
+       {{""sv, "\x00"sv, "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x01\x02"sv, "\x01\x03"sv},
    };
    auto contents = GENERATE(from_range(data));
    auto db       = createDb();
@@ -278,4 +285,89 @@ TEST_CASE("test take")
    r.reset();
    original.reset();
    CHECK(db->is_empty());
+}
+
+struct splice_data
+{
+   std::vector<std::string_view> rows;
+   std::string_view              lower;
+   std::string_view              upper;
+};
+
+TEST_CASE("test splice")
+{
+   using namespace std::literals::string_view_literals;
+   static std::vector<take_data> data{
+       //
+       {{}, ""sv, ""sv},
+       {{}, "\x00"sv, ""sv},
+       {{}, ""sv, "\x05"sv},
+       {{}, "\x00"sv, "\x05"sv},
+       {{""sv}, ""sv, ""sv},
+       {{""sv}, "\x00"sv, ""sv},
+       {{""sv}, ""sv, "\x05"sv},
+       {{""sv}, "\x00"sv, "\x05"sv},
+       {{"\x00"sv, "\x01"sv}, ""sv, ""sv},
+       {{"\x00"sv, "\x01"sv}, ""sv, "\x01"sv},
+       {{"\x00"sv, "\x01"sv}, ""sv, "\x01\x00"sv},
+       {{"\x00"sv, "\x01"sv}, ""sv, "\x05"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00"sv, ""sv},
+       {{"\x00"sv, "\x01"sv}, "\x00"sv, "\x01"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00"sv, "\x01\x00"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00"sv, "\x05"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, ""sv},
+       {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x01"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x01\x00"sv},
+       {{"\x00"sv, "\x01"sv}, "\x00\x00"sv, "\x05"sv},
+       {{""sv, "\x00"sv, "\x01"sv, "\x01\x02"sv, "\x05"sv}, ""sv, "\x01\x03"sv},
+       {{""sv, "\x00"sv, "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x00"sv, "\x07"sv},
+       {{""sv, "\x00"sv, "\x01"sv, "\x01\x02"sv, "\x05"sv}, "\x01\x02"sv, "\x01\x03"sv},
+   };
+   auto               contents = GENERATE(from_range(data));
+   unsigned long long n        = 1;
+   for (const auto& _ : contents.rows)
+   {
+      n *= 3;
+   }
+   for (unsigned long long i = 0; i < n; ++i)
+   {
+      auto        db      = createDb();
+      auto        session = db->start_write_session();
+      auto        r1      = std::shared_ptr<root>{};
+      auto        r2      = std::shared_ptr<root>{};
+      char        v0[]    = {'\0'};
+      char        v1[]    = {'\1'};
+      auto        opgen   = i;
+      std::string ops;
+      for (std::string_view row : contents.rows)
+      {
+         char op = "+-="[opgen % 3];
+         opgen /= 3;
+         ops.push_back(op);
+         if (op == '-' || op == '=')
+         {
+            session->upsert(r1, row, v0);
+         }
+         if (op == '+' || op == '=')
+         {
+            session->upsert(r2, row, v1);
+         }
+      }
+      auto original = r1;
+      session->splice(r1, r2, contents.lower, contents.upper);
+      INFO("ops: " << ops << " (" << i << ")");
+      INFO("rows:" << to_hex(contents.rows));
+      INFO("lower: " << to_hex(contents.lower));
+      INFO("upper: " << to_hex(contents.upper));
+      CHECK(session->is_equal_weak(r1, r2, contents.lower, contents.upper));
+      if (!contents.lower.empty())
+         CHECK(session->is_equal_weak(r1, original, ""sv, contents.lower));
+      if (!contents.upper.empty())
+         CHECK(session->is_equal_weak(r1, original, contents.upper, ""sv));
+      // make sure that reference counts were decremented correctly
+      r1.reset();
+      r2.reset();
+      original.reset();
+      CHECK(db->is_empty());
+   }
 }
