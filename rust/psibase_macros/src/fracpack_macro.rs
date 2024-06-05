@@ -302,10 +302,11 @@ fn process_struct(
 
     let check_optional_fields = fields.iter().map(|field| {
         let name = &field.name;
+        let ty = &field.ty;
         if opts.definition_will_not_change {
             quote! {true}
         } else {
-            quote! {!self.#name.is_empty_optional()}
+            quote! {!<#ty as #fracpack_mod::Pack>::is_empty_optional(&self.#name)}
         }
     });
 
@@ -329,7 +330,7 @@ fn process_struct(
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
 
-    let heap_size = fields
+    let fixed_data_size = fields
         .iter()
         .enumerate()
         .map(|(i, field)| {
@@ -453,7 +454,7 @@ fn process_struct(
                     ];
                     let last_non_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).unwrap_or(usize::MAX);
 
-                    let heap = #heap_size;
+                    let heap = #fixed_data_size;
                     assert!(heap as u16 as u32 == heap); // TODO: return error
 
 
