@@ -224,7 +224,7 @@ TEST_CASE("test is_equal_weak")
          session->remove(rhs, row.substr(1));
       }
    }
-   INFO("rows:" << to_hex(contents.rows));
+   INFO("rows:" << to_hex<true>(contents.rows));
    INFO("lower: " << to_hex(contents.lower));
    INFO("upper: " << to_hex(contents.upper));
    CHECK(session->is_equal_weak(lhs, rhs, contents.lower, contents.upper) == contents.expected);
