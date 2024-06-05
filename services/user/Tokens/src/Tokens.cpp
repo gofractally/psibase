@@ -87,7 +87,7 @@ void Tokens::init()
    }
 
    // Create system token
-   auto tid = tokService.create(Precision{8}, Quantity{1'000'000'000e8});
+   auto tid = tokService.create(Precision{4}, Quantity{1'000'000'000e4});
    check(tid == TID{1}, wrongSysTokenId);
 
    // Make system token default untradeable
@@ -125,7 +125,6 @@ TID Tokens::create(Precision precision, Quantity maxSupply)
    auto nftService = to<Nft>();
 
    TID newId = (tokenIdx.begin() == tokenIdx.end()) ? 1 : (*(--tokenIdx.end())).id + 1;
-   Precision::fracpack_validate(precision);  // Todo remove if/when happens automatically
    check(TokenRecord::isValidKey(newId), invalidTokenId);
    check(maxSupply.value > 0, supplyGt0);
 

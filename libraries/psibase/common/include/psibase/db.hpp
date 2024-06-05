@@ -31,7 +31,7 @@ namespace psibase
       /// but readable by all services during RPC. Doesn't undo
       /// from aborting transactions, aborting blocks, or forking
       /// blocks. Individual nodes may modify this database or wipe
-      //  it entirely at will.
+      /// it entirely at will.
       ///
       /// The first 64 bits of the key match the service.
       subjective,

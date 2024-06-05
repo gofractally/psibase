@@ -76,7 +76,6 @@ namespace UserService
                 maxSupply,
                 symbolId);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
-   // Todo - add symbolId as secondary index when possible
 
    struct BalanceKey
    {
@@ -112,11 +111,13 @@ namespace UserService
       SharedBalanceKey key;
       uint64_t         balance;
 
+      auto byDebitor() const { return std::tuple{key.debitor, key.creditor, key.tokenId}; }
+
       auto operator<=>(const SharedBalanceRecord&) const = default;
    };
    PSIO_REFLECT(SharedBalanceRecord, key, balance);
-   using SharedBalanceTable = psibase::Table<SharedBalanceRecord, &SharedBalanceRecord::key>;
-   // Todo - How can I add a secondary index for debitor? I imagine people will want to search for shared balances by debitor.
+   using SharedBalanceTable = psibase::
+       Table<SharedBalanceRecord, &SharedBalanceRecord::key, &SharedBalanceRecord::byDebitor>;
 
    struct TokenHolderRecord
    {
