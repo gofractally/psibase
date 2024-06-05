@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16.3)
 
 project(triedent-fuzzing CXX)
 
+find_package(Threads REQUIRED)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
@@ -18,6 +20,7 @@ add_library(triedent-fuzz
     main.cpp
 )
 target_include_directories(triedent-fuzz PUBLIC ../../include)
+target_link_libraries(triedent-fuzz PUBLIC Threads::Threads)
 if (TRIEDENT_FUZZING_ENABLED)
     target_compile_options(triedent-fuzz PUBLIC -fsanitize=fuzzer)
     target_link_options(triedent-fuzz PUBLIC -fsanitize=fuzzer)
