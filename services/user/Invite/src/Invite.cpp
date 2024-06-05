@@ -1,6 +1,6 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
-#include <services/system/AuthK1.hpp>
+#include <services/system/AuthSig.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
@@ -59,7 +59,7 @@ void Invite::init()
    // setWhitelist({"fractally"_m})
 }
 
-void Invite::createInvite(PublicKey inviteKey)
+void Invite::createInvite(Spki inviteKey)
 {
    auto inviteTable = Tables().open<InviteTable>();
    check(not inviteTable.get(inviteKey).has_value(), inviteAlreadyExists.data());
@@ -104,7 +104,7 @@ void Invite::createInvite(PublicKey inviteKey)
    eventTable.put(eventRecord);
 }
 
-void Invite::accept(PublicKey inviteKey)
+void Invite::accept(Spki inviteKey)
 {
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.get(inviteKey);
@@ -136,7 +136,7 @@ void Invite::accept(PublicKey inviteKey)
    eventTable.put(eventRecord);
 }
 
-void Invite::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, PublicKey newAccountKey)
+void Invite::acceptCreate(Spki inviteKey, AccountNumber acceptedBy, Spki newAccountKey)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
@@ -160,18 +160,18 @@ void Invite::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, PublicK
 
    // Create new account, and set key & auth
    to<Accounts>().newAccount(acceptedBy, AuthAny::service, true);
-   std::tuple<PublicKey> params{newAccountKey};
+   std::tuple<Spki> params{newAccountKey};
    Action           setKey{.sender  = acceptedBy,
-                           .service = AuthK1::AuthK1::service,
+                           .service = AuthSig::AuthSig::service,
                            .method  = "setKey"_m,
                            .rawData = psio::convert_to_frac(params)};
    to<Transact>().runAs(std::move(setKey), vector<ServiceMethod>{});
-   std::tuple<AccountNumber> params2{AuthK1::AuthK1::service};
+   std::tuple<AccountNumber> params2{AuthSig::AuthSig::service};
    Action                    setAuth{.sender  = acceptedBy,
                                      .service = Accounts::service,
                                      .method  = "setAuthServ"_m,
                                      .rawData = psio::convert_to_frac(params2)};
-   to<Transact>().runAs(move(setAuth), vector<ServiceMethod>{});
+   to<Transact>().runAs(std::move(setAuth), vector<ServiceMethod>{});
 
    invite->state = InviteStates::accepted;
    invite->actor = acceptedBy;
@@ -195,7 +195,7 @@ void Invite::acceptCreate(PublicKey inviteKey, AccountNumber acceptedBy, PublicK
    eventTable.put(eventRecord);
 }
 
-void Invite::reject(PublicKey inviteKey)
+void Invite::reject(Spki inviteKey)
 {
    auto table  = Tables().open<InviteTable>();
    auto invite = table.get(inviteKey);
@@ -232,7 +232,7 @@ void Invite::reject(PublicKey inviteKey)
    eventTable.put(eventRecord);
 }
 
-void Invite::delInvite(PublicKey inviteKey)
+void Invite::delInvite(Spki inviteKey)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
@@ -379,12 +379,12 @@ void Invite::setBlacklist(vector<AccountNumber> accounts)
    eventTable.put(eventRecord);
 }
 
-optional<InviteRecord> Invite::getInvite(PublicKey pubkey)
+optional<InviteRecord> Invite::getInvite(Spki pubkey)
 {
    return Tables().open<InviteTable>().get(pubkey);
 }
 
-bool Invite::isExpired(PublicKey pubkey)
+bool Invite::isExpired(Spki pubkey)
 {
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.get(pubkey);
@@ -394,7 +394,7 @@ bool Invite::isExpired(PublicKey pubkey)
    return now >= invite->expiry;
 }
 
-void Invite::checkClaim(AccountNumber actor, PublicKey pubkey)
+void Invite::checkClaim(AccountNumber actor, Spki pubkey)
 {
    auto invite = getInvite(pubkey);
    check(invite.has_value(), "This invite does not exist. It may have been deleted after expiry.");
@@ -413,7 +413,9 @@ struct Queries
 
    auto getInvite(string pubkey) const
    {
-      return Invite::Tables(Invite::service).open<InviteTable>().get(publicKeyFromString(pubkey));
+      return Invite::Tables(Invite::service)
+          .open<InviteTable>()
+          .get(Spki{AuthSig::parseSubjectPublicKeyInfo(pubkey)});
    }
 
    auto getInviter(psibase::AccountNumber user)
@@ -463,7 +465,7 @@ auto Invite::serveSys(HttpRequest request) -> std::optional<HttpReply>
 void Invite::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content), Tables());
+   storeContent(std::move(path), std::move(contentType), std::move(content), Tables());
 }
 
 PSIBASE_DISPATCH(UserService::InviteNs::Invite)

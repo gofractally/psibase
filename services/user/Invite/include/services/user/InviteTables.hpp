@@ -1,11 +1,14 @@
 #pragma once
 
 #include <psibase/Table.hpp>
+#include <services/system/AuthSig.hpp>
 
 namespace UserService
 {
    namespace InviteNs
    {
+      using Spki = SystemService::AuthSig::SubjectPublicKeyInfo;
+
       struct ServiceEventRecord
       {
          psibase::SingletonKey key;
@@ -54,7 +57,7 @@ namespace UserService
       /// accepted (1), or rejected (2)
       struct InviteRecord
       {
-         psibase::PublicKey     pubkey;
+         Spki                   pubkey;
          psibase::AccountNumber inviter;
          psibase::AccountNumber actor;
          uint32_t               expiry;
@@ -75,5 +78,5 @@ namespace UserService
       PSIO_REFLECT(NewAccountRecord, name, invitee);
       using NewAccTable = psibase::Table<NewAccountRecord, &NewAccountRecord::name>;
 
-   }  // namespace Invite
+   }  // namespace InviteNs
 }  // namespace UserService

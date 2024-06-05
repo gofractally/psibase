@@ -586,7 +586,7 @@ psibase_package(
     NAME Invite
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})" "AuthK1(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SERVER invite

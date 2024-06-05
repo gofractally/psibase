@@ -331,7 +331,7 @@ struct Queries
       return Fractal::Tables(Fractal::service).open<IdentityTable>().get(user);
    }
 
-   auto getInvite(PublicKey pubkey) const
+   auto getInvite(FractalNs::PublicKey pubkey) const
    {  //
       return Fractal::Tables(Fractal::service).open<InviteTable>().get(pubkey);
    }
@@ -433,7 +433,7 @@ optional<HttpReply> Fractal::serveSys(HttpRequest request)
 void Fractal::storeSys(string path, string contentType, vector<char> content)
 {
    check(getSender() == getReceiver(), "wrong sender");
-   storeContent(move(path), move(contentType), move(content), Tables());
+   storeContent(std::move(path), std::move(contentType), std::move(content), Tables());
 }
 
 PSIBASE_DISPATCH(UserService::FractalNs::Fractal)
