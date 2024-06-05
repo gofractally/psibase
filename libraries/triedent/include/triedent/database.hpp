@@ -1647,44 +1647,6 @@ namespace triedent
          database::id id;
          std::size_t  skip_prefix = 0;
          explicit     operator bool() const { return static_cast<bool>(id); }
-         // returns the value node at key or an empty tree
-         subtree_t value(const read_session& session, session_lock_ref<> l, std::string_view key)
-         {
-            if (!id)
-               return {};
-            auto n = session.get_by_id(l, id);
-            if (n.is_leaf_node())
-            {
-               auto& vn     = n.as_value_node();
-               auto  vn_key = vn.key().substr(skip_prefix);
-               if (vn_key == key)
-               {
-                  return *this;
-               }
-               else
-               {
-                  return {};
-               }
-            }
-            else
-            {
-               auto& in     = n.as_inner_node();
-               auto  in_key = in.key().substr(skip_prefix);
-               if (key == in_key)
-               {
-                  return {in.value()};
-               }
-               else if (key.starts_with(in_key))
-               {
-                  key.remove_prefix(in_key.size());
-                  return subtree_t{in.maybe_branch(key[0])}.value(session, l, key.substr(1));
-               }
-               else
-               {
-                  return {};
-               }
-            }
-         }
          // returns false if there were keys in [lower, upper) that do not start with prefix
          bool set_subtree(const read_session&    session,
                           session_lock_ref<>     l,
@@ -2109,12 +2071,6 @@ namespace triedent
 
       // Constructs a node from its key prefix and children.
       // Handles all combinations that require the node to be compressed.
-      //
-      // If key points to the key of any node, then id and key_offset must
-      // indicate the node.
-      //
-      // If key points to non-database owned memory (external or on the stack),
-      // then key_offset should be set to 0xffffffff. id will be ignored.
       //
       // children must be non-overlapping and in order.
       database::id build_node(write_session&                session,
