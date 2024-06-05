@@ -22,20 +22,6 @@ use psibase::services::auth_sig::action_structs as MyService;
 
 struct Component;
 
-/* https://docs.rs/p256/0.13.2/p256/ecdsa/index.html
-
-    // Signing
-    let signing_key = SigningKey::random(&mut OsRng); // Serialize with `::to_bytes()`
-    let message = b"ECDSA proves knowledge of a secret number in the context of a single message";
-    let signature: Signature = signing_key.sign(message);
-
-    // Verification
-    use p256::ecdsa::{VerifyingKey, signature::Verifier};
-
-    let verifying_key = VerifyingKey::from(&signing_key); // Serialize with `::to_encoded_point()`
-    assert!(verifying_key.verify(message, &signature).is_ok());
-*/
-
 impl SmartAuth for Component {
     fn get_claim() -> Result<smart_auth::Claim, CommonTypes::Error> {
         Err(NotYetImplemented.err("get_claim"))
@@ -48,8 +34,6 @@ impl SmartAuth for Component {
 
 impl KeyVault for Component {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
-        // Mock data:
-        //Ok("PUB_K1_7jTdMYEaHi66ZEcrh7To9XKingVkRdBuz6abm3meFbGw8zFFve".to_string())
         Err(NotYetImplemented.err("generate_keypair"))
     }
 
