@@ -5,60 +5,46 @@
 
 namespace SystemService
 {
-   /// The private key type used by this library.
-   /// It is encoded as a PKCS8 PrivateKeyInfo.
-   struct PrivateKeyInfo
+   namespace AuthSig
    {
-      std::vector<unsigned char> data;
-
-      friend bool operator==(const PrivateKeyInfo&, const PrivateKeyInfo&) = default;
-      friend auto operator<=>(const PrivateKeyInfo& lhs, const PrivateKeyInfo& rhs)
+      /// The public key type used by this library.
+      /// It is encoded as an X.509 SubjectPublicKeyInfo.
+      struct SubjectPublicKeyInfo
       {
-         return psibase::compare_wknd(lhs.data, rhs.data);
+         std::vector<unsigned char> data;
+
+         friend bool operator==(const SubjectPublicKeyInfo&, const SubjectPublicKeyInfo&) = default;
+         friend auto operator<=>(const SubjectPublicKeyInfo& lhs, const SubjectPublicKeyInfo& rhs)
+         {
+            return psibase::compare_wknd(lhs.data, rhs.data);
+         }
       };
-   };
-   std::vector<unsigned char>&       clio_unwrap_packable(PrivateKeyInfo& obj);
-   const std::vector<unsigned char>& clio_unwrap_packable(const PrivateKeyInfo& obj);
-   // Takes a private key in PEM format encoded as a PKCS8 PrivateKeyInfo
-   std::vector<unsigned char> parsePrivateKeyInfoFromPem(std::string_view s);
-   std::string                to_string(const PrivateKeyInfo&);
+      std::vector<unsigned char>&       clio_unwrap_packable(SubjectPublicKeyInfo& obj);
+      const std::vector<unsigned char>& clio_unwrap_packable(const SubjectPublicKeyInfo& obj);
+      // Takes a public key in any of the following formats
+      // - EOS Base58 encoded public key beginning PUB_K1 or PUB_R1
+      // - PEM encoded X.509 SubjectPublicKeyInfo
+      // Returns DER encoded SubjectPublicKeyInfo
+      std::vector<unsigned char> parseSubjectPublicKeyInfo(std::string_view);
+      std::string                to_string(const SubjectPublicKeyInfo&);
 
-   /// The public key type used by this library.
-   /// It is encoded as an X.509 SubjectPublicKeyInfo.
-   struct SubjectPublicKeyInfo
-   {
-      std::vector<unsigned char> data;
-
-      friend bool operator==(const SubjectPublicKeyInfo&, const SubjectPublicKeyInfo&) = default;
-      friend auto operator<=>(const SubjectPublicKeyInfo& lhs, const SubjectPublicKeyInfo& rhs)
+      void from_json(SubjectPublicKeyInfo& key, auto& stream)
       {
-         return psibase::compare_wknd(lhs.data, rhs.data);
+         key.data = parseSubjectPublicKeyInfo(stream.get_string());
       }
-   };
-   std::vector<unsigned char>&       clio_unwrap_packable(SubjectPublicKeyInfo& obj);
-   const std::vector<unsigned char>& clio_unwrap_packable(const SubjectPublicKeyInfo& obj);
-   // Takes a public key in any of the following formats
-   // - EOS Base58 encoded public key beginning PUB_K1 or PUB_R1
-   // - PEM encoded X.509 SubjectPublicKeyInfo
-   // Returns DER encoded SubjectPublicKeyInfo
-   std::vector<unsigned char> parseSubjectPublicKeyInfo(std::string_view);
-   std::string                to_string(const SubjectPublicKeyInfo&);
+      void to_json(const SubjectPublicKeyInfo& key, auto& stream)
+      {
+         to_json(to_string(key), stream);
+      }
+      void to_key(const SubjectPublicKeyInfo& obj, auto& stream)
+      {
+         to_key(obj.data, stream);
+      }
+      inline constexpr bool use_json_string_for_gql(SubjectPublicKeyInfo*)
+      {
+         return true;
+      }
 
-   void from_json(SubjectPublicKeyInfo& key, auto& stream)
-   {
-      key.data = parseSubjectPublicKeyInfo(stream.get_string());
-   }
-   void to_json(const SubjectPublicKeyInfo& key, auto& stream)
-   {
-      to_json(to_string(key), stream);
-   }
-   void to_key(const SubjectPublicKeyInfo& obj, auto& stream)
-   {
-      to_key(obj.data, stream);
-   }
-   inline constexpr bool use_json_string_for_gql(SubjectPublicKeyInfo*)
-   {
-      return true;
-   }
-
+      std::string keyFingerprint(const SubjectPublicKeyInfo& key);
+   }  // namespace AuthSig
 }  // namespace SystemService
