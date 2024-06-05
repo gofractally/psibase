@@ -256,17 +256,6 @@ AccountNumber DefaultTestChain::addAccount(const char*      name,
    return addAccount(AccountNumber(name), public_key, show);
 }
 
-void DefaultTestChain::setAuthK1(AccountNumber    name,
-                                 const PublicKey& pubkey,
-                                 bool             show /* = false */)
-{
-   auto n  = name.str();
-   auto t1 = from(name).to<AuthK1>().setKey(pubkey);
-   check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
-   auto t2 = from(name).to<Accounts>().setAuthServ(AuthK1::service);
-   check(psibase::show(show, t2.trace()) == "", "Failed to setAuthServ for " + n);
-}
-
 AccountNumber DefaultTestChain::addService(AccountNumber acc,
                                            const char*   filename,
                                            bool          show /* = false */)
