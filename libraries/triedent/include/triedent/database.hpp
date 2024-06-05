@@ -2595,67 +2595,18 @@ namespace triedent
                 (!has_lower || !n.value()) && new_lower_child == lower_child &&
                 new_upper_child == upper_child)
                return id;
-            // determine the branches in the result
-            if (new_lower_child)
-               branches |= inner_node::mask_eq(lower[offset]);
-            if (new_upper_child)
-               branches |= inner_node::mask_eq(upper[offset]);
-            auto count = std::popcount(branches) + (!has_lower && n.value());
-            if (count == 0)
-            {
-               return {};
-            }
-            else if (count == 1)
-            {
-               // find which child we have and clone it with a longer prefix
-               if (!has_lower && n.value())
-               {
-                  auto prefix = upper.substr(0, offset);
-                  auto vn     = session.get_by_id(l, n.value());
-                  return session.clone_value(l, vn, vn.type(), prefix, -1,
-                                             vn.as_value_node().data());
-               }
-               else if (new_lower_child)
-               {
-                  auto result =
-                      clone_with_prefix(session, l, new_lower_child, lower.substr(0, offset + 1));
-                  if (new_lower_child != lower_child)
-                     session.release(l, new_lower_child);
-                  return result;
-               }
-               else if (new_upper_child)
-               {
-                  auto result =
-                      clone_with_prefix(session, l, new_upper_child, upper.substr(0, offset + 1));
-                  if (new_upper_child != upper_child)
-                     session.release(l, new_upper_child);
-                  return result;
-               }
-               else
-               {
-                  auto prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
-                  auto b      = std::countr_zero(branches);
-                  return clone_with_prefix(session, l, n.branch(b), prefix, static_cast<char>(b));
-               }
-            }
-            else
-            {
-               // Make sure that the child refcounts are incremented
-               if (new_lower_child && new_lower_child == lower_child)
-                  new_lower_child = bump_refcount_or_copy(session.ring(), l, new_lower_child);
-               if (new_upper_child && new_upper_child == upper_child)
-                  new_upper_child = bump_refcount_or_copy(session.ring(), l, new_upper_child);
-               // clone the node and replace upper child and lower child if needed
-               auto  prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
-               auto& in     = n.as_inner_node();
-               auto  result = session.clone_inner(l, id, in, prefix, -1,
-                                                 has_lower ? database::id{} : in.value(), branches);
-               if (new_lower_child)
-                  set_branch(session, l, result, lower[offset], new_lower_child);
-               if (new_upper_child)
-                  set_branch(session, l, result, upper[offset], new_upper_child);
-               return result;
-            }
+
+            std::uint8_t lower_b = has_lower ? lower[offset] : 0;
+            std::uint8_t upper_b = has_upper ? upper[offset] : 0;
+
+            auto value = !has_lower ? n.value() : database::id{};
+
+            auto prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
+            return detail::build_node(
+                session, l, prefix, value, value != id,
+                maybe_clone_one{new_lower_child, lower_b, new_lower_child == lower_child},
+                node_children{n, mask},
+                maybe_clone_one{new_upper_child, upper_b, new_upper_child == upper_child});
          }
       }
 
