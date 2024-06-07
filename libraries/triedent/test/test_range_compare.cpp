@@ -300,7 +300,7 @@ struct splice_data
 TEST_CASE("test splice")
 {
    using namespace std::literals::string_view_literals;
-   static std::vector<take_data> data{
+   static std::vector<splice_data> data{
        //
        {{}, ""sv, ""sv},
        {{}, "\x00"sv, ""sv},
