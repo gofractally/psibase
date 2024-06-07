@@ -22,10 +22,9 @@ import {
 } from "@milkdown/components/link-tooltip";
 import { Bold, Italic, Link, Strikethrough } from "lucide-react";
 
-import { Button } from "@shadcn/button";
 import { Separator } from "@shadcn/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { editorSelectionAtom } from "@components/markdown-editor";
+import { Toggle } from "@shadcn/toggle";
 
 const insertLink = (ctx: Ctx) => {
     const view = ctx.get(editorViewCtx);
@@ -47,39 +46,35 @@ const insertLink = (ctx: Ctx) => {
     ctx.get(linkTooltipAPI.key).addLink(selection.from, selection.to);
 };
 
-interface ControlBarButtonProps {
+interface ControlBarToggleProps {
     action?: (ctx: Ctx) => void;
     Icon: React.FC<Omit<LucideProps, "ref">>;
     active?: boolean;
-    children: React.ReactNode;
+    label: string;
 }
 
-const ControlBarButton = ({
+const ControlBarToggle = ({
     action,
     Icon,
     active = false,
-    children,
-}: ControlBarButtonProps) => {
+    label,
+}: ControlBarToggleProps) => {
     // TODO: shadcs toggle buttons where appropriate
     const [_, getEditor] = useInstance();
     const editor = getEditor();
 
     if (!action) return null;
 
+    console.log("active:", active);
+
     return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button
-                    variant={active ? "default" : "ghost"}
-                    size="icon"
-                    onClick={() => editor?.action?.(action)}
-                >
-                    <Icon className="h-4 w-4" />
-                    <span className="sr-only">{children}</span>
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent>{children}</TooltipContent>
-        </Tooltip>
+        <Toggle
+            aria-label={label}
+            pressed={active}
+            onPressedChange={() => editor?.action?.(action)}
+        >
+            <Icon className="h-4 w-4" />
+        </Toggle>
     );
 };
 
@@ -136,7 +131,7 @@ export const ControlBar = () => {
     }, [selection]);
 
     const cmd = (key: CmdKey<unknown>) => {
-        // editor must be intantiated here before calling `callCommand`
+        // editor must be instantiated here before calling `callCommand`
         if (!editor) return;
         return callCommand(key);
     };
@@ -144,35 +139,31 @@ export const ControlBar = () => {
     return (
         <div className="flex justify-center p-2">
             <div className="flex w-full max-w-prose items-center gap-2">
-                <ControlBarButton
+                <ControlBarToggle
                     Icon={Bold}
                     action={cmd(toggleStrongCommand.key)}
                     active={active.includes("strong")}
-                >
-                    Bold
-                </ControlBarButton>
-                <ControlBarButton
+                    label="Toggle bold"
+                />
+                <ControlBarToggle
                     Icon={Italic}
                     action={cmd(toggleEmphasisCommand.key)}
                     active={active.includes("emphasis")}
-                >
-                    Italic
-                </ControlBarButton>
-                <ControlBarButton
+                    label="Toggle italic"
+                />
+                <ControlBarToggle
                     Icon={Strikethrough}
                     action={cmd(toggleStrikethroughCommand.key)}
                     active={active.includes("strike_through")}
-                >
-                    Strikethrough
-                </ControlBarButton>
+                    label="Toggle strikethrough"
+                />
                 <Separator orientation="vertical" className="mx-1 h-6" />
-                <ControlBarButton
+                <ControlBarToggle
                     Icon={Link}
                     action={insertLink}
                     active={active.includes("link")}
-                >
-                    Link
-                </ControlBarButton>
+                    label="Add or edit link"
+                />
             </div>
         </div>
     );
