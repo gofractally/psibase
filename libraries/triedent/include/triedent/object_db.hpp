@@ -176,6 +176,17 @@ namespace triedent
             throw std::runtime_error("invalid object id discovered: " + std::to_string(i.id));
       }
 
+      bool is_empty() const
+      {
+         std::lock_guard l{_region_mutex};
+         for (auto& obj : std::span{header()->objects + 1, header()->max_allocated.id})
+         {
+            if (object_info{obj.load()}.ref)
+               return false;
+         }
+         return true;
+      }
+
       // returns true if this is the first time the object has been retained
       // during this gc operation.
       bool gc_retain(object_id id);
@@ -231,6 +242,10 @@ namespace triedent
       mutex_group        _location_mutexes;
 
       object_db_header* header() { return reinterpret_cast<object_db_header*>(_region.data()); }
+      const object_db_header* header() const
+      {
+         return reinterpret_cast<const object_db_header*>(_region.data());
+      }
 
       void debug(uint64_t id, const char* msg)
       {
