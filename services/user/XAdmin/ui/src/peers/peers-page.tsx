@@ -1,8 +1,7 @@
 import { postJson } from "@psibase/common-lib";
 import { useState } from "react";
-import { SubmitHandler, useForm } from "react-hook-form";
+import { SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
-import { Form } from "../components";
 import { PsinodeConfig } from "../configuration/interfaces";
 import { putJson } from "../helpers";
 import {
@@ -14,6 +13,15 @@ import {
     PeerSpec,
     PeerState,
 } from "./interfaces";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface PeersPageProps {
     config?: PsinodeConfig;
@@ -35,6 +43,7 @@ export const PeersPage = ({
         handleSubmit,
         formState: { errors },
         reset,
+        control,
     } = useForm<AddConnectionInputs>({
         defaultValues: {
             url: "",
@@ -206,25 +215,43 @@ export const PeersPage = ({
                                 onSubmit={handleSubmit(onAddConnection)}
                                 id="new-connection"
                             >
-                                <Form.Input
+                                <Input
                                     autoComplete="url"
                                     {...register("url", {
                                         required: "This field is required",
                                     })}
-                                    errorText={errors.url?.message}
                                 />
+                                {errors.url?.message && (
+                                    <Label>{errors.url?.message}</Label>
+                                )}
                             </form>
                         </td>
                         <td>
-                            <Form.Select {...register("state")}>
-                                <option value="transient">Connect now</option>
-                                <option value="persistent">
-                                    Remember this connection
-                                </option>
-                                <option value="backup">
-                                    Connect automatically
-                                </option>
-                            </Form.Select>
+                            <Controller
+                                name="state"
+                                control={control}
+                                render={({ field }) => (
+                                    <Select
+                                        onValueChange={field.onChange}
+                                        value={field.value}
+                                    >
+                                        <SelectTrigger className="w-[280px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="transient">
+                                                Connect now
+                                            </SelectItem>
+                                            <SelectItem value="persistent">
+                                                Remember this connection
+                                            </SelectItem>
+                                            <SelectItem value="backup">
+                                                Connect automatically
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            />
                         </td>
                         <td>
                             <Button type="submit" form="new-connection">

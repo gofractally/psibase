@@ -1,16 +1,33 @@
-import { RegisterOptions } from "react-hook-form";
+import { Controller, RegisterOptions } from "react-hook-form";
 import { Form } from "../components/form";
 // import { Button } from "@/components/ui/button";
 import { LogConfig } from "./interfaces";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface LoggerProps {
     loggerKey: string;
+    control: any;
     register: (name: keyof LogConfig, options?: RegisterOptions) => any;
     watch: (name: keyof LogConfig) => string | boolean | undefined;
     remove: () => void;
 }
 
-export const Logger = ({ loggerKey, register, watch, remove }: LoggerProps) => {
+export const Logger = ({
+    loggerKey,
+    control,
+    register,
+    watch,
+    remove,
+}: LoggerProps) => {
     const type_ = watch("type") as string;
     return (
         <fieldset className="logger-control p-2">
@@ -19,57 +36,105 @@ export const Logger = ({ loggerKey, register, watch, remove }: LoggerProps) => {
                 {/* <Button onClick={remove}>Remove</Button> */}
             </div>
 
-            <Form.Select label="Type" {...register("type")}>
-                <option value="">--Choose Logger Type--</option>
-                <option value="console">Console</option>
-                <option value="file">File</option>
-                <option value="local">Local Socket</option>
-                <option value="pipe">Pipe</option>
-            </Form.Select>
+            <Controller
+                name="type"
+                control={control}
+                render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Choose logger type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="console">Console</SelectItem>
+                            <SelectItem value="file">File</SelectItem>
+                            <SelectItem value="local">Local</SelectItem>
+                            <SelectItem value="pipe">Pipe</SelectItem>
+                        </SelectContent>
+                    </Select>
+                )}
+            />
 
-            <Form.Input label="Filter" {...register("filter")} />
-            <Form.Input label="Format" {...register("format")} />
-            <Form.Input
-                label="File Name"
-                {...register("filename", { disabled: type_ != "file" })}
-            />
-            <Form.Input
-                label="Target File Name"
-                {...register("target", { disabled: type_ != "file" })}
-            />
-            <Form.Input
-                type="number"
-                label="File Rotation Size"
-                {...register("rotationSize", { disabled: type_ != "file" })}
-            />
-            <Form.Input
-                label="File Rotation Time"
-                {...register("rotationTime", { disabled: type_ != "file" })}
-            />
-            <Form.Input
-                type="number"
-                label="Max Total File Size"
-                {...register("maxSize", { disabled: type_ != "file" })}
-            />
-            <Form.Input
-                type="number"
-                label="Max Total Files"
-                {...register("maxFiles", { disabled: type_ != "file" })}
-            />
-            <fieldset disabled={type_ != "file"}>
-                <Form.Checkbox
-                    label="Flush every record"
-                    {...register("flush", { disabled: type_ != "file" })}
+            <div className="gap-1.5">
+                <Label>Filter</Label>
+                <Input {...register("filter")} />
+            </div>
+
+            <div className="gap-1.5">
+                <Label>Format</Label>
+                <Input {...register("format")} />
+            </div>
+
+            <div className="gap-1.5">
+                <Label>File Name</Label>
+                <Input
+                    {...register("filename", { disabled: type_ != "file" })}
                 />
-            </fieldset>
-            <Form.Input
-                label="Socket Path"
-                {...register("path", { disabled: type_ != "local" })}
-            />
-            <Form.Input
-                label="Command"
-                {...register("command", { disabled: type_ != "pipe" })}
-            />
+            </div>
+
+            <div className="gap-1.5">
+                <Label>Target File Name</Label>
+                <Input {...register("target", { disabled: type_ != "file" })} />
+            </div>
+
+            <div className="gap-1.5">
+                <Label>File Rotation Size</Label>
+                <Input
+                    type="number"
+                    {...register("rotationSize", { disabled: type_ != "file" })}
+                />
+            </div>
+
+            <div className="gap-1.5">
+                <Label>File Rotation Time</Label>
+                <Input
+                    {...register("rotationTime", { disabled: type_ != "file" })}
+                />
+            </div>
+
+            <div>
+                <Label>Max Total File Size</Label>
+                <Input
+                    type="number"
+                    {...register("maxSize", { disabled: type_ != "file" })}
+                />
+            </div>
+
+            <div>
+                <Label>Max Total Files</Label>
+                <Input
+                    type="number"
+                    {...register("maxFiles", { disabled: type_ != "file" })}
+                />
+            </div>
+
+            <div className="flex justify-between py-4">
+                <Label>Flush every record</Label>
+                <Controller
+                    name="flush"
+                    control={control}
+                    disabled={type_ != "file"}
+                    render={({ field }) => (
+                        <Checkbox
+                            disabled={field.disabled}
+                            checked={field.value}
+                            onCheckedChange={(checked) =>
+                                field.onChange(checked)
+                            }
+                        />
+                    )}
+                />
+            </div>
+
+            <div className="gap-1.5">
+                <Label>Socket Path</Label>
+                <Input {...register("path", { disabled: type_ != "local" })} />
+            </div>
+            <div className="gap-1.5">
+                <Label>Command</Label>
+                <Input
+                    {...register("command", { disabled: type_ != "pipe" })}
+                />
+            </div>
         </fieldset>
     );
 };

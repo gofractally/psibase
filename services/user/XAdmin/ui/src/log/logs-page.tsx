@@ -1,9 +1,21 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { Form } from "../components";
 import { websocketURL } from "../helpers";
 import { LogFilterInputs, LogRecord } from "./interfaces";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+import {
+    Table,
+    TableBody,
+    TableCaption,
+    TableCell,
+    TableFooter,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
 const MAX_LOGS_ROWS = 20;
 
@@ -78,42 +90,44 @@ export const LogsPage = () => {
                 </p>
             )}
             <form onSubmit={filterForm.handleSubmit(onFilter)}>
-                <Form.Input
-                    label="Filter"
-                    {...filterForm.register("filter")}
-                    errorText={filterError}
-                />
+                <Label>Filter</Label>
+                <Input {...filterForm.register("filter")} />
+                {filterError && <Label>{filterError}</Label>}
             </form>
-            <table className="my-4 w-full bg-black p-2 font-mono text-white">
-                <thead className="font-semibold">
-                    <tr>
-                        <td className="p-2">Time</td>
-                        <td>Severity</td>
-                        <td>Message</td>
-                    </tr>
-                </thead>
-                <tbody>
-                    {logData?.length ? (
-                        logData.map((row: LogRecord, idx) => (
-                            <tr key={idx} className={`log log-${row.Severity}`}>
-                                <td>
-                                    {new Date(row.TimeStamp).toLocaleString()}
-                                </td>
-                                <td>{row.Severity}</td>
-                                <td className="log-message">
-                                    {formatLog(row)}
-                                </td>
-                            </tr>
-                        ))
-                    ) : (
-                        <tr>
-                            <td colSpan={3} className="h-16 text-center">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Severity</TableHead>
+                        <TableHead>Message</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {(logData || []).map((row: LogRecord, idx) => (
+                        <TableRow
+                            key={idx}
+                            className={`log log-${row.Severity}`}
+                        >
+                            <TableCell>
+                                {new Date(row.TimeStamp).toLocaleString()}
+                            </TableCell>
+                            <TableCell>{row.Severity}</TableCell>
+                            <TableCell className="log-message">
+                                {formatLog(row)}
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+                {(logData || []).length == 0 && (
+                    <TableFooter>
+                        <TableRow>
+                            <TableCell colSpan={3}>
                                 No logs to display.
-                            </td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
+                            </TableCell>
+                        </TableRow>
+                    </TableFooter>
+                )}
+            </Table>
         </>
     );
 };

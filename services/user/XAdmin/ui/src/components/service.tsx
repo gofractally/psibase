@@ -1,6 +1,7 @@
 import { RegisterOptions } from "react-hook-form";
-import {Button} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { newId } from "../configuration/utils";
+import { Input } from "./ui/input";
 
 type ServiceConfig = {
     host: string;
@@ -43,14 +44,14 @@ export const Service = ({
         }
     };
     return (
-        <tr className="service-control">
+        <tr className="w-full">
             <td>
-                <input
+                <Input
                     {...register(`${index}.host`, { onChange: fixLastRow })}
                 />
             </td>
             <td>
-                <input
+                <Input
                     {...register(`${index}.root`, { onChange: fixLastRow })}
                 />
             </td>

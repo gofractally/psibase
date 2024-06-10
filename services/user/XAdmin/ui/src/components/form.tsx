@@ -1,9 +1,7 @@
 import React, { forwardRef, HTMLProps } from "react";
 
 import { Text } from "./text";
-import {
-    
-    Button} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Icon, IconType } from "./icon";
 
 export const Label: React.FC<{
@@ -83,54 +81,6 @@ export interface InputProps extends HTMLProps<HTMLInputElement> {
     rightIcon?: IconType;
     onClickRightIcon?: () => void;
 }
-
-export const Input = forwardRef<HTMLInputElement, InputProps & SubText>(
-    (props, ref) => {
-        const {
-            label,
-            rightIcon,
-            helperText,
-            successText,
-            errorText,
-            onClickRightIcon,
-            ...inputProps
-        } = props;
-        const hasError = Boolean(errorText);
-        const borderColor = hasError
-            ? "border-red-500"
-            : "border-gray-500 focus-visible:border-gray-400";
-
-        return (
-            <FieldSet
-                disabled={props.disabled}
-                label={props.label}
-                id={props.id}
-                helperText={props.helperText}
-                successText={props.successText}
-                errorText={props.errorText}
-            >
-                <input
-                    name={props.id}
-                    className={`Input w-full border bg-white px-3 py-4 text-lg text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500 ${borderColor}`}
-                    ref={ref}
-                    {...inputProps}
-                />
-                {rightIcon && (
-                    <Button
-                        onClick={() => {onClickRightIcon && onClickRightIcon()}}
-                        className="absolute right-3 top-[18px]"
-                    >
-                        <Icon
-                            type={rightIcon}
-                            iconStyle="outline"
-                            size="base"
-                        />
-                    </Button>
-                )}
-            </FieldSet>
-        );
-    }
-);
 
 export interface SelectProps extends HTMLProps<HTMLSelectElement> {
     label?: string;
@@ -236,18 +186,6 @@ export interface RadioProps extends HTMLProps<HTMLInputElement> {
     label?: string;
 }
 
-export const Radio = forwardRef<HTMLInputElement, RadioProps>((props, ref) => {
-    return (
-        <label
-            htmlFor={props.id}
-            className="flex place-items-center gap-4 p-3 font-medium text-gray-700"
-        >
-            <input type="radio" ref={ref} {...props} />
-            <div className="flex-1">{props.label}</div>
-        </label>
-    );
-});
-
 export interface LabeledSetProps {
     htmlFor: string;
     label: string;
@@ -279,13 +217,11 @@ export const LabeledSet = forwardRef<HTMLDivElement, LabeledSetProps>(
 
 export const Form = {
     Label,
-    Input,
     Select,
     TextArea,
     LabeledSet,
     FileInput,
     Checkbox,
-    Radio,
 };
 
 export default Form;

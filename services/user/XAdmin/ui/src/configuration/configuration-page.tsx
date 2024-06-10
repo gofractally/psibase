@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { RegisterOptions, useFieldArray, useForm } from "react-hook-form";
+import {
+    RegisterOptions,
+    useFieldArray,
+    useForm,
+    Controller,
+} from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Form, Service } from "../components";
@@ -15,6 +20,19 @@ import {
 import { putJson } from "../helpers";
 import { Logger } from "../log/logger";
 import { Divider } from "../components/divider";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { format } from "path";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface ConfigurationPageProps {
     config?: PsinodeConfig;
@@ -30,7 +48,6 @@ export const ConfigurationPage = ({
     const configForm = useForm<PsinodeConfig>({
         defaultValues: initialConfigForm(),
     });
-    configForm.formState.dirtyFields;
 
     const listeners = useFieldArray({
         control: configForm.control,
@@ -152,52 +169,86 @@ export const ConfigurationPage = ({
 
     return (
         <>
-            <h1>Configuration</h1>
             {!config ? (
                 <p>Unable to load config</p>
             ) : (
                 <form onSubmit={configForm.handleSubmit(onConfig)}>
-                    <Form.Checkbox
-                        label="Accept incoming P2P connections"
-                        {...configForm.register("p2p")}
+                    <Controller
+                        name="p2p"
+                        control={configForm.control}
+                        render={({ field }) => (
+                            <div className="my-6 flex items-center space-x-2">
+                                <Switch
+                                    onCheckedChange={field.onChange}
+                                    checked={field.value}
+                                />
+                                <Label>Accept incoming P2P connections</Label>
+                            </div>
+                        )}
                     />
-                    <Form.Input
-                        label="Block Producer Name"
-                        {...configForm.register("producer")}
-                    />
-                    <Form.Input label="Host" {...configForm.register("host")} />
+                    <div className="flex justify-between gap-4">
+                        <div className="grid w-full items-center gap-1.5">
+                            <Label htmlFor="blockProducerName">
+                                Block producer name
+                            </Label>
+                            <Input
+                                id="blockProducerName"
+                                {...configForm.register("producer")}
+                            />
+                        </div>
+                        <div className="grid w-full items-center gap-1.5">
+                            <Label>Host</Label>
+                            <Input {...configForm.register("host")} />
+                        </div>
+                    </div>
+                    <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">
+                        Ports
+                    </h4>
                     <table>
-                        <thead>
-                            <tr>
-                                <th>Port (requires restart)</th>
-                            </tr>
-                        </thead>
+                        <Label>Requires restart</Label>
                         <tbody>
                             {listeners.fields.map((l, idx: number) => (
                                 <tr key={l.key}>
                                     <td>
-                                        <input
-                                            className="w-full border bg-white px-3 py-2 text-base text-gray-900 outline-none placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-gray-500"
+                                        <Input
+                                            type="number"
                                             {...configForm.register(
                                                 `listen.${idx}.text`
                                             )}
                                         />
                                     </td>
                                     <td>
-                                        <select
-                                            {...configForm.register(
-                                                `listen.${idx}.protocol`
+                                        <Controller
+                                            name={`listen.${idx}.protocol`}
+                                            control={configForm.control}
+                                            render={({ field }) => (
+                                                <Select
+                                                    value={field.value}
+                                                    onValueChange={(value) =>
+                                                        field.onChange(value)
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-[180px]">
+                                                        <SelectValue placeholder="Theme" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="http">
+                                                            HTTP
+                                                        </SelectItem>
+                                                        <SelectItem value="https">
+                                                            HTTPS
+                                                        </SelectItem>
+                                                        <SelectItem value="socket">
+                                                            Local socket
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             )}
-                                        >
-                                            <option value="http">HTTP</option>
-                                            <option value="https">HTTPS</option>
-                                            <option value="local">
-                                                Local Socket
-                                            </option>
-                                        </select>
+                                        />
                                     </td>
                                     <td>
                                         <Button
+                                            variant="destructive"
                                             onClick={() =>
                                                 listeners.remove(idx)
                                             }
@@ -211,6 +262,7 @@ export const ConfigurationPage = ({
                                 <td>
                                     <Button
                                         className="mt-4"
+                                        type="button"
                                         onClick={onAddNewListenerClick}
                                     >
                                         New Listener
@@ -219,15 +271,16 @@ export const ConfigurationPage = ({
                             </tr>
                         </tbody>
                     </table>
-
                     <Divider />
-
-                    <h2>Loggers</h2>
+                    <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">
+                        Loggers{" "}
+                    </h3>
                     {loggers &&
                         Object.entries(loggers).map(([name, _contents]) => (
                             <Logger
                                 key={name}
                                 loggerKey={name}
+                                control={configForm.control}
                                 register={(field, options) =>
                                     handleLoggerFieldRegister(
                                         name,
@@ -244,16 +297,15 @@ export const ConfigurationPage = ({
                     <Button className="mt-4" onClick={onAddNewLoggerClick}>
                         New Logger
                     </Button>
-
                     <Divider />
-
                     <h2>Builtin Services</h2>
                     <fieldset>
-                        <table className="service-table">
+                        <table className="w-full">
                             <thead>
                                 <tr>
-                                    <th>Hostname</th>
-                                    <th>Path</th>
+                                    <th className="text-left">Hostname</th>
+                                    <th className="text-left">Path</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -278,25 +330,39 @@ export const ConfigurationPage = ({
                             </tbody>
                         </table>
                     </fieldset>
-
-                    <fieldset className="mt-4">
-                        <legend>Access to admin API</legend>
-                        <Form.Radio
-                            {...configForm.register("admin")}
-                            value="static:*"
-                            label="Builtin services only (recommended)"
-                        />
-                        <Form.Radio
-                            {...configForm.register("admin")}
-                            value="*"
-                            label="All services (not recommended)"
-                        />
-                        <Form.Radio
-                            {...configForm.register("admin")}
-                            value=""
-                            label="Disabled"
-                        />
-                    </fieldset>
+                    <Controller
+                        name="admin"
+                        control={configForm.control}
+                        render={({ field }) => (
+                            <fieldset className="mt-4">
+                                <Label>Access to admin API</Label>
+                                <RadioGroup
+                                    value={field.value}
+                                    onValueChange={(e) => field.onChange(e)}
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem
+                                            value="static:*"
+                                            id="r1"
+                                        />
+                                        <Label htmlFor="r1">
+                                            Builtin services only (recommended)
+                                        </Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="*" id="r2" />
+                                        <Label htmlFor="r2">
+                                            All services (not recommended)
+                                        </Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="" id="r3" />
+                                        <Label htmlFor="r3">Disabled</Label>
+                                    </div>
+                                </RadioGroup>
+                            </fieldset>
+                        )}
+                    />
 
                     <Button
                         className="my-4"

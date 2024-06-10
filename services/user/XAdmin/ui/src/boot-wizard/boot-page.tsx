@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useForm, UseFormReturn } from "react-hook-form";
+import { Controller, useForm, UseFormReturn } from "react-hook-form";
 import { Form } from "../components";
 import { Button } from "@/components/ui/button";
 import { PsinodeConfig } from "../configuration/interfaces";
@@ -11,6 +11,20 @@ import {
     postArrayBufferGetJson,
 } from "@psibase/common-lib";
 import * as wasm from "wasm-psibase";
+import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Input } from "@/components/ui/input";
+import {
+    Table,
+    TableBody,
+    TableCaption,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type InstallType = {
     installType: string;
@@ -134,19 +148,30 @@ export const TypeForm = ({
                 }
             })}
         >
-            <fieldset className="mt-4">
-                <legend>Install type</legend>
-                <Form.Radio
-                    {...typeForm.register("installType")}
-                    value="full"
-                    label="Install all services"
-                />
-                <Form.Radio
-                    {...typeForm.register("installType")}
-                    value="custom"
-                    label="Choose services to install"
-                />
-            </fieldset>
+            <Controller
+                name="installType"
+                control={typeForm.control}
+                render={({ field }) => (
+                    <RadioGroup
+                        defaultValue="full"
+                        onValueChange={field.onChange}
+                    >
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="full" id="option-one" />
+                            <Label htmlFor="option-one">
+                                Install all services
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="custom" id="option-two" />
+                            <Label htmlFor="option-two">
+                                Choose services to install
+                            </Label>
+                        </div>
+                    </RadioGroup>
+                )}
+            />
+
             <Button className="mt-4" type="submit">
                 Next
             </Button>
@@ -247,15 +272,20 @@ export const ProducerForm = ({
     return (
         <>
             <form onSubmit={() => setCurrentPage("install")}>
-                <Form.Input
-                    label="Block Producer Name"
-                    {...producerForm.register("producer", {
-                        required: true,
-                        pattern: /[-a-z0-9]+/,
-                    })}
-                />
+                <div className="grid w-full max-w-sm items-center gap-1.5">
+                    <Label htmlFor="bp-name">Block producer name</Label>
+                    <Input
+                        id="bp-name"
+                        {...producerForm.register("producer", {
+                            required: true,
+                            pattern: /[-a-z0-9]+/,
+                        })}
+                    />
+                </div>
+
                 <Button
-                    className="mt-4"
+                    className="mt-4 "
+                    variant="secondary"
                     onClick={() => {
                         let installType = typeForm.getValues("installType");
                         if (installType == "full") {
@@ -394,14 +424,50 @@ export const InstallForm = ({
     }
     return (
         <>
-            {nameChange && <h3>{nameChange}</h3>}
-            <h2>The following packages will be installed:</h2>
-            {packages.map((info) => (
-                <p>
-                    {info.name}-{info.version}
-                </p>
-            ))}
+            {nameChange && (
+                <h4 className="my-3 scroll-m-20 text-xl font-semibold tracking-tight">
+                    {nameChange}
+                </h4>
+            )}
+            <ScrollArea className=" h-[800px]">
+                <Table>
+                    <TableCaption>
+                        A list of packages to be installed.
+                    </TableCaption>
+                    <TableHeader>
+                        <TableRow>
+                            <TableCell
+                                colSpan={4}
+                                className="mx-auto bg-primary-foreground text-center"
+                            >
+                                The following packages will be installed
+                            </TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>File</TableHead>
+                            <TableHead className="text-right">
+                                Version
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {packages.map((info) => (
+                            <TableRow key={info.sha256}>
+                                <TableCell>{info.name}</TableCell>
+                                <TableCell>{info.description}</TableCell>
+                                <TableCell>{info.file}</TableCell>
+                                <TableCell className="text-right">
+                                    {info.version}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
             <form
+                className="flex w-full justify-between"
                 onSubmit={() => {
                     runBoot(
                         packages,
@@ -414,6 +480,7 @@ export const InstallForm = ({
                 }}
             >
                 <Button
+                    variant="secondary"
                     className="mt-4"
                     onClick={() => setCurrentPage("producer")}
                 >
@@ -434,17 +501,17 @@ export const ProgressPage = ({ state }: ProgressPageProps) => {
         return <>{state}</>;
     } else if ("actionTraces" in state) {
         return <>Boot failed: {getStack(state)}</>;
-    } else if (state[0] == "fetch") {
+    } else if (state[0] == "fetch" || state[0] == "push") {
+        const percent = Math.floor((state[1] / state[2]) * 100);
         return (
-            <>
-                Fetching packages {state[1]}/{state[2]}
-            </>
-        );
-    } else if (state[0] == "push") {
-        return (
-            <>
-                Pushing transactions {state[1]}/{state[2]}
-            </>
+            <div>
+                <Progress value={percent} />
+                <div>
+                    {state[0] == "fetch"
+                        ? "Fetching packages"
+                        : "Pushing transactions"}{" "}
+                </div>
+            </div>
         );
     } else {
         console.error(state);
@@ -499,7 +566,6 @@ export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
         );
     };
 
-    let allServices = ["Default", "AuthSig", "AuthAny"];
     if (currentPage == "type") {
         return (
             <TypeForm

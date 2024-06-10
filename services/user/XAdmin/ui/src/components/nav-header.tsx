@@ -4,6 +4,7 @@ interface NavHeaderProps {
 }
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MenuContent } from "./menu-content";
 
 export const NavHeader = ({ menuItems, activeItem }: NavHeaderProps) => {
     return (
@@ -11,16 +12,21 @@ export const NavHeader = ({ menuItems, activeItem }: NavHeaderProps) => {
             <LogoGroup>
                 <img src="/psibase.svg" alt="Psibase Logo" />
             </LogoGroup>
-            <LogoTitle />
-            <Tabs value={activeItem} className="w-[400px]">
-                <TabsList>
-                    {menuItems.map((item) => (
-                        <TabsTrigger asChild key={item} value={item}>
-                            <a href={`#${item}`}>{item}</a>
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
-            </Tabs>
+            <h1 className=" scroll-m-20 text-4xl font-extrabold tracking-tight">
+                Admin Panel
+            </h1>
+            <div className="flex gap-3">
+                <Tabs value={activeItem} className="">
+                    <TabsList>
+                        {menuItems.map((item) => (
+                            <TabsTrigger asChild key={item} value={item}>
+                                <a href={`#${item}`}>{item}</a>
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </Tabs>
+                <MenuContent />
+            </div>
         </Header>
     );
 };
@@ -33,10 +39,4 @@ const Header = ({ children }: { children: React.ReactNode }) => (
 
 const LogoGroup = ({ children }: { children: React.ReactNode }) => (
     <div className="mr-12 flex items-center">{children}</div>
-);
-
-const LogoTitle = () => (
-    <h1 className=" scroll-m-20 text-4xl font-extrabold tracking-tight">
-        Admin Panel
-    </h1>
 );
