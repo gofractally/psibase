@@ -1,6 +1,4 @@
 import { Controller, RegisterOptions } from "react-hook-form";
-import { Form } from "../components/form";
-// import { Button } from "@/components/ui/button";
 import { LogConfig } from "./interfaces";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +10,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 
 interface LoggerProps {
     loggerKey: string;
@@ -32,8 +31,12 @@ export const Logger = ({
     return (
         <fieldset className="logger-control p-2">
             <div className="flex justify-between">
-                <legend className="text-2xl">{loggerKey}</legend>
-                {/* <Button onClick={remove}>Remove</Button> */}
+                <legend className="scroll-m-20 text-2xl font-semibold tracking-tight">
+                    {loggerKey}
+                </legend>
+                <Button variant="secondary" onClick={remove}>
+                    Remove
+                </Button>
             </div>
 
             <Controller

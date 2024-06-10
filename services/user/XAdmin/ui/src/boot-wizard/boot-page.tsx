@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Controller, useForm, UseFormReturn } from "react-hook-form";
-import { Form } from "../components";
 import { Button } from "@/components/ui/button";
 import { PsinodeConfig } from "../configuration/interfaces";
 import { putJson } from "../helpers";
@@ -25,6 +24,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type InstallType = {
     installType: string;
@@ -244,13 +244,26 @@ export const ServicesForm = ({
             })}
         >
             {[...byname.values()].map((info) => (
-                <Form.Checkbox
-                    label={`${info.name}-${info.version}`}
-                    {...servicesForm.register(info.name)}
+                <Controller
+                    name={info.name}
+                    control={servicesForm.control}
+                    render={({ field }) => (
+                        <div className="flex items-center space-x-2 py-2">
+                            <Checkbox
+                                id={`info-${info.name}`}
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                            />
+                            <Label
+                                htmlFor={`info-${info.name}`}
+                            >{`${info.name}-${info.version}`}</Label>
+                        </div>
+                    )}
                 />
             ))}
             <Button
                 className="mt-4"
+                variant="secondary"
                 onClick={() => {
                     setCurrentPage("type");
                 }}
@@ -420,12 +433,15 @@ export const InstallForm = ({
     let nameChange = undefined;
     let actualProducer = producerForm.getValues("producer");
     if (config && config.producer !== actualProducer) {
-        nameChange = `The block producer name of this node will be set to ${actualProducer}`;
+        nameChange = actualProducer;
     }
     return (
         <>
             {nameChange && (
                 <h4 className="my-3 scroll-m-20 text-xl font-semibold tracking-tight">
+                    <span className="text-muted-foreground">
+                        The block producer name of this node will be set to{" "}
+                    </span>
                     {nameChange}
                 </h4>
             )}

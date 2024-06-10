@@ -7,7 +7,7 @@ import {
 } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
-import { Form, Service } from "../components";
+import { Service } from "../components";
 import { PsinodeConfig, ServiceConfig } from "./interfaces";
 import {
     defaultService,
@@ -19,7 +19,6 @@ import {
 } from "./utils";
 import { putJson } from "../helpers";
 import { Logger } from "../log/logger";
-import { Divider } from "../components/divider";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -29,9 +28,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { format } from "path";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface ConfigurationPageProps {
@@ -204,8 +201,8 @@ export const ConfigurationPage = ({
                     <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">
                         Ports
                     </h4>
+                    <Label>Requires restart</Label>
                     <table>
-                        <Label>Requires restart</Label>
                         <tbody>
                             {listeners.fields.map((l, idx: number) => (
                                 <tr key={l.key}>
@@ -248,7 +245,7 @@ export const ConfigurationPage = ({
                                     </td>
                                     <td>
                                         <Button
-                                            variant="destructive"
+                                            variant="secondary"
                                             onClick={() =>
                                                 listeners.remove(idx)
                                             }
@@ -271,10 +268,11 @@ export const ConfigurationPage = ({
                             </tr>
                         </tbody>
                     </table>
-                    <Divider />
-                    <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">
-                        Loggers{" "}
-                    </h3>
+
+                    <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+                        Loggers
+                    </h2>
+
                     {loggers &&
                         Object.entries(loggers).map(([name, _contents]) => (
                             <Logger
@@ -297,8 +295,9 @@ export const ConfigurationPage = ({
                     <Button className="mt-4" onClick={onAddNewLoggerClick}>
                         New Logger
                     </Button>
-                    <Divider />
-                    <h2>Builtin Services</h2>
+                    <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+                        Built-in Services
+                    </h2>
                     <fieldset>
                         <table className="w-full">
                             <thead>
