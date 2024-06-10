@@ -119,8 +119,8 @@ SCENARIO("Rejecting an invite")
       auto bob     = t.from(t.addAccount("bob"_a));
       auto invited = t.from(Invite::payerAccount);
 
-      t.setAuth<AuthK1::AuthK1, Accounts>(alice.id, userPub);
-      t.setAuth<AuthK1::AuthK1, Accounts>(bob.id, userPub);
+      t.setAuth<AuthK1::AuthK1>(alice.id, userPub);
+      t.setAuth<AuthK1::AuthK1>(bob.id, userPub);
 
       WHEN("Alice creates an invite")
       {
@@ -220,7 +220,7 @@ SCENARIO("Expired invites")
 
       auto alice = t.from(t.addAccount("alice"_a));
       auto bob   = t.from(t.addAccount("bob"_a));
-      t.setAuth<AuthK1::AuthK1, Accounts>(bob, userPub);
+      t.setAuth<AuthK1::AuthK1>(bob, userPub);
 
       auto a = alice.to<Invite>();
       auto b = bob.with({{userPub, userPriv}}).to<Invite>();
@@ -491,8 +491,8 @@ SCENARIO("Accepting an invite")
       auto charlie = t.from(t.addAccount("charlie"_a));
       auto invited = t.from(Invite::payerAccount);
 
-      t.setAuth<AuthK1::AuthK1, Accounts>(bob.id, userPub);
-      t.setAuth<AuthK1::AuthK1, Accounts>(charlie.id, userPub);
+      t.setAuth<AuthK1::AuthK1>(bob.id, userPub);
+      t.setAuth<AuthK1::AuthK1>(charlie.id, userPub);
 
       WHEN("Alice creates an invite")
       {

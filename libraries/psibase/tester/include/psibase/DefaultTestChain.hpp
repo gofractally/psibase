@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/tester.hpp>
+#include <services/system/Accounts.hpp>
 
 namespace psibase
 {
@@ -35,13 +36,13 @@ namespace psibase
          }
       }
 
-      template <typename AuthService, typename AccountsService>
+      template <typename AuthService>
       void setAuth(AccountNumber name, const auto& pubkey)
       {
          auto n  = name.str();
          auto t1 = this->from(name).to<AuthService>().setKey(pubkey);
          check(psibase::show(false, t1.trace()) == "", "Failed to setkey for " + n);
-         auto t2 = this->from(name).to<AccountsService>().setAuthServ(AuthService::service);
+         auto t2 = this->from(name).to<SystemService::Accounts>().setAuthServ(AuthService::service);
          check(psibase::show(false, t2.trace()) == "", "Failed to setAuthServ for " + n);
       }
 

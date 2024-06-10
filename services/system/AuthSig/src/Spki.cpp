@@ -84,15 +84,6 @@ namespace SystemService
                                         key.data.size(), "PUBLIC KEY");
       }
 
-      std::vector<unsigned char>& clio_unwrap_packable(SubjectPublicKeyInfo& obj)
-      {
-         return obj.data;
-      }
-      const std::vector<unsigned char>& clio_unwrap_packable(const SubjectPublicKeyInfo& obj)
-      {
-         return obj.data;
-      }
-
       std::string keyFingerprint(const SubjectPublicKeyInfo& key)
       {
          const char* xdigits = "0123456789abcdef";

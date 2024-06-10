@@ -19,8 +19,16 @@ namespace SystemService
             return psibase::compare_wknd(lhs.data, rhs.data);
          }
       };
-      std::vector<unsigned char>&       clio_unwrap_packable(SubjectPublicKeyInfo& obj);
-      const std::vector<unsigned char>& clio_unwrap_packable(const SubjectPublicKeyInfo& obj);
+
+      inline std::vector<unsigned char>& clio_unwrap_packable(SubjectPublicKeyInfo& obj)
+      {
+         return obj.data;
+      }
+      inline const std::vector<unsigned char>& clio_unwrap_packable(const SubjectPublicKeyInfo& obj)
+      {
+         return obj.data;
+      }
+
       // Takes a public key in any of the following formats
       // - EOS Base58 encoded public key beginning PUB_K1 or PUB_R1
       // - PEM encoded X.509 SubjectPublicKeyInfo
