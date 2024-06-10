@@ -62,5 +62,4 @@ fn main() {
     };
 
     build("service_wasi_polyfill");
-    build("tester_wasi_polyfill");
 }

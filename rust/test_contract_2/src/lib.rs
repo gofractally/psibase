@@ -98,12 +98,11 @@ mod service {
     }
 }
 
-// TODO: testing not working
-// #[psibase::test_case(services("example"))]
-// fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
-//     let result = Wrapper::push(&chain).add(3, 4);
-//     assert_eq!(result.get()?, 7);
-//     println!("\n\nTrace:\n{}", result.trace);
+#[psibase::test_case(services("example"))]
+fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    let result = Wrapper::push(&chain).add(3, 4);
+    assert_eq!(result.get()?, 7);
+    println!("\n\nTrace:\n{}", result.trace);
 
-//     Ok(())
-// }
+    Ok(())
+}

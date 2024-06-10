@@ -114,18 +114,14 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
         block = parse_quote! {{
             fn with_chain(#inputs) #output #block
             fn create_chain() -> Result<psibase::Chain, psibase::Error> {
+                use psibase::*;
+
                 let mut chain = psibase::Chain::new();
-                for trx in psibase::create_boot_transactions(
-                    &None,
-                    psibase::account!("prod"),
-                    false,
-                    false,
-                    false,
-                    psibase::TimePointSec { seconds: 10 },
-                ) {
-                    chain.push(&trx).ok()?;
-                }
+                chain.boot()?;
+
                 #deploy_services
+
+                println!("\n\n>>> {}: Chain Tester Booted & Services Deployed - Running test...", #name);
                 Ok(chain)
             }
             let chain = create_chain();
