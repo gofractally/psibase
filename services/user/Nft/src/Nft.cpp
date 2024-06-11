@@ -235,8 +235,8 @@ CreditRecord Nft::getCredRecord(NID nftId)
 
       return CreditRecord{
           .nftId    = nftId,
-          .creditor = Accounts::nullAccount,
-          .debitor  = Accounts::nullAccount  //
+          .debitor  = Accounts::nullAccount,
+          .creditor = Accounts::nullAccount  //
       };
    }
 }
