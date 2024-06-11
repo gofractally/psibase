@@ -1,27 +1,20 @@
 "use client";
-
-import { Cloud, Github, LifeBuoy, LogOut, Plus, UserPlus } from "lucide-react";
-
+import { UserPlus } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuGroup,
     DropdownMenuItem,
-    DropdownMenuLabel,
     DropdownMenuPortal,
     DropdownMenuSeparator,
-    DropdownMenuShortcut,
     DropdownMenuSub,
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
 import { Moon, Sun, Power, RotateCcw } from "lucide-react";
-
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "./ui/button";
-
 import { Cog } from "lucide-react";
 import { postJson } from "@psibase/common-lib";
 
