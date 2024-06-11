@@ -236,13 +236,13 @@ AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
                                            const PublicKey& public_key,
                                            bool             show /* = false */)
 {
-   transactor<Accounts> asys(Accounts::service, Accounts::service);
-   transactor<AuthK1>   ecsys(AuthK1::service, AuthK1::service);
+   transactor<Accounts>       asys(Accounts::service, Accounts::service);
+   transactor<AuthK1::AuthK1> ecsys(AuthK1::AuthK1::service, AuthK1::AuthK1::service);
 
    auto trace = pushTransaction(makeTransaction({
        asys.newAccount(name, AuthAny::service, true),
        ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthServ(AuthK1::service),
+       asys.from(name).setAuthServ(AuthK1::AuthK1::service),
    }));
 
    check(psibase::show(show, trace) == "", "Failed to add ec account");
@@ -254,17 +254,6 @@ AccountNumber DefaultTestChain::addAccount(const char*      name,
                                            bool             show /* = false */)
 {
    return addAccount(AccountNumber(name), public_key, show);
-}
-
-void DefaultTestChain::setAuthK1(AccountNumber    name,
-                                 const PublicKey& pubkey,
-                                 bool             show /* = false */)
-{
-   auto n  = name.str();
-   auto t1 = from(name).to<AuthK1>().setKey(pubkey);
-   check(psibase::show(show, t1.trace()) == "", "Failed to setkey for " + n);
-   auto t2 = from(name).to<Accounts>().setAuthServ(AuthK1::service);
-   check(psibase::show(show, t2.trace()) == "", "Failed to setAuthServ for " + n);
 }
 
 AccountNumber DefaultTestChain::addService(AccountNumber acc,

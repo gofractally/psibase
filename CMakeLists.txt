@@ -74,6 +74,15 @@ if(DEFINED WASI_SDK_PREFIX)
         BUILD_COMMAND make -j${NUM_PROCS}
         INSTALL_COMMAND make install
     )
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libbotan-3.a
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
+        COMPONENT libpsibase
+    )
+    install(DIRECTORY ${CMAKE_BINARY_DIR}/wasm/deps/include/botan-3
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
+        COMPONENT libpsibase
+    )
+
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
         DEPENDS ${wasm-deps} wasm-botan
@@ -392,6 +401,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         FLAGS isAuthService
     DEPENDS wasm
+    DEPENDS ${AuthPlugin_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
 
