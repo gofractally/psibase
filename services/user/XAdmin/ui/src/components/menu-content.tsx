@@ -66,7 +66,6 @@ export const MenuContent = () => {
                         </DropdownMenuPortal>
                     </DropdownMenuSub>
                 </DropdownMenuGroup>
-                <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
@@ -93,7 +92,6 @@ export const MenuContent = () => {
                                     <Power className="mr-2 h-4 w-4" />
                                     <span>Shutdown</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
                             </DropdownMenuSubContent>
                         </DropdownMenuPortal>
                     </DropdownMenuSub>
