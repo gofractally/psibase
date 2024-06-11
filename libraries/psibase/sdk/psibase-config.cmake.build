@@ -58,6 +58,7 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/libraries/psibase/wasm32-wasi
         @ROOT_SOURCE_DIR@/services/system/Accounts/include
         @ROOT_SOURCE_DIR@/services/system/AuthAny/include
+        @ROOT_SOURCE_DIR@/services/system/AuthSig/include
         @ROOT_SOURCE_DIR@/services/system/AuthK1/include
         @ROOT_SOURCE_DIR@/services/system/Producers/include
         @ROOT_SOURCE_DIR@/services/system/HttpServer/include
@@ -141,6 +142,9 @@ function(add_libs suffix)
         -lc++abi
         -lc
         -lpsitestlib${lib-suffix}
+        -L@ROOT_BINARY_DIR@/wasm/services/system/AuthSig
+        -lSpki${suffix}
+        -lPrivateKeyInfo${suffix}
         ${LIBCLANG_RT_BUILTINS}
         ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
     )
@@ -150,6 +154,36 @@ function(add_libs suffix)
     target_link_options(Psibase::test${suffix} INTERFACE
         -Wl,--entry,_start
         -nostdlib
+    )
+
+    add_library(Spki${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Spki${suffix} INTERFACE 
+        -L@ROOT_BINARY_DIR@/wasm/deps/lib
+        -lbotan-3
+        services_system${suffix} 
+        psibase${suffix} 
+        exception-stub${suffix}
+        -L@ROOT_BINARY_DIR@/wasm/services/system/AuthSig
+        -lSpki${suffix}
+    )
+    target_include_directories(Spki${suffix} INTERFACE 
+        @ROOT_SOURCE_DIR@/services/system/AuthSig/include
+        @ROOT_BINARY_DIR@/wasm/deps/include/botan-3 
+    )
+
+    add_library(PrivateKeyInfo${suffix} INTERFACE IMPORTED)
+    target_link_libraries(PrivateKeyInfo${suffix} INTERFACE 
+        -L@ROOT_BINARY_DIR@/wasm/deps/lib
+        -lbotan-3 
+        services_system${suffix} 
+        psibase${suffix} 
+        exception-stub${suffix}
+        -L@ROOT_BINARY_DIR@/wasm/services/system/AuthSig
+        -lPrivateKeyInfo${suffix}
+    )
+    target_include_directories(PrivateKeyInfo${suffix} INTERFACE 
+        @ROOT_SOURCE_DIR@/services/system/AuthSig/include
+        @ROOT_BINARY_DIR@/wasm/deps/include/botan-3 
     )
 endfunction()
 

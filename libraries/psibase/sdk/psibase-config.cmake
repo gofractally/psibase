@@ -118,6 +118,8 @@ function(add_libs suffix)
         -lc++abi
         -lc
         -lpsitestlib${lib-suffix}
+        -lSpki${suffix}
+        -lPrivateKeyInfo${suffix}
         ${LIBCLANG_RT_BUILTINS}
         ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
     )
@@ -125,6 +127,35 @@ function(add_libs suffix)
         -Wl,--entry,_start
         -nostdlib
     )
+
+    add_library(Spki${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Spki${suffix} INTERFACE 
+        -L${root}/lib
+        -lbotan-3 
+        services_system${suffix} 
+        psibase${suffix} 
+        exception-stub${suffix}
+        -lSpki${suffix}
+    )
+    target_include_directories(Spki${suffix} INTERFACE 
+        ${root}/include/services/system/AuthSig/include
+        ${root}/include/botan-3
+    )
+
+    add_library(PrivateKeyInfo${suffix} INTERFACE IMPORTED)
+    target_link_libraries(PrivateKeyInfo${suffix} INTERFACE 
+        -L${root}/lib
+        -lbotan-3 
+        services_system${suffix} 
+        psibase${suffix} 
+        exception-stub${suffix}
+        -lPrivateKeyInfo${suffix}
+    )
+    target_include_directories(PrivateKeyInfo${suffix} INTERFACE 
+        ${root}/include/services/system/AuthSig/include
+        ${root}/include/botan-3
+    )
+
 endfunction()
 
 add_libs("")
