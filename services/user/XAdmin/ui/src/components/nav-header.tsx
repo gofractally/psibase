@@ -1,10 +1,10 @@
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MenuContent } from "./menu-content";
+
 interface NavHeaderProps {
     menuItems: string[];
     activeItem: string;
 }
-
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MenuContent } from "./menu-content";
 
 export const NavHeader = ({ menuItems, activeItem }: NavHeaderProps) => {
     return (
