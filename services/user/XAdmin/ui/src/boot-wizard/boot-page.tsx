@@ -447,9 +447,6 @@ export const InstallForm = ({
             )}
             <ScrollArea className=" h-[800px]">
                 <Table>
-                    <TableCaption>
-                        A list of packages to be installed.
-                    </TableCaption>
                     <TableHeader>
                         <TableRow>
                             <TableCell
