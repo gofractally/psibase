@@ -1,5 +1,5 @@
 use clang::documentation::{Comment, CommentChild};
-use clang::{Accessibility, Entity, EntityKind, TranslationUnit};
+use clang::{Accessibility, Entity, EntityKind, TranslationUnit, Type};
 use clap::{Parser, Subcommand};
 use mdbook::preprocess::CmdPreprocessor;
 use mdbook::BookItem;
@@ -33,6 +33,7 @@ enum Kind {
     Enum,
     EnumConstant,
     Struct,
+    Alias,
 }
 
 struct Item<'tu> {
@@ -82,6 +83,12 @@ fn convert_children<'a, 'tu>(items: &'a mut Vec<Item<'tu>>, current: usize, enti
             }
             EntityKind::StructDecl => {
                 convert_child(items, current, child, Kind::Struct, false);
+            }
+            EntityKind::TypeAliasDecl => {
+                convert_child(items, current, child, Kind::Alias, false);
+            }
+            EntityKind::TypeAliasTemplateDecl => {
+                convert_child(items, current, child, Kind::Alias, false);
             }
             _ => (),
         }
@@ -400,6 +407,7 @@ fn generate_documentation(items: &[Item], path: &str) -> String {
             Kind::Enum => document_enum(items, index, path, &mut result),
             Kind::Function => document_function(items, index, path, &mut result),
             Kind::Struct => document_struct(items, index, path, &mut result),
+            Kind::Alias => document_alias(items, index, path, &mut result),
             _ => (),
         }
     }
@@ -639,6 +647,42 @@ fn document_function(items: &[Item], index: usize, path: &str, result: &mut Stri
         replace_bracket_links(&item.doc_str, items, index)
     );
 } // document_function
+
+fn unwrap_alias<'tu>(entity: &Entity<'tu>) -> Type<'tu> {
+    match entity.get_kind() {
+        EntityKind::TypeAliasTemplateDecl => {
+            for child in entity.get_children() {
+                if child.get_kind() == EntityKind::TypeAliasDecl {
+                    return unwrap_alias(&child);
+                }
+            }
+            panic!("underlying type not found");
+        }
+        _ => entity.get_typedef_underlying_type().unwrap(),
+    }
+}
+
+fn document_alias(items: &[Item], index: usize, path: &str, result: &mut String) {
+    let item = &items[index];
+    let mut def = String::new();
+    def.push_str(r#"<pre><code class="nohighlight">"#);
+    document_template_args(item, &mut def);
+    def.push_str(r#"<span class="hljs-keyword">using</span> "#);
+    def.push_str(r#"<span class="hljs-title">"#);
+    def.push_str(&path[2..]);
+    def.push_str(r#"</span> = "#);
+    let ty = unwrap_alias(&item.entity).get_display_name();
+    def.push_str(&style_type(&escape_and_add_links(&ty, items, index)));
+    def.push_str(";\n</code></pre>\n");
+
+    let _ = write!(
+        result,
+        "### {}\n\n{}\n{}\n",
+        &path[2..],
+        def,
+        replace_bracket_links(&item.doc_str, items, index)
+    );
+}
 
 fn document_template_args(item: &Item, def: &mut String) {
     let template_args: Vec<Entity> = filter_children(&item.entity, |c| {
