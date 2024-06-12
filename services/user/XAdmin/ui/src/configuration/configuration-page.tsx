@@ -169,7 +169,10 @@ export const ConfigurationPage = ({
             {!config ? (
                 <p>Unable to load config</p>
             ) : (
-                <form onSubmit={configForm.handleSubmit(onConfig)}>
+                <form
+                    onSubmit={configForm.handleSubmit(onConfig)}
+                    className="px-2"
+                >
                     <Controller
                         name="p2p"
                         control={configForm.control}
@@ -272,26 +275,30 @@ export const ConfigurationPage = ({
                     <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
                         Loggers
                     </h2>
-
-                    {loggers &&
-                        Object.entries(loggers).map(([name, _contents]) => (
-                            <Logger
-                                key={name}
-                                loggerKey={name}
-                                control={configForm.control}
-                                register={(field, options) =>
-                                    handleLoggerFieldRegister(
-                                        name,
-                                        field,
-                                        options
-                                    )
-                                }
-                                watch={(field) =>
-                                    handleLoggerFieldWatch(name, field)
-                                }
-                                remove={() => handleLoggerRemove(name)}
-                            />
-                        ))}
+                    {loggers && (
+                        <div className="flex flex-col gap-4">
+                            {Object.entries(loggers).map(
+                                ([name, _contents]) => (
+                                    <Logger
+                                        key={name}
+                                        loggerKey={name}
+                                        control={configForm.control}
+                                        register={(field, options) =>
+                                            handleLoggerFieldRegister(
+                                                name,
+                                                field,
+                                                options
+                                            )
+                                        }
+                                        watch={(field) =>
+                                            handleLoggerFieldWatch(name, field)
+                                        }
+                                        remove={() => handleLoggerRemove(name)}
+                                    />
+                                )
+                            )}
+                        </div>
+                    )}
                     <Button className="mt-4" onClick={onAddNewLoggerClick}>
                         New Logger
                     </Button>
@@ -345,13 +352,19 @@ export const ConfigurationPage = ({
                                             id="r1"
                                         />
                                         <Label htmlFor="r1">
-                                            Builtin services only (recommended)
+                                            Builtin services only{" "}
+                                            <span className="text-muted-foreground">
+                                                (recommended)
+                                            </span>
                                         </Label>
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <RadioGroupItem value="*" id="r2" />
                                         <Label htmlFor="r2">
-                                            All services (not recommended)
+                                            All services{" "}
+                                            <span className="text-muted-foreground">
+                                                (not recommended)
+                                            </span>
                                         </Label>
                                     </div>
                                     <div className="flex items-center space-x-2">
