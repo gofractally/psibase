@@ -153,7 +153,7 @@ export const TypeForm = ({
                 control={typeForm.control}
                 render={({ field }) => (
                     <RadioGroup
-                        defaultValue="full"
+                        defaultValue={field.value || "full"}
                         onValueChange={field.onChange}
                     >
                         <div className="flex items-center space-x-2">
