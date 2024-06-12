@@ -144,6 +144,25 @@ namespace psibase
       /// Sets the transaction timer to expire a given number of nanoseconds
       /// after the beginning of the current transaction.
       PSIBASE_NATIVE(setMaxTransactionTime) void setMaxTransactionTime(uint64_t ns);
+
+      /// Loads the subjective database
+      /// - The subjective database may not be accessed without calling this first
+      /// - If the subjective database is already checked out, this will create a nested checkout
+      ///
+      /// There exists a total ordering of all top-level checkouts. Every read operation returns
+      /// the most recent write in the current checkout or in previous checkouts that were
+      /// successfully committed.
+      PSIBASE_NATIVE(checkoutSubjective) void checkoutSubjective();
+      /// Attempts to commit changes to the subjective database
+      /// If changes were committed successfully, returns true and closes the subjective database
+      /// If changes were not successfully committed, returns false and reloads the subjective database, starting a new checkout.
+      ///
+      /// If there were no writes to the subjective database or if this is a nested checkout, commit always succeeds.
+      ///
+      PSIBASE_NATIVE(commitSubjective) bool commitSubjective();
+      ///
+      PSIBASE_NATIVE(abortSubjective) void abortSubjective();
+
    }  // namespace raw
 
    /// Get result
@@ -536,6 +555,10 @@ namespace psibase
    {
       raw::writeConsole(sv.data(), sv.size());
    }
+
+   using raw::abortSubjective;
+   using raw::checkoutSubjective;
+   using raw::commitSubjective;
 
 }  // namespace psibase
 

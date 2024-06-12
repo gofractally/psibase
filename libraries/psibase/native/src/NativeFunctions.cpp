@@ -87,14 +87,6 @@ namespace psibase
 
       Writable getDbWrite(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
-         check(self.allowDbRead,
-               "database access disabled during proof verification or first auth");
-
-         if (!self.allowDbWrite && self.allowDbWriteSubjective && db == uint32_t(DbId::writeOnly))
-            return {(DbId)db, true, false};
-
-         check(self.allowDbWrite, "database writes disabled during query");
-
          if (keyHasServicePrefix(db))
          {
             uint64_t prefix = self.code.codeNum.value;
@@ -116,19 +108,26 @@ namespace psibase
          // subjective attack mitigation.
          //
          // TODO: reenable after subjective database support is working as intended
-         if (false && db == uint32_t(DbId::subjective) &&
-             (self.code.flags & CodeRow::isSubjective) &&
+         if (db == uint32_t(DbId::subjective) && (self.code.flags & CodeRow::isSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
             return {(DbId)db, false, false};
 
+         check(self.allowDbRead,
+               "database access disabled during proof verification or first auth");
+
+         // the writeOnly database can be written by any ..
          if (db == uint32_t(DbId::writeOnly))
          {
+            check(self.allowDbWrite || self.allowDbWriteSubjective,
+                  "database writes disabled during query");
             check(!(self.code.flags & CodeRow::isSubjective) ||
                       (self.code.flags & CodeRow::forceReplay),
                   "subjective services may only write to DbId::subjective");
             return {(DbId)db, !(self.code.flags & CodeRow::isSubjective), false};
          }
+
+         check(self.allowDbWrite, "database writes disabled during query");
 
          // Prevent poison block; subjective services skip execution during replay
          check(!(self.code.flags & CodeRow::isSubjective),
@@ -645,5 +644,18 @@ namespace psibase
       transactionContext.kvResourceDeltas.adopt_sequence(boost::container::ordered_unique_range,
                                                          std::move(seq));
       return size;
+   }
+
+   void NativeFunctions::checkoutSubjective()
+   {
+      database.checkoutSubjective();
+   }
+   bool NativeFunctions::commitSubjective()
+   {
+      return database.commitSubjective();
+   }
+   void NativeFunctions::abortSubjective()
+   {
+      database.abortSubjective();
    }
 }  // namespace psibase

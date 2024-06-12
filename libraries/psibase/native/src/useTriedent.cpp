@@ -16,8 +16,13 @@ namespace psibase
    static constexpr uint8_t revisionHeadPrefix = 0;
    static constexpr uint8_t revisionByIdPrefix = 1;
    static constexpr uint8_t blockDataPrefix    = 2;
+   static constexpr uint8_t subjectivePrefix   = 3;
 
    static const char revisionHeadKey[] = {revisionHeadPrefix};
+   static const char subjectiveKey[]   = {subjectivePrefix};
+
+   // TODO: should this be defined in a header or even loaded from the db?
+   static constexpr std::size_t maxSubjectiveTransactionDepth = 8;
 
    static auto revisionById(const Checksum256& blockId)
    {
@@ -25,6 +30,96 @@ namespace psibase
       result[0] = revisionByIdPrefix;
       memcpy(result.data() + 1, blockId.data(), blockId.size());
       return result;
+   }
+
+   namespace
+   {
+      void prepare(DbChangeSet& changes)
+      {
+         std::ranges::sort(changes.ranges, {}, &DbChangeSet::Range::lower);
+         // merge adjacent and overlapping ranges
+         auto pos = changes.ranges.begin();
+         auto end = changes.ranges.end();
+         if (pos != end)
+         {
+            auto out = pos;
+            ++pos;
+            for (; pos != end; ++pos)
+            {
+               if (out->upper.empty())
+               {
+                  out->write = out->write || std::any_of(pos, end, [](auto& r) { return r.write; });
+                  break;
+               }
+               else if (pos->lower <= out->upper)
+               {
+                  out->write |= pos->write;
+                  if (out->upper < pos->upper || pos->upper.empty())
+                     out->upper = std::move(pos->upper);
+               }
+               else
+               {
+                  ++out;
+                  *out = std::move(*pos);
+               }
+            }
+            ++out;
+            changes.ranges.erase(out, changes.ranges.end());
+         }
+      }
+      std::vector<unsigned char> keyExact(std::span<const char> key)
+      {
+         return {key.begin(), key.end()};
+      }
+      std::vector<unsigned char> keyNext(std::span<const char> key)
+      {
+         std::vector<unsigned char> result;
+         result.reserve(key.size() + 1);
+         result.insert(result.end(), key.begin(), key.end());
+         result.push_back(0);
+         return result;
+      }
+      std::vector<unsigned char> keyNextPrefix(std::span<const char> key)
+      {
+         auto result = keyExact(key);
+         while (!result.empty() && result.back() == 0xffu)
+            result.pop_back();
+         if (!result.empty())
+            ++result.back();
+         return result;
+      }
+      std::span<const char> dbKey(const std::vector<unsigned char>& v)
+      {
+         return {reinterpret_cast<const char*>(v.data()), v.size()};
+      }
+   }  // namespace
+   void DbChangeSet::onRead(std::span<const char> key)
+   {
+      ranges.push_back({.lower = keyExact(key), .upper = keyNext(key)});
+   }
+   void DbChangeSet::onGreaterEqual(std::span<const char> key,
+                                    std::size_t           prefixLen,
+                                    bool                  found,
+                                    std::span<const char> result)
+   {
+      ranges.push_back(
+          {keyExact(key), found ? keyNext(result) : keyNextPrefix(key.subspan(0, prefixLen))});
+   }
+   void DbChangeSet::onLessThan(std::span<const char> key,
+                                std::size_t           prefixLen,
+                                bool                  found,
+                                std::span<const char> result)
+   {
+      ranges.push_back(
+          {found ? keyExact(result) : keyExact(key.subspan(0, prefixLen)), keyExact(key)});
+   }
+   void DbChangeSet::onMax(std::span<const char> key, bool found, std::span<const char> result)
+   {
+      ranges.push_back({found ? keyExact(result) : keyExact(key), keyNextPrefix(key)});
+   }
+   void DbChangeSet::onWrite(std::span<const char> key)
+   {
+      ranges.push_back({.lower = keyExact(key), .upper = keyNext(key), .write = true});
    }
 
    // TODO: move triedent::root destruction to a gc thread
@@ -176,6 +271,9 @@ namespace psibase
 
       std::mutex                      headMutex;
       std::shared_ptr<const Revision> head;
+
+      std::mutex                      subjectiveMutex;
+      std::shared_ptr<triedent::root> subjective;
 
       SharedDatabaseImpl(const std::filesystem::path& dir,
                          uint64_t                     hot_bytes,
@@ -344,6 +442,42 @@ namespace psibase
       return reader.get(topRoot, fullKey);
    }
 
+   DbPtr SharedDatabase::getSubjective()
+   {
+      std::lock_guard l{impl->subjectiveMutex};
+      return impl->subjective;
+   }
+
+   bool SharedDatabase::commitSubjective(Writer&       writer,
+                                         DbPtr&        original,
+                                         DbPtr         updated,
+                                         DbChangeSet&& changes)
+   {
+      prepare(changes);
+      if (std::ranges::any_of(changes.ranges, [](auto& r) { return r.write; }))
+      {
+         std::lock_guard l{impl->subjectiveMutex};
+         for (const auto& r : changes.ranges)
+         {
+            if (!writer.is_equal_weak(original, impl->subjective, dbKey(r.lower), dbKey(r.upper)))
+            {
+               original = impl->subjective;
+               return false;
+            }
+         }
+         for (const auto& r : changes.ranges)
+         {
+            if (r.write)
+               writer.splice(impl->subjective, updated, dbKey(r.lower), dbKey(r.upper));
+         }
+         // TODO: All access to top_root needs to be atomic
+         auto r = writer.get_top_root();
+         writer.upsert(r, subjectiveKey, {&impl->subjective, 1});
+         writer.set_top_root(std::move(r));
+      }
+      return true;
+   }
+
    bool SharedDatabase::isSlow() const
    {
       return impl->trie->is_slow();
@@ -355,6 +489,12 @@ namespace psibase
       return {result.begin(), result.end()};
    }
 
+   struct SubjectiveRevision
+   {
+      std::size_t                     changeSetPos;
+      std::shared_ptr<triedent::root> db;
+   };
+
    struct DatabaseImpl
    {
       SharedDatabase                           shared;
@@ -365,6 +505,23 @@ namespace psibase
       std::shared_ptr<const Revision>          readOnlyRevision;
       std::vector<char>                        keyBuffer;
       std::vector<char>                        valueBuffer;
+
+      DbChangeSet                     subjectiveChanges;
+      std::vector<SubjectiveRevision> subjectiveRevisions;
+
+      auto db(auto& revision, DbId db) -> decltype((revision.roots[(int)db]))
+      {
+         if (db == DbId::subjective)
+         {
+            check(!subjectiveRevisions.empty(),
+                  "subjectiveCheckout is required to access the subjective database");
+            return subjectiveRevisions.back().db;
+         }
+         else
+         {
+            return revision.roots[(int)db];
+         }
+      }
 
       template <typename F>
       auto read(F f)
@@ -452,6 +609,64 @@ namespace psibase
          else if (!writeRevisions.empty())
             writeRevisions.pop_back();
       }
+
+      void checkoutSubjective()
+      {
+         check(subjectiveRevisions.size() <= maxSubjectiveTransactionDepth,
+               "checkoutSubjective nesting exceeded limit");
+         if (subjectiveRevisions.empty())
+         {
+            subjectiveRevisions.push_back({0, shared.getSubjective()});
+         }
+         subjectiveRevisions.push_back(
+             {subjectiveChanges.ranges.size(), subjectiveRevisions.back().db});
+      }
+
+      bool commitSubjective()
+      {
+         check(!subjectiveRevisions.empty(), "commitSubjective requires checkoutSubjective");
+         if (subjectiveRevisions.size() > 2)
+         {
+            subjectiveRevisions[subjectiveRevisions.size() - 2].db =
+                std::move(subjectiveRevisions.back().db);
+            subjectiveRevisions.pop_back();
+         }
+         else
+         {
+            assert(subjectiveRevisions.size() == 2);
+            if (writeSession)
+            {
+               if (!shared.commitSubjective(*writeSession, subjectiveRevisions.front().db,
+                                            subjectiveRevisions.back().db,
+                                            std::move(subjectiveChanges)))
+               {
+                  subjectiveRevisions[1].db           = subjectiveRevisions[0].db;
+                  subjectiveRevisions[0].changeSetPos = 0;
+                  subjectiveRevisions[1].changeSetPos = 0;
+                  subjectiveChanges.ranges.clear();
+                  return false;
+               }
+            }
+            subjectiveRevisions.clear();
+            subjectiveChanges.ranges.clear();
+         }
+         return true;
+      }
+      void abortSubjective()
+      {
+         check(!subjectiveRevisions.empty(), "abortSubjective requires checkoutSubjective");
+         if (subjectiveRevisions.size() > 2)
+         {
+            assert(subjectiveRevisions.back().changeSetPos <= subjectiveChanges.ranges.size());
+            subjectiveChanges.ranges.resize(subjectiveRevisions.back().changeSetPos);
+            subjectiveRevisions.pop_back();
+         }
+         else
+         {
+            subjectiveRevisions.clear();
+            subjectiveChanges.ranges.clear();
+         }
+      }
    };  // DatabaseImpl
 
    Database::Database(SharedDatabase shared, ConstRevisionPtr revision)
@@ -508,12 +723,29 @@ namespace psibase
       impl->abort();
    }
 
+   void Database::checkoutSubjective()
+   {
+      return impl->checkoutSubjective();
+   }
+   bool Database::commitSubjective()
+   {
+      return impl->commitSubjective();
+   }
+   void Database::abortSubjective()
+   {
+      return impl->abortSubjective();
+   }
+
    void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
    {
       impl->write(
           [&](auto& session, auto& revision)
           {
-             session.upsert(revision.roots[(int)db], key.string_view(), value.string_view());
+             if (db == DbId::subjective)
+             {
+                impl->subjectiveChanges.onWrite(key.string_view());
+             }
+             session.upsert(impl->db(revision, db), key.string_view(), value.string_view());
              if constexpr (sanityCheck)
              {
                 revision.sanity()[(int)db][key.vector()] = value.vector();
@@ -527,7 +759,11 @@ namespace psibase
       impl->write(
           [&](auto& session, auto& revision)
           {
-             session.remove(revision.roots[(int)db], key.string_view());
+             if (db == DbId::subjective)
+             {
+                impl->subjectiveChanges.onWrite(key.string_view());
+             }
+             session.remove(impl->db(revision, db), key.string_view());
              if constexpr (sanityCheck)
              {
                 revision.sanity()[(int)db].erase(key.vector());
@@ -541,7 +777,12 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<psio::input_stream>
           {
-             if (!session.get(revision.roots[(int)db], key.string_view(), &impl->valueBuffer,
+             if (db == DbId::subjective)
+             {
+                impl->subjectiveChanges.onRead(key.string_view());
+             }
+
+             if (!session.get(impl->db(revision, db), key.string_view(), &impl->valueBuffer,
                               nullptr))
              {
                 if constexpr (sanityCheck)
@@ -572,11 +813,17 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_greater_equal(revision.roots[(int)db], key.string_view(),
+             auto found = session.get_greater_equal(impl->db(revision, db), key.string_view(),
                                                     &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            memcmp(impl->keyBuffer.data(), key.pos, matchKeySize)))
                 found = false;
+
+             if (db == DbId::subjective)
+             {
+                impl->subjectiveChanges.onGreaterEqual(key.string_view(), matchKeySize, found,
+                                                       impl->keyBuffer);
+             }
 
              if (!found)
              {
@@ -618,11 +865,17 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_less_than(revision.roots[(int)db], key.string_view(),
+             auto found = session.get_less_than(impl->db(revision, db), key.string_view(),
                                                 &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            memcmp(impl->keyBuffer.data(), key.pos, matchKeySize)))
                 found = false;
+
+             if (db == DbId::subjective)
+             {
+                impl->subjectiveChanges.onLessThan(key.string_view(), matchKeySize, found,
+                                                   impl->keyBuffer);
+             }
 
              if (!found)
              {
@@ -675,8 +928,15 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             if (!session.get_max(revision.roots[(int)db], key.string_view(), &impl->keyBuffer,
-                                  &impl->valueBuffer, nullptr))
+             auto found = session.get_max(impl->db(revision, db), key.string_view(),
+                                          &impl->keyBuffer, &impl->valueBuffer, nullptr);
+
+             if (db == DbId::subjective)
+             {
+                impl->subjectiveChanges.onMax(key.string_view(), found, impl->keyBuffer);
+             }
+
+             if (!found)
              {
                 if constexpr (sanityCheck)
                 {
