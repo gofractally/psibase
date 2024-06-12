@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface LoggerProps {
     loggerKey: string;
@@ -43,14 +44,17 @@ export const Logger = ({
                 name="type"
                 control={control}
                 render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                        onValueChange={field.onChange}
+                        defaultValue={type_ || field.value}
+                    >
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Choose logger type" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="console">Console</SelectItem>
                             <SelectItem value="file">File</SelectItem>
-                            <SelectItem value="local">Local</SelectItem>
+                            <SelectItem value="local">Local socket</SelectItem>
                             <SelectItem value="pipe">Pipe</SelectItem>
                         </SelectContent>
                     </Select>
@@ -67,19 +71,19 @@ export const Logger = ({
                 <Input {...register("format")} />
             </div>
 
-            <div className="gap-1.5">
+            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
                 <Label>File Name</Label>
                 <Input
                     {...register("filename", { disabled: type_ != "file" })}
                 />
             </div>
 
-            <div className="gap-1.5">
+            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
                 <Label>Target File Name</Label>
                 <Input {...register("target", { disabled: type_ != "file" })} />
             </div>
 
-            <div className="gap-1.5">
+            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
                 <Label>File Rotation Size</Label>
                 <Input
                     type="number"
@@ -87,14 +91,14 @@ export const Logger = ({
                 />
             </div>
 
-            <div className="gap-1.5">
+            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
                 <Label>File Rotation Time</Label>
                 <Input
                     {...register("rotationTime", { disabled: type_ != "file" })}
                 />
             </div>
 
-            <div>
+            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
                 <Label>Max Total File Size</Label>
                 <Input
                     type="number"
@@ -102,7 +106,7 @@ export const Logger = ({
                 />
             </div>
 
-            <div>
+            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
                 <Label>Max Total Files</Label>
                 <Input
                     type="number"
@@ -110,7 +114,11 @@ export const Logger = ({
                 />
             </div>
 
-            <div className="flex justify-between py-4">
+            <div
+                className={cn("flex justify-between py-4", {
+                    hidden: type_ != "file",
+                })}
+            >
                 <Label>Flush every record</Label>
                 <Controller
                     name="flush"
@@ -128,11 +136,11 @@ export const Logger = ({
                 />
             </div>
 
-            <div className="gap-1.5">
+            <div className={cn("gap-1.5", { hidden: type_ != "local" })}>
                 <Label>Socket Path</Label>
                 <Input {...register("path", { disabled: type_ != "local" })} />
             </div>
-            <div className="gap-1.5">
+            <div className={cn("gap-1.5", { hidden: type_ != "pipe" })}>
                 <Label>Command</Label>
                 <Input
                     {...register("command", { disabled: type_ != "pipe" })}
