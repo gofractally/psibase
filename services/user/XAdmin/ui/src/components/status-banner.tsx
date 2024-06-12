@@ -32,8 +32,20 @@ export const StatusBanner = ({
             case "needgenesis":
                 return (
                     <>
-                        No chain running. <a href="#Boot">Create a new chain</a>{" "}
-                        or <a href="#Peers">connect to an existing chain</a>
+                        No chain running.{" "}
+                        <a
+                            className="font-medium text-primary underline underline-offset-4"
+                            href="#Boot"
+                        >
+                            Create a new chain
+                        </a>{" "}
+                        or{" "}
+                        <a
+                            className="font-medium text-primary underline underline-offset-4"
+                            href="#Peers"
+                        >
+                            connect to an existing chain
+                        </a>
                     </>
                 );
             default:
