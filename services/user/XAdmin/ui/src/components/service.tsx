@@ -57,7 +57,10 @@ export const Service = ({
             </td>
             {!isEnd && (
                 <td>
-                    <Button onClick={() => services.remove(index)}>
+                    <Button
+                        variant="secondary"
+                        onClick={() => services.remove(index)}
+                    >
                         Remove
                     </Button>
                 </td>
