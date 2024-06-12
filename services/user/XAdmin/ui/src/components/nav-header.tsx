@@ -16,7 +16,7 @@ export const NavHeader = ({ menuItems, activeItem }: NavHeaderProps) => {
                 Admin Panel
             </h1>
             <div className="flex gap-3">
-                <Tabs value={activeItem} className="">
+                <Tabs value={activeItem}>
                     <TabsList>
                         {menuItems.map((item) => (
                             <TabsTrigger asChild key={item} value={item}>
