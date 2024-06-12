@@ -30,40 +30,41 @@ export const Logger = ({
 }: LoggerProps) => {
     const type_ = watch("type") as string;
     return (
-        <fieldset className="logger-control p-2">
-            <div className="flex justify-between">
+        <fieldset className="flex flex-col gap-2 rounded-md bg-muted p-3">
+            <div className="flex justify-between py-2">
                 <legend className="scroll-m-20 text-2xl font-semibold tracking-tight">
                     {loggerKey}
                 </legend>
-                <Button variant="secondary" onClick={remove}>
+                <Button size="sm" variant="default" onClick={remove}>
                     Remove
                 </Button>
             </div>
-
-            <Controller
-                name="type"
-                control={control}
-                render={({ field }) => (
-                    <Select
-                        onValueChange={field.onChange}
-                        defaultValue={type_ || field.value}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="gap-1.5">
+                    <Label>Type</Label>
+                    <select
+                        {...register("type")}
+                        className="flex h-10 w-full items-center justify-between rounded-md  bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Choose logger type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="console">Console</SelectItem>
-                            <SelectItem value="file">File</SelectItem>
-                            <SelectItem value="local">Local socket</SelectItem>
-                            <SelectItem value="pipe">Pipe</SelectItem>
-                        </SelectContent>
-                    </Select>
-                )}
-            />
+                        <option value="console" className="logger-option">
+                            Console
+                        </option>
+                        <option value="file" className="logger-option">
+                            File
+                        </option>
+                        <option value="local" className="logger-option">
+                            Local socket
+                        </option>
+                        <option value="pipe" className="logger-option">
+                            Pipe
+                        </option>
+                    </select>
+                </div>
 
-            <div className="gap-1.5">
-                <Label>Filter</Label>
-                <Input {...register("filter")} />
+                <div className="gap-1.5">
+                    <Label>Filter</Label>
+                    <Input {...register("filter")} />
+                </div>
             </div>
 
             <div className="gap-1.5">
@@ -71,47 +72,55 @@ export const Logger = ({
                 <Input {...register("format")} />
             </div>
 
-            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
-                <Label>File Name</Label>
-                <Input
-                    {...register("filename", { disabled: type_ != "file" })}
-                />
-            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
+                    <Label>File Name</Label>
+                    <Input
+                        {...register("filename", { disabled: type_ != "file" })}
+                    />
+                </div>
 
-            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
-                <Label>Target File Name</Label>
-                <Input {...register("target", { disabled: type_ != "file" })} />
-            </div>
+                <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
+                    <Label>Target File Name</Label>
+                    <Input
+                        {...register("target", { disabled: type_ != "file" })}
+                    />
+                </div>
 
-            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
-                <Label>File Rotation Size</Label>
-                <Input
-                    type="number"
-                    {...register("rotationSize", { disabled: type_ != "file" })}
-                />
-            </div>
+                <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
+                    <Label>File Rotation Size</Label>
+                    <Input
+                        type="number"
+                        {...register("rotationSize", {
+                            disabled: type_ != "file",
+                        })}
+                    />
+                </div>
 
-            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
-                <Label>File Rotation Time</Label>
-                <Input
-                    {...register("rotationTime", { disabled: type_ != "file" })}
-                />
-            </div>
+                <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
+                    <Label>File Rotation Time</Label>
+                    <Input
+                        {...register("rotationTime", {
+                            disabled: type_ != "file",
+                        })}
+                    />
+                </div>
 
-            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
-                <Label>Max Total File Size</Label>
-                <Input
-                    type="number"
-                    {...register("maxSize", { disabled: type_ != "file" })}
-                />
-            </div>
+                <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
+                    <Label>Max Total File Size</Label>
+                    <Input
+                        type="number"
+                        {...register("maxSize", { disabled: type_ != "file" })}
+                    />
+                </div>
 
-            <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
-                <Label>Max Total Files</Label>
-                <Input
-                    type="number"
-                    {...register("maxFiles", { disabled: type_ != "file" })}
-                />
+                <div className={cn("gap-1.5", { hidden: type_ != "file" })}>
+                    <Label>Max Total Files</Label>
+                    <Input
+                        type="number"
+                        {...register("maxFiles", { disabled: type_ != "file" })}
+                    />
+                </div>
             </div>
 
             <div
