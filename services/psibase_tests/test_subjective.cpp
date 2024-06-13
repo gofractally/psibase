@@ -1,4 +1,5 @@
 #include <psibase/DefaultTestChain.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>
 #include "subjective-service.hpp"
 
@@ -29,8 +30,16 @@ TEST_CASE("subjective db")
    t.from(SetCode::service)
        .to<SetCode>()
        .setFlags(SubjectiveService::service, SubjectiveService::serviceFlags);
+   t.from(SubjectiveService::service).to<HttpServer>().registerServer(SubjectiveService::service);
    auto subjective = t.from(SubjectiveService::service).to<SubjectiveService>();
 
    CHECK(subjective.write("a", "b").succeeded());
    CHECK(subjective.read("a").returnVal() == std::optional{std::string("b")});
+
+   CHECK(subjective.testWFail1("a", "b").failed(
+       "subjectiveCheckout is required to access the subjective database"));
+
+   t.post(SubjectiveService::service, "/write", SubjectiveRow{"c", "d"});
+   CHECK(t.post<std::optional<std::string>>(SubjectiveService::service, "/read", "c") ==
+         std::optional{std::string("d")});
 }

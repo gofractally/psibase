@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/nativeTables.hpp>
@@ -23,5 +24,12 @@ struct SubjectiveService : psibase::Service<SubjectiveService>
        psibase::CodeRow::isSubjective | psibase::CodeRow::allowWriteSubjective;
    void                       write(std::string key, std::string value);
    std::optional<std::string> read(std::string key);
+   void                       testWFail1(std::string key, std::string value);
+
+   std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
-PSIO_REFLECT(SubjectiveService, method(write, key, value), method(read, key, value))
+PSIO_REFLECT(SubjectiveService,
+             method(write, key, value),
+             method(read, key, value),
+             method(testWFail1, key, value),
+             method(serveSys, req))
