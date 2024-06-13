@@ -36,6 +36,19 @@ TEST_CASE("subjective db")
    CHECK(subjective.write("a", "b").succeeded());
    CHECK(subjective.read("a").returnVal() == std::optional{std::string("b")});
 
+   for (bool b : {false, true})
+   {
+      for (int i = 0; i < 4; ++i)
+      {
+         CHECK(subjective.testRFail1("a", b, i).failed(
+             "subjectiveCheckout is required to access the subjective database"));
+      }
+   }
+   for (int i = 0; i < 4; ++i)
+   {
+      CHECK(subjective.testRFail2(AccountNumber{"alice"}, "a", i)
+                .failed("key prefix must match service"));
+   }
    CHECK(subjective.testWFail1("a", "b").failed(
        "subjectiveCheckout is required to access the subjective database"));
 

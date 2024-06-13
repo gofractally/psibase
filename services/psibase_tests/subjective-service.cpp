@@ -54,6 +54,39 @@ std::optional<std::string> SubjectiveService::read(std::string key)
    return {};
 }
 
+void SubjectiveService::testRFail1(std::string key, bool txBefore, int op)
+{
+   if (txBefore)
+   {
+      PSIBASE_SUBJECTIVE_TX {}
+   }
+   auto index = Tables{}.open<SubjectiveTable>().getIndex<0>();
+   if (op == 0)
+      index.get(key);
+   else if (op == 1)
+      index.lower_bound(key);
+   else if (op == 2)
+      index.upper_bound(key);
+   else if (op == 3)
+      --index.end();
+}
+
+void SubjectiveService::testRFail2(AccountNumber account, std::string key, int op)
+{
+   auto index = Tables{account}.open<SubjectiveTable>().getIndex<0>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (op == 0)
+         index.get(key);
+      else if (op == 1)
+         index.lower_bound(key);
+      else if (op == 2)
+         index.upper_bound(key);
+      else if (op == 3)
+         --index.end();
+   }
+}
+
 void SubjectiveService::testWFail1(std::string key, std::string value)
 {
    Tables{}.open<SubjectiveTable>().put({key, value});

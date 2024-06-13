@@ -27,7 +27,7 @@ namespace psibase
              std::chrono::steady_clock::now() - start;
       }
 
-      DbId getDbRead(NativeFunctions& self, uint32_t db)
+      DbId getDbRead(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
          check(self.allowDbRead,
                "database access disabled during proof verification or first auth");
@@ -39,6 +39,10 @@ namespace psibase
             return (DbId)db;
          if (db == uint32_t(DbId::subjective))
          {
+            uint64_t prefix = self.code.codeNum.value;
+            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
+            check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
+                  "key prefix must match service for accessing the subjective database");
             // TODO: RPC service queries currently can read subjective data to monitor node status.
             //       However, there's a possibility this may make it easier on an active attacker.
             //       Make this capability a node configuration toggle? Allow node config to whitelist
@@ -569,9 +573,11 @@ namespace psibase
    {
       return timeDb(  //
           *this,
-          [&] {
+          [&]
+          {
              return setResult(*this,
-                              database.kvGetRaw(getDbRead(*this, db), {key.data(), key.size()}));
+                              database.kvGetRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                {key.data(), key.size()}));
           });
    }
 
@@ -599,8 +605,8 @@ namespace psibase
                 check(matchKeySize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
              return setResult(
-                 *this, database.kvGreaterEqualRaw(getDbRead(*this, db), {key.data(), key.size()},
-                                                   matchKeySize));
+                 *this, database.kvGreaterEqualRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                   {key.data(), key.size()}, matchKeySize));
           });
    }
 
@@ -617,8 +623,8 @@ namespace psibase
                 check(matchKeySize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
              return setResult(*this,
-                              database.kvLessThanRaw(getDbRead(*this, db), {key.data(), key.size()},
-                                                     matchKeySize));
+                              database.kvLessThanRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                     {key.data(), key.size()}, matchKeySize));
           });
    }
 
@@ -631,7 +637,8 @@ namespace psibase
              if (keyHasServicePrefix(db))
                 check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
              return setResult(*this,
-                              database.kvMaxRaw(getDbRead(*this, db), {key.data(), key.size()}));
+                              database.kvMaxRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                {key.data(), key.size()}));
           });
    }
 

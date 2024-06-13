@@ -24,12 +24,17 @@ struct SubjectiveService : psibase::Service<SubjectiveService>
        psibase::CodeRow::isSubjective | psibase::CodeRow::allowWriteSubjective;
    void                       write(std::string key, std::string value);
    std::optional<std::string> read(std::string key);
-   void                       testWFail1(std::string key, std::string value);
+
+   void testRFail1(std::string key, bool txBefore, int op);
+   void testRFail2(psibase::AccountNumber account, std::string key, int op);
+   void testWFail1(std::string key, std::string value);
 
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
 PSIO_REFLECT(SubjectiveService,
              method(write, key, value),
              method(read, key, value),
+             method(testRFail1, key, txBefore, op),
+             method(testRFail2, account, key, op),
              method(testWFail1, key, value),
              method(serveSys, req))
