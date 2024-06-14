@@ -108,7 +108,7 @@ function App() {
       .on("tick", handleSimulationTick(simulation.current, nodeRadius))
       .alphaDecay(0.002); // just added alpha decay to delay end of execution
     // 4: add/remove/update nodes to/in DOM and style them
-    addNodes(graph.nodes, uiOptions.current.centeredNodeIdx, nodeRadius);
+    addNodes(graph.nodes, nodeRadius);
 
     // deployNewGraph();
 
