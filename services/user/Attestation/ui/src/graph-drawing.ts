@@ -1,7 +1,7 @@
 import * as d3 from "d3";
 import rawData from "./members-fixture";
 import { getCouncilLinks } from "./graph-data";
-import { AttestationGraph, AttestationGraphLink, AttestationGraphNode, AttestationGraphSecondaryLink, NodeAwareLink, UiOptions, Vector, isD3ifiedLink } from "./types";
+import { AttestationGraph, AttestationGraphLink, AttestationGraphNode, AttestationGraphSecondaryLink, UiOptions, Vector, isD3ifiedLink } from "./types";
 import { SELECTOR, dataSetName } from "./constants";
 
 export const handleSimulationTick = (simulation: d3.Simulation<AttestationGraphNode, AttestationGraphLink>, nodeRadius: number) => () => {
@@ -56,7 +56,7 @@ function addAccountCreationLineage(accountCreations: AttestationGraphLink[]) {
   }
   
   function addBackAttestations(backAttestations: AttestationGraphLink[]) {
-    const debug = false;
+    const debug = true;
     if (!backAttestations)
         return;
     else
@@ -75,6 +75,7 @@ export const addAllLinks = (graph: AttestationGraph) => {
     // addNodes(graph.nodes, centeredNodeIdx, nodeRadius);
     addLinks(graph.attestations);
     addAccountCreationLineage(graph["account-creations"]);
+    console.info("if backAttestations:", !!graph.backAttestations)
     if (graph.backAttestations)
         addBackAttestations(graph.backAttestations);
   }
@@ -137,10 +138,12 @@ export const addNodes = (nodes: AttestationGraphNode[], centeredNodeIdx: number,
     Ns.exit().remove();
   }
   
-const drawStraightLink = (d: NodeAwareLink, dvec: Vector) => {
+const drawStraightLink = (d: AttestationGraphLink, dvec: Vector): string => {
+  if (!d.source?.x || !d.source.y || !d.target.x || !d.target.y) return "";
   return `M${d.source.x + dvec.x} ${d.source.y + dvec.y} L${d.target.x - dvec.x} ${d.target.y - dvec.y}`;
 }
-const drawArcLink = (d: NodeAwareLink, dvec: Vector) => {
+const drawArcLink = (d: AttestationGraphLink, dvec: Vector): string => {
+  if (!d.source?.x || !d.source.y || !d.target.x || !d.target.y) return "";
     const dx = d.target.x - d.source.x;
     const dy = d.target.y - d.source.y;
     const dr = Math.sqrt(dx * dx + dy * dy);
@@ -168,7 +171,7 @@ export const drawLink = (simulation: d3.Simulation<AttestationGraphNode, Attesta
     // debug && console.info("1 _d:", _d, " sourceNode:", sourceNode, "targetNode:", targetNode)
     if (!sourceNode?.x || !sourceNode?.y || !targetNode?.x || !targetNode?.y) return "";
 
-    const d: NodeAwareLink = {
+    const d: AttestationGraphLink = {
         source: {
             id: isD3ifiedLink(_d) ? _d.source.id : _d.source,
             x: sourceNode.x,

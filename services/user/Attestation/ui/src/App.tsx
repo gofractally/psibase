@@ -72,7 +72,7 @@ function App() {
     );
     applyLinkColors(
       uiOptions.current,
-      SELECTOR.BACK_LINK,
+      SELECTOR.ACCOUNT_CREATION_LINK,
       uiOptions.current.checkAccountCreations
     );
 

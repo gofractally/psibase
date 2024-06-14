@@ -27,24 +27,6 @@ export interface AttestationGraphLink extends SimulationNodeDatum {
   target: AttestationGraphNode;
 }
 
-export interface NodeAwareLink {
-  source: {
-    id: number;
-    x: number;
-    y: number;
-  }
-  target: {
-    id: number;
-    x: number;
-    y: number;
-  }
-}
-
-export interface NodeUnawareLink {
-  source: number;
-  target: number;
-}
-
 export interface AttestationGraph {
   nodes: AttestationGraphNode[];
   attestations: AttestationGraphLink[];

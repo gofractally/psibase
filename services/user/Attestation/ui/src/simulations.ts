@@ -14,13 +14,14 @@ const boxingForce = (graph: AttestationGraph, width: number, height: number) => 
 }
 
 export const initSimulation = (graph: AttestationGraph, width: number, height: number, centerThisNode: () => void) => {
+	console.info("width:", width, "height:", height, "graph:", JSON.parse(JSON.stringify(graph)))
 	// Define the params of the simulation
 	const simulation = d3.forceSimulation<AttestationGraphNode, AttestationGraphLink>()
 		.nodes(graph.nodes)
-		//.force("center", d3.forceCenter(width / 2, 0.6 * height).strength(0.01))
 		.force("bounding-box", boxingForce(graph, width, height))
+		// center and charge forces aren't being applied for some reason. don't know why, but it's obvious if you comment the LINK charge
 		.force("center", d3.forceCenter(0, 0).strength(0.01))
-		.force("link", d3.forceLink(graph.attestations).distance(120).strength(1))
+		.force("link", d3.forceLink(graph.attestations.map((L) => ({source: L.source.id, target: L.target.id}))).distance(120).strength(1))
 		.force("charge", d3.forceManyBody().strength(-100))
 		//.force("charge", d3.forceCollide(30).strength(1))
 		//.force("x", d3.forceX())
