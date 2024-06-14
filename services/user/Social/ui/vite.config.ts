@@ -1,12 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import * as fs from "fs";
 import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-const psibase = (_service: string, isServing?: boolean) => {
+const psibase = (service: string, isServing?: boolean) => {
     const buildAliases = [
         {
             // bundle non-external (above) common files except fonts (which should only be referenced)
@@ -23,6 +24,68 @@ const psibase = (_service: string, isServing?: boolean) => {
                 "../../CommonApi/common/packages/common-lib/src",
             ),
         });
+    }
+
+    const runLocalHttpsDev = process.env.VITE_SECURE_LOCAL_DEV === "true";
+    const pathToCerts: string = process.env.VITE_SECURE_PATH_TO_CERTS ?? "";
+
+    // establish base server config (http)
+    const httpServerConfig = {
+        host: "psibase.127.0.0.1.sslip.io",
+        port: 8081,
+        proxy: {
+            "/": {
+                bypass: (req, _res, _opt) => {
+                    const host = req.headers.host || "";
+                    const subdomain = host.split(".")[0];
+                    if (
+                        subdomain === service &&
+                        req.method !== "POST" &&
+                        req.headers.accept !== "application/json" &&
+                        !req.url.startsWith("/common") &&
+                        !req.url.startsWith("/api")
+                    ) {
+                        return req.url;
+                    }
+                },
+            },
+        },
+    };
+
+    let serverConfig;
+    // supplement/upate server config if https flag is set in .env
+    if (runLocalHttpsDev) {
+        serverConfig = {
+            ...httpServerConfig,
+            https: {
+                key: fs.readFileSync(
+                    `${pathToCerts}psibase.127.0.0.1.sslip.io+1-key.pem`,
+                    "utf8",
+                ),
+                cert: fs.readFileSync(
+                    `${pathToCerts}psibase.127.0.0.1.sslip.io+1.pem`,
+                    "utf8",
+                ),
+            },
+            proxy: {
+                "/": {
+                    ...httpServerConfig.proxy["/"],
+                    target: "https://psibase.127.0.0.1.sslip.io:8080/",
+                    // disable dev server forcing security to the chain
+                    secure: false,
+                },
+            },
+        };
+    } else {
+        serverConfig = {
+            ...httpServerConfig,
+            proxy: {
+                "/": {
+                    ...httpServerConfig.proxy["/"],
+                    target: "http://psibase.127.0.0.1.sslip.io:8080/",
+                },
+            },
+        };
     }
 
     return [
@@ -45,35 +108,7 @@ const psibase = (_service: string, isServing?: boolean) => {
                             },
                         },
                     },
-                    server: {
-                        host: "psibase.127.0.0.1.sslip.io",
-                        port: 8081,
-                        proxy: {
-                            "^/ws/.*": {
-                                target: "ws://localhost:8079/",
-                                ws: true,
-                                rewrite: (path) => path.replace(/^\/ws/, ""),
-                                timeout: 10000,
-                            },
-                            "/": {
-                                target: "http://psibase.127.0.0.1.sslip.io:8079/",
-                                autoRewrite: true,
-                                bypass: (req, _res, _opt) => {
-                                    if (
-                                        req.url === "/" ||
-                                        (req.method !== "POST" &&
-                                            req.method !== "PUT" &&
-                                            req.headers.accept !==
-                                                "application/json" &&
-                                            !req.url.startsWith("/common"))
-                                    ) {
-                                        return req.url;
-                                    }
-                                },
-                                timeout: 10000,
-                            },
-                        },
-                    },
+                    server: serverConfig,
                     resolve: {
                         alias: buildAliases,
                     },
@@ -101,7 +136,7 @@ export default defineConfig(({ command }) => ({
                 },
             },
         }),
-        psibase("__contract__(kebabCase)", command === "serve"),
+        psibase("social", command === "serve"),
         wasm(),
         topLevelAwait(),
         tsconfigPaths(),
