@@ -64,9 +64,7 @@ export const Sidebar = ({
             />
           </div>
         </>
-      ) : (
-        <div></div>
-      )}
+      ) : null}
       Account Creation:
       <div>
         <input

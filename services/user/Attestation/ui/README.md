@@ -17,21 +17,20 @@ If you are developing a production application, we recommend updating the config
 export default {
   // other rules...
   parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
+    ecmaVersion: "latest",
+    sourceType: "module",
+    project: ["./tsconfig.json", "./tsconfig.node.json"],
     tsconfigRootDir: __dirname,
   },
-}
+};
 ```
 
 - Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
 - Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
 - Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
 
-
 ## TASKS
-O-update code to remove hidden Links from effect of forces (so they float to outside of bounding box as they did before; this'll create more room for the relevant nodes to spread)
+
 -James suggestion of friends group based on degrees of separation (Center a few people to see a personal network)
 
 -arrow tips don't match arrow shafts
@@ -45,16 +44,18 @@ Explorations:
 -incoming/outgoing depth
 -Improve color gradient. clearer/nicer. not red-green blind sensitive. configurable?
 
-
 Feedback
 -Who have I attested to and all my friends? Color it; not render stand-alone graph
- - with adjustment for depth (level of indirection)
+
+- with adjustment for depth (level of indirection)
+  -Some Council Links will turn red when depth is too small to show _why_ they're red. not necessarily a bug but a little odd
 
 Completed:
+x-update code to remove hidden Links from effect of forces (so they float to outside of bounding box as they did before; this'll create more room for the relevant nodes to spread)
 x-numerous ui options, including DepthToSubject, don't keep their value when switching between graphModes
 x-poke the simulation on new centered node to redistribute the nodes
- x-changing depth breaks resetting graph and only works in one direction (stopped updating because the simulation had stabalized and was no longer updating)
- x-multi-center-clicking fails pretty fast (also an issue of simulation stopping?)
+x-changing depth breaks resetting graph and only works in one direction (stopped updating because the simulation had stabalized and was no longer updating)
+x-multi-center-clicking fails pretty fast (also an issue of simulation stopping?)
 x-copy notes from previous project html
 x-Add types
 x-pulse centered node
@@ -94,4 +95,3 @@ x-Mock up a far larger graph to test, with appropriate number of Council members
 x-add bounding box so everything's on-screen
 x-Add arrows to make it a DAG so another algo can analyze relationships
 x-add mutual attestations. it won't be a DAG
-
