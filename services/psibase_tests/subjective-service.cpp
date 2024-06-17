@@ -4,38 +4,6 @@
 
 using namespace psibase;
 
-struct SubjectiveTransaction
-{
-   SubjectiveTransaction() { psibase::checkoutSubjective(); }
-   ~SubjectiveTransaction()
-   {
-      if (!done)
-      {
-         psibase::abortSubjective();
-      }
-   }
-   void commit()
-   {
-      if (!done)
-      {
-         done = psibase::commitSubjective();
-      }
-   }
-   bool done = false;
-};
-
-// PSIBASE_SUBJECTIVE_TX stmt
-//
-// The statement will be executed one or more times until
-// it is successfully committed.
-//
-// Unstructured control flow that exits the statement, including break,
-// return, and exceptions, will discard any changes made to the
-// subjective database.
-//
-#define PSIBASE_SUBJECTIVE_TX \
-   for (::SubjectiveTransaction _psibase_s_tx; !_psibase_s_tx.done; _psibase_s_tx.commit())
-
 void SubjectiveService::write(std::string key, std::string value)
 {
    PSIBASE_SUBJECTIVE_TX
