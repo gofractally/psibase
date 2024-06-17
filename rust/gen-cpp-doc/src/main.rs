@@ -34,6 +34,7 @@ enum Kind {
     EnumConstant,
     Struct,
     Alias,
+    Macro,
 }
 
 struct Item<'tu> {
@@ -89,6 +90,9 @@ fn convert_children<'a, 'tu>(items: &'a mut Vec<Item<'tu>>, current: usize, enti
             }
             EntityKind::TypeAliasTemplateDecl => {
                 convert_child(items, current, child, Kind::Alias, false);
+            }
+            EntityKind::MacroDefinition => {
+                convert_child(items, current, child, Kind::Macro, false);
             }
             _ => (),
         }
@@ -408,6 +412,7 @@ fn generate_documentation(items: &[Item], path: &str) -> String {
             Kind::Function => document_function(items, index, path, &mut result),
             Kind::Struct => document_struct(items, index, path, &mut result),
             Kind::Alias => document_alias(items, index, path, &mut result),
+            Kind::Macro => document_macro(items, index, path, &mut result),
             _ => (),
         }
     }
@@ -707,6 +712,25 @@ fn document_template_args(item: &Item, def: &mut String) {
     }
 }
 
+fn document_macro(items: &[Item], index: usize, path: &str, result: &mut String) {
+    let item = &items[index];
+    let mut def = String::new();
+    def.push_str(r#"<pre><code class="nohighlight">"#);
+    def.push_str(r#"<span class="hljs-keyword">#define</span> "#);
+    def.push_str(r#"<span class="hljs-title">"#);
+    def.push_str(&path[..]);
+    def.push_str(r#"</span>"#);
+    def.push_str("\n</code></pre>\n");
+
+    let _ = write!(
+        result,
+        "### {}\n\n{}\n{}\n",
+        &path[..],
+        def,
+        replace_bracket_links(&item.doc_str, items, index)
+    );
+}
+
 fn escape_html(s: &str) -> String {
     let mut result = String::new();
     pulldown_cmark::escape::escape_html(&mut result, s).unwrap();
@@ -804,11 +828,12 @@ fn parse<'tu>(
     ]);
     parser.skip_function_bodies(true);
     parser.keep_going(true);
+    parser.detailed_preprocessing_record(true);
     Ok(parser.parse()?)
 }
 
 fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
-    let cpp_doc_re = Regex::new(r"[{][{] *#cpp-doc +(::[^ ]+)+ *[}][}]").unwrap();
+    let cpp_doc_re = Regex::new(r"[{][{] *#cpp-doc +([^ ]+) *[}][}]").unwrap();
     let svg_bob_re = Regex::new(r"(?s)```svgbob(.*?)```").unwrap();
 
     for item in book.iter() {
