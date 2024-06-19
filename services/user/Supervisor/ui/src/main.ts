@@ -23,11 +23,12 @@ import {
     buildPluginCallRequest,
     isPluginSyncCall,
     PluginSyncCall,
-    CallContext,
     LoaderPreloadComplete,
     buildPreloadStartMessage,
     isPreloadCompleteMessage,
 } from "@psibase/supervisor-lib/messaging";
+
+import { CallContext } from "./CallContext";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>

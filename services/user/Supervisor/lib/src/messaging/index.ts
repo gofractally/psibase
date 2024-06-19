@@ -3,7 +3,6 @@ export const LOADER_PRELOAD_START = "LOADER_PRELOAD_START" as const;
 export const LOADER_PRELOAD_COMPLETE = "LOADER_PRELOAD_COMPLETE" as const;
 export const SYNC_CALL_REQUEST = "SYNC_CALL_REQUEST" as const;
 
-export { type ResultCache, CallStack, CallContext } from "./CallContext";
 
 export {
     type PluginCallResponse,

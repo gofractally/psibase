@@ -1,5 +1,5 @@
 import { QualifiedFunctionCallArgs, toString } from "@psibase/common-lib";
-import { AddableAction } from "./PluginCallResponse";
+import { AddableAction } from "@psibase/supervisor-lib/messaging/PluginCallResponse";
 import { siblingUrl } from "@psibase/common-lib";
 
 export interface Call<T = any> {
