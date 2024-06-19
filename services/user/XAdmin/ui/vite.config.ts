@@ -45,17 +45,17 @@ const psibase = (_service: string, isServing?: boolean) => {
                         },
                     },
                     server: {
-                        host: "psibase.127.0.0.1.sslip.io",
+                        host: "x-admin.psibase.127.0.0.1.sslip.io",
                         port: 8081,
                         proxy: {
                             "^/ws/.*": {
-                                target: "ws://localhost:8079/",
+                                target: "ws://localhost:8080/",
                                 ws: true,
                                 rewrite: (path) => path.replace(/^\/ws/, ""),
                                 timeout: 10000,
                             },
                             "/": {
-                                target: "http://psibase.127.0.0.1.sslip.io:8079/",
+                                target: "http://psibase.127.0.0.1.sslip.io:8080/",
                                 autoRewrite: true,
                                 bypass: (req, _res, _opt) => {
                                     if (
@@ -104,4 +104,10 @@ export default defineConfig(({ command }) => ({
         wasm(),
         topLevelAwait(),
     ],
+    resolve: { 
+        alias: {
+            "@/lib": path.resolve(__dirname, "./src/lib"),
+            "@/components": path.resolve(__dirname, "./src/components"),
+          },
+    }
 }));
