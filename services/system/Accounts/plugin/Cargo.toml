@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 bitflags = "2.4.2"
-wit-bindgen-rt = "0.22.0"
+wit-bindgen-rt = "0.24.0"
+psibase = { path="../../../../rust/psibase/" }
 
 [lib]
 crate-type = ["cdylib"]

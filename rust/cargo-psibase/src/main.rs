@@ -25,8 +25,6 @@ const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
-const TESTER_POLYFILL: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/tester_wasi_polyfill.wasm"));
 
 /// Build, test, and deploy psibase services
 #[derive(Parser, Debug)]
@@ -130,7 +128,7 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     Ok(())
 }
 
-fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), Error> {
+fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
     let timestamp_file = filename.to_string_lossy().to_string() + ".cargo_psibase";
     let md = fs::metadata(filename)
         .with_context(|| format!("Failed to get metadata for {}", filename.to_string_lossy()))?;
@@ -147,11 +145,15 @@ fn process(filename: &PathBuf, polyfill: &[u8]) -> Result<(), Error> {
     let mut config = walrus::ModuleConfig::new();
     config.generate_name_section(debug_build);
     config.generate_producers_section(false);
-    let source_module = config.parse(polyfill)?;
     let mut dest_module = config.parse(code)?;
 
-    pretty_path("Polyfilling", filename);
-    link_module(&source_module, &mut dest_module)?;
+    if let Some(polyfill) = polyfill {
+        let polyfill_source_module = config.parse(polyfill)?;
+        pretty_path("Polyfilling", filename);
+        link_module(&polyfill_source_module, &mut dest_module)?;
+    } else {
+        pretty("Polyfilling", "SKIPPED! No polyfill functions found");
+    }
 
     pretty_path("Reoptimizing", filename);
     optimize(&mut dest_module)?;
@@ -225,7 +227,7 @@ async fn build(
     packages: &[&str],
     envs: Vec<(&str, &str)>,
     args: &[&str],
-    poly: &[u8],
+    poly: Option<&[u8]>,
 ) -> Result<Vec<PathBuf>, Error> {
     let mut command = tokio::process::Command::new(get_cargo())
         .envs(envs)
@@ -330,7 +332,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
             &[id.unwrap()],
             vec![],
             &["--lib", "--crate-type=cdylib", "-p", &service],
-            SERVICE_POLYFILL,
+            Some(SERVICE_POLYFILL),
         )
         .await?;
         if wasms.is_empty() {
@@ -356,7 +358,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
             ("CARGO_PSIBASE_SERVICE_LOCATIONS", &service_wasms),
         ],
         &["--tests"],
-        TESTER_POLYFILL,
+        None,
     )
     .await?;
     if tests.is_empty() {
@@ -381,7 +383,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
 }
 
 async fn deploy(opts: &DeployCommand, root: &str) -> Result<(), Error> {
-    let files = build(&[root], vec![], SERVICE_ARGS, SERVICE_POLYFILL).await?;
+    let files = build(&[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
     if files.is_empty() {
         Err(anyhow!("Nothing found to deploy"))?
     }
@@ -456,7 +458,7 @@ async fn main2() -> Result<(), Error> {
 
     match args.command {
         Command::Build {} => {
-            build(&[root], vec![], SERVICE_ARGS, SERVICE_POLYFILL).await?;
+            build(&[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
             pretty("Done", "");
         }
         Command::Test {} => {

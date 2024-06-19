@@ -7,13 +7,17 @@
 //! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
 
 use crate::{
-    kv_get, services, status_key, tester_raw, AccountNumber, Action, Caller, InnerTraceEnum,
-    Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace,
+    create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
+    AccountNumber, Action, Caller, DirectoryRegistry, Error, InnerTraceEnum, JointRegistry,
+    PackageRegistry, Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction,
+    TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
+use futures::executor::block_on;
 use psibase_macros::account_raw;
 use std::cell::{Cell, RefCell};
+use std::path::Path;
 use std::{marker::PhantomData, ptr::null_mut};
 
 /// Execute a shell command
@@ -21,36 +25,6 @@ use std::{marker::PhantomData, ptr::null_mut};
 /// Returns the process exit code
 pub fn execute(command: &str) -> i32 {
     unsafe { tester_raw::testerExecute(command.as_ptr(), command.len()) }
-}
-
-/// Read a file into memory. Returns `None` if failure.
-pub fn read_whole_file(filename: &str) -> Option<Vec<u8>> {
-    struct Context {
-        size: usize,
-        bytes: Vec<u8>,
-    }
-    let mut context = Context {
-        size: 0,
-        bytes: Vec::new(),
-    };
-    unsafe {
-        unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-            let context = &mut *(alloc_context as *mut Context);
-            context.size = size;
-            context.bytes.reserve(size);
-            context.bytes.as_mut_ptr()
-        }
-        if !tester_raw::testerReadWholeFile(
-            filename.as_ptr(),
-            filename.len(),
-            (&mut context) as *mut Context as *mut u8,
-            alloc,
-        ) {
-            return None;
-        }
-        context.bytes.set_len(context.size);
-        Some(context.bytes)
-    }
 }
 
 /// Block chain under test
@@ -76,31 +50,52 @@ impl Drop for Chain {
 impl Chain {
     /// Create a new chain and make it active for database native functions.
     ///
-    /// Shortcut for `Tester::create(1_000_000_000, 32, 32, 32, 38)`
+    /// Shortcut for `Tester::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)`
     pub fn new() -> Chain {
-        Self::create(1_000_000_000, 32, 32, 32, 38)
+        Self::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)
+    }
+
+    /// Boot the tester chain with default services being deployed
+    pub fn boot(&self) -> Result<(), Error> {
+        let default_services: Vec<String> = vec!["Default".to_string()];
+
+        let psibase_data_dir = std::env::var("PSIBASE_DATADIR")
+            .expect("Cannot find package directory: PSIBASE_DATADIR not defined");
+        let packages_dir = Path::new(&psibase_data_dir).join("packages");
+
+        let mut result = JointRegistry::new();
+        result.push(DirectoryRegistry::new(packages_dir))?;
+        let mut services = block_on(result.resolve(&default_services[..]))?;
+
+        let (boot_tx, subsequent_tx) = create_boot_transactions(
+            &None,
+            AccountNumber::new(account_raw!("prod")),
+            false,
+            TimePointSec { seconds: 10 },
+            &mut services[..],
+        )
+        .unwrap();
+
+        for trx in boot_tx {
+            self.push(&trx).ok()?;
+        }
+
+        for trx in subsequent_tx {
+            self.push(&trx).ok()?;
+        }
+
+        Ok(())
     }
 
     /// Create a new chain and make it active for database native functions.
     ///
-    /// `max_objects` is the maximum number of objects the database can hold.
-    /// The remaining arguments are log-base-2 of file sizes for the database's
-    /// various files. e.g. `32` is 4 GB.
-    pub fn create(
-        max_objects: u64,
-        hot_addr_bits: u64,
-        warm_addr_bits: u64,
-        cool_addr_bits: u64,
-        cold_addr_bits: u64,
-    ) -> Chain {
+    /// The arguments are the file sizes in bytes for the database's
+    /// various files.
+    pub fn create(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> Chain {
         unsafe {
             Chain {
                 chain_handle: tester_raw::testerCreateChain(
-                    max_objects,
-                    hot_addr_bits,
-                    warm_addr_bits,
-                    cool_addr_bits,
-                    cold_addr_bits,
+                    hot_bytes, warm_bytes, cool_bytes, cold_bytes,
                 ),
                 status: None.into(),
                 producing: false.into(),
@@ -116,6 +111,7 @@ impl Chain {
     /// TODO: Support sub-second block times
     pub fn start_block_at(&self, time: TimePointSec) {
         let status = &mut *self.status.borrow_mut();
+
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
             if status.current.time.seconds + 1 < time.seconds {
@@ -170,31 +166,14 @@ impl Chain {
         }
 
         let transaction = transaction.packed();
-        struct Context {
-            size: usize,
-            bytes: Vec<u8>,
-        }
-        let mut context = Context {
-            size: 0,
-            bytes: Vec::new(),
-        };
-        unsafe {
-            unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-                let context = &mut *(alloc_context as *mut Context);
-                context.size = size;
-                context.bytes.reserve(size);
-                context.bytes.as_mut_ptr()
-            }
+        let size = unsafe {
             tester_raw::testerPushTransaction(
                 self.chain_handle,
                 transaction.as_ptr(),
                 transaction.len(),
-                (&mut context) as *mut Context as *mut u8,
-                alloc,
-            );
-            context.bytes.set_len(context.size);
-            TransactionTrace::unpacked(&context.bytes).unwrap()
-        }
+            )
+        };
+        TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
 
     /// Copy database to `path`
@@ -294,16 +273,27 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
             let ret = transact
                 .inner_traces
                 .iter()
+                // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
-                        Some(&at.raw_retval)
+                        println!(
+                            ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
+                            at.action.method, at.raw_retval
+                        );
+                        if at.raw_retval.is_empty() {
+                            return None;
+                        } else {
+                            Some(&at.raw_retval)
+                        }
                     } else {
                         None
                     }
                 })
-                .last();
+                .next();
             if let Some(ret) = ret {
-                return Ok(T::unpacked(ret)?);
+                println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
+                let unpacked_ret = T::unpacked(ret)?;
+                return Ok(unpacked_ret);
             }
         }
         Err(anyhow!("Can't find action in trace"))
@@ -370,9 +360,10 @@ impl<'a> Caller for ChainPusher<'a> {
             transaction: trx.packed().into(),
             proofs: Default::default(),
         });
-        ChainResult::<Ret> {
+        let ret = ChainResult::<Ret> {
             trace,
             _marker: Default::default(),
-        }
+        };
+        ret
     }
 }

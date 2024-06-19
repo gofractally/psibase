@@ -62,7 +62,7 @@ namespace SystemService
       {
          writeConsole("new acc: ");
          writeConsole(strName);
-         writeConsole("auth con: ");
+         writeConsole("auth srv: ");
          writeConsole(authService.str());
       }
 

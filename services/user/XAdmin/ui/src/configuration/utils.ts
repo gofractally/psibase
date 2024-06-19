@@ -3,10 +3,11 @@ import { LogConfig } from "../log/interfaces";
 import { readLoggers } from "../log/utils";
 import { PsinodeConfig, ServiceConfig, ListenConfig } from "./interfaces";
 
-export const initialConfigForm = () => ({
+export const initialConfigForm = (): PsinodeConfig => ({
     p2p: false,
     producer: "",
     host: "",
+    peers: [],
     listen: [],
     services: [{ host: "", root: "", key: "x" }],
     admin: "",

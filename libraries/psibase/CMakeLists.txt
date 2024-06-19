@@ -127,6 +127,8 @@ function(add suffix)
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
         target_link_libraries(psitestlib${suffix} PUBLIC
             psibase${suffix}
+            Spki${suffix}
+            PrivateKeyInfo${suffix}
             catch2
             boost
             -lz
@@ -144,6 +146,7 @@ function(add suffix)
             ../../services/system/Accounts/include
             ../../services/system/Producers/include
             ../../services/system/AuthDelegate/include
+            ../../services/system/AuthSig/include
             ../../services/system/AuthK1/include
             ../../services/system/AuthAny/include
             ../../services/system/CpuLimit/include
@@ -163,6 +166,7 @@ function(add suffix)
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE
             ../../services/system/VerifyK1/include
+            ../../services/system/VerifySig/include
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start

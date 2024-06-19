@@ -2,8 +2,8 @@
 
 # Actions
 
-{{#cpp-doc ::SystemService::AuthK1}}
+{{#cpp-doc ::SystemService::AuthK1::AuthK1}}
 
 # Tables
 
-{{#cpp-doc ::SystemService::AuthK1Record::AuthRecord}}
+{{#cpp-doc ::SystemService::AuthK1::AuthRecord}}

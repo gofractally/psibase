@@ -1,8 +1,15 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::common::plugin::server as Server;
 use bindings::common::plugin::types as CommonTypes;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
+use psibase::fracpack::Pack;
+use psibase::services::accounts as AccountsService;
+use psibase::AccountNumber;
+
+mod errors;
+use errors::ErrorType::*;
 
 struct AccountsPlugin;
 
@@ -16,14 +23,20 @@ impl Accounts for AccountsPlugin {
     }
 
     fn add_auth_service(_: String) -> Result<(), CommonTypes::Error> {
-        Err(CommonTypes::Error {
-            code: 0,
-            producer: CommonTypes::PluginId {
-                service: String::from("accounts"),
-                plugin: "plugin".to_string(),
-            },
-            message: "Function not yet implemented".to_string(),
-        })
+        Err(NotYetImplemented.err("add_auth_service"))
+    }
+
+    fn set_auth_service(service_name: String) -> Result<(), CommonTypes::Error> {
+        let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
+            .map_err(|_| InvalidAccountNumber.err(&service_name))?;
+        Server::add_action_to_transaction(
+            "setAuthServ",
+            &AccountsService::action_structs::setAuthServ {
+                authService: account_num,
+            }
+            .packed(),
+        )?;
+        Ok(())
     }
 }
 

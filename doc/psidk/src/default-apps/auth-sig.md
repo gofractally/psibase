@@ -2,8 +2,8 @@
 
 # Actions
 
-{{#cpp-doc ::SystemService::AuthSig}}
+{{#cpp-doc ::SystemService::AuthSig::AuthSig}}
 
 # Tables
 
-{{#cpp-doc ::SystemService::AuthRecord}}
+{{#cpp-doc ::SystemService::AuthSig::AuthRecord}}
