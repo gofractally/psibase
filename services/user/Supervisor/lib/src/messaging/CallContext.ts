@@ -1,5 +1,6 @@
 import { QualifiedFunctionCallArgs, toString } from "@psibase/common-lib";
 import { AddableAction } from "./PluginCallResponse";
+import { siblingUrl } from "@psibase/common-lib";
 
 export interface Call<T = any> {
     caller: string;
@@ -111,5 +112,50 @@ export class CallContext {
         this.rootAppOrigin = "";
         this.cache = [];
         this.addableActions = [];
+    }
+
+
+    // Callstack management
+    isActive(): boolean {
+        return !this.callStack.isEmpty();
+    }
+
+    private validateOrigin(origin: string) {
+        // During an active execution context, only the origin of the prior callee can
+        //  with the callstack
+        if (this.isActive()) {
+            let expectedHost = siblingUrl(null, this.callStack.peek()!.args.service);
+            if (expectedHost != origin) {
+                throw Error(
+                    `Plugins may only send messages when they are on top of the call stack.`,
+                );
+            }
+        } 
+    }
+
+    pushCall(callerOrigin: string, item: QualifiedFunctionCallArgs) {
+        this.validateOrigin(callerOrigin);
+
+        if (!this.isActive()) {
+            if (this.rootAppOrigin !== callerOrigin) 
+            {
+                // Once there is a root app origin, then there can never be a different root app origin
+                // for this supervisor. Loading a new root app would load a new supervisor.
+                throw Error("Cannot have two different root apps using the same supervisor.");
+            }
+            this.rootAppOrigin = callerOrigin;
+        }
+
+        this.callStack.push({
+            caller: new URL(origin).origin,
+            args: item,
+        });
+    }
+
+    popCall(callOrigin: string) : Call {
+        this.validateOrigin(callOrigin);
+        let call = this.callStack.pop()!;
+
+        return call;
     }
 }

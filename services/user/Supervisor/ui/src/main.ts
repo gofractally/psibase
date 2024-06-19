@@ -177,10 +177,7 @@ const onFunctionCallRequest = (
         );
     }
 
-    callStack.push({
-        caller: new URL(origin).origin,
-        args: message.args,
-    });
+    context.pushCall(origin, message.args);
     processTop();
 
     // TODO: Consider if a plugin runs an infinite loop. We need a way to terminate the
@@ -189,35 +186,6 @@ const onFunctionCallRequest = (
     //   If the popup is blocked, this is considered an error, but a special error code is returned to the
     //     application so it can instruct the user to enable popups. But since it's an error, cache is
     //     cleared and stack emptied.
-};
-
-// TODO - move callstack management into the context class, then the root app origin can be
-// automatically handled in there.
-const setApplicationOrigin = (origin: string) => {
-    if (origin && !context.rootAppOrigin) {
-        context.rootAppOrigin = origin;
-    }
-};
-
-const verifyOriginOnTopOfStack = (origin: string) => {
-    if (!callStack.isEmpty()) {
-        let expectedHost = siblingUrl(null, callStack.peek()!.args.service);
-        if (expectedHost != origin) {
-            if (callStack.peek()!.caller == origin) {
-                // If this happens, it's the secondary sync call notification that can happen.
-                // It can be safely ignored. This check can be removed once this issue is
-                //   resolved: https://github.com/bytecodealliance/jco/issues/405 and the sync
-                //   call throw in the loader is moved from within the import to the catch handler.
-            }
-            throw Error(
-                `Plugins may only send messages when they are on top of the call stack.`,
-            );
-        }
-    } else {
-        throw Error(
-            `Plugin messages may only be processed when the call stack is non-empty.`,
-        );
-    }
 };
 
 const isUnrecoverableError = (result: any) => {
@@ -231,11 +199,9 @@ const onPluginCallResponse = async (
     if (!context.rootAppOrigin)
         throw new Error(`Plugin responded to unknown root application origin.`);
 
-    verifyOriginOnTopOfStack(origin);
+    let returningCall = context.popCall(origin);
 
     let { actions: newActions, result } = message;
-
-    let returningCall = callStack.pop()!;
 
     if (newActions.length > 0) {
         context.addActionsToTx(newActions);
@@ -296,13 +262,7 @@ const onPluginCallResponse = async (
 };
 
 const onPluginSyncCall = (origin: string, message: PluginSyncCall) => {
-    verifyOriginOnTopOfStack(origin);
-
-    callStack.push({
-        caller: new URL(origin).origin,
-        args: message.payload,
-    });
-
+    context.pushCall(origin, message.payload);
     processTop();
 };
 
@@ -352,13 +312,17 @@ const isMessageFromChild = (message: MessageEvent): boolean => {
 const onRawEvent = async (message: MessageEvent<any>) => {
     try {
         if (isMessageFromApplication(message)) {
-            setApplicationOrigin(message.origin);
             if (isFunctionCallRequest(message.data)) {
                 onFunctionCallRequest(message.origin, message.data);
             } else if (isPreLoadPluginsRequest(message.data)) {
                 onPreloadPluginsRequest(message.data);
             }
         } else if (isMessageFromChild(message)) {
+            if (!context.isActive()) {
+                throw Error(
+                    `Plugin messages may only be processed during an existing plugin execution context.`,
+                );
+            }
             if (isPluginCallResponse(message.data)) {
                 await onPluginCallResponse(message.origin, message.data);
             } else if (isPluginSyncCall(message.data)) {
