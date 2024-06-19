@@ -1,18 +1,16 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { usePollJson } from "../hooks/usePollJson";
+import { Peer } from "../peers/interfaces";
+import { useStatuses } from "../hooks/useStatuses";
+import { useConfig } from "../hooks/useConfig";
 
-interface StatusBannerProps {
-    peersError?: string;
-    configError?: string;
-    status?: string[];
-    statusError?: string;
-}
+export const StatusBanner = () => {
+    const [peers, peersError] = usePollJson<Peer[]>("/native/admin/peers");
+    const { data: config, error: configError } = useConfig();
+    const { data: status, error: statusError } = useStatuses();
 
-export const StatusBanner = ({
-    peersError,
-    configError,
-    status,
-    statusError,
-}: StatusBannerProps) => {
+    console.log({ configError, peersError, statusError });
+
     let serverStatus = [
         ...(status || []),
         ...(!statusError ? [] : [statusError]),

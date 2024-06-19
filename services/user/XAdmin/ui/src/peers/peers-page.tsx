@@ -22,20 +22,18 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useConfig } from "../hooks/useConfig";
+import { usePeers } from "../hooks/usePeers";
 
-interface PeersPageProps {
-    config?: PsinodeConfig;
-    peers: Peer[];
-    refetchConfig: () => void;
-    refetchPeers: () => void;
-}
+export const PeersPage = () => {
+    const {
+        data: peers,
+        error: peersError,
+        refetch: refetchPeers,
+    } = usePeers();
 
-export const PeersPage = ({
-    peers,
-    refetchPeers,
-    refetchConfig,
-    config,
-}: PeersPageProps) => {
+    const { data: config, error: configError, refetch: refetchConfig } = useConfig();
+
     const [configPeersError, setConfigPeersError] = useState<string>();
 
     const {
@@ -187,7 +185,7 @@ export const PeersPage = ({
         }
     };
 
-    const combinedPeers = combinePeers(config?.peers || [], peers);
+    const combinedPeers = combinePeers(config?.peers || [], peers || []);
 
     return (
         <>

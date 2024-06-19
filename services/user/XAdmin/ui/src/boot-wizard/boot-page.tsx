@@ -26,6 +26,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
+import { usePollJson } from "../hooks/usePollJson";
+
 type InstallType = {
     installType: string;
 };
@@ -552,7 +554,11 @@ function useGetJson<R>(url: string): [R | undefined, string | undefined] {
     return [value, error];
 }
 
-export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
+export const BootPage = () => {
+    const [config, configError, refetchConfig] = usePollJson<PsinodeConfig>(
+        "/native/admin/config"
+    );
+
     const [bootState, setBootState] = useState<BootState>();
 
     let [serviceIndex, serviceIndexError] = useGetJson<PackageIndex>(

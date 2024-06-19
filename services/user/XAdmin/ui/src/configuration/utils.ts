@@ -1,7 +1,12 @@
 import { UseFormReturn } from "react-hook-form";
 import { LogConfig } from "../log/interfaces";
 import { readLoggers } from "../log/utils";
-import { PsinodeConfig, ServiceConfig, ListenConfig } from "./interfaces";
+import {
+    PsinodeConfig,
+    ServiceConfig,
+    ListenConfig,
+    PsinodeConfigSchemaa,
+} from "./interfaces";
 
 export const initialConfigForm = (): PsinodeConfig => ({
     p2p: false,
@@ -275,28 +280,21 @@ export const mergeConfig = (
     };
 };
 
-export const writeConfig = (input: PsinodeConfig) => {
-    return {
-        ...input,
-        listen: input.listen.map(writeListen),
-        services: input.services
-            .filter((s) => !emptyService(s))
-            .map((s) => ({
-                host: s.host,
-                root: s.root,
-            })),
-        admin: input.admin != "" ? input.admin : null,
-        loggers: writeLoggers(input.loggers),
-    };
-};
+export const writeConfig = (input: PsinodeConfig): PsinodeConfigSchemaa => ({
+    ...input,
+    listen: input.listen.map(writeListen),
+    services: input.services
+        .filter((s) => !emptyService(s))
+        .map((s) => ({
+            host: s.host,
+            root: s.root,
+        })),
+    admin: input.admin != "" ? input.admin : null,
+    loggers: writeLoggers(input.loggers),
+});
 
-export const defaultService = (root: string) => {
-    if (root) {
-        return root.substring(root.lastIndexOf("/") + 1) + ".";
-    } else {
-        return "";
-    }
-};
+export const defaultService = (root: string) =>
+    root ? root.substring(root.lastIndexOf("/") + 1) + "." : "";
 
 let nextId = 1;
 export const newId = (): string => {
