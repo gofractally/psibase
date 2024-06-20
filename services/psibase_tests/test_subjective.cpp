@@ -42,6 +42,9 @@ TEST_CASE("subjective db")
       CHECK(subjective.read("a").returnVal() == std::optional{std::string("b")});
    }
 
+   CHECK(subjective.nested("n", "1", "2").succeeded());
+   CHECK(subjective.read("n").returnVal() == std::optional{std::string("1")});
+
    for (bool b : {false, true})
    {
       for (int i = 0; i < 4; ++i)

@@ -74,6 +74,20 @@ void SubjectiveService::abort(std::string key, std::string value, int op)
    }
 }
 
+void SubjectiveService::nested(std::string key, std::string value1, std::string value2)
+{
+   auto table = Tables{}.open<SubjectiveTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      table.put({key, value1});
+      PSIBASE_SUBJECTIVE_TX
+      {
+         table.put({key, value2});
+         break;
+      }
+   }
+}
+
 std::optional<HttpReply> SubjectiveService::serveSys(const HttpRequest& req)
 {
    if (req.target == "/write")
