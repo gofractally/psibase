@@ -591,12 +591,6 @@ export const BootPage = () => {
             />
         );
     } else if (currentPage == "install") {
-        let namedPackages =
-            typeForm.getValues("installType") == "full"
-                ? ["Default"]
-                : serviceIndex
-                      .map((meta) => meta.name)
-                      .filter((name) => servicesForm.getValues(name));
         return (
             <InstallForm
                 packages={packagesToInstall || []}
