@@ -315,16 +315,17 @@ pub fn abort_subjective() {
 macro_rules! subjective_tx {
     {$($stmt:tt)*} => {
         $crate::native::checkout_subjective();
-        let mut guard = $crate::native::scopeguard::guard((), |_|{
-            $crate::native::abort_subjective();
-        });
+        #[allow(unreachable_code)]
         let r = loop {
+            let mut guard = $crate::native::scopeguard::guard((), |_|{
+                $crate::native::abort_subjective();
+            });
             let result = { $($stmt)* };
+            $crate::native::scopeguard::ScopeGuard::into_inner(guard);
             if $crate::native::commit_subjective() {
                 break result;
             }
         };
-        $crate::native::scopeguard::ScopeGuard::into_inner(guard);
         r
     }
 }
