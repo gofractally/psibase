@@ -61,6 +61,16 @@ TEST_CASE("subjective db")
    CHECK(subjective.testWFail1("a", "b").failed(
        "subjectiveCheckout is required to access the subjective database"));
 
+   for (bool b : {false, true})
+   {
+      CHECK(subjective.nestFail1a(b).failed("requires checkoutSubjective"));
+      CHECK(subjective.nestFail2a(b).failed("requires checkoutSubjective"));
+      for (bool b2 : {false, true})
+      {
+         CHECK(subjective.nestFail3a(b, b2).failed("requires checkoutSubjective"));
+      }
+   }
+
    t.post(SubjectiveService::service, "/write", SubjectiveRow{"c", "d"});
    CHECK(t.post<std::optional<std::string>>(SubjectiveService::service, "/read", "c") ==
          std::optional{std::string("d")});

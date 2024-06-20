@@ -160,6 +160,9 @@ namespace psibase
       void checkoutSubjective();
       bool commitSubjective();
       void abortSubjective();
+      // Used to ensure that checkout and commit are run in the same action
+      std::size_t saveSubjective();
+      void        restoreSubjective(std::size_t depth);
 
       // TODO: kvPutRaw, kvRemoveRaw: return deltas
       // TODO: getters: pass in input buffers instead of returning KVResult

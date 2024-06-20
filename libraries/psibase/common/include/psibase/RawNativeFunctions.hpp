@@ -149,8 +149,8 @@ namespace psibase
       ///
       /// - The subjective database may not be accessed without calling this first
       /// - If the subjective database is already checked out, this will create a nested checkout
-      /// - If the subjective database is still checked out at the end of a transaction or query,
-      ///   any changes will be discarded
+      /// - If an action checks out the subjective database and does not commit it before
+      ///   returning, any changes will be discarded.
       ///
       /// There exists a total ordering of all top-level checkouts. Every read of the subjective
       /// database returns the most recent write in the current checkout or in previous checkouts
@@ -160,6 +160,7 @@ namespace psibase
       ///
       /// - If changes were committed successfully, returns true and closes the subjective database
       /// - If changes were not successfully committed, returns false and reloads the subjective database, starting a new checkout
+      /// - It is an error if the current action did not check out the subjective database
       ///
       /// If there were no writes to the subjective database or if this is a nested checkout, commit always succeeds.
       PSIBASE_NATIVE(commitSubjective) bool commitSubjective();

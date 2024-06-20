@@ -88,6 +88,53 @@ void SubjectiveService::nested(std::string key, std::string value1, std::string 
    }
 }
 
+void SubjectiveService::nestFail1a(bool commit)
+{
+   psibase::checkoutSubjective();
+   to<SubjectiveService>().nestFail1b(commit);
+}
+
+void SubjectiveService::nestFail1b(bool commit)
+{
+   if (commit)
+      psibase::commitSubjective();
+   else
+      psibase::abortSubjective();
+}
+
+void SubjectiveService::nestFail2a(bool commit)
+{
+   to<SubjectiveService>().nestFail2b();
+   if (commit)
+      psibase::commitSubjective();
+   else
+      psibase::abortSubjective();
+}
+
+void SubjectiveService::nestFail2b()
+{
+   psibase::checkoutSubjective();
+}
+
+void SubjectiveService::nestFail3a(bool commit1, bool commit2)
+{
+   psibase::checkoutSubjective();
+   to<SubjectiveService>().nestFail3b(commit2);
+   if (commit1)
+      psibase::commitSubjective();
+   else
+      psibase::abortSubjective();
+}
+
+void SubjectiveService::nestFail3b(bool commit)
+{
+   if (commit)
+      psibase::commitSubjective();
+   else
+      psibase::abortSubjective();
+   psibase::checkoutSubjective();
+}
+
 std::optional<HttpReply> SubjectiveService::serveSys(const HttpRequest& req)
 {
    if (req.target == "/write")

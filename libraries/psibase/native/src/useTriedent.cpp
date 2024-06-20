@@ -508,6 +508,7 @@ namespace psibase
 
       DbChangeSet                     subjectiveChanges;
       std::vector<SubjectiveRevision> subjectiveRevisions;
+      std::size_t                     subjectiveLimit;
 
       auto db(auto& revision, DbId db) -> decltype((revision.roots[(int)db]))
       {
@@ -624,7 +625,8 @@ namespace psibase
 
       bool commitSubjective()
       {
-         check(!subjectiveRevisions.empty(), "commitSubjective requires checkoutSubjective");
+         check(subjectiveRevisions.size() > subjectiveLimit,
+               "commitSubjective requires checkoutSubjective");
          if (subjectiveRevisions.size() > 2)
          {
             subjectiveRevisions[subjectiveRevisions.size() - 2].db =
@@ -654,7 +656,8 @@ namespace psibase
       }
       void abortSubjective()
       {
-         check(!subjectiveRevisions.empty(), "abortSubjective requires checkoutSubjective");
+         check(subjectiveRevisions.size() > subjectiveLimit,
+               "abortSubjective requires checkoutSubjective");
          if (subjectiveRevisions.size() > 2)
          {
             assert(subjectiveRevisions.back().changeSetPos <= subjectiveChanges.ranges.size());
@@ -666,6 +669,26 @@ namespace psibase
             subjectiveRevisions.clear();
             subjectiveChanges.ranges.clear();
          }
+      }
+      std::size_t saveSubjective()
+      {
+         subjectiveLimit = subjectiveRevisions.size();
+         return subjectiveRevisions.size();
+      }
+      void restoreSubjective(std::size_t depth)
+      {
+         check(depth <= subjectiveRevisions.size(), "Wrong subjective depth");
+         if (depth == 0)
+         {
+            subjectiveRevisions.clear();
+            subjectiveChanges.ranges.clear();
+         }
+         else if (depth < subjectiveRevisions.size())
+         {
+            subjectiveChanges.ranges.resize(subjectiveRevisions[depth].changeSetPos);
+            subjectiveRevisions.resize(depth);
+         }
+         subjectiveLimit = depth;
       }
    };  // DatabaseImpl
 
@@ -734,6 +757,14 @@ namespace psibase
    void Database::abortSubjective()
    {
       return impl->abortSubjective();
+   }
+   std::size_t Database::saveSubjective()
+   {
+      return impl->saveSubjective();
+   }
+   void Database::restoreSubjective(std::size_t depth)
+   {
+      impl->restoreSubjective(depth);
    }
 
    void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
