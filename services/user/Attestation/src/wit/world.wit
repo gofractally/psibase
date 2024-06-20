@@ -1,0 +1,63 @@
+package attestation:service;
+
+/*
+NOTES
+- VCs?
+ - indexing can be done with events
+*/
+
+interface types {
+    // Our credential here is built on the (evolving) W3C standard so that
+    // 1) we leverage all the thinking that's gone into the standard (delegating all that work) and
+    // 2) so that if we want to support some standard later, like Web5 VCs, our format will require the least changes.
+    // RFC Verifiable Credential Data Model v1.1 https://www.w3.org/TR/vc-data-model
+    // VC schema: https://www.w3.org/2018/credentials/v1
+    record credential {
+        context: string[],
+        type: string[],
+        // NOTE: issuer signs the VC at point of issuance
+        issuer: string,
+        // Relevant: for us holder and subject will generally be the same entity.
+        // TODO: aren't these just bearer credentials anyway? What distinguishes this?
+        // NOTE: holder provides sig that confirms them as the holder did
+        holder: string,
+        subject: string,
+        // Relevant: what is being being attested to / the message
+        // for identity, confidence of attestation would be stored here (or any other info that would otherwise be in a `payload` object)
+        // w3c defn of claim? In this case, what is the confidence in humanness called?
+        credential-subject: string, // RFC: arbitrary object
+        evidence: string, // RFC: object[]
+        issued: date-time,
+        valid-from: date-time,
+        valid-to: date-time,
+        // Relevant: crypto info
+        proof: string, // RFC: object
+    }
+}
+
+interface api {
+    use common:plugin/types.{error};
+    use types.{credential};
+
+    /* store the tuple<calling service as namespace, attestation-type> with
+        - `claim` (for the identity service, the entity being attested to; otherwise any statement) and
+          - `data` (a normalized float, i.e., 0.0-1.0 to be interpretted by the calling service)
+        */
+    // Option 1: data is the focus, but a stringified JSON can be included with specified fields that would be stored (in variant field) and indexed (or not)
+    // attest: func(attestation-type: string, payload: string,  data: f32) -> result<_, error>;
+    
+    // Option 2: data is the focus, but standard VC, stringified JSON can be included with specified fields that would be stored (in variant field) and indexed
+    // - serialization of JSON payload will happen client-side and
+    // server side will deserialize the payload and build the index
+    // so the data is searchable via the RPC
+    // NOTE: type and claims would be part of credential-subject (so would be replaced by the vc)
+    // verifiable-credential = { subject: attestee, credential-subject: { confidence: 0.90 }}
+    // TODO: determine how attestation-type would fit in the VC and ensure we could translate back and forth from chain attestation-type and the relevant VC field
+    //    What will we need to index the data?
+    attest: func(vc: credential) -> result<_, error>;
+    // indexing the vc can happen at time of issuance
+}
+
+world attestation {
+    export api;
+}
