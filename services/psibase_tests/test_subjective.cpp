@@ -36,6 +36,12 @@ TEST_CASE("subjective db")
    CHECK(subjective.write("a", "b").succeeded());
    CHECK(subjective.read("a").returnVal() == std::optional{std::string("b")});
 
+   for (int i = 0; i < 3; ++i)
+   {
+      subjective.abort("a", "WRONG", i);
+      CHECK(subjective.read("a").returnVal() == std::optional{std::string("b")});
+   }
+
    for (bool b : {false, true})
    {
       for (int i = 0; i < 4; ++i)

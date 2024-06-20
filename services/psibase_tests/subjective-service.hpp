@@ -25,6 +25,8 @@ struct SubjectiveService : psibase::Service<SubjectiveService>
    void                       write(std::string key, std::string value);
    std::optional<std::string> read(std::string key);
 
+   void abort(std::string key, std::string value, int op);
+
    void testRFail1(std::string key, bool txBefore, int op);
    void testRFail2(psibase::AccountNumber account, std::string key, int op);
    void testWFail1(std::string key, std::string value);
@@ -34,6 +36,7 @@ struct SubjectiveService : psibase::Service<SubjectiveService>
 PSIO_REFLECT(SubjectiveService,
              method(write, key, value),
              method(read, key, value),
+             method(abort, key, value, op),
              method(testRFail1, key, txBefore, op),
              method(testRFail2, account, key, op),
              method(testWFail1, key, value),

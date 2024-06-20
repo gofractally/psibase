@@ -60,6 +60,20 @@ void SubjectiveService::testWFail1(std::string key, std::string value)
    Tables{}.open<SubjectiveTable>().put({key, value});
 }
 
+void SubjectiveService::abort(std::string key, std::string value, int op)
+{
+   PSIBASE_SUBJECTIVE_TX
+   {
+      Tables{}.open<SubjectiveTable>().put({key, value});
+      if (op == 0)
+         return;
+      else if (op == 1)
+         break;
+      else if (op == 2)
+         abortMessage("fail");
+   }
+}
+
 std::optional<HttpReply> SubjectiveService::serveSys(const HttpRequest& req)
 {
    if (req.target == "/write")
