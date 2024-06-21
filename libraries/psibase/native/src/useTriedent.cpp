@@ -269,6 +269,8 @@ namespace psibase
    {
       std::shared_ptr<triedent::database> trie;
 
+      std::mutex topMutex;
+
       std::mutex                      headMutex;
       std::shared_ptr<const Revision> head;
 
@@ -318,9 +320,12 @@ namespace psibase
 
       void setHead(triedent::write_session& session, std::shared_ptr<const Revision> r)
       {
-         auto topRoot = session.get_top_root();
-         session.upsert(topRoot, revisionHeadKey, r->roots);
-         session.set_top_root(topRoot);
+         {
+            std::lock_guard lock{topMutex};
+            auto            topRoot = session.get_top_root();
+            session.upsert(topRoot, revisionHeadKey, r->roots);
+            session.set_top_root(topRoot);
+         }
 
          std::lock_guard<std::mutex> lock(headMutex);
          head = std::move(r);
@@ -330,7 +335,8 @@ namespace psibase
                          const Checksum256&       blockId,
                          const Revision&          r)
       {
-         auto topRoot = session.get_top_root();
+         std::lock_guard lock{topMutex};
+         auto            topRoot = session.get_top_root();
          session.upsert(topRoot, revisionById(blockId), r.roots);
          session.set_top_root(topRoot);
       }
@@ -377,6 +383,8 @@ namespace psibase
    // TODO: move triedent::root destruction to a gc thread
    void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
    {
+      // TODO: Reduce critical section
+      std::lock_guard   lock{impl->topMutex};
       auto              topRoot = writer.get_top_root();
       std::vector<char> key{revisionByIdPrefix};
 
@@ -419,12 +427,13 @@ namespace psibase
                                      std::span<const char> key,
                                      std::span<const char> value)
    {
-      auto              topRoot = writer.get_top_root();
       std::vector<char> fullKey;
       fullKey.reserve(1 + blockId.size() + key.size());
       fullKey.push_back(blockDataPrefix);
       fullKey.insert(fullKey.end(), blockId.begin(), blockId.end());
       fullKey.insert(fullKey.end(), key.begin(), key.end());
+      std::lock_guard lock{impl->topMutex};
+      auto            topRoot = writer.get_top_root();
       writer.upsert(topRoot, fullKey, value);
       writer.set_top_root(topRoot);
    }
@@ -470,8 +479,8 @@ namespace psibase
             if (r.write)
                writer.splice(impl->subjective, updated, dbKey(r.lower), dbKey(r.upper));
          }
-         // TODO: All access to top_root needs to be atomic
-         auto r = writer.get_top_root();
+         std::lock_guard lock{impl->topMutex};
+         auto            r = writer.get_top_root();
          writer.upsert(r, subjectiveKey, {&impl->subjective, 1});
          writer.set_top_root(std::move(r));
       }
