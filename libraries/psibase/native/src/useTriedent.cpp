@@ -22,6 +22,7 @@ namespace psibase
    static const char subjectiveKey[]   = {subjectivePrefix};
 
    // TODO: should this be defined in a header or even loaded from the db?
+   // It is not consensus, so it's somewhat safe to change it.
    static constexpr std::size_t maxSubjectiveTransactionDepth = 8;
 
    static auto revisionById(const Checksum256& blockId)

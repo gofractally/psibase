@@ -43,10 +43,6 @@ namespace psibase
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
                   "key prefix must match service for accessing the subjective database");
-            // TODO: RPC service queries currently can read subjective data to monitor node status.
-            //       However, there's a possibility this may make it easier on an active attacker.
-            //       Make this capability a node configuration toggle? Allow node config to whitelist
-            //       services for this?
             if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
                return (DbId)db;
          }
@@ -99,19 +95,6 @@ namespace psibase
                   "key prefix must match service during write");
          };
 
-         // User-written subjective services writing to subjective storage isn't really
-         // viable, so it requires an additional permission bit. The oddities:
-         //
-         // * It has billing issues since database billing is objective
-         // * Aborting or undoing a transaction doesn't roll back subjective storage;
-         //   writes from speculative execution survive
-         // * Forking doesn't roll back subjective storage
-         // * Subjective execution doesn't happen when nodes get the produced block
-         //
-         // The unusual semantics exist to enable trusted subjective services to do
-         // subjective attack mitigation.
-         //
-         // TODO: reenable after subjective database support is working as intended
          if (db == uint32_t(DbId::subjective) && (self.code.flags & CodeRow::isSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
