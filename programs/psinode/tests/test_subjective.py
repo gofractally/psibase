@@ -41,31 +41,47 @@ class TestSubjective(unittest.TestCase):
         a.run_psibase(['install', '--package-source', testutil.test_packages(), 'PSubjective'])
         a.wait(new_block())
 
-        threads = []
+        def parallel_query(fn):
+            threads = []
 
-        nthreads = 4
-        niter = 200
-        values = []
-        for i in range(nthreads):
-            def tfn(api, out):
-                for i in range(niter):
-                    with api.post('/inc', 'psubjective', json={}) as response:
-                        response.raise_for_status()
-                        out.append(response.json()['value'])
-            v = []
-            values.append(v)
-            threads.append(Thread(target=tfn, args=(a.new_api(),v)))
+            nthreads = 4
+            niter = 200
+            values = []
+            for i in range(nthreads):
+                def tfn(api, out):
+                    for i in range(niter):
+                        out.append(fn(api))
+                v = []
+                values.append(v)
+                threads.append(Thread(target=tfn, args=(a.new_api(),v)))
 
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
 
-        all_values = []
-        for v in values:
-            all_values += v
-        all_values.sort()
-        self.assertSequenceEqual(all_values, range(1, nthreads*niter+1))
+            all_values = []
+            for v in values:
+                all_values += v
+                all_values.sort()
+            return all_values
+
+        def inc(api):
+            with api.post('/inc', 'psubjective', json={}) as response:
+                response.raise_for_status()
+                return response.json()['value']
+
+        values = parallel_query(inc)
+        self.assertSequenceEqual(values, range(1, len(values)+1))
+
+        def ge(api):
+            with api.post('/ge', 'psubjective', json={}) as response:
+                response.raise_for_status()
+                return response.json()['key']
+
+        u32max = 0xffffffff
+        values = parallel_query(ge)
+        self.assertSequenceEqual(values, range(u32max - len(values) + 1, u32max + 1))
 
     @testutil.psinode_test
     def test_parallel_with_tx(self, cluster):

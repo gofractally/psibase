@@ -14,14 +14,21 @@ struct ParallelSubjectiveRow
    std::string   key;
    std::uint32_t value;
 };
-
 PSIO_REFLECT(ParallelSubjectiveRow, key, value)
 
 using ParallelSubjectiveTable = psibase::Table<ParallelSubjectiveRow, &ParallelSubjectiveRow::key>;
 
+struct GeRow
+{
+   std::uint32_t key;
+};
+PSIO_REFLECT(GeRow, key)
+
+using GeTable = Table<GeRow, &GeRow::key>;
+
 struct ParallelSubjectiveService : psibase::Service<ParallelSubjectiveService>
 {
-   using Tables                  = psibase::SubjectiveTables<ParallelSubjectiveTable>;
+   using Tables                  = psibase::SubjectiveTables<ParallelSubjectiveTable, GeTable>;
    static constexpr auto service = psibase::AccountNumber{"psubjective"};
    static constexpr auto serviceFlags =
        psibase::CodeRow::isSubjective | psibase::CodeRow::allowWriteSubjective;
@@ -46,6 +53,21 @@ struct IncResponse
 };
 PSIO_REFLECT(IncResponse, attempts, value)
 
+template <typename T>
+T convert_from_json(const std::vector<char>& data)
+{
+   return psio::convert_from_json<T>(std::string(data.data(), data.size()));
+}
+
+template <typename T>
+HttpReply json_reply(const T& body)
+{
+   HttpReply           response{.contentType = "application/json"};
+   psio::vector_stream stream{response.body};
+   psio::to_json(body, stream);
+   return response;
+}
+
 std::optional<HttpReply> ParallelSubjectiveService::serveSys(const HttpRequest& req)
 {
    if (req.target == "/inc")
@@ -62,10 +84,21 @@ std::optional<HttpReply> ParallelSubjectiveService::serveSys(const HttpRequest& 
          table.put(*row);
          ++data.attempts;
       }
-      HttpReply           response{.contentType = "application/json"};
-      psio::vector_stream stream{response.body};
-      psio::to_json(data, stream);
-      return response;
+      return json_reply(data);
+   }
+   else if (req.target == "/ge")
+   {
+      GeRow row;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = Tables{}.open<GeTable>();
+         auto index = table.getIndex<0>();
+         auto pos   = index.begin();
+         row        = (pos != index.end()) ? *pos : GeRow{};
+         --row.key;
+         table.put(row);
+      }
+      return json_reply(row);
    }
    return {};
 }
