@@ -17,6 +17,7 @@ function(add suffix)
     service(subjective-service "${suffix}" subjective-service.cpp)
 
     service(PSubjectiveService "${suffix}" ParallelSubjectiveService.cpp)
+    service(CounterService "${suffix}" CounterService.cpp)
 
     add_executable(psibase-tests${suffix} test.cpp test-ec.cpp test_event.cpp test_crypto.cpp test_memo.cpp test_clock.cpp test_semver.cpp test_subjective.cpp)
     target_include_directories(psibase-tests${suffix} PUBLIC include)

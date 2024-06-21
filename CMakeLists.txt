@@ -143,6 +143,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
@@ -780,7 +781,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/Counter.psi
+    NAME Counter
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Test service than increments a counter"
+    SERVICE counter
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
+        SERVER counter
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter)
 
 ExternalProject_Add(
     rust
