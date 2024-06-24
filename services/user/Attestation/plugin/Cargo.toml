@@ -1,5 +1,5 @@
 [package]
-name = "attestation"
+name = "attestation-plugin"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 bitflags = "2.5.0"
 wit-bindgen-rt = "0.26.0"
 psibase = { path = "../../../../rust/psibase/" }
-service = { path = "../service" }
+attestation = { path = "../service" }
 
 [lib]
 crate-type = ["cdylib"]
