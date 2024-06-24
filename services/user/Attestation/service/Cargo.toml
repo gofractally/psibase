@@ -1,0 +1,23 @@
+[package]
+name = "attestation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitflags = "2.5.0"
+wit-bindgen-rt = "0.26.0"
+psibase_macros = { version = "0.10.0", path = "../psibase_macros" }
+psibase = { version = "0.10.0", path = "../../../../rust/psibase/" }
+serde = { version = "1", features = ["derive"] }
+async-graphql = "4.0"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "attestation:service"
+
+
+[package.metadata.component.target.dependencies]
+"common:plugin" = { path = "../../../user/CommonApi/common/packages/wit/plugin.wit" }
