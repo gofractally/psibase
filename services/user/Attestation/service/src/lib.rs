@@ -4,69 +4,91 @@
 /// query interface.
 #[psibase::service]
 #[allow(non_snake_case)]
-mod service {
+mod AttestationService {
     use async_graphql::*;
-    use psibase::*;
+    use psibase::{TimePointSec, *};
     use serde::{Deserialize, Serialize};
 
-    /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AttestationTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject)]
+    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
     pub struct Attestation {
-        /// The account responsible for the calculation
+        /// The attesting account / the issuer
         #[primary_key]
-        issuer: AccountNumber,
-        holder: AccountNumber,
-        subject: AccountNumber,
-        credential_subject: String,
+        attester: AccountNumber,
 
-        issued: DateTime,
+        /// The subject (generally also the holder)
+        subject: AccountNumber,
+
+        /// The subject (generally also the holder)
+        // #[secondary_key(2)]
+        issued: psibase::TimePointSec,
+
+        /// The result of the calculation
+        credentialSubject: i32,
     }
 
-    #[action]
-    pub fn attest(vc: VerifiedCredential) -> i32 {
-        let res = a + b;
+    impl Attestation {
+        #[secondary_key(1)]
+        fn by_id(&self) -> (psibase::TimePointSec, AccountNumber, AccountNumber) {
+            (self.issued, self.attester, self.subject)
+        }
+        #[secondary_key(2)]
+        fn by_subject(&self) -> (psibase::TimePointSec, AccountNumber, AccountNumber) {
+            (self.issued, self.attester, self.subject)
+        }
+    }
 
-        let attestation_table = AttestationTable::new();
-        attestation_table
-            .put(&Answer {
-                id: get_sender(),
-                result: res,
+    #[table(record = "WebContentRow", index = 1)]
+    struct WebContentTable;
+
+    #[action]
+    pub fn attest(vc: Attestation) -> TimePointSec {
+        let attester = get_sender();
+        // let subject = get_sender();
+        let issued = TimePointSec { seconds: 52 };
+        let credentialSubject = 5;
+
+        let answer_table = AttestationTable::new();
+        answer_table
+            .put(&Attestation {
+                attester,
+                subject: vc.subject,
+                issued,
+                credentialSubject,
             })
             .unwrap();
 
-        Wrapper::emit().history().add(issuer, holder, subject, issued);
+        Wrapper::emit()
+            .history()
+            .attest(attester, vc.subject, issued, credentialSubject);
 
-        res
+        issued
     }
 
     #[event(history)]
-    pub fn attest(issuer: AccountNumber, holder: AccountNumber, subject: String, issued: DateTime) {}
+    pub fn attest(
+        id: AccountNumber,
+        subject: AccountNumber,
+        issued: TimePointSec,
+        credentialSubject: i32,
+    ) {
+    }
 
     struct Query;
 
     #[Object]
     impl Query {
-        /// Get the answer to `account`'s most recent calculation
-        async fn attestation(&self, account: AccountNumber) -> Option<Answer> {
-            AttestationTable::new().get_index_pk().get(&account)
+        async fn attestation(&self, attestedAccount: AccountNumber) -> Option<Attestation> {
+            AttestationTable::new().get_index_pk().get(&attestedAccount)
         }
 
-        /// Look up an event
-        ///
-        /// ```
-        /// query {
-        ///   event(id: 1) {
-        ///     __typename
-        ///     ... on Add {
-        ///       a b result
-        ///     }
-        ///     ... on Multiply {
-        ///       a b result
-        ///     }
-        ///   }
-        /// }
-        /// ```
+        // async fn answers(&self, account: AccountNumber) -> Option<Vec<i32>> {
+        //     let answer_table = AnswerTable::new();
+        //     let tab = answer_table.get_index_pk();
+
+        //     Some(tab.iter().map(|val| val.result).collect())
+        // }
+
         async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
             get_event(id)
         }
@@ -75,17 +97,16 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_simple_ui::<Wrapper>(&request))
+        None.or_else(|| serve_content(&request, &WebContentTable::new()))
             .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
     }
-}
 
-#[psibase::test_case(services("example"))]
-fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let result = Wrapper::push(&chain).add(3, 4);
-    assert_eq!(result.get()?, 7);
-    println!("\n\nTrace:\n{}", result.trace);
-
-    Ok(())
+    #[action]
+    #[allow(non_snake_case)]
+    fn storeSys(path: String, contentType: String, content: HexBytes) {
+        check(get_sender() == get_service(), "unauthorized");
+        let table = WebContentTable::new();
+        store_content(path, contentType, content, &table).unwrap();
+    }
 }
