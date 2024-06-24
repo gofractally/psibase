@@ -7,14 +7,15 @@ NOTES
 */
 
 interface types {
+    type date-time = string;
     // Our credential here is built on the (evolving) W3C standard so that
     // 1) we leverage all the thinking that's gone into the standard (delegating all that work) and
     // 2) so that if we want to support some standard later, like Web5 VCs, our format will require the least changes.
     // RFC Verifiable Credential Data Model v1.1 https://www.w3.org/TR/vc-data-model
     // VC schema: https://www.w3.org/2018/credentials/v1
     record credential {
-        context: string[],
-        type: string[],
+        context: list<string>,
+        cred-type: list<string>,
         // NOTE: issuer signs the VC at point of issuance
         issuer: string,
         // Relevant: for us holder and subject will generally be the same entity.
