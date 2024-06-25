@@ -3,6 +3,7 @@ mod bindings;
 
 use bindings::common::plugin::{server as CommonServer, types as CommonTypes};
 use bindings::exports::attestation::plugin::api::Guest;
+use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType::*;
