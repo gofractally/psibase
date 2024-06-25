@@ -2,9 +2,9 @@
 /// numbers, similar to test_contract. This service has additional
 /// features such as writing tables, and providing a graphiql
 /// query interface.
-#[psibase::service]
+#[psibase::service(name = "attestation")]
 #[allow(non_snake_case)]
-mod AttestationService {
+mod service {
     use async_graphql::*;
     use psibase::{TimePointSec, *};
     use serde::{Deserialize, Serialize};

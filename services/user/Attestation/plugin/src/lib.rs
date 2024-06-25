@@ -3,7 +3,6 @@ mod bindings;
 
 use bindings::common::plugin::{server as CommonServer, types as CommonTypes};
 use bindings::exports::attestation::plugin::api::Guest;
-// use attestation::AttestationService;
 
 mod errors;
 use errors::ErrorType::*;
@@ -17,8 +16,9 @@ impl Guest for AttestationPlugin {
         // subject: String,
         claim: String,
     ) -> Result<(), CommonTypes::Error> {
+        let packed_a = attestation::action_structs::attest { vc: todo!() }.packed();
+
         if true {
-            // attestation::action_structs::attest
             // CommonServer::add_action_to_transaction(
             //     "attest",
             //     &AttestationService::action_structs::attest {
