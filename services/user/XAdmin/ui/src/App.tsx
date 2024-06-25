@@ -8,20 +8,10 @@ import { ConfigurationPage } from "./configuration/configuration-page";
 import { usePollJson } from "./hooks";
 import { LogsPage } from "./log/logs-page";
 import { DashboardPage } from "./dashboard/dashboard-page";
-import { PowerPage } from "./power-control/power-page";
 import { PeersPage } from "./peers/peers-page";
 import { Peer } from "./peers/interfaces";
 
-import "./App.css";
-
-const MENU_ITEMS = [
-    "Dashboard",
-    "Peers",
-    "Logs",
-    "Configuration",
-    "Power",
-    "Boot",
-];
+const MENU_ITEMS = ["Dashboard", "Peers", "Logs", "Configuration", "Boot"];
 
 function App() {
     const [activeItem, setActiveItem] = useState("");
@@ -45,20 +35,15 @@ function App() {
     );
     const [status, statusError] = usePollJson<string[]>("/native/admin/status");
 
-    let activeMenuItems = [
-        "Dashboard",
-        "Peers",
-        "Logs",
-        "Configuration",
-        "Power",
-    ];
+    let activeMenuItems = ["Dashboard", "Peers", "Logs", "Configuration"];
     if (status && status.includes("needgenesis")) {
         activeMenuItems.push("Boot");
     }
 
     return (
-        <>
+        <div className="mx-auto max-w-screen-xl">
             <NavHeader menuItems={activeMenuItems} activeItem={activeItem} />
+
             <StatusBanner
                 status={status}
                 statusError={statusError}
@@ -81,12 +66,10 @@ function App() {
                     config={config}
                     refetchConfig={refetchConfig}
                 />
-            ) : activeItem === "Power" ? (
-                <PowerPage />
             ) : activeItem === "Boot" ? (
                 <BootPage config={config} refetchConfig={refetchConfig} />
             ) : null}
-        </>
+        </div>
     );
 }
 

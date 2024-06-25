@@ -64,8 +64,8 @@ TEST_CASE("Watchdog zero limit")
 
 TEST_CASE("Watchdog required accuracy")
 {
-   constexpr int run_count        = 5;
-   constexpr int allowed_failures = 1;
+   constexpr int run_count        = 20;
+   constexpr int allowed_failures = 4;
    int           failed           = 0;
    for (int i = 0; i < run_count; ++i)
    {

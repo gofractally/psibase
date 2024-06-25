@@ -223,8 +223,8 @@ where
     T: FromHex,
 {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct Visitor<'a, T>(&'a mut String, PhantomData<T>);
-        impl<'de, 'a, T> serde::de::Visitor<'de> for Visitor<'a, T>
+        struct Visitor<T>(PhantomData<T>);
+        impl<'de, T> serde::de::Visitor<'de> for Visitor<T>
         where
             T: FromHex,
         {
@@ -238,8 +238,7 @@ where
                 ))
             }
         }
-        let mut s = String::new();
-        deserializer.deserialize_str(Visitor::<T>(&mut s, PhantomData))
+        deserializer.deserialize_str(Visitor::<T>(PhantomData))
     }
 }
 
