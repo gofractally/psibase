@@ -7,7 +7,7 @@ edition = "2021"
 bitflags = "2.5.0"
 wit-bindgen-rt = "0.26.0"
 psibase = { path = "../../../../rust/psibase/" }
-attestation = { path = "../service" }
+attestation = { path = "../service/" }
 
 [lib]
 crate-type = ["cdylib"]

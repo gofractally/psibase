@@ -10,11 +10,10 @@ use errors::ErrorType::*;
 struct IdentityPlugin;
 
 impl Guest for IdentityPlugin {
-    /// Say hello!
-    fn attest(subject: String, conidence: f32) -> Result<(), CommonTypes::Error> {
+    fn attest(subject: String, confidence: f32) -> Result<(), CommonTypes::Error> {
         if true {
             // claims = <claims>
-            // attest("identity", claims)  // -> Result<(), CommonTypes::Error> {
+            // attest("identity", claims); // -> Result<(), CommonTypes::Error> {
             return Ok(());
         } else {
             return Err(NotYetImplemented.err("add attest fn"));

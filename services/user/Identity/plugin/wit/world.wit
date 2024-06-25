@@ -66,6 +66,7 @@ interface queries {
     get-history: func(subject: string) -> result<list<identity-attestation>, error>;
 }
 
-world attestation {
+world identity {
+    import attestation:plugin/api;
     export api;
 }

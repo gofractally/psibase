@@ -2,6 +2,7 @@
 name = "attestation"
 edition = "2021"
 version = "0.1.0"
+include = ["src/**/*", "Cargo.toml"]
 
 [lib]
 path = "src/lib.rs"
