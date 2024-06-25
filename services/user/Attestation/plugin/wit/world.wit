@@ -14,7 +14,7 @@ interface api {
     // build a VC and pass that to the server
 }
 
-world attestation-plugin {
+world attestation-world {
     import common:plugin/server;
     export api;
 }

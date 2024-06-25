@@ -2,15 +2,8 @@
 name = "attestation"
 edition = "2021"
 version = "0.1.0"
-include = ["src/**/*", "Cargo.toml"]
 
-[lib]
-path = "src/lib.rs"
-crate-type = ["cdylib"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-psibase_macros = { version = "0.10.0", path = "../../../../rust/psibase_macros" }
 psibase = { version = "0.10.0", path = "../../../../rust/psibase" }
 serde = { version = "1", features = ["derive"] }
 async-graphql = "4.0"
