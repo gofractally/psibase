@@ -11,13 +11,18 @@ use errors::ErrorType::*;
 struct AttestationPlugin;
 
 impl Guest for AttestationPlugin {
-    /// Say hello!
     fn attest(
         attestation_type: String,
-        // subject: String,
+        subject: String,
         claim: String,
     ) -> Result<(), CommonTypes::Error> {
-        let packed_a = attestation::action_structs::attest { vc: todo!() }.packed();
+        let packed_a = attestation::action_structs::attest {
+            vc: attestation:::VerifiableCredential {
+                subject,
+                credentialSubject: claim,
+            },
+        }
+        .packed();
 
         if true {
             // CommonServer::add_action_to_transaction(
