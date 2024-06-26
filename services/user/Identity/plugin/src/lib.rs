@@ -7,7 +7,6 @@ use bindings::exports::identity::plugin::api::Guest;
 use psibase::AccountNumber;
 
 mod errors;
-use errors::ErrorType::*;
 
 struct IdentityPlugin;
 
