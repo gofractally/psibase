@@ -1,18 +1,14 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useStatuses } from "../hooks/useStatuses";
+import { useConfig } from "../hooks/useConfig";
+import { usePeers } from "../hooks/usePeers";
 
-interface StatusBannerProps {
-    peersError?: string;
-    configError?: string;
-    status?: string[];
-    statusError?: string;
-}
+export const StatusBanner = () => {
+    const { data: peers, error: peersError } = usePeers();
 
-export const StatusBanner = ({
-    peersError,
-    configError,
-    status,
-    statusError,
-}: StatusBannerProps) => {
+    const { data: config, error: configError } = useConfig();
+    const { data: status, error: statusError } = useStatuses();
+
     let serverStatus = [
         ...(status || []),
         ...(!statusError ? [] : [statusError]),

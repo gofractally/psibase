@@ -26,6 +26,10 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
+import { useConfig } from "../hooks/useConfig";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
+
 type InstallType = {
     installType: string;
 };
@@ -532,33 +536,16 @@ export const ProgressPage = ({ state }: ProgressPageProps) => {
     }
 };
 
-function useGetJson<R>(url: string): [R | undefined, string | undefined] {
-    const [error, setError] = useState<string>();
-    const [value, setValue] = useState<R>();
-    useEffect(() => {
-        if (value === undefined && error === undefined) {
-            setError(`Waiting for ${url}`);
-            (async () => {
-                try {
-                    let result = await getJson(url);
-                    setValue(result);
-                    setError(undefined);
-                } catch (e) {
-                    setError(`Failed to load ${url}`);
-                }
-            })();
-        }
-    }, []);
-    return [value, error];
-}
+export const BootPage = () => {
+    const { data: config, refetch: refetchConfig } = useConfig();
 
-export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
     const [bootState, setBootState] = useState<BootState>();
 
-    let [serviceIndex, serviceIndexError] = useGetJson<PackageIndex>(
-        "/packages/index.json"
-    );
-    serviceIndex = serviceIndex || [];
+    const { data: serviceIndex } = useQuery<PackageIndex>({
+        queryKey: queryKeys.packages,
+        queryFn: () => getJson("/packages/index.json"),
+        initialData: [],
+    });
 
     const typeForm = useForm<InstallType>({
         defaultValues: { installType: "full" },
@@ -605,12 +592,6 @@ export const BootPage = ({ config, refetchConfig }: BootPageProps) => {
             />
         );
     } else if (currentPage == "install") {
-        let namedPackages =
-            typeForm.getValues("installType") == "full"
-                ? ["Default"]
-                : serviceIndex
-                      .map((meta) => meta.name)
-                      .filter((name) => servicesForm.getValues(name));
         return (
             <InstallForm
                 packages={packagesToInstall || []}

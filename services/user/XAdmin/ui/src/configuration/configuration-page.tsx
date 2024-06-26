@@ -30,17 +30,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useConfig, useConfigUpdate } from "../hooks/useConfig";
 
-interface ConfigurationPageProps {
-    config?: PsinodeConfig;
-    refetchConfig: () => void;
-}
-
-export const ConfigurationPage = ({
-    config,
-    refetchConfig,
-}: ConfigurationPageProps) => {
-    const [configPutError, setConfigPutError] = useState<string>();
+export const ConfigurationPage = () => {
+    const { data: config, refetch: refetchConfig } = useConfig();
 
     const configForm = useForm<PsinodeConfig>({
         defaultValues: initialConfigForm(),
@@ -84,28 +77,15 @@ export const ConfigurationPage = ({
         }
     });
 
+    const { mutateAsync, error: configPutError } = useConfigUpdate();
+
     const onConfig = async (input: PsinodeConfig) => {
-        try {
-            setConfigPutError(undefined);
-            for (let service of input.services) {
-                if (service.host == "") {
-                    service.host = defaultService(service.root);
-                }
+        for (let service of input.services) {
+            if (service.host == "") {
+                service.host = defaultService(service.root);
             }
-            const result = await putJson(
-                "/native/admin/config",
-                writeConfig(input)
-            );
-            if (result.ok) {
-                configForm.reset(input);
-                refetchConfig();
-            } else {
-                setConfigPutError(await result.text());
-            }
-        } catch (e) {
-            console.error("error", e);
-            setConfigPutError("Failed to write /native/admin/config");
         }
+        mutateAsync(writeConfig(input));
     };
 
     const onAddNewLoggerClick = () => {

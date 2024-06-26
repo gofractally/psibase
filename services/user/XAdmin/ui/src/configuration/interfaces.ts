@@ -26,7 +26,7 @@ export type PsinodeConfig = {
     port?: number;
     listen: ListenConfig[];
     services: ServiceConfig[];
-    admin: string;
+    admin?: string;
     loggers: { [index: string]: LogConfig };
 };
 
@@ -47,12 +47,12 @@ const LogConfigSchema = z.object({
     command: z.string().optional(),
 });
 
-const psinodeConfigSchema = z.object({
+export const psinodeConfigSchema = z.object({
     p2p: z.boolean(),
     peers: z.string().array(),
     producer: z.string(),
     host: z.string(),
-    port,
+    port: z.number().optional(),
     listen: z
         .object({
             protocol: z.enum(["http", "https", "local"]),
@@ -65,9 +65,10 @@ const psinodeConfigSchema = z.object({
         .object({
             host: z.string(),
             root: z.string(),
-            key: z.string(),
         })
         .array(),
-    admin: z.string(),
+    admin: z.string().optional().nullable(),
     loggers: z.record(z.string(), LogConfigSchema),
 });
+
+export type PsinodeConfigSchemaa = z.infer<typeof psinodeConfigSchema>;

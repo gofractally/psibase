@@ -11,11 +11,20 @@ import { Moon, Sun, Power, RotateCcw } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "./ui/button";
 import { postJson } from "@psibase/common-lib";
+import { Cog } from "lucide-react";
+import { Link } from "react-router-dom";
 
-export const MenuContent = () => {
+export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
     const { setTheme } = useTheme();
     return (
         <>
+            {condense && (
+                <Button asChild variant="outline">
+                    <Link to="/setup-config">
+                        <Cog size={20} />
+                    </Link>
+                </Button>
+            )}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline">
