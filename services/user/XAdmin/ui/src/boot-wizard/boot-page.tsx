@@ -28,6 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { useConfig } from "../hooks/useConfig";
 import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 
 type InstallType = {
     installType: string;
@@ -541,7 +542,7 @@ export const BootPage = () => {
     const [bootState, setBootState] = useState<BootState>();
 
     const { data: serviceIndex } = useQuery<PackageIndex>({
-        queryKey: ["packages"],
+        queryKey: queryKeys.packages,
         queryFn: () => getJson("/packages/index.json"),
         initialData: [],
     });

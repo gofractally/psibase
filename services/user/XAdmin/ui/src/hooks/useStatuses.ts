@@ -1,10 +1,11 @@
+import { queryKeys } from "@/lib/queryKeys";
 import { getJson } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 export const useStatuses = () =>
     useQuery<string[], string>({
-        queryKey: ["statuses"],
+        queryKey: queryKeys.statuses,
         queryFn: async () => {
             try {
                 const res = await getJson<string[]>("/native/admin/status");

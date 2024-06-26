@@ -32,7 +32,7 @@ export const PeersPage = () => {
         refetch: refetchPeers,
     } = usePeers();
 
-    const { data: config, error: configError, refetch: refetchConfig } = useConfig();
+    const { data: config, refetch: refetchConfig } = useConfig();
 
     const [configPeersError, setConfigPeersError] = useState<string>();
 
@@ -62,6 +62,7 @@ export const PeersPage = () => {
         endpoint: ConnectInputs
     ) => {
         try {
+            console.log(endpoint, "is the endpoint");
             await postJson("/native/admin/connect", endpoint);
             reset();
             refetchPeers();

@@ -2,6 +2,7 @@ import { getJson } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
 import { Peer } from "../peers/interfaces";
 import { z } from "zod";
+import { queryKeys } from "@/lib/queryKeys";
 
 const Peers = z
     .object({
@@ -13,7 +14,7 @@ const Peers = z
 
 export const usePeers = () =>
     useQuery<Peer[], string>({
-        queryKey: ["peers"],
+        queryKey: queryKeys.peers,
         queryFn: async () => {
             try {
                 return Peers.parse(

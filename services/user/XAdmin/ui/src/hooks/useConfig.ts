@@ -7,10 +7,11 @@ import {
 import { getJson } from "@psibase/common-lib";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "../main";
+import { queryKeys } from "@/lib/queryKeys";
 
 export const useConfig = () =>
     useQuery<PsinodeConfig, string>({
-        queryKey: ["config"],
+        queryKey: queryKeys.config,
         queryFn: async (): Promise<PsinodeConfig> => {
             try {
                 const res = psinodeConfigSchema.parse(
@@ -22,7 +23,11 @@ export const useConfig = () =>
                     admin: res.admin ? res.admin : undefined,
                     listen: res.listen.map((listen) => ({
                         ...listen,
-                        key: `${listen.address}${listen.port}${listen.protocol}${listen.path}`,
+                        key:
+                            listen.protocol +
+                            listen.address +
+                            listen.path +
+                            listen.port,
                     })),
                     services: res.services.map((service, index) => ({
                         ...service,
@@ -40,7 +45,7 @@ export const useConfig = () =>
 
 export const useConfigUpdate = () =>
     useMutation<void, string, PsinodeConfigSchemaa>({
-        mutationKey: ["configUpdate"],
+        mutationKey: queryKeys.configUpdate,
         mutationFn: async (input) => {
             try {
                 const result = await putJson("/native/admin/config", input);
@@ -50,8 +55,7 @@ export const useConfigUpdate = () =>
             }
         },
         onSuccess: () => {
-            const queryKey = ["config"];
-            queryClient.invalidateQueries({ queryKey });
-            queryClient.refetchQueries({ queryKey });
+            queryClient.invalidateQueries({ queryKey: queryKeys.config });
+            queryClient.refetchQueries({ queryKey: queryKeys.config });
         },
     });
