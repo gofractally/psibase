@@ -50,9 +50,11 @@
 //! for the two types.
 
 use custom_error::custom_error;
-use std::{cell::RefCell, mem, rc::Rc, sync::Arc};
-
 pub use psibase_macros::{Pack, Unpack};
+use std::{cell::RefCell, hash::Hash, mem, rc::Rc, sync::Arc};
+
+mod schema;
+pub use schema::*;
 
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
@@ -823,6 +825,87 @@ impl<'a, T: Unpack<'a>, const N: usize> Unpack<'a> for [T; N] {
         Ok(())
     }
 }
+
+macro_rules! container_impl {
+    (impl<$($n:ident),+> Pack+Unpack for $t:ty $(where $($w:tt)*)?) =>
+    {
+        impl <$($n:Pack),+> Pack for $t $(where $($w)*)?
+{
+    const FIXED_SIZE: u32 = 4;
+    const VARIABLE_SIZE: bool = true;
+
+    fn pack(&self, dest: &mut Vec<u8>) {
+        let num_bytes = self.len() as u32 * <&$t as IntoIterator>::Item::FIXED_SIZE;
+        dest.extend_from_slice(&num_bytes.to_le_bytes());
+        dest.reserve(num_bytes as usize);
+        let start = dest.len();
+        for x in self {
+            <&$t as IntoIterator>::Item::embedded_fixed_pack(&x, dest);
+        }
+        for (i, x) in self.into_iter().enumerate() {
+            let heap_pos = dest.len() as u32;
+            <&$t as IntoIterator>::Item::embedded_fixed_repack(&x, start as u32 + (i as u32) * <&$t as IntoIterator>::Item::FIXED_SIZE, heap_pos, dest);
+            <&$t as IntoIterator>::Item::embedded_variable_pack(&x, dest);
+        }
+    }
+
+    fn is_empty_container(&self) -> bool {
+        self.into_iter().next().is_none()
+    }
+}
+
+impl<'a, $($n: Unpack<'a>),+> Unpack<'a> for $t $(where $($w)*)? {
+    const FIXED_SIZE: u32 = 4;
+    const VARIABLE_SIZE: bool = true;
+
+    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
+        let num_bytes = u32::unpack(src, pos)?;
+        if num_bytes % <$t as IntoIterator>::Item::FIXED_SIZE != 0 {
+            return Err(Error::BadSize);
+        }
+        let hp = *pos as u64 + num_bytes as u64;
+        let mut heap_pos = hp as u32;
+        if heap_pos as u64 != hp {
+            return Err(Error::ReadPastEnd);
+        }
+        let len = (num_bytes / <$t as IntoIterator>::Item::FIXED_SIZE) as usize;
+        let mut err = Ok(());
+        let result = (0..len).map_while(|_| {
+            match <$t as IntoIterator>::Item::embedded_unpack(src, pos, &mut heap_pos) {
+                Ok(item) => { Some(item) },
+                Err(e) => { err = Err(e); None }
+            }
+        }).collect();
+        err?;
+        *pos = heap_pos;
+        Ok(result)
+    }
+
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        let num_bytes = u32::unpack(src, pos)?;
+        if num_bytes % <$t as IntoIterator>::Item::FIXED_SIZE != 0 {
+            return Err(Error::BadSize);
+        }
+        let hp = *pos as u64 + num_bytes as u64;
+        let mut heap_pos = hp as u32;
+        if heap_pos as u64 != hp {
+            return Err(Error::ReadPastEnd);
+        }
+        for _ in 0..num_bytes / <$t as IntoIterator>::Item::FIXED_SIZE {
+            <$t as IntoIterator>::Item::embedded_verify(src, pos, &mut heap_pos)?;
+        }
+        *pos = heap_pos;
+        Ok(())
+    }
+
+    fn new_empty_container() -> Result<Self> {
+        Ok(Default::default())
+    }
+}
+    }
+}
+
+container_impl!(impl<K, V> Pack+Unpack for indexmap::IndexMap<K, V> where K: Hash, K: Eq);
 
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)*))+) => {

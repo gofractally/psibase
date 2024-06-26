@@ -722,8 +722,12 @@ dependencies = [
 name = "fracpack"
 version = "0.10.0"
 dependencies = [
+ "anyhow",
  "custom_error",
+ "indexmap 2.2.6",
  "psibase_macros",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1057,6 +1061,7 @@ checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.5",
+ "serde",
 ]
 
 [[package]]
