@@ -16,5 +16,6 @@ interface api {
 
 world attestation-world {
     import common:plugin/server;
+    import common:plugin/client;
     export api;
 }

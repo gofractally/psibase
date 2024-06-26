@@ -1,16 +1,21 @@
+use async_graphql::SimpleObject;
 /// This is another example service that adds and multiplies `i32`
 /// numbers, similar to test_contract. This service has additional
 /// features such as writing tables, and providing a graphiql
 /// query interface.
+use psibase::fracpack::*;
+use psibase_macros::Reflect;
+use serde::{Deserialize, Serialize};
 
-// #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
-// pub struct VerifiableCredential {
-//     /// The subject (generally also the holder)
-//     subject: AccountNumber,
+#[derive(Pack, Unpack, Reflect, Deserialize, Serialize, SimpleObject, Debug, Clone)]
+#[allow(non_snake_case)]
+pub struct VerifiableCredential {
+    /// The subject (generally also the holder)
+    // pub subject: AccountNumber,
 
-//     /// The result of the calculation
-//     credentialSubject: String,
-// }
+    /// The claims being attested to
+    pub credentialSubject: String,
+}
 
 #[psibase::service(name = "attestation")]
 #[allow(non_snake_case)]
@@ -27,7 +32,7 @@ mod service {
         attester: AccountNumber,
 
         /// The subject (generally also the holder)
-        subject: AccountNumber,
+        // subject: AccountNumber,
 
         /// creation/issue time
         // #[secondary_key(2)]
@@ -39,41 +44,32 @@ mod service {
 
     impl Attestation {
         #[secondary_key(1)]
-        fn by_id(&self) -> (psibase::TimePointSec, AccountNumber, AccountNumber) {
-            (self.issued, self.attester, self.subject)
+        fn by_id(&self) -> (psibase::TimePointSec, AccountNumber) {
+            //, AccountNumber) {
+            (self.issued, self.attester) //, self.subject)
         }
         #[secondary_key(2)]
-        fn by_subject(&self) -> (psibase::TimePointSec, AccountNumber, AccountNumber) {
-            (self.issued, self.attester, self.subject)
+        fn by_subject(&self) -> (psibase::TimePointSec, AccountNumber) {
+            //, AccountNumber) {
+            (self.issued, self.attester) //, self.subject)
         }
     }
 
     #[table(record = "WebContentRow", index = 1)]
     struct WebContentTable;
 
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
-    pub struct VerifiableCredential {
-        /// The subject (generally also the holder)
-        subject: AccountNumber,
-
-        /// The result of the calculation
-        credentialSubject: String,
-    }
-
     #[action]
-    pub fn attest(vc: VerifiableCredential) -> TimePointSec {
+    pub fn attest(vc: crate::VerifiableCredential) -> TimePointSec {
         let attester = get_sender();
-        // let subject = get_sender();
-        // let issued = TimePointSec { seconds: 52 };
         let issued = transact::Wrapper::call().currentBlock().time;
-        let subject = vc.subject;
+        // let subject = vc.subject;
         let credentialSubject = vc.credentialSubject.as_str();
 
         let answer_table = AttestationTable::new();
         answer_table
             .put(&Attestation {
                 attester,
-                subject,
+                // subject,
                 issued,
                 credentialSubject: String::from(credentialSubject),
             })
@@ -81,7 +77,7 @@ mod service {
 
         Wrapper::emit().history().attest(
             attester,
-            subject,
+            // subject,
             issued,
             String::from(credentialSubject),
         );
@@ -92,7 +88,7 @@ mod service {
     #[event(history)]
     pub fn attest(
         id: AccountNumber,
-        subject: AccountNumber,
+        // subject: AccountNumber,
         issued: TimePointSec,
         credentialSubject: String,
     ) {

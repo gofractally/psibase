@@ -1,9 +1,15 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::common::plugin::{server as CommonServer, types as CommonTypes};
+// use bindings::common;
+use bindings::common::plugin::{
+    client as CommonClient, server as CommonServer, types as CommonTypes,
+};
 use bindings::exports::attestation::plugin::api::Guest;
 use psibase::fracpack::Pack;
+// use psibase::services::common_api;
+// use psibase::AccountNumber;
+use serde::{Deserialize, Serialize};
 
 mod errors;
 use errors::ErrorType::*;
@@ -11,32 +17,31 @@ use errors::ErrorType::*;
 struct AttestationPlugin;
 
 impl Guest for AttestationPlugin {
-    fn attest(
-        attestation_type: String,
-        subject: String,
-        claim: String,
-    ) -> Result<(), CommonTypes::Error> {
+    fn attest(attestation_type: String, claim: String) -> Result<(), CommonTypes::Error> {
+        #[derive(Serialize, Deserialize)]
+        struct CredentialSubject {
+            subject: String,
+            attestationType: String,
+            score: f32,
+        }
+        let mut claim_as_obj: CredentialSubject =
+            serde_json::from_str(claim.as_str()).expect("Failed to parse claim");
+        let calling_app = CommonClient::get_sender_app().ok().unwrap().app.unwrap();
+        // namespace the attestation type with the calling app's name so different apps can use common names for types and not confliect
+        claim_as_obj.attestationType = calling_app + claim_as_obj.attestationType.as_str();
         let packed_a = attestation::action_structs::attest {
-            vc: attestation:::VerifiableCredential {
-                subject,
-                credentialSubject: claim,
+            vc: attestation::VerifiableCredential {
+                // subject: AccountNumber::from_exact(subject.as_str())
+                //     .expect("invalid `subject` account"),
+                // TODO: tack on name of calling plugin's service to type as a namespace
+                credentialSubject: serde_json::to_string(&claim_as_obj)
+                    .expect("failed to reserialize namespaced claim"),
             },
         }
         .packed();
 
         if true {
-            // CommonServer::add_action_to_transaction(
-            //     "attest",
-            //     &AttestationService::action_structs::attest {
-            //     vc: Attestation {
-            //         attester: get_sender(),
-            //         subject,
-            //         claim,
-            //     },
-            //   }.packed(),
-            // );
-            // psibase::services::invite::action_structs::accept { inviteKey: todo!() };
-            return Ok(());
+            return CommonServer::add_action_to_transaction("attest", &packed_a);
         } else {
             return Err(NotYetImplemented.err("add attest fn"));
         }

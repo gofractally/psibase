@@ -1,8 +1,10 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::attestation::plugin::api::attest;
 use bindings::common::plugin::types as CommonTypes;
 use bindings::exports::identity::plugin::api::Guest;
+use psibase::AccountNumber;
 
 mod errors;
 use errors::ErrorType::*;
@@ -11,13 +13,15 @@ struct IdentityPlugin;
 
 impl Guest for IdentityPlugin {
     fn attest(subject: String, confidence: f32) -> Result<(), CommonTypes::Error> {
-        if true {
-            // claims = <claims>
-            // attest("identity", claims); // -> Result<(), CommonTypes::Error> {
-            return Ok(());
-        } else {
-            return Err(NotYetImplemented.err("add attest fn"));
-        }
+        // verify this is an AccountNumber-like thing
+        AccountNumber::from_exact(subject.as_str()).expect("Invalid `subject` account name");
+
+        return attest(
+            "identity",
+            // subject.as_str(),
+            format!("{{subject: {subject}, attestationType: \"identity\", score: {confidence}}}")
+                .as_str(),
+        ); // -> Result<(), CommonTypes::Error>
     }
 }
 
