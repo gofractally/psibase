@@ -2,11 +2,21 @@
 /// numbers, similar to test_contract. This service has additional
 /// features such as writing tables, and providing a graphiql
 /// query interface.
+
+// #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+// pub struct VerifiableCredential {
+//     /// The subject (generally also the holder)
+//     subject: AccountNumber,
+
+//     /// The result of the calculation
+//     credentialSubject: String,
+// }
+
 #[psibase::service(name = "attestation")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
-    use psibase::{TimePointSec, *};
+    use psibase::{services::transact, TimePointSec, *};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "AttestationTable", index = 0)]
@@ -19,12 +29,12 @@ mod service {
         /// The subject (generally also the holder)
         subject: AccountNumber,
 
-        /// The subject (generally also the holder)
+        /// creation/issue time
         // #[secondary_key(2)]
         issued: psibase::TimePointSec,
 
         /// The result of the calculation
-        credentialSubject: i32,
+        credentialSubject: String,
     }
 
     impl Attestation {
@@ -41,26 +51,40 @@ mod service {
     #[table(record = "WebContentRow", index = 1)]
     struct WebContentTable;
 
+    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+    pub struct VerifiableCredential {
+        /// The subject (generally also the holder)
+        subject: AccountNumber,
+
+        /// The result of the calculation
+        credentialSubject: String,
+    }
+
     #[action]
-    pub fn attest(vc: Attestation) -> TimePointSec {
+    pub fn attest(vc: VerifiableCredential) -> TimePointSec {
         let attester = get_sender();
         // let subject = get_sender();
-        let issued = TimePointSec { seconds: 52 };
-        let credentialSubject = 5;
+        // let issued = TimePointSec { seconds: 52 };
+        let issued = transact::Wrapper::call().currentBlock().time;
+        let subject = vc.subject;
+        let credentialSubject = vc.credentialSubject.as_str();
 
         let answer_table = AttestationTable::new();
         answer_table
             .put(&Attestation {
                 attester,
-                subject: vc.subject,
+                subject,
                 issued,
-                credentialSubject,
+                credentialSubject: String::from(credentialSubject),
             })
             .unwrap();
 
-        Wrapper::emit()
-            .history()
-            .attest(attester, vc.subject, issued, credentialSubject);
+        Wrapper::emit().history().attest(
+            attester,
+            subject,
+            issued,
+            String::from(credentialSubject),
+        );
 
         issued
     }
@@ -70,7 +94,7 @@ mod service {
         id: AccountNumber,
         subject: AccountNumber,
         issued: TimePointSec,
-        credentialSubject: i32,
+        credentialSubject: String,
     ) {
     }
 
