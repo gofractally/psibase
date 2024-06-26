@@ -676,6 +676,7 @@ namespace psibase
          }
          else
          {
+            assert(subjectiveRevisions.size() == 2);
             subjectiveRevisions.clear();
             subjectiveChanges.ranges.clear();
          }
