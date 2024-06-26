@@ -759,7 +759,7 @@ namespace psibase
 
    void Database::checkoutSubjective()
    {
-      return impl->checkoutSubjective();
+      impl->checkoutSubjective();
    }
    bool Database::commitSubjective()
    {
@@ -767,7 +767,7 @@ namespace psibase
    }
    void Database::abortSubjective()
    {
-      return impl->abortSubjective();
+      impl->abortSubjective();
    }
    std::size_t Database::saveSubjective()
    {
