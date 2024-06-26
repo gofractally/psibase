@@ -47,7 +47,7 @@ struct SubjectiveService : psibase::Service<SubjectiveService>
 };
 PSIO_REFLECT(SubjectiveService,
              method(write, key, value),
-             method(read, key, value),
+             method(read, key),
              method(abort, key, value, op),
              method(nested, key, value1, value2),
              method(testRFail1, key, txBefore, op),
