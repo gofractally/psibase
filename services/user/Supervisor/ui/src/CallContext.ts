@@ -1,6 +1,20 @@
-import { QualifiedFunctionCallArgs, toString } from "@psibase/common-lib";
+import { toString, isErrorResult, siblingUrl } from "@psibase/common-lib";
 import { AddableAction } from "@psibase/supervisor-lib/messaging/PluginCallResponse";
-import { siblingUrl } from "@psibase/common-lib";
+import {
+    buildFunctionCallResponse,
+    FunctionCallArgs,
+    QualifiedFunctionCallArgs,
+} from "@psibase/common-lib/messaging";
+
+import { ResultCache } from "@psibase/supervisor-lib/messaging/PluginCallRequest";
+
+import {
+    getTaposForHeadBlock,
+    signAndPushTransaction,
+    uint8ArrayToHex,
+} from "@psibase/common-lib/rpc";
+
+const supervisorDomain = siblingUrl(null, "supervisor");
 
 export interface Call<T = any> {
     caller: string;
@@ -28,7 +42,7 @@ export class CallStack {
             return undefined;
         }
 
-        let beingPopped = this.peek()!;
+        let beingPopped = this.peek(0)!;
         let resolutionTime = Date.now() - beingPopped.startTime!;
         console.log(
             `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}-${toString(beingPopped.args)} [${resolutionTime} ms]`,
@@ -37,19 +51,15 @@ export class CallStack {
         return this.storage.pop();
     }
 
-    peek(): Call | undefined {
-        return this.storage[this.storage.length - 1];
+    peek(depth: number): Call | undefined {
+        return this.storage[this.storage.length - (1 + depth)];
     }
 
-    peek2(): Call | undefined {
-        return this.storage[this.storage.length - 2];
-    }
-
-    peekBottom(): Call | undefined {
+    peekBottom(height: number): Call | undefined {
         if (this.isEmpty()) {
             return undefined;
         }
-        return this.storage[0];
+        return this.storage[0 + height];
     }
 
     isEmpty(): boolean {
@@ -59,16 +69,6 @@ export class CallStack {
     reset(): void {
         this.storage = [];
     }
-}
-
-export interface ResultCache {
-    allowedService: string;
-    callService: string;
-    callPlugin: string;
-    callIntf?: string;
-    callMethod: string;
-    args_json: string;
-    result: any;
 }
 
 export class CallContext {
@@ -95,10 +95,6 @@ export class CallContext {
         this.cache.push(cacheObject);
     }
 
-    addActionsToTx(actions: AddableAction[]) {
-        this.addableActions.push(...actions);
-    }
-
     getCachedResults(service: string, plugin: string): ResultCache[] {
         return this.cache.filter(
             (cacheObject) =>
@@ -114,7 +110,6 @@ export class CallContext {
         this.addableActions = [];
     }
 
-
     // Callstack management
     isActive(): boolean {
         return !this.callStack.isEmpty();
@@ -124,26 +119,42 @@ export class CallContext {
         // During an active execution context, only the origin of the prior callee can
         //  with the callstack
         if (this.isActive()) {
-            let expectedHost = siblingUrl(null, this.callStack.peek()!.args.service);
+            const expectedService = this.callStack.peek(0)!.args.service;
+            const expectedHost = siblingUrl(
+                null,
+                expectedService,
+            );
             if (expectedHost != origin) {
                 throw Error(
-                    `Plugins may only send messages when they are on top of the call stack.`,
+                    `Expected response from ${expectedHost} but came from ${origin}`
                 );
             }
-        } 
+        }
     }
 
     pushCall(callerOrigin: string, item: QualifiedFunctionCallArgs) {
         this.validateOrigin(callerOrigin);
 
         if (!this.isActive()) {
-            if (this.rootAppOrigin !== callerOrigin) 
-            {
+            if (this.rootAppOrigin && this.rootAppOrigin !== callerOrigin) {
                 // Once there is a root app origin, then there can never be a different root app origin
                 // for this supervisor. Loading a new root app would load a new supervisor.
-                throw Error("Cannot have two different root apps using the same supervisor.");
+                throw Error(
+                    "Cannot have two different root apps using the same supervisor.",
+                );
             }
             this.rootAppOrigin = callerOrigin;
+        } else {
+            if (this.rootAppOrigin === callerOrigin) {
+                // If there's already a callstack from this root, and it hasn't resolved yet
+                //   another call is currently not allowed.
+                // TODO - Buffer multiple calls from root app
+                throw Error(
+                    `Plugin call resolution already in progress: ${toString(
+                        this.callStack.peekBottom(0)!.args,
+                    )}`,
+                );
+            }
         }
 
         this.callStack.push({
@@ -152,10 +163,93 @@ export class CallContext {
         });
     }
 
-    popCall(callOrigin: string) : Call {
+    private isUnrecoverableError(result: any) {
+        return isErrorResult(result) && result.errorType === "unrecoverable";
+    }
+
+    private replyToParent(call: FunctionCallArgs, result: any) {
+        window.parent.postMessage(
+            buildFunctionCallResponse(call, result),
+            this.rootAppOrigin,
+        );
+
+        // Replying back to the parent app is the end of this call context.
+        this.reset();
+    }
+
+    private cacheCallResult(
+        callerService: string,
+        { service, plugin, intf, method, params }: FunctionCallArgs,
+        result: any,
+    ) {
+        this.addCacheObject({
+            allowedService: callerService,
+            callService: service,
+            callPlugin: plugin!,
+            callIntf: intf,
+            callMethod: method,
+            args_json: JSON.stringify(params),
+            result,
+        });
+    }
+
+    async popCall(callOrigin: string, actions: AddableAction[], result: any) {
         this.validateOrigin(callOrigin);
         let call = this.callStack.pop()!;
 
-        return call;
+        // Return if error
+        if (this.isUnrecoverableError(result)) {
+            this.replyToParent(call.args, result);
+            return;
+        }
+
+        // Track any actions added to the tx context
+        if (actions.length > 0) {
+            this.addableActions.push(...actions);
+        }
+
+        // Submit tx and reply if the stack was emptied
+        if (this.callStack.isEmpty()) {
+            await this.submitTx();
+            this.replyToParent(call.args, result);
+            return;
+        }
+
+        // Track any cache updates
+        const callerService = this.callStack.peek(0)!.args.service;
+        this.cacheCallResult(callerService, call.args, result);
+    }
+
+    // Temporary tx submission logic, until smart auth is implemented
+    // All transactions are sent with
+    async submitTx() {
+        if (this.addableActions.length > 0) {
+            let actions = this.addableActions.map((a) => {
+                return {
+                    sender: "alice",
+                    service: a.service,
+                    method: a.action,
+                    rawData: uint8ArrayToHex(a.args),
+                };
+            });
+            const tenSeconds = 10000;
+            const transaction: any = {
+                tapos: {
+                    ...(await getTaposForHeadBlock(supervisorDomain)),
+                    expiration: new Date(Date.now() + tenSeconds),
+                },
+                actions,
+            };
+            await signAndPushTransaction(supervisorDomain, transaction, []);
+        }
+    }
+
+    assertPluginCallsAllowed() {
+        if (!this.isActive()) {
+            throw Error(`Plugin call outside of plugin execution context.`);
+        }
+        if (!this.rootAppOrigin) {
+            throw new Error(`Unknown root application origin.`);
+        }
     }
 }

@@ -1,34 +1,19 @@
 import {
-    getTaposForHeadBlock,
     siblingUrl,
-    signAndPushTransaction,
-    uint8ArrayToHex,
 } from "@psibase/common-lib/rpc";
 import {
-    FunctionCallRequest,
     isFunctionCallRequest,
-    buildFunctionCallResponse,
     buildMessageIFrameInitialized,
-    toString,
-    isErrorResult,
-    QualifiedPluginId,
     isPreLoadPluginsRequest,
-    PreLoadPluginsRequest,
 } from "@psibase/common-lib/messaging";
 import {
-    isLoaderInitMessage,
-    PluginCallResponse,
     isPluginCallResponse,
-    PluginCallPayload,
-    buildPluginCallRequest,
     isPluginSyncCall,
-    PluginSyncCall,
-    LoaderPreloadComplete,
-    buildPreloadStartMessage,
     isPreloadCompleteMessage,
 } from "@psibase/supervisor-lib/messaging";
 
 import { CallContext } from "./CallContext";
+import { PluginMgr } from "./PluginMgr";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -38,258 +23,24 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
 const context = new CallContext();
 const callStack = context.callStack;
+const pluginMgr = new PluginMgr();
 
-const createLoaderDomain = (subDomain = "supervisor") =>
-    siblingUrl(null, subDomain) + "/common/wasm-loader";
+// TODO: Consider if a plugin runs an infinite loop. We need a way to terminate the
+//   current callstack, and report the faulty plugin that never returned.
+//   And also if there's a request for IO, then the timer needs to be paused. IO has no timeout.
+//   If the popup is blocked, this is considered an error, but a special error code is returned to the
+//     application so it can instruct the user to enable popups. But since it's an error, cache is
+//     cleared and stack emptied.
 
-const buildIFrameId = (service: string) => `iframe-${service}`;
-const supervisorDomain = siblingUrl(null, "supervisor");
 
-interface PluginManagers {
-    [service: string]: string[];
-}
-const autoArrayInit = {
-    get: (target: PluginManagers, service: string): string[] => {
-        if (!target[service]) {
-            target[service] = [];
-        }
-        return target[service];
-    },
-};
-
-const pluginManagers: PluginManagers = new Proxy({}, autoArrayInit);
-
-const addPluginManager = (pluginId: QualifiedPluginId): boolean => {
-    const { service, plugin } = pluginId;
-    if (!pluginManagers[service].includes(plugin)) {
-        pluginManagers[service].push(plugin);
-        return true;
-    }
-    return false;
-};
-
-const getOnLoaderInit = (
-    frameInfo: FrameInfo,
-    resolve: (
-        value: HTMLIFrameElement | PromiseLike<HTMLIFrameElement>,
-    ) => void,
-) => {
-    return (message: MessageEvent<any>) => {
-        if (isLoaderInitMessage(message.data)) {
-            // Is message from the right child?
-            if (message.origin !== new URL(frameInfo.src).origin) return;
-
-            const loader = document.getElementById(
-                frameInfo.id,
-            ) as HTMLIFrameElement;
-            if (!(loader && loader.contentWindow)) {
-                console.error(
-                    `${frameInfo.service} sent LOADER_INITIALIZED, but the loader is not ready to receive messages.`,
-                );
-                return;
-            }
-
-            resolve(loader);
-        }
-    };
-};
-
-interface FrameInfo {
-    id: string;
-    service: string;
-    src: string;
-}
-
-const addIframe = (service: string) => {
-    const iframe = document.createElement("iframe");
-    iframe.id = buildIFrameId(service);
-    iframe.src = createLoaderDomain(service);
-    iframe.style.display = "none";
-
-    let { readyState } = document;
-    if (readyState === "complete" || readyState === "interactive") {
-        document.body.appendChild(iframe);
-    } else {
-        document.addEventListener("DOMContentLoaded", () => {
-            document.body.appendChild(iframe);
-        });
-    }
-
-    return { id: iframe.id, service, src: iframe.src };
-};
-
-const getLoader = async (service: string): Promise<HTMLIFrameElement> => {
-    // Get loader if it exists
-    const iFrameId = buildIFrameId(service);
-    const loader = document.getElementById(iFrameId) as HTMLIFrameElement;
-    if (loader) return loader;
-
-    // Otherwise, create it
-    let frameInfo = addIframe(service);
-
-    return new Promise((resolve) => {
-        // Only resolve this promise when we receive the LOADER_INITIALIZED message back
-        window.addEventListener("message", getOnLoaderInit(frameInfo, resolve));
-    });
-};
-
-const prepareServicePlugins = async (service: string, plugins: string[]) => {
-    let loader = await getLoader(service);
-
-    loader.contentWindow!.postMessage(
-        buildPreloadStartMessage(plugins),
-        siblingUrl(null, service),
-    );
-};
-
-const sendPluginCallRequest = async (param: PluginCallPayload) => {
-    const iframe = await getLoader(param.args.service);
-    iframe.contentWindow?.postMessage(
-        buildPluginCallRequest(param),
-        siblingUrl(null, param.args.service),
-    );
-
-    let { service, plugin } = param.args;
-    addPluginManager({ service, plugin });
-};
-
-const processTop = () => {
+const processTop = async () => {
     if (callStack.isEmpty()) return;
-    let { caller, args } = callStack.peek()!;
+    let { caller, args: { service, plugin, intf, method, params } } = callStack.peek(0)!;
 
-    let resultCache = context.getCachedResults(args.service, args.plugin);
-
-    sendPluginCallRequest({
-        caller,
-        args,
-        resultCache,
-    });
-};
-
-const onFunctionCallRequest = (
-    origin: string,
-    message: FunctionCallRequest,
-) => {
-    if (!callStack.isEmpty()) {
-        throw Error(
-            `Plugin call resolution already in progress: ${toString(
-                callStack.peekBottom()!.args,
-            )}`,
-        );
-    }
-
-    context.pushCall(origin, message.args);
-    processTop();
-
-    // TODO: Consider if a plugin runs an infinite loop. We need a way to terminate the
-    //   current callstack, and report the faulty plugin that never returned.
-    //   And also if there's a request for IO, then the timer needs to be paused. IO has no timeout.
-    //   If the popup is blocked, this is considered an error, but a special error code is returned to the
-    //     application so it can instruct the user to enable popups. But since it's an error, cache is
-    //     cleared and stack emptied.
-};
-
-const isUnrecoverableError = (result: any) => {
-    return isErrorResult(result) && result.errorType === "unrecoverable";
-};
-
-const onPluginCallResponse = async (
-    origin: string,
-    message: PluginCallResponse,
-) => {
-    if (!context.rootAppOrigin)
-        throw new Error(`Plugin responded to unknown root application origin.`);
-
-    let returningCall = context.popCall(origin);
-
-    let { actions: newActions, result } = message;
-
-    if (newActions.length > 0) {
-        context.addActionsToTx(newActions);
-    }
-
-    let isError = isUnrecoverableError(result);
-    let isLastCall = callStack.isEmpty();
-
-    if (isError || isLastCall) {
-        if (!isError && isLastCall) {
-            if (context.addableActions.length > 0) {
-                let actions = context.addableActions.map((a) => {
-                    return {
-                        sender: "alice",
-                        service: a.service,
-                        method: a.action,
-                        rawData: uint8ArrayToHex(a.args),
-                    };
-                });
-                const tenSeconds = 10000;
-                const transaction: any = {
-                    tapos: {
-                        ...(await getTaposForHeadBlock(supervisorDomain)),
-                        expiration: new Date(Date.now() + tenSeconds),
-                    },
-                    actions,
-                };
-                await signAndPushTransaction(supervisorDomain, transaction, []);
-            }
-        }
-
-        window.parent.postMessage(
-            buildFunctionCallResponse(returningCall.args, result),
-            context.rootAppOrigin,
-        );
-        context.reset();
-    } else {
-        let topFrame = callStack.peek()!;
-        let {
-            service: callService,
-            plugin: callPlugin,
-            intf: callIntf,
-            method: callMethod,
-        } = returningCall.args;
-
-        context.addCacheObject({
-            allowedService: topFrame.args.service,
-            callService,
-            callPlugin,
-            callIntf,
-            callMethod,
-            args_json: JSON.stringify(returningCall.args.params),
-            result,
-        });
-
-        processTop();
-    }
-};
-
-const onPluginSyncCall = (origin: string, message: PluginSyncCall) => {
-    context.pushCall(origin, message.payload);
-    processTop();
-};
-
-const onPreloadPluginsRequest = async ({
-    payload,
-}: PreLoadPluginsRequest): Promise<void> => {
-    let { plugins } = payload;
-    // Get all loaders
-    await Promise.all(
-        plugins.map((pluginId: QualifiedPluginId) => {
-            return getLoader(pluginId.service);
-        }),
-    );
-
-    // Load plugins
-    plugins.forEach(addPluginManager);
-
-    for (const [service, plugins] of Object.entries(pluginManagers)) {
-        prepareServicePlugins(service, plugins);
-    }
-};
-
-const onPreloadComplete = async ({
-    payload: _payload,
-}: LoaderPreloadComplete) => {
-    // TODO: Use dependencies from the payload to DFS load other plugins
+    const p = pluginMgr.get({service, plugin})!;
+    let resultCache = context.getCachedResults(service, plugin);
+    p.loadMemory(resultCache);
+    await p.call(caller, intf, method, params);
 };
 
 const isMessageFromApplication = (message: MessageEvent) => {
@@ -301,36 +52,38 @@ const isMessageFromApplication = (message: MessageEvent) => {
     return isTop && isParent && isSameRootDomain;
 };
 
-const isMessageFromChild = (message: MessageEvent): boolean => {
-    const originIsChild = Object.entries(pluginManagers)
-        .map(([service, _]) => siblingUrl(null, service))
-        .includes(message.origin);
-    const isTop = message.source == window.top;
-    const isParent = message.source == window.parent;
-    return originIsChild && !isTop && !isParent;
+const appInterface = async (message: MessageEvent<any>) => {
+    if (!isMessageFromApplication(message))
+        return;
+
+    try {
+        if (isFunctionCallRequest(message.data)) {
+            context.pushCall(message.origin, message.data.args);
+            processTop();
+        } else if (isPreLoadPluginsRequest(message.data)) {
+            await pluginMgr.preloadPlugins(message.data.payload.plugins);
+        } 
+    } catch (e) {
+        console.error(`Error in supervisor: ${e}`);
+        context.reset();
+    }
 };
 
-const onRawEvent = async (message: MessageEvent<any>) => {
+const pluginInterface = async(message: MessageEvent<any>) => {
+    if (!pluginMgr.isMessageFromPlugin(message))
+        return;
+    
     try {
-        if (isMessageFromApplication(message)) {
-            if (isFunctionCallRequest(message.data)) {
-                onFunctionCallRequest(message.origin, message.data);
-            } else if (isPreLoadPluginsRequest(message.data)) {
-                onPreloadPluginsRequest(message.data);
-            }
-        } else if (isMessageFromChild(message)) {
-            if (!context.isActive()) {
-                throw Error(
-                    `Plugin messages may only be processed during an existing plugin execution context.`,
-                );
-            }
-            if (isPluginCallResponse(message.data)) {
-                await onPluginCallResponse(message.origin, message.data);
-            } else if (isPluginSyncCall(message.data)) {
-                onPluginSyncCall(message.origin, message.data);
-            } else if (isPreloadCompleteMessage(message.data)) {
-                onPreloadComplete(message.data);
-            }
+        if (isPluginCallResponse(message.data)) {
+            context.assertPluginCallsAllowed();
+            await context.popCall(message.origin, message.data.actions, message.data.result);
+            processTop();
+        } else if (isPluginSyncCall(message.data)) {
+            context.assertPluginCallsAllowed();
+            context.pushCall(message.origin, message.data.args);
+            processTop();
+        } else if (isPreloadCompleteMessage(message.data)) {
+            // TODO: Use dependencies from the payload to DFS load other plugins
         }
     } catch (e) {
         console.error(`Error in supervisor: ${e}`);
@@ -338,7 +91,8 @@ const onRawEvent = async (message: MessageEvent<any>) => {
     }
 };
 
-addEventListener("message", onRawEvent);
+addEventListener("message", appInterface);
+addEventListener("message", pluginInterface);
 
 const initializeSupervisor = () => {
     window.parent.postMessage(buildMessageIFrameInitialized(), "*");

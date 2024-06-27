@@ -3,15 +3,15 @@ import { SYNC_CALL_REQUEST } from "./index";
 
 export interface PluginSyncCall {
     type: typeof SYNC_CALL_REQUEST;
-    payload: QualifiedFunctionCallArgs;
+    args: QualifiedFunctionCallArgs;
 }
 
 export const isPluginSyncCall = (data: any): data is PluginSyncCall =>
     data && data.type == SYNC_CALL_REQUEST;
 
 export const buildPluginSyncCall = (
-    payload: QualifiedFunctionCallArgs,
+    args: QualifiedFunctionCallArgs,
 ): PluginSyncCall => ({
-    payload,
+    args,
     type: SYNC_CALL_REQUEST,
 });

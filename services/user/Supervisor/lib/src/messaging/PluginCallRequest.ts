@@ -1,7 +1,17 @@
 import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
-import { ResultCache } from "./CallContext";
 
 const PLUGIN_CALL_REQUEST = "PLUGIN_CALL_REQUEST" as const;
+
+
+export interface ResultCache {
+    allowedService: string;
+    callService: string;
+    callPlugin: string;
+    callIntf?: string;
+    callMethod: string;
+    args_json: string;
+    result: any;
+}
 
 export interface FunctionCallResult<T = any> extends QualifiedFunctionCallArgs {
     result: T;

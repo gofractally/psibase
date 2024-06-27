@@ -1,5 +1,5 @@
 import { isErrorResult } from "@psibase/common-lib/messaging";
-import { ResultCache } from "@psibase/supervisor-lib";
+import { ResultCache } from "@psibase/supervisor-lib/messaging/PluginCallRequest";
 
 interface PluginFunc {
     service: string;
