@@ -1,11 +1,13 @@
 use anyhow::Error;
 use anyhow::{anyhow, Context};
+use cargo_metadata::semver::Version;
 use cargo_metadata::Message;
 use cargo_metadata::Metadata;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use console::style;
 use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
 use regex::Regex;
+use serde::Deserialize;
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, OpenOptions};
 use std::path::Path;
@@ -19,6 +21,9 @@ use wasm_opt::OptimizationOptions;
 
 mod link;
 use link::link_module;
+
+/// The version of the cargo-psibase crate at compile time
+const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
 const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"];
@@ -39,20 +44,16 @@ enum PsibaseCommand {
     Psibase(Args),
 }
 
+#[derive(Debug, Copy, Clone, ValueEnum)]
+pub enum HostType {
+    Dev,
+    Prod,
+}
+
 /// Build, test, and deploy psibase services
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    // TODO: load default from environment variable
-    /// API Endpoint
-    #[clap(
-        short = 'a',
-        long,
-        value_name = "URL",
-        default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
-    )]
-    api: Url,
-
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<PrivateKey>,
@@ -71,6 +72,10 @@ struct Args {
 
 #[derive(Parser, Debug)]
 struct DeployCommand {
+    /// API Endpoint
+    #[clap(short = 'a', long, value_name = "URL", env = "PSINODE_URL")]
+    api: Option<Url>,
+
     /// Account to deploy service on
     account: Option<ExactAccountNumber>,
 
@@ -93,6 +98,10 @@ struct DeployCommand {
     /// Sender to use when creating the account.
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
     sender: ExactAccountNumber,
+
+    /// Defines which psibase host environment config to be deployed.
+    #[clap(long, value_name = "HOST")]
+    host: Option<HostType>,
 }
 
 #[derive(Parser, Debug)]
@@ -114,8 +123,23 @@ enum Command {
     Deploy(DeployCommand),
 }
 
+#[derive(Deserialize, Debug)]
+struct Hosts {
+    dev: String,
+    prod: String,
+}
+
 fn pretty(label: &str, message: &str) {
     println!("{:>12} {}", style(label).bold().green(), message);
+}
+
+fn warn(label: &str, message: &str) {
+    println!(
+        "{}: {} {}",
+        style("warning").bold().yellow(),
+        style(label).bold().yellow(),
+        message
+    );
 }
 
 fn pretty_path(label: &str, filename: &Path) {
@@ -166,8 +190,6 @@ fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
         let polyfill_source_module = config.parse(polyfill)?;
         pretty_path("Polyfilling", filename);
         link_module(&polyfill_source_module, &mut dest_module)?;
-    } else {
-        pretty("Polyfilling", "SKIPPED! No polyfill functions found");
     }
 
     pretty_path("Reoptimizing", filename);
@@ -253,6 +275,26 @@ fn get_metadata(args: &Args) -> Result<Metadata, Error> {
         exit(output.status.code().unwrap());
     }
     Ok(serde_json::from_slice::<Metadata>(&output.stdout)?)
+}
+
+/// Check the psibase dependency version against cargo-psibase
+fn check_psibase_version(metadata: &Metadata) {
+    let psibase_version = &metadata
+        .packages
+        .iter()
+        .find(|pkg| pkg.name == "psibase")
+        .expect("psibase dependency not found")
+        .version;
+
+    let cargo_psibase_version = Version::parse(CARGO_PSIBASE_VERSION).unwrap();
+
+    if *psibase_version != cargo_psibase_version {
+        let version_mismatch_msg = format!(
+            "cargo-psibase v{} != psibase v{}",
+            CARGO_PSIBASE_VERSION, psibase_version
+        );
+        warn("Version Mismatch", &version_mismatch_msg);
+    }
 }
 
 async fn build(
@@ -345,6 +387,8 @@ async fn test(
     services.sort();
     services.dedup();
 
+    pretty("Services", "building dependencies...");
+
     pretty(
         "Services",
         &services
@@ -393,7 +437,12 @@ async fn test(
         service_wasms += &(service + ";" + &wasms.into_iter().next().unwrap().to_string_lossy());
     }
 
-    // println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
+    if service_wasms.len() > 0 {
+        pretty("Services", "compiled and included successfully");
+    }
+
+    pretty("Test", "building unit tests...");
+
     let tests = build(
         args,
         &[root],
@@ -447,7 +496,9 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
             .replace(".wasm", "")
     };
 
-    let mut args = vec!["--suppress-ok".into(), "deploy".into()];
+    let mut args = vec!["--suppress-ok".into()];
+    pass_api_arg(opts, &mut args)?;
+    args.push("deploy".into());
     if let Some(key) = &opts.create_account {
         args.append(&mut vec!["--create-account".into(), key.to_string()]);
     }
@@ -476,6 +527,52 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
     Ok(())
 }
 
+fn pass_api_arg(opts: &DeployCommand, psibase_args: &mut Vec<String>) -> Result<(), Error> {
+    if let Some(api) = &opts.api {
+        psibase_args.push("--api".into());
+        psibase_args.push(api.to_string());
+    } else if let Some(host_opt) = opts.host {
+        let hosts = read_hosts_config();
+        if let Some(hosts) = hosts {
+            pass_hosts_to_api_arg(hosts, host_opt, psibase_args);
+        } else {
+            return Err(anyhow!(
+                r#"No psibase.hosts found in Cargo.toml.
+            
+Make sure you defined both the prod and the dev properties like so:
+
+[psibase.hosts]
+prod = "https://prod.example.com"
+dev = "https://dev.example.com"
+            "#
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn pass_hosts_to_api_arg(hosts: Hosts, host_opt: HostType, psibase_args: &mut Vec<String>) {
+    let (api_url, host_name) = match host_opt {
+        HostType::Prod => (hosts.prod.to_string(), "prod"),
+        HostType::Dev => (hosts.dev.to_string(), "dev"),
+    };
+
+    let message = format!("Pushing to {} host {}", host_name, api_url);
+    pretty("Host Config", &message);
+
+    psibase_args.push("--api".into());
+    psibase_args.push(api_url.to_string());
+}
+
+fn read_hosts_config() -> Option<Hosts> {
+    let toml_content = std::fs::read_to_string("Cargo.toml").ok()?;
+    let toml_value: toml::Value = toml::from_str(&toml_content).ok()?;
+    let psibase_section = toml_value.get("psibase")?;
+    let hosts_section = psibase_section.get("hosts")?;
+    hosts_section.clone().try_into().ok()
+}
+
 #[tokio::main]
 async fn main2() -> Result<(), Error> {
     let mut is_cargo_subcommand = false;
@@ -499,6 +596,7 @@ async fn main2() -> Result<(), Error> {
         .as_ref()
         .unwrap()
         .repr;
+    check_psibase_version(&metadata);
 
     match &args.command {
         Command::Build {} => {
