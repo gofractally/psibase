@@ -4,21 +4,7 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use std::str::FromStr;
-use syn::{
-    parse_macro_input, Data, DataEnum, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, LitStr,
-};
-
-#[derive(Debug, FromDeriveInput, FromVariant)]
-#[darling(default, attributes(schema))]
-struct DeriveOptions {
-    custom: Option<LitStr>,
-}
-
-impl Default for DeriveOptions {
-    fn default() -> Self {
-        Self { custom: None }
-    }
-}
+use syn::{parse_macro_input, Data, DataEnum, DeriveInput, Fields, FieldsNamed, FieldsUnnamed};
 
 fn visit_fields_named(
     fracpack_mod: &TokenStream2,
@@ -130,14 +116,13 @@ fn visit_enum(
                 );
                 return quote! {};
             }
-            let opts = DeriveOptions::from_variant(variant).unwrap();
             let fracpack_opts = errors
                 .handle(FracpackOptions::from_variant(variant))
                 .unwrap_or_default();
             let variant_name = variant.ident.to_string();
             let variant_type = apply_custom(
                 fracpack_mod,
-                &opts,
+                &fracpack_opts,
                 visit_fields(&fracpack_mod, &variant.fields, &fracpack_opts, errors),
             );
             quote! {
@@ -157,7 +142,7 @@ fn visit_enum(
 
 fn apply_custom(
     fracpack_mod: &TokenStream2,
-    opts: &DeriveOptions,
+    opts: &FracpackOptions,
     result: TokenStream2,
 ) -> TokenStream2 {
     if let Some(id) = &opts.custom {
@@ -171,9 +156,6 @@ pub fn schema_derive_macro(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let mut errors = darling::Error::accumulator();
 
-    let opts = errors
-        .handle(DeriveOptions::from_derive_input(&input))
-        .unwrap_or_default();
     let fracpack_opts = errors
         .handle(FracpackOptions::from_derive_input(&input))
         .unwrap_or_default();
@@ -183,7 +165,7 @@ pub fn schema_derive_macro(input: TokenStream) -> TokenStream {
 
     let result = apply_custom(
         &fracpack_mod,
-        &opts,
+        &fracpack_opts,
         match &input.data {
             Data::Struct(data) => {
                 visit_fields(&fracpack_mod, &data.fields, &fracpack_opts, &mut errors)

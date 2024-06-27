@@ -409,8 +409,7 @@ mod tests {
     }
 
     #[derive(Serialize, Deserialize, ToSchema)]
-    #[fracpack(fracpack_mod = "crate")]
-    #[schema(custom = "hex")]
+    #[fracpack(fracpack_mod = "crate", custom = "hex")]
     enum EnumTest {
         S1 { o: Option<Box<EnumTest>> },
         S2(i32),
