@@ -14,8 +14,12 @@ function(add suffix)
     service(event-service "${suffix}" event-service.cpp)
     service(memo-service "${suffix}" memo-service.cpp)
     service(clock-service "${suffix}" clock-service.cpp)
+    service(subjective-service "${suffix}" subjective-service.cpp)
 
-    add_executable(psibase-tests${suffix} test.cpp test-ec.cpp test_event.cpp test_crypto.cpp test_memo.cpp test_clock.cpp test_semver.cpp)
+    service(PSubjectiveService "${suffix}" ParallelSubjectiveService.cpp)
+    service(CounterService "${suffix}" CounterService.cpp)
+
+    add_executable(psibase-tests${suffix} test.cpp test-ec.cpp test_event.cpp test_crypto.cpp test_memo.cpp test_clock.cpp test_semver.cpp test_subjective.cpp)
     target_include_directories(psibase-tests${suffix} PUBLIC include)
     target_link_libraries(psibase-tests${suffix} services_system${suffix} psitestlib${suffix} )
     set_target_properties(psibase-tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})

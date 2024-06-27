@@ -1393,6 +1393,7 @@ dependencies = [
  "reqwest",
  "ripemd",
  "rpassword",
+ "scopeguard",
  "sec1",
  "secp256k1",
  "serde",

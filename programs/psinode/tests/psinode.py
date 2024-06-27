@@ -370,6 +370,14 @@ class Node(API):
             self.child = subprocess.Popen(args, stderr=logfile)
         self._wait_for_startup()
 
+    def new_api(self):
+        '''
+        Creates an independent API object
+        '''
+        session = requests.Session()
+        session.mount('http://', _LocalAdapter(self.socketpath))
+        return API(self.url, session)
+
     def __enter__(self):
         return self
     def __exit__(self, exc_type, exc_value, traceback):

@@ -6,8 +6,8 @@
 #include <concepts>
 #include <cstdint>
 #include <functional>
-#include <psibase/blob.hpp>
 #include <psibase/RawNativeFunctions.hpp>
+#include <psibase/blob.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/to_key.hpp>
 #include <span>
@@ -687,15 +687,16 @@ namespace psibase
 
    template <typename T>
    concept TableType = requires(T table) {
-                          typename decltype(table)::key_type;
-                          typename decltype(table)::value_type;
-                       };
+      typename decltype(table)::key_type;
+      typename decltype(table)::value_type;
+   };
 
    // TODO: allow tables to be forward declared.  The simplest method is:
    // struct xxx : Table<...> {};
    /// Defines the set of tables in a service
    ///
    /// Template arguments:
+   /// - `Db`: the database holding the tables
    /// - `Tables`: one or more [Table] types; one for each table the service supports.
    ///
    /// #### Modifying table set
@@ -708,24 +709,24 @@ namespace psibase
    ///
    /// #### Prefix format
    ///
-   /// `ServiceTables` gives each table the following prefix. See [Data format](#data-format).
+   /// `DbTables` gives each table the following prefix. See [Data format](#data-format).
    ///
    /// | Field | Size | Description |
    /// | ----- | ---- | ----------- |
    /// | account | 64 bits | Service account |
    /// | table | 16 bits | Table number. First table is 0. |
-   template <typename... Tables>
-   struct ServiceTables
+   template <DbId Db, typename... Tables>
+   struct DbTables
    {
       /// Default constructor
       ///
       /// Assumes the desired service is running on the current action receiver account.
-      ServiceTables() : account(getReceiver()) {}
+      DbTables() : account(getReceiver()) {}
 
       /// Constructor
       ///
       /// `account` is the account the service runs on.
-      explicit constexpr ServiceTables(AccountNumber account) : account(account) {}
+      explicit constexpr DbTables(AccountNumber account) : account(account) {}
 
       /// Open by table number
       ///
@@ -738,7 +739,7 @@ namespace psibase
       auto open() const
       {
          std::vector<char> key_prefix = psio::convert_to_key(std::tuple(account, Table));
-         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(DbId::service,
+         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(Db,
                                                                              std::move(key_prefix));
       }
 
@@ -780,11 +781,22 @@ namespace psibase
       AccountNumber account;  ///< the service runs on this account
    };
 
+   /// Defines tables in the `service` database
+   template <typename... Tables>
+   using ServiceTables = DbTables<DbId::service, Tables...>;
+
+   /// Defines tables in the `writeOnly` database
+   template <typename... Tables>
+   using WriteOnlyTables = DbTables<DbId::writeOnly, Tables...>;
+
+   /// Defines tables in the `subjective` database
+   template <typename... Tables>
+   using SubjectiveTables = DbTables<DbId::subjective, Tables...>;
+
    // An empty key that can be used for any singleton table
    struct SingletonKey
    {
    };
    PSIO_REFLECT(SingletonKey);
-
 
 }  // namespace psibase

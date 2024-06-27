@@ -31,6 +31,7 @@ psibase_macros = { version = "0.10.0", path = "../psibase_macros" }
 psibase_names = { version = "0.10.0", path = "../psibase_names" }
 regex = "1"
 ripemd = "0.1"
+scopeguard = "1.2"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde-aux = "4.4"
 serde_bytes = "0.11.12"
