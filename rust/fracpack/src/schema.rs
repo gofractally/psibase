@@ -45,6 +45,7 @@ pub enum AnyType {
         type_: Box<AnyType>,
         id: String,
     },
+    #[serde(untagged)]
     Type(String),
 }
 
@@ -407,10 +408,19 @@ mod tests {
         a: [i8; 10],
     }
 
+    #[derive(Serialize, Deserialize, ToSchema)]
+    #[fracpack(fracpack_mod = "crate")]
+    #[schema(custom = "hex")]
+    enum EnumTest {
+        S1 { o: Option<Box<EnumTest>> },
+        S2(i32),
+    }
+
     #[test]
     fn test_build_schema() -> Result<(), anyhow::Error> {
         let mut builder = SchemaBuilder::new();
         builder.insert_named::<SchemaTest>("s".to_string());
+        builder.insert_named::<EnumTest>("e".to_string());
         let s = serde_json::to_string(&builder.build())?;
         eprintln!("{}", s);
         assert!(&s == "");

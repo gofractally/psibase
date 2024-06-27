@@ -1,4 +1,4 @@
-use darling::FromDeriveInput;
+use darling::{FromDeriveInput, FromVariant};
 use proc_macro::TokenStream;
 use quote::quote;
 use std::str::FromStr;
@@ -7,7 +7,7 @@ use syn::{
 };
 
 /// Fracpack struct level options
-#[derive(Debug, FromDeriveInput)]
+#[derive(Debug, FromDeriveInput, FromVariant)]
 #[darling(default, attributes(fracpack))]
 pub(crate) struct Options {
     pub(crate) definition_will_not_change: bool,
