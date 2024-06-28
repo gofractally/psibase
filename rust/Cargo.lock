@@ -2373,6 +2373,7 @@ dependencies = [
  "reqwest",
  "ripemd",
  "rpassword",
+ "scopeguard",
  "sec1",
  "secp256k1",
  "serde",
@@ -3076,6 +3077,15 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "subjective"
+version = "0.10.0"
+dependencies = [
+ "psibase",
+ "psibase_macros",
+ "serde",
 ]
 
 [[package]]

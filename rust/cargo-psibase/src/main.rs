@@ -6,11 +6,11 @@ use clap::{Parser, Subcommand};
 use console::style;
 use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
 use regex::Regex;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, OpenOptions};
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::{exit, Stdio};
+use std::process::{exit, ExitCode, Stdio};
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
 use url::Url;
@@ -57,6 +57,14 @@ struct Args {
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<PrivateKey>,
 
+    /// Path to Cargo.toml
+    #[clap(long, global = true, value_name = "PATH")]
+    manifest_path: Option<PathBuf>,
+
+    /// Directory for all generated artifacts
+    #[clap(long, global = true, value_name = "DIRECTORY")]
+    target_dir: Option<PathBuf>,
+
     #[clap(subcommand)]
     command: Command,
 }
@@ -87,13 +95,20 @@ struct DeployCommand {
     sender: ExactAccountNumber,
 }
 
+#[derive(Parser, Debug)]
+struct TestCommand {
+    /// Path to psitest executable
+    #[clap(long, default_value = "psitest")]
+    psitest: PathBuf,
+}
+
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Build a service
     Build {},
 
     /// Build and run tests
-    Test {},
+    Test(TestCommand),
 
     /// Build and deploy a service
     Deploy(DeployCommand),
@@ -210,10 +225,27 @@ fn get_cargo() -> OsString {
     env::var_os("CARGO").unwrap_or_else(|| "cargo".into())
 }
 
-fn get_metadata() -> Result<Metadata, Error> {
+fn get_manifest_path(args: &Args) -> Vec<&OsStr> {
+    if let Some(mpath) = &args.manifest_path {
+        vec![OsStr::new("--manifest-path"), mpath.as_os_str()]
+    } else {
+        vec![]
+    }
+}
+
+fn get_target_dir(args: &Args) -> Vec<&OsStr> {
+    if let Some(tdir) = &args.target_dir {
+        vec![OsStr::new("--target-dir"), tdir.as_os_str()]
+    } else {
+        vec![]
+    }
+}
+
+fn get_metadata(args: &Args) -> Result<Metadata, Error> {
     let output = std::process::Command::new(get_cargo())
         .arg("metadata")
         .arg("--format-version=1")
+        .args(get_manifest_path(args))
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .output()?;
@@ -224,17 +256,20 @@ fn get_metadata() -> Result<Metadata, Error> {
 }
 
 async fn build(
+    args: &Args,
     packages: &[&str],
     envs: Vec<(&str, &str)>,
-    args: &[&str],
+    extra_args: &[&str],
     poly: Option<&[u8]>,
 ) -> Result<Vec<PathBuf>, Error> {
     let mut command = tokio::process::Command::new(get_cargo())
         .envs(envs)
         .arg("rustc")
-        .args(args)
+        .args(extra_args)
         .arg("--release")
         .arg("--target=wasm32-wasi")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .arg("--color=always")
         .args(SERVICE_ARGS_RUSTC)
@@ -261,9 +296,11 @@ async fn build(
     Ok(files)
 }
 
-async fn get_test_services() -> Result<Vec<(String, String)>, Error> {
+async fn get_test_services(args: &Args) -> Result<Vec<(String, String)>, Error> {
     let mut command: tokio::process::Child = tokio::process::Command::new(get_cargo())
         .arg("test")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
         .arg("--color=always")
         .arg("--")
         .arg("--show-output")
@@ -298,8 +335,13 @@ async fn get_test_services() -> Result<Vec<(String, String)>, Error> {
         .collect())
 }
 
-async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
-    let mut services = get_test_services().await?;
+async fn test(
+    args: &Args,
+    opts: &TestCommand,
+    metadata: &Metadata,
+    root: &str,
+) -> Result<(), Error> {
+    let mut services = get_test_services(args).await?;
     services.sort();
     services.dedup();
 
@@ -329,6 +371,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
         }
 
         let wasms = build(
+            args,
             &[id.unwrap()],
             vec![],
             &["--lib", "--crate-type=cdylib", "-p", &service],
@@ -352,6 +395,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
 
     // println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
     let tests = build(
+        args,
         &[root],
         vec![
             ("CARGO_PSIBASE_TEST", ""),
@@ -369,7 +413,7 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
         pretty_path("Running", &test);
         let args = [test.to_str().unwrap(), "--nocapture"];
         let msg = format!("Failed running: psitest {}", args.join(" "));
-        if !std::process::Command::new("psitest")
+        if !std::process::Command::new(&opts.psitest)
             .args(args)
             .status()
             .context(msg.clone())?
@@ -382,8 +426,8 @@ async fn test(metadata: &Metadata, root: &str) -> Result<(), Error> {
     Ok(())
 }
 
-async fn deploy(opts: &DeployCommand, root: &str) -> Result<(), Error> {
-    let files = build(&[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
+async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Error> {
+    let files = build(args, &[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
     if files.is_empty() {
         Err(anyhow!("Nothing found to deploy"))?
     }
@@ -446,7 +490,7 @@ async fn main2() -> Result<(), Error> {
         Args::parse()
     };
 
-    let metadata = get_metadata()?;
+    let metadata = get_metadata(&args)?;
     let root = &metadata
         .resolve
         .as_ref()
@@ -456,25 +500,28 @@ async fn main2() -> Result<(), Error> {
         .unwrap()
         .repr;
 
-    match args.command {
+    match &args.command {
         Command::Build {} => {
-            build(&[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
+            build(&args, &[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
             pretty("Done", "");
         }
-        Command::Test {} => {
-            test(&metadata, root).await?;
+        Command::Test(opts) => {
+            test(&args, opts, &metadata, root).await?;
             pretty("Done", "All tests passed");
         }
-        Command::Deploy(args) => {
-            deploy(&args, root).await?;
+        Command::Deploy(opts) => {
+            deploy(&args, opts, root).await?;
         }
     };
 
     Ok(())
 }
 
-fn main() {
+fn main() -> ExitCode {
     if let Err(e) = main2() {
         println!("{:}: {:?}", style("error").bold().red(), e);
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }

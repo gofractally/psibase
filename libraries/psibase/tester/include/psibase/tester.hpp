@@ -135,6 +135,16 @@ namespace psibase
       std::uint64_t coldBytes = 1ull << 27;
    };
 
+   template <typename T>
+   concept HttpRequestBody = requires(const T& t) {
+      {
+         t.contentType()
+      } -> std::convertible_to<std::string>;
+      {
+         t.body()
+      } -> std::convertible_to<std::vector<char>>;
+   };
+
    /**
     * Manages a chain.
     * Only one TestChain can exist at a time.
@@ -223,7 +233,84 @@ namespace psibase
       [[nodiscard]] TransactionTrace pushTransaction(Transaction    trx,
                                                      const KeyList& keys = defaultKeys());
 
+      /**
+       * Creates a POST request with a JSON body
+       */
+      template <typename T>
+      HttpRequest makePost(AccountNumber account, std::string_view target, const T& data) const
+      {
+         HttpRequest         req{.host     = account.str() + ".psibase.io",
+                                 .rootHost = "psibase.io",
+                                 .method   = "POST",
+                                 .target{target},
+                                 .contentType = "application/json"};
+         psio::vector_stream stream{req.body};
+         using psio::to_json;
+         to_json(data, stream);
+         return req;
+      }
+
+      /**
+       * Creates a POST request
+       */
+      template <HttpRequestBody T>
+      HttpRequest makePost(AccountNumber account, std::string_view target, const T& data) const
+      {
+         return {.host     = account.str() + ".psibase.io",
+                 .rootHost = "psibase.io",
+                 .method   = "POST",
+                 .target{target},
+                 .contentType = data.contentType(),
+                 .body        = data.body()};
+      }
+
+      /**
+       * Creates a GET request
+       */
+      HttpRequest makeGet(AccountNumber account, std::string_view target) const
+      {
+         return {.host     = account.str() + ".psibase.io",
+                 .rootHost = "psibase.io",
+                 .method   = "POST",
+                 .target{target}};
+      }
+
+      /**
+       * Runs a query and returns the response
+       */
       HttpReply http(const HttpRequest& request);
+      /**
+       * Runs a query and deserializes the body of the response
+       */
+      template <typename R>
+      R http(const HttpRequest& request)
+      {
+         auto response = http(request);
+         if constexpr (std::is_convertible_v<HttpReply, R>)
+         {
+            return response;
+         }
+         else
+         {
+            if (response.contentType != "application/json")
+               abortMessage("Wrong Content-Type " + response.contentType);
+            response.body.push_back('\0');
+            psio::json_token_stream stream(response.body.data());
+            return psio::from_json<R>(stream);
+         }
+      }
+
+      template <typename R = HttpReply, typename T>
+      R post(AccountNumber account, std::string_view target, const T& data)
+      {
+         return http<R>(makePost(account, target, data));
+      }
+
+      template <typename R = HttpReply>
+      R get(AccountNumber account, std::string_view target)
+      {
+         return http<R>(makeGet(account, target));
+      }
 
       template <typename Action>
       auto trace(Action&& a, const KeyList& keyList = defaultKeys())

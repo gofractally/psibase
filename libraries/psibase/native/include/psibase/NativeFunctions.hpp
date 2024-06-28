@@ -53,5 +53,9 @@ namespace psibase
       uint32_t kvLessThan(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize);
       uint32_t kvMax(uint32_t db, eosio::vm::span<const char> key);
       uint32_t kvGetTransactionUsage();
+
+      void checkoutSubjective();
+      bool commitSubjective();
+      void abortSubjective();
    };  // NativeFunctions
 }  // namespace psibase

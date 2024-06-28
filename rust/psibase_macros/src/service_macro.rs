@@ -15,6 +15,7 @@ pub struct TableOptions {
     name: String,
     record: Option<String>,
     index: u16,
+    db: String,
 }
 
 impl Default for TableOptions {
@@ -23,6 +24,7 @@ impl Default for TableOptions {
             name: "".into(),
             record: None,
             index: 0,
+            db: "Service".into(),
         }
     }
 }
@@ -962,11 +964,13 @@ fn process_service_tables(
         let pk_data = pk_data.unwrap();
         let pk_ty = pk_data.ty;
         let pk_call_ident = pk_data.call_ident;
+        let db = Ident::new(&table_options.db, Span::mixed_site());
 
         let table_record_impl = quote! {
             impl #psibase_mod::TableRecord for #table_record_struct_name {
                 type PrimaryKey = #pk_ty;
                 const SECONDARY_KEYS: u8 = #sks_len;
+                const DB: #psibase_mod::DbId = #psibase_mod::DbId::#db;
 
                 fn get_primary_key(&self) -> Self::PrimaryKey {
                     self.#pk_call_ident

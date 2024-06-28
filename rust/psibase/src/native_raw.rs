@@ -108,4 +108,8 @@ extern "C" {
     /// Otherwise returns `u32::MAX` and clears result. Use [getResult] to get result
     /// and [getKey] to get found key.
     pub fn kvMax(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+
+    pub fn checkoutSubjective();
+    pub fn commitSubjective() -> bool;
+    pub fn abortSubjective();
 }

@@ -47,6 +47,7 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 - [psibase::setRetval]
 - [psibase::setRetvalBytes]
 - [psibase::writeConsole]
+- [PSIBASE_SUBJECTIVE_TX]
 
 {{#cpp-doc ::psibase::abortMessage}}
 {{#cpp-doc ::psibase::call}}
@@ -77,6 +78,7 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 {{#cpp-doc ::psibase::setRetval}}
 {{#cpp-doc ::psibase::setRetvalBytes}}
 {{#cpp-doc ::psibase::writeConsole}}
+{{#cpp-doc PSIBASE_SUBJECTIVE_TX}}
 
 ## Raw Native Functions
 
@@ -98,6 +100,9 @@ This is the set of raw native functions (wasm imports). They are available for s
 - [psibase::raw::putSequential]
 - [psibase::raw::setRetval]
 - [psibase::raw::writeConsole]
+- [psibase::raw::checkoutSubjective]
+- [psibase::raw::commitSubjective]
+- [psibase::raw::abortSubjective]
 
 {{#cpp-doc ::psibase::raw::abortMessage}}
 {{#cpp-doc ::psibase::raw::call}}
@@ -115,3 +120,6 @@ This is the set of raw native functions (wasm imports). They are available for s
 {{#cpp-doc ::psibase::raw::putSequential}}
 {{#cpp-doc ::psibase::raw::setRetval}}
 {{#cpp-doc ::psibase::raw::writeConsole}}
+{{#cpp-doc ::psibase::raw::checkoutSubjective}}
+{{#cpp-doc ::psibase::raw::commitSubjective}}
+{{#cpp-doc ::psibase::raw::abortSubjective}}

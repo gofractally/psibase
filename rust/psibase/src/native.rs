@@ -296,3 +296,36 @@ pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {
     let size = unsafe { native_raw::getSequential(db_id, id) };
     get_optional_result_bytes(size)
 }
+
+pub use scopeguard;
+
+pub fn checkout_subjective() {
+    unsafe { native_raw::checkoutSubjective() }
+}
+
+pub fn commit_subjective() -> bool {
+    unsafe { native_raw::commitSubjective() }
+}
+
+pub fn abort_subjective() {
+    unsafe { native_raw::abortSubjective() }
+}
+
+#[macro_export]
+macro_rules! subjective_tx {
+    {$($stmt:tt)*} => {
+        $crate::native::checkout_subjective();
+        #[allow(unreachable_code)]
+        let r = loop {
+            let mut guard = $crate::native::scopeguard::guard((), |_|{
+                $crate::native::abort_subjective();
+            });
+            let result = { $($stmt)* };
+            $crate::native::scopeguard::ScopeGuard::into_inner(guard);
+            if $crate::native::commit_subjective() {
+                break result;
+            }
+        };
+        r
+    }
+}
