@@ -50,7 +50,7 @@
 //! for the two types.
 
 use custom_error::custom_error;
-pub use psibase_macros::{Pack, Unpack};
+pub use psibase_macros::{Pack, ToSchema, Unpack};
 use std::{cell::RefCell, hash::Hash, mem, rc::Rc, sync::Arc};
 
 mod schema;

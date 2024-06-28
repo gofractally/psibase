@@ -209,11 +209,11 @@ impl SchemaBuilder {
             schema: IndexMap::new(),
         }
     }
-    pub fn insert_named<T: ToSchema + 'static>(&mut self, name: String) {
+    pub fn insert_named<T: ToSchema + ?Sized + 'static>(&mut self, name: String) {
         let ty = self.insert::<T>();
         self.schema.insert(name, ty);
     }
-    pub fn insert<T: ToSchema + 'static>(&mut self) -> AnyType {
+    pub fn insert<T: ToSchema + ?Sized + 'static>(&mut self) -> AnyType {
         let mut is_new = false;
         let id = self
             .ids
@@ -226,7 +226,7 @@ impl SchemaBuilder {
             })
             .clone();
         if is_new {
-            let ty = <T as ToSchema>::schema(self);
+            let ty = T::schema(self);
             self.schema.insert(id.clone(), ty);
         }
         AnyType::Type(id)
@@ -402,6 +402,24 @@ impl<T: ToSchema + 'static, const N: usize> ToSchema for [T; N] {
     }
 }
 
+impl<T: ToSchema + 'static> ToSchema for [T] {
+    fn schema(builder: &mut SchemaBuilder) -> AnyType {
+        AnyType::List(builder.insert::<T>().into())
+    }
+}
+
+impl<T: ToSchema + 'static + ?Sized> ToSchema for &'static T {
+    fn schema(builder: &mut SchemaBuilder) -> AnyType {
+        builder.insert::<T>().into()
+    }
+}
+
+impl<T: ToSchema + 'static + ?Sized> ToSchema for &'static mut T {
+    fn schema(builder: &mut SchemaBuilder) -> AnyType {
+        builder.insert::<T>().into()
+    }
+}
+
 macro_rules! ptr_impl {
     {$t:ident} => {
         impl<T: ToSchema + 'static> ToSchema for $t<T> {
@@ -417,6 +435,34 @@ ptr_impl! {Rc}
 ptr_impl! {Arc}
 ptr_impl! {Cell}
 ptr_impl! {RefCell}
+
+macro_rules! tuple_impl {
+    ($($id:ident)+) => {
+        impl<$($id: ToSchema + 'static),+> ToSchema for ($($id),+,) {
+            fn schema(builder: &mut SchemaBuilder) -> AnyType {
+                AnyType::Tuple(vec![$(builder.insert::<$id>()),+])
+            }
+        }
+    }
+}
+
+impl ToSchema for () {
+    fn schema(_builder: &mut SchemaBuilder) -> AnyType {
+        AnyType::Tuple(Vec::new())
+    }
+}
+
+tuple_impl!(T0);
+tuple_impl!(T0 T1);
+tuple_impl!(T0 T1 T2);
+tuple_impl!(T0 T1 T2 T3);
+tuple_impl!(T0 T1 T2 T3 T4);
+tuple_impl!(T0 T1 T2 T3 T4 T5);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10);
 
 #[cfg(test)]
 mod tests {

@@ -4,7 +4,25 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use std::str::FromStr;
-use syn::{parse_macro_input, Data, DataEnum, DeriveInput, Fields, FieldsNamed, FieldsUnnamed};
+use syn::{
+    parse_macro_input, parse_quote, Data, DataEnum, DeriveInput, Fields, FieldsNamed,
+    FieldsUnnamed, Type,
+};
+
+struct MakeStaticLifetime;
+
+impl syn::visit_mut::VisitMut for MakeStaticLifetime {
+    fn visit_lifetime_mut(&mut self, node: &mut syn::Lifetime) {
+        let lifetime: syn::Lifetime = parse_quote! { 'static };
+        node.ident = lifetime.ident;
+    }
+}
+
+fn visit_type(ty: &Type) -> TokenStream2 {
+    let mut new_type = ty.clone();
+    syn::visit_mut::visit_type_mut(&mut MakeStaticLifetime, &mut new_type);
+    quote! { #new_type }
+}
 
 fn visit_fields_named(
     fracpack_mod: &TokenStream2,
@@ -23,7 +41,7 @@ fn visit_fields_named(
         .iter()
         .map(|field| {
             let name_str = field.ident.as_ref().unwrap().to_string();
-            let ty = &field.ty;
+            let ty = visit_type(&field.ty);
             quote! { fields.insert(#name_str.into(), builder.insert::<#ty>()); }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -52,7 +70,7 @@ fn visit_fields_unnamed(
     let fields = &unnamed.unnamed;
 
     if fields.len() == 1 {
-        let inner = &fields[0].ty;
+        let inner = visit_type(&fields[0].ty);
         quote! {
             builder.insert::<#inner>()
         }
@@ -60,7 +78,7 @@ fn visit_fields_unnamed(
         let visit_fields = fields
             .iter()
             .map(|field| {
-                let ty = &field.ty;
+                let ty = visit_type(&field.ty);
                 quote! { fields.push(builder.insert::<#ty>()); }
             })
             .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -153,7 +171,7 @@ fn apply_custom(
 }
 
 pub fn schema_derive_macro(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+    let mut input = parse_macro_input!(input as DeriveInput);
     let mut errors = darling::Error::accumulator();
 
     let fracpack_opts = errors
@@ -162,6 +180,23 @@ pub fn schema_derive_macro(input: TokenStream) -> TokenStream {
     let fracpack_mod = TokenStream2::from_str(&fracpack_opts.fracpack_mod).unwrap();
 
     let name = &input.ident;
+
+    let mut extra_predicates: Vec<syn::WherePredicate> = Vec::new();
+    for param in &input.generics.params {
+        if let syn::GenericParam::Type(t) = param {
+            let t = &t.ident;
+            extra_predicates.push(parse_quote! { #t: #fracpack_mod::ToSchema + 'static });
+        }
+    }
+    if !extra_predicates.is_empty() {
+        input
+            .generics
+            .make_where_clause()
+            .predicates
+            .extend(extra_predicates);
+    }
+
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let result = apply_custom(
         &fracpack_mod,
@@ -186,8 +221,8 @@ pub fn schema_derive_macro(input: TokenStream) -> TokenStream {
     }
 
     quote! {
-        impl ToSchema for #name {
-            fn schema(builder: &mut SchemaBuilder) -> #fracpack_mod::AnyType {
+        impl #impl_generics #fracpack_mod::ToSchema for #name #ty_generics #where_clause {
+            fn schema(builder: &mut #fracpack_mod::SchemaBuilder) -> #fracpack_mod::AnyType {
                 #result
             }
         }

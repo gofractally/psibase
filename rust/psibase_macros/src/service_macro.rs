@@ -649,6 +649,11 @@ fn process_mod(
                 EventType::Ui => quote! {UiEvent},
                 EventType::Merkle => quote! {MerkleEvent},
             };
+            let event_module_name = match kind {
+                EventType::History => quote!(history),
+                EventType::Ui => quote!(ui),
+                EventType::Merkle => quote!(merkle),
+            };
             let mut event_callers = proc_macro2::TokenStream::new();
             let mut event_structs = quote! {};
             let mut event_schema_init = quote! {};
@@ -672,7 +677,12 @@ fn process_mod(
                     );
                     process_event_callers(psibase_mod, f, &mut event_callers, &invoke_args);
                     process_event_name(psibase_mod, f, &mut event_structs);
-                    process_event_schema(psibase_mod, f, &mut event_schema_init);
+                    process_event_schema(
+                        psibase_mod,
+                        &quote! { #event_structs_mod::#event_module_name},
+                        f,
+                        &mut event_schema_init,
+                    );
                     if options.gql {
                         process_gql_union_member(
                             psibase_mod,
@@ -697,17 +707,12 @@ fn process_mod(
                 #[automatically_derived]
                 impl #psibase_mod::ToEventsSchema for #event_name {
                     fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::AnyType> {
-                        let events = #psibase_mod::fracpack::indexmap::IndexMap::new();
+                        let mut events = #psibase_mod::fracpack::indexmap::IndexMap::new();
                         #event_schema_init
                         events
                     }
                 }
             });
-            let event_module_name = match kind {
-                EventType::History => quote!(history),
-                EventType::Ui => quote!(ui),
-                EventType::Merkle => quote!(merkle),
-            };
             if options.gql {
                 process_gql_union(
                     psibase_mod,
@@ -1245,7 +1250,7 @@ fn process_action_args(
 
     *new_items = quote! {
         #new_items
-        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::Reflect, serde::Deserialize, serde::Serialize #gql_object_attr)]
+        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::Reflect, #psibase_mod::fracpack::ToSchema, serde::Deserialize, serde::Serialize #gql_object_attr)]
         #[fracpack(fracpack_mod = #fracpack_mod)]
         #[reflect(psibase_mod = #psibase_mod_str)]
         #[doc = #doc]
@@ -1431,6 +1436,7 @@ fn process_event_name(
 
 fn process_event_schema(
     psibase_mod: &proc_macro2::TokenStream,
+    event_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     insertions: &mut proc_macro2::TokenStream,
 ) {
@@ -1441,7 +1447,7 @@ fn process_event_schema(
 
     *insertions = quote! {
         #insertions
-        events.insert(#method_number, builder.insert::<#name>());
+        events.insert(#method_number, builder.insert::<#event_mod::#name>());
     }
 }
 
