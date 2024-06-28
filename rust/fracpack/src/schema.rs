@@ -113,6 +113,36 @@ fn add_ref(aliases: &mut AliasMap, name: &String) {
     aliases.resolve_mut(name).unwrap().0.uses += 1;
 }
 
+pub trait VisitTypes {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F);
+}
+
+impl VisitTypes for () {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, _f: &mut F) {}
+}
+
+impl VisitTypes for AnyType {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        visit_types(self, f);
+    }
+}
+
+impl<T: VisitTypes> VisitTypes for [&mut T] {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        for t in self {
+            t.visit_types(f);
+        }
+    }
+}
+
+impl<K, T: VisitTypes> VisitTypes for IndexMap<K, T> {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        for (_k, t) in self {
+            t.visit_types(f);
+        }
+    }
+}
+
 fn visit_types<F: FnMut(&mut AnyType) -> ()>(t: &mut AnyType, f: &mut F) {
     match t {
         AnyType::Struct(members) => {
@@ -152,8 +182,12 @@ fn visit_types<F: FnMut(&mut AnyType) -> ()>(t: &mut AnyType, f: &mut F) {
     }
 }
 
-fn rewrite(aliases: &AliasMap, ty: &mut AnyType, schema: &mut HashMap<String, AnyType>) {
-    visit_types(ty, &mut |t: &mut AnyType| {
+fn rewrite<T: VisitTypes + ?Sized>(
+    aliases: &AliasMap,
+    ty: &mut T,
+    schema: &mut HashMap<String, AnyType>,
+) {
+    ty.visit_types(&mut |t: &mut AnyType| {
         if t.as_type().starts_with('@') {
             if let Some((tinfo, _)) = aliases.resolve(t.as_type()) {
                 if tinfo.can_inline() {
@@ -198,7 +232,7 @@ impl SchemaBuilder {
         AnyType::Type(id)
     }
     pub fn build(self) -> Schema {
-        self.optimize(&mut [])
+        self.build_ext(&mut ())
     }
     fn resolve_aliases(&self) -> AliasMap {
         let mut aliases = AliasMap::new();
@@ -237,14 +271,12 @@ impl SchemaBuilder {
         }
         aliases
     }
-    fn optimize(mut self, ext: &mut [&mut AnyType]) -> Schema {
+    pub fn build_ext<Ext: VisitTypes + ?Sized>(mut self, ext: &mut Ext) -> Schema {
         let mut aliases = self.resolve_aliases();
         // Count uses of each type
-        for ty in &mut ext[..] {
-            visit_types(ty, &mut |t: &mut AnyType| {
-                add_ref(&mut aliases, t.as_type());
-            });
-        }
+        ext.visit_types(&mut |t: &mut AnyType| {
+            add_ref(&mut aliases, t.as_type());
+        });
         for (_, ty) in &mut self.schema {
             if !matches!(ty, AnyType::Type(_)) {
                 visit_types(ty, &mut |t: &mut AnyType| {
@@ -276,9 +308,7 @@ impl SchemaBuilder {
         }
         // Move items to the result, translating type names
         let mut result = Schema(IndexMap::new());
-        for ty in ext {
-            rewrite(&mut aliases, ty, &mut inlined);
-        }
+        rewrite(&mut aliases, ext, &mut inlined);
         for (mut ty, idx) in types {
             let tinfo = &mut aliases.types[idx];
             let resolved_name = tinfo.names[0].clone();
