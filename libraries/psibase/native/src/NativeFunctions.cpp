@@ -27,7 +27,7 @@ namespace psibase
              std::chrono::steady_clock::now() - start;
       }
 
-      DbId getDbRead(NativeFunctions& self, uint32_t db)
+      DbId getDbRead(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
          check(self.allowDbRead,
                "database access disabled during proof verification or first auth");
@@ -39,10 +39,10 @@ namespace psibase
             return (DbId)db;
          if (db == uint32_t(DbId::subjective))
          {
-            // TODO: RPC service queries currently can read subjective data to monitor node status.
-            //       However, there's a possibility this may make it easier on an active attacker.
-            //       Make this capability a node configuration toggle? Allow node config to whitelist
-            //       services for this?
+            uint64_t prefix = self.code.codeNum.value;
+            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
+            check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
+                  "key prefix must match service for accessing the subjective database");
             if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
                return (DbId)db;
          }
@@ -87,14 +87,6 @@ namespace psibase
 
       Writable getDbWrite(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
-         check(self.allowDbRead,
-               "database access disabled during proof verification or first auth");
-
-         if (!self.allowDbWrite && self.allowDbWriteSubjective && db == uint32_t(DbId::writeOnly))
-            return {(DbId)db, true, false};
-
-         check(self.allowDbWrite, "database writes disabled during query");
-
          if (keyHasServicePrefix(db))
          {
             uint64_t prefix = self.code.codeNum.value;
@@ -103,32 +95,25 @@ namespace psibase
                   "key prefix must match service during write");
          };
 
-         // User-written subjective services writing to subjective storage isn't really
-         // viable, so it requires an additional permission bit. The oddities:
-         //
-         // * It has billing issues since database billing is objective
-         // * Aborting or undoing a transaction doesn't roll back subjective storage;
-         //   writes from speculative execution survive
-         // * Forking doesn't roll back subjective storage
-         // * Subjective execution doesn't happen when nodes get the produced block
-         //
-         // The unusual semantics exist to enable trusted subjective services to do
-         // subjective attack mitigation.
-         //
-         // TODO: reenable after subjective database support is working as intended
-         if (false && db == uint32_t(DbId::subjective) &&
-             (self.code.flags & CodeRow::isSubjective) &&
+         if (db == uint32_t(DbId::subjective) && (self.code.flags & CodeRow::isSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
             return {(DbId)db, false, false};
 
+         check(self.allowDbRead,
+               "database access disabled during proof verification or first auth");
+
          if (db == uint32_t(DbId::writeOnly))
          {
+            check(self.allowDbWrite || self.allowDbWriteSubjective,
+                  "database writes disabled during query");
             check(!(self.code.flags & CodeRow::isSubjective) ||
                       (self.code.flags & CodeRow::forceReplay),
                   "subjective services may only write to DbId::subjective");
             return {(DbId)db, !(self.code.flags & CodeRow::isSubjective), false};
          }
+
+         check(self.allowDbWrite, "database writes disabled during query");
 
          // Prevent poison block; subjective services skip execution during replay
          check(!(self.code.flags & CodeRow::isSubjective),
@@ -570,9 +555,11 @@ namespace psibase
    {
       return timeDb(  //
           *this,
-          [&] {
+          [&]
+          {
              return setResult(*this,
-                              database.kvGetRaw(getDbRead(*this, db), {key.data(), key.size()}));
+                              database.kvGetRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                {key.data(), key.size()}));
           });
    }
 
@@ -600,8 +587,8 @@ namespace psibase
                 check(matchKeySize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
              return setResult(
-                 *this, database.kvGreaterEqualRaw(getDbRead(*this, db), {key.data(), key.size()},
-                                                   matchKeySize));
+                 *this, database.kvGreaterEqualRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                   {key.data(), key.size()}, matchKeySize));
           });
    }
 
@@ -618,8 +605,8 @@ namespace psibase
                 check(matchKeySize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
              return setResult(*this,
-                              database.kvLessThanRaw(getDbRead(*this, db), {key.data(), key.size()},
-                                                     matchKeySize));
+                              database.kvLessThanRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                     {key.data(), key.size()}, matchKeySize));
           });
    }
 
@@ -632,7 +619,8 @@ namespace psibase
              if (keyHasServicePrefix(db))
                 check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
              return setResult(*this,
-                              database.kvMaxRaw(getDbRead(*this, db), {key.data(), key.size()}));
+                              database.kvMaxRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                {key.data(), key.size()}));
           });
    }
 
@@ -645,5 +633,18 @@ namespace psibase
       transactionContext.kvResourceDeltas.adopt_sequence(boost::container::ordered_unique_range,
                                                          std::move(seq));
       return size;
+   }
+
+   void NativeFunctions::checkoutSubjective()
+   {
+      database.checkoutSubjective();
+   }
+   bool NativeFunctions::commitSubjective()
+   {
+      return database.commitSubjective();
+   }
+   void NativeFunctions::abortSubjective()
+   {
+      database.abortSubjective();
    }
 }  // namespace psibase

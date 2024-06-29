@@ -561,7 +561,6 @@ dependencies = [
 name = "demoapp1"
 version = "0.1.0"
 dependencies = [
- "bitflags 2.5.0",
  "psibase",
  "service",
  "wit-bindgen-rt",
@@ -2537,9 +2536,12 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.22.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcb8738270f32a2d6739973cbbb7c1b6dd8959ce515578a6e19165853272ee64"
+checksum = "29c7526379ace8709ee9ab9f2bb50f112d95581063a59ef3097d9c10153886c9"
+dependencies = [
+ "bitflags 2.5.0",
+]
 
 [[package]]
 name = "zeroize"

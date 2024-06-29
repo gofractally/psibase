@@ -107,22 +107,6 @@ pub struct DepGraph<'a> {
     reinstall: bool,
 }
 
-trait PackageDep {
-    fn depends(&self) -> &[PackageRef];
-}
-
-impl PackageDep for PackageInfo {
-    fn depends(&self) -> &[PackageRef] {
-        &self.depends
-    }
-}
-
-impl PackageDep for Meta {
-    fn depends(&self) -> &[PackageRef] {
-        &self.depends
-    }
-}
-
 fn get_removed_impl(
     reg: &HashMap<String, PackageInfo>,
     names: &[PackageRef],

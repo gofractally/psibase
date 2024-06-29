@@ -1111,7 +1111,8 @@ struct callbacks
       auto           databaseTime  = std::chrono::steady_clock::duration(0);
       try
       {
-         psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead()};
+         psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead(), chain.writer,
+                                  true};
          bc.start();
          psibase::check(!bc.needGenesisAction,
                         "Need genesis block; use 'psibase boot' to boot chain");

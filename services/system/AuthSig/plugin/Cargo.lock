@@ -234,7 +234,6 @@ dependencies = [
 name = "auth-sig"
 version = "0.1.0"
 dependencies = [
- "bitflags 2.5.0",
  "p256",
  "psibase",
  "rand_core",
@@ -1486,6 +1485,7 @@ dependencies = [
  "reqwest",
  "ripemd",
  "rpassword",
+ "scopeguard",
  "sec1",
  "secp256k1",
  "serde",
@@ -2652,6 +2652,9 @@ name = "wit-bindgen-rt"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29c7526379ace8709ee9ab9f2bb50f112d95581063a59ef3097d9c10153886c9"
+dependencies = [
+ "bitflags 2.5.0",
+]
 
 [[package]]
 name = "zeroize"

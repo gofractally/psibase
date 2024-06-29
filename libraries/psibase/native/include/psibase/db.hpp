@@ -13,7 +13,8 @@
 namespace triedent
 {
    class write_session;
-}
+   class root;
+}  // namespace triedent
 
 namespace psibase
 {
@@ -22,6 +23,30 @@ namespace psibase
 
    using Writer    = triedent::write_session;
    using WriterPtr = std::shared_ptr<Writer>;
+
+   using DbPtr = std::shared_ptr<triedent::root>;
+
+   struct DbChangeSet
+   {
+      struct Range
+      {
+         std::vector<unsigned char> lower;
+         std::vector<unsigned char> upper;
+         bool                       write;
+      };
+      std::vector<Range> ranges;
+      void               onRead(std::span<const char> value);
+      void               onGreaterEqual(std::span<const char> key,
+                                        std::size_t           prefixLen,
+                                        bool                  found,
+                                        std::span<const char> result);
+      void               onLessThan(std::span<const char> key,
+                                    std::size_t           prefixLen,
+                                    bool                  found,
+                                    std::span<const char> result);
+      void               onMax(std::span<const char> key, bool found, std::span<const char> result);
+      void               onWrite(std::span<const char> key);
+   };
 
    struct SharedDatabaseImpl;
    struct SharedDatabase
@@ -47,13 +72,17 @@ namespace psibase
       ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
       void             removeRevisions(Writer& writer, const Checksum256& irreversible);
 
-      void                               setBlockData(Writer&               writer,
-                                                      const Checksum256&    blockId,
-                                                      std::span<const char> key,
-                                                      std::span<const char> value);
-      std::optional<std::vector<char>>   getBlockData(Writer&               writer,
-                                                      const Checksum256&    blockId,
-                                                      std::span<const char> key);
+      void                             setBlockData(Writer&               writer,
+                                                    const Checksum256&    blockId,
+                                                    std::span<const char> key,
+                                                    std::span<const char> value);
+      std::optional<std::vector<char>> getBlockData(Writer&               writer,
+                                                    const Checksum256&    blockId,
+                                                    std::span<const char> key);
+
+      DbPtr getSubjective();
+      bool  commitSubjective(Writer& writer, DbPtr& original, DbPtr updated, DbChangeSet&& changes);
+
       bool                               isSlow() const;
       std::vector<std::span<const char>> span() const;
    };
@@ -126,6 +155,14 @@ namespace psibase
       void             commit(Session& session);
       ConstRevisionPtr writeRevision(Session& session, const Checksum256& blockId);
       void             abort(Session&);
+
+      // Manage access to subjective database
+      void checkoutSubjective();
+      bool commitSubjective();
+      void abortSubjective();
+      // Used to ensure that checkout and commit are run in the same action
+      std::size_t saveSubjective();
+      void        restoreSubjective(std::size_t depth);
 
       // TODO: kvPutRaw, kvRemoveRaw: return deltas
       // TODO: getters: pass in input buffers instead of returning KVResult
