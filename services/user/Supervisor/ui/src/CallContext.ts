@@ -1,4 +1,4 @@
-import { toString, isErrorResult, siblingUrl } from "@psibase/common-lib";
+import { toString, siblingUrl } from "@psibase/common-lib";
 import { AddableAction } from "@psibase/supervisor-lib/messaging/PluginCallResponse";
 import {
     buildFunctionCallResponse,
@@ -13,6 +13,7 @@ import {
     signAndPushTransaction,
     uint8ArrayToHex,
 } from "@psibase/common-lib/rpc";
+import { isPluginError } from "./plugin/Errors";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 
@@ -120,13 +121,10 @@ export class CallContext {
         //  with the callstack
         if (this.isActive()) {
             const expectedService = this.callStack.peek(0)!.args.service;
-            const expectedHost = siblingUrl(
-                null,
-                expectedService,
-            );
+            const expectedHost = siblingUrl(null, expectedService);
             if (expectedHost != origin) {
                 throw Error(
-                    `Expected response from ${expectedHost} but came from ${origin}`
+                    `Expected response from ${expectedHost} but came from ${origin}`,
                 );
             }
         }
@@ -135,36 +133,10 @@ export class CallContext {
     pushCall(callerOrigin: string, item: QualifiedFunctionCallArgs) {
         this.validateOrigin(callerOrigin);
 
-        if (!this.isActive()) {
-            if (this.rootAppOrigin && this.rootAppOrigin !== callerOrigin) {
-                // Once there is a root app origin, then there can never be a different root app origin
-                // for this supervisor. Loading a new root app would load a new supervisor.
-                throw Error(
-                    "Cannot have two different root apps using the same supervisor.",
-                );
-            }
-            this.rootAppOrigin = callerOrigin;
-        } else {
-            if (this.rootAppOrigin === callerOrigin) {
-                // If there's already a callstack from this root, and it hasn't resolved yet
-                //   another call is currently not allowed.
-                // TODO - Buffer multiple calls from root app
-                throw Error(
-                    `Plugin call resolution already in progress: ${toString(
-                        this.callStack.peekBottom(0)!.args,
-                    )}`,
-                );
-            }
-        }
-
         this.callStack.push({
             caller: new URL(origin).origin,
             args: item,
         });
-    }
-
-    private isUnrecoverableError(result: any) {
-        return isErrorResult(result) && result.errorType === "unrecoverable";
     }
 
     private replyToParent(call: FunctionCallArgs, result: any) {
@@ -172,9 +144,6 @@ export class CallContext {
             buildFunctionCallResponse(call, result),
             this.rootAppOrigin,
         );
-
-        // Replying back to the parent app is the end of this call context.
-        this.reset();
     }
 
     private cacheCallResult(
@@ -193,25 +162,30 @@ export class CallContext {
         });
     }
 
-    async popCall(callOrigin: string, actions: AddableAction[], result: any) {
+    addActions(callOrigin: string, actions: AddableAction[]) {
+        this.validateOrigin(callOrigin);
+        // Track any actions added to the tx context
+        if (actions.length > 0) {
+            this.addableActions.push(...actions);
+        }
+    }
+
+    async popCall(callOrigin: string, result: any) {
         this.validateOrigin(callOrigin);
         let call = this.callStack.pop()!;
 
         // Return if error
-        if (this.isUnrecoverableError(result)) {
+        if (isPluginError(result) && result.errorType === "unrecoverable") {
             this.replyToParent(call.args, result);
+            this.reset();
             return;
-        }
-
-        // Track any actions added to the tx context
-        if (actions.length > 0) {
-            this.addableActions.push(...actions);
         }
 
         // Submit tx and reply if the stack was emptied
         if (this.callStack.isEmpty()) {
             await this.submitTx();
             this.replyToParent(call.args, result);
+            this.reset();
             return;
         }
 

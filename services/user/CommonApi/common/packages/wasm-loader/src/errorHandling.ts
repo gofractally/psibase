@@ -2,7 +2,6 @@ import { siblingUrl } from "@psibase/common-lib/rpc";
 import {
     QualifiedFunctionCallArgs,
     QualifiedPluginId,
-    toString,
 } from "@psibase/common-lib/messaging";
 import { buildPluginCallResponse } from "@psibase/supervisor-lib";
 
@@ -114,7 +113,20 @@ const isParseError = (e: any) => {
     );
 };
 
-const reply = (payload: any) => {
+function isComponentError(e: any): e is ComponentError {
+    return e instanceof Error && 
+           'payload' in e && 
+           typeof (e as ComponentError).payload === "object" &&
+           isCommonError((e as ComponentError).payload);
+}
+
+interface PluginError {
+    errorType: string,
+    args: QualifiedFunctionCallArgs,
+    val: Error | CommonError,
+};
+
+const err = (payload: PluginError) => {
     window.parent.postMessage(
         buildPluginCallResponse(payload, []),
         siblingUrl(null, "supervisor"),
@@ -123,78 +135,95 @@ const reply = (payload: any) => {
 
 export const handleErrors = (args: QualifiedFunctionCallArgs, e: any) => {
     if (isDeserializationError(e)) {
-        reply({
+        err({
             errorType: "unrecoverable",
+            args,
             val: {
-                message: `${toString(args)}: Possible plugin import code gen error.`,
+                name: "DeserializationError",
+                message: `Possible error with plugin import code generation`,
             },
         });
-    } else if (
-        e instanceof Error &&
-        typeof (e as ComponentError).payload === "object" &&
-        isCommonError((e as ComponentError).payload)
-    ) {
-        reply({
+    } else if (isComponentError(e)) {
+        // This happens when a plugin returns an error
+        //  as opposed to trapping. The returned error is considered 
+        //  "recoverable" in the sense that it can be passed back to 
+        //  and handled within the caller.
+        err({
             errorType: "recoverable",
-            val: (e as ComponentError).payload,
+            args,
+            val: e.payload as CommonError,
         });
     } else if (e instanceof Error && e.message === "unreachable") {
-        reply({
+        e.message = `Runtime error (panic)`;
+        err({
             errorType: "unrecoverable",
-            val: { message: `${toString(args)}: Runtime error (panic)` },
+            args,
+            val: e,
         });
     } else if (isParseError(e)) {
-        reply({
+        err({
             errorType: "unrecoverable",
+            args,
             val: {
-                message: `${toString(args)}: Possible plugin import code gen error`,
+                name: "ParseError",
+                message: `Possible plugin import code gen error`,
             },
         });
     } else if (e instanceof PluginDownloadFailed) {
         let { service, plugin } = e.pluginId;
-        reply({
+        err({
             errorType: "unrecoverable",
+            args,
             val: {
-                message: `${toString(args)}: Failed to download ${service}:${plugin}.`,
+                name: "PluginDownloadFailed",
+                message: `Failed to download ${service}:${plugin}.`,
             },
         });
     } else if (e instanceof ParserDownloadFailed) {
-        reply({
+        err({
             errorType: "unrecoverable",
+            args,
             val: {
-                message: `${toString(args)}: Failed to download parser. Possible network issues.`,
+                name: "ParserDownloadFailed",
+                message: `Failed to download parser. Possible network issues.`,
             },
         });
     } else if (e instanceof ParsingFailed) {
-        reply({
+        err({
             errorType: "unrecoverable",
+            args,
             val: {
-                message: `${toString(args)}: Parsing plugin failed. Possible invalid wit syntax.`,
+                name: "ComponentParsingFailed",
+                message: `Parsing plugin failed. Possible invalid wit syntax.`,
             },
         });
     } else if (e instanceof InvalidPlugin) {
-        reply({
+        err({
             errorType: "unrecoverable",
+            args,
             val: {
-                message: `${toString(args)}: [InvalidPlugin] ${e.message}`,
+                name: "InvalidPlugin",
+                message: `${e.message}`,
             },
         });
     } else {
         // Unrecognized error
         if (e instanceof Error) {
-            reply({
+            err({
                 errorType: "unrecoverable",
+                args,
                 val: {
-                    error: e.name,
-                    message: `${toString(args)}: ${e.message}`,
+                    name: e.name,
+                    message: `${e.message}`,
                 },
             });
         } else {
-            reply({
+            err({
                 errorType: "unrecoverable",
+                args,
                 val: {
-                    error: "unknown",
-                    message: `${toString(args)}: ${JSON.stringify(e, null, 2)}`,
+                    name: "unknown",
+                    message: `${JSON.stringify(e, null, 2)}`,
                 },
             });
         }

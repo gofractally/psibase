@@ -7,7 +7,7 @@ import { isErrorResponse } from "./messaging/FunctionCallResponse";
 import { PluginId, QualifiedPluginId } from "./messaging/PluginId";
 import { buildPreLoadPluginsRequest } from "./messaging/PreLoadPluginsRequest";
 import {
-    isIFrameInitialized,
+    isSupervisorInitialized,
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
@@ -93,7 +93,7 @@ export class Supervisor {
         }
 
         try {
-            if (isIFrameInitialized(messageEvent.data)) {
+            if (isSupervisorInitialized(messageEvent.data)) {
                 this.onSupervisorInitialized();
             } else if (isFunctionCallResponse(messageEvent.data)) {
                 this.onFunctionCallResponse(messageEvent.data);
