@@ -1479,6 +1479,7 @@ dependencies = [
  "getrandom",
  "hmac",
  "include_dir",
+ "indexmap 2.2.6",
  "indicatif",
  "jwt",
  "mime_guess",
