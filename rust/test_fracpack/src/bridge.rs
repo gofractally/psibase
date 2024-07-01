@@ -5,5 +5,6 @@ pub mod ffi {
 
         fn round_trip_outer_struct(index: usize, blob: &[u8]);
         fn round_trip_outer_struct_field(index: usize, field_name: &str, blob: &[u8]);
+        fn round_trip_with_schema(index: usize, schema_json: &[u8], blob: &[u8]);
     }
 }

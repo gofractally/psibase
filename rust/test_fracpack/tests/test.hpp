@@ -12,11 +12,40 @@
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #pragma GCC diagnostic ignored "-Wambiguous-reversed-operator"
 #include <psio/bytes.hpp>
-#include <psio/shared_view_ptr.hpp>
 #include <psio/fracpack.hpp>
+#include <psio/shared_view_ptr.hpp>
 #pragma GCC diagnostic pop
 
-using Variant = std::variant<uint32_t, std::string>;
+#define NAMED_WRAPPER(Name, Type)                                 \
+   struct Name                                                    \
+   {                                                              \
+      Type        value;                                          \
+      friend bool operator==(const Name&, const Name&) = default; \
+   };                                                             \
+   PSIO_REFLECT_TYPENAME(Name)                                    \
+   void to_json(const Name& obj, auto& stream)                    \
+   {                                                              \
+      using psio::to_json;                                        \
+      to_json(obj.value, stream);                                 \
+   }                                                              \
+   void from_json(Name& obj, auto& stream)                        \
+   {                                                              \
+      using psio::from_json;                                      \
+      from_json(obj.value, stream);                               \
+   }                                                              \
+   inline auto& clio_unwrap_packable(Name& obj)                   \
+   {                                                              \
+      return obj.value;                                           \
+   }                                                              \
+   inline const auto& clio_unwrap_packable(const Name& obj)       \
+   {                                                              \
+      return obj.value;                                           \
+   }
+
+NAMED_WRAPPER(ItemU32, std::uint32_t)
+NAMED_WRAPPER(ItemStr, std::string)
+
+using Variant = std::variant<ItemU32, ItemStr>;
 
 struct DefWontChangeInnerStruct
 {
@@ -26,7 +55,7 @@ struct DefWontChangeInnerStruct
    int16_t                            field_i16;
    std::optional<Variant>             field_o_var;
    std::string                        field_str;
-   std::array<uint16_t, 3>            field_a_i16_3;
+   std::array<int16_t, 3>             field_a_i16_3;
    float                              field_f32;
    std::optional<std::vector<int8_t>> field_o_v_i8;
    std::array<std::string, 2>         field_a_s_2;
@@ -173,3 +202,6 @@ void round_trip_outer_struct(size_t index, rust::Slice<const uint8_t> blob);
 void round_trip_outer_struct_field(size_t                     index,
                                    rust::Str                  field_name,
                                    rust::Slice<const uint8_t> blob);
+void round_trip_with_schema(size_t                     index,
+                            rust::Slice<const uint8_t> schema_packed,
+                            rust::Slice<const uint8_t> blob);

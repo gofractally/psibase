@@ -130,6 +130,26 @@ namespace psio
       };
       PSIO_REFLECT(Schema, types)
 
+      void to_json(const Schema& schema, auto& stream)
+      {
+         to_json(schema.types, stream);
+      }
+
+      void from_json(Schema& schema, auto& stream)
+      {
+         from_json(schema.types, stream);
+      }
+
+      inline auto& clio_unwrap_packable(Schema& schema)
+      {
+         return schema.types;
+      }
+
+      inline const auto& clio_unwrap_packable(const Schema& schema)
+      {
+         return schema.types;
+      }
+
       struct Member;
 
       void to_json_members(const std::vector<Member>&, auto& stream);
@@ -623,6 +643,7 @@ namespace psio
          char operator()(const Variant&) const { return '{'; }
          char operator()(const Struct&) const { return '{'; }
          char operator()(const FracPack&) const { return 0; };
+         char operator()(const Option&) const { return 0; };
          char operator()(const auto&) const { return '['; }
       };
 
@@ -632,6 +653,7 @@ namespace psio
          char operator()(const Variant&) const { return '}'; }
          char operator()(const Struct&) const { return '}'; }
          char operator()(const FracPack&) const { return 0; };
+         char operator()(const Option&) const { return 0; };
          char operator()(const auto&) const { return ']'; }
       };
 
@@ -1031,7 +1053,6 @@ namespace psio
                   }
                }
                else if constexpr (std::is_same_v<T, std::vector<char>> ||
-                                  std::is_same_v<T, std::vector<signed char>> ||
                                   std::is_same_v<T, std::vector<unsigned char>>)
                {
                   schema.insert(
@@ -1083,7 +1104,6 @@ namespace psio
                   using value_type = std::remove_cv_t<typename is_std_array<T>::value_type>;
                   AnyType arr = Array{.type = insert<value_type>(), .len = is_std_array<T>::size};
                   if constexpr (std::is_same_v<value_type, char> ||
-                                std::is_same_v<value_type, signed char> ||
                                 std::is_same_v<value_type, unsigned char>)
                   {
                      arr = Custom{.type = std::move(arr), .id = "hex"};
@@ -1151,11 +1171,6 @@ namespace psio
          Schema                             schema;
          std::map<const void*, std::size_t> ids;
       };
-
-      void to_json(const Schema& schema, auto& stream)
-      {
-         to_json(schema.types, stream);
-      }
 
       void to_json_members(const std::vector<Member>& members, auto& stream)
       {

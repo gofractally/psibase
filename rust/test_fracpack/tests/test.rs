@@ -1,4 +1,4 @@
-use fracpack::{Pack, Result, Unpack, UnpackOwned};
+use fracpack::{Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
 use test_fracpack::*;
 
 fn get_tests1() -> [OuterStruct; 3] {
@@ -338,6 +338,11 @@ fn t1() -> Result<()> {
         assert_eq!(*t, unpacked);
         test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
         // TODO: optionals after fixed-data portion ends
+
+        let mut builder = SchemaBuilder::new();
+        builder.insert_named::<OuterStruct>("OuterStruct".to_string());
+        let schema = builder.build().packed();
+        test_fracpack::bridge::ffi::round_trip_with_schema(i, &schema[..], &packed[..]);
     }
     Ok(())
 }

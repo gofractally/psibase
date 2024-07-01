@@ -1,17 +1,19 @@
-use darling::FromDeriveInput;
+use darling::{FromDeriveInput, FromVariant};
 use proc_macro::TokenStream;
 use quote::quote;
 use std::str::FromStr;
 use syn::{
     parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, FieldsUnnamed,
+    LitStr,
 };
 
 /// Fracpack struct level options
-#[derive(Debug, FromDeriveInput)]
+#[derive(Debug, FromDeriveInput, FromVariant)]
 #[darling(default, attributes(fracpack))]
 pub(crate) struct Options {
     pub(crate) definition_will_not_change: bool,
     pub(crate) fracpack_mod: String,
+    pub(crate) custom: Option<LitStr>,
 }
 
 impl Default for Options {
@@ -19,6 +21,7 @@ impl Default for Options {
         Self {
             definition_will_not_change: false,
             fracpack_mod: "psibase::fracpack".into(),
+            custom: None,
         }
     }
 }

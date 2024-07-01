@@ -480,6 +480,9 @@ void test(std::initializer_list<T> values)
       test(std::tuple{std::optional<std::vector<T>>{}});
       test(std::tuple{std::optional{std::vector<T>{}}});
       test(std::tuple{std::optional{std::vector<T>(values)}});
+
+      test(std::tuple{std::optional{std::uint32_t{6}}, std::vector<T>(values),
+                      std::optional{std::uint32_t{7}}});
    }
    // variant
    for (const auto& v : values)
@@ -505,6 +508,7 @@ void test(std::initializer_list<T> values)
       test(std::tuple{a});
       test(std::tuple{std::optional<std::array<T, 20>>{}});
       test(std::tuple{std::optional{a}});
+      test(std::tuple{std::optional{std::uint32_t{6}}, a, std::optional{std::uint32_t{7}}});
    }
    // shared_view_ptr
    {
@@ -512,5 +516,16 @@ void test(std::initializer_list<T> values)
       {
          test(psio::shared_view_ptr{v});
       }
+   }
+   // Sandwiched between two heap objects (checks correct tracking of fixed_pos vs heap_pos)
+   for (const auto& v : values)
+   {
+      test(std::tuple{std::optional{std::uint32_t{6}}, v, std::optional{std::uint32_t{7}}});
+      test(std::tuple{std::optional{std::uint32_t{6}}, nonextensible_wrapper{v},
+                      std::optional{std::uint32_t{7}}});
+      test(std::tuple{std::optional{std::uint32_t{6}}, extensible_wrapper{v},
+                      std::optional{std::uint32_t{7}}});
+      test(std::tuple{std::optional{std::uint32_t{6}}, std::optional<T>(v),
+                      std::optional{std::uint32_t{7}}});
    }
 }
