@@ -668,12 +668,6 @@ namespace psio
       from_json_hex(obj, stream);
    }
 
-   template <typename S>
-   void from_json(std::vector<signed char>& obj, S& stream)
-   {
-      from_json_hex(obj, stream);
-   }
-
    template <typename T, std::size_t N, typename S>
       requires std::same_as<T, char> || std::same_as<T, unsigned char> ||
                std::same_as<T, signed char>
@@ -694,12 +688,6 @@ namespace psio
 
    template <std::size_t N, typename S>
    void from_json(std::array<unsigned char, N>& obj, S& stream)
-   {
-      from_json_hex(obj, stream);
-   }
-
-   template <std::size_t N, typename S>
-   void from_json(std::array<signed char, N>& obj, S& stream)
    {
       from_json_hex(obj, stream);
    }
