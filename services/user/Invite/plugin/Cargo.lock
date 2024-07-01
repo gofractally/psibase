@@ -660,12 +660,10 @@ dependencies = [
 name = "fracpack"
 version = "0.10.0"
 dependencies = [
- "anyhow",
  "custom_error",
  "indexmap 2.2.6",
  "psibase_macros",
  "serde",
- "serde_json",
 ]
 
 [[package]]
