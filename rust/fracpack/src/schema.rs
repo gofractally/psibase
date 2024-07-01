@@ -463,3 +463,8 @@ tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14);
+tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
