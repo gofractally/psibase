@@ -902,7 +902,13 @@ namespace psio::schema_types
          }
          else
          {
-            if (auto err = push(type, pos, offset != 0))
+            if (offset == 0)
+            {
+               assert(type->is_container());
+               result.kind = FracParser::start;
+               stack.push_back(ArrayReader{.type = type, .pos = pos, .end = pos});
+            }
+            else if (auto err = push(type, pos, offset != 0))
                result = err;
             else
                result.kind = FracParser::start;
