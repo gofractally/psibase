@@ -95,7 +95,7 @@ namespace psibase::net
       };
 
       template <typename ExecutionContext>
-      explicit blocknet(ExecutionContext& ctx) : _block_timer(ctx)
+      explicit blocknet(ExecutionContext& ctx) : _trx_timer(ctx), _block_timer(ctx)
       {
          logger.add_attribute("Channel",
                               boost::log::attributes::constant(std::string("consensus")));
@@ -130,9 +130,12 @@ namespace psibase::net
       // that it is trying to produce has been aborted.
       std::uint64_t _leader_cancel = 0;
 
+      Timer                     _trx_timer;
       Timer                     _block_timer;
       std::chrono::milliseconds _timeout        = std::chrono::seconds(3);
       std::chrono::milliseconds _block_interval = std::chrono::seconds(1);
+
+      bool _trx_loop_running = false;
 
       std::vector<std::unique_ptr<peer_connection>> _peers;
 
@@ -475,6 +478,7 @@ namespace psibase::net
                    }
                 }
              });
+         schedule_process_transactions();
       }
 
       // \pre common invariants
@@ -487,6 +491,37 @@ namespace psibase::net
             _block_timer.cancel();
             PSIBASE_LOG(consensus().logger, info) << log_message;
             chain().abort_block();
+         }
+      }
+
+      // This async loop is active when running as the leader and
+      // there is at least one pending transaction
+      void process_transactions()
+      {
+         if (_state == producer_state::leader)
+         {
+            if (auto trx = chain().nextTransaction())
+            {
+               chain().pushTransaction(std::move(*trx));
+            }
+            else
+            {
+               _trx_timer.expires_after(std::chrono::milliseconds{100});
+            }
+            _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
+         }
+         else
+         {
+            _trx_loop_running = false;
+         }
+      }
+
+      void schedule_process_transactions()
+      {
+         if (!_trx_loop_running && _state == producer_state::leader)
+         {
+            _trx_loop_running = true;
+            _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
          }
       }
 

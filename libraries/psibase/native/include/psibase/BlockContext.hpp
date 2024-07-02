@@ -63,6 +63,10 @@ namespace psibase
                            bool                                     enableUndo = true,
                            bool                                     commit     = true);
 
+      // The action is not allowed to modify any consensus state.
+      // It is allowed to read and write subjective tables.
+      void execNonTrxAction(Action&& action, ActionTrace& trace);
+
       void execAllInBlock();
 
       std::vector<std::vector<char>> exec(

@@ -394,6 +394,17 @@ namespace psibase
       current.transactions.push_back(std::move(trx));
    }
 
+   void BlockContext::execNonTrxAction(Action&& action, ActionTrace& atrace)
+   {
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, true, false, true, true};
+
+      auto session = db.startWrite(writer);
+      tc.execNonTrxAction(0, action, atrace);
+      session.commit();
+   }
+
    // TODO: call callStartBlock() here? caller's responsibility?
    // TODO: caller needs to verify proofs
    void BlockContext::execAllInBlock()
