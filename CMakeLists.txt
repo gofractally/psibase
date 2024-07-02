@@ -140,6 +140,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/TransactionQueue.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
@@ -555,6 +556,19 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/TransactionQueue.psi
+    NAME TransactionQueue
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Subjective service that manages transactions"
+    SERVICE txqueue
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionQueue.wasm
+        FLAGS isSubjective allowWriteSubjective
+        SERVER txqueue
+    DEPENDS wasm
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/SetCode.psi
     NAME SetCode
     VERSION ${PSIBASE_VERSION}
@@ -707,7 +721,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
                     Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
+                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact TransactionQueue
 )
 
 psibase_package(
@@ -716,7 +730,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Packages Producers HttpServer
-                    SetCode Transact
+                    SetCode Transact TransactionQueue
 )
 
 function(write_package_index target dir)
@@ -735,7 +749,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
+    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact TransactionQueue)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -765,6 +779,7 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/TransactionQueue.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 
