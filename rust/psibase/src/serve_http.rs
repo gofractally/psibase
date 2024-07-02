@@ -176,6 +176,15 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
                 body: schema.sdl().into_bytes().into(),
                 headers: vec![],
             })
+        } else if request.contentType == "application/graphql" {
+            let res = schema
+                .execute(std::str::from_utf8(&request.body.0).unwrap())
+                .await;
+            Some(HttpReply {
+                contentType: "application/json".into(),
+                body: serde_json::to_vec(&res).unwrap().into(),
+                headers: vec![],
+            })
         } else {
             let request_result = receive_body(
                 Some(&request.contentType),

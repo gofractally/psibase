@@ -100,9 +100,19 @@ mod service {
 
 #[psibase::test_case(services("example"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use psibase::services::http_server;
+    use serde_json::{json, Value};
+    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
     let result = Wrapper::push(&chain).add(3, 4);
     assert_eq!(result.get()?, 7);
     println!("\n\nTrace:\n{}", result.trace);
+
+    chain.finish_block();
+    let reply: Value = chain.graphql(
+        SERVICE,
+        r#"query { answer(account: "example") { result } }"#,
+    )?;
+    assert_eq!(reply, json!({ "data": { "answer": {"result": 7} } }));
 
     Ok(())
 }

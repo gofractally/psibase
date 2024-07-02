@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{Hex, Pack, Reflect, ToKey, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// An HTTP header
 ///
@@ -74,6 +74,20 @@ pub struct HttpRequest {
     pub body: Hex<Vec<u8>>,
 }
 
+pub struct HttpBody {
+    pub contentType: String,
+    pub body: Hex<Vec<u8>>,
+}
+
+impl HttpBody {
+    pub fn graphql(query: &str) -> Self {
+        HttpBody {
+            contentType: "application/graphql".into(),
+            body: query.to_string().into_bytes().into(),
+        }
+    }
+}
+
 /// An HTTP reply
 ///
 /// Services return this from their [serveSys](crate::server_interface::ServerActions::serveSys) action.
@@ -103,4 +117,13 @@ pub struct HttpReply {
 
     /// HTTP Headers
     pub headers: Vec<HttpHeader>,
+}
+
+impl HttpReply {
+    pub fn text(self) -> Result<String, anyhow::Error> {
+        Ok(String::from_utf8(self.body.0)?)
+    }
+    pub fn json<T: DeserializeOwned>(self) -> Result<T, anyhow::Error> {
+        Ok(serde_json::de::from_str(&self.text()?)?)
+    }
 }
