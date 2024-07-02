@@ -7,9 +7,8 @@ const words: string[] = [
     "started",
     "connected",
     "decentralized",
-    "blocky",
-    "immutable",
     "configured",
+    "synced",
 ].map((word) => word + ".");
 
 export const SetupPage = () => {
