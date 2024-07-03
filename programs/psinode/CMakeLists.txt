@@ -50,6 +50,10 @@ if(Python_Interpreter_FOUND)
         COMMAND ${Python_EXECUTABLE} test_subjective.py --psinode=$<TARGET_FILE:psinode>
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     set_tests_properties(psinode_test_subjective PROPERTIES PROCESSORS 4)
+    add_test(
+        NAME psinode_test_txqueue
+        COMMAND ${Python_EXECUTABLE} test_txqueue.py --psinode=$<TARGET_FILE:psinode>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif()
 
 include(GNUInstallDirs)

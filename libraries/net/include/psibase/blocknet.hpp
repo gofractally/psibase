@@ -503,6 +503,7 @@ namespace psibase::net
             if (auto trx = chain().nextTransaction())
             {
                chain().pushTransaction(std::move(*trx));
+               _trx_timer.expires_after(std::chrono::microseconds{0});
             }
             else
             {
@@ -521,6 +522,7 @@ namespace psibase::net
          if (!_trx_loop_running && _state == producer_state::leader)
          {
             _trx_loop_running = true;
+            _trx_timer.expires_after(std::chrono::microseconds{0});
             _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
          }
       }

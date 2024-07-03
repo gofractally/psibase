@@ -1218,11 +1218,13 @@ namespace psibase
             bc->execNonTrxAction(std::move(action), atrace);
             if (!psio::from_frac(result, atrace.rawRetval))
             {
+               PSIBASE_LOG(bc->trxLogger, info) << "failed to deserialize result of txqueue::next";
                result.reset();
             }
          }
-         catch (...)
+         catch (std::exception& e)
          {
+            PSIBASE_LOG(bc->trxLogger, info) << "failed txqueue::next: " << e.what();
          }
          return result;
       }

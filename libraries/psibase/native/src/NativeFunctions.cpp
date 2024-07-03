@@ -105,11 +105,13 @@ namespace psibase
 
          if (db == uint32_t(DbId::writeOnly))
          {
-            check(self.allowDbWrite || self.allowDbWriteSubjective,
-                  "database writes disabled during query");
-            check(!(self.code.flags & CodeRow::isSubjective) ||
-                      (self.code.flags & CodeRow::forceReplay),
-                  "subjective services may only write to DbId::subjective");
+            if (!self.allowDbWriteSubjective)
+            {
+               check(self.allowDbWrite, "database writes disabled during query");
+               check(!(self.code.flags & CodeRow::isSubjective) ||
+                         (self.code.flags & CodeRow::forceReplay),
+                     "subjective services may only write to DbId::subjective");
+            }
             return {(DbId)db, !(self.code.flags & CodeRow::isSubjective), false};
          }
 

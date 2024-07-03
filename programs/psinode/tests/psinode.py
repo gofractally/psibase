@@ -297,6 +297,49 @@ class API:
         else:
             return edges[0]['node']['header']
 
+class Service(object):
+    def __init__(self, api, service=None):
+        self.api = api
+        if service is not None:
+            self.service = service
+
+    def request(self, method, path, **kw):
+        '''Makes an HTTP request and returns a Response. Other named parameters are passed through to requests.request.'''
+        return self.api.request(method, path, self.service, **kw)
+    def head(self, path, **kw):
+        '''HTTP HEAD request'''
+        return self.request('HEAD', path, **kw)
+    def get(self, path, **kw):
+        '''HTTP GET request'''
+        return self.request('GET', path, **kw)
+    def post(self, path, **kw):
+        '''HTTP POST request'''
+        return self.request('POST', path, **kw)
+    def put(self, path, **kw):
+        '''HTTP PUT request'''
+        return self.request('PUT', path, **kw)
+    def patch(self, path, **kw):
+        '''HTTP PATCH request'''
+        return self.request('PATCH', path, **kw)
+    def delete(self, path, **kw):
+        '''HTTP DELETE request'''
+        return self.request('DELETE', path, **kw)
+
+    def push_action(self, sender, method, data):
+        '''
+        Push a transaction consisting of a single action to the chain and return the transaction trace
+
+        Raise TransactionError if the transaction fails
+        '''
+        return self.api.push_action(sender, self.service, method, data)
+    def graphql(self, query):
+        '''
+        Sends a GraphQL query to a service and returns the result as json
+
+        Raise GraphQLError if the query fails
+        '''
+        return self.api.graphql(self.service, query)
+
 _default_config = '''# psinode config
 service  = localhost:$PSIBASE_DATADIR/services/x-admin
 service  = 127.0.0.1:$PSIBASE_DATADIR/services/x-admin
