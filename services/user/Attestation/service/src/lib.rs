@@ -20,6 +20,7 @@ pub struct VerifiableCredential {
 #[psibase::service(name = "attestation")]
 #[allow(non_snake_case)]
 mod service {
+    use async_graphql::connection::Connection;
     use async_graphql::*;
     use psibase::{services::transact, TimePointSec, *};
     use serde::{Deserialize, Serialize};
@@ -27,8 +28,10 @@ mod service {
     #[table(name = "AttestationTable", index = 0)]
     #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
     pub struct Attestation {
-        /// The attesting account / the issuer
         #[primary_key]
+        id: u64,
+
+        /// The attesting account / the issuer
         attester: AccountNumber,
 
         /// The subject (generally also the holder)
@@ -44,14 +47,9 @@ mod service {
 
     impl Attestation {
         #[secondary_key(1)]
-        fn by_id(&self) -> (psibase::TimePointSec, AccountNumber) {
+        fn by_attester(&self) -> (AccountNumber, u64) {
             //, AccountNumber) {
-            (self.issued, self.attester) //, self.subject)
-        }
-        #[secondary_key(2)]
-        fn by_subject(&self) -> (psibase::TimePointSec, AccountNumber) {
-            //, AccountNumber) {
-            (self.issued, self.attester) //, self.subject)
+            (self.attester, self.id) //, self.subject)
         }
     }
 
@@ -59,15 +57,29 @@ mod service {
     struct WebContentTable;
 
     #[action]
-    pub fn attest(vc: crate::VerifiableCredential) -> TimePointSec {
+    pub fn attest(vc: crate::VerifiableCredential) {
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
         // let subject = vc.subject;
         let credentialSubject = vc.credentialSubject.as_str();
 
-        let answer_table = AttestationTable::new();
-        answer_table
+        let attestation_table = AttestationTable::new();
+        let pk_table_idx = attestation_table.get_index_pk();
+        let lastRec = pk_table_idx.iter().last();
+        let last_id = lastRec
+            .unwrap_or(Attestation {
+                id: u64::MAX,
+                attester: AccountNumber::from(""),
+                issued: TimePointSec::from(0),
+                credentialSubject: "".to_string(),
+            })
+            .id;
+        let next_id = last_id + 1;
+
+        // Update lastMessageId
+        attestation_table
             .put(&Attestation {
+                id: next_id,
                 attester,
                 // subject,
                 issued,
@@ -81,8 +93,6 @@ mod service {
             issued,
             String::from(credentialSubject),
         );
-
-        issued
     }
 
     #[event(history)]
@@ -98,16 +108,29 @@ mod service {
 
     #[Object]
     impl Query {
-        async fn attestation(&self, attestedAccount: AccountNumber) -> Option<Attestation> {
-            AttestationTable::new().get_index_pk().get(&attestedAccount)
-        }
-
-        // async fn answers(&self, account: AccountNumber) -> Option<Vec<i32>> {
-        //     let answer_table = AnswerTable::new();
-        //     let tab = answer_table.get_index_pk();
-
-        //     Some(tab.iter().map(|val| val.result).collect())
+        // async fn attestation(&self, attester: AccountNumber) -> Option<Attestation> {
+        // let mytuple: (AccountNumber,) = (attester,);
+        // AttestationTable::new()
+        //     .get_index_by_attester().
+        //     .get(&mytuple)
         // }
+
+        async fn attestations(
+            &self,
+            attester: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
+            TableQuery::subindex::<u64>(AttestationTable::new().get_index_by_attester(), &attester)
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+        }
 
         async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
             get_event(id)
@@ -120,6 +143,7 @@ mod service {
         None.or_else(|| serve_content(&request, &WebContentTable::new()))
             .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
+            .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 
     #[action]
