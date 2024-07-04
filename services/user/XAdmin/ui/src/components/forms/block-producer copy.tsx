@@ -12,19 +12,19 @@ import {
 import { Input } from "../ui/input";
 
 const BlockProducerSchema = z.object({
-    name: z.string().min(2),
+    packages: z.string().array(),
 });
 
 interface Props {
     form: UseFormReturn<z.infer<typeof BlockProducerSchema>>;
 }
 
-export const BlockProducerForm = ({ form }: Props) => (
+export const CreateNetworkConfirmationForm = ({ form }: Props) => (
     <Form {...form}>
         <form className="space-y-6">
             <FormField
                 control={form.control}
-                name="name"
+                name="packages"
                 render={({ field }) => (
                     <FormItem>
                         <FormControl>

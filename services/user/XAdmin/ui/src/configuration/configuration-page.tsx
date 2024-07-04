@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
     RegisterOptions,
     useFieldArray,
@@ -17,7 +17,6 @@ import {
     writeConfig,
     newId,
 } from "./utils";
-import { putJson } from "../helpers";
 import { Logger } from "../log/logger";
 import { Input } from "@/components/ui/input";
 import {
@@ -123,6 +122,7 @@ export const ConfigurationPage = () => {
         loggerName: string,
         field: string,
         options?: RegisterOptions
+        // @ts-expect-error eee
     ) => configForm.register(`loggers.${loggerName}.${field}`, options);
 
     const handleLoggerRemove = (loggerName: string) => {
@@ -301,6 +301,7 @@ export const ConfigurationPage = () => {
                                         register={(name, options) =>
                                             configForm.register(
                                                 `services.${name}`,
+                                                // @ts-expect-error eeej
                                                 options
                                             )
                                         }

@@ -1,61 +1,25 @@
-import { useState, useEffect } from "react";
-import { Controller, useForm, UseFormReturn } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { PsinodeConfig } from "../configuration/interfaces";
-import { putJson } from "../helpers";
-import {
-    getJson,
-    getArrayBuffer,
-    postArrayBuffer,
-    postArrayBufferGetJson,
-} from "@psibase/common-lib";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { getJson } from "@psibase/common-lib";
 import * as wasm from "wasm-psibase";
-import { Progress } from "@/components/ui/progress";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Input } from "@/components/ui/input";
-import {
-    Table,
-    TableBody,
-    TableCaption,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-
 import { useConfig } from "../hooks/useConfig";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
-
-type InstallType = {
-    installType: string;
-};
-type ServicesType = {
-    [key: string]: boolean;
-};
-
-interface PackageRef {
-    name: string;
-    version: string;
-}
-
-interface PackageMeta {
-    name: string;
-    version: string;
-    description: string;
-    depends: PackageRef[];
-    accounts: string[];
-}
-
-interface PackageInfo extends PackageMeta {
-    file: string;
-    sha256: string;
-}
-
-type PackageIndex = PackageInfo[];
+import {
+    BootState,
+    InstallType,
+    PackageInfo,
+    PackageMeta,
+    ProducerType,
+    ServicesType,
+} from "@/types";
+import { ServicesForm } from "@/components/forms/services-form";
+import { InstallForm } from "@/components/forms/install-form";
+import { TypeForm } from "@/components/forms/type-form";
+import { ProducerForm } from "@/components/forms/producer-form";
+import { ProgressStatus } from "@/components/progress-status";
+import { ConfirmationForm } from "@/components/forms/confirmation-form";
+import { z } from "zod";
 
 interface PackageOp {
     Install?: PackageInfo;
@@ -63,485 +27,35 @@ interface PackageOp {
     Remove?: PackageMeta;
 }
 
-interface TypeFormProps {
-    setPackages: (names: string[]) => void;
-    typeForm: UseFormReturn<InstallType>;
-    setCurrentPage: (page: string) => void;
-}
+const DependencySchema = z.object({
+    name: z.string(),
+    version: z.string(),
+});
 
-interface ServicesFormProps {
-    setPackages: (names: string[]) => void;
-    serviceIndex: PackageInfo[];
-    servicesForm: UseFormReturn<ServicesType>;
-    setCurrentPage: (page: string) => void;
-}
+const PackageInfoSchema = z.object({
+    accounts: z.string().array(),
+    depends: z.array(DependencySchema),
+    description: z.string(),
+    file: z.string(),
+    name: z.string(),
+    sha256: z.string(),
+    version: z.string(),
+});
 
-interface ProducerType {
-    producer: string;
-}
+const WrappedPackages = z
+    .object({
+        Install: PackageInfoSchema,
+    })
+    .array();
 
-interface ProducerFormProps {
-    producerForm: UseFormReturn<ProducerType>;
-    typeForm: UseFormReturn<InstallType>;
-    setCurrentPage: (page: string) => void;
-}
-
-interface InnerTrace {
-    ActionTrace?: ActionTrace;
-    ConsoleTrace?: any;
-    EventTrace?: any;
-}
-
-interface Action {
-    sender: string;
-    service: string;
-    method: string;
-    rawData: string;
-}
-
-interface ActionTrace {
-    action: Action;
-    rawRetval: string;
-    innerTraces: { inner: InnerTrace }[];
-    totalTime: number;
-    error?: string;
-}
-
-interface TransactionTrace {
-    actionTraces: ActionTrace[];
-    error?: string;
-}
-
-type BootState =
-    | undefined
-    | [string, number, number]
-    | string
-    | TransactionTrace;
-
-interface InstallFormProps {
-    packages: PackageInfo[];
-    producerForm: UseFormReturn<ProducerType>;
-    config?: PsinodeConfig;
-    refetchConfig: () => void;
-    setCurrentPage: (page: string) => void;
-    setBootState: (state: BootState) => void;
-}
-
-interface BootPageProps {
-    config?: PsinodeConfig;
-    refetchConfig: () => void;
-}
-
-interface ProgressPageProps {
-    state: BootState;
-}
-
-export const TypeForm = ({
-    setPackages,
-    typeForm,
-    setCurrentPage,
-}: TypeFormProps) => {
-    return (
-        <form
-            onSubmit={typeForm.handleSubmit((state) => {
-                if (state.installType == "full") {
-                    setPackages(["Default"]);
-                    setCurrentPage("producer");
-                } else if (state.installType == "custom") {
-                    setCurrentPage("services");
-                }
-            })}
-        >
-            <Controller
-                name="installType"
-                control={typeForm.control}
-                render={({ field }) => (
-                    <RadioGroup
-                        defaultValue={field.value || "full"}
-                        onValueChange={field.onChange}
-                    >
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="full" id="option-one" />
-                            <Label htmlFor="option-one">
-                                Install all services
-                            </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="custom" id="option-two" />
-                            <Label htmlFor="option-two">
-                                Choose services to install
-                            </Label>
-                        </div>
-                    </RadioGroup>
-                )}
-            />
-
-            <Button className="mt-4" type="submit">
-                Next
-            </Button>
-        </form>
-    );
-};
-
-type ParsedVersion = undefined | [number, number, number];
-
-function splitVersion(version: string): ParsedVersion {
-    let result = version.match(/^(\d+).(\d+).(\d+)(?:\+.*)?$/);
-    if (result) {
-        return [+result[0], +result[1], +result[2]];
-    }
-}
-
-function versionLess(lhs: ParsedVersion, rhs: ParsedVersion) {
-    if (lhs && rhs) {
-        for (let i = 0; i < 3; ++i) {
-            if (lhs[i] != rhs[i]) {
-                return lhs[i] < rhs[i];
-            }
-        }
-        return false;
-    }
-    if (rhs) {
-        return true;
-    }
-    return false;
-}
-
-function installedOnly(ops: PackageOp[]): PackageInfo[] {
-    return ops.map((op) => {
-        if (op.Install) {
-            return op.Install;
-        } else {
-            throw Error(`Expected install: ${op}`);
-        }
-    });
-}
-
-export const ServicesForm = ({
-    setPackages,
-    serviceIndex,
-    servicesForm,
-    setCurrentPage,
-}: ServicesFormProps) => {
-    let byname = new Map();
-    for (let info of serviceIndex) {
-        let version = splitVersion(info.version);
-        if (version) {
-            let existing = byname.get(info.name);
-            if (
-                !existing ||
-                versionLess(splitVersion(existing.version), version)
-            ) {
-                byname.set(info.name, info);
-            }
-        }
-    }
-    return (
-        <form
-            onSubmit={servicesForm.handleSubmit((state) => {
-                setPackages(
-                    serviceIndex
-                        .map((meta) => meta.name)
-                        .filter((name) => servicesForm.getValues(name))
-                );
-                setCurrentPage("producer");
-            })}
-        >
-            {[...byname.values()].map((info) => (
-                <Controller
-                    name={info.name}
-                    control={servicesForm.control}
-                    render={({ field }) => (
-                        <div className="flex items-center space-x-2 py-2">
-                            <Checkbox
-                                id={`info-${info.name}`}
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                            />
-                            <Label
-                                htmlFor={`info-${info.name}`}
-                            >{`${info.name}-${info.version}`}</Label>
-                        </div>
-                    )}
-                />
-            ))}
-            <Button
-                className="mt-4"
-                variant="secondary"
-                onClick={() => {
-                    setCurrentPage("type");
-                }}
-            >
-                Back
-            </Button>
-            <Button className="mt-4" type="submit">
-                Next
-            </Button>
-        </form>
-    );
-};
-
-export const ProducerForm = ({
-    producerForm,
-    typeForm,
-    setCurrentPage,
-}: ProducerFormProps) => {
-    return (
-        <>
-            <form onSubmit={() => setCurrentPage("install")}>
-                <div className="grid w-full max-w-sm items-center gap-1.5">
-                    <Label htmlFor="bp-name">Block producer name</Label>
-                    <Input
-                        id="bp-name"
-                        {...producerForm.register("producer", {
-                            required: true,
-                            pattern: /[-a-z0-9]+/,
-                        })}
-                    />
-                </div>
-
-                <Button
-                    className="mt-4 "
-                    variant="secondary"
-                    onClick={() => {
-                        let installType = typeForm.getValues("installType");
-                        if (installType == "full") {
-                            setCurrentPage("type");
-                        } else if (installType == "custom") {
-                            setCurrentPage("services");
-                        }
-                    }}
-                >
-                    Back
-                </Button>
-                <Button
-                    className="mt-4"
-                    type="submit"
-                    disabled={!producerForm.formState.isValid}
-                >
-                    Next
-                </Button>
-            </form>
-        </>
-    );
-};
-
-function getActionStack(trace: ActionTrace): Action[] | undefined {
-    if (trace.error) {
-        for (let atrace of trace.innerTraces) {
-            if (atrace.inner.ActionTrace) {
-                let result = getActionStack(atrace.inner.ActionTrace);
-                if (result) {
-                    return [trace.action, ...result];
-                }
-            }
-        }
-        return [trace.action];
-    }
-}
-
-const getStack = (trace: TransactionTrace) => {
-    for (let atrace of trace.actionTraces) {
-        let stack = getActionStack(atrace);
-        if (stack) {
-            return (
-                <p>
-                    {stack.map((act) => (
-                        <>
-                            {" "}
-                            {`${act.sender} => ${act.service}::${act.method}`}{" "}
-                            <br />
-                        </>
-                    ))}
-                    {trace.error}
-                </p>
-            );
-        }
-    }
-};
-
-async function runBoot(
-    packageInfo: PackageInfo[],
-    producer: string,
-    config: PsinodeConfig | undefined,
-    refetchConfig: () => void,
-    setBootState: (state: BootState) => void
-) {
-    try {
-        // Set producer name
-        if (config && producer !== config.producer) {
-            const result = await putJson("/native/admin/config", {
-                ...config,
-                producer: producer,
-            });
-            if (result.ok) {
-                refetchConfig();
-            } else {
-                setBootState("Failed to set producer name");
-                return;
-            }
-        }
-
-        // fetch packages
-        let packages: ArrayBuffer[] = [];
-        let i = 0;
-        for (let info of packageInfo) {
-            setBootState(["fetch", i, packageInfo.length]);
-            packages.push(await getArrayBuffer(`/packages/${info.file}`));
-            i++;
-        }
-        // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
-        // in a dev environment.
-        let [boot_transactions, transactions] =
-            wasm.js_create_boot_transactions(producer, packages);
-        setBootState(["push", 0, transactions.length + 1]);
-        let trace = await postArrayBufferGetJson(
-            "/native/push_boot",
-            boot_transactions.buffer
-        );
-        if (trace.error) {
-            setBootState(trace);
-            console.error(trace.error);
-            return;
-        }
-        i = 1;
-        for (const t of transactions) {
-            console.log(`Pushing transaction number: ${i}`);
-            setBootState(["push", i, transactions.length + 1]);
-            let trace = await postArrayBufferGetJson(
-                "/native/push_transaction",
-                t.buffer
-            );
-            if (trace.error) {
-                setBootState(trace);
-                console.error(trace.error);
-                return;
-            }
-            i++;
-        }
-        setBootState("Boot successful.");
-    } catch (e) {
-        setBootState("Boot failed.");
-        console.error(e);
-    }
-}
-
-export const InstallForm = ({
-    packages,
-    config,
-    refetchConfig,
-    producerForm,
-    setCurrentPage,
-    setBootState,
-}: InstallFormProps) => {
-    let nameChange = undefined;
-    let actualProducer = producerForm.getValues("producer");
-    if (config && config.producer !== actualProducer) {
-        nameChange = actualProducer;
-    }
-    return (
-        <>
-            {nameChange && (
-                <h4 className="my-3 scroll-m-20 text-xl font-semibold tracking-tight">
-                    <span className="text-muted-foreground">
-                        The block producer name of this node will be set to{" "}
-                    </span>
-                    {nameChange}
-                </h4>
-            )}
-            <ScrollArea className=" h-[800px]">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableCell
-                                colSpan={4}
-                                className="mx-auto bg-primary-foreground text-center"
-                            >
-                                The following packages will be installed
-                            </TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>File</TableHead>
-                            <TableHead className="text-right">
-                                Version
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {packages.map((info) => (
-                            <TableRow key={info.sha256}>
-                                <TableCell>{info.name}</TableCell>
-                                <TableCell>{info.description}</TableCell>
-                                <TableCell>{info.file}</TableCell>
-                                <TableCell className="text-right">
-                                    {info.version}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </ScrollArea>
-            <form
-                className="flex w-full justify-between"
-                onSubmit={() => {
-                    runBoot(
-                        packages,
-                        actualProducer,
-                        config,
-                        refetchConfig,
-                        setBootState
-                    );
-                    setCurrentPage("go");
-                }}
-            >
-                <Button
-                    variant="secondary"
-                    className="mt-4"
-                    onClick={() => setCurrentPage("producer")}
-                >
-                    Back
-                </Button>
-                <Button className="mt-4" type="submit">
-                    Install
-                </Button>
-            </form>
-        </>
-    );
-};
-
-export const ProgressPage = ({ state }: ProgressPageProps) => {
-    if (state === undefined) {
-        return <>Preparing to install</>;
-    } else if (typeof state === "string") {
-        return <>{state}</>;
-    } else if ("actionTraces" in state) {
-        return <>Boot failed: {getStack(state)}</>;
-    } else if (state[0] == "fetch" || state[0] == "push") {
-        const percent = Math.floor((state[1] / state[2]) * 100);
-        return (
-            <div>
-                <Progress value={percent} />
-                <div>
-                    {state[0] == "fetch"
-                        ? "Fetching packages"
-                        : "Pushing transactions"}{" "}
-                </div>
-            </div>
-        );
-    } else {
-        console.error(state);
-        return <p>Unexpected boot state</p>;
-    }
-};
+type PackageInfoShape = z.infer<typeof PackageInfoSchema>;
 
 export const BootPage = () => {
     const { data: config, refetch: refetchConfig } = useConfig();
 
     const [bootState, setBootState] = useState<BootState>();
 
-    const { data: serviceIndex } = useQuery<PackageIndex>({
+    const { data: availablePackages } = useQuery<PackageInfo[]>({
         queryKey: queryKeys.packages,
         queryFn: () => getJson("/packages/index.json"),
         initialData: [],
@@ -557,15 +71,27 @@ export const BootPage = () => {
 
     const [currentPage, setCurrentPage] = useState<string>("type");
 
-    let [packagesToInstall, setPackagesToInstall] = useState<PackageInfo[]>();
+    const [packagesToInstall, setPackagesToInstall] = useState<PackageInfo[]>(
+        []
+    );
 
-    let resolvePackages = (names: string[]) => {
-        console.log(names);
-        setPackagesToInstall(
-            installedOnly(wasm.js_resolve_packages(serviceIndex, names, []))
-        );
+    const resolvePackages = (packageNamesRequeted: string[]) => {
+        const fullDependencies = WrappedPackages.parse(
+            wasm.js_resolve_packages(
+                availablePackages,
+                packageNamesRequeted,
+                []
+            )
+        ).map((x) => x.Install);
+
+        console.log({
+            in: packageNamesRequeted,
+            resolvedPackages: fullDependencies,
+        });
+        setPackagesToInstall(fullDependencies);
     };
 
+    // return <ConfirmationForm packages={packagesToInstall} />;
     if (currentPage == "type") {
         return (
             <TypeForm
@@ -578,7 +104,7 @@ export const BootPage = () => {
         return (
             <ServicesForm
                 setPackages={resolvePackages}
-                serviceIndex={serviceIndex}
+                serviceIndex={availablePackages}
                 servicesForm={servicesForm}
                 setCurrentPage={setCurrentPage}
             />
@@ -603,6 +129,6 @@ export const BootPage = () => {
             />
         );
     } else if (currentPage == "go") {
-        return <ProgressPage state={bootState} />;
+        return <ProgressStatus state={bootState} />;
     }
 };

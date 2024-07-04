@@ -8,28 +8,34 @@ import {
     ChevronFirst,
 } from "lucide-react";
 import { SetupWrapper } from "./setup-wrapper";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+    ChainTypeForm,
+    chainTypeSchema,
+} from "@/components/forms/chain-mode-form";
+import { BlockProducerForm } from "@/components/forms/block-producer";
+import { ConfirmationForm } from "@/components/forms/confirmation-form";
 
-const useStepper = (numberOfSteps: number, forms: UseFormReturn<any>[]) => {
+import { usePackages } from "../hooks/usePackages";
+
+const useStepper = (
+    numberOfSteps: number,
+    formsOrFunctions: (UseFormReturn<any> | string)[]
+) => {
     const [currentStep, setStep] = useState(1);
     const canNext = currentStep < numberOfSteps;
     const canPrev = currentStep > 1;
 
     const next = async () => {
         if (canNext) {
-            const res = await forms[currentStep - 1].trigger();
-            if (res) {
+            const currentChecker = formsOrFunctions[currentStep - 1];
+            const isPassable =
+                typeof currentChecker == "string"
+                    ? !!currentChecker
+                    : await currentChecker.trigger();
+            if (isPassable) {
                 setStep((step) => (canNext ? step + 1 : step));
             }
         }
@@ -132,72 +138,6 @@ const PortsSchema = z.object({
     ports: z.string().min(4),
 });
 
-type BlockProducerShape = z.infer<typeof BlockProducerSchema>;
-type PortsShape = z.infer<typeof PortsSchema>;
-
-interface Props {
-    form: UseFormReturn<BlockProducerShape>;
-}
-
-const defaultValues = {
-    name: "",
-};
-
-export const BlockProducerForm = ({ form }: Props) => (
-    <Form {...form}>
-        <form className="space-y-6">
-            <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormControl>
-                            <Input
-                                placeholder="Block producer name"
-                                {...field}
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-        </form>
-    </Form>
-);
-
-export const PortsForm = ({
-    form,
-    onSubmit,
-}: {
-    form: UseFormReturn<PortsShape>;
-    onSubmit?: (data: PortsShape) => void;
-}) => (
-    <Form {...form}>
-        <form
-            onSubmit={onSubmit ? form.handleSubmit(onSubmit) : undefined}
-            className="space-y-6"
-        >
-            <FormField
-                control={form.control}
-                name="ports"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormControl>
-                            <Input placeholder="Ports name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            {onSubmit && (
-                <div className="flex w-full flex-row-reverse">
-                    <Button type="submit">Submit</Button>
-                </div>
-            )}
-        </form>
-    </Form>
-);
-
 export const CreatePage = () => {
     const blockProducerForm = useForm<z.infer<typeof BlockProducerSchema>>({
         resolver: zodResolver(BlockProducerSchema),
@@ -206,15 +146,17 @@ export const CreatePage = () => {
         },
     });
 
-    const portsForm = useForm<z.infer<typeof PortsSchema>>({
-        resolver: zodResolver(PortsSchema),
-        defaultValues: {
-            ports: "",
-        },
+    const chainTypeForm = useForm<z.infer<typeof chainTypeSchema>>({
+        resolver: zodResolver(chainTypeSchema),
     });
 
     const { canNext, canPrev, next, previous, currentStep, maxSteps } =
-        useStepper(4, [blockProducerForm, portsForm]);
+        useStepper(4, [chainTypeForm, blockProducerForm]);
+
+    const { data: packages } = usePackages();
+
+    // track what packages we've got, update;
+    // provide array of packages to the confirmation page.
 
     return (
         <SetupWrapper>
@@ -223,18 +165,25 @@ export const CreatePage = () => {
                     <Steps currentStep={currentStep} numberOfSteps={maxSteps} />
                     {currentStep == 1 && (
                         <div>
-                            <BlockProducerForm form={blockProducerForm} />
+                            <ChainTypeForm form={chainTypeForm} />
                         </div>
                     )}
                     {currentStep == 2 && (
                         <div>
-                            <PortsForm
-                                onSubmit={(e) => console.log(e)}
-                                form={portsForm}
+                            <BlockProducerForm form={blockProducerForm} />
+                        </div>
+                    )}
+                    {currentStep == 3 && (
+                        <div>
+                            <ConfirmationForm
+                                rowSelection={{}}
+                                onRowSelect={(e) => {
+                                    console.log(e, "came out");
+                                }}
+                                packages={packages}
                             />
                         </div>
                     )}
-                    {currentStep == 3 && <div>Step 3</div>}
                     {currentStep == 4 && <div>Step 4</div>}
                     <PrevNextButtons
                         canNext={canNext}
