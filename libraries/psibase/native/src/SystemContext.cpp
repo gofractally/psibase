@@ -1,4 +1,5 @@
 #include <psibase/ActionContext.hpp>
+#include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 
 #include <mutex>
@@ -13,6 +14,7 @@ namespace psibase
       WasmCache                                   wasmCache;
       std::vector<std::unique_ptr<SystemContext>> systemContextCache;
       std::shared_ptr<WatchdogManager>            watchdogManager;
+      std::shared_ptr<Sockets>                    sockets;
 
       // TODO: This assumes that systemContexts are always returned to the cache
       std::vector<SystemContext*> allSystemContexts;
@@ -20,7 +22,8 @@ namespace psibase
       SharedStateImpl(SharedDatabase db, WasmCache wasmCache)
           : db{std::move(db)},
             wasmCache{std::move(wasmCache)},
-            watchdogManager(std::make_shared<WatchdogManager>())
+            watchdogManager(std::make_shared<WatchdogManager>()),
+            sockets(std::make_shared<Sockets>())
       {
       }
    };
@@ -82,7 +85,7 @@ namespace psibase
       if (impl->systemContextCache.empty())
       {
          auto result = std::make_unique<SystemContext>(
-             SystemContext{impl->db, impl->wasmCache, {}, impl->watchdogManager});
+             SystemContext{impl->db, impl->wasmCache, {}, impl->watchdogManager, impl->sockets});
          impl->allSystemContexts.push_back(result.get());
          return result;
       }

@@ -28,10 +28,10 @@ def generate_names(n):
     letters = 'abcdefghijklmnopqrstuvwxyz'
     return list(letters[0:n])
 
-def boot_with_producers(nodes, algorithm=None, timeout=10):
+def boot_with_producers(nodes, algorithm=None, timeout=10, packages=[]):
     p = nodes[0]
     print("booting chain")
-    p.boot()
+    p.boot(packages=packages)
     print("setting producers")
     p.set_producers(nodes, algorithm)
     p.wait(predicates.producers_are(nodes), timeout=timeout)

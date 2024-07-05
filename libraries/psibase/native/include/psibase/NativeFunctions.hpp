@@ -57,5 +57,7 @@ namespace psibase
       void checkoutSubjective();
       bool commitSubjective();
       void abortSubjective();
+
+      int32_t socketSend(int32_t fd, eosio::vm::span<const char> msg);
    };  // NativeFunctions
 }  // namespace psibase

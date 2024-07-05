@@ -38,13 +38,12 @@ std::optional<SignedTransaction> SystemService::TransactionQueue::next()
    __builtin_unreachable();
 }
 
-std::optional<psibase::HttpReply> TransactionQueue::serveSys(const psibase::HttpRequest& request)
+namespace
 {
-   if (request.method == "POST" && request.target == "/push_transaction")
+   using Subjective = TransactionQueue::Subjective;
+   bool pushTransaction(std::span<const char> data)
    {
-      if (request.contentType != "application/octet-stream")
-         abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
-      auto trx = psio::from_frac<SignedTransaction>(request.body);
+      auto trx = psio::from_frac<SignedTransaction>(data);
 
       auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
       PSIBASE_SUBJECTIVE_TX
@@ -67,6 +66,24 @@ std::optional<psibase::HttpReply> TransactionQueue::serveSys(const psibase::Http
                       .sequence   = sequence});
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
       }
+      return true;
+   }
+}  // namespace
+
+void TransactionQueue::recv(int socket, const std::vector<char>& data)
+{
+   pushTransaction(data);
+}
+
+std::optional<psibase::HttpReply> TransactionQueue::serveSys(const psibase::HttpRequest& request)
+{
+   if (request.method == "POST" && request.target == "/push_transaction")
+   {
+      if (request.contentType != "application/octet-stream")
+         abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
+      auto trx = psio::from_frac<SignedTransaction>(request.body);
+      if (pushTransaction(request.body))
+         socketSend(producer_multicast, request.body);
       return HttpReply{.contentType = "application/json", .body = std::vector{'t', 'r', 'u', 'e'}};
    }
    return {};

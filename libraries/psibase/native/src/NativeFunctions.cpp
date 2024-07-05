@@ -1,6 +1,7 @@
 #include <psibase/NativeFunctions.hpp>
 
 #include <psibase/ActionContext.hpp>
+#include <psibase/Socket.hpp>
 
 namespace psibase
 {
@@ -649,4 +650,11 @@ namespace psibase
    {
       database.abortSubjective();
    }
+
+   int32_t NativeFunctions::socketSend(int32_t fd, eosio::vm::span<const char> msg)
+   {
+      check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
+      return transactionContext.blockContext.systemContext.sockets->send(fd, msg);
+   }
+
 }  // namespace psibase

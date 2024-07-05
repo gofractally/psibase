@@ -168,6 +168,9 @@ namespace psibase
       /// the subjective database
       PSIBASE_NATIVE(abortSubjective) void abortSubjective();
 
+      /// Send a message to a socket
+      PSIBASE_NATIVE(socketSend)
+      std::int32_t socketSend(std::int32_t fd, const void* data, std::size_t size);
    }  // namespace raw
 
    /// Get result
@@ -600,6 +603,17 @@ namespace psibase
    /// subjective database.
 #define PSIBASE_SUBJECTIVE_TX \
    for (::psibase::SubjectiveTransaction _psibase_s_tx; !_psibase_s_tx.done; _psibase_s_tx.commit())
+
+   inline int socketSend(int fd, std::span<const char> data)
+   {
+      if (auto err = raw::socketSend(fd, data.data(), data.size()))
+      {
+         errno = err;
+         return -1;
+      }
+      return 0;
+   }
+   static constexpr int producer_multicast = 0;
 
 }  // namespace psibase
 

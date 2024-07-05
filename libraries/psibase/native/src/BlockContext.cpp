@@ -405,6 +405,16 @@ namespace psibase
       session.commit();
    }
 
+   void BlockContext::execAsyncAction(Action&& action)
+   {
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      auto&              atrace = trace.actionTraces.emplace_back();
+      TransactionContext tc{*this, trx, trace, true, false, true};
+
+      tc.execNonTrxAction(0, action, atrace);
+   }
+
    // TODO: call callStartBlock() here? caller's responsibility?
    // TODO: caller needs to verify proofs
    void BlockContext::execAllInBlock()

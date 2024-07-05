@@ -5,6 +5,7 @@
 #include <iostream>
 #include <psibase/BlockContext.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/Socket.hpp>
 #include <psibase/VerifyProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
@@ -1228,6 +1229,28 @@ namespace psibase
          }
          return result;
       }
+
+      void recvMessage(const Socket& sock, const std::vector<char>& data)
+      {
+         // TODO: handle receiver more generically
+         Action action{.service = AccountNumber{"txqueue"},
+                       .method  = MethodNumber{"recv"},
+                       .rawData = psio::to_frac(std::tuple(sock.id, data))};
+
+         // TODO: This can run concurrently
+         BlockContext bc{*systemContext, systemContext->sharedDatabase.getHead(),
+                         systemContext->sharedDatabase.createWriter(), true};
+         try
+         {
+            bc.execAsyncAction(std::move(action));
+         }
+         catch (std::exception& e)
+         {
+            PSIBASE_LOG(bc.trxLogger, warning) << "failed txqueue::recv: " << e.what();
+         }
+      }
+
+      void addSocket(const std::shared_ptr<Socket>& sock) { systemContext->sockets->add(sock); }
 
       std::vector<char> getBlockProof(ConstRevisionPtr revision, BlockNum blockNum)
       {

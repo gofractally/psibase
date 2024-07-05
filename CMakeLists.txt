@@ -562,7 +562,7 @@ psibase_package(
     DESCRIPTION "Subjective service that manages transactions"
     SERVICE txqueue
         WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionQueue.wasm
-        FLAGS isSubjective allowWriteSubjective
+        FLAGS isSubjective allowWriteSubjective allowSocket
         SERVER txqueue
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
