@@ -51,7 +51,6 @@ const services = [{
 }
 ];
 
-// Supervisor.connect(...) will internally create a uuid to represent the client session
 const supervisor = await Supervisor.connect(options: {
     services   // optional: for, e.g., preloading. the <wasm filename>.wasm
     // if not provided, Supervisor will load the wasm specified in supervisor.call()
@@ -93,9 +92,7 @@ This hierarchy of apps ensures all apps can verify the source/destination of the
 '-------------------------------------------'
 ```
 
-When App1 instantiates the Supervisor, Supervisor is embedded in a hidden iframe.
-The Supervisor, in turn, embeds another iframe that contains `app2`'s plugin.
-Finally, Supervisor mediates the call from app1 to app2's plugin (as well as a return value).
+App1 instantiates the Supervisor in a hidden iframe. The Supervisor mediates the calls and returns between plugins.
 
 ```svgbob
 .------------------------------------------------------------------------------------.
@@ -107,19 +104,17 @@ Finally, Supervisor mediates the call from app1 to app2's plugin (as well as a r
 |   |-----------------------------------------------------------------------------|  |
 |  <-->                                                                           |  |
 |   |   .----------------------------------------------------------------------.  |  |
-|   |   | [hidden] iframe.src = https://app2.psibase.tld/common/wasm-loader    |  |  |
+|   |   | App2 Plugin                                                          |  |  |
 |   |   |----------------------------------------------------------------------|  |  |
 |   |  <-->                                                                    |  |  |
-|   |   |    wasm-loader loads plugin for the requested app                    |  |  |
-|   |   |    Plugin: https://app2.psibase.tld/plugin.wasm                      |  |  |
+|   |   |    Source: https://app2.psibase.tld/plugin.wasm                      |  |  |
 |   |   |                                                                      |  |  |
 |   |   '----------------------------------------------------------------------'  |  |
 |   |                                                                             |  |
 |   |   .----------------------------------------------------------------------.  |  |
-|   |   | [hidden] iframe.src = https://app3.psibase.tld/common/wasm-loader    |  |  |
+|   |   | App3 Plugin                                                          |  |  |
 |   |   |----------------------------------------------------------------------|  |  |
 |   |  <-->                                                                    |  |  |
-|   |   |    wasm-loader loads plugin for the requested app                    |  |  |
 |   |   |    Plugin: https://app3.psibase.io/plugin.wasm                       |  |  |
 |   |   |                                                                      |  |  |
 |   |   '----------------------------------------------------------------------'  |  |
@@ -128,10 +123,6 @@ Finally, Supervisor mediates the call from app1 to app2's plugin (as well as a r
 |                                                                                    |
 '------------------------------------------------------------------------------------'
 ```
-
-For example, if `app1.psibase` is requested from a psibase infrastructure provider, then the document stored at the root path in that service is returned to the client. That UI element is the root page of the psibase app, which will then request the supervisor from its domain on the server. After the supervisor loads, the psibase app can call into the supervisor in order to execute functionality defined in app2's plugin.
-
-> ⚠️ For security, plugins should only listen for messages from the supervisor (identified by its domain). Otherwise, an attacker app could instantiate the victim app within its own iframe and impersonate the supervisor.
 
 #### Supervisor initialization
 
