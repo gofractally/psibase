@@ -237,7 +237,6 @@ set(JS_DIRS
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
-set(COMMON_LOADER_DIR services/user/CommonApi/common/packages/wasm-loader/:CommonApiLoaderLib_js)
 set(SUPERVISOR_LIB_DIR services/user/Supervisor/lib/:SupervisorLib_js)
 
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
@@ -267,7 +266,6 @@ file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/servic
 # Builds the Common files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
 add_js_target(${SUPERVISOR_LIB_DIR} supervisor-lib.js ${CommonApiCommonLib_js_DEP})
-add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP} ${SupervisorLib_js_DEP})
 
 # Build each UI
 # Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
@@ -428,7 +426,6 @@ psibase_package(
     SERVICE common-api
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
         SERVER common-api
-        DATA GLOB ${COMMON_API}/common/packages/wasm-loader/dist/*            common/wasm-loader/
         DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
         DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
         DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
@@ -437,7 +434,6 @@ psibase_package(
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
     DEPENDS ${CommonApi_js_DEP}
     DEPENDS ${CommonApiCommonLib_js_DEP}
-    DEPENDS ${CommonApiLoaderLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
