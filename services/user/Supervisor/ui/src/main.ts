@@ -5,13 +5,13 @@ import {
     isPreLoadPluginsRequest,
 } from "@psibase/common-lib/messaging";
 
-import { Supervisor } from "./Supervisor";
-import { AppInterface } from "./AppInterace";
+import { Supervisor } from "./supervisor";
+import { AppInterface } from "./appInterace";
 import {
     CallHandler,
     addCallHandler,
     registerCallHandlers,
-} from "./WindowMessaging";
+} from "./windowMessaging";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div>
@@ -31,12 +31,14 @@ const shouldHandleMessage = (message: MessageEvent) => {
     return isTop && isParent && isSameRootDomain;
 };
 
+
+// When the supervisor is first loaded, all it does is register some handlers for 
+//   calls from the parent window, and also tells the parent window that it's ready.
 addCallHandler(callHandlers, isFunctionCallRequest, (msg) =>
-    supervisor.call(msg.origin, msg.data),
+    supervisor.entry(msg.origin, msg.data.args),
 );
 addCallHandler(callHandlers, isPreLoadPluginsRequest, (msg) =>
-    supervisor.preloadPlugins(msg.origin, msg.data),
+    supervisor.preloadPlugins(msg.origin, msg.data.payload.plugins),
 );
 registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
-
 window.parent.postMessage(buildMessageSupervisorInitialized(), "*");

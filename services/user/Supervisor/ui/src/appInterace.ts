@@ -1,14 +1,14 @@
 import {
-    FunctionCallRequest,
-    PreLoadPluginsRequest,
+    QualifiedFunctionCallArgs,
+    QualifiedPluginId,
 } from "@psibase/common-lib";
 
 // This is the part of the supervisor interface exposed to front-end apps
 export interface AppInterface {
     preloadPlugins: (
         callerOrigin: string,
-        request: PreLoadPluginsRequest,
+        plugins: QualifiedPluginId[]
     ) => void;
 
-    call: (callerOrigin: string, request: FunctionCallRequest) => void;
+    entry: (callerOrigin: string, args: QualifiedFunctionCallArgs) => void;
 }
