@@ -24,6 +24,7 @@ mod service {
     use async_graphql::*;
     use psibase::{services::transact, TimePointSec, *};
     use serde::{Deserialize, Serialize};
+    use services::transact::auth_interface::FIRST_AUTH_FLAG;
 
     #[table(name = "AttestationTable", index = 0)]
     #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
@@ -58,6 +59,7 @@ mod service {
 
     #[action]
     pub fn attest(vc: crate::VerifiableCredential) {
+        psibase::write_console("Attestation[service].attest()");
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
         // let subject = vc.subject;
@@ -108,11 +110,60 @@ mod service {
 
     #[Object]
     impl Query {
-        // async fn attestation(&self, attester: AccountNumber) -> Option<Attestation> {
-        // let mytuple: (AccountNumber,) = (attester,);
-        // AttestationTable::new()
-        //     .get_index_by_attester().
-        //     .get(&mytuple)
+        // async fn attestation(
+        //     &self,
+        //     n: usize,
+        //     attester: AccountNumber,
+        //     // ) -> async_graphql::Result<Vec<Attestation>, async_graphql::Error> {
+        // ) -> Vec<Attestation> {
+        //     // let mytuple: (AccountNumber,) = (attester,);
+        //     // AttestationTable::new()
+        //     //     .get_index_by_attester()
+        //     //     .get(&mytuple)
+
+        //     // TableQuery::subindex::<u64>(AttestationTable::new().get_index_by_attester(), &attester)
+        //     //     .first(Some(1))
+
+        //     // AttestationTable::new()
+        //     //     .get_index_by_attester()
+        //     //     .iter()
+        //     //     .take(n)
+        //     //     .collect::<Vec<Attestation>>()
+
+        //     // .query()
+        //     // .await
+
+        //     write_console("Query.attestation()");
+
+        //     // works
+        //     let obj1 = AttestationTable::new().get_index_pk();
+        //     // .iter().take(1);
+        //     // not works
+        //     let obj2 = AttestationTable::new()
+        //         .get_index_by_attester()
+        //         .iter()
+        //         .take(1)
+        //         .collect();
+        //     // works
+        //     let obj3 = TableQuery::subindex::<u64>(
+        //         AttestationTable::new().get_index_by_attester(),
+        //         &attester,
+        //     );
+        //     // .iter()
+        //     // .take(1);
+
+        //     AttestationTable::new()
+        //         .get_index_pk()
+        //         .iter()
+        //         .take(1)
+        //         .collect()
+
+        //     // let first_attestation: Vec<Attestation> = AttestationTable::new()
+        //     //     .get_index_by_attester()
+        //     //     .iter()
+        //     //     .take(1)
+        //     //     .collect();
+        //     // first_attestation[0].clone()
         // }
 
         async fn attestations(
@@ -123,6 +174,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
+            write_console("Query.attestations()");
             TableQuery::subindex::<u64>(AttestationTable::new().get_index_by_attester(), &attester)
                 .first(first)
                 .last(last)

@@ -18,17 +18,18 @@ struct AttestationPlugin;
 
 impl Guest for AttestationPlugin {
     fn attest(attestation_type: String, claim: String) -> Result<(), CommonTypes::Error> {
+        psibase::write_console("Attestation.attest()");
         #[derive(Serialize, Deserialize)]
         struct CredentialSubject {
             subject: String,
-            attestationType: String,
+            attestation_type: String,
             score: f32,
         }
         let mut claim_as_obj: CredentialSubject =
             serde_json::from_str(claim.as_str()).expect("Failed to parse claim");
         let calling_app = CommonClient::get_sender_app().ok().unwrap().app.unwrap();
         // namespace the attestation type with the calling app's name so different apps can use common names for types and not confliect
-        claim_as_obj.attestationType = calling_app + claim_as_obj.attestationType.as_str();
+        claim_as_obj.attestation_type = calling_app + claim_as_obj.attestation_type.as_str();
         let packed_a = attestation::action_structs::attest {
             vc: attestation::VerifiableCredential {
                 // subject: AccountNumber::from_exact(subject.as_str())

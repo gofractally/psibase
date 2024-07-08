@@ -13,7 +13,9 @@ interface Invite {
   callback: string;
 }
 
-const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({ onLoad }) => {
+const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({
+  onLoad,
+}) => {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files ? event.target.files[0] : null;
 
@@ -27,12 +29,8 @@ const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({ onLoad 
     }
   };
 
-  return (
-    <input type="file" accept=".pem" onChange={handleFileChange} />
-  );
+  return <input type="file" accept=".pem" onChange={handleFileChange} />;
 };
-
-
 
 function App() {
   const [res, setRes] = useState("Empty");
@@ -44,6 +42,7 @@ function App() {
       { service: "accounts" },
       { service: "auth-sig" },
       { service: "demoapp1" },
+      { service: "identity" },
     ]);
   };
 
@@ -160,9 +159,7 @@ function App() {
         method: "generateUnmanagedKeypair",
         params: [],
       });
-      console.log(
-        `Decoded response: ${JSON.stringify(res, null, 2)}`
-      );
+      console.log(`Decoded response: ${JSON.stringify(res, null, 2)}`);
       setRes(`Keypair written to console`);
     } catch (e) {
       if (e instanceof Error) {
@@ -181,9 +178,7 @@ function App() {
         method: "setKey",
         params: [c],
       });
-      console.log(
-        `Decoded response: ${JSON.stringify(res, null, 2)}`
-      );
+      console.log(`Decoded response: ${JSON.stringify(res, null, 2)}`);
       setRes(`Res: ${res}`);
     } catch (e) {
       if (e instanceof Error) {
@@ -194,15 +189,76 @@ function App() {
     }
   };
 
-
   const [a, setA] = useState("");
   const [b, setB] = useState("");
   const [c, setC] = useState("");
   const [answer, setAnswer] = useState("?");
 
+  const [claim, setClaim] = useState<number>(0.0);
+  const [attestationClaim, setAttestationClaim] = useState<string>("");
+
+  const attestIdentity = async () => {
+    try {
+      console.info("attest().calling identity.api.attest()");
+      const res = await supervisor.functionCall({
+        service: "identity",
+        intf: "api",
+        method: "attest",
+        params: ["bob", claim],
+      });
+      console.info("returned from Identity.api.attest()");
+      setRes(res as string);
+      console.info("Res:", res);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+  };
+  const attestAttestation = async () => {
+    try {
+      console.info("attest().calling identity.api.attest()");
+      const res = await supervisor.functionCall({
+        service: "attestation",
+        intf: "api",
+        method: "attest",
+        params: ["not identity", attestationClaim],
+      });
+      console.info("returned from Attestation.api.attest()");
+      setRes(res as string);
+      console.info("Res:", res);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+  };
   return (
     <>
       <h1>Psibase Demo App 1</h1>
+      <h3>Attestation</h3>
+      <div>
+        <h4>Identity Claim:</h4>
+        <input
+          id="claim"
+          type="text"
+          onChange={(e) => {
+            if (!/^[0-9.]*$/.test(e.target.value)) {
+              e.preventDefault();
+            } else {
+              setClaim(parseFloat(e.target.value));
+            }
+          }}
+        />
+        <button onClick={attestIdentity}> Attest </button>
+      </div>
+      <div>
+        <h4>Attestation Claim:</h4>
+        <input
+          id="attestation-claim"
+          type="text"
+          onChange={(e) => {
+            setAttestationClaim(e.target.value);
+          }}
+        />
+        <button onClick={attestAttestation}> Attest </button>
+      </div>
       <h3>{res}</h3>
       <div className="card">
         <button onClick={() => run()}>
