@@ -85,7 +85,7 @@ namespace SystemService
    {
       auto act = getCurrentAction();
       // TODO: use a view
-      auto req = psio::from_frac<HttpRequest>(act.rawData);
+      auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
 
       std::string serviceName;
 
@@ -124,7 +124,7 @@ namespace SystemService
          }
       }
 
-      setRetval(result);
+      socketSend(sock, psio::to_frac(result));
    }  // serve()
 
 }  // namespace SystemService

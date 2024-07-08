@@ -6,6 +6,7 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include "psibase/http.hpp"
+#include "psibase/Socket.hpp"
 #include "psibase/TransactionContext.hpp"
 #include "psibase/log.hpp"
 #include "psibase/serviceEntry.hpp"
@@ -463,6 +464,85 @@ namespace psibase::http
       return std::vector(s.begin(), s.end());
    }
 
+   struct QueryTimes
+   {
+      std::chrono::microseconds             packTime;
+      std::chrono::microseconds             serviceLoadTime;
+      std::chrono::microseconds             databaseTime;
+      std::chrono::microseconds             wasmExecTime;
+      std::chrono::steady_clock::time_point startTime;
+   };
+
+   template <typename Session, typename F>
+   struct HttpSocket : Socket, std::enable_shared_from_this<HttpSocket<Session, F>>
+   {
+      explicit HttpSocket(std::shared_ptr<Session>&& session, F&& f)
+          : session(std::move(session)), callback(std::forward<F>(f))
+      {
+         this->session->queue_.pause_read = true;
+      }
+      void close()
+      {
+         if (auto socks = sockets.lock())
+            socks->remove(this->shared_from_this());
+         sockets.reset();
+         session->queue_.pause_read = false;
+         session.reset();
+      }
+      void send(std::span<const char> data) override
+      {
+         auto  result = psio::from_frac<std::optional<HttpReply>>(data);
+         auto* p      = session.get();
+         net::post(
+             p->derived_session().stream.get_executor(),
+             [self   = this->shared_from_this(),
+              result = static_cast<decltype(result)>(result)]() mutable
+             {
+                auto session = std::move(self->session);
+                if (!session)
+                   return;
+                if (auto sockets = self->sockets.lock())
+                   sockets->remove(self);
+                auto& trace                = self->trace;
+                auto& queryTimes           = self->queryTimes;
+                session->queue_.pause_read = false;
+                {
+                   auto endTime = steady_clock::now();
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "Trace", std::move(trace));
+
+                   // TODO: consider bundling into a single attribute
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "PackTime", queryTimes.packTime);
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "ServiceLoadTime",
+                                               queryTimes.serviceLoadTime);
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "DatabaseTime",
+                                               queryTimes.databaseTime);
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "WasmExecTime",
+                                               queryTimes.wasmExecTime);
+                   BOOST_LOG_SCOPED_LOGGER_TAG(
+                       session->logger, "ResponseTime",
+                       std::chrono::duration_cast<std::chrono::microseconds>(endTime -
+                                                                             queryTimes.startTime));
+                   session->queue_(self->callback(std::move(result)));
+                }
+                if (session->queue_.can_read())
+                   session->do_read();
+             });
+      }
+      std::shared_ptr<Session> session;
+      F                        callback;
+      TransactionTrace         trace;
+      QueryTimes               queryTimes;
+      std::weak_ptr<Sockets>   sockets;
+   };
+
+   template <typename Send, typename F>
+   auto makeHttpSocket(Send& send, F&& f)
+   {
+      return std::make_shared<
+          HttpSocket<std::remove_reference_t<decltype(send.self)>, std::decay_t<F>>>(
+          send.self.derived_session().shared_from_this(), std::forward<F>(f));
+   }
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -813,8 +893,32 @@ namespace psibase::http
             // Do not use any reconfigurable members of server.http_config after this point
             l.unlock();
 
+            auto socket =
+                makeHttpSocket(send,
+                               [ok, not_found](std::optional<HttpReply>&& reply)
+                               {
+                                  if (reply)
+                                     return ok(std::move(reply->body), reply->contentType.c_str(),
+                                               &reply->headers);
+                                  else
+                                     // TODO: remember target. This won't be needed if we allow wasm
+                                     // to return a specific response code.
+                                     return not_found("/whatever/the/target/is");
+                               });
+
             // TODO: time limit
-            auto          system = server.sharedState->getSystemContext();
+            auto system = server.sharedState->getSystemContext();
+
+            system->sockets->add(socket);
+            socket->sockets = system->sockets;
+
+            bool          success = false;
+            psio::finally sockGuard{[&]
+                                    {
+                                       if (!success)
+                                          socket->close();
+                                    }};
+
             psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
@@ -826,7 +930,7 @@ namespace psibase::http
             Action            action{
                            .sender  = AccountNumber(),
                            .service = proxyServiceNum,
-                           .rawData = psio::convert_to_frac(data),
+                           .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
             };
             TransactionTrace   trace;
             TransactionContext tc{bc, trx, trace, true, false, true};
@@ -834,33 +938,22 @@ namespace psibase::http
             auto               startExecTime = steady_clock::now();
             tc.execServe(action, atrace);
             auto endExecTime = steady_clock::now();
-            // TODO: option to print this
-            // printf("%s\n", prettyTrace(atrace).c_str());
-            auto result  = psio::from_frac<std::optional<HttpReply>>(atrace.rawRetval);
-            auto endTime = steady_clock::now();
 
             trace.actionTraces.push_back(std::move(atrace));
-            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "Trace", std::move(trace));
+            socket->trace = std::move(trace);
 
-            // TODO: consider bundling into a single attribute
-            BOOST_LOG_SCOPED_LOGGER_TAG(
-                send.self.logger, "PackTime",
-                std::chrono::duration_cast<std::chrono::microseconds>(startExecTime - startTime));
-            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "ServiceLoadTime",
-                                        std::chrono::duration_cast<std::chrono::microseconds>(
-                                            endExecTime - startExecTime - tc.getBillableTime()));
-            BOOST_LOG_SCOPED_LOGGER_TAG(
-                send.self.logger, "DatabaseTime",
-                std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime));
-            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "WasmExecTime",
-                                        std::chrono::duration_cast<std::chrono::microseconds>(
-                                            tc.getBillableTime() - tc.databaseTime));
-            BOOST_LOG_SCOPED_LOGGER_TAG(
-                send.self.logger, "ResponseTime",
-                std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime));
-            if (!result)
-               return send(not_found(req.target()));
-            return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
+            socket->queryTimes.packTime =
+                std::chrono::duration_cast<std::chrono::microseconds>(startExecTime - startTime);
+            socket->queryTimes.serviceLoadTime =
+                std::chrono::duration_cast<std::chrono::microseconds>(endExecTime - startExecTime -
+                                                                      tc.getBillableTime());
+            socket->queryTimes.databaseTime =
+                std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
+            socket->queryTimes.wasmExecTime = std::chrono::duration_cast<std::chrono::microseconds>(
+                tc.getBillableTime() - tc.databaseTime);
+            socket->queryTimes.startTime = startTime;
+
+            success = true;
          }  // !native
          else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
          {
