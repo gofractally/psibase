@@ -7,12 +7,17 @@ import time
 import math
 import os
 import shutil
+import requests
 
 def psinode_test(f):
     def result(self):
         with Cluster(executable=args.psinode, log_filter=args.log_filter, log_format=args.log_format, database_cache_size=256*1024*1024) as cluster:
             try:
-                f(self, cluster)
+                try:
+                    f(self, cluster)
+                except requests.exceptions.HTTPError as e:
+                    print(e.response.text)
+                    raise
             except:
                 for node in cluster.nodes.values():
                     node.print_log()
