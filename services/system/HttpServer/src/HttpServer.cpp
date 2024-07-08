@@ -3,6 +3,7 @@
 #include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/HttpServer.hpp>
+#include <services/system/TransactionQueue.hpp>
 #include "services/system/Accounts.hpp"
 
 static constexpr bool enable_print = false;
@@ -47,6 +48,35 @@ namespace SystemService
           .server  = server,
       };
       kvPut(row.key(getReceiver()), row);
+   }
+
+   static void checkRecvAuth(const Action& act)
+   {
+      if (act.sender != HttpServer::service)
+         psibase::abortMessage("messages must have " + HttpServer::service.str() +
+                               " as the sender");
+      if (!(act.service == TransactionQueue::service && act.method == MethodNumber{"recv"}))
+         psibase::abortMessage(act.service.str() + "::" + act.method.str() +
+                               " is not authorized to receive messages");
+   }
+
+   void HttpServer::recv(std::int32_t socket, psio::view<const std::vector<char>> data)
+   {
+      check(getSender() == AccountNumber{}, "recv can only be called by native");
+      if (socket == producer_multicast)
+      {
+         auto act = psio::from_frac<Action>(data);
+         checkRecvAuth(act);
+         psibase::call(act);
+      }
+   }
+
+   void HttpServer::sendProds(const Action& act)
+   {
+      if (getSender() != act.service)
+         psibase::abortMessage(getSender().str() + " cannot send messages to " + act.service.str());
+      checkRecvAuth(act);
+      socketSend(producer_multicast, psio::to_frac(act));
    }
 
    constexpr std::string_view allowedHeaders[] = {"Content-Encoding"};

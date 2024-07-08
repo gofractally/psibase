@@ -63,11 +63,11 @@ namespace SystemService
           SubjectiveTables<PendingTransactionTable, TransactionDataTable, AvailableSequenceTable>;
       using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable>;
       std::optional<psibase::SignedTransaction> next();
-      void                                      recv(int socket, const std::vector<char>& data);
+      void                                      recv(const psibase::SignedTransaction& transaction);
       std::optional<psibase::HttpReply>         serveSys(const psibase::HttpRequest&);
    };
    PSIO_REFLECT(TransactionQueue,
                 method(next),
-                method(recv, socket, data),
+                method(recv, transaction),
                 method(serveSys, request))
 }  // namespace SystemService

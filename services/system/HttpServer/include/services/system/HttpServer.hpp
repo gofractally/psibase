@@ -33,6 +33,9 @@ namespace SystemService
    {
       static constexpr auto service = psibase::proxyServiceNum;
 
+      void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
+      void sendProds(const psibase::Action& action);
+
       /// Register sender's subdomain
       ///
       /// When requests are made to the sender service subdomain, `http-server` will
@@ -45,5 +48,8 @@ namespace SystemService
       /// * Respond to GraphQL requests
       void registerServer(psibase::AccountNumber server);
    };
-   PSIO_REFLECT(HttpServer, method(registerServer, server))
+   PSIO_REFLECT(HttpServer,
+                method(recv, socket, data),
+                method(sendProds, action),
+                method(registerServer, server))
 }  // namespace SystemService

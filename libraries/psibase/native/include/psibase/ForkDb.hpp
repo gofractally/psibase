@@ -10,6 +10,7 @@
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 #include <psibase/log.hpp>
+#include <psibase/serviceEntry.hpp>
 
 #include <ranges>
 
@@ -1232,8 +1233,7 @@ namespace psibase
 
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {
-         // TODO: handle receiver more generically
-         Action action{.service = AccountNumber{"txqueue"},
+         Action action{.service = proxyServiceNum,
                        .method  = MethodNumber{"recv"},
                        .rawData = psio::to_frac(std::tuple(sock.id, data))};
 

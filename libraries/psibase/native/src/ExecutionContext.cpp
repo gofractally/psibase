@@ -357,7 +357,8 @@ namespace psibase
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       // Prevents a poison block
-      if (callerFlags & CodeRow::isSubjective)
+      if (callerFlags & CodeRow::isSubjective &&
+          !actionContext.transactionContext.allowDbReadSubjective)
       {
          check(impl->code.flags & CodeRow::isSubjective,
                "subjective services may not call non-subjective ones");

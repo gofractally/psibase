@@ -1,5 +1,6 @@
 #include <services/system/TransactionQueue.hpp>
 
+#include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 
 #include <psibase/dispatch.hpp>
@@ -41,16 +42,14 @@ std::optional<SignedTransaction> SystemService::TransactionQueue::next()
 namespace
 {
    using Subjective = TransactionQueue::Subjective;
-   bool pushTransaction(std::span<const char> data)
+   bool pushTransaction(const SignedTransaction& trx)
    {
-      auto trx = psio::from_frac<SignedTransaction>(data);
-
       auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
       PSIBASE_SUBJECTIVE_TX
       {
          auto pending = Subjective{}.open<PendingTransactionTable>();
          if (pending.get(id))
-            break;
+            return false;
          // Find the next sequence number
          auto available = Subjective{}.open<AvailableSequenceTable>();
          auto sequence =
@@ -68,11 +67,17 @@ namespace
       }
       return true;
    }
+   void forwardTransaction(const SignedTransaction& trx)
+   {
+      to<HttpServer>().sendProds(
+          transactor<TransactionQueue>(HttpServer::service, TransactionQueue::service).recv(trx));
+   }
 }  // namespace
 
-void TransactionQueue::recv(int socket, const std::vector<char>& data)
+void TransactionQueue::recv(const SignedTransaction& trx)
 {
-   pushTransaction(data);
+   if (pushTransaction(trx))
+      forwardTransaction(trx);
 }
 
 std::optional<psibase::HttpReply> TransactionQueue::serveSys(const psibase::HttpRequest& request)
@@ -82,8 +87,8 @@ std::optional<psibase::HttpReply> TransactionQueue::serveSys(const psibase::Http
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
       auto trx = psio::from_frac<SignedTransaction>(request.body);
-      if (pushTransaction(request.body))
-         socketSend(producer_multicast, request.body);
+      if (pushTransaction(trx))
+         forwardTransaction(trx);
       return HttpReply{.contentType = "application/json", .body = std::vector{'t', 'r', 'u', 'e'}};
    }
    return {};
