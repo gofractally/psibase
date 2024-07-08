@@ -96,7 +96,8 @@ namespace psibase
                   "key prefix must match service during write");
          };
 
-         if (db == uint32_t(DbId::subjective) && (self.code.flags & CodeRow::isSubjective) &&
+         if (db == uint32_t(DbId::subjective) &&
+             (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
             return {(DbId)db, false, false};
@@ -351,7 +352,8 @@ namespace psibase
 
    int32_t NativeFunctions::clockTimeGet(uint32_t id, eosio::vm::argument_proxy<uint64_t*> time)
    {
-      check(code.flags & CodeRow::isSubjective, "only subjective services may call clockGetTime");
+      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
+            "only subjective services may call clockGetTime");
       clearResult(*this);
       std::chrono::nanoseconds result;
       if (id == 0)
@@ -653,6 +655,8 @@ namespace psibase
 
    int32_t NativeFunctions::socketSend(int32_t fd, eosio::vm::span<const char> msg)
    {
+      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
+            "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
       return transactionContext.blockContext.systemContext.sockets->send(fd, msg);
    }
