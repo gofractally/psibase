@@ -2,7 +2,7 @@ import {OutputOptions, RenderedChunk, TransformResult} from "@rollup/browser";
 
 const decoder = new TextDecoder();
 
-export const plugin = (files: [string, Uint8Array|string][]) => ({
+export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: boolean) => ({
     name: "loader",
 
     // The purpose of resolveId is to make sure that we have URLs for every file
@@ -74,17 +74,19 @@ export const plugin = (files: [string, Uint8Array|string][]) => ({
         };
     },
 
-    async renderChunk(code: string, chunk: RenderedChunk, _: OutputOptions) {
-        console.log(chunk);
-        const prependCode = `
-            let host = {};
+    async renderChunk(code: string, _chunk: RenderedChunk, _: OutputOptions) {
+        if (useSetupFunction)
+        {
+            const prependCode = `
+                let host = {};
 
-            export function __setup(pluginHost) {
-                host = pluginHost;
-            };
-
-        `;
-        return prependCode + code;
+                export function __setup(pluginHost) {
+                    host = pluginHost;
+                };
+            `;
+            code = prependCode + code;
+        }
+        return code;
     }
 });
 

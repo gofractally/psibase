@@ -166,7 +166,7 @@ async function load(wasmBytes: Uint8Array, imports: ImportDetails) {
             plugin([
                 ...files_2, 
                 ...imports.files
-            ]),
+            ], true),
         ],
     })
     .then((bundle) => bundle.generate({ format: "es" }))
@@ -204,7 +204,7 @@ export async function loadBasic(wasmBytes: Uint8Array) {
     const bundleCode: string = await rollup({
         input: name + ".js",
         plugins: [
-            plugin(files_2),
+            plugin(files_2, false),
         ],
     })
     .then((bundle) => bundle.generate({ format: "es" }))
