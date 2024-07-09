@@ -21,7 +21,7 @@ import { isRecoverableError } from "./plugin/errors";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 
-// The supervisor facilitates all communication 
+// The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private serviceContexts: { [service: string]: ServiceContext } = {};
 
@@ -32,21 +32,31 @@ export class Supervisor implements AppInterface {
     parentOrigination: OriginationData | undefined;
 
     private setParentOrigination(callerOrigin: string) {
-        assert(this.parentOrigination === undefined 
-            || this.parentOrigination.origin === callerOrigin, 
-            "Redundant setting parent origination");
-        
+        assert(
+            this.parentOrigination === undefined ||
+                this.parentOrigination.origin === callerOrigin,
+            "Redundant setting parent origination",
+        );
+
         if (callerOrigin === supervisorDomain) {
-            console.info("TODO: handle calls directly from the rootdomain itself");
+            console.info(
+                "TODO: handle calls directly from the rootdomain itself",
+            );
         }
-        this.parentOrigination = {app: serviceFromOrigin(callerOrigin), origin: callerOrigin};
+        this.parentOrigination = {
+            app: serviceFromOrigin(callerOrigin),
+            origin: callerOrigin,
+        };
     }
 
     private loadContext(service: string): ServiceContext {
         if (!this.serviceContexts[service]) {
             this.serviceContexts[service] = new ServiceContext(
                 service,
-                new PluginHost(this, {app: service, origin: siblingUrl(null, service)}),
+                new PluginHost(this, {
+                    app: service,
+                    origin: siblingUrl(null, service),
+                }),
             );
         }
         return this.serviceContexts[service];
@@ -58,9 +68,11 @@ export class Supervisor implements AppInterface {
         return id.service !== "wasi" && id.service !== "common";
     }
 
-    private async getDependencies(plugin: Plugin): Promise<QualifiedPluginId[]> {
+    private async getDependencies(
+        plugin: Plugin,
+    ): Promise<QualifiedPluginId[]> {
         const dependencies = await plugin.getDependencies();
-        return dependencies.filter(id => this.validated(id));
+        return dependencies.filter((id) => this.validated(id));
     }
 
     private async loadPlugins(plugins: QualifiedPluginId[]) {
@@ -75,10 +87,14 @@ export class Supervisor implements AppInterface {
             }
         });
 
-        const imports = await Promise.all(addedPlugins.map(plugin => this.getDependencies(plugin)));
+        const imports = await Promise.all(
+            addedPlugins.map((plugin) => this.getDependencies(plugin)),
+        );
         const dependencies = [...new Set(imports.flat())];
 
-        const pluginsReady = Promise.all(addedPlugins.map(plugin => plugin.ready));
+        const pluginsReady = Promise.all(
+            addedPlugins.map((plugin) => plugin.ready),
+        );
         await Promise.all([pluginsReady, this.loadPlugins(dependencies)]);
     }
 
@@ -96,30 +112,47 @@ export class Supervisor implements AppInterface {
     // Called by the current plugin looking to identify its caller
     getCaller(currentPlugin: OriginationData): OriginationData | undefined {
         const frame = this.context!.stack.peek(0);
-        assert(frame !== undefined, "`getCaller` invalid outside plugin call resolution");
-        assert(frame!.args.service === currentPlugin.app, "Only active plugin can ask for its caller");
+        assert(
+            frame !== undefined,
+            "`getCaller` invalid outside plugin call resolution",
+        );
+        assert(
+            frame!.args.service === currentPlugin.app,
+            "Only active plugin can ask for its caller",
+        );
         return frame!.caller;
     }
 
     // Called by the active plugin to schedule an action for execution
     addAction(sender: OriginationData, action: AddableAction) {
         const frame = this.context!.stack.peek(0);
-        assert(frame !== undefined, "Can only add actions during plugin call resolution");
-        assert(frame!.args.service === sender.app, "Invalid service attempted to add action");
+        assert(
+            frame !== undefined,
+            "Can only add actions during plugin call resolution",
+        );
+        assert(
+            frame!.args.service === sender.app,
+            "Invalid service attempted to add action",
+        );
         this.context!.addAction(action);
     }
 
     // Manages callstack and calls plugins
-    call(sender: OriginationData, args: QualifiedFunctionCallArgs) : any {
-
+    call(sender: OriginationData, args: QualifiedFunctionCallArgs): any {
         if (this.context!.stack.isEmpty()) {
-            assert(sender.origin === this.parentOrigination!.origin, "Parent origin mismatch");
+            assert(
+                sender.origin === this.parentOrigination!.origin,
+                "Parent origin mismatch",
+            );
         } else {
             assert(sender.app !== undefined, "Cannot determine caller service");
-            assert(sender.app === this.context!.stack.peek(0)!.args.service, "Invalid sync call sender");
+            assert(
+                sender.app === this.context!.stack.peek(0)!.args.service,
+                "Invalid sync call sender",
+            );
         }
 
-        const {service, plugin, intf, method, params} = args;
+        const { service, plugin, intf, method, params } = args;
         const p = this.loadContext(service).loadPlugin(plugin);
         assert(p.new === false, "Tried to call plugin before initialization");
 
@@ -140,7 +173,7 @@ export class Supervisor implements AppInterface {
     async submitTx() {
         const actions = this.context!.actions;
         if (actions.length <= 0) return;
-        
+
         let formatted = actions.map((a: AddableAction) => {
             return {
                 sender: "alice",
@@ -173,11 +206,17 @@ export class Supervisor implements AppInterface {
     }
 
     // This is an entrypoint for apps to call into plugins.
-    async entry(callerOrigin: string, args: QualifiedFunctionCallArgs): Promise<any> {
+    async entry(
+        callerOrigin: string,
+        args: QualifiedFunctionCallArgs,
+    ): Promise<any> {
         try {
             // Handle if a call is already in progress
             // TODO - Buffer multiple calls from root app
-            assert(this.context === undefined, `Plugin call resolution already in progress.`)
+            assert(
+                this.context === undefined,
+                `Plugin call resolution already in progress.`,
+            );
             this.context = new CallContext();
 
             // Store the origin of the root app. That should be the one-and-only root app that ever tries
@@ -185,16 +224,18 @@ export class Supervisor implements AppInterface {
             this.setParentOrigination(callerOrigin);
 
             // Wait to load the full plugin tree (a plugin and all it's dependencies, recursively).
-            // This is the time-intensive step. It includes: downloading, parsing, generating import fills, 
-            //   transpiling the component, bundling with rollup, and importing & instantiating the es module 
+            // This is the time-intensive step. It includes: downloading, parsing, generating import fills,
+            //   transpiling the component, bundling with rollup, and importing & instantiating the es module
             //   in memory.
             // Use `preloadPlugins` to decouple this task from the actual call to the plugin.
-            await this.loadPlugins([{
-                service: args.service,
-                plugin: args.plugin, 
-            }]);
+            await this.loadPlugins([
+                {
+                    service: args.service,
+                    plugin: args.plugin,
+                },
+            ]);
 
-            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was 
+            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
             //   preloaded.
             // TODO: Consider if a plugin runs an infinite loop. We need a way to terminate the
             //   current call and report the faulty plugin.
@@ -215,7 +256,10 @@ export class Supervisor implements AppInterface {
                 // It is only recoverable at intermediate steps in the callstack.
                 // Since it is the final return value, it is no longer recoverable and is
                 //   converted to a PluginError to be handled by the client.
-                this.replyToParent(args, new PluginError(e.payload.producer, e.payload.message));
+                this.replyToParent(
+                    args,
+                    new PluginError(e.payload.producer, e.payload.message),
+                );
             } else {
                 this.replyToParent(args, e);
             }

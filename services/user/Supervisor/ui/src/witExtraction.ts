@@ -3,7 +3,7 @@ export interface Interface {
     package: string;
     name: string;
     funcs: string[];
-};
+}
 
 export interface Functions {
     namespace: string;

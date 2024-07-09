@@ -1,7 +1,5 @@
 import { toString } from "@psibase/common-lib";
-import {
-    QualifiedFunctionCallArgs,
-} from "@psibase/common-lib/messaging";
+import { QualifiedFunctionCallArgs } from "@psibase/common-lib/messaging";
 
 import { OriginationData } from "./utils";
 
@@ -23,7 +21,7 @@ export class CallStack {
         this.storage.push({
             caller: sender,
             args: args,
-            startTime: Date.now()
+            startTime: Date.now(),
         });
     }
 

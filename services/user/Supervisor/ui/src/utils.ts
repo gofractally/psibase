@@ -10,9 +10,7 @@ export const wasmFromUrl = (url: string) =>
         })
         .then((buffer) => new Uint8Array(buffer));
 
-export const serviceFromOrigin = (
-    callerOrigin: string
-): string | undefined => {
+export const serviceFromOrigin = (callerOrigin: string): string | undefined => {
     const extractRootDomain = (origin: string): string => {
         const url = new URL(origin);
         const parts = url.hostname.split(".");
@@ -29,21 +27,26 @@ export const serviceFromOrigin = (
 };
 
 export interface OriginationData {
-    app: string | undefined,
-    origin: string,
-};
+    app: string | undefined;
+    origin: string;
+}
 
 export const assert = (condition: boolean, errorMessage: string): void => {
-    if (!condition)
-        throw new Error(errorMessage);
-}
+    if (!condition) throw new Error(errorMessage);
+};
 
 let modulePromise: Promise<any>;
 
 export const parser = (): Promise<any> => {
     if (!modulePromise) {
-        const url = siblingUrl(null, "supervisor", "/common/component_parser.wasm");
-        modulePromise = wasmFromUrl(url).then(bytes => loadBasic(bytes, "Component parser"));
+        const url = siblingUrl(
+            null,
+            "supervisor",
+            "/common/component_parser.wasm",
+        );
+        modulePromise = wasmFromUrl(url).then((bytes) =>
+            loadBasic(bytes, "Component parser"),
+        );
     }
     return modulePromise;
-}
+};

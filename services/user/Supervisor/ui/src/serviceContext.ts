@@ -2,8 +2,8 @@ import { Plugin } from "./plugin/plugin";
 import { HostInterface } from "./hostInterface";
 
 export interface LoadedPlugin {
-    plugin: Plugin,
-    new: boolean,
+    plugin: Plugin;
+    new: boolean;
 }
 
 // A service can serve multiple plugins, but each plugin does not have a meaninful identity
@@ -25,19 +25,19 @@ export class ServiceContext {
             (p) => p.id.service == this.service && p.id.plugin == plugin,
         );
         if (p) {
-            return {plugin: p, new: false};
+            return { plugin: p, new: false };
         }
 
-        p = new Plugin(
-            { service: this.service, plugin },
-            this.hostInterface
-        );
+        p = new Plugin({ service: this.service, plugin }, this.hostInterface);
         this.plugins.push(p);
-        return {plugin: p, new: true};
+        return { plugin: p, new: true };
     }
 
     hasLoaded(plugin: Plugin): boolean {
-        return !!this.plugins.find(p=>p.id.plugin === plugin.id.plugin 
-            && p.id.service === plugin.id.service);
+        return !!this.plugins.find(
+            (p) =>
+                p.id.plugin === plugin.id.plugin &&
+                p.id.service === plugin.id.service,
+        );
     }
 }

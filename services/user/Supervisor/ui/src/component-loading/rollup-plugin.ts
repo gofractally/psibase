@@ -1,15 +1,21 @@
-import {OutputOptions, RenderedChunk, TransformResult} from "@rollup/browser";
+import { OutputOptions, RenderedChunk, TransformResult } from "@rollup/browser";
 
 const decoder = new TextDecoder();
 
-export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: boolean, identity: string) => ({
+export const plugin = (
+    files: [string, Uint8Array | string][],
+    useSetupFunction: boolean,
+    identity: string,
+) => ({
     name: "loader",
 
     // The purpose of resolveId is to make sure that we have URLs for every file
     //   and allowing for the possiblity of passing in various data as long as it can
     //   be resolved into a URL.
-    async resolveId(importId: string, _importer: string | undefined): Promise<string> {
-
+    async resolveId(
+        importId: string,
+        _importer: string | undefined,
+    ): Promise<string> {
         if (files.find((file) => file[0] === importId)) {
             return importId;
         }
@@ -23,20 +29,16 @@ export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: b
 
     // Loads the code from the URLs
     async load(id: string): Promise<string> {
-        let match = files.find((file) => file[0] == id); 
+        let match = files.find((file) => file[0] == id);
         if (match) {
-            if (typeof match[1] === "string") 
-                return match[1];
-            else
-                return decoder.decode(match[1]);
-        }
-        else throw Error(`No file found for ${id}`);
+            if (typeof match[1] === "string") return match[1];
+            else return decoder.decode(match[1]);
+        } else throw Error(`No file found for ${id}`);
     },
 
-    // Transforms wasm imports within js files to use a blob URL of the bytes instead 
+    // Transforms wasm imports within js files to use a blob URL of the bytes instead
     //   of `new URL('./${fileName}', import.meta.url)`
     async transform(code: string, id: string): Promise<TransformResult> {
-
         if (!id.endsWith(".js")) {
             return null;
         }
@@ -50,17 +52,16 @@ export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: b
         urlRefs.forEach((urlReference) => {
             const fileName = urlReference.match(/'.\/(.*)'/)?.[1];
             if (!fileName?.endsWith(".wasm")) return;
-    
+
             const fileContent = files.find(([name]) => name === fileName)?.[1];
             if (!fileContent) return;
-    
+
             const wasmBlobUrl = URL.createObjectURL(
                 new Blob([fileContent], { type: "application/wasm" }),
             );
-    
-            if (!wasmBlobUrl) 
-                return;
-    
+
+            if (!wasmBlobUrl) return;
+
             code = code.replace(
                 `new URL('./${fileName}', import.meta.url)`,
                 `'${wasmBlobUrl}'`,
@@ -74,8 +75,7 @@ export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: b
     },
 
     async renderChunk(code: string, _chunk: RenderedChunk, _: OutputOptions) {
-        if (useSetupFunction)
-        {
+        if (useSetupFunction) {
             const prependCode = `
                 let host = {};
 
@@ -86,6 +86,5 @@ export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: b
             code = prependCode + code;
         }
         return code;
-    }
+    },
 });
-

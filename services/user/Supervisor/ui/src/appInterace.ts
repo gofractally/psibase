@@ -7,7 +7,7 @@ import {
 export interface AppInterface {
     preloadPlugins: (
         callerOrigin: string,
-        plugins: QualifiedPluginId[]
+        plugins: QualifiedPluginId[],
     ) => void;
 
     entry: (callerOrigin: string, args: QualifiedFunctionCallArgs) => void;

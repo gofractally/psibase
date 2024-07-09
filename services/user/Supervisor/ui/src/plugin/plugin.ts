@@ -1,7 +1,4 @@
-import {
-    siblingUrl,
-    QualifiedPluginId,
-} from "@psibase/common-lib";
+import { siblingUrl, QualifiedPluginId } from "@psibase/common-lib";
 
 import { HostInterface } from "../hostInterface";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
@@ -25,37 +22,34 @@ export class Plugin {
 
     ready: Promise<void>;
 
-
     // A module dynamically generated from a bundle including: transpiled component, wasi shims, and imports
     private pluginModule: any;
 
-    private methodExists(
-        intf: string | undefined,
-        method: string,
-    ) {
-        if (!this.componentAPI)  {
+    private methodExists(intf: string | undefined, method: string) {
+        if (!this.componentAPI) {
             throw new PluginInvalid(this.id);
         }
 
         const { exportedFuncs } = this.componentAPI;
 
         if (intf !== undefined) {
-            const foundInterface = exportedFuncs.interfaces.find(i => i.name === intf);
-            return !!foundInterface?.funcs.find(f => f === method);
+            const foundInterface = exportedFuncs.interfaces.find(
+                (i) => i.name === intf,
+            );
+            return !!foundInterface?.funcs.find((f) => f === method);
         }
 
-        return !!exportedFuncs.funcs.find(f => f === method);
-    };
+        return !!exportedFuncs.funcs.find((f) => f === method);
+    }
 
     private async doFetchPlugin(): Promise<Uint8Array> {
-        const {service, plugin} = this.id;
+        const { service, plugin } = this.id;
         const url = siblingUrl(null, service, `/${plugin}.wasm`);
         try {
             this.bytes = await wasmFromUrl(url);
             return this.bytes;
         } catch (e) {
-            if (e instanceof DownloadFailed)
-            {
+            if (e instanceof DownloadFailed) {
                 throw new PluginDownloadFailed(this.id);
             }
             throw e;
@@ -72,9 +66,9 @@ export class Plugin {
     async getDependencies(): Promise<QualifiedPluginId[]> {
         const api = await this.parsed;
 
-        return api.importedFuncs.interfaces.map(intf => ({
+        return api.importedFuncs.interfaces.map((intf) => ({
             service: intf.namespace,
-            plugin: intf.package
+            plugin: intf.package,
         }));
     }
 
@@ -83,10 +77,7 @@ export class Plugin {
         this.pluginModule = await loadPlugin(this.bytes!, this.host, api);
     }
 
-    constructor(
-        id: QualifiedPluginId,
-        host: HostInterface,
-    ) {
+    constructor(id: QualifiedPluginId, host: HostInterface) {
         this.id = id;
         this.host = host;
         this.bytes = undefined;
@@ -96,24 +87,19 @@ export class Plugin {
     }
 
     // Called by the supervisor to call into a plugin wasm
-    call(
-        intf: string | undefined,
-        method: string,
-        params: any[],
-    ) {
+    call(intf: string | undefined, method: string, params: any[]) {
         if (!this.methodExists(intf, method)) {
             throw new InvalidCall(this.id, intf, method);
         }
 
-        if (this.bytes === undefined || 
-            this.pluginModule === undefined
-        ) {
+        if (this.bytes === undefined || this.pluginModule === undefined) {
             throw new PluginInvalid(this.id);
         }
 
-        let func = typeof intf === "undefined" || intf === ""
-            ? this.pluginModule[method]
-            : this.pluginModule[intf][method];
+        let func =
+            typeof intf === "undefined" || intf === ""
+                ? this.pluginModule[method]
+                : this.pluginModule[intf][method];
 
         return func(...params);
     }

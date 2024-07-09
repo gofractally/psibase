@@ -32,8 +32,7 @@ const shouldHandleMessage = (message: MessageEvent) => {
     return isTop && isParent && isSameRootDomain;
 };
 
-
-// When the supervisor is first loaded, all it does is register some handlers for 
+// When the supervisor is first loaded, all it does is register some handlers for
 //   calls from the parent window, and also tells the parent window that it's ready.
 addCallHandler(callHandlers, isFunctionCallRequest, (msg) =>
     supervisor.entry(msg.origin, msg.data.args),
