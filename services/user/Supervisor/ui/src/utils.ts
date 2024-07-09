@@ -38,9 +38,12 @@ export const assert = (condition: boolean, errorMessage: string): void => {
         throw new Error(errorMessage);
 }
 
-export const parser = async (): Promise<any> => {
-    const url = siblingUrl(null, "supervisor", "/common/component_parser.wasm");
-    const bytes = await wasmFromUrl(url);
-    const module = await loadBasic(bytes);
-    return module;
+let modulePromise: Promise<any>;
+
+export const parser = (): Promise<any> => {
+    if (!modulePromise) {
+        const url = siblingUrl(null, "supervisor", "/common/component_parser.wasm");
+        modulePromise = wasmFromUrl(url).then(bytes => loadBasic(bytes, "Component parser"));
+    }
+    return modulePromise;
 }
