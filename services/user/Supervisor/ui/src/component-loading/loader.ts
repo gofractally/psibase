@@ -7,6 +7,7 @@ const wasiShimURL = new URL("./bundled/_preview2-shim.js", import.meta.url);
 import hostShimCode from "./host-api.js?raw";
 import { HostInterface } from "../hostInterface.js";
 import { ComponentAPI } from "../witExtraction.js";
+import { assert } from "../utils.js";
 
 type Code = string;
 type PkgId = string;
@@ -139,18 +140,20 @@ function mergeImports(importDetails: ImportDetails[]) : ImportDetails {
     return new ImportDetails(importMap, files);
 }
 
-export async function loadPlugin(wasmBytes: Uint8Array, pluginHost: HostInterface, api: ComponentAPI) {
+export async function loadPlugin(wasmBytes: Uint8Array, pluginHost: HostInterface, _api: ComponentAPI) {
     const imports = mergeImports([await getWasiImports(), await getHostImports()]);
-    const pluginModule = await load(wasmBytes, imports);
+    const { app } = pluginHost.getSelf();
+    assert(app !== undefined, "Plugin must correspond to a psibase service");
 
-    console.log("Temp: Printing the component api");
-    console.log(JSON.parse(api.debug));
+    const pluginModule = await load(wasmBytes, imports, `${app!} plugin`);
 
-    pluginModule.__setup(pluginHost);
+    const {__setHost} = pluginModule;
+    __setHost(pluginHost);
+
     return pluginModule;
 }
 
-async function load(wasmBytes: Uint8Array, imports: ImportDetails) {
+async function load(wasmBytes: Uint8Array, imports: ImportDetails, debugName: string) {
     const name = "component";
     let opts = {
         name,
@@ -167,18 +170,13 @@ async function load(wasmBytes: Uint8Array, imports: ImportDetails) {
     const { files, imports: _imports, exports: _exports } = await transpile(wasmBytes, opts);
     const files_2 = files as unknown as Array<[string, Uint8Array]>; // todo: can delete this once type annotations for transpile are fixed
 
-    // Todo - here is a good time to check if the _imports are satisfied by the `imports.importmap` and 
-    //        fire off an error, if not.
-    console.info("temp: transpilation imports", _imports);
-    console.info("temp: transpilation exports", _exports);
-
     const bundleCode: string = await rollup({
         input: name + ".js",
         plugins: [
             plugin([
                 ...files_2, 
                 ...imports.files
-            ], true),
+            ], true, debugName),
         ],
     })
     .then((bundle) => bundle.generate({ format: "es" }))
@@ -197,7 +195,7 @@ async function load(wasmBytes: Uint8Array, imports: ImportDetails) {
 // Not sufficient for plugins, which require other direct host exports, but can be used
 //   to run various other utilities in the browser that have been compiled into wasm 
 //   components.
-export async function loadBasic(wasmBytes: Uint8Array) {
+export async function loadBasic(wasmBytes: Uint8Array, debugName: string) {
 
     const wasiImports = await getWasiImports();
     const name = "component";
@@ -216,7 +214,7 @@ export async function loadBasic(wasmBytes: Uint8Array) {
     const bundleCode: string = await rollup({
         input: name + ".js",
         plugins: [
-            plugin(files_2, false),
+            plugin(files_2, false, debugName),
         ],
     })
     .then((bundle) => bundle.generate({ format: "es" }))
@@ -229,72 +227,3 @@ export async function loadBasic(wasmBytes: Uint8Array) {
 
     return mod;
 }
-
-
-// Combines the wasm bytes and imports into a fully wired JavaScript module
-// async function load(wasmBytes: Uint8Array, importables: ImportFills[]) {
-
-//     // Turn the `importables` array of objects into two mappings:
-//     // 1. A single object { 'component:cargo-comp/imports': './component_cargo-comp_imports.js', 'component:cargo-comp/more': './component_cargo-comp_more.js' }
-//     // 2. An array of arrays [ ['./component_cargo-comp_imports.js', importableCode], ['./component_cargo-comp_more.js', moreCode] ]
-//     const customImports = importables.reduce<ImportDetails>(
-//         (acc, current) => {
-//             const name: string = Object.keys(current)[0];
-//             let globImportPattern = /\/\*$/;
-//             let filePath =
-//                 "./" +
-//                 name
-//                     .replace(globImportPattern, "")
-//                     .replace(":", "_")
-//                     .replace(/\//g, "_") +
-//                 ".js";
-//             acc.importMap[name] = filePath + (name.match(globImportPattern) ? "#*" : "");
-//             acc.files.push([filePath, current[name]]);
-//             return acc;
-//         },
-//         {importMap: {}, files: []},
-//     );
-
-//     const wasiImports = await getWasiImports();
-
-//     const importMap = {
-//             ...wasiImports.importMap,
-//             ...customImports.importMap
-//     };
-
-//     const name = "component";
-//     let opts = {
-//         name,
-//         map: importMap ?? {},
-//         validLiftingOptimization: false,
-//         noNodejsCompat: true,
-//         tlaCompat: false,
-//         base64Cutoff: 4096,
-//     };
-
-//     // pass into generate along with bytes
-//     let { files, imports, exports } = await transpile(wasmBytes, opts);
-//     const componentFiles = Object.entries(files).map(([filename, content]): [string, string] => [filename, decoder.decode(content)]);
-//     console.info("temp: transpilation imports", imports);
-//     console.info("temp: transpilation exports", exports);
-
-//     const bundleCode: string = await rollup({
-//         input: name + ".js",
-//         plugins: [
-//             plugin([
-//                 ...componentFiles, 
-//                 ...customImports.files, 
-//                 ...wasiImports.files,
-//             ]),
-//         ],
-//     })
-//     .then((bundle) => bundle.generate({ format: "es" }))
-//     .then(({ output }) => output[0].code);
-
-//     let blob = new Blob([bundleCode], { type: "text/javascript" });
-//     let url = URL.createObjectURL(blob);
-
-//     let mod = await import(/* @vite-ignore */ url);
-
-//     return mod;
-// }

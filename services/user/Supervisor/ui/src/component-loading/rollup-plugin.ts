@@ -2,7 +2,7 @@ import {OutputOptions, RenderedChunk, TransformResult} from "@rollup/browser";
 
 const decoder = new TextDecoder();
 
-export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: boolean) => ({
+export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: boolean, identity: string) => ({
     name: "loader",
 
     // The purpose of resolveId is to make sure that we have URLs for every file
@@ -18,8 +18,7 @@ export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: b
             throw Error("Web imports disabled");
         }
 
-        console.log("TODO: Probably want to throw an error here");
-        return importId;
+        throw Error(`[${identity}] Unsupported import: ${importId}`);
     },
 
     // Loads the code from the URLs
@@ -80,7 +79,7 @@ export const plugin = (files: [string, Uint8Array|string][], useSetupFunction: b
             const prependCode = `
                 let host = {};
 
-                export function __setup(pluginHost) {
+                export function __setHost(pluginHost) {
                     host = pluginHost;
                 };
             `;
