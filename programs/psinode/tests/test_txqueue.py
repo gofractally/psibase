@@ -27,6 +27,9 @@ class TestTransactionQueue(unittest.TestCase):
             print(response.text)
             self.assertEqual(response.status_code, 404)
 
+        with self.assertRaises(psinode.TransactionError, msg='Transaction expired'):
+            txqueue.push_action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":100000000}, "memo":"fail"})
+
     @testutil.psinode_test
     def test_forward(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))

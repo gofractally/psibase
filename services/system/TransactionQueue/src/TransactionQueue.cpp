@@ -59,6 +59,60 @@ void TransactionQueue::onTrx(const Checksum256& id, const TransactionTrace& trac
    }
 }
 
+void TransactionQueue::onBlock()
+{
+   // Update reversible table and find the time of the last commit
+   auto stat = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   if (!stat)
+      return;
+   auto commitNum  = stat->current.commitNum;
+   auto reversible = WriteOnly{}.open<ReversibleBlocksTable>();
+   reversible.put({.blockNum = stat->current.blockNum, .time = stat->current.time});
+   TimePointSec irreversibleTime = {};
+   for (auto r : reversible.getIndex<0>())
+   {
+      if (r.blockNum > commitNum)
+         break;
+      irreversibleTime = r.time;
+      if (r.blockNum < commitNum)
+         reversible.remove(r);
+   }
+   // Remove expired transactions and find associated requests
+   std::vector<TraceClientRow> ids;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto table       = Subjective{}.open<PendingTransactionTable>();
+      auto dataTable   = Subjective{}.open<TransactionDataTable>();
+      auto clientTable = Subjective{}.open<TraceClientTable>();
+      auto index       = table.getIndex<3>();
+      for (auto item : index)
+      {
+         if (item.expiration > irreversibleTime)
+            break;
+         if (auto client = clientTable.get(item.id))
+         {
+            ids.push_back(*client);
+            clientTable.remove(*client);
+         }
+         dataTable.erase(item.id);
+         table.remove(item);
+      }
+   }
+   // Send responses to everyone waiting for a transaction that expired
+   if (!ids.empty())
+   {
+      TransactionTrace    trace{.error = "Transaction expired"};
+      HttpReply           reply{.contentType = "application/json"};
+      psio::vector_stream stream{reply.body};
+      to_json(trace, stream);
+      for (auto row : ids)
+      {
+         for (auto sock : row.sockets)
+            to<HttpServer>().sendReply(sock, reply);
+      }
+   }
+}
+
 namespace
 {
    using Subjective = TransactionQueue::Subjective;

@@ -1,4 +1,4 @@
-from psinode import Action, Transaction, Service
+from psinode import Action, Transaction, TransactionError, Service
 import time
 
 class Tokens(Service):
@@ -18,6 +18,10 @@ class TransactionQueue(Service):
         packed = self.api.pack_signed_transaction(trx)
         with self.post('/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed) as response:
             response.raise_for_status()
+            trace = response.json()
+            if trace['error'] is not None:
+                raise TransactionError(trace)
+            return trace
     def push_action(self, sender, service, method, data):
         tapos = self.api.get_tapos()
         tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + 10))

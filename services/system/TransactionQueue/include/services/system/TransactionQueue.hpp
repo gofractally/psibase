@@ -33,7 +33,8 @@ namespace SystemService
    using PendingTransactionTable = psibase::Table<PendingTransactionRecord,
                                                   &PendingTransactionRecord::id,
                                                   &PendingTransactionRecord::sequence,
-                                                  &PendingTransactionRecord::ctime>;
+                                                  &PendingTransactionRecord::ctime,
+                                                  &PendingTransactionRecord::expiration>;
 
    struct AvailableSequenceRecord
    {
@@ -56,6 +57,16 @@ namespace SystemService
    using UnappliedTransactionTable =
        psibase::Table<UnappliedTransactionRecord, &UnappliedTransactionRecord::primary_key>;
 
+   struct ReversibleBlocksRow
+   {
+      psibase::BlockNum     blockNum;
+      psibase::TimePointSec time;
+   };
+   PSIO_REFLECT(ReversibleBlocksRow, blockNum, time)
+
+   using ReversibleBlocksTable =
+       psibase::Table<ReversibleBlocksRow, &ReversibleBlocksRow::blockNum>;
+
    struct TraceClientRow
    {
       psibase::Checksum256      id;
@@ -73,17 +84,19 @@ namespace SystemService
                                                    TransactionDataTable,
                                                    AvailableSequenceTable,
                                                    TraceClientTable>;
-      using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable>;
+      using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable>;
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
       void recv(const psibase::SignedTransaction& transaction);
       // Callback
       void onTrx(const psibase::Checksum256& id, const psibase::TransactionTrace& trace);
+      void onBlock();
       void serveSys(std::int32_t sock, const psibase::HttpRequest& request);
    };
    PSIO_REFLECT(TransactionQueue,
                 method(next),
                 method(recv, transaction),
                 method(onTrx, id, trace),
+                method(onBlock),
                 method(serveSys, socket, request))
 }  // namespace SystemService
