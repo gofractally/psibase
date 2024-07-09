@@ -7,6 +7,7 @@ import {
     uint8ArrayToHex,
     getTaposForHeadBlock,
     signAndPushTransaction,
+    PluginError,
 } from "@psibase/common-lib";
 
 import { AppInterface } from "./appInterace";
@@ -16,6 +17,7 @@ import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
 import { Plugin } from "./plugin/plugin";
 import { CallContext } from "./callContext";
 import { PluginHost } from "./pluginHost";
+import { isRecoverableError } from "./plugin/errors";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 
@@ -117,14 +119,18 @@ export class Supervisor implements AppInterface {
             assert(sender.app === this.context!.stack.peek(0)!.args.service, "Invalid sync call sender");
         }
 
-        this.context!.stack.push(sender, args);
-
         const {service, plugin, intf, method, params} = args;
         const p = this.loadContext(service).loadPlugin(plugin);
         assert(p.new === false, "Tried to call plugin before initialization");
-        const ret = p.plugin.call(intf, method, params);
 
-        this.context!.stack.pop();
+        this.context!.stack.push(sender, args);
+
+        let ret: any;
+        try {
+            ret = p.plugin.call(intf, method, params);
+        } finally {
+            this.context!.stack.pop();
+        }
 
         return ret;
     }
@@ -159,16 +165,14 @@ export class Supervisor implements AppInterface {
     //   which accelerates the responsiveness of the plugins for subsequent calls.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
-            //
             this.setParentOrigination(callerOrigin);
             await this.loadPlugins(plugins);
         } catch (e) {
-            console.error("Error in supervisor caught. TODO: return error to parent window", e);
+            console.error(e);
         }
     }
 
     // This is an entrypoint for apps to call into plugins.
-    // Sync calls between plugins should use `syncCall`.
     async entry(callerOrigin: string, args: QualifiedFunctionCallArgs): Promise<any> {
         try {
             // Handle if a call is already in progress
@@ -207,7 +211,15 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } catch (e) {
-            this.replyToParent(args, e);
+            if (isRecoverableError(e)) {
+                // It is only recoverable at intermediate steps in the callstack.
+                // Since it is the final return value, it is no longer recoverable and is
+                //   converted to a PluginError to be handled by the client.
+                this.replyToParent(args, new PluginError(e.payload.producer, e.payload.message));
+            } else {
+                this.replyToParent(args, e);
+            }
+
             this.context = undefined;
         }
     }

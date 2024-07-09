@@ -3,7 +3,6 @@ import {
     QualifiedFunctionCallArgs,
     toString,
 } from "./messaging/FunctionCallRequest";
-import { isGenericError, isPluginError } from "./messaging/FunctionCallResponse";
 import { PluginId, QualifiedPluginId } from "./messaging/PluginId";
 import { buildPreLoadPluginsRequest } from "./messaging/PreLoadPluginsRequest";
 import {
@@ -12,6 +11,8 @@ import {
     FunctionCallResponse,
     FunctionCallArgs,
     FunctionCallRequest,
+    isPluginError,
+    isGenericError,
 } from "./messaging";
 
 const SupervisorIFrameId = "iframe-supervisor" as const;
@@ -124,8 +125,19 @@ export class Supervisor {
             expected.method !== received.method ||
             expected.service !== received.service;
 
-        if (isPluginError(response.result) || isGenericError(response.result)) {
-            this.pendingRequest.reject(response.result);
+        const {result} = response;
+        if (isPluginError(result)) {
+            const {service, plugin} = result.pluginId;
+            console.error(`Call to ${toString(response.call)} failed`);
+            console.error(`[${service}:${plugin}] ${result.message}`);
+            this.pendingRequest.reject(result);
+            return;
+        }
+
+        if (isGenericError(result)) {
+            console.error(`Call to ${toString(response.call)} failed`);
+            console.error(result.message);
+            this.pendingRequest.reject(result);
             return;
         }
 

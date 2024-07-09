@@ -6,9 +6,6 @@ export {
     type FunctionCallResponse,
     buildFunctionCallResponse,
     isFunctionCallResponse,
-    PluginError,
-    isPluginError,
-    isGenericError,
 } from "./FunctionCallResponse";
 
 export {
@@ -30,3 +27,9 @@ export {
     isSupervisorInitialized,
     buildMessageSupervisorInitialized,
 } from "./SupervisorInitialized";
+
+export {
+    PluginError,
+    isPluginError,
+    isGenericError,
+} from "./Errors";
