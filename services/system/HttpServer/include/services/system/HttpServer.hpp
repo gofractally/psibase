@@ -5,6 +5,15 @@
 
 namespace SystemService
 {
+   struct PendingRequestRow
+   {
+      std::int32_t           socket;
+      psibase::AccountNumber owner;
+   };
+   PSIO_REFLECT(PendingRequestRow, socket, owner)
+
+   using PendingRequestTable = psibase::Table<PendingRequestRow, &PendingRequestRow::socket>;
+
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///
    /// Rule set:
@@ -33,8 +42,12 @@ namespace SystemService
    {
       static constexpr auto service = psibase::proxyServiceNum;
 
+      using Subjective = psibase::SubjectiveTables<PendingRequestTable>;
+
       void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
       void sendProds(const psibase::Action& action);
+
+      void sendReply(std::int32_t socket, const std::optional<psibase::HttpReply>& response);
 
       /// Register sender's subdomain
       ///
@@ -51,5 +64,6 @@ namespace SystemService
    PSIO_REFLECT(HttpServer,
                 method(recv, socket, data),
                 method(sendProds, action),
+                method(sendReply, socket, response),
                 method(registerServer, server))
 }  // namespace SystemService

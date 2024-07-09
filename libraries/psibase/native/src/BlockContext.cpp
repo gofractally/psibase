@@ -204,6 +204,50 @@ namespace psibase
       }
    }
 
+   void BlockContext::callOnTransaction(const Checksum256& id, const TransactionTrace& trace)
+   {
+      auto notifyData = db.kvGetRaw(NotifyRow::db,
+                                    psio::convert_to_key(notifyKey(NotifyType::acceptTransaction)));
+      if (!notifyData)
+         return;
+      auto notifySpan = std::span{notifyData->pos, notifyData->end};
+      if (!psio::fracpack_validate<NotifyRow>(notifySpan))
+         return;
+
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions();
+
+      auto oldIsProducing = isProducing;
+      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      isProducing         = true;
+
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tuple(id, trace))};
+
+      for (auto a : actions)
+      {
+         if (a.sender() != AccountNumber{})
+            continue;
+         if (!a.rawData().empty())
+            continue;
+         action.service = a.service();
+         action.method  = a.method();
+         SignedTransaction  trx;
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         auto&              atrace = trace.actionTraces.emplace_back();
+
+         try
+         {
+            tc.execNonTrxAction(0, action, atrace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+            PSIBASE_LOG(trxLogger, info) << "onTransaction succeeded";
+         }
+         catch (std::exception& e)
+         {
+            PSIBASE_LOG(trxLogger, info) << "onTransaction failed: " << e.what();
+         }
+      }
+   }
+
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
       Merkle m;
@@ -434,8 +478,8 @@ namespace psibase
        bool                                     enableUndo,
        bool                                     commit)
    {
-      BOOST_LOG_SCOPED_THREAD_TAG("TransactionId",
-                                  sha256(trx.transaction.data(), trx.transaction.size()));
+      auto id = sha256(trx.transaction.data(), trx.transaction.size());
+      BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
       try
       {
          checkActive();
@@ -466,6 +510,7 @@ namespace psibase
          if (commit)
          {
             session.commit();
+            callOnTransaction(id, trace);
             active = true;
          }
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);

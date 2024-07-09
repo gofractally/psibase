@@ -94,6 +94,19 @@ namespace SystemService
       }
    }
 
+   static NotifyType getNotifyType(CallbackType type)
+   {
+      switch (type)
+      {
+         case CallbackType::onBlock:
+            return NotifyType::acceptBlock;
+         case CallbackType::onTransaction:
+            return NotifyType::acceptTransaction;
+         default:
+            abortMessage("Unsupported subjective callback type");
+      }
+   }
+
    void Transact::addCallback(CallbackType type, bool objective, psibase::Action act)
    {
       auto me = getReceiver();
@@ -116,8 +129,7 @@ namespace SystemService
       else
       {
          check(act.sender == AccountNumber{}, "Subjective callbacks must not have a sender");
-         check(type == CallbackType::onBlock, "Subjective transaction callbacks not supported");
-         auto ntype = NotifyType::acceptBlock;
+         auto ntype = getNotifyType(type);
          auto key   = notifyKey(ntype);
          auto value = kvGet<NotifyRow>(NotifyRow::db, key);
          if (!value)
@@ -154,8 +166,7 @@ namespace SystemService
       }
       else
       {
-         check(type == CallbackType::onBlock, "Subjective transaction callbacks not supported");
-         auto ntype = NotifyType::acceptBlock;
+         auto ntype = getNotifyType(type);
          auto key   = notifyKey(ntype);
          if (auto value = kvGet<NotifyRow>(NotifyRow::db, key))
          {

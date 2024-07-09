@@ -186,6 +186,10 @@ namespace psibase
    {
       // A block is produced or validated
       acceptBlock,
+      // A transaction is accepted or validated
+      acceptTransaction,
+      // A transaction is rejected
+      rejectTransaction,
    };
 
    inline auto notifyKey(NotifyType type)

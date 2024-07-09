@@ -550,7 +550,7 @@ psibase_package(
     SERVICE http-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
         SERVER rhttp-server
-        FLAGS allowSocket
+        FLAGS allowSocket allowWriteSubjective
     SERVICE rhttp-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
     DEPENDS wasm
@@ -565,8 +565,9 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionQueue.wasm
         FLAGS allowWriteSubjective
         SERVER txqueue
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/TransactionQueue/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
 )
 
 psibase_package(

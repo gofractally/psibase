@@ -33,6 +33,19 @@ namespace psibase
    };
    PSIO_REFLECT(ServerInterface, method(serveSys, request))
 
+   struct AsyncServerInterface
+   {
+      /// Handle HTTP requests
+      ///
+      /// - Call `http-server::sendReply` to return a response
+      /// - Abort. psinode produces a 500 response with the service's abort message.
+      /// - Otherwise, the request will be left in a pending state until
+      ///   `http-server::sendReply` is called
+      ///
+      void serveSys(std::int32_t socket, HttpRequest request);
+   };
+   PSIO_REFLECT(AsyncServerInterface, method(serveSys, socket, request))
+
    /// Interface for services which support storing files
    ///
    /// Some services support storing files which they then serve via HTTP.

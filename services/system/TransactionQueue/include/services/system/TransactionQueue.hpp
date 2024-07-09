@@ -4,6 +4,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/block.hpp>
+#include <psibase/trace.hpp>
 
 #include <cstdint>
 
@@ -55,19 +56,34 @@ namespace SystemService
    using UnappliedTransactionTable =
        psibase::Table<UnappliedTransactionRecord, &UnappliedTransactionRecord::primary_key>;
 
+   struct TraceClientRow
+   {
+      psibase::Checksum256      id;
+      std::vector<std::int32_t> sockets;
+   };
+   PSIO_REFLECT(TraceClientRow, id, sockets)
+
+   using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
+
    class TransactionQueue : psibase::Service<TransactionQueue>
    {
      public:
       static constexpr auto service = psibase::AccountNumber{"txqueue"};
-      using Subjective              = psibase::
-          SubjectiveTables<PendingTransactionTable, TransactionDataTable, AvailableSequenceTable>;
-      using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable>;
+      using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
+                                                   TransactionDataTable,
+                                                   AvailableSequenceTable,
+                                                   TraceClientTable>;
+      using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable>;
       std::optional<psibase::SignedTransaction> next();
-      void                                      recv(const psibase::SignedTransaction& transaction);
-      std::optional<psibase::HttpReply>         serveSys(const psibase::HttpRequest&);
+      // Handles transactions coming over P2P
+      void recv(const psibase::SignedTransaction& transaction);
+      // Callback
+      void onTrx(const psibase::Checksum256& id, const psibase::TransactionTrace& trace);
+      void serveSys(std::int32_t sock, const psibase::HttpRequest& request);
    };
    PSIO_REFLECT(TransactionQueue,
                 method(next),
                 method(recv, transaction),
-                method(serveSys, request))
+                method(onTrx, id, trace),
+                method(serveSys, socket, request))
 }  // namespace SystemService

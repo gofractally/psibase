@@ -79,7 +79,67 @@ namespace SystemService
       socketSend(producer_multicast, psio::to_frac(act));
    }
 
-   constexpr std::string_view allowedHeaders[] = {"Content-Encoding"};
+   namespace
+   {
+      constexpr std::string_view allowedHeaders[] = {"Content-Encoding"};
+
+      void sendReplyImpl(AccountNumber                   service,
+                         std::int32_t                    socket,
+                         const std::optional<HttpReply>& result)
+      {
+         if (result && service != AccountNumber{"common-api"})
+         {
+            for (const auto& header : result->headers)
+            {
+               if (!std::ranges::binary_search(allowedHeaders, header.name))
+               {
+                  abortMessage("service " + service.str() + " attempted to set http header " +
+                               header.name);
+               }
+            }
+         }
+
+         socketSend(socket, psio::to_frac(result));
+      }
+
+      std::optional<PendingRequestRow> currentRequest;
+   }  // namespace
+
+   void HttpServer::sendReply(std::int32_t socket, const std::optional<HttpReply>& result)
+   {
+      bool okay   = false;
+      auto sender = getSender();
+      if (currentRequest && currentRequest->socket == socket)
+      {
+         if (currentRequest->owner == sender)
+         {
+            currentRequest.reset();
+            okay = true;
+         }
+      }
+      else
+      {
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto requests = Subjective{}.open<PendingRequestTable>();
+            auto row      = requests.get(socket);
+            if (row && row->owner == sender)
+            {
+               requests.remove(*row);
+               okay = true;
+            }
+            else
+            {
+               okay = false;
+            }
+         }
+      }
+      if (!okay)
+      {
+         abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
+      }
+      sendReplyImpl(sender, socket, result);
+   }
 
    extern "C" [[clang::export_name("serve")]] void serve()
    {
@@ -108,23 +168,31 @@ namespace SystemService
       else
          service = "sites"_a;
 
-      // TODO: avoid repacking (both directions)
-      psibase::Actor<ServerInterface> iface(act.service, service);
-
-      auto result = iface.serveSys(std::move(req));
-      if (result && serviceName != "common-api")
+      // TODO: configure interface with registerServer
+      if (service == AccountNumber{"txqueue"})
       {
-         for (const auto& header : result->headers)
-         {
-            if (!std::ranges::binary_search(allowedHeaders, header.name))
-            {
-               abortMessage("service " + service.str() + " attempted to set http header " +
-                            header.name);
-            }
-         }
-      }
+         currentRequest = {.socket = sock, .owner = service};
 
-      socketSend(sock, psio::to_frac(result));
+         psibase::Actor<AsyncServerInterface> iface(act.service, service);
+         iface.serveSys(sock, std::move(req));
+
+         if (currentRequest)
+         {
+            PSIBASE_SUBJECTIVE_TX
+            {
+               auto requests = HttpServer::Subjective{}.open<PendingRequestTable>();
+               requests.put(*currentRequest);
+            }
+            currentRequest.reset();
+         }
+         return;
+      }
+      else
+      {
+         // TODO: avoid repacking (both directions)
+         psibase::Actor<ServerInterface> iface(act.service, service);
+         sendReplyImpl(service, sock, iface.serveSys(std::move(req)));
+      }
    }  // serve()
 
 }  // namespace SystemService

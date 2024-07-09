@@ -39,12 +39,31 @@ std::optional<SignedTransaction> SystemService::TransactionQueue::next()
    __builtin_unreachable();
 }
 
+void TransactionQueue::onTrx(const Checksum256& id, const TransactionTrace& trace)
+{
+   auto                          clients = Subjective{}.open<TraceClientTable>();
+   std::optional<TraceClientRow> row;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      row = clients.get(id);
+      if (row)
+         clients.remove(*row);
+   }
+   if (row)
+   {
+      HttpReply           reply{.contentType = "application/json"};
+      psio::vector_stream stream{reply.body};
+      to_json(trace, stream);
+      for (std::int32_t sock : row->sockets)
+         to<HttpServer>().sendReply(sock, reply);
+   }
+}
+
 namespace
 {
    using Subjective = TransactionQueue::Subjective;
-   bool pushTransaction(const SignedTransaction& trx)
+   bool pushTransaction(const Checksum256& id, const SignedTransaction& trx)
    {
-      auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
       PSIBASE_SUBJECTIVE_TX
       {
          auto pending = Subjective{}.open<PendingTransactionTable>();
@@ -76,22 +95,29 @@ namespace
 
 void TransactionQueue::recv(const SignedTransaction& trx)
 {
-   if (pushTransaction(trx))
+   auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+   if (pushTransaction(id, trx))
       forwardTransaction(trx);
 }
 
-std::optional<psibase::HttpReply> TransactionQueue::serveSys(const psibase::HttpRequest& request)
+void TransactionQueue::serveSys(int32_t socket, const psibase::HttpRequest& request)
 {
    if (request.method == "POST" && request.target == "/push_transaction")
    {
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
       auto trx = psio::from_frac<SignedTransaction>(request.body);
-      if (pushTransaction(trx))
+      auto id  = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto clients = Subjective{}.open<TraceClientTable>();
+         auto row     = clients.get(id).value_or(TraceClientRow{.id = id});
+         row.sockets.push_back(socket);
+         clients.put(row);
+      }
+      if (pushTransaction(id, trx))
          forwardTransaction(trx);
-      return HttpReply{.contentType = "application/json", .body = std::vector{'t', 'r', 'u', 'e'}};
    }
-   return {};
 }
 
 PSIBASE_DISPATCH(TransactionQueue)
