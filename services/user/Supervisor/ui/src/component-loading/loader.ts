@@ -75,29 +75,41 @@ class ImportDetails {
 // }
 
 async function getWasiImports(): Promise<ImportDetails> {
-    // Using bundled shim is faster (but bigger: 3.5MB) than CDN https://unpkg.com/@bytecodealliance/preview2-shim/lib/browser/index.js
-    const wasi_shimName = "./shim.js"; // Internal name used by bundler
-    const wasi_nameMapping: Array<[PkgId, FilePath]> = [
-        ["wasi:cli/*", `${wasi_shimName}#*`],
-        // ["wasi:cli/stdin", `${wasi_shimName}#*`],
-        // ["wasi:cli/stdout", `${wasi_shimName}#*`],
-        // ["wasi:cli/stderr", `${wasi_shimName}#*`],
-        ["wasi:random/*", `${wasi_shimName}#*`],
-        ["wasi:clocks/*", `${wasi_shimName}#*`],
 
-        // Seems like I should be able to disable the below shims
-        ["wasi:filesystem/*", `${wasi_shimName}#*`],
-        ["wasi:io/*", `${wasi_shimName}#*`],
-        ["wasi:sockets/*", `${wasi_shimName}#*`],
-        ["wasi:http/*", `${wasi_shimName}#*`],
+    /*
+      I'm taking a whitelisting approach, as opposed to providing all wasi imports by default.
+      As we discover that plugins need additional wasi imports, we can add them, but each added
+      shim should be validated.
+    */
+
+    const wasi_shimName = "./wasi-shim.js"; // Internal name used by bundler
+    const wasi_nameMapping: Array<[PkgId, FilePath]> = [
+        // e.g. importing an entire package ["wasi:cli/*", `${wasi_shimName}#*`],
+
+        ["wasi:cli/environment", `${wasi_shimName}#environment`],
+        ["wasi:cli/exit", `${wasi_shimName}#exit`],
+        ["wasi:io/error", `${wasi_shimName}#error`],
+        ["wasi:io/streams", `${wasi_shimName}#streams`],
+        ["wasi:cli/stdin", `${wasi_shimName}#stdin`],
+        ["wasi:cli/stdout", `${wasi_shimName}#stdout`],
+        ["wasi:cli/stderr", `${wasi_shimName}#stderr`],
+        ["wasi:clocks/wall-clock", `${wasi_shimName}#wallClock`],
+        ["wasi:filesystem/types", `${wasi_shimName}#types`],
+        ["wasi:filesystem/preopens", `${wasi_shimName}#preopens`],
+        ["wasi:random/random", `${wasi_shimName}#random`],
+        // ["wasi:io/*", `${wasi_shimName}#*`],
+        // ["wasi:sockets/*", `${wasi_shimName}#*`],
+
+        //  ~~~~~~~~~~~~~~~ BLACKLISTED ~~~~~~~~~~~~~~~
+        // ["wasi:http/*", `${wasi_shimName}#*`],
+        // We should not provide the http shim.
+        // Plugins should not be able to make HTTP requests except those that are wrapped in an 
+        //   interface provided by the host imports.
+        
     ];
-    console.log("TODO: Audit plugin wasi shims");
-    console.log("Improve the library... see comment.");
-    // The libary should detect if there is an invalid import map, suchas:
-    // ["wasi:cli/stdin", `${wasi_shimName}#*`],
-    //   I beat my head against bizarre errors for hours, where the transpiled library
-    //   included invalid javascript, such as: 
-    //   import {  as _, } from './shim.js';
+    // If the transpiled library contains bizarre inputs, such as:
+    //    import {  as _, } from './shim.js';
+    // It is very likely an issue with an invalid import mapping.
 
     // Bundle all the imports into one file, using URLs to link to the wasm blobs
     const wasi_shimCode = await fetch(wasiShimURL).then((r) => r.text());
