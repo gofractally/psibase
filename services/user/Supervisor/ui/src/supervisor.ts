@@ -9,7 +9,6 @@ import {
     signAndPushTransaction,
 } from "@psibase/common-lib";
 
-import { CallStack } from "./callStack";
 import { AppInterface } from "./appInterace";
 import { AddableAction } from "@psibase/supervisor-lib/messaging/PluginCallResponse";
 import { ServiceContext } from "./serviceContext";
@@ -24,9 +23,7 @@ const supervisorDomain = siblingUrl(null, "supervisor");
 export class Supervisor implements AppInterface {
     private serviceContexts: { [service: string]: ServiceContext } = {};
 
-    private callstack: CallStack;
-
-    private activeContext: CallContext | undefined;
+    private context: CallContext | undefined;
 
     parser: Promise<any>;
 
@@ -92,43 +89,42 @@ export class Supervisor implements AppInterface {
 
     constructor() {
         this.parser = parser();
-        this.callstack = new CallStack();
     }
 
-    // Called by the plugin on top of the callstack looking to identify its caller
+    // Called by the current plugin looking to identify its caller
     getCaller(currentPlugin: OriginationData): OriginationData | undefined {
-        const frame = this.callstack.peek(0);
+        const frame = this.context!.stack.peek(0);
         assert(frame !== undefined, "`getCaller` invalid outside plugin call resolution");
         assert(frame!.args.service === currentPlugin.app, "Only active plugin can ask for its caller");
         return frame!.caller;
     }
 
-    // Tracks actions that plugins scheduled to be added to the transaction
+    // Called by the active plugin to schedule an action for execution
     addAction(sender: OriginationData, action: AddableAction) {
-        const frame = this.callstack.peek(0);
+        const frame = this.context!.stack.peek(0);
         assert(frame !== undefined, "Can only add actions during plugin call resolution");
         assert(frame!.args.service === sender.app, "Invalid service attempted to add action");
-        this.activeContext!.addAction(action);
+        this.context!.addAction(action);
     }
 
     // Manages callstack and calls plugins
     call(sender: OriginationData, args: QualifiedFunctionCallArgs) : any {
 
-        if (this.callstack.isEmpty()) {
+        if (this.context!.stack.isEmpty()) {
             assert(sender.origin === this.parentOrigination!.origin, "Parent origin mismatch");
         } else {
             assert(sender.app !== undefined, "Cannot determine caller service");
-            assert(sender.app === this.callstack.peek(0)!.args.service, "Invalid sync call sender");
+            assert(sender.app === this.context!.stack.peek(0)!.args.service, "Invalid sync call sender");
         }
 
-        this.callstack.push(sender, args);
+        this.context!.stack.push(sender, args);
 
         const {service, plugin, intf, method, params} = args;
         const p = this.loadContext(service).loadPlugin(plugin);
         assert(p.new === false, "Tried to call plugin before initialization");
         const ret = p.plugin.call(intf, method, params);
 
-        this.callstack.pop();
+        this.context!.stack.pop();
 
         return ret;
     }
@@ -136,7 +132,7 @@ export class Supervisor implements AppInterface {
     // Temporary tx submission logic, until smart auth is implemented
     // All transactions are sent by "alice"
     async submitTx() {
-        const actions = this.activeContext!.actions;
+        const actions = this.context!.actions;
         if (actions.length <= 0) return;
         
         let formatted = actions.map((a: AddableAction) => {
@@ -177,8 +173,8 @@ export class Supervisor implements AppInterface {
         try {
             // Handle if a call is already in progress
             // TODO - Buffer multiple calls from root app
-            assert(this.activeContext === undefined, `Plugin call resolution already in progress.`)
-            this.activeContext = new CallContext();
+            assert(this.context === undefined, `Plugin call resolution already in progress.`)
+            this.context = new CallContext();
 
             // Store the origin of the root app. That should be the one-and-only root app that ever tries
             //      to interact with this supervisor.
@@ -201,7 +197,7 @@ export class Supervisor implements AppInterface {
             const result = this.call(this.parentOrigination!, args);
 
             // Post execution assertions
-            assert(this.callstack.isEmpty(), "Callstack should be empty");
+            assert(this.context.stack.isEmpty(), "Callstack should be empty");
 
             // Send plugin result to parent window
             this.replyToParent(args, result);
@@ -209,10 +205,10 @@ export class Supervisor implements AppInterface {
             // Pack any scheduled actions into a transaction and submit
             this.submitTx();
 
-            this.activeContext = undefined;
+            this.context = undefined;
         } catch (e) {
-            console.error("Error in supervisor caught. TODO: return error to parent window", e);
-            this.activeContext = undefined;
+            this.replyToParent(args, e);
+            this.context = undefined;
         }
     }
 }
