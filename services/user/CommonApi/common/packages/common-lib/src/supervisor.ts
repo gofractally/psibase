@@ -3,7 +3,7 @@ import {
     QualifiedFunctionCallArgs,
     toString,
 } from "./messaging/FunctionCallRequest";
-import { isErrorResponse } from "./messaging/FunctionCallResponse";
+import { isGenericError, isPluginError } from "./messaging/FunctionCallResponse";
 import { PluginId, QualifiedPluginId } from "./messaging/PluginId";
 import { buildPreLoadPluginsRequest } from "./messaging/PreLoadPluginsRequest";
 import {
@@ -82,7 +82,7 @@ export class Supervisor {
     handleRawEvent(messageEvent: MessageEvent) {
         if (
             messageEvent.origin !== myOrigin &&
-            messageEvent.origin != supervisorOrigin
+            messageEvent.origin !== supervisorOrigin
         ) {
             console.log("Received unauthorized message. Ignoring.");
             return;
@@ -121,23 +121,20 @@ export class Supervisor {
         const expected = this.pendingRequest.call;
         const received = response.call;
         const unexpected =
-            expected.method != received.method ||
-            expected.service != received.service;
+            expected.method !== received.method ||
+            expected.service !== received.service;
 
-        if (isErrorResponse(response)) {
-            this.pendingRequest.reject(response.result.val);
+        if (isPluginError(response.result) || isGenericError(response.result)) {
+            this.pendingRequest.reject(response.result);
             return;
         }
 
         if (unexpected) {
             // Could be infra error rather than plugin error, printing to console to increase probability
             // that it gets reported.
-            console.warn(
-                `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`,
-            );
-            this.pendingRequest.reject(
-                `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`,
-            );
+            const msg = `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`;
+            console.warn(msg);
+            this.pendingRequest.reject(msg);
             return;
         }
 

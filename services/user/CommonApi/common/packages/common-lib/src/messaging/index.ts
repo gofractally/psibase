@@ -6,7 +6,9 @@ export {
     type FunctionCallResponse,
     buildFunctionCallResponse,
     isFunctionCallResponse,
-    isErrorResult,
+    PluginError,
+    isPluginError,
+    isGenericError,
 } from "./FunctionCallResponse";
 
 export {

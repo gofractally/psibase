@@ -1,4 +1,4 @@
-import { FUNCTION_CALL_RESPONSE } from "./index";
+import { FUNCTION_CALL_RESPONSE, QualifiedPluginId } from "./index";
 import { FunctionCallArgs } from "./index";
 
 export interface FunctionCallResponse {
@@ -13,18 +13,27 @@ export const isFunctionCallResponse = (
     return data && data.type == FUNCTION_CALL_RESPONSE;
 };
 
-export const isErrorResult = (result: any) => {
-    return (
-        typeof result === "object" &&
-        "errorType" in result &&
-        typeof result.errorType === "string" &&
-        "val" in result &&
-        typeof result.val === "object"
-    );
+export class PluginError extends Error {
+    pluginId: QualifiedPluginId;
+    constructor(pluginId: QualifiedPluginId, message: string) {
+        super("");
+        this.name = "PluginError";
+        this.pluginId = pluginId;
+        this.message = message;
+    }
+}
+
+export const isGenericError = (error: any): error is Error => {
+    return typeof error === 'object' &&
+        'message' in error &&
+        typeof error.message === 'string' &&
+        'name' in error && 
+        typeof error.name === 'string';
 };
 
-export const isErrorResponse = (response: FunctionCallResponse) => {
-    return isErrorResult(response.result);
+export const isPluginError = (error: any): error is PluginError => {
+    return isGenericError(error) &&
+        'pluginId' in error;
 };
 
 export const buildFunctionCallResponse = (
