@@ -4,7 +4,7 @@ import { rollup } from "@rollup/browser";
 import { plugin } from "./index.js";
 
 const wasiShimURL = new URL("./bundled/_preview2-shim.js", import.meta.url);
-import hostShimCode from "./common-plugin.js?raw";
+import hostShimCode from "./host-api.js?raw";
 import { HostInterface } from "../hostInterface.js";
 import { ComponentAPI } from "../witExtraction.js";
 
@@ -110,7 +110,7 @@ async function getWasiImports(): Promise<ImportDetails> {
 }
 
 async function getHostImports(): Promise<ImportDetails> {
-    const hostShimName = "./common-plugin.js"; // internal name used by bundler
+    const hostShimName = "./host-api.js"; // internal name used by bundler
     const host_importMap: Array<[PkgId, FilePath]> = [
         [`common:plugin/*`, `${hostShimName}#*`],
     ];

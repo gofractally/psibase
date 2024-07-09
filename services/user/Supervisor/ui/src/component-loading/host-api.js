@@ -25,7 +25,7 @@ function send(req) {
         }
         xhr.send(req.body && req.body.length > 0 ? req.body : null);
         if (xhr.status === 500) {
-            throw commonErr(`${xhr.response}`);
+            return commonErr(`${xhr.response}`);
         }
         const body = xhr.response || undefined;
         const headers = [];
@@ -67,7 +67,7 @@ export const server = {
     // add-action-to-transaction: func(service: string, action: string, args: list<u8>) -> result<_, string>;
     addActionToTransaction(action, args) {
         if (!isValidAction(action)) {
-            throw commonErr(`Invalid action name: ${JSON.stringify(action)}`);
+            return CommonErr(`Invalid action name: ${JSON.stringify(action)}`);
         }
 
         host.addAction({
@@ -83,9 +83,9 @@ export const server = {
             return res.body;
         } catch (e) {
             if (e instanceof Error) {
-                throw commonErr(`Query failed: ${e.message}`);
+                return CommonErr(`Query failed: ${e.message}`);
             }
-            throw commonErr("GraphQL query failed.");
+            return CommonErr("GraphQL query failed.");
         }
     },
 };
@@ -95,7 +95,7 @@ export const client = {
     getSenderApp() {
         const caller = host.getCaller();
         if (caller === undefined)
-            throw CommonErr("Error determining caller");
+            return CommonErr("Error determining caller");
         return caller;
     },
 
@@ -103,7 +103,7 @@ export const client = {
     myServiceAccount() {
         const acc = host.getSelf().app;
         if (acc === undefined)
-            throw CommonErr("Error determining self app");
+            return CommonErr("Error determining self app");
         return acc;
     },
 
