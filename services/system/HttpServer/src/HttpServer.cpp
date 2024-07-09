@@ -180,7 +180,7 @@ namespace SystemService
          {
             PSIBASE_SUBJECTIVE_TX
             {
-               auto requests = HttpServer::Subjective{}.open<PendingRequestTable>();
+               auto requests = HttpServer::Subjective{act.service}.open<PendingRequestTable>();
                requests.put(*currentRequest);
             }
             currentRequest.reset();
