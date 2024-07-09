@@ -895,7 +895,7 @@ namespace psibase::http
 
             auto socket =
                 makeHttpSocket(send,
-                               [ok, not_found](std::optional<HttpReply>&& reply)
+                               [ok, error](std::optional<HttpReply>&& reply)
                                {
                                   if (reply)
                                      return ok(std::move(reply->body), reply->contentType.c_str(),
@@ -903,7 +903,7 @@ namespace psibase::http
                                   else
                                      // TODO: remember target. This won't be needed if we allow wasm
                                      // to return a specific response code.
-                                     return not_found("/whatever/the/target/is");
+                                     return error(bhttp::status::not_found, "Not found");
                                });
 
             // TODO: time limit
