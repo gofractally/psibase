@@ -11,13 +11,13 @@ import {
 } from "@psibase/common-lib";
 
 import { AppInterface } from "./appInterace";
-import { AddableAction } from "@psibase/supervisor-lib/messaging/PluginCallResponse";
 import { ServiceContext } from "./serviceContext";
 import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
 import { Plugin } from "./plugin/plugin";
 import { CallContext } from "./callContext";
 import { PluginHost } from "./pluginHost";
 import { isRecoverableError } from "./plugin/errors";
+import { Action } from "./action";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 
@@ -124,7 +124,7 @@ export class Supervisor implements AppInterface {
     }
 
     // Called by the active plugin to schedule an action for execution
-    addAction(sender: OriginationData, action: AddableAction) {
+    addAction(sender: OriginationData, action: Action) {
         const frame = this.context!.stack.peek(0);
         assert(
             frame !== undefined,
@@ -174,7 +174,7 @@ export class Supervisor implements AppInterface {
         const actions = this.context!.actions;
         if (actions.length <= 0) return;
 
-        let formatted = actions.map((a: AddableAction) => {
+        let formatted = actions.map((a: Action) => {
             return {
                 sender: "alice",
                 service: a.service,

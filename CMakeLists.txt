@@ -237,7 +237,6 @@ set(JS_DIRS
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
-set(SUPERVISOR_LIB_DIR services/user/Supervisor/lib/:SupervisorLib_js)
 
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
@@ -265,7 +264,6 @@ file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/servic
 
 # Builds the Common files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${SUPERVISOR_LIB_DIR} supervisor-lib.js ${CommonApiCommonLib_js_DEP})
 
 # Build each UI
 # Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
@@ -626,9 +624,7 @@ psibase_package(
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
     DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
-    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/lib/dist/supervisor-lib.js /supervisor-lib.js
     DEPENDS ${Supervisor_js_DEP}
-    DEPENDS ${SupervisorLib_js_DEP}
 )
 
 psibase_package(

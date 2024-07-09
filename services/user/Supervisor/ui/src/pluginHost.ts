@@ -2,7 +2,7 @@ import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
 import { HostInterface } from "./hostInterface";
 import { Supervisor } from "./supervisor";
 import { OriginationData } from "./utils";
-import { AddableAction } from "@psibase/supervisor-lib/messaging/PluginCallResponse";
+import { Action } from "./action";
 
 // This host interface is given to each serviceContext, but each is given a host interface
 //   that injects the service's identity into calls back to the supervisor. Therefore, caller
@@ -19,7 +19,7 @@ export class PluginHost implements HostInterface {
         return this.supervisor.call(this.self, args);
     }
 
-    addAction(action: AddableAction): void {
+    addAction(action: Action): void {
         this.supervisor.addAction(this.self, action);
     }
 

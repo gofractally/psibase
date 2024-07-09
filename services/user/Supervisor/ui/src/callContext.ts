@@ -1,14 +1,14 @@
-import { AddableAction } from "@psibase/supervisor-lib/messaging/PluginCallResponse";
+import { Action } from "./action";
 import { CallStack } from "./callStack";
 
 // An instance of this class is created to correspond to each invocation
 //   of the `entry` function on the supervisor. It contains data that is specific to each
 //   invocation.
 export class CallContext {
-    public actions: AddableAction[] = [];
+    public actions: Action[] = [];
     public stack: CallStack = new CallStack();
 
-    addAction(action: AddableAction) {
+    addAction(action: Action) {
         this.actions.push(action);
     }
 }
