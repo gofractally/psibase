@@ -118,6 +118,10 @@ void TransactionQueue::serveSys(int32_t socket, const psibase::HttpRequest& requ
       if (pushTransaction(id, trx))
          forwardTransaction(trx);
    }
+   else
+   {
+      to<HttpServer>().sendReply(socket, std::nullopt);
+   }
 }
 
 PSIBASE_DISPATCH(TransactionQueue)

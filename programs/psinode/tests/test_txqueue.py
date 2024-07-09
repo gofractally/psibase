@@ -23,6 +23,10 @@ class TestTransactionQueue(unittest.TestCase):
         new_balance = tokens.balance('alice', token=1)
         self.assertEqual(old_balance - 10000, new_balance)
 
+        with txqueue.get('/foo') as response:
+            print(response.text)
+            self.assertEqual(response.status_code, 404)
+
     @testutil.psinode_test
     def test_forward(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
