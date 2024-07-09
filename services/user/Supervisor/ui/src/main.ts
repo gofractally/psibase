@@ -25,9 +25,10 @@ const callHandlers: CallHandler[] = [];
 const shouldHandleMessage = (message: MessageEvent) => {
     const isTop = message.source == window.top;
     const isParent = message.source == window.parent;
-    const isSameRootDomain =
-        message.origin.endsWith(siblingUrl().slice("https://".length)) &&
-        message.origin.startsWith("https://");
+    const protocol = new URL(message.origin).protocol + "//";
+    const urlSuffix = siblingUrl().slice(protocol.length);
+    const isSameRootDomain = message.origin.endsWith(urlSuffix);
+
     return isTop && isParent && isSameRootDomain;
 };
 
