@@ -6,74 +6,53 @@ import { plugin } from "./index.js";
 const wasiShimURL = new URL("./bundled/_preview2-shim.js", import.meta.url);
 import hostShimCode from "./host-api.js?raw";
 import { HostInterface } from "../hostInterface.js";
-import { ComponentAPI } from "../witExtraction.js";
+import { ComponentAPI, Functions } from "../witExtraction.js";
 import { assert } from "../utils.js";
+import { ProxyPkg } from "./proxy/proxyPackage.js";
+import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 
-type Code = string;
-type PkgId = string;
-type FilePath = string;
-class ImportDetails {
-    importMap: Array<[PkgId, FilePath]>
-    files: Array<[FilePath, Code]>;
-    constructor(importMap: Array<[PkgId, FilePath]>, files: Array<[FilePath, Code]>) {
-        this.importMap = importMap;
-        this.files = files;
+class ProxyPkgs {
+    packages: ProxyPkg[] = [];
+
+    [Symbol.iterator]() {
+        return this.packages.values();
+    }
+
+    get = (ns: string, id: string): ProxyPkg => {
+        let pkg = this.packages.find(p => p.namespace === ns && p.id === id);
+        if (pkg) {
+            return pkg;
+        }
+        pkg = new ProxyPkg(ns, id);
+        this.packages.push(pkg);
+        return pkg;
+    }
+
+    map<T>(callback: (pkg: ProxyPkg, index: number, array: ProxyPkg[]) => T): T[] {
+        return this.packages.map(callback);
     }
 };
 
-// const getImportFills = (
-//     importedFuncs: ImportedFunctions,
-//     resultCache: ResultCache[],
-// ): { [key: string]: string }[] => {
-//     const { interfaces, funcs: freeFunctions } = importedFuncs;
-//     if (freeFunctions.length !== 0) {
-//         // TODO: Check how this behaves if a plugin exports a freestanding function and
-//         //       another plugin imports it.
-//         throw Error(`TODO: Plugins may not import freestanding functions.`);
-//     }
+function getProxiedImports({ interfaces: allInterfaces, funcs: freeFunctions }: Functions): ImportDetails {
+    assert(freeFunctions.length === 0, `TODO: Plugins may not import freestanding functions.`);
 
-//     let importables: { [key: string]: string }[] = [];
-//     let subset = interfaces.filter((i) => {
-//         return !hostIntf(i) && !(i.funcs.length === 0);
-//     });
+    const interfaces = allInterfaces.filter(i=>i.namespace !== "wasi" 
+        && i.namespace !== "common"
+        && i.funcs.length !== 0
+    );
 
-//     let namespaced: FunctionIntfs = new Proxy({}, autoArrayInit);
-//     subset.forEach((intf: FunctionInterface) => {
-//         let key: PkgId = { ns: intf.namespace, pkg: intf.package };
-//         namespaced[serializePkgId(key)].push(intf);
-//     });
+    if (interfaces.length === 0) {
+        return new ImportDetails([], []);
+    }
 
-//     for (const [pkgId, intfs] of Object.entries(namespaced)) {
-//         let imp: string[] = [];
-//         intfs.forEach((intf: FunctionInterface) => {
-//             imp.push(`export const ${intf.name} = {
-//             `);
-//             intf.funcs.forEach((f: string) => {
-//                 imp.push(`${f}(...args) {
-//                 `);
-//                 imp.push(
-//                     getFunctionBody(
-//                         {
-//                             service: intf.namespace,
-//                             plugin: intf.package,
-//                             intf: intf.name,
-//                             method: f,
-//                         },
-//                         resultCache,
-//                     ),
-//                 );
-//                 imp.push(`},`);
-//             });
-//             imp.push(`}`);
-//         });
-//         importables.push({ [`${pkgId}/*`]: `${imp.join("")}` });
-//     }
-//     return importables;
-// };
+    const packages = new ProxyPkgs();
+    for (const i of interfaces) {
+        packages.get(i.namespace, i.package).add(i.name, i.funcs);
+    }
 
-// async function getDynamicImports(api: ComponentAPI) {
-//     console.log(api);
-// }
+    const imports: ImportDetails[] = packages.map(p => p.getImportDetails());
+    return mergeImports(imports);
+}
 
 async function getWasiImports(): Promise<ImportDetails> {
 
@@ -112,10 +91,8 @@ async function getWasiImports(): Promise<ImportDetails> {
     //    import {  as _, } from './shim.js';
     // It is very likely an issue with an invalid import mapping.
 
-    // Bundle all the imports into one file, using URLs to link to the wasm blobs
     const wasi_shimCode = await fetch(wasiShimURL).then((r) => r.text());
     const wasi_ShimFile: [FilePath, Code] = [wasi_shimName, wasi_shimCode];
-
     return {
         importMap: wasi_nameMapping,
         files: [wasi_ShimFile]
@@ -140,8 +117,12 @@ function mergeImports(importDetails: ImportDetails[]) : ImportDetails {
     return new ImportDetails(importMap, files);
 }
 
-export async function loadPlugin(wasmBytes: Uint8Array, pluginHost: HostInterface, _api: ComponentAPI) {
-    const imports = mergeImports([await getWasiImports(), await getHostImports()]);
+export async function loadPlugin(wasmBytes: Uint8Array, pluginHost: HostInterface, api: ComponentAPI) {
+    const imports = mergeImports([
+        await getWasiImports(), 
+        await getHostImports(),
+        await getProxiedImports(api.importedFuncs),
+    ]);
     const { app } = pluginHost.getSelf();
     assert(app !== undefined, "Plugin must correspond to a psibase service");
 
