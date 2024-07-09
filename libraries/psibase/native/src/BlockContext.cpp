@@ -176,7 +176,7 @@ namespace psibase
       if (!psio::fracpack_validate<NotifyRow>(notifySpan))
          return;
 
-      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions();
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions().unpack();
 
       auto oldIsProducing = isProducing;
       auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
@@ -214,7 +214,7 @@ namespace psibase
       if (!psio::fracpack_validate<NotifyRow>(notifySpan))
          return;
 
-      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions();
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions().unpack();
 
       auto oldIsProducing = isProducing;
       auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
@@ -222,14 +222,14 @@ namespace psibase
 
       Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tuple(id, trace))};
 
-      for (auto a : actions)
+      for (const auto& a : actions)
       {
-         if (a.sender() != AccountNumber{})
+         if (a.sender != AccountNumber{})
             continue;
-         if (!a.rawData().empty())
+         if (!a.rawData.empty())
             continue;
-         action.service = a.service();
-         action.method  = a.method();
+         action.service = a.service;
+         action.method  = a.method;
          SignedTransaction  trx;
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, true, false, true, true};
