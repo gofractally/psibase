@@ -110,61 +110,61 @@ mod service {
 
     #[Object]
     impl Query {
-        // async fn attestation(
-        //     &self,
-        //     n: usize,
-        //     attester: AccountNumber,
-        //     // ) -> async_graphql::Result<Vec<Attestation>, async_graphql::Error> {
-        // ) -> Vec<Attestation> {
-        //     // let mytuple: (AccountNumber,) = (attester,);
-        //     // AttestationTable::new()
-        //     //     .get_index_by_attester()
-        //     //     .get(&mytuple)
+        async fn all_attestations(
+            &self,
+            //     n: usize,
+            //     attester: AccountNumber,
+        ) -> async_graphql::Result<Vec<Attestation>, async_graphql::Error> {
+            println!("Query.all_attestations()");
+            // ) -> Vec<Attestation> {
+            //     // let mytuple: (AccountNumber,) = (attester,);
+            //     // AttestationTable::new()
+            //     //     .get_index_by_attester()
+            //     //     .get(&mytuple)
 
-        //     // TableQuery::subindex::<u64>(AttestationTable::new().get_index_by_attester(), &attester)
-        //     //     .first(Some(1))
+            //     // TableQuery::subindex::<u64>(AttestationTable::new().get_index_by_attester(), &attester)
+            //     //     .first(Some(1))
 
-        //     // AttestationTable::new()
-        //     //     .get_index_by_attester()
-        //     //     .iter()
-        //     //     .take(n)
-        //     //     .collect::<Vec<Attestation>>()
+            //     // AttestationTable::new()
+            //     //     .get_index_by_attester()
+            //     //     .iter()
+            //     //     .take(n)
+            //     //     .collect::<Vec<Attestation>>()
 
-        //     // .query()
-        //     // .await
+            //     // .query()
+            //     // .await
 
-        //     write_console("Query.attestation()");
+            //     write_console("Query.attestation()");
 
-        //     // works
-        //     let obj1 = AttestationTable::new().get_index_pk();
-        //     // .iter().take(1);
-        //     // not works
-        //     let obj2 = AttestationTable::new()
-        //         .get_index_by_attester()
-        //         .iter()
-        //         .take(1)
-        //         .collect();
-        //     // works
-        //     let obj3 = TableQuery::subindex::<u64>(
-        //         AttestationTable::new().get_index_by_attester(),
-        //         &attester,
-        //     );
-        //     // .iter()
-        //     // .take(1);
+            //     // works
+            //     let obj1 = AttestationTable::new().get_index_pk();
+            //     // .iter().take(1);
+            //     // not works
+            //     let obj2 = AttestationTable::new()
+            //         .get_index_by_attester()
+            //         .iter()
+            //         .take(1)
+            //         .collect();
+            //     // works
+            //     let obj3 = TableQuery::subindex::<u64>(
+            //         AttestationTable::new().get_index_by_attester(),
+            //         &attester,
+            //     );
+            //     // .iter()
+            //     // .take(1);
 
-        //     AttestationTable::new()
-        //         .get_index_pk()
-        //         .iter()
-        //         .take(1)
-        //         .collect()
+            Ok(AttestationTable::new()
+                .get_index_pk()
+                .iter()
+                .collect::<Vec<Attestation>>())
 
-        //     // let first_attestation: Vec<Attestation> = AttestationTable::new()
-        //     //     .get_index_by_attester()
-        //     //     .iter()
-        //     //     .take(1)
-        //     //     .collect();
-        //     // first_attestation[0].clone()
-        // }
+            //     // let first_attestation: Vec<Attestation> = AttestationTable::new()
+            //     //     .get_index_by_attester()
+            //     //     .iter()
+            //     //     .take(1)
+            //     //     .collect();
+            //     // first_attestation[0].clone()
+        }
 
         async fn attestations(
             &self,

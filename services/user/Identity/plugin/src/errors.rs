@@ -4,6 +4,7 @@ use crate::bindings::common::plugin::types::{Error, PluginId};
 pub enum ErrorType {
     NotYetImplemented,
     InvalidAccountNumber,
+    InvalidClaim,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -25,6 +26,11 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("Invalid account number: {}", msg),
+            },
+            ErrorType::InvalidClaim => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Invalid Confidence (must be between 0.0 and 1.0): {}", msg),
             },
         }
     }

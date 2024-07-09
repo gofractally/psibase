@@ -194,8 +194,11 @@ function App() {
   const [c, setC] = useState("");
   const [answer, setAnswer] = useState("?");
 
-  const [claim, setClaim] = useState<number>(0.0);
-  const [attestationClaim, setAttestationClaim] = useState<string>("");
+  const [claim, setClaim] = useState<number>(0.95);
+  const [attestee, setAttestee] = useState<string>("bob");
+  const [attestationClaim, setAttestationClaim] =
+    useState<string>(`{"attestation_type": "notIdentity", "subject": "bob", "claim": "My test claim", "score": 0.95}
+`);
 
   const attestIdentity = async () => {
     try {
@@ -215,7 +218,10 @@ function App() {
   };
   const attestAttestation = async () => {
     try {
-      console.info("attest().calling identity.api.attest()");
+      console.info(
+        "attest().calling identity.api.attest() claim:",
+        attestationClaim
+      );
       const res = await supervisor.functionCall({
         service: "attestation",
         intf: "api",
@@ -235,18 +241,32 @@ function App() {
       <h3>Attestation</h3>
       <div>
         <h4>Identity Claim:</h4>
-        <input
-          id="claim"
-          type="text"
-          onChange={(e) => {
-            if (!/^[0-9.]*$/.test(e.target.value)) {
-              e.preventDefault();
-            } else {
-              setClaim(parseFloat(e.target.value));
-            }
-          }}
-        />
-        <button onClick={attestIdentity}> Attest </button>
+        <div>
+          <span>Attestee:</span>
+          <input
+            id="attestee"
+            type="text"
+            onChange={(e) => {
+              setAttestee(e.target.value);
+            }}
+            value={attestee}
+          />
+        </div>
+        <div>
+          <input
+            id="claim"
+            type="text"
+            onChange={(e) => {
+              if (!/^[0-9.]*$/.test(e.target.value)) {
+                e.preventDefault();
+              } else {
+                setClaim(parseFloat(e.target.value));
+              }
+            }}
+            value={claim}
+          />
+          <button onClick={attestIdentity}> Attest </button>
+        </div>
       </div>
       <div>
         <h4>Attestation Claim:</h4>
@@ -256,6 +276,7 @@ function App() {
           onChange={(e) => {
             setAttestationClaim(e.target.value);
           }}
+          value={attestationClaim}
         />
         <button onClick={attestAttestation}> Attest </button>
       </div>
