@@ -42,7 +42,6 @@ A psibase app is composed of various parts:
 * The database
 * The service
 * The plugin
-* The supervisor
 * The user interface
 
 ## Database
@@ -51,40 +50,19 @@ On the server side, a psibase app has read/write access to a key/value database.
 
 ## Service
 
-A service is a server-side component that defines an API for both authenticated and unauthenticated requests to the app. Authenticated requests are called "actions" and allow users of the app to update the app state.
+A service is a server-side component that defines an API for both authenticated and unauthenticated requests to the app. 
 
-Unauthenticated requests are read-only and could be traditional GET requests, GraphQL queries, or any other kind of HTTP request. The logic for handling these HTTP requests is completely defined by the service.
+* Authenticated requests are called "actions" and allow users of the app to update the app state.
+* Unauthenticated requests are read-only and could be traditional GET requests, GraphQL queries, or any other kind of HTTP request. The logic for handling these HTTP requests is completely defined by the service.
 
 Psibase services are intended to take the place of the server-side component for traditional apps. 
 
-### Limitations
-
-All data stored in a service is public and accessible at least by the infrastructure providers. Therefore, services are not suitable for storing private data unless the data is encrypted.
-
-Services are unable to make web requests to external APIs and servers. Services are sandboxed and their functionality is limited to whatever is explicitly exposed to the service, such as the key/value API and the forwarding of web-requests into their RPC handling functions.
-
 ## Plugin
 
-Psibase service developers can build components that run client-side known as plugins. Plugins are responsible for:
-
-1. Wrapping complicated interactions with one or more services into concise and user-friendly APIs
-2. Managing and exposing client-side local storage between apps
-3. Using the supervisor to send and receive messages to and from other plugins
-
-Psibase apps enjoy unprecedented modularity and allow apps to define both client and server-side functionality that can be reused by other apps. Plugins are the innovation that allow this client-side modularity. See the [plugins](./plugins.md) specification for more details.
-
-## Supervisor
-
-Psibase apps make use of a client-side component known as the supervisor. The supervisor is responsible for:
-1. Instantiating plugins
-2. Facilitating all communication between UIs and plugins, plugins and other plugins, and plugins and services
-3. Constructing and submitting transactions (write operations) to the server
-
-See the [supervisor](./supervisor.md) specification for more details.
-
+Psibase app developers build plugins to manage client-side user interactions and enable external integrations with their application. See the [plugins](./plugins.md) specification for more details.
 
 ## User interfaces
 
-Every app needs a user interface. The difference between user-interfaces on psibase networks vs other user interfaces is that psibase app UIs are stored in the service database along with the other app state. This allows the UI to be replicated across the network and eliminates the web server as a potential point of centralization in an otherwise distributed app hosting architecture.
+User-interfaces on psibase networks are stored in the service database along with all other app state. This implies that the UI is replicated across the network and it eliminates the web server as a potential point of centralization in an otherwise decentralized technology stack.
 
-User interfaces can be written and bundled using regular UI development techniques and can then be uploaded to and served directly from services.
+User interfaces can be created using standard UI development techniques and can then be uploaded to and served directly from services.
