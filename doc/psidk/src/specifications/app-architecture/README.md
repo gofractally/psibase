@@ -1,6 +1,6 @@
 # Psibase apps
 
-Psibase networks can host the full application stack. Rather than needing to rent your own web server for your app's server side component, you can simply create a psibase account which doubles as a domain name and can handle HTTP server requests. For example, if an infrastructure provider is hosting their psibase node at `my-node.com`, then an account `alice` could host content that is retrievable at `alice.my-node.com/`. Another psibase node on the same network will serve the same content at `alice.another-node.com`.
+Psibase networks can host the full application stack. Rather than needing to rent your own web server for your app's server side component, you can simply create an account on a psibase network which doubles as a domain name and can even handle HTTP server requests. For example, if an infrastructure provider is hosting their psibase node at `my-node.com`, then an account `alice` could host content that is retrievable at `alice.my-node.com/`. Another psibase node in the same psibase network hosted at `another-node.com` will serve the same content at `alice.another-node.com`.
 
 # Psibase app components
 
