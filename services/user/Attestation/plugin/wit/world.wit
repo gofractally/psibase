@@ -9,8 +9,8 @@ interface api {
     */
     // Simple call that builds the VC, making assumptions about who's the holder, the subject, etc.
     // assumption: subject == holder
-    // `claim` maps to `credential-subject` in the VC
-    attest: func(attestation-type: string, claim: string) -> result<_, error>;
+    // `claim` maps roughly to `credential-subject` in the VC
+    attest: func(claim: string) -> result<_, error>;
     // build a VC and pass that to the server
 }
 
