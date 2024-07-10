@@ -1,14 +1,25 @@
 #![allow(non_snake_case)]
 
-use crate::{Hex, Pack, Reflect, ToKey, Unpack};
-use serde::{Deserialize, Serialize};
+use crate::{Hex, Pack, Reflect, ToKey, ToSchema, Unpack};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// An HTTP header
 ///
 /// Note: `http-server` aborts when most services set HTTP headers. It only allows services
 /// it trust to set them in order to enforce security rules.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    Pack,
+    Unpack,
+    Reflect,
+    ToKey,
+    ToSchema,
+    Serialize,
+    Deserialize,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
@@ -27,7 +38,18 @@ pub struct HttpHeader {
 /// action. The `http-server` service receives it via its `serve` exported function.
 
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    Pack,
+    Unpack,
+    Reflect,
+    ToKey,
+    ToSchema,
+    Serialize,
+    Deserialize,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
@@ -52,11 +74,36 @@ pub struct HttpRequest {
     pub body: Hex<Vec<u8>>,
 }
 
+pub struct HttpBody {
+    pub contentType: String,
+    pub body: Hex<Vec<u8>>,
+}
+
+impl HttpBody {
+    pub fn graphql(query: &str) -> Self {
+        HttpBody {
+            contentType: "application/graphql".into(),
+            body: query.to_string().into_bytes().into(),
+        }
+    }
+}
+
 /// An HTTP reply
 ///
 /// Services return this from their [serveSys](crate::server_interface::ServerActions::serveSys) action.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    Pack,
+    Unpack,
+    Reflect,
+    ToSchema,
+    ToKey,
+    Serialize,
+    Deserialize,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]
@@ -70,4 +117,13 @@ pub struct HttpReply {
 
     /// HTTP Headers
     pub headers: Vec<HttpHeader>,
+}
+
+impl HttpReply {
+    pub fn text(self) -> Result<String, anyhow::Error> {
+        Ok(String::from_utf8(self.body.0)?)
+    }
+    pub fn json<T: DeserializeOwned>(self) -> Result<T, anyhow::Error> {
+        Ok(serde_json::de::from_str(&self.text()?)?)
+    }
 }

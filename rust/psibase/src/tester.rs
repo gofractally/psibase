@@ -8,14 +8,15 @@
 
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
-    AccountNumber, Action, Caller, DirectoryRegistry, Error, InnerTraceEnum, JointRegistry,
-    PackageRegistry, Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction,
-    TransactionTrace,
+    AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
+    InnerTraceEnum, JointRegistry, PackageRegistry, Reflect, SignedTransaction, StatusRow,
+    TimePointSec, Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
 use futures::executor::block_on;
 use psibase_macros::account_raw;
+use serde::de::DeserializeOwned;
 use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::{marker::PhantomData, ptr::null_mut};
@@ -238,6 +239,60 @@ impl Chain {
         services::setcode::Wrapper::push_from(self, account)
             .setCode(account, 0, 0, code.to_vec().into())
             .get()
+    }
+
+    pub fn http(&self, request: &HttpRequest) -> Result<HttpReply, anyhow::Error> {
+        //if producing.get() && is_auto_block_start {
+        //    finishBlock();
+        //}
+
+        let packed_request = request.packed();
+        let size = unsafe {
+            tester_raw::testerHttpRequest(
+                self.chain_handle,
+                packed_request.as_ptr(),
+                packed_request.len(),
+            )
+        };
+        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
+
+        if let Some(error) = &trace.error {
+            return Err(anyhow!("http request failed: {}", error));
+        }
+
+        if trace.action_traces.len() != 1 {
+            return Err(anyhow!("Expected exactly one action trace"));
+        }
+        let action_trace = trace.action_traces.first().unwrap();
+        if let Some(response) = <Option<HttpReply>>::unpacked(&action_trace.raw_retval)? {
+            Ok(response)
+        } else {
+            return Err(anyhow!("404 Not Found"));
+        }
+    }
+    pub fn post(
+        &self,
+        account: AccountNumber,
+        target: &str,
+        data: HttpBody,
+    ) -> Result<HttpReply, anyhow::Error> {
+        self.http(&HttpRequest {
+            host: format!("{}.psibase.io", account),
+            rootHost: "psibase.io".into(),
+            method: "POST".into(),
+            target: target.into(),
+            contentType: data.contentType,
+            body: data.body,
+        })
+    }
+
+    pub fn graphql<T: DeserializeOwned>(
+        &self,
+        account: AccountNumber,
+        query: &str,
+    ) -> Result<T, anyhow::Error> {
+        self.post(account, "/graphql", HttpBody::graphql(query))?
+            .json()
     }
 }
 
