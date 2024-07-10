@@ -12,7 +12,8 @@ import {
     PackageMeta,
     ProducerType,
     ServicesType,
-} from "@/types";
+    WrappedPackages,
+} from "../types";
 import { ServicesForm } from "@/components/forms/services-form";
 import { InstallForm } from "@/components/forms/install-form";
 import { TypeForm } from "@/components/forms/type-form";
@@ -26,29 +27,6 @@ interface PackageOp {
     Replace?: [PackageMeta, PackageInfo];
     Remove?: PackageMeta;
 }
-
-const DependencySchema = z.object({
-    name: z.string(),
-    version: z.string(),
-});
-
-const PackageInfoSchema = z.object({
-    accounts: z.string().array(),
-    depends: z.array(DependencySchema),
-    description: z.string(),
-    file: z.string(),
-    name: z.string(),
-    sha256: z.string(),
-    version: z.string(),
-});
-
-const WrappedPackages = z
-    .object({
-        Install: PackageInfoSchema,
-    })
-    .array();
-
-type PackageInfoShape = z.infer<typeof PackageInfoSchema>;
 
 export const BootPage = () => {
     const { data: config, refetch: refetchConfig } = useConfig();
@@ -84,10 +62,6 @@ export const BootPage = () => {
             )
         ).map((x) => x.Install);
 
-        console.log({
-            in: packageNamesRequeted,
-            resolvedPackages: fullDependencies,
-        });
         setPackagesToInstall(fullDependencies);
     };
 

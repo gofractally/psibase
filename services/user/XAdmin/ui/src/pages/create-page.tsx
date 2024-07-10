@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Fragment, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ChevronRight,
     ChevronLeft,
@@ -19,6 +18,20 @@ import { BlockProducerForm } from "@/components/forms/block-producer";
 import { ConfirmationForm } from "@/components/forms/confirmation-form";
 
 import { usePackages } from "../hooks/usePackages";
+import { PackageInfo } from "@/types";
+
+import { useSelectedRows } from "../hooks/useSelectedRows";
+import { Steps } from "@/components/steps";
+import { DependencyDialog } from "./dependency-dialog";
+import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
+import { getId } from "@/lib/getId";
+
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const useStepper = (
     numberOfSteps: number,
@@ -55,44 +68,6 @@ const useStepper = (
     };
 };
 
-const Steps = ({
-    currentStep,
-    numberOfSteps,
-}: {
-    currentStep: number;
-    numberOfSteps: number;
-}) => {
-    return (
-        <div className="flex items-center ">
-            {Array.from({ length: numberOfSteps }).map((_, index) => {
-                const isPresentOrPast = currentStep >= index + 1;
-                const isHighlight = currentStep > index + 1;
-                const isFinalStep = index + 1 == numberOfSteps;
-                return (
-                    <Fragment key={index}>
-                        <div
-                            className={cn(
-                                "h-6 w-6 rounded-full bg-border transition-colors duration-300",
-                                {
-                                    "bg-primary": isPresentOrPast,
-                                }
-                            )}
-                        ></div>
-                        {!isFinalStep && (
-                            <div
-                                className={cn(
-                                    `h-1 w-96 bg-border transition-all duration-300`,
-                                    { "bg-primary": isHighlight }
-                                )}
-                            ></div>
-                        )}
-                    </Fragment>
-                );
-            })}
-        </div>
-    );
-};
-
 interface PrevNextProps {
     previous: () => void;
     next: () => void;
@@ -105,38 +80,53 @@ const PrevNextButtons = ({
     canPrev,
     next,
     previous,
-}: PrevNextProps) => {
-    return (
-        <div className="flex w-full justify-between">
-            <Button
-                variant="ghost"
-                onClick={() => {
-                    previous();
-                }}
-                disabled={!canPrev}
-            >
-                {canPrev ? <ChevronLeft /> : <ChevronFirst />}
-            </Button>
+}: PrevNextProps) => (
+    <div className="flex w-full justify-between">
+        <Button
+            variant="ghost"
+            onClick={() => {
+                previous();
+            }}
+            disabled={!canPrev}
+        >
+            {canPrev ? <ChevronLeft /> : <ChevronFirst />}
+        </Button>
 
-            <Button
-                variant="ghost"
-                onClick={() => {
-                    next();
-                }}
-                disabled={!canNext}
-            >
-                {canNext ? <ChevronRight /> : <ChevronLast />}
-            </Button>
-        </div>
-    );
-};
+        <Button
+            variant="ghost"
+            onClick={() => {
+                next();
+            }}
+            disabled={!canNext}
+        >
+            {canNext ? <ChevronRight /> : <ChevronLast />}
+        </Button>
+    </div>
+);
 
 const BlockProducerSchema = z.object({
     name: z.string().min(2),
 });
-const PortsSchema = z.object({
-    ports: z.string().min(4),
-});
+
+interface DependencyState {
+    show: boolean;
+    removingPackage?: PackageInfo;
+    dependencies: PackageInfo[];
+}
+
+let prom: (value: boolean) => void;
+
+interface Props {
+    label: string;
+    value: string;
+}
+
+const Card = ({ label, value }: Props) => (
+    <div className="w-60 rounded-md border p-2 text-right">
+        <div className="text-sm text-muted-foreground">{label}</div>
+        {value}
+    </div>
+);
 
 export const CreatePage = () => {
     const blockProducerForm = useForm<z.infer<typeof BlockProducerSchema>>({
@@ -151,16 +141,73 @@ export const CreatePage = () => {
     });
 
     const { canNext, canPrev, next, previous, currentStep, maxSteps } =
-        useStepper(4, [chainTypeForm, blockProducerForm]);
+        useStepper(4, [chainTypeForm, blockProducerForm, "a"]);
 
     const { data: packages } = usePackages();
 
-    // track what packages we've got, update;
-    // provide array of packages to the confirmation page.
+    const isDev = chainTypeForm.watch("type") == "dev";
+
+    const suggestedSelected = getDefaultSelectedPackages(
+        {
+            dev: isDev,
+        },
+        packages
+    );
+
+    console.log(JSON.stringify(packages.map((x) => x.name)));
+
+    const [
+        { dependencies, show: showDependencyDialog, removingPackage },
+        setWarningState,
+    ] = useState<DependencyState>({
+        dependencies: [],
+        show: false,
+    });
+
+    const [rows, setRows, overWriteRows] = useSelectedRows(
+        packages,
+        async (warning) => {
+            setWarningState({
+                removingPackage: warning.removedPackage,
+                dependencies: warning.dependencies,
+                show: true,
+            });
+            return new Promise((resolve) => {
+                prom = resolve;
+            });
+        }
+    );
+
+    console.log(rows, "rows");
+
+    useEffect(() => {
+        if (currentStep == 3) {
+            console.log("running");
+            const state = suggestedSelected.selectedPackages.reduce(
+                (acc, item) => ({ ...acc, [getId(item)]: true }),
+                {}
+            );
+
+            console.log(state, "should be set too");
+            overWriteRows(state);
+        }
+    }, [currentStep]);
 
     return (
         <SetupWrapper>
-            <div className="flex h-full flex-col ">
+            <DependencyDialog
+                removingPackage={removingPackage}
+                show={showDependencyDialog}
+                dependencies={dependencies}
+                onResponse={(confirmed) => {
+                    setWarningState((res) => ({
+                        ...res,
+                        show: false,
+                    }));
+                    prom(confirmed);
+                }}
+            />
+            <div className="flex h-full flex-col border border-green-500">
                 <div className="my-auto flex h-full flex-col justify-between sm:h-5/6">
                     <Steps currentStep={currentStep} numberOfSteps={maxSteps} />
                     {currentStep == 1 && (
@@ -174,14 +221,43 @@ export const CreatePage = () => {
                         </div>
                     )}
                     {currentStep == 3 && (
-                        <div>
-                            <ConfirmationForm
-                                rowSelection={{}}
-                                onRowSelect={(e) => {
-                                    console.log(e, "came out");
-                                }}
-                                packages={packages}
-                            />
+                        <div className="border border-blue-500">
+                            <div className="grid grid-cols-2 py-6">
+                                <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
+                                    Installation
+                                </h1>{" "}
+                                <div className="flex flex-row-reverse">
+                                    <div className="flex flex-col border border-red-500">
+                                        <Card
+                                            label="Template"
+                                            value={
+                                                isDev
+                                                    ? "Developer"
+                                                    : "Production"
+                                            }
+                                        />
+
+                                        <Card
+                                            label="Block Producer Name"
+                                            value="orelosoftware"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <Accordion type="single" collapsible>
+                                <AccordionItem value="item-1">
+                                    <AccordionTrigger className="w-60">
+                                        Advanced
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <ConfirmationForm
+                                            rowSelection={rows}
+                                            onRowSelectionChange={setRows}
+                                            packages={packages}
+                                        />
+                                    </AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
                         </div>
                     )}
                     {currentStep == 4 && <div>Step 4</div>}

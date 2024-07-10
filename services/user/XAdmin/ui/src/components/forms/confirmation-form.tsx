@@ -28,22 +28,11 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { PackageInfo } from "@/types";
+import { getId } from "@/lib/getId";
 
 export const columns: ColumnDef<PackageInfo>[] = [
     {
         id: "select",
-        header: ({ table }) => (
-            <Checkbox
-                checked={
-                    table.getIsAllPageRowsSelected() ||
-                    (table.getIsSomePageRowsSelected() && "indeterminate")
-                }
-                onCheckedChange={(value) =>
-                    table.toggleAllPageRowsSelected(!!value)
-                }
-                aria-label="Select all"
-            />
-        ),
         cell: ({ row }) => (
             <Checkbox
                 checked={row.getIsSelected()}
@@ -93,26 +82,21 @@ export const columns: ColumnDef<PackageInfo>[] = [
 interface Props {
     packages: PackageInfo[];
     rowSelection: RowSelectionState;
-    onRowSelect: (index: number) => void;
+    onRowSelectionChange: React.Dispatch<
+        React.SetStateAction<RowSelectionState>
+    >;
 }
 
 export function ConfirmationForm({
     packages,
     rowSelection,
-    onRowSelect,
+    onRowSelectionChange,
 }: Props) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] =
         React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] =
         React.useState<VisibilityState>({});
-
-    console.log(rowSelection, "all data");
-
-    const selectRow = (e: any) => {
-        console.log(e, "came in", e());
-        // setRowSelection(e);
-    };
 
     const table = useReactTable({
         data: packages,
@@ -124,8 +108,8 @@ export function ConfirmationForm({
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         onColumnVisibilityChange: setColumnVisibility,
-        onRowSelectionChange: selectRow,
-
+        onRowSelectionChange: onRowSelectionChange,
+        getRowId: getId,
         state: {
             sorting,
             columnFilters,
