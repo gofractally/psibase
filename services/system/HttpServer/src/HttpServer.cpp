@@ -105,6 +105,24 @@ namespace SystemService
       std::optional<PendingRequestRow> currentRequest;
    }  // namespace
 
+   void HttpServer::deferReply(std::int32_t socket)
+   {
+      auto sender = getSender();
+      if (currentRequest && currentRequest->owner == sender && currentRequest->socket == socket)
+      {
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto requests = HttpServer::Subjective{}.open<PendingRequestTable>();
+            requests.put(*currentRequest);
+         }
+         currentRequest.reset();
+      }
+      else
+      {
+         abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
+      }
+   }
+
    void HttpServer::sendReply(std::int32_t socket, const std::optional<HttpReply>& result)
    {
       bool okay   = false;
@@ -168,30 +186,15 @@ namespace SystemService
       else
          service = "sites"_a;
 
-      // TODO: configure interface with registerServer
-      if (service == AccountNumber{"txqueue"})
-      {
-         currentRequest = {.socket = sock, .owner = service};
+      currentRequest = {.socket = sock, .owner = service};
 
-         psibase::Actor<AsyncServerInterface> iface(act.service, service);
-         iface.serveSys(sock, std::move(req));
+      psibase::Actor<ServerInterface> iface(act.service, service);
+      auto                            result = iface.serveSys(std::move(req), std::optional{sock});
 
-         if (currentRequest)
-         {
-            PSIBASE_SUBJECTIVE_TX
-            {
-               auto requests = HttpServer::Subjective{act.service}.open<PendingRequestTable>();
-               requests.put(*currentRequest);
-            }
-            currentRequest.reset();
-         }
-         return;
-      }
-      else
+      if (currentRequest)
       {
-         // TODO: avoid repacking (both directions)
-         psibase::Actor<ServerInterface> iface(act.service, service);
-         sendReplyImpl(service, sock, iface.serveSys(std::move(req)));
+         sendReplyImpl(service, sock, std::move(result));
+         currentRequest.reset();
       }
    }  // serve()
 

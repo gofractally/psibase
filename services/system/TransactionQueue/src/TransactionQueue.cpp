@@ -154,8 +154,11 @@ void TransactionQueue::recv(const SignedTransaction& trx)
       forwardTransaction(trx);
 }
 
-void TransactionQueue::serveSys(int32_t socket, const psibase::HttpRequest& request)
+std::optional<HttpReply> TransactionQueue::serveSys(const psibase::HttpRequest& request,
+                                                    std::optional<std::int32_t> socket)
 {
+   check(getSender() == HttpServer::service, "Wrong sender");
+   check(socket.has_value(), "Missing socket");
    if (request.method == "POST" && request.target == "/push_transaction")
    {
       if (request.contentType != "application/octet-stream")
@@ -166,16 +169,14 @@ void TransactionQueue::serveSys(int32_t socket, const psibase::HttpRequest& requ
       {
          auto clients = Subjective{}.open<TraceClientTable>();
          auto row     = clients.get(id).value_or(TraceClientRow{.id = id});
-         row.sockets.push_back(socket);
+         row.sockets.push_back(*socket);
          clients.put(row);
+         to<HttpServer>().deferReply(*socket);
       }
       if (pushTransaction(id, trx))
          forwardTransaction(trx);
    }
-   else
-   {
-      to<HttpServer>().sendReply(socket, std::nullopt);
-   }
+   return {};
 }
 
 PSIBASE_DISPATCH(TransactionQueue)

@@ -47,6 +47,8 @@ namespace SystemService
       void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
       void sendProds(const psibase::Action& action);
 
+      /// Indicates that the response will be produced later
+      void deferReply(std::int32_t socket);
       void sendReply(std::int32_t socket, const std::optional<psibase::HttpReply>& response);
 
       /// Register sender's subdomain
@@ -64,6 +66,7 @@ namespace SystemService
    PSIO_REFLECT(HttpServer,
                 method(recv, socket, data),
                 method(sendProds, action),
+                method(deferReply, socket),
                 method(sendReply, socket, response),
                 method(registerServer, server))
 }  // namespace SystemService

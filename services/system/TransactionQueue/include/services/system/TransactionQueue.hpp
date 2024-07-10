@@ -88,15 +88,16 @@ namespace SystemService
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
       void recv(const psibase::SignedTransaction& transaction);
-      // Callback
+      // Callbacks used to track successful/expired transactions
       void onTrx(const psibase::Checksum256& id, const psibase::TransactionTrace& trace);
       void onBlock();
-      void serveSys(std::int32_t sock, const psibase::HttpRequest& request);
+      auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> socket)
+          -> std::optional<psibase::HttpReply>;
    };
    PSIO_REFLECT(TransactionQueue,
                 method(next),
                 method(recv, transaction),
                 method(onTrx, id, trace),
                 method(onBlock),
-                method(serveSys, socket, request))
+                method(serveSys, request, socket))
 }  // namespace SystemService
