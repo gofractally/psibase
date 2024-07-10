@@ -21,15 +21,22 @@ impl Guest for AttestationPlugin {
     fn attest(attestation_type: String, claim: String) -> Result<(), CommonTypes::Error> {
         println!("Attestation.attest()");
         #[derive(Serialize, Deserialize, Debug)]
+        struct CredentialSubjectArg {
+            subject: String,
+            attestation_type: String,
+            score: f32,
+        }
+        #[derive(Serialize, Deserialize, Debug)]
         struct CredentialSubject {
+            creating_app: String,
             subject: String,
             attestation_type: String,
             score: f32,
         }
         println!("Attestation.claim: {}", claim.as_str());
-        let mut claim_as_obj: CredentialSubject;
+        let mut claim_arg_as_obj: CredentialSubjectArg;
         match serde_json::from_str(claim.as_str()) {
-            Ok(v) => claim_as_obj = v,
+            Ok(v) => claim_arg_as_obj = v,
             Err(e) => {
                 return Err(CommonTypes::Error {
                     code: 0,
@@ -43,7 +50,12 @@ impl Guest for AttestationPlugin {
         };
         let calling_app = CommonClient::get_sender_app().ok().unwrap().app.unwrap();
         // namespace the attestation type with the calling app's name so different apps can use common names for types and not confliect
-        claim_as_obj.attestation_type = calling_app + ":" + claim_as_obj.attestation_type.as_str();
+        let claim_as_obj = CredentialSubject {
+            creating_app: calling_app,
+            subject: claim_arg_as_obj.subject,
+            attestation_type: claim_arg_as_obj.attestation_type,
+            score: claim_arg_as_obj.score,
+        };
         println!("{:?}", claim_as_obj);
         let packed_a = attestation::action_structs::attest {
             vc: attestation::VerifiableCredential {
