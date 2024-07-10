@@ -683,21 +683,22 @@ namespace psibase
       }
       std::size_t saveSubjective()
       {
+         auto result     = subjectiveLimit;
          subjectiveLimit = subjectiveRevisions.size();
-         return subjectiveRevisions.size();
+         return result;
       }
       void restoreSubjective(std::size_t depth)
       {
-         check(depth <= subjectiveRevisions.size(), "Wrong subjective depth");
-         if (depth == 0)
+         check(depth <= subjectiveLimit, "Wrong subjective depth");
+         if (subjectiveLimit == 0)
          {
             subjectiveRevisions.clear();
             subjectiveChanges.ranges.clear();
          }
-         else if (depth < subjectiveRevisions.size())
+         else if (subjectiveLimit < subjectiveRevisions.size())
          {
-            subjectiveChanges.ranges.resize(subjectiveRevisions[depth].changeSetPos);
-            subjectiveRevisions.resize(depth);
+            subjectiveChanges.ranges.resize(subjectiveRevisions[subjectiveLimit].changeSetPos);
+            subjectiveRevisions.resize(subjectiveLimit);
          }
          subjectiveLimit = depth;
       }
