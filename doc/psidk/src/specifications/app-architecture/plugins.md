@@ -1,6 +1,6 @@
 # Plugins
 
-Plugins manage client-side user interactions and enable external integrations with psibase apps. Typically, they are stored in and served from a [service](./services.md) and they run within a users's browser. 
+Plugins manage client-side user interactions and enable external integrations with psibase apps. Typically, they are stored in and served from a service and they run within a users's browser. 
 
 ```mermaid
 sequenceDiagram 
@@ -45,7 +45,7 @@ Plugins can synchronously call functionality exported by other app's plugins. Th
 
 ### Transactions
 
-Transactions contain the data and authentication payload necessary to execute an action on a [service](./services.md). Transactions may contain multiple actions. Only the supervisor knows what the entire transaction looks like, whereas plugins are only aware of their own added actions.
+Transactions contain the data and authentication payload necessary to execute an action on a service. Transactions may contain multiple actions. Only the supervisor knows what the entire transaction looks like, whereas plugins are only aware of their own added actions.
 
 Actions are added to transactions in a FIFO queue. For example, the following sequence diagram will finally submit a transaction containing actions in the order: C, A, B.
 
