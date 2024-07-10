@@ -345,20 +345,8 @@ template <typename S> void to_json(float value, S& stream)              { return
       to_json_hex(reinterpret_cast<const char*>(v.data()), v.size(), stream);
    }
 
-   template <typename S>
-   void to_json(const std::vector<signed char>& v, S& stream)
-   {
-      to_json_hex(reinterpret_cast<const char*>(v.data()), v.size(), stream);
-   }
-
    template <size_t N, typename S>
    void to_json(const std::array<unsigned char, N>& obj, S& stream)
-   {
-      to_json_hex(reinterpret_cast<const char*>(obj.data()), obj.size(), stream);
-   }
-
-   template <size_t N, typename S>
-   void to_json(const std::array<signed char, N>& obj, S& stream)
    {
       to_json_hex(reinterpret_cast<const char*>(obj.data()), obj.size(), stream);
    }

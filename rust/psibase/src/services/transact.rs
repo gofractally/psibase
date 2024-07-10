@@ -1,4 +1,4 @@
-use crate::{Pack, Reflect, ToKey, Unpack};
+use crate::{Pack, Reflect, ToKey, ToSchema, Unpack};
 use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
     Unpack,
     Reflect,
     ToKey,
+    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,

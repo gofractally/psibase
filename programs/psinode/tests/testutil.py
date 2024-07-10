@@ -5,6 +5,8 @@ import unittest
 import sys
 import time
 import math
+import os
+import shutil
 
 def psinode_test(f):
     def result(self):
@@ -57,12 +59,20 @@ class SuppressErrors:
             if self.n >= 0:
                 return True
 
+def test_packages():
+    result = args.test_packages
+    if result is None:
+        psinode = shutil.which(args.psinode)
+        result = os.path.join(os.path.dirname(psinode), 'test-packages')
+    return result
+
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--psinode", default="psinode", help="The path to the psinode executable")
     parser.add_argument('--log-filter', metavar='FILTER', help="Filter for log messages")
     parser.add_argument('--log-format', metavar='FORMAT', help="Format for log messages")
     parser.add_argument('--print-logs', metavar='NODE', action='append', help="Nodes whose logs should be printed")
+    parser.add_argument('--test-packages', metavar='DIRECTORY', help="Directory containing test packages")
     global args
     (args, remaining) = parser.parse_known_args(argv)
     unittest.main(argv=remaining)

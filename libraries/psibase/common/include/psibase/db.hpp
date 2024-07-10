@@ -27,13 +27,14 @@ namespace psibase
 
       /// Data that is not part of consensus
       ///
-      /// Only accessible to subjective services during transactions,
-      /// but readable by all services during RPC. Doesn't undo
-      /// from aborting transactions, aborting blocks, or forking
+      /// Only accessible to subjective services and during RPC. Doesn't
+      /// undo from aborting transactions, aborting blocks, or forking
       /// blocks. Individual nodes may modify this database or wipe
-      /// it entirely at will.
+      /// it entirely at will. Can only be accessed within
+      /// `PSIBASE_SUBJECTIVE_TX`.
       ///
-      /// The first 64 bits of the key match the service.
+      /// The first 64 bits of the key match the service. Services are
+      /// not allowed to read or write keys belonging to other services.
       subjective,
 
       /// Tables used by native code

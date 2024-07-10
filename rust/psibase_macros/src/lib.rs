@@ -7,6 +7,7 @@ use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use reflect_macro::{reflect_attr_macro, reflect_derive_macro};
+use schema_macro::schema_derive_macro;
 use service_macro::service_macro_impl;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
@@ -15,6 +16,7 @@ mod fracpack_macro;
 mod graphql_macro;
 mod number_macro;
 mod reflect_macro;
+mod schema_macro;
 mod service_macro;
 mod test_case_macro;
 mod to_key_macro;
@@ -50,6 +52,11 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn reflect(attr: TokenStream, item: TokenStream) -> TokenStream {
     reflect_attr_macro(attr, item)
+}
+
+#[proc_macro_derive(ToSchema, attributes(schema, fracpack))]
+pub fn to_schema(input: TokenStream) -> TokenStream {
+    schema_derive_macro(input)
 }
 
 /// Define a [psibase](https://psibase.io) service interface.

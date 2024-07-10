@@ -41,7 +41,7 @@ fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
         if i > 0 {
             wit.push_str("\n\n");
         }
-        match printer.print(resolved_wit, id) {
+        match printer.print(resolved_wit, &[id]) {
             Ok(s) => wit.push_str(&s),
             Err(e) => {
                 // If we can't print the document, just use the error text
@@ -68,8 +68,10 @@ where
     let (_, world) = worlds.iter().next().unwrap();
     for (_, item) in get_world_item(world) {
         match item {
-            WorldItem::Interface(i) => {
-                let intf = resolved_wit.interfaces.get(*i).unwrap();
+            WorldItem::Interface { id, stability: _ } => {
+                // Todo: consider omitting items based on the stability feature
+                // (https://github.com/WebAssembly/component-model/pull/332)
+                let intf = resolved_wit.interfaces.get(*id).unwrap();
                 let pkg = resolved_wit.packages.get(intf.package.unwrap()).unwrap();
                 let mut new_intf = Intf {
                     namespace: pkg.name.namespace.to_owned(),
