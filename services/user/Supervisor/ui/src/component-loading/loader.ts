@@ -1,4 +1,3 @@
-import { transpile } from "@bytecodealliance/jco";
 import { rollup } from "@rollup/browser";
 import { plugin } from "./index.js";
 
@@ -9,6 +8,7 @@ import { ComponentAPI, Functions } from "../witExtraction.js";
 import { assert } from "../utils.js";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
 import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
+import { generate, GenerateOptions } from "@bytecodealliance/jco/component";
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
@@ -155,7 +155,7 @@ async function load(
     debugName: string,
 ) {
     const name = "component";
-    let opts = {
+    const opts: GenerateOptions = {
         name,
         map: imports.importMap ?? {},
         validLiftingOptimization: false,
@@ -163,20 +163,13 @@ async function load(
         noNodejsCompat: true,
         tlaCompat: false,
         base64Cutoff: 4096,
-    } as any;
-    // todo: delete "as any" after bytecodealliance/jco#462 is addressed.
-    //       and also after the type annotations of `opts.map` has been fixed
+    };
 
-    const {
-        files,
-        imports: _imports,
-        exports: _exports,
-    } = await transpile(wasmBytes, opts);
-    const files_2 = files as unknown as Array<[string, Uint8Array]>; // todo: can delete this once type annotations for transpile are fixed
+    const {files, imports: _imports, exports: _exports} = await generate(wasmBytes, opts);
 
     const bundleCode: string = await rollup({
         input: name + ".js",
-        plugins: [plugin([...files_2, ...imports.files], true, debugName)],
+        plugins: [plugin([...files, ...imports.files], true, debugName)],
     })
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);
@@ -196,21 +189,20 @@ async function load(
 export async function loadBasic(wasmBytes: Uint8Array, debugName: string) {
     const wasiImports = await getWasiImports();
     const name = "component";
-    let opts = {
+    const opts: GenerateOptions = {
         name,
         map: wasiImports.importMap,
         validLiftingOptimization: false,
         noNodejsCompat: true,
         tlaCompat: false,
         base64Cutoff: 4096,
-    } as any; // todo: delete "as any" after bytecodealliance/jco#462 is addressed.
+    };
 
-    const { files } = await transpile(wasmBytes, opts);
-    const files_2 = files as unknown as Array<[string, Uint8Array]>; // todo: delete after transpile type annotations fixed
+    const { files } = await generate(wasmBytes, opts);
 
     const bundleCode: string = await rollup({
         input: name + ".js",
-        plugins: [plugin(files_2, false, debugName)],
+        plugins: [plugin(files, false, debugName)],
     })
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);
