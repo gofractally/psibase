@@ -458,10 +458,13 @@ namespace psibase
       return impl->subjective;
    }
 
-   bool SharedDatabase::commitSubjective(Writer&       writer,
-                                         DbPtr&        original,
-                                         DbPtr         updated,
-                                         DbChangeSet&& changes)
+   bool SharedDatabase::commitSubjective(Writer&             writer,
+                                         DbPtr&              original,
+                                         DbPtr               updated,
+                                         DbChangeSet&&       changes,
+                                         SocketChangeSet&&   socketChanges,
+                                         Sockets&            sockets,
+                                         SocketAutoCloseSet& closing)
    {
       prepare(changes);
       if (std::ranges::any_of(changes.ranges, [](auto& r) { return r.write; }))
@@ -475,6 +478,8 @@ namespace psibase
                return false;
             }
          }
+         if (!sockets.applyChanges(socketChanges, &closing))
+            return false;
          for (const auto& r : changes.ranges)
          {
             if (r.write)
@@ -502,6 +507,7 @@ namespace psibase
    struct SubjectiveRevision
    {
       std::size_t                     changeSetPos;
+      std::size_t                     socketChangePos;
       std::shared_ptr<triedent::root> db;
    };
 
@@ -517,6 +523,7 @@ namespace psibase
       std::vector<char>                        valueBuffer;
 
       DbChangeSet                     subjectiveChanges;
+      std::vector<SocketChange>       socketChanges;
       std::vector<SubjectiveRevision> subjectiveRevisions;
       std::size_t                     subjectiveLimit;
 
@@ -627,13 +634,13 @@ namespace psibase
                "checkoutSubjective nesting exceeded limit");
          if (subjectiveRevisions.empty())
          {
-            subjectiveRevisions.push_back({0, shared.getSubjective()});
+            subjectiveRevisions.push_back({0, 0, shared.getSubjective()});
          }
-         subjectiveRevisions.push_back(
-             {subjectiveChanges.ranges.size(), subjectiveRevisions.back().db});
+         subjectiveRevisions.push_back({subjectiveChanges.ranges.size(), socketChanges.size(),
+                                        subjectiveRevisions.back().db});
       }
 
-      bool commitSubjective()
+      bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing)
       {
          check(subjectiveRevisions.size() > subjectiveLimit,
                "commitSubjective requires checkoutSubjective");
@@ -648,19 +655,23 @@ namespace psibase
             assert(subjectiveRevisions.size() == 2);
             if (writeSession)
             {
-               if (!shared.commitSubjective(*writeSession, subjectiveRevisions.front().db,
-                                            subjectiveRevisions.back().db,
-                                            std::move(subjectiveChanges)))
+               if (!shared.commitSubjective(
+                       *writeSession, subjectiveRevisions.front().db, subjectiveRevisions.back().db,
+                       std::move(subjectiveChanges), std::move(socketChanges), sockets, closing))
                {
-                  subjectiveRevisions[1].db           = subjectiveRevisions[0].db;
-                  subjectiveRevisions[0].changeSetPos = 0;
-                  subjectiveRevisions[1].changeSetPos = 0;
+                  subjectiveRevisions[1].db              = subjectiveRevisions[0].db;
+                  subjectiveRevisions[0].changeSetPos    = 0;
+                  subjectiveRevisions[0].socketChangePos = 0;
+                  subjectiveRevisions[1].changeSetPos    = 0;
+                  subjectiveRevisions[1].socketChangePos = 0;
                   subjectiveChanges.ranges.clear();
+                  socketChanges.clear();
                   return false;
                }
             }
             subjectiveRevisions.clear();
             subjectiveChanges.ranges.clear();
+            socketChanges.clear();
          }
          return true;
       }
@@ -671,7 +682,9 @@ namespace psibase
          if (subjectiveRevisions.size() > 2)
          {
             assert(subjectiveRevisions.back().changeSetPos <= subjectiveChanges.ranges.size());
+            assert(subjectiveRevisions.back().socketChangePos <= socketChanges.size());
             subjectiveChanges.ranges.resize(subjectiveRevisions.back().changeSetPos);
+            socketChanges.resize(subjectiveRevisions.back().socketChangePos);
             subjectiveRevisions.pop_back();
          }
          else
@@ -679,7 +692,16 @@ namespace psibase
             assert(subjectiveRevisions.size() == 2);
             subjectiveRevisions.clear();
             subjectiveChanges.ranges.clear();
+            socketChanges.clear();
          }
+      }
+      std::int32_t socketAutoClose(std::int32_t        socket,
+                                   bool                value,
+                                   Sockets&            sockets,
+                                   SocketAutoCloseSet& closing)
+      {
+         return sockets.autoClose(socket, value, &closing,
+                                  subjectiveRevisions.empty() ? nullptr : &socketChanges);
       }
       std::size_t saveSubjective()
       {
@@ -694,10 +716,12 @@ namespace psibase
          {
             subjectiveRevisions.clear();
             subjectiveChanges.ranges.clear();
+            socketChanges.clear();
          }
          else if (subjectiveLimit < subjectiveRevisions.size())
          {
             subjectiveChanges.ranges.resize(subjectiveRevisions[subjectiveLimit].changeSetPos);
+            socketChanges.resize(subjectiveRevisions[subjectiveLimit].socketChangePos);
             subjectiveRevisions.resize(subjectiveLimit);
          }
          subjectiveLimit = depth;
@@ -762,13 +786,20 @@ namespace psibase
    {
       impl->checkoutSubjective();
    }
-   bool Database::commitSubjective()
+   bool Database::commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing)
    {
-      return impl->commitSubjective();
+      return impl->commitSubjective(sockets, closing);
    }
    void Database::abortSubjective()
    {
       impl->abortSubjective();
+   }
+   std::int32_t Database::socketAutoClose(std::int32_t        socket,
+                                          bool                value,
+                                          Sockets&            sockets,
+                                          SocketAutoCloseSet& closing)
+   {
+      return impl->socketAutoClose(socket, value, sockets, closing);
    }
    std::size_t Database::saveSubjective()
    {

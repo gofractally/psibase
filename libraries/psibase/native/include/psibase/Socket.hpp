@@ -5,72 +5,60 @@
 #include <memory>
 #include <mutex>
 #include <psibase/check.hpp>
+#include <set>
 #include <span>
 #include <vector>
 
 namespace psibase
 {
-
+   struct Sockets;
    struct Socket
    {
-      virtual void send(std::span<const char>) = 0;
-      std::int32_t id;
+      ~Socket();
+      virtual void           send(std::span<const char>) = 0;
+      virtual bool           canAutoClose() const;
+      std::int32_t           id;
+      bool                   closed = false;
+      std::weak_ptr<Sockets> weak_sockets;
    };
 
-   struct Sockets
+   struct SocketAutoCloseSet;
+
+   struct AutoCloseSocket : Socket
+   {
+      virtual bool        canAutoClose() const override;
+      virtual void        autoClose(const std::optional<std::string>& message) noexcept = 0;
+      SocketAutoCloseSet* owner;
+   };
+
+   struct SocketChange
+   {
+      std::shared_ptr<AutoCloseSocket> socket;
+      SocketAutoCloseSet*              owner;
+   };
+
+   using SocketChangeSet = std::vector<SocketChange>;
+
+   struct SocketAutoCloseSet
+   {
+      std::set<std::shared_ptr<AutoCloseSocket>> sockets;
+      void close(const std::optional<std::string>& message = {});
+      ~SocketAutoCloseSet();
+   };
+
+   struct Sockets : std::enable_shared_from_this<Sockets>
    {
       std::vector<std::shared_ptr<Socket>> sockets;
       boost::dynamic_bitset<>              available;
       std::mutex                           mutex;
-      std::int32_t                         send(std::int32_t fd, std::span<const char> buf)
-      {
-         constexpr auto          wasi_errno_badf = 8;
-         constexpr auto          wasi_errno_pipe = 64;
-         std::shared_ptr<Socket> p;
-         {
-            std::lock_guard l{mutex};
-            if (fd < 0 || fd > sockets.size())
-               return wasi_errno_badf;
-            p = sockets[fd];
-         }
-         if (!p)
-            return wasi_errno_pipe;
-
-         p->send(buf);
-         return 0;
-      }
-      void add(const std::shared_ptr<Socket>& socket)
-      {
-         std::lock_guard l{mutex};
-         if (auto pos = available.find_first(); pos != boost::dynamic_bitset<>::npos)
-         {
-            socket->id   = pos;
-            sockets[pos] = socket;
-            available.reset(pos);
-         }
-         else
-         {
-            check(sockets.size() <=
-                      static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()),
-                  "Too many open sockets");
-
-            socket->id = sockets.size();
-            sockets.push_back(socket);
-            available.push_back(false);
-         }
-      }
-      void remove(const std::shared_ptr<Socket>& socket)
-      {
-         std::lock_guard l{mutex};
-         if (socket->id >= 0 && socket->id < sockets.size())
-         {
-            if (sockets[socket->id] == socket)
-            {
-               available.set(socket->id);
-               sockets[socket->id].reset();
-            }
-         }
-      }
+      std::int32_t                         send(std::int32_t fd, std::span<const char> buf);
+      void         add(const std::shared_ptr<Socket>& socket, SocketAutoCloseSet* owner = nullptr);
+      void         remove(const std::shared_ptr<Socket>& socket);
+      std::int32_t autoClose(std::int32_t               socket,
+                             bool                       value,
+                             SocketAutoCloseSet*        owner,
+                             std::vector<SocketChange>* diff = nullptr);
+      bool         applyChanges(const std::vector<SocketChange>& diff, SocketAutoCloseSet* owner);
    };
 
 }  // namespace psibase

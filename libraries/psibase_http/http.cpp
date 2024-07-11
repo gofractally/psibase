@@ -473,36 +473,36 @@ namespace psibase::http
       std::chrono::steady_clock::time_point startTime;
    };
 
-   template <typename Session, typename F>
-   struct HttpSocket : Socket, std::enable_shared_from_this<HttpSocket<Session, F>>
+   template <typename Session, typename F, typename E>
+   struct HttpSocket : AutoCloseSocket, std::enable_shared_from_this<HttpSocket<Session, F, E>>
    {
-      explicit HttpSocket(std::shared_ptr<Session>&& session, F&& f)
-          : session(std::move(session)), callback(std::forward<F>(f))
+      explicit HttpSocket(std::shared_ptr<Session>&& session, F&& f, E&& err)
+          : session(std::move(session)), callback(std::forward<F>(f)), err(std::forward<E>(err))
       {
          this->session->queue_.pause_read = true;
       }
-      void close()
+      void autoClose(const std::optional<std::string>& message) noexcept override
       {
-         if (auto socks = sockets.lock())
-            socks->remove(this->shared_from_this());
-         sockets.reset();
-         session->queue_.pause_read = false;
-         session.reset();
+         sendImpl([message = message.value_or("service did not send a response")](
+                      HttpSocket* self) mutable { return self->err(message); });
       }
       void send(std::span<const char> data) override
       {
-         auto  result = psio::from_frac<std::optional<HttpReply>>(data);
-         auto* p      = session.get();
+         sendImpl([result = psio::from_frac<std::optional<HttpReply>>(data)](
+                      HttpSocket* self) mutable { return self->callback(std::move(result)); });
+      }
+      void sendImpl(auto make_reply)
+      {
+         auto self = this->shared_from_this();
+         if (auto sockets = this->weak_sockets.lock())
+            sockets->remove(self);
          net::post(
-             p->derived_session().stream.get_executor(),
-             [self   = this->shared_from_this(),
-              result = static_cast<decltype(result)>(result)]() mutable
+             session->derived_session().stream.get_executor(),
+             [self = std::move(self), make_reply = std::move(make_reply)]() mutable
              {
                 auto session = std::move(self->session);
                 if (!session)
                    return;
-                if (auto sockets = self->sockets.lock())
-                   sockets->remove(self);
                 auto& trace                = self->trace;
                 auto& queryTimes           = self->queryTimes;
                 session->queue_.pause_read = false;
@@ -522,7 +522,7 @@ namespace psibase::http
                        session->logger, "ResponseTime",
                        std::chrono::duration_cast<std::chrono::microseconds>(endTime -
                                                                              queryTimes.startTime));
-                   session->queue_(self->callback(std::move(result)));
+                   session->queue_(make_reply(self.get()));
                 }
                 if (session->queue_.can_read())
                    session->do_read();
@@ -530,17 +530,17 @@ namespace psibase::http
       }
       std::shared_ptr<Session> session;
       F                        callback;
+      E                        err;
       TransactionTrace         trace;
       QueryTimes               queryTimes;
-      std::weak_ptr<Sockets>   sockets;
    };
 
-   template <typename Send, typename F>
-   auto makeHttpSocket(Send& send, F&& f)
+   template <typename Send, typename F, typename E>
+   auto makeHttpSocket(Send& send, F&& f, E&& e)
    {
-      return std::make_shared<
-          HttpSocket<std::remove_reference_t<decltype(send.self)>, std::decay_t<F>>>(
-          send.self.derived_session().shared_from_this(), std::forward<F>(f));
+      return std::make_shared<HttpSocket<std::remove_reference_t<decltype(send.self)>,
+                                         std::decay_t<F>, std::decay_t<E>>>(
+          send.self.derived_session().shared_from_this(), std::forward<F>(f), std::forward<E>(e));
    }
 
    // This function produces an HTTP response for the given
@@ -893,31 +893,8 @@ namespace psibase::http
             // Do not use any reconfigurable members of server.http_config after this point
             l.unlock();
 
-            auto socket =
-                makeHttpSocket(send,
-                               [ok, error](std::optional<HttpReply>&& reply)
-                               {
-                                  if (reply)
-                                     return ok(std::move(reply->body), reply->contentType.c_str(),
-                                               &reply->headers);
-                                  else
-                                     // TODO: remember target. This won't be needed if we allow wasm
-                                     // to return a specific response code.
-                                     return error(bhttp::status::not_found, "Not found");
-                               });
-
             // TODO: time limit
             auto system = server.sharedState->getSystemContext();
-
-            system->sockets->add(socket);
-            socket->sockets = system->sockets;
-
-            bool          success = false;
-            psio::finally sockGuard{[&]
-                                    {
-                                       if (!success)
-                                          socket->close();
-                                    }};
 
             psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
@@ -926,34 +903,63 @@ namespace psibase::http
             if (bc.needGenesisAction)
                return send(error(bhttp::status::internal_server_error,
                                  "Need genesis block; use 'psibase boot' to boot chain"));
-            SignedTransaction trx;
-            Action            action{
-                           .sender  = AccountNumber(),
-                           .service = proxyServiceNum,
-                           .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
-            };
+
+            SignedTransaction  trx;
             TransactionTrace   trace;
             TransactionContext tc{bc, trx, trace, true, false, true};
-            ActionTrace        atrace;
+            ActionTrace&       atrace        = trace.actionTraces.emplace_back();
             auto               startExecTime = steady_clock::now();
-            tc.execServe(action, atrace);
-            auto endExecTime = steady_clock::now();
 
-            trace.actionTraces.push_back(std::move(atrace));
-            socket->trace = std::move(trace);
+            auto socket = makeHttpSocket(
+                send,
+                [ok, error](std::optional<HttpReply>&& reply)
+                {
+                   if (reply)
+                      return ok(std::move(reply->body), reply->contentType.c_str(),
+                                &reply->headers);
+                   else
+                      // TODO: remember target. This won't be needed if we allow wasm
+                      // to return a specific response code.
+                      return error(bhttp::status::not_found, "Not found");
+                },
+                [error](const std::string& message)
+                { return error(bhttp::status::internal_server_error, message); });
+            system->sockets->add(socket, &tc.ownedSockets);
 
-            socket->queryTimes.packTime =
-                std::chrono::duration_cast<std::chrono::microseconds>(startExecTime - startTime);
-            socket->queryTimes.serviceLoadTime =
-                std::chrono::duration_cast<std::chrono::microseconds>(endExecTime - startExecTime -
-                                                                      tc.getBillableTime());
-            socket->queryTimes.databaseTime =
-                std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
-            socket->queryTimes.wasmExecTime = std::chrono::duration_cast<std::chrono::microseconds>(
-                tc.getBillableTime() - tc.databaseTime);
-            socket->queryTimes.startTime = startTime;
+            auto setStatus = psio::finally(
+                [&]
+                {
+                   auto endExecTime = steady_clock::now();
 
-            success = true;
+                   socket->trace = std::move(trace);
+
+                   socket->queryTimes.packTime =
+                       std::chrono::duration_cast<std::chrono::microseconds>(startExecTime -
+                                                                             startTime);
+                   socket->queryTimes.serviceLoadTime =
+                       std::chrono::duration_cast<std::chrono::microseconds>(
+                           endExecTime - startExecTime - tc.getBillableTime());
+                   socket->queryTimes.databaseTime =
+                       std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
+                   socket->queryTimes.wasmExecTime =
+                       std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime() -
+                                                                             tc.databaseTime);
+                   socket->queryTimes.startTime = startTime;
+                });
+
+            try
+            {
+               Action action{
+                   .sender  = AccountNumber(),
+                   .service = proxyServiceNum,
+                   .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
+               };
+               tc.execServe(action, atrace);
+            }
+            catch (...)
+            {
+               // An error will be sent by the transaction context, if needed
+            }
          }  // !native
          else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
          {

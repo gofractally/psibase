@@ -646,7 +646,8 @@ namespace psibase
    }
    bool NativeFunctions::commitSubjective()
    {
-      return database.commitSubjective();
+      return database.commitSubjective(*transactionContext.blockContext.systemContext.sockets,
+                                       transactionContext.ownedSockets);
    }
    void NativeFunctions::abortSubjective()
    {
@@ -659,6 +660,16 @@ namespace psibase
             "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
       return transactionContext.blockContext.systemContext.sockets->send(fd, msg);
+   }
+
+   int32_t NativeFunctions::socketAutoClose(int32_t fd, bool value)
+   {
+      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
+            "Sockets are only available during subjective execution");
+      check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
+      return database.socketAutoClose(fd, value,
+                                      *transactionContext.blockContext.systemContext.sockets,
+                                      transactionContext.ownedSockets);
    }
 
 }  // namespace psibase

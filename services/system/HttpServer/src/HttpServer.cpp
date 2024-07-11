@@ -114,6 +114,7 @@ namespace SystemService
          {
             auto requests = HttpServer::Subjective{}.open<PendingRequestTable>();
             requests.put(*currentRequest);
+            socketAutoClose(socket, false);
          }
          currentRequest.reset();
       }
@@ -150,6 +151,7 @@ namespace SystemService
             {
                okay = false;
             }
+            socketAutoClose(socket, true);
          }
       }
       if (!okay)

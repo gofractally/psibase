@@ -155,6 +155,15 @@ namespace psibase
       /// There exists a total ordering of all top-level checkouts. Every read of the subjective
       /// database returns the most recent write in the current checkout or in previous checkouts
       /// that were successfully committed.
+      ///
+      /// The following state is controlled by checkoutSubjective
+      /// - DbId::subjective
+      /// - Socket auto-close
+      ///
+      /// State that is not affected includes
+      /// - Databases that follow forks
+      /// - WASM linear memory
+      /// - Socket messages sent
       PSIBASE_NATIVE(checkoutSubjective) void checkoutSubjective();
       /// Attempts to commit changes to the subjective database
       ///
@@ -171,6 +180,25 @@ namespace psibase
       /// Send a message to a socket
       PSIBASE_NATIVE(socketSend)
       std::int32_t socketSend(std::int32_t fd, const void* data, std::size_t size);
+
+      /// Tells the current transaction/query/callback context to take or release
+      /// ownership of a socket.
+      ///
+      /// Any sockets that are owned by a context will be closed when it finishes.
+      /// - HTTP socket: send a 500 response with an error message in the body
+      /// - Other sockets may not be set to auto-close
+      ///
+      /// If this function is called within a subjectiveCheckout, it will only take
+      /// effect if the top-level commit succeeds. If another context takes ownership
+      /// of the socket, subjectiveCommit may fail.
+      ///
+      /// Returns:
+      ///  - EBADF: fd is not a valid file descriptor
+      ///  - ENOPROTOOPT: The socket does not support auto-close
+      ///  - ENOTSOCK: fd is not a socket
+      ///  - EACCES: The socket is owned by another context
+      PSIBASE_NATIVE(socketAutoClose)
+      std::int32_t socketAutoClose(std::int32_t fd, bool value);
    }  // namespace raw
 
    /// Get result
@@ -614,6 +642,16 @@ namespace psibase
       return 0;
    }
    static constexpr int producer_multicast = 0;
+
+   inline int socketAutoClose(std::int32_t fd, bool value)
+   {
+      if (auto err = raw::socketAutoClose(fd, value))
+      {
+         errno = err;
+         return -1;
+      }
+      return 0;
+   }
 
 }  // namespace psibase
 

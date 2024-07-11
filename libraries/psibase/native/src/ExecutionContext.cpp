@@ -340,6 +340,7 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
       rhf_t::add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
       rhf_t::add<&ExecutionContextImpl::socketSend>("env", "socketSend");
+      rhf_t::add<&ExecutionContextImpl::socketAutoClose>("env", "socketAutoClose");
    }
 
    std::uint32_t ExecutionContext::remainingStack() const
