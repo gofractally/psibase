@@ -123,9 +123,9 @@ export function ConfirmationForm({
     });
 
     return (
-        <div className="w-full">
+        <div className="w-full ">
             <div className="rounded-md border">
-                <ScrollArea className=" h-[800px]">
+                <ScrollArea className="h-[600px]">
                     <Table>
                         <TableHeader>
                             {table.getHeaderGroups().map((headerGroup) => (

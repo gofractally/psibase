@@ -32,6 +32,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
+import { MultiStepLoader } from "@/components/multi-step-loader";
 
 const useStepper = (
     numberOfSteps: number,
@@ -147,7 +148,7 @@ export const CreatePage = () => {
 
     const isDev = chainTypeForm.watch("type") == "dev";
 
-    const suggestedSelected = getDefaultSelectedPackages(
+    const suggestedSelection = getDefaultSelectedPackages(
         {
             dev: isDev,
         },
@@ -183,13 +184,30 @@ export const CreatePage = () => {
     useEffect(() => {
         if (currentStep == 3) {
             console.log("running");
-            const state = suggestedSelected.selectedPackages.reduce(
+            const state = suggestedSelection.selectedPackages.reduce(
                 (acc, item) => ({ ...acc, [getId(item)]: true }),
                 {}
             );
 
             console.log(state, "should be set too");
             overWriteRows(state);
+        }
+    }, [currentStep]);
+
+    const [loading, setLoading] = useState(false);
+
+    const selectedPackageIds = Object.keys(rows);
+    const selectedPackages = packages.filter((pack) =>
+        selectedPackageIds.some((id) => id == getId(pack))
+    );
+
+    const loadingStates = selectedPackages.map((pack) => ({
+        text: `Installing ${pack.name}..`,
+    }));
+
+    useEffect(() => {
+        if (currentStep == 4) {
+            setLoading(true);
         }
     }, [currentStep]);
 
@@ -207,7 +225,12 @@ export const CreatePage = () => {
                     prom(confirmed);
                 }}
             />
-            <div className="flex h-full flex-col border border-green-500">
+            <MultiStepLoader
+                loadingStates={loadingStates}
+                loading={loading}
+                currentState={1}
+            />
+            <div className="flex h-full flex-col border ">
                 <div className="my-auto flex h-full flex-col justify-between sm:h-5/6">
                     <Steps currentStep={currentStep} numberOfSteps={maxSteps} />
                     {currentStep == 1 && (
@@ -221,13 +244,13 @@ export const CreatePage = () => {
                         </div>
                     )}
                     {currentStep == 3 && (
-                        <div className="border border-blue-500">
+                        <div className="px-4">
                             <div className="grid grid-cols-2 py-6">
                                 <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
-                                    Installation
+                                    Installation summary
                                 </h1>{" "}
-                                <div className="flex flex-row-reverse">
-                                    <div className="flex flex-col border border-red-500">
+                                <div className="flex flex-row-reverse ">
+                                    <div className="flex flex-col gap-3  ">
                                         <Card
                                             label="Template"
                                             value={
@@ -244,23 +267,25 @@ export const CreatePage = () => {
                                     </div>
                                 </div>
                             </div>
-                            <Accordion type="single" collapsible>
-                                <AccordionItem value="item-1">
-                                    <AccordionTrigger className="w-60">
-                                        Advanced
-                                    </AccordionTrigger>
-                                    <AccordionContent>
-                                        <ConfirmationForm
-                                            rowSelection={rows}
-                                            onRowSelectionChange={setRows}
-                                            packages={packages}
-                                        />
-                                    </AccordionContent>
-                                </AccordionItem>
-                            </Accordion>
+                            <div className="max-h-[600px] ">
+                                <Accordion type="single" collapsible>
+                                    <AccordionItem value="item-1">
+                                        <AccordionTrigger className="w-60">
+                                            Advanced
+                                        </AccordionTrigger>
+                                        <AccordionContent>
+                                            <ConfirmationForm
+                                                rowSelection={rows}
+                                                onRowSelectionChange={setRows}
+                                                packages={packages}
+                                            />
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
+                            </div>
                         </div>
                     )}
-                    {currentStep == 4 && <div>Step 4</div>}
+                    {currentStep == 4 && <div>better</div>}
                     <PrevNextButtons
                         canNext={canNext}
                         canPrev={canPrev}

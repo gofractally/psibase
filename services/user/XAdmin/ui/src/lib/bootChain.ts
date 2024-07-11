@@ -16,7 +16,7 @@ const updateConfig = async (config: PsinodeConfig) => {
     }
 };
 
-export const runBoot = async (
+export const bootChain = async (
     packages: PackageInfo[],
     producerName: string,
     existingConfig: PsinodeConfig | undefined,

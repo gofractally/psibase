@@ -13,7 +13,7 @@ import { UseFormReturn } from "react-hook-form";
 import { PsinodeConfig } from "@/configuration/interfaces";
 import { Button } from "../ui/button";
 
-import { runBoot } from "@/lib/bootChain";
+import { bootChain } from "@/lib/bootChain";
 
 interface InstallFormProps {
     packages: PackageInfo[];
@@ -87,7 +87,7 @@ export const InstallForm = ({
             <form
                 className="flex w-full justify-between"
                 onSubmit={() => {
-                    runBoot(
+                    bootChain(
                         packages,
                         actualProducer,
                         config,
