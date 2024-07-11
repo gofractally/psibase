@@ -673,10 +673,12 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "custom_error",
+ "indexmap 2.2.6",
  "psibase_macros",
+ "serde",
 ]
 
 [[package]]
@@ -998,6 +1000,7 @@ checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.5",
+ "serde",
 ]
 
 [[package]]
@@ -1377,7 +1380,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1395,6 +1398,7 @@ dependencies = [
  "getrandom",
  "hmac",
  "include_dir",
+ "indexmap 2.2.6",
  "indicatif",
  "jwt",
  "mime_guess",
@@ -1406,6 +1410,7 @@ dependencies = [
  "reqwest",
  "ripemd",
  "rpassword",
+ "scopeguard",
  "sec1",
  "secp256k1",
  "serde",
@@ -1426,7 +1431,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "darling",
  "proc-macro-error",
@@ -1438,7 +1443,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "seahash",
 ]

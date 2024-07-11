@@ -5,7 +5,7 @@ use psibase::fracpack::*;
 use psibase_macros::Reflect;
 use serde::{Deserialize, Serialize};
 
-#[derive(Pack, Unpack, Reflect, Deserialize, Serialize, SimpleObject, Debug, Clone)]
+#[derive(Pack, Unpack, Reflect, Deserialize, Serialize, SimpleObject, Debug, Clone, ToSchema)]
 #[allow(non_snake_case)]
 /// Given get_sender() gives us a verified `attester`, and
 /// the credentialSubject contains the subject / attestee,

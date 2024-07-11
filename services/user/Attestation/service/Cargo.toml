@@ -4,7 +4,7 @@ edition = "2021"
 version = "0.1.0"
 
 [dependencies]
-psibase_macros = { version = "0.10.0", path = "../../../../rust/psibase_macros" }
-psibase = { version = "0.10.0", path = "../../../../rust/psibase" }
+psibase_macros = { version = "0.11.0", path = "../../../../rust/psibase_macros" }
+psibase = { version = "0.11.0", path = "../../../../rust/psibase" }
 serde = { version = "1", features = ["derive"] }
 async-graphql = "4.0"
