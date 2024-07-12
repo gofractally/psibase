@@ -26,13 +26,13 @@ export class CallStack {
     }
 
     pop(): Call | undefined {
-        if (this.storage.length === 0) {
+        if (this.isEmpty()) {
             console.error(`Tried to pop empty callstack`);
             return undefined;
         }
 
-        let popped = this.peek(0)!;
-        let resolutionTime = Date.now() - popped.startTime!;
+        const popped = this.peek(0)!;
+        const resolutionTime = Date.now() - popped.startTime!;
         console.log(
             `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}-${toString(popped.args)} [${resolutionTime} ms]`,
         );
