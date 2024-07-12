@@ -206,6 +206,7 @@ export class Supervisor implements AppInterface {
             },
             actions: formatted,
         };
+
         await signAndPushTransaction(supervisorDomain, transaction, []);
     }
 
@@ -227,14 +228,6 @@ export class Supervisor implements AppInterface {
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
-            // Handle if a call is already in progress
-            // TODO - Buffer multiple calls from root app
-            assert(
-                this.context === undefined,
-                `Plugin call resolution already in progress.`,
-            );
-            this.context = new CallContext();
-
             // Store the origin of the root app. That should be the one-and-only root app that ever tries
             //      to interact with this supervisor.
             this.setParentOrigination(callerOrigin);
@@ -251,10 +244,10 @@ export class Supervisor implements AppInterface {
                 },
             ]);
 
+            this.context = new CallContext();
+
             // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
             //   preloaded.
-            // TODO: Consider if a plugin runs an infinite loop. We need a way to terminate the
-            //   current call and report the faulty plugin.
             assertTruthy(
                 this.parentOrigination,
                 "Parent origination corrupted",
