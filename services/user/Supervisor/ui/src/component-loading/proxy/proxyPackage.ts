@@ -1,7 +1,7 @@
 import { Code, FilePath, ImportDetails, PkgId } from "../importDetails";
 
 class Func {
-    public name: string;
+    name: string;
 
     constructor(name: string) {
         this.name = name;

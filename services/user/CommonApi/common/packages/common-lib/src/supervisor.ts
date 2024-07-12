@@ -58,7 +58,7 @@ const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`
 
 // Convenient library for users to interact with the supervisor.
 export class Supervisor {
-    public isSupervisorInitialized = false;
+    isSupervisorInitialized = false;
 
     private pendingRequest: {
         call: FunctionCallArgs;
@@ -188,7 +188,7 @@ export class Supervisor {
         });
     }
 
-    public async onLoaded() {
+    async onLoaded() {
         if (this.isSupervisorInitialized) return;
         return new Promise((resolve) => {
             this.onLoadPromise = resolve;

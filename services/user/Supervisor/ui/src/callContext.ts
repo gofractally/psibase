@@ -5,8 +5,8 @@ import { CallStack } from "./callStack";
 //   of the `entry` function on the supervisor. It contains data that is specific to each
 //   invocation.
 export class CallContext {
-    public actions: Action[] = [];
-    public stack: CallStack = new CallStack();
+    actions: Action[] = [];
+    stack: CallStack = new CallStack();
 
     addAction(action: Action) {
         this.actions.push(action);
