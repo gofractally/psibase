@@ -133,11 +133,13 @@ export async function loadPlugin(
     pluginHost: HostInterface,
     api: ComponentAPI,
 ) {
-    const imports = mergeImports([
-        await getWasiImports(),
-        await getHostImports(),
-        await getProxiedImports(api.importedFuncs),
-    ]);
+    const imports = mergeImports(
+        await Promise.all([
+            getWasiImports(),
+            getHostImports(),
+            getProxiedImports(api.importedFuncs),
+        ]),
+    );
     const { app } = pluginHost.getSelf();
     assert(app !== undefined, "Plugin must correspond to a psibase service");
 
