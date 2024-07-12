@@ -96,7 +96,7 @@ export class Plugin {
             throw new PluginInvalid(this.id);
         }
 
-        let func =
+        const func =
             typeof intf === "undefined" || intf === ""
                 ? this.pluginModule[method]
                 : this.pluginModule[intf][method];

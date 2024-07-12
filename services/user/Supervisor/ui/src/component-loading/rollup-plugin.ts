@@ -29,7 +29,7 @@ export const plugin = (
 
     // Loads the code from the URLs
     async load(id: string): Promise<string> {
-        let match = files.find((file) => file[0] == id);
+        const match = files.find((file) => file[0] == id);
         if (match) {
             if (typeof match[1] === "string") return match[1];
             else return decoder.decode(match[1]);

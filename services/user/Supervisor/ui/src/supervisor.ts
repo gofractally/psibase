@@ -84,7 +84,7 @@ export class Supervisor implements AppInterface {
     private async loadPlugins(plugins: QualifiedPluginId[]) {
         if (plugins.length === 0) return;
 
-        let addedPlugins: Plugin[] = [];
+        const addedPlugins: Plugin[] = [];
         plugins.forEach(({ service, plugin }) => {
             const c = this.loadContext(service);
             const loaded = c.loadPlugin(plugin);
@@ -190,7 +190,7 @@ export class Supervisor implements AppInterface {
         const actions = this.context.actions;
         if (actions.length <= 0) return;
 
-        let formatted = actions.map((a: Action) => {
+        const formatted = actions.map((a: Action) => {
             return {
                 sender: "alice",
                 service: a.service,

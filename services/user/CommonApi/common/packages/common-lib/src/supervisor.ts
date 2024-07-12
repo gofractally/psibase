@@ -197,7 +197,7 @@ export class Supervisor {
 
     preLoadPlugins(plugins: PluginId[]) {
         // Fully qualify any plugins with default values
-        let fqPlugins: QualifiedPluginId[] = plugins.map((plugin) => ({
+        const fqPlugins: QualifiedPluginId[] = plugins.map((plugin) => ({
             ...plugin,
             plugin: plugin.plugin || "plugin",
         }));

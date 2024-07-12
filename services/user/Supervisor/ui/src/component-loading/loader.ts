@@ -157,7 +157,7 @@ async function load(
     debugName: string,
 ) {
     const name = "component";
-    let opts = {
+    const opts = {
         name,
         map: imports.importMap ?? {},
         validLiftingOptimization: false,
@@ -183,10 +183,10 @@ async function load(
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);
 
-    let blob = new Blob([bundleCode], { type: "text/javascript" });
-    let url = URL.createObjectURL(blob);
+    const blob = new Blob([bundleCode], { type: "text/javascript" });
+    const url = URL.createObjectURL(blob);
 
-    let mod = await import(/* @vite-ignore */ url);
+    const mod = await import(/* @vite-ignore */ url);
 
     return mod;
 }
@@ -198,7 +198,7 @@ async function load(
 export async function loadBasic(wasmBytes: Uint8Array, debugName: string) {
     const wasiImports = await getWasiImports();
     const name = "component";
-    let opts = {
+    const opts = {
         name,
         map: wasiImports.importMap,
         validLiftingOptimization: false,
@@ -217,10 +217,10 @@ export async function loadBasic(wasmBytes: Uint8Array, debugName: string) {
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);
 
-    let blob = new Blob([bundleCode], { type: "text/javascript" });
-    let url = URL.createObjectURL(blob);
+    const blob = new Blob([bundleCode], { type: "text/javascript" });
+    const url = URL.createObjectURL(blob);
 
-    let mod = await import(/* @vite-ignore */ url);
+    const mod = await import(/* @vite-ignore */ url);
 
     return mod;
 }
