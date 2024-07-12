@@ -12,14 +12,19 @@ export interface QualifiedFunctionCallArgs extends FunctionCallArgs {
     plugin: string;
 }
 
-export const isQualifiedFunctionCallArgs = (obj: any): obj is QualifiedFunctionCallArgs => {
-    return typeof obj === 'object' && obj !== null
-        && typeof obj.service === 'string'
-        && typeof obj.plugin === 'string'
-        && (typeof obj.intf === 'string' || obj.intf === undefined)
-        && typeof obj.method === 'string'
-        && Array.isArray(obj.params);
-}
+export const isQualifiedFunctionCallArgs = (
+    obj: any,
+): obj is QualifiedFunctionCallArgs => {
+    return (
+        typeof obj === "object" &&
+        obj !== null &&
+        typeof obj.service === "string" &&
+        typeof obj.plugin === "string" &&
+        (typeof obj.intf === "string" || obj.intf === undefined) &&
+        typeof obj.method === "string" &&
+        Array.isArray(obj.params)
+    );
+};
 
 export function toString(item: QualifiedFunctionCallArgs): string;
 export function toString(item: FunctionCallArgs): string;

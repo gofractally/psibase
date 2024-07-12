@@ -125,9 +125,10 @@ export class Supervisor {
             expected.method !== received.method ||
             expected.service !== received.service;
 
-        const {result} = response;
+        const { result } = response;
         if (isPluginError(result)) {
-            const {service, plugin} = result.pluginId;
+            const { service, plugin } = result.pluginId;
+
             console.error(`Call to ${toString(response.call)} failed`);
             console.error(`[${service}:${plugin}] ${result.message}`);
             this.pendingRequest.reject(result);

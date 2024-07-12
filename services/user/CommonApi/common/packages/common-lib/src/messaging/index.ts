@@ -28,8 +28,4 @@ export {
     buildMessageSupervisorInitialized,
 } from "./SupervisorInitialized";
 
-export {
-    PluginError,
-    isPluginError,
-    isGenericError,
-} from "./Errors";
+export { PluginError, isPluginError, isGenericError } from "./Errors";

@@ -12,14 +12,15 @@ export class PluginError extends Error {
 }
 
 export const isGenericError = (error: any): error is Error => {
-    return typeof error === 'object' &&
-        'message' in error &&
-        typeof error.message === 'string' &&
-        'name' in error && 
-        typeof error.name === 'string';
+    return (
+        typeof error === "object" &&
+        "message" in error &&
+        typeof error.message === "string" &&
+        "name" in error &&
+        typeof error.name === "string"
+    );
 };
 
 export const isPluginError = (error: any): error is PluginError => {
-    return isGenericError(error) &&
-        'pluginId' in error;
+    return isGenericError(error) && "pluginId" in error;
 };
