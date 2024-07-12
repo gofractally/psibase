@@ -12,7 +12,13 @@ import {
 
 import { AppInterface } from "./appInterace";
 import { ServiceContext } from "./serviceContext";
-import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
+import {
+    OriginationData,
+    assert,
+    assertTruthy,
+    parser,
+    serviceFromOrigin,
+} from "./utils";
 import { Plugin } from "./plugin/plugin";
 import { CallContext } from "./callContext";
 import { PluginHost } from "./pluginHost";
@@ -99,9 +105,10 @@ export class Supervisor implements AppInterface {
     }
 
     private replyToParent(call: FunctionCallArgs, result: any) {
+        assertTruthy(this.parentOrigination, "Unknown reply target");
         window.parent.postMessage(
             buildFunctionCallResponse(call, result),
-            this.parentOrigination!.origin,
+            this.parentOrigination.origin,
         );
     }
 
@@ -111,43 +118,50 @@ export class Supervisor implements AppInterface {
 
     // Called by the current plugin looking to identify its caller
     getCaller(currentPlugin: OriginationData): OriginationData | undefined {
-        const frame = this.context!.stack.peek(0);
-        assert(
-            frame !== undefined,
+        assertTruthy(this.context, "Uninitialized call context");
+
+        const frame = this.context.stack.peek(0);
+        assertTruthy(
+            frame,
             "`getCaller` invalid outside plugin call resolution",
         );
         assert(
-            frame!.args.service === currentPlugin.app,
+            frame.args.service === currentPlugin.app,
             "Only active plugin can ask for its caller",
         );
-        return frame!.caller;
+        return frame.caller;
     }
 
     // Called by the active plugin to schedule an action for execution
     addAction(sender: OriginationData, action: Action) {
-        const frame = this.context!.stack.peek(0);
-        assert(
-            frame !== undefined,
+        assertTruthy(this.context, "Uninitialized call context");
+
+        const frame = this.context.stack.peek(0);
+        assertTruthy(
+            frame,
             "Can only add actions during plugin call resolution",
         );
         assert(
-            frame!.args.service === sender.app,
+            frame.args.service === sender.app,
             "Invalid service attempted to add action",
         );
-        this.context!.addAction(action);
+        this.context.addAction(action);
     }
 
     // Manages callstack and calls plugins
     call(sender: OriginationData, args: QualifiedFunctionCallArgs): any {
-        if (this.context!.stack.isEmpty()) {
+        assertTruthy(this.context, "Uninitialized call context");
+        assertTruthy(this.parentOrigination, "Uninitialized call origination");
+
+        if (this.context.stack.isEmpty()) {
             assert(
-                sender.origin === this.parentOrigination!.origin,
+                sender.origin === this.parentOrigination.origin,
                 "Parent origin mismatch",
             );
         } else {
-            assert(sender.app !== undefined, "Cannot determine caller service");
+            assertTruthy(sender.app, "Cannot determine caller service");
             assert(
-                sender.app === this.context!.stack.peek(0)!.args.service,
+                sender.app === this.context.stack.peek(0)!.args.service,
                 "Invalid sync call sender",
             );
         }
@@ -156,13 +170,13 @@ export class Supervisor implements AppInterface {
         const p = this.loadContext(service).loadPlugin(plugin);
         assert(p.new === false, "Tried to call plugin before initialization");
 
-        this.context!.stack.push(sender, args);
+        this.context.stack.push(sender, args);
 
         let ret: any;
         try {
             ret = p.plugin.call(intf, method, params);
         } finally {
-            this.context!.stack.pop();
+            this.context.stack.pop();
         }
 
         return ret;
@@ -171,7 +185,9 @@ export class Supervisor implements AppInterface {
     // Temporary tx submission logic, until smart auth is implemented
     // All transactions are sent by "alice"
     async submitTx() {
-        const actions = this.context!.actions;
+        assertTruthy(this.context, "Uninitialized call context");
+
+        const actions = this.context.actions;
         if (actions.length <= 0) return;
 
         let formatted = actions.map((a: Action) => {
@@ -239,7 +255,11 @@ export class Supervisor implements AppInterface {
             //   preloaded.
             // TODO: Consider if a plugin runs an infinite loop. We need a way to terminate the
             //   current call and report the faulty plugin.
-            const result = this.call(this.parentOrigination!, args);
+            assertTruthy(
+                this.parentOrigination,
+                "Parent origination corrupted",
+            );
+            const result = this.call(this.parentOrigination, args);
 
             // Post execution assertions
             assert(this.context.stack.isEmpty(), "Callstack should be empty");

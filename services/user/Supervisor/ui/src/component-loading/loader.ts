@@ -6,7 +6,7 @@ const wasiShimURL = new URL("./bundled/_preview2-shim.js", import.meta.url);
 import hostShimCode from "./host-api.js?raw";
 import { HostInterface } from "../hostInterface.js";
 import { ComponentAPI, Functions } from "../witExtraction.js";
-import { assert } from "../utils.js";
+import { assert, assertTruthy } from "../utils.js";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
 import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 
@@ -141,9 +141,9 @@ export async function loadPlugin(
         ]),
     );
     const { app } = pluginHost.getSelf();
-    assert(app !== undefined, "Plugin must correspond to a psibase service");
+    assertTruthy(app, "Plugin must correspond to a psibase service");
 
-    const pluginModule = await load(wasmBytes, imports, `${app!} plugin`);
+    const pluginModule = await load(wasmBytes, imports, `${app} plugin`);
 
     const { __setHost } = pluginModule;
     __setHost(pluginHost);

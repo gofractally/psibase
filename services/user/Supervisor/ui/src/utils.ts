@@ -35,6 +35,16 @@ export const assert = (condition: boolean, errorMessage: string): void => {
     if (!condition) throw new Error(errorMessage);
 };
 
+export function assertTruthy<T>(
+    variable: T | undefined | null,
+    errorMessage: string,
+    condition?: boolean,
+): asserts variable is T {
+    if (!condition || variable == null) {
+        throw new Error(errorMessage);
+    }
+}
+
 let modulePromise: Promise<any>;
 
 export const parser = (): Promise<any> => {
