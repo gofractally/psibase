@@ -47,8 +47,13 @@ namespace SystemService
       void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
       void sendProds(const psibase::Action& action);
 
-      /// Indicates that the response will be produced later
+      /// Indicates that the query is not expected to produce an immediate response
+      /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
       void deferReply(std::int32_t socket);
+      /// Indicates that a reply will be produced by the current transaction/query/callback
+      /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
+      void claimReply(std::int32_t socket);
+      /// Sends a reply
       void sendReply(std::int32_t socket, const std::optional<psibase::HttpReply>& response);
 
       /// Register sender's subdomain
@@ -67,6 +72,7 @@ namespace SystemService
                 method(recv, socket, data),
                 method(sendProds, action),
                 method(deferReply, socket),
+                method(claimReply, socket),
                 method(sendReply, socket, response),
                 method(registerServer, server))
 }  // namespace SystemService

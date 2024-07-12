@@ -124,6 +124,27 @@ namespace SystemService
       }
    }
 
+   void HttpServer::claimReply(std::int32_t socket)
+   {
+      auto sender = getSender();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto requests = Subjective{}.open<PendingRequestTable>();
+         auto row      = requests.get(socket);
+         if (row && row->owner == sender)
+         {
+            requests.remove(*row);
+            currentRequest = row;
+         }
+         else
+         {
+            abortMessage(sender.str() + " cannot send a response on socket " +
+                         std::to_string(socket));
+         }
+         socketAutoClose(socket, true);
+      }
+   }
+
    void HttpServer::sendReply(std::int32_t socket, const std::optional<HttpReply>& result)
    {
       bool okay   = false;

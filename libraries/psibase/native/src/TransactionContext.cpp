@@ -152,6 +152,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
+         self.ownedSockets.close(atrace.error);
          throw;
       }
    }
@@ -199,6 +200,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
+         ownedSockets.close(atrace.error);
          throw;
       }
    }
@@ -224,6 +226,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
+         ownedSockets.close(atrace.error);
          throw;
       }
    }
@@ -266,6 +269,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
+         ownedSockets.close(atrace.error);
          throw;
       }
    }
