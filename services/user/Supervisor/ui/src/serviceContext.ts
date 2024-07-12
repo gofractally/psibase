@@ -34,7 +34,7 @@ export class ServiceContext {
     }
 
     hasLoaded(plugin: Plugin): boolean {
-        return !!this.plugins.find(
+        return this.plugins.some(
             (p) =>
                 p.id.plugin === plugin.id.plugin &&
                 p.id.service === plugin.id.service,
