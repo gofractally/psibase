@@ -20,6 +20,18 @@ def parallel(api, *args):
         t.join()
     return result
 
+def do_post(api, target, data):
+    with api.post(target, service='as-query', json=data) as reply:
+        if reply.status_code == 200:
+            return reply.json()
+        else:
+            return '%d: %s' % (reply.status_code, reply.text)
+
+def post_parallel(api, *targets):
+    def fn(t, d):
+        return lambda a: do_post(a, t, d)
+    return parallel(api, *(fn(t, d) for (t,d) in targets))
+
 class TestQuery(unittest.TestCase):
     @testutil.psinode_test
     def test_(self, cluster):
@@ -28,6 +40,14 @@ class TestQuery(unittest.TestCase):
 
         a.run_psibase(['install', '--package-source', testutil.test_packages(), 'AsyncQuery'])
         a.wait(new_block())
+
+        # Basic normal usage
+        with a.post('/send', service='as-query', json={"t":"send"}) as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.json(), {"t":"send"})
+        with a.post('/send_async', service='as-query', json={"t":"async"}) as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.json(), {"t":"async"})
 
         # Check that native and wasm maintain a consistent view of the socket's availability
         with a.post('/send_async_and_abort', service='as-query', json={"i":0}) as reply:
@@ -45,17 +65,23 @@ class TestQuery(unittest.TestCase):
             self.assertEqual(reply.status_code, 500)
             self.assertEqual(reply.text, "service 'as-query' aborted with message: test send and abort async")
 
-        # Check that a single callback can produce multiple responses
-        def send_async(a, i):
-            with a.post('/send_async', service='as-query', json={"i":i}) as reply:
-                if reply.status_code == 200:
-                    return reply.json()
-                else:
-                    return '%d: %s' % (reply.status_code, reply.text)
+        # A response takes precedence over abort
+        with a.post('/send_and_abort', service='as-query', json={"t":"send-abort"}) as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.json(), {"t":"send-abort"})
+        with a.post('/send_async_and_abort', service='as-query', json={"t":"send-async-abort"}) as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.json(), {"t":"send-async-abort"})
 
-        (r0, r1) = parallel(a, lambda api: send_async(api, 4), lambda api: send_async(api, 5))
+        # Check that a single callback can produce multiple responses
+        (r0, r1) = post_parallel(a, ('/send_async', {"i":4}), ('/send_async', {"i":5}))
         self.assertEqual(r0, {"i":4})
         self.assertEqual(r1, {"i":5})
+
+        # Test queries that cause retries
+        (r0, r1) = post_parallel(a, ('/send_with_contention', {"i":6}), ('/send_with_contention', {"i":7}))
+        self.assertEqual(r0, {"i":6})
+        self.assertEqual(r1, {"i":7})
 
 if __name__ == '__main__':
     testutil.main()

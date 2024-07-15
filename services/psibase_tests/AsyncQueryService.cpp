@@ -121,7 +121,7 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
       }
       wait_for(delay);
    }
-   else if (request.target == "/send_and_abort_async")
+   else if (path == "/send_and_abort_async")
    {
       auto table = Subjective{}.open<AsyncResponseTable>();
       PSIBASE_SUBJECTIVE_TX
@@ -131,13 +131,13 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
       }
       wait_for(delay);
    }
-   else if (request.target == "/send_and_abort")
+   else if (path == "/send_and_abort")
    {
       wait_for(delay);
       to<HttpServer>().sendReply(*socket, reply);
       abortMessage("test send and abort");
    }
-   else if (request.target == "/send_async_and_abort")
+   else if (path == "/send_async_and_abort")
    {
       auto table = Subjective{}.open<AsyncResponseTable>();
       PSIBASE_SUBJECTIVE_TX
@@ -148,7 +148,7 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
       wait_for(delay);
       abortMessage("test send async and abort");
    }
-   else if (request.target == "/send_with_contention")
+   else if (path == "/send_with_contention")
    {
       auto table = Subjective{}.open<CounterTable>();
       PSIBASE_SUBJECTIVE_TX
