@@ -6,6 +6,9 @@ edition = "2021"
 [dependencies]
 wit-bindgen-rt = { version = "0.27.0", features = ["bitflags"] }
 psibase = { path = "../../../../rust/psibase/" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1.0" }
+identity = { path = "../service/" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -17,4 +20,4 @@ package = "identity:plugin"
 
 [package.metadata.component.target.dependencies]
 "common:plugin" = { path = "../../../user/CommonApi/common/packages/wit/plugin.wit" }
-"attestation:plugin" = { path = "../../Attestation/plugin/wit/world.wit" }
+# "attestation:plugin" = { path = "../../Attestation/plugin/wit/world.wit" }

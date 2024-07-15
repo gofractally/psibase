@@ -1,31 +1,44 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::attestation::plugin::api::attest;
-use bindings::common::plugin::types::{self as CommonTypes};
+use std::error::Error;
+
+use bindings::common::plugin::{
+    client as CommonClient, server as CommonServer, types as CommonTypes,
+};
 use bindings::exports::identity::plugin::api::Guest;
+use psibase::fracpack::Pack;
 use psibase::AccountNumber;
+
+use serde::{Deserialize, Serialize};
 
 mod errors;
 use errors::ErrorType::*;
 
 struct IdentityPlugin;
 
-impl Guest for IdentityPlugin {
-    fn attest(subject: String, confidence: f32) -> Result<(), CommonTypes::Error> {
-        if !(confidence >= 0.0 && confidence <= 1.0) {
-            return Err(InvalidClaim.err(&format!("{confidence}")));
-        }
-        match AccountNumber::from_exact(&subject) {
-            Ok(_) => (),
-            Err(e) => return Err(InvalidAccountNumber.err(&subject)),
-        }
+#[derive(Serialize, Deserialize, Debug)]
+struct Attestation {
+    subject: String,
+    attestation_type: String,
+    score: f32,
+}
 
-        let claim = format!("{{\"subject\": \"{subject}\", \"attestation_type\": \"identity\", \"score\": {confidence}}}");
-        return attest(
-            "identity", // subject.as_str(),
-            claim.as_str(),
-        );
+impl Guest for IdentityPlugin {
+    fn attest_identity_claim(subject: String, value: f32) -> Result<(), CommonTypes::Error> {
+        if !(value >= 0.0 && value <= 1.0) {
+            return Err(InvalidClaim.err(&format!("{value}")));
+        }
+        AccountNumber::from_exact(&subject)
+            .map_err(|err| InvalidAccountNumber.err(&err.to_string()));
+
+        let packed_a = identity::action_structs::attest_identity_claim {
+            subject: subject.clone(),
+            value,
+        }
+        .packed();
+
+        CommonServer::add_action_to_transaction("attest_identity_claim", &packed_a)
     }
 }
 

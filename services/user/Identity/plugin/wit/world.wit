@@ -1,11 +1,6 @@
 package identity:plugin;
 
-/* NOTES
-- VCs: indexing can be done with events
-*/
-
 interface types {
-    // use accounts:plugin/types.{account};
     type account = string;
     type date-time = string;
 
@@ -40,7 +35,7 @@ interface api {
     // calls Attestation service's attest("identity", ???)
     // The attestor attests (being something of a provider in this scenario), logging an event on chain, with a signature from the issuer (account)
     // which can always become a verifiable credential for someone else (more of a consumer in this equation)
-    attest: func(subject: string, confidence: f32) -> result<_, error>;
+    attest-identity-claim: func(subject: string, confidence: f32) -> result<_, error>;
     // impl: attestation:plugin.attest("identity", vc)
 }
 
@@ -67,6 +62,8 @@ interface queries {
 }
 
 world identity {
-    import attestation:plugin/api;
+    import common:plugin/server;
+    import common:plugin/client;
     export api;
+    // export queries;
 }

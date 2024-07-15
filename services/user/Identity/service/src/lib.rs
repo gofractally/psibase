@@ -1,7 +1,8 @@
 use async_graphql::SimpleObject;
-/// Attestation service to log attestations, and providing a graphiql
+/// Identity service to log identity attestations, and provide a graphiql
 /// query interface.
 use psibase::fracpack::*;
+use psibase::AccountNumber;
 use psibase_macros::Reflect;
 use serde::{Deserialize, Serialize};
 
@@ -10,13 +11,14 @@ use serde::{Deserialize, Serialize};
 /// Given get_sender() gives us a verified `attester`, and
 /// the credentialSubject contains the subject / attestee,
 /// we only need the "claims" being made.
-pub struct VerifiableCredential {
+pub struct Credential {
     /// The subject (generally also the holder)
     /// The claims being attested to (includes subject)
-    pub credentialSubject: String,
+    subject: AccountNumber,
+    confidence: f32,
 }
 
-#[psibase::service(name = "attestation")]
+#[psibase::service(name = "identity")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::connection::Connection;
@@ -37,7 +39,9 @@ mod service {
         issued: psibase::TimePointSec,
 
         /// The credential subject, which includes the subject/attestee as well as the claim being made
-        credentialSubject: String,
+        subject: String,
+
+        value: f32,
     }
 
     impl Attestation {
@@ -51,24 +55,16 @@ mod service {
     struct WebContentTable;
 
     #[action]
-    pub fn attest(vc: crate::VerifiableCredential) {
+    pub fn attest_identity_claim(subject: String, value: f32) {
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
-        let credentialSubject = vc.credentialSubject.as_str();
 
         let attestation_table = AttestationTable::new();
-        let pk_table_idx = attestation_table.get_index_pk();
-        let lastRec = pk_table_idx.iter().last();
-        // TODO: Is there a better way to do this, i.e., a way that doesn't unnecessarily create a bunch of unused, temporary values?
-        let last_id = lastRec
-            .unwrap_or(Attestation {
-                id: u64::MAX,
-                attester: AccountNumber::from(""),
-                issued: TimePointSec::from(0),
-                credentialSubject: "".to_string(),
-            })
-            .id;
-        let next_id = last_id + 1;
+        let next_id = attestation_table
+            .get_index_pk()
+            .iter()
+            .last()
+            .map_or(0, |rec| rec.id + 1);
 
         // TODO: Update summary stats
         // Q: Will this *update* or just add?
@@ -79,17 +75,24 @@ mod service {
                 id: next_id,
                 attester,
                 issued,
-                credentialSubject: String::from(credentialSubject),
+                subject: subject.clone(),
+                value,
             })
             .unwrap();
 
         Wrapper::emit()
             .history()
-            .attest(attester, issued, String::from(credentialSubject));
+            .attest_identity_claim(attester, issued, subject, value);
     }
 
     #[event(history)]
-    pub fn attest(id: AccountNumber, issued: TimePointSec, credentialSubject: String) {}
+    pub fn attest_identity_claim(
+        id: AccountNumber,
+        issued: TimePointSec,
+        subject: String,
+        value: f32,
+    ) {
+    }
 
     struct Query;
 

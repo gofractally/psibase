@@ -932,10 +932,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
+name = "identity"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase_macros",
+ "serde",
+]
+
+[[package]]
 name = "identity-plugin"
 version = "0.1.0"
 dependencies = [
+ "identity",
  "psibase",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt",
 ]
 
