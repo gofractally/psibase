@@ -142,6 +142,8 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
@@ -189,6 +191,7 @@ file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
 file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
+    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/book/html
     DEPENDS gen-cpp-doc ${doc-src} ${doc-cpp} ${doc-cmake} ${doc-headers} ${doc-service-headers}
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/book
     COMMAND mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk
@@ -308,6 +311,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm ${plugin-wit})
 add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm ${plugin-wit} ${AuthPlugin_DEP})
+add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm ${plugin-wit})
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -355,7 +359,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.10.0")
+set(PSIBASE_VERSION "0.11.0")
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
@@ -644,7 +648,8 @@ psibase_package(
         INIT
     SERVICE r-tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/* /
+        DATA ${COMPONENT_BIN_DIR}/${TokensPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS ${Tokens_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/index.html
     DEPENDS wasm
 )
@@ -716,20 +721,20 @@ psibase_package(
                     SetCode Transact
 )
 
-function(write_package_index out)
+function(write_package_index target dir)
     set(deps ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh)
     foreach(service IN LISTS ARGN)
-        list(APPEND deps ${service} ${SERVICE_DIR}/${service}.psi)
+        list(APPEND deps ${service} ${dir}/${service}.psi)
     endforeach()
     add_custom_command(
-        OUTPUT ${SERVICE_DIR}/index.json
+        OUTPUT ${dir}/index.json
         DEPENDS ${deps}
-        COMMAND /usr/bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${SERVICE_DIR} >${SERVICE_DIR}/index.json
+        COMMAND /usr/bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} >${dir}/index.json
     )
-    add_custom_target(index.json ALL DEPENDS ${SERVICE_DIR}/index.json)
+    add_custom_target(${target} ALL DEPENDS ${dir}/index.json)
 endfunction()
 
-write_package_index(${SERVICE_DIR}/index.json
+write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
@@ -764,6 +769,33 @@ install(
           ${SERVICE_DIR}/Transact.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
+
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/PSubjective.psi
+    NAME PSubjective
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Test service for parallel access to the subjective database"
+    SERVICE psubjective
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
+        FLAGS isSubjective allowWriteSubjective
+        SERVER psubjective
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/Counter.psi
+    NAME Counter
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Test service than increments a counter"
+    SERVICE counter
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
+        SERVER counter
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter)
 
 ExternalProject_Add(
     rust

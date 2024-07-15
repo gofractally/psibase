@@ -11,6 +11,6 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-fracpack = { version = "0.10.0", path = "../fracpack" }
-psibase = { version = "0.10.0", path = "../psibase" }
+fracpack = { version = "0.11.0", path = "../fracpack" }
+psibase = { version = "0.11.0", path = "../psibase" }
 serde = { version = "1.0.145", features = ["derive"] }

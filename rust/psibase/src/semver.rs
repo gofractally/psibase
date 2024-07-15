@@ -342,18 +342,10 @@ enum Stack<'a> {
 }
 
 trait ParseStackVersion {
-    fn and(self, other: Self) -> Self;
-    fn or(self, other: Self) -> Self;
     fn op(self, op: StackBinOp, other: Self) -> Self;
 }
 
 impl ParseStackVersion for CompiledVersion<'_> {
-    fn and(self, other: Self) -> Self {
-        CompiledVersion::And(Box::new(self), Box::new(other))
-    }
-    fn or(self, other: Self) -> Self {
-        CompiledVersion::Or(Box::new(self), Box::new(other))
-    }
     fn op(self, op: StackBinOp, other: Self) -> Self {
         let lhs = Box::new(self);
         let rhs = Box::new(other);

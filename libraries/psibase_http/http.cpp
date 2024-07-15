@@ -816,7 +816,8 @@ namespace psibase::http
             // TODO: time limit
             auto          system = server.sharedState->getSystemContext();
             psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
-            BlockContext  bc{*system, system->sharedDatabase.getHead()};
+            BlockContext  bc{*system, system->sharedDatabase.getHead(),
+                            system->sharedDatabase.createWriter(), true};
             bc.start();
             if (bc.needGenesisAction)
                return send(error(bhttp::status::internal_server_error,

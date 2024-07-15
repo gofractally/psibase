@@ -336,6 +336,9 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
       rhf_t::add<&ExecutionContextImpl::kvMax>("env", "kvMax");
       // rhf_t::add<&ExecutionContextImpl::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
+      rhf_t::add<&ExecutionContextImpl::checkoutSubjective>("env", "checkoutSubjective");
+      rhf_t::add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
+      rhf_t::add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
    }
 
    std::uint32_t ExecutionContext::remainingStack() const

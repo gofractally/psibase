@@ -1,4 +1,4 @@
-use crate::{Pack, Reflect, ToKey, Unpack};
+use crate::{Pack, Reflect, ToKey, ToSchema, Unpack};
 use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
@@ -16,6 +16,7 @@ use std::ops::{Add, Sub};
     Unpack,
     Reflect,
     ToKey,
+    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,

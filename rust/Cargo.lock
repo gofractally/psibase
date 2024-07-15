@@ -358,7 +358,7 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "burst-transfer"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -414,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -855,7 +855,7 @@ dependencies = [
 
 [[package]]
 name = "elections"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "fracpack",
  "psibase",
@@ -918,12 +918,13 @@ dependencies = [
 
 [[package]]
 name = "example"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-graphql",
  "psibase",
  "psibase_macros",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -986,10 +987,12 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "custom_error",
+ "indexmap 2.2.6",
  "psibase_macros",
+ "serde",
 ]
 
 [[package]]
@@ -1102,7 +1105,7 @@ dependencies = [
 
 [[package]]
 name = "gen-cpp-doc"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "clang",
@@ -1495,6 +1498,7 @@ checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.5",
+ "serde",
 ]
 
 [[package]]
@@ -1746,7 +1750,7 @@ dependencies = [
 
 [[package]]
 name = "md2man"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "clap",
  "pulldown-cmark 0.9.6",
@@ -2338,7 +2342,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2356,6 +2360,7 @@ dependencies = [
  "getrandom",
  "hmac",
  "include_dir",
+ "indexmap 2.2.6",
  "indicatif",
  "jwt",
  "mime_guess",
@@ -2367,6 +2372,7 @@ dependencies = [
  "reqwest",
  "ripemd",
  "rpassword",
+ "scopeguard",
  "sec1",
  "secp256k1",
  "serde",
@@ -2387,7 +2393,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "darling",
  "proc-macro-error",
@@ -2399,7 +2405,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "seahash",
 ]
@@ -2953,7 +2959,7 @@ checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
 name = "sites"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-graphql",
  "fracpack",
@@ -3070,6 +3076,15 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "subjective"
+version = "0.11.0"
+dependencies = [
+ "psibase",
+ "psibase_macros",
+ "serde",
 ]
 
 [[package]]
@@ -3209,7 +3224,7 @@ dependencies = [
 
 [[package]]
 name = "test_contract"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3218,7 +3233,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "cxx",
  "cxx-build",

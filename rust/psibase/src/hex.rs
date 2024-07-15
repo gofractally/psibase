@@ -1,4 +1,4 @@
-use crate::{reflect, ToKey};
+use crate::{reflect, ToKey, ToSchema};
 use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType};
 use std::convert::AsRef;
 use std::fmt::{Debug, Display};
@@ -22,10 +22,9 @@ trait FromHex: ToHex {
 ///
 /// `Hex<Vec<u8>>`, `Hex<&[u8]>`, and `Hex<[u8; SIZE]>` store binary
 /// data. This wrapper does not support other inner types.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Hex<T>(pub T)
-where
-    T: Debug + Clone + PartialEq + Eq + PartialOrd + Ord;
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, ToSchema)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct Hex<T>(pub T);
 
 impl<T> Default for Hex<T>
 where
@@ -223,8 +222,8 @@ where
     T: FromHex,
 {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct Visitor<'a, T>(&'a mut String, PhantomData<T>);
-        impl<'de, 'a, T> serde::de::Visitor<'de> for Visitor<'a, T>
+        struct Visitor<T>(PhantomData<T>);
+        impl<'de, T> serde::de::Visitor<'de> for Visitor<T>
         where
             T: FromHex,
         {
@@ -238,8 +237,7 @@ where
                 ))
             }
         }
-        let mut s = String::new();
-        deserializer.deserialize_str(Visitor::<T>(&mut s, PhantomData))
+        deserializer.deserialize_str(Visitor::<T>(PhantomData))
     }
 }
 
