@@ -6,6 +6,8 @@
 #include <services/system/TransactionQueue.hpp>
 #include "services/system/Accounts.hpp"
 
+#include <algorithm>
+
 static constexpr bool enable_print = false;
 
 using namespace psibase;
@@ -102,6 +104,7 @@ namespace SystemService
          socketSend(socket, psio::to_frac(result));
       }
 
+      std::vector<PendingRequestRow>   ownedRequests;
       std::optional<PendingRequestRow> currentRequest;
    }  // namespace
 
@@ -134,7 +137,16 @@ namespace SystemService
          if (row && row->owner == sender)
          {
             requests.remove(*row);
-            currentRequest = row;
+            if (auto pos = std::ranges::find_if(ownedRequests,
+                                                [&](auto& r) { return r.socket == socket; });
+                pos != ownedRequests.end())
+            {
+               *pos = *row;
+            }
+            else
+            {
+               ownedRequests.push_back(*row);
+            }
          }
          else
          {
@@ -163,7 +175,21 @@ namespace SystemService
          {
             auto requests = Subjective{}.open<PendingRequestTable>();
             auto row      = requests.get(socket);
-            if (row && row->owner == sender)
+            if (!row)
+            {
+               if (auto pos = std::ranges::find_if(ownedRequests,
+                                                   [&](auto& r) { return r.socket == socket; });
+                   pos != ownedRequests.end() && pos->owner == sender)
+               {
+                  ownedRequests.erase(pos);
+                  okay = true;
+               }
+               else
+               {
+                  okay = false;
+               }
+            }
+            else if (row && row->owner == sender)
             {
                requests.remove(*row);
                okay = true;
@@ -172,7 +198,8 @@ namespace SystemService
             {
                okay = false;
             }
-            socketAutoClose(socket, true);
+            if (okay && socketAutoClose(socket, true) != 0)
+               okay = false;
          }
       }
       if (!okay)
