@@ -27,7 +27,8 @@ export const ChainTypeForm = ({ form }: Props) => (
                     <FormItem>
                         <div className="flex w-full justify-between gap-8">
                             <Button
-                                onClick={() => {
+                                onClick={(event) => {
+                                    event.preventDefault();
                                     field.onChange("dev");
                                 }}
                                 variant={
@@ -49,7 +50,8 @@ export const ChainTypeForm = ({ form }: Props) => (
                                 </div>
                             </Button>
                             <Button
-                                onClick={() => {
+                                onClick={(event) => {
+                                    event.preventDefault();
                                     field.onChange("prod");
                                 }}
                                 variant={
