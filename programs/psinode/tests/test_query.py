@@ -48,6 +48,9 @@ class TestQuery(unittest.TestCase):
         with a.post('/send_async', service='as-query', json={"t":"async"}) as reply:
             reply.raise_for_status()
             self.assertEqual(reply.json(), {"t":"async"})
+        with a.post('/undefined', service='as-query', json={"t":"404"}) as reply:
+            self.assertEqual(reply.status_code, 404)
+            self.assertEqual(reply.text, "The resource '/undefined' was not found")
 
         # Check that native and wasm maintain a consistent view of the socket's availability
         with a.post('/send_async_and_abort', service='as-query', json={"i":0}) as reply:

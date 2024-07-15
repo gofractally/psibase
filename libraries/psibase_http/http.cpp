@@ -489,8 +489,8 @@ namespace psibase::http
       }
       void send(std::span<const char> data) override
       {
-         sendImpl([result = psio::from_frac<std::optional<HttpReply>>(data)](
-                      HttpSocket* self) mutable { return self->callback(std::move(result)); });
+         sendImpl([result = psio::from_frac<HttpReply>(data)](HttpSocket* self) mutable
+                  { return self->callback(std::move(result)); });
       }
       void sendImpl(auto make_reply)
       {
@@ -911,15 +911,19 @@ namespace psibase::http
 
             auto socket = makeHttpSocket(
                 send,
-                [ok, error](std::optional<HttpReply>&& reply)
+                [req_version, set_cors, set_keep_alive](HttpReply&& reply)
                 {
-                   if (reply)
-                      return ok(std::move(reply->body), reply->contentType.c_str(),
-                                &reply->headers);
-                   else
-                      // TODO: remember target. This won't be needed if we allow wasm
-                      // to return a specific response code.
-                      return error(bhttp::status::not_found, "Not found");
+                   bhttp::response<bhttp::vector_body<char>> res{
+                       bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)), req_version};
+                   res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+                   for (auto& h : reply.headers)
+                      res.set(h.name, h.value);
+                   res.set(bhttp::field::content_type, reply.contentType);
+                   set_cors(res);
+                   set_keep_alive(res);
+                   res.body() = std::move(reply.body);
+                   res.prepare_payload();
+                   return res;
                 },
                 [error](const std::string& message)
                 { return error(bhttp::status::internal_server_error, message); });

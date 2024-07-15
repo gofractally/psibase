@@ -85,13 +85,11 @@ namespace SystemService
    {
       constexpr std::string_view allowedHeaders[] = {"Content-Encoding"};
 
-      void sendReplyImpl(AccountNumber                   service,
-                         std::int32_t                    socket,
-                         const std::optional<HttpReply>& result)
+      void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result)
       {
-         if (result && service != AccountNumber{"common-api"})
+         if (service != AccountNumber{"common-api"})
          {
-            for (const auto& header : result->headers)
+            for (const auto& header : result.headers)
             {
                if (!std::ranges::binary_search(allowedHeaders, header.name))
                {
@@ -157,7 +155,7 @@ namespace SystemService
       }
    }
 
-   void HttpServer::sendReply(std::int32_t socket, const std::optional<HttpReply>& result)
+   void HttpServer::sendReply(std::int32_t socket, const HttpReply& result)
    {
       bool okay   = false;
       auto sender = getSender();
@@ -239,11 +237,22 @@ namespace SystemService
       currentRequest = {.socket = sock, .owner = service};
 
       psibase::Actor<ServerInterface> iface(act.service, service);
-      auto                            result = iface.serveSys(std::move(req), std::optional{sock});
+      auto                            result = iface.serveSys(req, std::optional{sock});
 
       if (currentRequest)
       {
-         sendReplyImpl(service, sock, std::move(result));
+         if (result)
+         {
+            sendReplyImpl(service, sock, std::move(*result));
+         }
+         else
+         {
+            std::string msg = "The resource '" + req.target + "' was not found";
+            sendReplyImpl(service, sock,
+                          {.status      = HttpStatus::notFound,
+                           .contentType = "text/html",
+                           .body        = std::vector(msg.begin(), msg.end())});
+         }
          currentRequest.reset();
       }
    }  // serve()
