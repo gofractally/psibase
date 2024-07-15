@@ -38,6 +38,22 @@ SocketAutoCloseSet::~SocketAutoCloseSet()
    close();
 }
 
+namespace
+{
+   void doRemoveSocket(std::shared_ptr<Socket>& socket)
+   {
+      assert(!socket->closed);
+      if (socket->canAutoClose())
+      {
+         auto sockptr = std::static_pointer_cast<AutoCloseSocket>(socket);
+         if (sockptr->owner)
+            sockptr->owner->sockets.erase(sockptr);
+      }
+      socket->closed = true;
+      socket.reset();
+   }
+}  // namespace
+
 std::int32_t Sockets::send(std::int32_t fd, std::span<const char> buf)
 {
    std::shared_ptr<Socket> p;
@@ -45,9 +61,13 @@ std::int32_t Sockets::send(std::int32_t fd, std::span<const char> buf)
       std::lock_guard l{mutex};
       if (fd >= 0 && fd < sockets.size())
          p = sockets[fd];
+      if (!p)
+         return wasi_errno_badf;
+      if (p->once)
+      {
+         doRemoveSocket(sockets[fd]);
+      }
    }
-   if (!p)
-      return wasi_errno_badf;
 
    p->send(buf);
    return 0;
@@ -83,20 +103,9 @@ void Sockets::add(const std::shared_ptr<Socket>& socket, SocketAutoCloseSet* own
 void Sockets::remove(const std::shared_ptr<Socket>& socket)
 {
    std::lock_guard l{mutex};
-   if (socket->id >= 0 && socket->id < sockets.size())
+   if (socket->id >= 0 && socket->id < sockets.size() && sockets[socket->id] == socket)
    {
-      if (sockets[socket->id] == socket)
-      {
-         assert(!socket->closed);
-         if (socket->canAutoClose())
-         {
-            auto sockptr = std::static_pointer_cast<AutoCloseSocket>(socket);
-            if (sockptr->owner)
-               sockptr->owner->sockets.erase(sockptr);
-         }
-         socket->closed = true;
-         sockets[socket->id].reset();
-      }
+      doRemoveSocket(sockets[socket->id]);
    }
 }
 std::int32_t Sockets::autoClose(std::int32_t               fd,

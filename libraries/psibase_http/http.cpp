@@ -480,6 +480,7 @@ namespace psibase::http
           : session(std::move(session)), callback(std::forward<F>(f)), err(std::forward<E>(err))
       {
          this->session->queue_.pause_read = true;
+         this->once                       = true;
       }
       void autoClose(const std::optional<std::string>& message) noexcept override
       {
@@ -494,8 +495,6 @@ namespace psibase::http
       void sendImpl(auto make_reply)
       {
          auto self = this->shared_from_this();
-         if (auto sockets = this->weak_sockets.lock())
-            sockets->remove(self);
          net::post(
              session->derived_session().stream.get_executor(),
              [self = std::move(self), make_reply = std::move(make_reply)]() mutable

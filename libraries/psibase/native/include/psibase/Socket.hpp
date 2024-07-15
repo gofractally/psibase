@@ -19,6 +19,7 @@ namespace psibase
       virtual bool           canAutoClose() const;
       std::int32_t           id;
       bool                   closed = false;
+      bool                   once   = false;
       std::weak_ptr<Sockets> weak_sockets;
    };
 
