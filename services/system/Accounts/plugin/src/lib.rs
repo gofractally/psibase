@@ -14,6 +14,10 @@ use errors::ErrorType::*;
 struct AccountsPlugin;
 
 impl Accounts for AccountsPlugin {
+    fn login() -> Result<(), CommonTypes::Error> {
+        return Err(NotYetImplemented.err("login"));
+    }
+
     fn get_logged_in_user() -> Result<Option<String>, CommonTypes::Error> {
         Ok(Some("alice".to_string()))
     }

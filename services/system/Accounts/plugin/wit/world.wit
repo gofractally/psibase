@@ -3,6 +3,9 @@ package accounts:plugin;
 interface accounts {
     use common:plugin/types.{error};
 
+    /// Creates a login popup allowing the user to log into an account.
+    login: func() -> result<_, error>;
+
     /// Gets the name of the currently logged in user, if there is one.
     /// Returned option can be empty if there is no currently logged in user.
     get-logged-in-user: func() -> result<option<string>, error>;
