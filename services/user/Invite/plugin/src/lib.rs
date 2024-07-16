@@ -146,9 +146,9 @@ impl Inviter for Component {
             .packed(),
         )?;
 
-        let link_root = format!("{}{}", Client::my_service_origin()?, "/invited");
+        let link_root = format!("{}{}", Client::my_service_origin(), "/invited");
 
-        let orig_data = Client::get_sender_app()?;
+        let orig_data = Client::get_sender_app();
         let orig_domain = orig_data.origin;
         let originator = orig_data.app.unwrap_or(orig_domain.clone());
 

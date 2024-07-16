@@ -117,7 +117,7 @@ export class Supervisor implements AppInterface {
     }
 
     // Called by the current plugin looking to identify its caller
-    getCaller(currentPlugin: OriginationData): OriginationData | undefined {
+    getCaller(currentPlugin: OriginationData): OriginationData {
         assertTruthy(this.context, "Uninitialized call context");
 
         const frame = this.context.stack.peek(0);
