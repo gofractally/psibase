@@ -313,6 +313,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm ${plugin-wit})
 add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm ${plugin-wit} ${AuthPlugin_DEP})
+add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm ${plugin-wit})
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -360,7 +361,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.10.0")
+set(PSIBASE_VERSION "0.11.0")
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
@@ -664,7 +665,8 @@ psibase_package(
         INIT
     SERVICE r-tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/* /
+        DATA ${COMPONENT_BIN_DIR}/${TokensPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS ${Tokens_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/index.html
     DEPENDS wasm
 )
