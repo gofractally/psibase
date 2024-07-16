@@ -43,7 +43,7 @@ export class PluginHost implements HostInterface {
     }
 
     private isValidAction(actionName: string): boolean {
-        return /^[a-zA-Z0-9]+$/.test(actionName);
+        return /^[a-zA-Z0-9_]+$/.test(actionName);
     }
 
     // A synchronous web request.
