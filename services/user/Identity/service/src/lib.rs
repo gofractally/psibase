@@ -55,7 +55,7 @@ mod service {
     struct WebContentTable;
 
     #[action]
-    pub fn attest_identity_claim(subject: String, value: f32) {
+    pub fn attest(subject: String, value: f32) {
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
 

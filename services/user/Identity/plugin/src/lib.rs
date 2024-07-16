@@ -1,11 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use std::error::Error;
-
-use bindings::common::plugin::{
-    client as CommonClient, server as CommonServer, types as CommonTypes,
-};
+use bindings::common::plugin::{server as CommonServer, types as CommonTypes};
 use bindings::exports::identity::plugin::api::Guest;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
@@ -29,16 +25,17 @@ impl Guest for IdentityPlugin {
         if !(value >= 0.0 && value <= 1.0) {
             return Err(InvalidClaim.err(&format!("{value}")));
         }
-        AccountNumber::from_exact(&subject)
-            .map_err(|err| InvalidAccountNumber.err(&err.to_string()));
+        if let Err(err) = AccountNumber::from_exact(&subject) {
+            return Err(InvalidAccountNumber.err(&err.to_string()));
+        }
 
-        let packed_a = identity::action_structs::attest_identity_claim {
+        let packed_a = identity::action_structs::attest {
             subject: subject.clone(),
             value,
         }
         .packed();
 
-        CommonServer::add_action_to_transaction("attest_identity_claim", &packed_a)
+        CommonServer::add_action_to_transaction("attest", &packed_a)
     }
 }
 
