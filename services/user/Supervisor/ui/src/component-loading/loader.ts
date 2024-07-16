@@ -46,7 +46,7 @@ function getProxiedImports({
     const interfaces = allInterfaces.filter(
         (i) =>
             i.namespace !== "wasi" &&
-            i.namespace !== "common" &&
+            i.namespace !== "host" &&
             i.funcs.length !== 0,
     );
 
@@ -109,7 +109,7 @@ async function getWasiImports(): Promise<ImportDetails> {
 async function getHostImports(): Promise<ImportDetails> {
     const hostShimName = "./host-api.js"; // internal name used by bundler
     const host_importMap: Array<[PkgId, FilePath]> = [
-        [`common:plugin/*`, `${hostShimName}#*`],
+        [`host:common/*`, `${hostShimName}#*`],
     ];
     const host_ShimFile: [FilePath, Code] = [hostShimName, hostShimCode];
     return {

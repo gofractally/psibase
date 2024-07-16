@@ -1,4 +1,4 @@
-package common:plugin;
+package host:common;
 
 /// Common types used by plugins
 interface types {

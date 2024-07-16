@@ -2,8 +2,8 @@
 mod bindings;
 
 use bindings::auth_sig::plugin::types::Keypair;
-use bindings::common::plugin::server as Server;
-use bindings::common::plugin::types as CommonTypes;
+use bindings::host::common::server as Server;
+use bindings::host::common::types as CommonTypes;
 use bindings::exports::auth_sig::plugin::smart_auth;
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, keyvault::Guest as KeyVault, smart_auth::Guest as SmartAuth,

@@ -1,7 +1,7 @@
 package accounts:plugin;
 
 interface accounts {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
 
     /// Creates a login popup allowing the user to log into an account.
     login: func() -> result<_, error>;
@@ -22,7 +22,7 @@ interface accounts {
 }
 
 world psibase-plugin {
-    import common:plugin/server;
+    import host:common/server;
     export accounts;
 }
 

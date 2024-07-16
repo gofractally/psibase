@@ -71,7 +71,7 @@ export class Supervisor implements AppInterface {
     // A valid plugin ID implies that it should be loaded as a distinct plugin
     //   Therefore we should not validate wasi interfaces or direct host exports
     private validated(id: QualifiedPluginId): boolean {
-        return id.service !== "wasi" && id.service !== "common";
+        return id.service !== "wasi" && id.service !== "host";
     }
 
     private async getDependencies(

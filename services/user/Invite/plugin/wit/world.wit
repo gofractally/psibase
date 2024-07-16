@@ -18,7 +18,7 @@ interface types {
 }
 
 interface admin {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
 
     /// Restricts the accounts that are able to create invites to those 
     /// that exist in the whitelist.
@@ -36,7 +36,7 @@ interface admin {
 
 /// Functionality exposed for the inviter
 interface inviter {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
     use types.{url};
 
     /// Allows a user to generate an invite link that can be used to 
@@ -66,7 +66,7 @@ interface inviter {
 
 /// Functionality exposed for the recipient of an invite (the invitee)
 interface invitee {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
 
     use types.{invite, invite-id};
 
@@ -94,8 +94,8 @@ interface invitee {
 }
 
 world psibase-plugin {
-    import common:plugin/server;
-    import common:plugin/client;
+    import host:common/server;
+    import host:common/client;
 
     // For getting logged-in-user, for example to generate an invite
     import accounts:plugin/accounts;

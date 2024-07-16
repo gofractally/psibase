@@ -3,10 +3,10 @@ mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::accounts::plugin::accounts;
 use bindings::auth_sig::plugin::keyvault;
-use bindings::common::plugin::{client as Client, server as Server, types as CommonTypes};
 use bindings::exports::invite::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
 };
+use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
 use bindings::invite::plugin::types::{Invite, InviteId, Url};
 use fracpack::Pack;
 use psibase::services::invite as InviteService;
