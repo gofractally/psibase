@@ -3,15 +3,16 @@ import {
     QualifiedFunctionCallArgs,
     toString,
 } from "./messaging/FunctionCallRequest";
-import { isErrorResponse } from "./messaging/FunctionCallResponse";
 import { PluginId, QualifiedPluginId } from "./messaging/PluginId";
 import { buildPreLoadPluginsRequest } from "./messaging/PreLoadPluginsRequest";
 import {
-    isIFrameInitialized,
+    isSupervisorInitialized,
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
     FunctionCallRequest,
+    isPluginError,
+    isGenericError,
 } from "./messaging";
 
 const SupervisorIFrameId = "iframe-supervisor" as const;
@@ -57,7 +58,7 @@ const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`
 
 // Convenient library for users to interact with the supervisor.
 export class Supervisor {
-    public isSupervisorInitialized = false;
+    isSupervisorInitialized = false;
 
     private pendingRequest: {
         call: FunctionCallArgs;
@@ -82,7 +83,7 @@ export class Supervisor {
     handleRawEvent(messageEvent: MessageEvent) {
         if (
             messageEvent.origin !== myOrigin &&
-            messageEvent.origin != supervisorOrigin
+            messageEvent.origin !== supervisorOrigin
         ) {
             console.log("Received unauthorized message. Ignoring.");
             return;
@@ -93,7 +94,7 @@ export class Supervisor {
         }
 
         try {
-            if (isIFrameInitialized(messageEvent.data)) {
+            if (isSupervisorInitialized(messageEvent.data)) {
                 this.onSupervisorInitialized();
             } else if (isFunctionCallResponse(messageEvent.data)) {
                 this.onFunctionCallResponse(messageEvent.data);
@@ -121,23 +122,32 @@ export class Supervisor {
         const expected = this.pendingRequest.call;
         const received = response.call;
         const unexpected =
-            expected.method != received.method ||
-            expected.service != received.service;
+            expected.method !== received.method ||
+            expected.service !== received.service;
 
-        if (isErrorResponse(response)) {
-            this.pendingRequest.reject(response.result.val);
+        const { result } = response;
+        if (isPluginError(result)) {
+            const { service, plugin } = result.pluginId;
+
+            console.error(`Call to ${toString(response.call)} failed`);
+            console.error(`[${service}:${plugin}] ${result.message}`);
+            this.pendingRequest.reject(result);
+            return;
+        }
+
+        if (isGenericError(result)) {
+            console.error(`Call to ${toString(response.call)} failed`);
+            console.error(result.message);
+            this.pendingRequest.reject(result);
             return;
         }
 
         if (unexpected) {
             // Could be infra error rather than plugin error, printing to console to increase probability
             // that it gets reported.
-            console.warn(
-                `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`,
-            );
-            this.pendingRequest.reject(
-                `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`,
-            );
+            const msg = `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`;
+            console.warn(msg);
+            this.pendingRequest.reject(msg);
             return;
         }
 
@@ -178,7 +188,7 @@ export class Supervisor {
         });
     }
 
-    public async onLoaded() {
+    async onLoaded() {
         if (this.isSupervisorInitialized) return;
         return new Promise((resolve) => {
             this.onLoadPromise = resolve;
@@ -187,7 +197,7 @@ export class Supervisor {
 
     preLoadPlugins(plugins: PluginId[]) {
         // Fully qualify any plugins with default values
-        let fqPlugins: QualifiedPluginId[] = plugins.map((plugin) => ({
+        const fqPlugins: QualifiedPluginId[] = plugins.map((plugin) => ({
             ...plugin,
             plugin: plugin.plugin || "plugin",
         }));

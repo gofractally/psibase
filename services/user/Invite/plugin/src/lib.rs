@@ -89,7 +89,6 @@ impl Invitee for Component {
                 })
             })?;
 
-        let url = format!("{}/graphql", Client::my_service_origin()?);
         let pubkey = &decoded.pk;
         let query = format!(
             r#"query {{
@@ -101,7 +100,7 @@ impl Invitee for Component {
             pubkey = pubkey
         );
 
-        let invite: GetInvite = Server::post_graphql_get_json(&url, &query)
+        let invite: GetInvite = Server::post_graphql_get_json(&query)
             .map_err(|e| QueryError.err(&e.message))
             .and_then(|result| {
                 serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
