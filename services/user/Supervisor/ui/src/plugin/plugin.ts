@@ -89,6 +89,11 @@ export class Plugin {
     // Called by the supervisor to call into a plugin wasm
     call(intf: string | undefined, method: string, params: any[]) {
         if (!this.methodExists(intf, method)) {
+            assertTruthy(this.componentAPI, "Component API undefined");
+            console.info(
+                "[Debug info] Valid exports:",
+                this.componentAPI.exportedFuncs,
+            );
             throw new InvalidCall(this.id, intf, method);
         }
 
