@@ -5,14 +5,14 @@ export interface SupervisorInitialized {
     payload: {};
 }
 
-export const isIFrameInitialized = (
+export const isSupervisorInitialized = (
     message: any,
 ): message is SupervisorInitialized => {
     // TODO add further assertions on expectations in the payload.
     return message && message.type == SUPERVISOR_INITIALIZED;
 };
 
-export const buildMessageIFrameInitialized = (): SupervisorInitialized => ({
+export const buildMessageSupervisorInitialized = (): SupervisorInitialized => ({
     payload: {},
     type: SUPERVISOR_INITIALIZED,
 });

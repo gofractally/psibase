@@ -98,13 +98,13 @@ impl Parser for ComponentParser {
     fn parse(name: String, bytes: Vec<u8>) -> Result<ComponentExtraction, String> {
         let component = Component::from_bytes(name, bytes).map_err(|e| format!("{e:#}"))?;
         let decoded = decode(component.bytes()).map_err(|e| format!("{e:#}"))?;
-        let resolved_wit = decoded.resolve();
+        let resolve = decoded.resolve();
 
         Ok(ComponentExtraction {
-            imported_funcs: extract_functions(resolved_wit, |w: &World| &w.imports),
-            exported_funcs: extract_functions(resolved_wit, |w: &World| &w.exports),
-            wit: extract_wit(resolved_wit)?,
-            debug: serde_json::to_string(&resolved_wit).unwrap(),
+            imported_funcs: extract_functions(resolve, |w: &World| &w.imports),
+            exported_funcs: extract_functions(resolve, |w: &World| &w.exports),
+            wit: extract_wit(resolve)?,
+            debug: serde_json::to_string_pretty(&resolve).unwrap(),
         })
     }
 }

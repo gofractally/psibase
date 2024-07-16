@@ -41,11 +41,6 @@ pub struct TokenDetail {
 }
 
 pub fn fetch_token(token_number: u32) -> Result<TokenDetail, CommonTypes::Error> {
-    let url = format!(
-        "{}/graphql",
-        client::my_service_origin().expect("origin failure")
-    );
-
     let query = format!(
         r#"query {{
             tokenDetails(tokenId: {token_id}) {{
@@ -63,7 +58,7 @@ pub fn fetch_token(token_number: u32) -> Result<TokenDetail, CommonTypes::Error>
         token_id = token_number
     );
 
-    let res = server::post_graphql_get_json(&url, &query)
+    let res = server::post_graphql_get_json(&query)
         .map_err(|e| ErrorType::QueryError.err(&e.message))
         .and_then(|result| {
             serde_json::from_str(&result).map_err(|e| ErrorType::QueryError.err(&e.to_string()))
