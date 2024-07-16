@@ -2,9 +2,9 @@
 
 using namespace psibase;
 
-static constexpr auto wasi_errno_acces      = 2;
-static constexpr auto wasi_errno_badf       = 8;
-static constexpr auto wasi_errno_noprotoopt = 50;
+static constexpr auto wasi_errno_acces  = 2;
+static constexpr auto wasi_errno_badf   = 8;
+static constexpr auto wasi_errno_notsup = 58;
 
 Socket::~Socket()
 {
@@ -121,7 +121,7 @@ std::int32_t Sockets::autoClose(std::int32_t               fd,
       auto p = sockets[fd];
 
       if (!p->canAutoClose())
-         return wasi_errno_noprotoopt;
+         return wasi_errno_notsup;
 
       sockptr = std::static_pointer_cast<AutoCloseSocket>(p);
 
