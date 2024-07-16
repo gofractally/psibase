@@ -206,7 +206,7 @@ function App() {
       const res = await supervisor.functionCall({
         service: "identity",
         intf: "api",
-        method: "attest",
+        method: "attestIdentityClaim",
         params: ["bob", claim],
       });
       console.info("returned from Identity.api.attest()");
