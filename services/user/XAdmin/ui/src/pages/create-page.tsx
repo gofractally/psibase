@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ChevronRight,
     ChevronLeft,
@@ -18,7 +18,13 @@ import { BlockProducerForm } from "@/components/forms/block-producer";
 import { ConfirmationForm } from "@/components/forms/confirmation-form";
 
 import { usePackages } from "../hooks/usePackages";
-import { PackageInfo } from "@/types";
+import {
+    BootCompleteSchema,
+    BootCompleteUpdate,
+    PackageInfo,
+    RequestUpdate,
+    RequestUpdateSchema,
+} from "../types";
 
 import { useSelectedRows } from "../hooks/useSelectedRows";
 import { Steps } from "@/components/steps";
@@ -33,6 +39,12 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { MultiStepLoader } from "@/components/multi-step-loader";
+import { getRequiredPackages } from "../lib/getRequiredPackages";
+import { bootChain } from "../lib/bootChain";
+import { useConfig } from "../hooks/useConfig";
+import { useToast } from "@/components/ui/use-toast";
+
+import { useNavigate } from "react-router-dom";
 
 const useStepper = (
     numberOfSteps: number,
@@ -129,6 +141,21 @@ const Card = ({ label, value }: Props) => (
     </div>
 );
 
+const calculateIndex = (
+    packagesLength: number,
+    currentTx: number,
+    totalTransactions: number
+) => {
+    const percentProgressed = currentTx / totalTransactions;
+    return Math.floor(percentProgressed * (packagesLength - 1));
+};
+
+const isRequestingUpdate = (data: unknown): data is RequestUpdate =>
+    RequestUpdateSchema.safeParse(data).success;
+
+const isBootCompleteUpdate = (data: unknown): data is BootCompleteUpdate =>
+    BootCompleteSchema.safeParse(data).success;
+
 export const CreatePage = () => {
     const blockProducerForm = useForm<z.infer<typeof BlockProducerSchema>>({
         resolver: zodResolver(BlockProducerSchema),
@@ -136,6 +163,11 @@ export const CreatePage = () => {
             name: "",
         },
     });
+
+    const navigate = useNavigate();
+    const { toast } = useToast();
+
+    const { data: config, refetch: refetchConfig } = useConfig();
 
     const chainTypeForm = useForm<z.infer<typeof chainTypeSchema>>({
         resolver: zodResolver(chainTypeSchema),
@@ -205,11 +237,55 @@ export const CreatePage = () => {
         text: `Installing ${pack.name}..`,
     }));
 
+    const installRan = useRef(false);
+    const bpName = blockProducerForm.watch("name");
+
+    const [currentState, setCurrentState] = useState(1);
+
     useEffect(() => {
-        if (currentStep == 4) {
+        if (currentStep == 4 && !installRan.current && config) {
             setLoading(true);
+            installRan.current = true;
+            const desiredPackageIds = Object.keys(rows);
+            const desiredPackages = packages.filter((pack) =>
+                desiredPackageIds.some((id) => id == getId(pack))
+            );
+            const requiredPackages = getRequiredPackages(
+                packages,
+                desiredPackages.map((pack) => pack.name)
+            );
+            bootChain(
+                requiredPackages,
+                bpName,
+                config,
+                () => {
+                    refetchConfig();
+                },
+                (state) => {
+                    if (isRequestingUpdate(state)) {
+                        const [_, current, total] = state;
+                        const newIndex = calculateIndex(
+                            loadingStates.length,
+                            current,
+                            total
+                        );
+                        setCurrentState(newIndex);
+                    } else if (isBootCompleteUpdate(state)) {
+                        if (state.success) {
+                            navigate("/Dashboard");
+                            setCurrentState(loadingStates.length + 1);
+                            toast({
+                                title: "Success",
+                                description: "Successfully booted chain.",
+                            });
+                        }
+                    } else {
+                        console.log(state, "Unrecognised message.");
+                    }
+                }
+            );
         }
-    }, [currentStep]);
+    }, [currentStep, rows, bpName, config]);
 
     return (
         <SetupWrapper>
@@ -228,9 +304,9 @@ export const CreatePage = () => {
             <MultiStepLoader
                 loadingStates={loadingStates}
                 loading={loading}
-                currentState={1}
+                currentState={currentState}
             />
-            <div className="flex h-full flex-col border ">
+            <div className="flex h-full flex-col  ">
                 <div className="my-auto flex h-full flex-col justify-between sm:h-5/6">
                     <Steps currentStep={currentStep} numberOfSteps={maxSteps} />
                     {currentStep == 1 && (

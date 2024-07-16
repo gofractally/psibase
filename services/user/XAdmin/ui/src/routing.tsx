@@ -11,7 +11,7 @@ import { BootPage } from "./boot-wizard/boot-page";
 import { JoinPage } from "./pages/join-page";
 import { CreatePage } from "./pages/create-page";
 
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useStatuses } from "./hooks/useStatuses";
 import { useEffect } from "react";
 

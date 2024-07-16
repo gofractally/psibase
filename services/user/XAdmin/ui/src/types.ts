@@ -26,11 +26,27 @@ export interface ProducerType {
     producer: string;
 }
 
+export type RequestUpdate = [type: string, current: number, total: number];
+
+export const RequestUpdateSchema = z.tuple([
+    z.string(),
+    z.number(),
+    z.number(),
+]);
+
+export const BootCompleteSchema = z.object({
+    type: z.literal("BootComplete"),
+    success: z.boolean(),
+});
+
+export type BootCompleteUpdate = z.infer<typeof BootCompleteSchema>;
+
 export type BootState =
     | undefined
-    | [string, number, number]
+    | RequestUpdate
     | string
-    | TransactionTrace;
+    | TransactionTrace
+    | BootCompleteUpdate;
 
 export type InstallType = {
     installType: string;

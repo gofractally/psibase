@@ -5,13 +5,7 @@ import { useStatuses } from "../hooks/useStatuses";
 
 const Loading = () => <div>Loading...</div>;
 
-export const NavHeader = ({
-    title,
-    condense = false,
-}: {
-    title?: string;
-    condense?: boolean;
-}) => {
+export const NavHeader = ({ title }: { title?: string }) => {
     const { data: status, isLoading } = useStatuses();
 
     const isBootable = status && status.includes("needgenesis");
@@ -39,7 +33,7 @@ export const NavHeader = ({
                 </h1>
             )}
             <div className="flex gap-3">
-                {!condense && (
+                {!isBootable && (
                     <Tabs>
                         <TabsList>
                             {menuItems.map((item) => (
@@ -59,7 +53,7 @@ export const NavHeader = ({
                         </TabsList>
                     </Tabs>
                 )}
-                <MenuContent condense />
+                <MenuContent condense={isBootable} />
             </div>
         </header>
     );

@@ -82,7 +82,7 @@ export const LogsPage = () => {
         <>
             <h1 className="mb-2">Logs</h1>
             {logConnectionError && (
-                <p className="bg-red-100 p-4">
+                <p className=" p-4">
                     🔴 {logConnectionError || "Unknown log connection error"}
                 </p>
             )}

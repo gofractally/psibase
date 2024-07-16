@@ -1,28 +1,29 @@
-function isLocalhost() {
-    const hostname = window.location.hostname;
-    const localhostPatterns = [
-        /^(.*\.)?localhost.*$/,
-        /^(.*\.)?127\.0\.0\.1(\..*)?$/,
-        /^(.*\.)?127\.0\.0\.1:(.*)?$/,
-        /^\[::1\].*$/,
-        /^(.*\.)?--1(\..*)?/ // ipv6 sslip.io
-    ];
+import { useGraphana, url } from "../hooks/useGraphana";
 
-    return localhostPatterns.some(pattern => pattern.test(hostname));
+interface Props {
+    url: string;
 }
 
-const GRAFANA_PORT = 3000;
-const DASHBOARDS_PREFIX = isLocalhost()
-        ? `${window.location.protocol}//${window.location.hostname}:${GRAFANA_PORT}/grafana`
-        : "/grafana";
-
-export const DashboardPage = () => {
+const Graphana = ({ url }: Props) => {
     return (
         <iframe
-            src={`${DASHBOARDS_PREFIX}/d/psinode-dashboard?orgId=1&from=now-1h&to=now&refresh=5s&theme=light&kiosk=tv`}
+            src={url}
             style={{ overflow: "hidden", height: "100%", width: "100%" }}
             height="100%"
             width="100%"
         />
+    );
+};
+
+export const DashboardPage = () => {
+    const { isSuccess } = useGraphana();
+
+    return (
+        <div>
+            <h2 className="scroll-m-20  pb-2 text-3xl font-semibold tracking-tight ">
+                Dashboard
+            </h2>
+            {isSuccess && <Graphana url={url} />}
+        </div>
     );
 };

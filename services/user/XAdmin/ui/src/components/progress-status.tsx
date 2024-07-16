@@ -1,4 +1,10 @@
-import { BootState } from "@/types";
+import {
+    BootCompleteSchema,
+    BootCompleteUpdate,
+    BootState,
+    RequestUpdate,
+    RequestUpdateSchema,
+} from "../types";
 import { Progress } from "./ui/progress";
 
 const getStack = (trace: TransactionTrace) => {
@@ -25,6 +31,12 @@ interface ProgressPageProps {
     state: BootState;
 }
 
+const isRequestingUpdate = (data: unknown): data is RequestUpdate =>
+    RequestUpdateSchema.safeParse(data).success;
+
+const isBootCompleteUpdate = (data: unknown): data is BootCompleteUpdate =>
+    BootCompleteSchema.safeParse(data).success;
+
 export const ProgressStatus = ({ state }: ProgressPageProps) => {
     if (state === undefined) {
         return <>Preparing to install</>;
@@ -32,7 +44,7 @@ export const ProgressStatus = ({ state }: ProgressPageProps) => {
         return <>{state}</>;
     } else if ("actionTraces" in state) {
         return <>Boot failed: {getStack(state)}</>;
-    } else if (state[0] == "fetch" || state[0] == "push") {
+    } else if (isRequestingUpdate(state)) {
         const percent = Math.floor((state[1] / state[2]) * 100);
         return (
             <div>

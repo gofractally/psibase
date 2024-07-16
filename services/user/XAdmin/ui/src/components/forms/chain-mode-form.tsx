@@ -44,9 +44,10 @@ export const ChainTypeForm = ({ form }: Props) => (
                                     }
                                 )}
                             >
-                                <div className="text-2xl">Dev</div>
+                                <div className="text-2xl">Development</div>
                                 <div className="w-full text-left text-sm text-muted-foreground">
-                                    Dev description
+                                    Boot chain with development apps, pre-built
+                                    users and insecure authentication.
                                 </div>
                             </Button>
                             <Button
@@ -67,9 +68,9 @@ export const ChainTypeForm = ({ form }: Props) => (
                                     }
                                 )}
                             >
-                                <div className="text-2xl">Prod</div>
+                                <div className="text-2xl">Production</div>
                                 <div className="w-full text-left text-sm text-muted-foreground">
-                                    Prod description
+                                    Create a secure production blockchain.
                                 </div>
                             </Button>
                         </div>

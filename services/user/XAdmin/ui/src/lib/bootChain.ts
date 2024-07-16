@@ -38,38 +38,37 @@ export const bootChain = async (
             }
         }
 
-        // fetch packages
-        let fetchedPackages: ArrayBuffer[] = [];
-        let i = 0;
-        for (let info of packages) {
-            onProgressUpdate(["fetch", i, packages.length]);
-            fetchedPackages.push(
-                await getArrayBuffer(`/packages/${info.file}`)
-            );
-            i++;
-        }
+        const fetchedPackages: ArrayBuffer[] = await Promise.all(
+            packages.map((pack) => getArrayBuffer(`/packages/${pack.file}`))
+        );
+
         // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
         // in a dev environment.
-        let [boot_transactions, transactions] =
+
+        const [boot_transaction, transactions] =
             wasm.js_create_boot_transactions(producerName, fetchedPackages);
-        onProgressUpdate(["push", 0, transactions.length + 1]);
-        let trace = await postArrayBufferGetJson(
+
+        let i = 1;
+        onProgressUpdate(["push", i, transactions.length + 1]);
+        const trace = await postArrayBufferGetJson(
             "/native/push_boot",
-            boot_transactions.buffer
+            boot_transaction.buffer
         );
         if (trace.error) {
             onProgressUpdate(trace);
             console.error(trace.error);
             return;
         }
-        i = 1;
+        i++;
+
         for (const t of transactions) {
             console.log(`Pushing transaction number: ${i}`);
-            onProgressUpdate(["push", i, transactions.length + 1]);
+            onProgressUpdate(["push", i + 1, transactions.length + 1]);
             let trace = await postArrayBufferGetJson(
                 "/native/push_transaction",
                 t.buffer
             );
+            console.log(trace, "is the trace");
             if (trace.error) {
                 onProgressUpdate(trace);
                 console.error(trace.error);
@@ -77,9 +76,9 @@ export const bootChain = async (
             }
             i++;
         }
-        onProgressUpdate("Boot successful.");
+        onProgressUpdate({ type: "BootComplete", success: true });
     } catch (e) {
-        onProgressUpdate("Boot failed.");
+        onProgressUpdate({ type: "BootComplete", success: false });
         console.error(e);
     }
 };
