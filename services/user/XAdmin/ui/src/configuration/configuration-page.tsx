@@ -243,7 +243,10 @@ export const ConfigurationPage = () => {
                                     <Button
                                         className="mt-4"
                                         type="button"
-                                        onClick={onAddNewListenerClick}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            onAddNewListenerClick();
+                                        }}
                                     >
                                         New Listener
                                     </Button>
@@ -279,7 +282,13 @@ export const ConfigurationPage = () => {
                             )}
                         </div>
                     )}
-                    <Button className="mt-4" onClick={onAddNewLoggerClick}>
+                    <Button
+                        className="mt-4"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            onAddNewLoggerClick();
+                        }}
+                    >
                         New Logger
                     </Button>
                     <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
