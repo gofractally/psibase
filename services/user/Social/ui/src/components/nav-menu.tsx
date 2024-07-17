@@ -1,14 +1,4 @@
-import {
-    AlertCircle,
-    Archive,
-    User,
-    CheckSquare,
-    List,
-    MessagesSquare,
-    Gavel,
-    ShoppingCart,
-    Users2,
-} from "lucide-react";
+import { Send, PencilLine, Inbox } from "lucide-react";
 
 import { Separator } from "@shadcn/separator";
 import { cn } from "@lib/utils";
@@ -40,22 +30,22 @@ export const NavMenu = ({ isCollapsed = false }: Props) => {
                 links={[
                     {
                         title: "Inbox",
-                        label: "128",
-                        icon: List,
+                        // label: "128",
+                        icon: Inbox,
                         variant: at === "/" ? "default" : "ghost",
                         href: "#",
                     },
                     {
                         title: "Drafts",
-                        label: "9",
-                        icon: CheckSquare,
+                        // label: "9",
+                        icon: PencilLine,
                         variant: at === "/drafts" ? "default" : "ghost",
                         href: "#/drafts",
                     },
                     {
                         title: "Sent",
-                        label: "9",
-                        icon: CheckSquare,
+                        // label: "9",
+                        icon: Send,
                         variant: at === "/sent" ? "default" : "ghost",
                         href: "#/sent",
                     },

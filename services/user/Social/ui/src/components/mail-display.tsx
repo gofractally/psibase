@@ -1,46 +1,23 @@
-import { Link } from "react-router-dom";
-import { addDays, addHours, format, nextSaturday } from "date-fns";
-import {
-    Archive,
-    ArchiveX,
-    Clock,
-    MoreVertical,
-    Reply,
-    Maximize2,
-    Trash2,
-} from "lucide-react";
+import { useEffect, useRef } from "react";
+import { MilkdownProvider, useInstance } from "@milkdown/react";
+import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
+import { format } from "date-fns";
+import { Reply, Trash2 } from "lucide-react";
 import { replaceAll } from "@milkdown/utils";
 
-import { DropdownMenuContent, DropdownMenuItem } from "@shadcn/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@shadcn/avatar";
 import { Button } from "@shadcn/button";
-import { Calendar } from "@shadcn/calendar";
-import { DropdownMenu, DropdownMenuTrigger } from "@shadcn/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@shadcn/popover";
 import { Separator } from "@shadcn/separator";
-import { Textarea } from "@shadcn/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { ScrollArea } from "@shadcn/scroll-area";
 
 import { MarkdownEditor } from "@components";
-import { Message, useLocalMail } from "@hooks";
+import { Message, useLocalMail, useLocalStorage } from "@hooks";
 
 import { accounts } from "../fixtures/data";
-import { useEffect, useRef } from "react";
-import { MilkdownProvider, useInstance } from "@milkdown/react";
-import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 
 export function MailDisplay() {
     const [_messages, selectedMessage] = useLocalMail();
-    const [_state, getEditor] = useInstance();
-
-    const messageId = useRef<string>();
-    useEffect(() => {
-        if (!selectedMessage) return;
-        if (selectedMessage?.id === messageId.current) return;
-        const editor = getEditor();
-        editor?.action(replaceAll(selectedMessage.body));
-    }, [selectedMessage?.id]);
 
     if (!selectedMessage) return null;
 
@@ -57,12 +34,8 @@ export function MailDisplay() {
                             {selectedMessage ? (
                                 <MilkdownProvider>
                                     <ProsemirrorAdapterProvider>
-                                        <MarkdownEditor
-                                            initialValue={
-                                                selectedMessage?.body ?? ""
-                                            }
-                                            updateMarkdown={() => {}}
-                                            readOnly
+                                        <MessageBody
+                                            message={selectedMessage}
                                         />
                                     </ProsemirrorAdapterProvider>
                                 </MilkdownProvider>
@@ -79,12 +52,44 @@ export function MailDisplay() {
     );
 }
 
+const MessageBody = ({ message }: { message: Message }) => {
+    const [_state, getEditor] = useInstance();
+
+    const messageId = useRef<string>();
+    useEffect(() => {
+        if (message.id === messageId.current) return;
+        const editor = getEditor();
+        editor?.action(replaceAll(message.body));
+    }, [message.id]);
+
+    return (
+        <MarkdownEditor
+            initialValue={message.body ?? ""}
+            updateMarkdown={() => {}}
+            readOnly
+        />
+    );
+};
+
 const ActionBar = ({ message }: { message: Message }) => {
-    const today = new Date();
+    const [_, __, setSelectedMessageId] = useLocalMail();
+    const [messages, setMessages, getMessages] = useLocalStorage<Message[]>(
+        "messages",
+        [],
+    );
+
+    const onDelete = () => {
+        const allMessages = getMessages() ?? [];
+        const newMessages = allMessages.filter((m) => m.id !== message.id);
+        setSelectedMessageId("");
+        setMessages(newMessages);
+    };
+
+    // const today = new Date();
     return (
         <div className="flex p-2">
             <div className="flex items-center gap-2">
-                <Tooltip>
+                {/* <Tooltip>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" disabled={!message}>
                             <Archive className="h-4 w-4" />
@@ -101,10 +106,15 @@ const ActionBar = ({ message }: { message: Message }) => {
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Move to junk</TooltipContent>
-                </Tooltip>
+                </Tooltip> */}
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!message}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={!message}
+                            onClick={onDelete}
+                        >
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Move to trash</span>
                         </Button>
@@ -200,7 +210,7 @@ const ActionBar = ({ message }: { message: Message }) => {
                     </TooltipTrigger>
                     <TooltipContent>Reply</TooltipContent>
                 </Tooltip>
-                <Tooltip>
+                {/* <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
                             variant="ghost"
@@ -215,9 +225,9 @@ const ActionBar = ({ message }: { message: Message }) => {
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Full screen</TooltipContent>
-                </Tooltip>
+                </Tooltip> */}
             </div>
-            <div className="flex items-center gap-2">
+            {/* <div className="flex items-center gap-2">
                 <Separator orientation="vertical" className="mx-2 h-6" />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -233,7 +243,7 @@ const ActionBar = ({ message }: { message: Message }) => {
                         <DropdownMenuItem>Mute thread</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-            </div>
+            </div> */}
         </div>
     );
 };

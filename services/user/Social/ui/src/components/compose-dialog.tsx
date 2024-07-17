@@ -49,6 +49,13 @@ export const ComposeDialog = ({ trigger }: { trigger: ReactNode }) => {
         [],
     );
 
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            subject: "",
+        },
+    });
+
     const id = useRef<string>();
 
     const createDraft = (value: string) => {
@@ -73,6 +80,8 @@ export const ComposeDialog = ({ trigger }: { trigger: ReactNode }) => {
             createDraft(value);
         } else {
             draft.datetime = Date.now();
+            draft.to = form.getValues().to ?? "";
+            draft.subject = form.getValues().subject ?? "";
             draft.body = value;
             setMessages(data);
         }
@@ -93,13 +102,6 @@ export const ComposeDialog = ({ trigger }: { trigger: ReactNode }) => {
             setMessages(data);
         }
     };
-
-    const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
-        defaultValues: {
-            subject: "",
-        },
-    });
 
     function onSubmit(values: z.infer<typeof formSchema>) {
         sendMessage(values);
