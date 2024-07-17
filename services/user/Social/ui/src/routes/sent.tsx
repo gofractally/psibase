@@ -1,7 +1,3 @@
-import type { Mail } from "../fixtures/data";
-
-import { useLoaderData } from "react-router-dom";
-
 import {
     ResizableHandle,
     ResizablePanel,
@@ -12,21 +8,15 @@ import { Separator } from "@shadcn/separator";
 import { MailDisplay } from "@components/mail-display";
 import { MailList } from "@components/mail-list";
 
-import { useLocalMail, useMail } from "@hooks/use-mail";
 import { Dialog } from "@shadcn/dialog";
 import {
     ComposeDialog,
     ComposeDialogTriggerIconWithTooltip,
 } from "@components";
-
-import { mails } from "../fixtures/data";
+import { useLocalMail } from "@hooks";
 import { useEffect } from "react";
 
-export const homeLoader = () => {
-    return { mails };
-};
-
-export function Home() {
+export function Sent() {
     const [_, _a, setSelectedMessageId] = useLocalMail();
 
     useEffect(() => {
@@ -41,7 +31,7 @@ export function Home() {
         >
             <ResizablePanel minSize={30} id="list" order={3}>
                 <div className="flex items-center justify-between px-4">
-                    <h1 className="text-xl font-bold">Inbox</h1>
+                    <h1 className="text-xl font-bold">Sent</h1>
                     <div className="flex items-center gap-2">
                         <Dialog>
                             <ComposeDialog
@@ -62,7 +52,7 @@ export function Home() {
                     </form>
                 </div> */}
                 <div className="py-4">
-                    <MailList filter="inbox" />
+                    <MailList filter="sent" />
                 </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
@@ -73,4 +63,4 @@ export function Home() {
     );
 }
 
-export default Home;
+export default Sent;

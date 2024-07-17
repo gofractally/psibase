@@ -573,12 +573,12 @@ export type Mail = (typeof mails)[number];
 
 export const accounts = [
     {
-        label: "Brandon Fancher",
-        email: "brandonfancher",
+        name: "Brandon Fancher",
+        account: "brandonfancher",
     },
     {
-        label: "Brandon F",
-        email: "thegazelle",
+        name: "The Gazelle",
+        account: "thegazelle",
     },
 ];
 

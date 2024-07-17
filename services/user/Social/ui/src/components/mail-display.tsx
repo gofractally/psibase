@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { addDays, addHours, format, nextSaturday } from "date-fns";
 import {
     Archive,
@@ -8,61 +9,66 @@ import {
     Maximize2,
     Trash2,
 } from "lucide-react";
+import { replaceAll } from "@milkdown/utils";
 
-import {
-    DropdownMenuContent,
-    DropdownMenuItem,
-} from "../shad/components/ui/dropdown-menu";
-import {
-    Avatar,
-    AvatarFallback,
-    AvatarImage,
-} from "../shad/components/ui/avatar";
-import { Button } from "../shad/components/ui/button";
-import { Calendar } from "../shad/components/ui/calendar";
-import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-} from "../shad/components/ui/dropdown-menu";
-import { Label } from "../shad/components/ui/label";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "../shad/components/ui/popover";
-import { Separator } from "../shad/components/ui/separator";
-import { Textarea } from "../shad/components/ui/textarea";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "../shad/components/ui/tooltip";
-import { Mail } from "../fixtures/data";
+import { DropdownMenuContent, DropdownMenuItem } from "@shadcn/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@shadcn/avatar";
+import { Button } from "@shadcn/button";
+import { Calendar } from "@shadcn/calendar";
+import { DropdownMenu, DropdownMenuTrigger } from "@shadcn/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@shadcn/popover";
+import { Separator } from "@shadcn/separator";
+import { Textarea } from "@shadcn/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { ScrollArea } from "@shadcn/scroll-area";
-import { Link } from "react-router-dom";
 
-interface MailDisplayProps {
-    mail: Mail | null;
-}
+import { MarkdownEditor } from "@components";
+import { Message, useLocalMail } from "@hooks";
 
-export function MailDisplay({ mail }: MailDisplayProps) {
+import { accounts } from "../fixtures/data";
+import { useEffect, useRef } from "react";
+import { MilkdownProvider, useInstance } from "@milkdown/react";
+import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
+
+export function MailDisplay() {
+    const [_messages, selectedMessage] = useLocalMail();
+    const [_state, getEditor] = useInstance();
+
+    const messageId = useRef<string>();
+    useEffect(() => {
+        if (!selectedMessage) return;
+        if (selectedMessage?.id === messageId.current) return;
+        const editor = getEditor();
+        editor?.action(replaceAll(selectedMessage.body));
+    }, [selectedMessage?.id]);
+
+    if (!selectedMessage) return null;
+
     return (
         <div className="flex h-full max-h-full flex-col">
-            {mail ? (
+            {selectedMessage ? (
                 <>
-                    <ActionBar mail={mail} />
+                    <ActionBar message={selectedMessage} />
                     <Separator />
-                    <PostHeader mail={mail} />
+                    <MessageHeader message={selectedMessage} />
                     <Separator />
                     <ScrollArea className="flex-1">
-                        <article className="prose max-w-none p-4">
-                            {mail.text}
-                        </article>
-                        <Separator />
-                        <Comments mail={mail} />
+                        <main className="mx-auto max-w-5xl">
+                            {selectedMessage ? (
+                                <MilkdownProvider>
+                                    <ProsemirrorAdapterProvider>
+                                        <MarkdownEditor
+                                            initialValue={
+                                                selectedMessage?.body ?? ""
+                                            }
+                                            updateMarkdown={() => {}}
+                                            readOnly
+                                        />
+                                    </ProsemirrorAdapterProvider>
+                                </MilkdownProvider>
+                            ) : null}
+                        </main>
                     </ScrollArea>
-                    <Separator />
-                    <CommentForm />
                 </>
             ) : (
                 <div className="flex flex-1 items-center justify-center text-muted-foreground">
@@ -73,14 +79,14 @@ export function MailDisplay({ mail }: MailDisplayProps) {
     );
 }
 
-const ActionBar = ({ mail }: MailDisplayProps) => {
+const ActionBar = ({ message }: { message: Message }) => {
     const today = new Date();
     return (
         <div className="flex p-2">
             <div className="flex items-center gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!mail}>
+                        <Button variant="ghost" size="icon" disabled={!message}>
                             <Archive className="h-4 w-4" />
                             <span className="sr-only">Archive</span>
                         </Button>
@@ -89,7 +95,7 @@ const ActionBar = ({ mail }: MailDisplayProps) => {
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!mail}>
+                        <Button variant="ghost" size="icon" disabled={!message}>
                             <ArchiveX className="h-4 w-4" />
                             <span className="sr-only">Move to junk</span>
                         </Button>
@@ -98,22 +104,22 @@ const ActionBar = ({ mail }: MailDisplayProps) => {
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!mail}>
+                        <Button variant="ghost" size="icon" disabled={!message}>
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Move to trash</span>
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Move to trash</TooltipContent>
                 </Tooltip>
-                <Separator orientation="vertical" className="mx-1 h-6" />
-                <Tooltip>
+                {/* <Separator orientation="vertical" className="mx-1 h-6" /> */}
+                {/* <Tooltip>
                     <Popover>
                         <PopoverTrigger asChild>
                             <TooltipTrigger asChild>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    disabled={!mail}
+                                    disabled={!message}
                                 >
                                     <Clock className="h-4 w-4" />
                                     <span className="sr-only">Snooze</span>
@@ -182,12 +188,12 @@ const ActionBar = ({ mail }: MailDisplayProps) => {
                         </PopoverContent>
                     </Popover>
                     <TooltipContent>Snooze</TooltipContent>
-                </Tooltip>
+                </Tooltip> */}
             </div>
             <div className="ml-auto flex items-center gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!mail}>
+                        <Button variant="ghost" size="icon" disabled={!message}>
                             <Reply className="h-4 w-4" />
                             <span className="sr-only">Reply</span>
                         </Button>
@@ -199,10 +205,10 @@ const ActionBar = ({ mail }: MailDisplayProps) => {
                         <Button
                             variant="ghost"
                             size="icon"
-                            disabled={!mail}
+                            disabled={!message}
                             asChild
                         >
-                            <Link to={`/posts/${mail!.id}`}>
+                            <Link to={`/posts/${message!.id}`}>
                                 <Maximize2 className="h-4 w-4" />
                                 <span className="sr-only">Full screen</span>
                             </Link>
@@ -215,7 +221,7 @@ const ActionBar = ({ mail }: MailDisplayProps) => {
                 <Separator orientation="vertical" className="mx-2 h-6" />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!mail}>
+                        <Button variant="ghost" size="icon" disabled={!message}>
                             <MoreVertical className="h-4 w-4" />
                             <span className="sr-only">More</span>
                         </Button>
@@ -232,86 +238,87 @@ const ActionBar = ({ mail }: MailDisplayProps) => {
     );
 };
 
-const PostHeader = ({ mail }: { mail: Mail }) => {
+const MessageHeader = ({ message }: { message: Message }) => {
+    const account = accounts.find((a) => a.account === message.from);
     return (
         <div className="flex items-center gap-4 p-4 text-sm">
             <Avatar>
-                <AvatarImage alt={mail.name} />
+                <AvatarImage alt={account?.name} />
                 <AvatarFallback>
-                    {mail.name
+                    {account?.name
                         .split(" ")
                         .map((chunk) => chunk[0])
                         .join("")}
                 </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-                <h2 className="text-xl font-bold">{mail.subject}</h2>
+                <h2 className="text-xl font-bold">{message.subject}</h2>
                 <p className="text-sm text-muted-foreground">
-                    By{" "}
+                    From{" "}
                     <Tooltip delayDuration={700}>
                         <TooltipTrigger asChild>
-                            <span>{mail.name}</span>
+                            <span>{account?.name}</span>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
-                            {mail.email}
+                            {message.from}
                         </TooltipContent>
                     </Tooltip>{" "}
-                    • {format(new Date(mail.date), "PPp")}
+                    • {format(new Date(message.datetime), "PPp")}
                 </p>
             </div>
         </div>
     );
 };
 
-const Comments = ({ mail }: { mail: Mail }) => {
-    return (
-        <div className="p-4">
-            <h3 className="mb-4 text-lg font-bold">Comments</h3>
-            <div className="space-y-4">
-                {mail.comments.map((comment) => (
-                    <div
-                        className="flex items-start space-x-2"
-                        key={comment.id}
-                    >
-                        <Avatar className="scale-[85%] border">
-                            <AvatarImage alt={comment.name} />
-                            <AvatarFallback className="bg-white">
-                                {comment.name
-                                    .split(" ")
-                                    .map((chunk) => chunk[0])
-                                    .join("")}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                            <h4 className="text-sm font-semibold">
-                                {comment.name}
-                            </h4>
-                            <p className="text-xs text-muted-foreground">
-                                {comment.text}
-                            </p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
+// const Comments = ({ mail }: { mail: Mail }) => {
+//     return (
+//         <div className="p-4">
+//             <h3 className="mb-4 text-lg font-bold">Comments</h3>
+//             <div className="space-y-4">
+//                 {mail.comments.map((comment) => (
+//                     <div
+//                         className="flex items-start space-x-2"
+//                         key={comment.id}
+//                     >
+//                         <Avatar className="scale-[85%] border">
+//                             <AvatarImage alt={comment.name} />
+//                             <AvatarFallback className="bg-white">
+//                                 {comment.name
+//                                     .split(" ")
+//                                     .map((chunk) => chunk[0])
+//                                     .join("")}
+//                             </AvatarFallback>
+//                         </Avatar>
+//                         <div className="flex-1">
+//                             <h4 className="text-sm font-semibold">
+//                                 {comment.name}
+//                             </h4>
+//                             <p className="text-xs text-muted-foreground">
+//                                 {comment.text}
+//                             </p>
+//                         </div>
+//                     </div>
+//                 ))}
+//             </div>
+//         </div>
+//     );
+// };
 
-const CommentForm = () => {
-    return (
-        <form className="p-4">
-            <div className="grid gap-4">
-                <Textarea className="p-4" placeholder="Add comment" />
-                <div className="flex items-center">
-                    <Button
-                        onClick={(e) => e.preventDefault()}
-                        size="sm"
-                        className="ml-auto"
-                    >
-                        Send
-                    </Button>
-                </div>
-            </div>
-        </form>
-    );
-};
+// const CommentForm = () => {
+//     return (
+//         <form className="p-4">
+//             <div className="grid gap-4">
+//                 <Textarea className="p-4" placeholder="Add comment" />
+//                 <div className="flex items-center">
+//                     <Button
+//                         onClick={(e) => e.preventDefault()}
+//                         size="sm"
+//                         className="ml-auto"
+//                     >
+//                         Send
+//                     </Button>
+//                 </div>
+//             </div>
+//         </form>
+//     );
+// };

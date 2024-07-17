@@ -1,34 +1,32 @@
-import * as React from "react";
-
-import { cn } from "../lib/utils";
+import { useLocalMail, useUser } from "@hooks";
+import { cn } from "@lib/utils";
+import { accounts } from "src/fixtures/data";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "../shad/components/ui/select";
+} from "@shadcn/select";
 
 interface AccountSwitcherProps {
     isCollapsed: boolean;
-    accounts: {
-        label: string;
-        email: string;
-    }[];
 }
 
-export function AccountSwitcher({
-    isCollapsed,
-    accounts,
-}: AccountSwitcherProps) {
-    const [selectedAccount, setSelectedAccount] = React.useState<string>(
-        accounts[0].email,
-    );
+export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
+    const [_, _a, setSelectedMessageId] = useLocalMail();
+    const [selectedAccount, setSelectedAccount] = useUser();
 
     return (
         <Select
-            defaultValue={selectedAccount}
-            onValueChange={setSelectedAccount}
+            defaultValue={selectedAccount.account}
+            onValueChange={(value) => {
+                setSelectedMessageId("");
+                setSelectedAccount(
+                    accounts.find((acct) => acct.account === value) ??
+                        accounts[0],
+                );
+            }}
         >
             <SelectTrigger
                 className={cn(
@@ -40,19 +38,15 @@ export function AccountSwitcher({
             >
                 <SelectValue placeholder="Select an account">
                     <span className={cn("ml-2", isCollapsed && "hidden")}>
-                        {
-                            accounts.find(
-                                (account) => account.email === selectedAccount,
-                            )?.label
-                        }
+                        {selectedAccount.name}
                     </span>
                 </SelectValue>
             </SelectTrigger>
             <SelectContent>
                 {accounts.map((account) => (
-                    <SelectItem key={account.email} value={account.email}>
-                        <div className="[&_svg]:text-foreground flex items-center gap-3 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0">
-                            {account.email}
+                    <SelectItem key={account.account} value={account.account}>
+                        <div className="flex items-center gap-3 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-foreground">
+                            {account.account}
                         </div>
                     </SelectItem>
                 ))}

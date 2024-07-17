@@ -1,9 +1,9 @@
 .milkdown {
-    @apply m-5;
+    @apply p-4;
 }
 
-.editor {
-    @apply mx-auto;
+.prose.editor {
+    @apply mx-auto max-w-none;
 }
 
 /* list-item-block */

@@ -15,16 +15,15 @@ import { cn } from "@lib/utils";
 
 import { AccountSwitcher } from "./account-switcher";
 import { Nav } from "./nav";
+import { useLocation } from "react-router-dom";
 
 interface Props {
-    accounts: {
-        label: string;
-        email: string;
-    }[];
     isCollapsed?: boolean;
 }
 
-export const NavMenu = ({ accounts, isCollapsed = false }: Props) => {
+export const NavMenu = ({ isCollapsed = false }: Props) => {
+    const location = useLocation();
+    const at = location.pathname;
     return (
         <>
             <div
@@ -33,42 +32,36 @@ export const NavMenu = ({ accounts, isCollapsed = false }: Props) => {
                     isCollapsed ? "h-14" : "px-2",
                 )}
             >
-                <AccountSwitcher
-                    isCollapsed={isCollapsed}
-                    accounts={accounts}
-                />
+                <AccountSwitcher isCollapsed={isCollapsed} />
             </div>
             <Separator />
             <Nav
                 isCollapsed={isCollapsed}
                 links={[
                     {
-                        title: "Feed",
+                        title: "Inbox",
                         label: "128",
                         icon: List,
-                        variant: "default",
+                        variant: at === "/" ? "default" : "ghost",
+                        href: "#",
                     },
                     {
-                        title: "Participate",
+                        title: "Drafts",
                         label: "9",
                         icon: CheckSquare,
-                        variant: "ghost",
+                        variant: at === "/drafts" ? "default" : "ghost",
+                        href: "#/drafts",
                     },
                     {
-                        title: "Govern",
-                        label: "",
-                        icon: Gavel,
-                        variant: "ghost",
-                    },
-                    {
-                        title: "Membership",
-                        label: "23",
-                        icon: User,
-                        variant: "ghost",
+                        title: "Sent",
+                        label: "9",
+                        icon: CheckSquare,
+                        variant: at === "/sent" ? "default" : "ghost",
+                        href: "#/sent",
                     },
                 ]}
             />
-            <Separator />
+            {/* <Separator />
             <Nav
                 isCollapsed={isCollapsed}
                 links={[
@@ -77,33 +70,38 @@ export const NavMenu = ({ accounts, isCollapsed = false }: Props) => {
                         label: "972",
                         icon: Users2,
                         variant: "ghost",
+                        href: "#",
                     },
                     {
                         title: "Contributions",
                         label: "342",
                         icon: AlertCircle,
                         variant: "ghost",
+                        href: "#",
                     },
                     {
                         title: "Petitions",
                         label: "128",
                         icon: MessagesSquare,
                         variant: "ghost",
+                        href: "#",
                     },
                     {
                         title: "Council",
                         label: "8",
                         icon: ShoppingCart,
                         variant: "ghost",
+                        href: "#",
                     },
                     {
                         title: "Foreign Relations",
                         label: "21",
                         icon: Archive,
                         variant: "ghost",
+                        href: "#",
                     },
                 ]}
-            />
+            /> */}
         </>
     );
 };

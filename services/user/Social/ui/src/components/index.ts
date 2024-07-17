@@ -1,4 +1,5 @@
 export * from "./account-switcher";
+export * from "./compose-dialog";
 export * from "./mail-display";
 export * from "./mail-list";
 export * from "./markdown-editor";

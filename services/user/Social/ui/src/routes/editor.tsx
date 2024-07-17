@@ -1,6 +1,3 @@
-import { MilkdownProvider } from "@milkdown/react";
-import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
-
 import { MarkdownEditor } from "@components";
 import { ControlBar } from "@components/editor";
 import { useLocalStorage } from "@hooks";
@@ -127,23 +124,19 @@ export function Editor() {
         defaultMarkdown,
     );
 
+    if (!markdown) return null;
+
     return (
-        <MilkdownProvider>
-            <ProsemirrorAdapterProvider>
-                {markdown ? (
-                    <>
-                        <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
-                            <ControlBar />
-                            <Separator />
-                        </div>
-                        <MarkdownEditor
-                            initialValue={markdown}
-                            updateMarkdown={setMarkdown}
-                        />
-                    </>
-                ) : null}
-            </ProsemirrorAdapterProvider>
-        </MilkdownProvider>
+        <>
+            <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
+                <ControlBar />
+                <Separator />
+            </div>
+            <MarkdownEditor
+                initialValue={markdown}
+                updateMarkdown={setMarkdown}
+            />
+        </>
     );
 }
 

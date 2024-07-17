@@ -6,19 +6,13 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from "@shadcn/resizable";
-import { NavMenu } from "@components/nav-menu";
+import { ComposeDialog, NavMenu } from "@components";
 import { cn } from "@lib/utils";
 
 import { type Account, accounts } from "../fixtures/data";
 
-export const accountsLoader = () => {
-    return { accounts };
-};
-
 export default function DefaultLayout() {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
-
-    const { accounts } = useLoaderData() as { accounts: Account[] };
 
     return (
         <div className="h-dvh max-h-dvh">
@@ -39,13 +33,14 @@ export default function DefaultLayout() {
                             "min-w-[50px] transition-all duration-300 ease-in-out",
                     )}
                 >
-                    <NavMenu accounts={accounts} isCollapsed={isCollapsed} />
+                    <NavMenu isCollapsed={isCollapsed} />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
                 <ResizablePanel minSize={30} id="body" order={2}>
                     <Outlet />
                 </ResizablePanel>
             </ResizablePanelGroup>
+            {/* <ComposeDialog /> */}
         </div>
     );
 }

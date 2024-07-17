@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 export function useLocalStorage<T>(
     key: string,
     defaultValue: T,
-): [T | undefined, (value: T) => void] {
+): [T | undefined, (value: T) => void, () => T | null] {
     const [value, setValue] = useState<T>();
 
     useEffect(() => {
@@ -39,6 +39,11 @@ export function useLocalStorage<T>(
         };
     }, []);
 
+    const getValue = () => {
+        const stored = localStorage.getItem(key);
+        return JSON.parse(stored ?? "") as T;
+    };
+
     const setValueWrap = (value: T) => {
         // console.log("setValueWrap:", value);
         try {
@@ -53,5 +58,5 @@ export function useLocalStorage<T>(
         }
     };
 
-    return [value, setValueWrap];
+    return [value, setValueWrap, getValue];
 }
