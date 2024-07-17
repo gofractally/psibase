@@ -10,6 +10,7 @@ using namespace SystemService;
 
 std::optional<SignedTransaction> SystemService::RTransact::next()
 {
+   check(getSender() == Transact::service, "Wrong sender");
    auto unapplied = WriteOnly{}.open<UnappliedTransactionTable>();
    auto nextSequence =
        unapplied.get(SingletonKey{}).value_or(UnappliedTransactionRecord{0}).nextSequence;
@@ -41,6 +42,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
 
 void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
 {
+   check(getSender() == AccountNumber{}, "Wrong sender");
    auto                          clients = Subjective{}.open<TraceClientTable>();
    std::optional<TraceClientRow> row;
    PSIBASE_SUBJECTIVE_TX
@@ -61,6 +63,7 @@ void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
 
 void RTransact::onBlock()
 {
+   check(getSender() == AccountNumber{}, "Wrong sender");
    // Update reversible table and find the time of the last commit
    auto stat = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    if (!stat)
@@ -149,6 +152,7 @@ namespace
 
 void RTransact::recv(const SignedTransaction& trx)
 {
+   check(getSender() == HttpServer::service, "Wrong sender");
    auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
    if (pushTransaction(id, trx))
       forwardTransaction(trx);
