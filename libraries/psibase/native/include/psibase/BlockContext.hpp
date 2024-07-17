@@ -67,8 +67,10 @@ namespace psibase
       // The action is not allowed to modify any consensus state.
       // It is allowed to read and write subjective tables.
       void execNonTrxAction(Action&& action, ActionTrace& trace);
+      void execExport(std::string_view fn, Action&& action, ActionTrace& trace);
       // The action has the same database access rules as queries
       void execAsyncAction(Action&& action);
+      void execAsyncExport(std::string_view fn, Action&& action);
 
       void execAllInBlock();
 

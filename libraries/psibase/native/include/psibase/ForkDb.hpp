@@ -1210,24 +1210,23 @@ namespace psibase
          auto bc = getBlockContext();
          if (!bc)
             return {};
-         Action                           action{.service = AccountNumber{"r-transact"},
-                                                 .method  = MethodNumber{"next"},
-                                                 .rawData = psio::to_frac(std::tuple())};
+         Action action{.service = transactionServiceNum, .rawData = psio::to_frac(std::tuple())};
          std::optional<SignedTransaction> result;
          try
          {
             ActionTrace atrace;
-            bc->execNonTrxAction(std::move(action), atrace);
+            bc->execExport("nextTransaction", std::move(action), atrace);
             if (!psio::from_frac(result, atrace.rawRetval))
             {
-               PSIBASE_LOG(bc->trxLogger, info)
-                   << "failed to deserialize result of r-transact::next";
+               PSIBASE_LOG(bc->trxLogger, info) << "failed to deserialize result of "
+                                                << action.service.str() << "::nextTransaction";
                result.reset();
             }
          }
          catch (std::exception& e)
          {
-            PSIBASE_LOG(bc->trxLogger, info) << "failed r-transact::next: " << e.what();
+            PSIBASE_LOG(bc->trxLogger, warning)
+                << "failed " << action.service.str() << "::nextTransaction: " << e.what();
          }
          return result;
       }
@@ -1235,7 +1234,6 @@ namespace psibase
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {
          Action action{.service = proxyServiceNum,
-                       .method  = MethodNumber{"recv"},
                        .rawData = psio::to_frac(std::tuple(sock.id, data))};
 
          // TODO: This can run concurrently
@@ -1243,7 +1241,7 @@ namespace psibase
                          systemContext->sharedDatabase.createWriter(), true};
          try
          {
-            bc.execAsyncAction(std::move(action));
+            bc.execAsyncExport("recv", std::move(action));
          }
          catch (std::exception& e)
          {

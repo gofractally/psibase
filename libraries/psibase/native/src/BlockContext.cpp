@@ -449,6 +449,17 @@ namespace psibase
       session.commit();
    }
 
+   void BlockContext::execExport(std::string_view fn, Action&& action, ActionTrace& atrace)
+   {
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, true, false, true, true};
+
+      auto session = db.startWrite(writer);
+      tc.execExport(fn, action, atrace);
+      session.commit();
+   }
+
    void BlockContext::execAsyncAction(Action&& action)
    {
       SignedTransaction  trx;
@@ -457,6 +468,16 @@ namespace psibase
       TransactionContext tc{*this, trx, trace, true, false, true};
 
       tc.execNonTrxAction(0, action, atrace);
+   }
+
+   void BlockContext::execAsyncExport(std::string_view fn, Action&& action)
+   {
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      auto&              atrace = trace.actionTraces.emplace_back();
+      TransactionContext tc{*this, trx, trace, true, false, true};
+
+      tc.execExport(fn, action, atrace);
    }
 
    // TODO: call callStartBlock() here? caller's responsibility?

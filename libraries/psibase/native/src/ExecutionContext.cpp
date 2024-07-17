@@ -429,6 +429,13 @@ namespace psibase
       });
    }
 
+   void ExecutionContext::exec(ActionContext& actionContext, std::string_view fn)
+   {
+      impl->exec(actionContext, [&] {  //
+         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", fn);
+      });
+   }
+
    void ExecutionContext::asyncTimeout()
    {
       if (impl->code.flags & CodeRow::canNotTimeOut)

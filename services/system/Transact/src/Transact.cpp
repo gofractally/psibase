@@ -2,6 +2,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/CpuLimit.hpp>
+#include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
 
 #include <boost/container/flat_map.hpp>
@@ -456,6 +457,16 @@ namespace SystemService
       }
 
       trxData = std::span<const char>{};
+   }
+
+   extern "C" [[clang::export_name("nextTransaction")]] void nextTransaction()
+   {
+      // forward to r-transact
+      auto act       = getCurrentActionView();
+      act->sender()  = act->service().unpack();
+      act->service() = RTransact::service;
+      act->method()  = MethodNumber{"next"};
+      setRetvalBytes(call(act.data_without_size_prefix()));
    }
 
 }  // namespace SystemService

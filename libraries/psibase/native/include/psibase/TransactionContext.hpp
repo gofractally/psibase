@@ -61,6 +61,7 @@ namespace psibase
       void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execServe(const Action& act, ActionTrace& atrace);
+      void execExport(std::string_view fn, const Action& action, ActionTrace& atrace);
 
       ExecutionContext& getExecutionContext(AccountNumber service);
 

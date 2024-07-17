@@ -44,7 +44,6 @@ namespace SystemService
 
       using Subjective = psibase::SubjectiveTables<PendingRequestTable>;
 
-      void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
       void sendProds(const psibase::Action& action);
 
       /// Indicates that the query is not expected to produce an immediate response
@@ -69,7 +68,6 @@ namespace SystemService
       void registerServer(psibase::AccountNumber server);
    };
    PSIO_REFLECT(HttpServer,
-                method(recv, socket, data),
                 method(sendProds, action),
                 method(deferReply, socket),
                 method(claimReply, socket),

@@ -62,9 +62,11 @@ namespace SystemService
                                " is not authorized to receive messages");
    }
 
-   void HttpServer::recv(std::int32_t socket, psio::view<const std::vector<char>> data)
+   extern "C" [[clang::export_name("recv")]] void recv()
    {
-      check(getSender() == AccountNumber{}, "recv can only be called by native");
+      auto act = getCurrentActionView();
+      auto [socket, data] =
+          psio::view<const std::tuple<std::int32_t, std::vector<char>>>(act->rawData());
       if (socket == producer_multicast)
       {
          auto act = psio::from_frac<Action>(data);
