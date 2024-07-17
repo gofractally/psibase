@@ -19,12 +19,13 @@ namespace SystemService
 {
    struct AccountsQuery
    {
-      auto exists(AccountNumber account) const
-      {  //
-         return to<Accounts>().exists(account);
+      auto getAccount(AccountNumber account) const
+      {
+         Accounts::Tables tables{Accounts::service};
+         return tables.open<AccountTable>().get(account);
       }
    };
-   PSIO_REFLECT(AccountsQuery, method(exists, account));
+   PSIO_REFLECT(AccountsQuery, method(getAccount, account));
 
    std::optional<HttpReply> RAccounts::serveSys(HttpRequest request)
    {
