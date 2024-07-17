@@ -254,36 +254,30 @@ export const CreatePage = () => {
                 packages,
                 desiredPackages.map((pack) => pack.name)
             );
-            bootChain(
-                requiredPackages,
-                bpName,
-                config,
-                () => {
-                    refetchConfig();
-                },
-                (state) => {
-                    if (isRequestingUpdate(state)) {
-                        const [_, current, total] = state;
-                        const newIndex = calculateIndex(
-                            loadingStates.length,
-                            current,
-                            total
-                        );
-                        setCurrentState(newIndex);
-                    } else if (isBootCompleteUpdate(state)) {
-                        if (state.success) {
-                            navigate("/Dashboard");
-                            setCurrentState(loadingStates.length + 1);
-                            toast({
-                                title: "Success",
-                                description: "Successfully booted chain.",
-                            });
-                        }
+            bootChain(requiredPackages, bpName, (state) => {
+                if (isRequestingUpdate(state)) {
+                    const [_, current, total] = state;
+                    const newIndex = calculateIndex(
+                        loadingStates.length,
+                        current,
+                        total
+                    );
+                    setCurrentState(newIndex);
+                } else if (isBootCompleteUpdate(state)) {
+                    if (state.success) {
+                        navigate("/Dashboard");
+                        setCurrentState(loadingStates.length + 1);
+                        toast({
+                            title: "Success",
+                            description: "Successfully booted chain.",
+                        });
                     } else {
-                        console.log(state, "Unrecognised message.");
+                        // TODO: Display boot failure message
                     }
+                } else {
+                    console.log(state, "Unrecognised message.");
                 }
-            );
+            });
         }
     }, [currentStep, rows, bpName, config]);
 

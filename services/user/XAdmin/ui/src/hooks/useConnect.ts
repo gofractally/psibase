@@ -1,3 +1,4 @@
+import { chain } from "@/lib/chainEndpoints";
 import { queryKeys } from "@/lib/queryKeys";
 import { postJson } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
@@ -12,10 +13,7 @@ export const useConnect = () =>
         mutationKey: queryKeys.connect,
         mutationFn: async (param) => {
             try {
-                await postJson(
-                    "/native/admin/connect",
-                    connectParam.parse(param)
-                );
+                await chain.connect(connectParam.parse(param))
             } catch (e) {
                 throw "Failed connecting to node";
             }

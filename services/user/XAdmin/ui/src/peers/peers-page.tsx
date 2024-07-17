@@ -1,9 +1,7 @@
-import { postJson } from "@psibase/common-lib";
 import { useState } from "react";
 import { SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { PsinodeConfig } from "../configuration/interfaces";
-import { putJson } from "../helpers";
 import {
     AddConnectionInputs,
     ConnectInputs,
@@ -24,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConfig } from "../hooks/useConfig";
 import { usePeers } from "../hooks/usePeers";
+import { chain } from "@/lib/chainEndpoints";
 
 export const PeersPage = () => {
     const {
@@ -51,7 +50,7 @@ export const PeersPage = () => {
 
     const onDisconnect = async (id: number) => {
         try {
-            await postJson("/native/admin/disconnect", { id: id });
+            await chain.disconnectPeer(id);
             refetchPeers();
         } catch (e) {
             console.error("DISCONNECT ERROR", e);
@@ -63,7 +62,7 @@ export const PeersPage = () => {
     ) => {
         try {
             console.log(endpoint, "is the endpoint");
-            await postJson("/native/admin/connect", endpoint);
+            await chain.connect(endpoint);
             reset();
             refetchPeers();
         } catch (e) {
@@ -72,19 +71,20 @@ export const PeersPage = () => {
     };
 
     const setConfigPeers = async (input: PsinodeConfig) => {
-        try {
-            setConfigPeersError(undefined);
-            const result = await putJson("/native/admin/config", input);
-            if (result.ok) {
-                // TODO: revisit
-                // configForm.resetField("peers", { defaultValue: input.peers });
-                refetchConfig();
-            } else {
-                setConfigPeersError(await result.text());
-            }
-        } catch (e) {
-            setConfigPeersError("Failed to write /native/admin/config");
-        }
+        // TODO: Re-implement
+        // try {
+        // setConfigPeersError(undefined);
+        // const result = await chain.updateConfig(input);
+        //     if (result.ok) {
+        //         // TODO: revisit
+        //         // configForm.resetField("peers", { defaultValue: input.peers });
+        //         refetchConfig();
+        //     } else {
+        //         setConfigPeersError(await result.text());
+        //     }
+        // } catch (e) {
+        //     setConfigPeersError("Failed to write /native/admin/config");
+        // }
     };
 
     const modifyPeer = (

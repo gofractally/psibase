@@ -5,7 +5,8 @@ import {
     PsinodeConfig,
     ServiceConfig,
     ListenConfig,
-    PsinodeConfigSchemaa,
+    PsinodeConfigSelect,
+    PsinodeConfigUpdate,
 } from "./interfaces";
 
 export const initialConfigForm = (): PsinodeConfig => ({
@@ -280,7 +281,7 @@ export const mergeConfig = (
     };
 };
 
-export const writeConfig = (input: PsinodeConfig): PsinodeConfigSchemaa => ({
+export const writeConfig = (input: PsinodeConfig): PsinodeConfigUpdate => ({
     ...input,
     listen: input.listen.map(writeListen),
     services: input.services

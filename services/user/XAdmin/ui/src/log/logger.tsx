@@ -129,19 +129,10 @@ export const Logger = ({
                 })}
             >
                 <Label>Flush every record</Label>
-                <Controller
-                    name="flush"
-                    control={control}
-                    disabled={type_ != "file"}
-                    render={({ field }) => (
-                        <Checkbox
-                            disabled={field.disabled}
-                            checked={field.value}
-                            onCheckedChange={(checked) =>
-                                field.onChange(checked)
-                            }
-                        />
-                    )}
+                <input
+                    className="peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                    type="checkbox"
+                    {...register("flush", { disabled: type_ != "file" })}
                 />
             </div>
 

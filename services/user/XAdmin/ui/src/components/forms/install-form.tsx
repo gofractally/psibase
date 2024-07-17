@@ -19,7 +19,6 @@ interface InstallFormProps {
     packages: PackageInfo[];
     producerForm: UseFormReturn<ProducerType>;
     config?: PsinodeConfig;
-    refetchConfig: () => void;
     setCurrentPage: (page: string) => void;
     setBootState: (state: BootState) => void;
 }
@@ -27,7 +26,6 @@ interface InstallFormProps {
 export const InstallForm = ({
     packages,
     config,
-    refetchConfig,
     producerForm,
     setCurrentPage,
     setBootState,
@@ -87,13 +85,7 @@ export const InstallForm = ({
             <form
                 className="flex w-full justify-between"
                 onSubmit={() => {
-                    bootChain(
-                        packages,
-                        actualProducer,
-                        config,
-                        refetchConfig,
-                        setBootState
-                    );
+                    bootChain(packages, actualProducer, setBootState);
                     setCurrentPage("go");
                 }}
             >

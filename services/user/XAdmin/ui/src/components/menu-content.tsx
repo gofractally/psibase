@@ -10,9 +10,9 @@ import {
 import { Moon, Sun, Power, RotateCcw } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "./ui/button";
-import { postJson } from "@psibase/common-lib";
 import { Cog } from "lucide-react";
 import { Link } from "react-router-dom";
+import { chain } from "@/lib/chainEndpoints";
 
 export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
     const { setTheme } = useTheme();
@@ -55,21 +55,11 @@ export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
                     <DropdownMenuSub>
-                        <DropdownMenuItem
-                            onClick={() =>
-                                postJson("/native/admin/shutdown", {
-                                    restart: true,
-                                })
-                            }
-                        >
+                        <DropdownMenuItem onClick={() => void chain.restart()}>
                             <RotateCcw className="mr-2 h-4 w-4" />
                             <span>Restart</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={() =>
-                                postJson("/native/admin/shutdown", {})
-                            }
-                        >
+                        <DropdownMenuItem onClick={() => void chain.shutdown()}>
                             <Power className="mr-2 h-4 w-4" />
                             <span>Shutdown</span>
                         </DropdownMenuItem>

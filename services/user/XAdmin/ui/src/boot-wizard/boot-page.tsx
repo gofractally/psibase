@@ -29,7 +29,7 @@ interface PackageOp {
 }
 
 export const BootPage = () => {
-    const { data: config, refetch: refetchConfig } = useConfig();
+    const { data: config } = useConfig();
 
     const [bootState, setBootState] = useState<BootState>();
 
@@ -96,7 +96,6 @@ export const BootPage = () => {
             <InstallForm
                 packages={packagesToInstall || []}
                 config={config}
-                refetchConfig={refetchConfig}
                 producerForm={producerForm}
                 setCurrentPage={setCurrentPage}
                 setBootState={setBootState}

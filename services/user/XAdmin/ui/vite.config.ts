@@ -104,10 +104,10 @@ export default defineConfig(({ command }) => ({
         wasm(),
         topLevelAwait(),
     ],
-    resolve: { 
+    resolve: {
         alias: {
             "@/lib": path.resolve(__dirname, "./src/lib"),
             "@/components": path.resolve(__dirname, "./src/components"),
-          },
-    }
+        },
+    },
 }));
