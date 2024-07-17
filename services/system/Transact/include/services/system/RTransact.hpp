@@ -76,10 +76,10 @@ namespace SystemService
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
 
-   class TransactionQueue : psibase::Service<TransactionQueue>
+   class RTransact : psibase::Service<RTransact>
    {
      public:
-      static constexpr auto service = psibase::AccountNumber{"txqueue"};
+      static constexpr auto service = psibase::AccountNumber{"r-transact"};
       using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
                                                    TransactionDataTable,
                                                    AvailableSequenceTable,
@@ -94,7 +94,7 @@ namespace SystemService
       auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> socket)
           -> std::optional<psibase::HttpReply>;
    };
-   PSIO_REFLECT(TransactionQueue,
+   PSIO_REFLECT(RTransact,
                 method(next),
                 method(recv, transaction),
                 method(onTrx, id, trace),

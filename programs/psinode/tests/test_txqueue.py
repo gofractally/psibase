@@ -5,7 +5,7 @@ import unittest
 from predicates import *
 import time
 import psinode
-from services import Tokens, TransactionQueue
+from services import Tokens, Transact
 
 class TestTransactionQueue(unittest.TestCase):
     @testutil.psinode_test
@@ -16,7 +16,7 @@ class TestTransactionQueue(unittest.TestCase):
         tokens = Tokens(a)
         old_balance = tokens.balance('alice', token=1)
 
-        txqueue = TransactionQueue(a)
+        txqueue = Transact(a)
         txqueue.push_action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":10000}, "memo":"test"})
 
         a.wait(new_block())
@@ -38,7 +38,7 @@ class TestTransactionQueue(unittest.TestCase):
         tokens = Tokens(a)
         old_balance = tokens.balance('alice', token=1)
 
-        txqueue = TransactionQueue(prods[2])
+        txqueue = Transact(prods[2])
         txqueue.push_action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":10000}, "memo":"test"})
 
         a.wait(new_block())

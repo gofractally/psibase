@@ -1210,7 +1210,7 @@ namespace psibase
          auto bc = getBlockContext();
          if (!bc)
             return {};
-         Action                           action{.service = AccountNumber{"txqueue"},
+         Action                           action{.service = AccountNumber{"r-transact"},
                                                  .method  = MethodNumber{"next"},
                                                  .rawData = psio::to_frac(std::tuple())};
          std::optional<SignedTransaction> result;
@@ -1220,13 +1220,14 @@ namespace psibase
             bc->execNonTrxAction(std::move(action), atrace);
             if (!psio::from_frac(result, atrace.rawRetval))
             {
-               PSIBASE_LOG(bc->trxLogger, info) << "failed to deserialize result of txqueue::next";
+               PSIBASE_LOG(bc->trxLogger, info)
+                   << "failed to deserialize result of r-transact::next";
                result.reset();
             }
          }
          catch (std::exception& e)
          {
-            PSIBASE_LOG(bc->trxLogger, info) << "failed txqueue::next: " << e.what();
+            PSIBASE_LOG(bc->trxLogger, info) << "failed r-transact::next: " << e.what();
          }
          return result;
       }
@@ -1246,7 +1247,8 @@ namespace psibase
          }
          catch (std::exception& e)
          {
-            PSIBASE_LOG(bc.trxLogger, warning) << "failed txqueue::recv: " << e.what();
+            PSIBASE_LOG(bc.trxLogger, warning)
+                << "failed " << action.service.str() << "::recv: " << e.what();
          }
       }
 

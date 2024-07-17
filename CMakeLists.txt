@@ -136,11 +136,11 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/TransactionQueue.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
@@ -369,10 +369,15 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
-    FLAGS allowSudo allowWriteNative
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
+        FLAGS allowSudo allowWriteNative
+        SERVER r-transact
+    SERVICE r-transact
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
+        FLAGS allowWriteSubjective
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -559,20 +564,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/TransactionQueue.psi
-    NAME TransactionQueue
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Subjective service that manages transactions"
-    SERVICE txqueue
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/TransactionQueue.wasm
-        FLAGS allowWriteSubjective
-        SERVER txqueue
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/TransactionQueue/src/postinstall.json
-    DEPENDS wasm
-    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/SetCode.psi
     NAME SetCode
     VERSION ${PSIBASE_VERSION}
@@ -726,7 +717,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
                     Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact TransactionQueue
+                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
 
 psibase_package(
@@ -735,7 +726,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Minimum services for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Packages Producers HttpServer
-                    SetCode Transact TransactionQueue
+                    SetCode Transact
 )
 
 function(write_package_index target dir)
@@ -754,7 +745,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact TransactionQueue)
+    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -784,7 +775,6 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/Transact.psi
-          ${SERVICE_DIR}/TransactionQueue.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

@@ -12,8 +12,8 @@ class Tokens(Service):
             if node['tokenId'] == token:
                 return int(node['balance'])
 
-class TransactionQueue(Service):
-    service = 'txqueue'
+class Transact(Service):
+    service = 'transact'
     def push_transaction(self, trx):
         packed = self.api.pack_signed_transaction(trx)
         with self.post('/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed) as response:

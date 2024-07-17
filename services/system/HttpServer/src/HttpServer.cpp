@@ -3,7 +3,7 @@
 #include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/HttpServer.hpp>
-#include <services/system/TransactionQueue.hpp>
+#include <services/system/RTransact.hpp>
 #include "services/system/Accounts.hpp"
 
 #include <algorithm>
@@ -57,7 +57,7 @@ namespace SystemService
       if (act.sender != HttpServer::service)
          psibase::abortMessage("messages must have " + HttpServer::service.str() +
                                " as the sender");
-      if (!(act.service == TransactionQueue::service && act.method == MethodNumber{"recv"}))
+      if (!(act.service == RTransact::service && act.method == MethodNumber{"recv"}))
          psibase::abortMessage(act.service.str() + "::" + act.method.str() +
                                " is not authorized to receive messages");
    }

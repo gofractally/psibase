@@ -1,4 +1,4 @@
-#include <services/system/TransactionQueue.hpp>
+#include <services/system/RTransact.hpp>
 
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
@@ -8,7 +8,7 @@
 using namespace psibase;
 using namespace SystemService;
 
-std::optional<SignedTransaction> SystemService::TransactionQueue::next()
+std::optional<SignedTransaction> SystemService::RTransact::next()
 {
    auto unapplied = WriteOnly{}.open<UnappliedTransactionTable>();
    auto nextSequence =
@@ -39,7 +39,7 @@ std::optional<SignedTransaction> SystemService::TransactionQueue::next()
    __builtin_unreachable();
 }
 
-void TransactionQueue::onTrx(const Checksum256& id, const TransactionTrace& trace)
+void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
 {
    auto                          clients = Subjective{}.open<TraceClientTable>();
    std::optional<TraceClientRow> row;
@@ -59,7 +59,7 @@ void TransactionQueue::onTrx(const Checksum256& id, const TransactionTrace& trac
    }
 }
 
-void TransactionQueue::onBlock()
+void RTransact::onBlock()
 {
    // Update reversible table and find the time of the last commit
    auto stat = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
@@ -115,7 +115,7 @@ void TransactionQueue::onBlock()
 
 namespace
 {
-   using Subjective = TransactionQueue::Subjective;
+   using Subjective = RTransact::Subjective;
    bool pushTransaction(const Checksum256& id, const SignedTransaction& trx)
    {
       PSIBASE_SUBJECTIVE_TX
@@ -143,19 +143,19 @@ namespace
    void forwardTransaction(const SignedTransaction& trx)
    {
       to<HttpServer>().sendProds(
-          transactor<TransactionQueue>(HttpServer::service, TransactionQueue::service).recv(trx));
+          transactor<RTransact>(HttpServer::service, RTransact::service).recv(trx));
    }
 }  // namespace
 
-void TransactionQueue::recv(const SignedTransaction& trx)
+void RTransact::recv(const SignedTransaction& trx)
 {
    auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
    if (pushTransaction(id, trx))
       forwardTransaction(trx);
 }
 
-std::optional<HttpReply> TransactionQueue::serveSys(const psibase::HttpRequest& request,
-                                                    std::optional<std::int32_t> socket)
+std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request,
+                                             std::optional<std::int32_t> socket)
 {
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
@@ -179,4 +179,4 @@ std::optional<HttpReply> TransactionQueue::serveSys(const psibase::HttpRequest& 
    return {};
 }
 
-PSIBASE_DISPATCH(TransactionQueue)
+PSIBASE_DISPATCH(RTransact)
