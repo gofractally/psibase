@@ -207,7 +207,7 @@ function App() {
         service: "identity",
         intf: "api",
         method: "attestIdentityClaim",
-        params: ["bob", claim],
+        params: [attestee, claim],
       });
       console.info("returned from Identity.api.attest()");
       setRes(res as string);

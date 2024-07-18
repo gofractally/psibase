@@ -15,7 +15,7 @@ pub struct Credential {
     /// The subject (generally also the holder)
     /// The claims being attested to (includes subject)
     subject: AccountNumber,
-    confidence: f32,
+    value: u8,
 }
 
 #[psibase::service(name = "identity")]
@@ -41,7 +41,7 @@ mod service {
         /// The credential subject, which includes the subject/attestee as well as the claim being made
         subject: String,
 
-        value: f32,
+        value: u8,
     }
 
     impl Attestation {
@@ -55,7 +55,7 @@ mod service {
     struct WebContentTable;
 
     #[action]
-    pub fn attest(subject: String, value: f32) {
+    pub fn attest(subject: String, value: u8) {
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
 
@@ -90,7 +90,7 @@ mod service {
         id: AccountNumber,
         issued: TimePointSec,
         subject: String,
-        value: f32,
+        value: u8,
     ) {
     }
 

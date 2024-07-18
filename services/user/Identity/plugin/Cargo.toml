@@ -20,4 +20,4 @@ package = "identity:plugin"
 
 [package.metadata.component.target.dependencies]
 "common:plugin" = { path = "../../../user/CommonApi/common/packages/wit/plugin.wit" }
-# "attestation:plugin" = { path = "../../Attestation/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }
