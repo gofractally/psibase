@@ -64,7 +64,7 @@ namespace SystemService
 
       auto key() const { return accountNum; }
    };
-   PSIO_REFLECT(Account, accountNum, authService)
+   PSIO_REFLECT(Account, accountNum, authService, resourceBalance)
    using AccountTable = psibase::Table<Account, &Account::key>;
 
    /// This service facilitates the creation of new accounts

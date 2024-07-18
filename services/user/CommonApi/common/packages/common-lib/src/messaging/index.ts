@@ -6,7 +6,6 @@ export {
     type FunctionCallResponse,
     buildFunctionCallResponse,
     isFunctionCallResponse,
-    isErrorResult,
 } from "./FunctionCallResponse";
 
 export {
@@ -14,6 +13,7 @@ export {
     isFunctionCallRequest,
     type FunctionCallArgs,
     type QualifiedFunctionCallArgs,
+    isQualifiedFunctionCallArgs,
     toString,
 } from "./FunctionCallRequest";
 
@@ -24,6 +24,8 @@ export {
 
 export { type PluginId, type QualifiedPluginId } from "./PluginId";
 export {
-    isIFrameInitialized,
-    buildMessageIFrameInitialized,
+    isSupervisorInitialized,
+    buildMessageSupervisorInitialized,
 } from "./SupervisorInitialized";
+
+export { PluginError, isPluginError, isGenericError } from "./Errors";

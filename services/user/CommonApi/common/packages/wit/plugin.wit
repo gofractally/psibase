@@ -48,15 +48,15 @@ interface server {
     /// 
     /// Parameters
     /// * `action`: The name of the action being called
-    /// * `args-json`: The arguments for the action, packed into fracpack format
+    /// * `args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(action: string, args: list<u8>) -> result<_, error>;
 
     /// Used to post graphql to the server and get a JSON response back
+    /// The graphql payload is automatically posted to the app's own `/graphql` endpoint.
     /// 
     /// Parameters
-    /// * `url`: The url for the request
     /// * `graphql`: The graphql data for the request
-    post-graphql-get-json: func(url: string, graphql: string) -> result<string, error>;
+    post-graphql-get-json: func(graphql: string) -> result<string, error>;
 
     // Todo: Probably will need to implement most/all js library functionality:
     // https://docs.psibase.io/development/front-ends/reference/js-libraries.html

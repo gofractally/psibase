@@ -13,20 +13,6 @@ export const isFunctionCallResponse = (
     return data && data.type == FUNCTION_CALL_RESPONSE;
 };
 
-export const isErrorResult = (result: any) => {
-    return (
-        typeof result === "object" &&
-        "errorType" in result &&
-        typeof result.errorType === "string" &&
-        "val" in result &&
-        typeof result.val === "object"
-    );
-};
-
-export const isErrorResponse = (response: FunctionCallResponse) => {
-    return isErrorResult(response.result);
-};
-
 export const buildFunctionCallResponse = (
     call: FunctionCallArgs,
     result: any,
