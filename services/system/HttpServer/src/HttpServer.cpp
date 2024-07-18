@@ -1,5 +1,6 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/psibase.hpp>
 #include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/HttpServer.hpp>
@@ -19,34 +20,14 @@ namespace SystemService
                 && req.host.ends_with(req.rootHost)        //
                 && req.host[req.host.size() - req.rootHost.size() - 1] == '.';
       }
-
    }  // namespace
-
-   // TODO: switch to Table wrapper
-   using table_num = uint16_t;
-
-   static constexpr table_num registeredServiceTable = 1;
-
-   inline auto registeredServiceKey(AccountNumber thisService, AccountNumber service)
-   {
-      return std::tuple{thisService, registeredServiceTable, service};
-   }
-   struct RegisteredServiceRow
-   {
-      AccountNumber service = {};
-      AccountNumber server  = {};
-
-      auto key(AccountNumber thisService) { return registeredServiceKey(thisService, service); }
-   };
-   PSIO_REFLECT(RegisteredServiceRow, service, server)
 
    void HttpServer::registerServer(AccountNumber server)
    {
-      RegisteredServiceRow row{
+      Tables{getReceiver()}.open<RegServTable>().put(RegisteredServiceRow{
           .service = getSender(),
           .server  = server,
-      };
-      kvPut(row.key(getReceiver()), row);
+      });
    }
 
    constexpr std::string_view allowedHeaders[] = {"Content-Encoding"};
@@ -72,9 +53,10 @@ namespace SystemService
          serviceName = "common-api";
 
       auto service = AccountNumber(serviceName);
-      auto reg     = kvGet<RegisteredServiceRow>(registeredServiceKey(act.service, service));
-      if (reg)
-         service = reg->server;
+      auto table   = HttpServer::Tables(HttpServer::service).open<RegServTable>();
+      auto record  = table.get(service);
+      if (record.has_value())
+         service = record->server;
       else
          service = "sites"_a;
 

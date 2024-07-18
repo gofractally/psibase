@@ -1,10 +1,21 @@
 #pragma once
 #include <psibase/Service.hpp>
+#include <psibase/Table.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
 
 namespace SystemService
 {
+
+   /// Each table record contains a service and it's registered HTTP Server service.
+   struct RegisteredServiceRow
+   {
+      psibase::AccountNumber service;
+      psibase::AccountNumber server;
+   };
+   PSIO_REFLECT(RegisteredServiceRow, service, server)
+   using RegServTable = psibase::Table<RegisteredServiceRow, &RegisteredServiceRow::service>;
+
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///
    /// Rule set:
@@ -32,6 +43,7 @@ namespace SystemService
    struct HttpServer : psibase::Service<HttpServer>
    {
       static constexpr auto service = psibase::proxyServiceNum;
+      using Tables                  = psibase::ServiceTables<RegServTable>;
 
       /// Register sender's subdomain
       ///
