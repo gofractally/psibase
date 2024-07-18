@@ -1208,7 +1208,7 @@ namespace psibase
       std::optional<SignedTransaction> nextTransaction()
       {
          auto bc = getBlockContext();
-         if (!bc)
+         if (!bc || bc->needGenesisAction)
             return {};
          Action action{.service = transactionServiceNum, .rawData = psio::to_frac(std::tuple())};
          std::optional<SignedTransaction> result;
@@ -1226,7 +1226,7 @@ namespace psibase
             else
             {
                BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
-               PSIBASE_LOG(bc->trxLogger, info)
+               PSIBASE_LOG(bc->trxLogger, debug)
                    << action.service.str() << "::nextTransaction succeeded";
             }
          }
@@ -1252,7 +1252,7 @@ namespace psibase
          {
             auto& atrace = bc.execAsyncExport("recv", std::move(action), trace);
             BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, info) << action.service.str() << "::recv succeeded";
+            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::recv succeeded";
          }
          catch (std::exception& e)
          {

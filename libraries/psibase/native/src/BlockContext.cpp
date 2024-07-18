@@ -195,11 +195,11 @@ namespace psibase
          {
             tc.execNonTrxAction(0, action, atrace);
             BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-            PSIBASE_LOG(trxLogger, info) << "onBlock succeeded";
+            PSIBASE_LOG(trxLogger, debug) << "onBlock succeeded";
          }
          catch (std::exception& e)
          {
-            PSIBASE_LOG(trxLogger, info) << "onBlock failed: " << e.what();
+            PSIBASE_LOG(trxLogger, warning) << "onBlock failed: " << e.what();
          }
       }
    }
@@ -245,11 +245,11 @@ namespace psibase
          {
             tc.execNonTrxAction(0, action, atrace);
             BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-            PSIBASE_LOG(trxLogger, info) << "onTransaction succeeded";
+            PSIBASE_LOG(trxLogger, debug) << "onTransaction succeeded";
          }
          catch (std::exception& e)
          {
-            PSIBASE_LOG(trxLogger, info) << "onTransaction failed: " << e.what();
+            PSIBASE_LOG(trxLogger, warning) << "onTransaction failed: " << e.what();
          }
       }
    }
