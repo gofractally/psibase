@@ -20,6 +20,7 @@ struct ResourceLimit {
     value: String,
 }
 
+#[allow(non_snake_case)]
 #[derive(Deserialize)]
 struct Account {
     accountNum: String,

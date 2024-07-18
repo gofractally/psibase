@@ -194,12 +194,28 @@ function App() {
   const [c, setC] = useState("");
   const [answer, setAnswer] = useState("?");
 
+  const [accountName, setAccountName] = useState<string>("alice");
   const [claim, setClaim] = useState<number>(0.95);
   const [attestee, setAttestee] = useState<string>("bob");
   const [attestationClaim, setAttestationClaim] =
     useState<string>(`{"attestation_type": "notIdentity", "subject": "bob", "claim": "My test claim", "score": 0.95}
 `);
-
+  const getAccount = async () => {
+    try {
+      console.info("calling accounts.getAccount()");
+      const res = await supervisor.functionCall({
+        service: "accounts",
+        intf: "accounts",
+        method: "getAccount",
+        params: [accountName],
+      });
+      console.info("returned from Accounts.accounts.getAccount()");
+      setRes(res as string);
+      console.info("Res:", res);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+  };
   const attestIdentity = async () => {
     try {
       console.info("attest().calling identity.api.attest()");
@@ -238,6 +254,22 @@ function App() {
   return (
     <>
       <h1>Psibase Demo App 1</h1>
+      <h3>Accounts</h3>
+      <div>
+        <h4>getAccount query:</h4>
+        <div>
+          <span>Account:</span>
+          <input
+            id="accountName"
+            type="text"
+            onChange={(e) => {
+              setAccountName(e.target.value);
+            }}
+            value={accountName}
+          />
+        </div>
+        <button onClick={getAccount}> getAccount() </button>
+      </div>
       <h3>Attestation</h3>
       <div>
         <h4>Identity Claim:</h4>

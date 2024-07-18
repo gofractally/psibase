@@ -21,7 +21,7 @@ interface accounts {
     set-auth-service: func(service-name: string) -> result<_, error>;
 }
 
-world psibase-plugin {
+world plugin {
     import common:plugin/server;
     export accounts;
 }
