@@ -22,8 +22,6 @@ class Transact(Service):
             if trace['error'] is not None:
                 raise TransactionError(trace)
             return trace
-    def push_action(self, sender, service, method, data):
-        tapos = self.api.get_tapos()
-        tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + 10))
-        tapos['flags'] = 0
+    def push_action(self, sender, service, method, data, timeout=10, flags=0):
+        tapos = self.api.get_tapos(timeout=timeout, flags=flags)
         return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)]))

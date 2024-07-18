@@ -212,10 +212,7 @@ class API:
 
         Raise TransactionError if the transaction fails
         '''
-        tapos = tapos=self.get_tapos()
-        tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + 10))
-        tapos['flags'] = 0
-        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)]))
+        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)]))
 
     # Transactions for key system services
     def set_producers(self, prods, algorithm=None):
@@ -250,11 +247,14 @@ class API:
                 raise GraphQLError(json)
             return json['data']
 
-    def get_tapos(self):
+    def get_tapos(self, timeout=10, flags=0):
         '''Returns TaPoS for the current head block'''
         with  self.get('/common/tapos/head') as result:
             result.raise_for_status()
-            return result.json()
+            tapos = result.json()
+            tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + timeout))
+            tapos['flags'] = flags
+            return tapos
 
     def get_producers(self):
         '''Returns a tuple of (current producers, next producers). The next producers are empty except when the chain is in the process of changing block producers.'''
@@ -358,7 +358,7 @@ filter = %s
 format = %s
 '''
 _default_log_filter = 'Severity >= info'
-_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}'
+_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
 
 def _write_config(dir, log_filter, log_format):
     logfile = os.path.join(dir, 'config')

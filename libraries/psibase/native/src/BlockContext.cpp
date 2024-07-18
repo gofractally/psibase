@@ -206,8 +206,8 @@ namespace psibase
 
    void BlockContext::callOnTransaction(const Checksum256& id, const TransactionTrace& trace)
    {
-      auto notifyData = db.kvGetRaw(NotifyRow::db,
-                                    psio::convert_to_key(notifyKey(NotifyType::acceptTransaction)));
+      auto notifyType = trace.error ? NotifyType::rejectTransaction : NotifyType::acceptTransaction;
+      auto notifyData = db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(notifyType)));
       if (!notifyData)
          return;
       auto notifySpan = std::span{notifyData->pos, notifyData->end};
@@ -225,9 +225,15 @@ namespace psibase
       for (const auto& a : actions)
       {
          if (a.sender != AccountNumber{})
+         {
+            PSIBASE_LOG(trxLogger, warning) << "Invalid onTransaction callback" << std::endl;
             continue;
+         }
          if (!a.rawData.empty())
+         {
+            PSIBASE_LOG(trxLogger, warning) << "Invalid onTransaction callback" << std::endl;
             continue;
+         }
          action.service = a.service;
          action.method  = a.method;
          SignedTransaction  trx;
@@ -396,7 +402,11 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
+         auto id = sha256(trx.transaction.data(), trx.transaction.size());
+         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
+         PSIBASE_LOG(trxLogger, info) << "Transaction signature verification failed";
          trace.error = e.what();
+         callOnTransaction(id, trace);
          throw;
       }
       catch (...)
@@ -419,10 +429,11 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
-         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId",
-                                     sha256(trx.transaction.data(), trx.transaction.size()));
+         auto id = sha256(trx.transaction.data(), trx.transaction.size());
+         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
          PSIBASE_LOG(trxLogger, info) << "Transaction check first auth failed";
          trace.error = e.what();
+         callOnTransaction(id, trace);
          throw;
       }
    }
@@ -449,15 +460,17 @@ namespace psibase
       session.commit();
    }
 
-   void BlockContext::execExport(std::string_view fn, Action&& action, ActionTrace& atrace)
+   auto BlockContext::execExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+       -> ActionTrace&
    {
       SignedTransaction  trx;
-      TransactionTrace   trace;
+      auto&              atrace = trace.actionTraces.emplace_back();
       TransactionContext tc{*this, trx, trace, true, false, true, true};
 
       auto session = db.startWrite(writer);
       tc.execExport(fn, action, atrace);
       session.commit();
+      return atrace;
    }
 
    void BlockContext::execAsyncAction(Action&& action)
@@ -470,14 +483,15 @@ namespace psibase
       tc.execNonTrxAction(0, action, atrace);
    }
 
-   void BlockContext::execAsyncExport(std::string_view fn, Action&& action)
+   auto BlockContext::execAsyncExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+       -> ActionTrace&
    {
       SignedTransaction  trx;
-      TransactionTrace   trace;
       auto&              atrace = trace.actionTraces.emplace_back();
       TransactionContext tc{*this, trx, trace, true, false, true};
 
       tc.execExport(fn, action, atrace);
+      return atrace;
    }
 
    // TODO: call callStartBlock() here? caller's responsibility?
@@ -542,6 +556,7 @@ namespace psibase
       {
          PSIBASE_LOG(trxLogger, info) << "Transaction failed";
          trace.error = e.what();
+         callOnTransaction(id, trace);
          throw;
       }
    }

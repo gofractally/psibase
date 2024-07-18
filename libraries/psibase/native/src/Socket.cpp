@@ -38,6 +38,12 @@ SocketAutoCloseSet::~SocketAutoCloseSet()
    close();
 }
 
+bool SocketAutoCloseSet::owns(Sockets& sockets, const AutoCloseSocket& sock)
+{
+   std::lock_guard l{sockets.mutex};
+   return sock.owner == this;
+}
+
 namespace
 {
    void doRemoveSocket(std::shared_ptr<Socket>& socket)

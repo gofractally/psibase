@@ -963,6 +963,17 @@ namespace psibase::http
             {
                // An error will be sent by the transaction context, if needed
             }
+            if (!tc.ownedSockets.owns(*system->sockets, *socket))
+            {
+               auto error = trace.error;
+               BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "Trace", std::move(trace));
+               if (error)
+                  PSIBASE_LOG(send.self.logger, info)
+                      << proxyServiceNum.str() << "::serve failed: " << *error;
+               else
+                  PSIBASE_LOG(send.self.logger, info)
+                      << proxyServiceNum.str() << "::serve succeeded";
+            }
          }  // !native
          else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
          {

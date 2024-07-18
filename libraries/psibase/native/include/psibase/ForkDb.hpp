@@ -1212,21 +1212,29 @@ namespace psibase
             return {};
          Action action{.service = transactionServiceNum, .rawData = psio::to_frac(std::tuple())};
          std::optional<SignedTransaction> result;
+         TransactionTrace                 trace;
          try
          {
-            ActionTrace atrace;
-            bc->execExport("nextTransaction", std::move(action), atrace);
+            auto& atrace = bc->execExport("nextTransaction", std::move(action), trace);
             if (!psio::from_frac(result, atrace.rawRetval))
             {
-               PSIBASE_LOG(bc->trxLogger, info) << "failed to deserialize result of "
-                                                << action.service.str() << "::nextTransaction";
+               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(bc->trxLogger, warning) << "failed to deserialize result of "
+                                                   << action.service.str() << "::nextTransaction";
                result.reset();
+            }
+            else
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(bc->trxLogger, info)
+                   << action.service.str() << "::nextTransaction succeeded";
             }
          }
          catch (std::exception& e)
          {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
             PSIBASE_LOG(bc->trxLogger, warning)
-                << "failed " << action.service.str() << "::nextTransaction: " << e.what();
+                << action.service.str() << "::nextTransaction failed: " << e.what();
          }
          return result;
       }
@@ -1237,16 +1245,20 @@ namespace psibase
                        .rawData = psio::to_frac(std::tuple(sock.id, data))};
 
          // TODO: This can run concurrently
-         BlockContext bc{*systemContext, systemContext->sharedDatabase.getHead(),
+         BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
                          systemContext->sharedDatabase.createWriter(), true};
+         TransactionTrace trace;
          try
          {
-            bc.execAsyncExport("recv", std::move(action));
+            auto& atrace = bc.execAsyncExport("recv", std::move(action), trace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, info) << action.service.str() << "::recv succeeded";
          }
          catch (std::exception& e)
          {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
             PSIBASE_LOG(bc.trxLogger, warning)
-                << "failed " << action.service.str() << "::recv: " << e.what();
+                << action.service.str() << "::recv failed: " << e.what();
          }
       }
 

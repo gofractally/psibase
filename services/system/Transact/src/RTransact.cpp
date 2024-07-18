@@ -21,7 +21,8 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
       auto index = table.getIndex<1>();
       for (auto iter = index.lower_bound(nextSequence), end = index.end(); iter != end; ++iter)
       {
-         auto item = *iter;
+         auto item    = *iter;
+         nextSequence = item.sequence + 1;
          if (!included.get(std::tuple(item.expiration, item.id)))
          {
             unapplied.put({nextSequence});
@@ -32,7 +33,6 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
             }
             check(false, "Internal error: missing transaction data");
          }
-         nextSequence = item.sequence + 1;
       }
       unapplied.put({nextSequence});
       return {};
@@ -119,13 +119,16 @@ void RTransact::onBlock()
 namespace
 {
    using Subjective = RTransact::Subjective;
+   using WriteOnly  = RTransact::WriteOnly;
    bool pushTransaction(const Checksum256& id, const SignedTransaction& trx)
    {
       PSIBASE_SUBJECTIVE_TX
       {
          auto pending = Subjective{}.open<PendingTransactionTable>();
          if (pending.get(id))
+         {
             return false;
+         }
          // Find the next sequence number
          auto available = Subjective{}.open<AvailableSequenceTable>();
          auto sequence =

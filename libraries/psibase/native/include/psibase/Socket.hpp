@@ -44,6 +44,7 @@ namespace psibase
    {
       std::set<std::shared_ptr<AutoCloseSocket>> sockets;
       void close(const std::optional<std::string>& message = {});
+      bool owns(Sockets& sockets, const AutoCloseSocket& sock);
       ~SocketAutoCloseSet();
    };
 

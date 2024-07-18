@@ -95,6 +95,21 @@ namespace SystemService
       }
    }
 
+   static void checkObjectiveCallback(CallbackType type)
+   {
+      switch (type)
+      {
+         case CallbackType::onBlock:
+            abortMessage("Objective block callbacks not supported");
+         case CallbackType::onTransaction:
+            break;
+         case CallbackType::onFailedTransaction:
+            abortMessage("Objective failed transaction callbacks not supported");
+         default:
+            abortMessage("Unknown callback type");
+      }
+   }
+
    static NotifyType getNotifyType(CallbackType type)
    {
       switch (type)
@@ -103,8 +118,10 @@ namespace SystemService
             return NotifyType::acceptBlock;
          case CallbackType::onTransaction:
             return NotifyType::acceptTransaction;
+         case CallbackType::onFailedTransaction:
+            return NotifyType::rejectTransaction;
          default:
-            abortMessage("Unsupported subjective callback type");
+            abortMessage("Unknown callback type");
       }
    }
 
@@ -115,7 +132,7 @@ namespace SystemService
       if (objective)
       {
          check(act.sender == me, "Objective callbacks must have 'transact' as sender");
-         check(type == CallbackType::onTransaction, "Objective block callbacks not supported");
+         checkObjectiveCallback(type);
          Tables tables(me);
          auto   table = tables.open<CallbacksTable>();
          auto   index = table.getIndex<0>();

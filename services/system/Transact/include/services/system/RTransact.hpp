@@ -27,14 +27,17 @@ namespace SystemService
       psibase::TimePointSec expiration;
       psibase::TimePointSec ctime;
       std::uint64_t         sequence;
+
+      auto ctimeKey() const { return std::tuple(ctime, sequence); }
+      auto expirationKey() const { return std::tuple(expiration, sequence); }
    };
    PSIO_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence);
 
    using PendingTransactionTable = psibase::Table<PendingTransactionRecord,
                                                   &PendingTransactionRecord::id,
                                                   &PendingTransactionRecord::sequence,
-                                                  &PendingTransactionRecord::ctime,
-                                                  &PendingTransactionRecord::expiration>;
+                                                  &PendingTransactionRecord::ctimeKey,
+                                                  &PendingTransactionRecord::expirationKey>;
 
    struct AvailableSequenceRecord
    {
