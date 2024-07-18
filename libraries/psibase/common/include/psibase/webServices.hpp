@@ -1,3 +1,4 @@
+#pragma once
 #include <psibase/Service.hpp>
 #include <psibase/serviceEntry.hpp>
 

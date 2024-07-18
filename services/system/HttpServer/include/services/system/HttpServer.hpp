@@ -1,5 +1,6 @@
 #pragma once
 #include <psibase/Service.hpp>
+#include <psibase/Table.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
 
@@ -11,8 +12,15 @@ namespace SystemService
       psibase::AccountNumber owner;
    };
    PSIO_REFLECT(PendingRequestRow, socket, owner)
-
    using PendingRequestTable = psibase::Table<PendingRequestRow, &PendingRequestRow::socket>;
+
+   struct RegisteredServiceRow
+   {
+      psibase::AccountNumber service;
+      psibase::AccountNumber server;
+   };
+   PSIO_REFLECT(RegisteredServiceRow, service, server)
+   using RegServTable = psibase::Table<RegisteredServiceRow, &RegisteredServiceRow::service>;
 
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///
@@ -41,6 +49,7 @@ namespace SystemService
    struct HttpServer : psibase::Service<HttpServer>
    {
       static constexpr auto service = psibase::proxyServiceNum;
+      using Tables                  = psibase::ServiceTables<RegServTable>;
 
       using Subjective = psibase::SubjectiveTables<PendingRequestTable>;
 
