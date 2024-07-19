@@ -968,7 +968,7 @@ namespace psibase::http
                auto error = trace.error;
                BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "Trace", std::move(trace));
                if (error)
-                  PSIBASE_LOG(send.self.logger, info)
+                  PSIBASE_LOG(send.self.logger, warning)
                       << proxyServiceNum.str() << "::serve failed: " << *error;
                else
                   PSIBASE_LOG(send.self.logger, info)
