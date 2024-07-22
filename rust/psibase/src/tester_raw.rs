@@ -9,6 +9,14 @@
 //! [Wrapped Native Functions](crate::tester) instead.
 
 extern "C" {
+    /// Execute a shell command
+    ///
+    /// Returns the process exit code
+    pub fn testerExecute(command: *const u8, command_size: usize) -> i32;
+}
+
+#[link(wasm_import_module = "psibase")]
+extern "C" {
     /// Create a new chain and make it active for database native functions.
     ///
     /// `max_objects` is the maximum number of objects the database can hold.
@@ -16,27 +24,17 @@ extern "C" {
     /// various files. e.g. `32` is 4 GB.
     ///
     /// Returns a chain handle
-    pub fn testerCreateChain(
-        hot_bytes: u64,
-        warm_bytes: u64,
-        cool_bytes: u64,
-        cold_bytes: u64,
-    ) -> u32;
+    pub fn createChain(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> u32;
 
     /// Destroy chain
     ///
     /// This destroys the chain and deletes its database from the filesystem.
-    pub fn testerDestroyChain(chain_handle: u32);
-
-    /// Execute a shell command
-    ///
-    /// Returns the process exit code
-    pub fn testerExecute(command: *const u8, command_size: usize) -> i32;
+    pub fn destroyChain(chain_handle: u32);
 
     /// Finish a block
     ///
     /// This does nothing if a block isn't currently being produced.
-    pub fn testerFinishBlock(chain_handle: u32);
+    pub fn finishBlock(chain_handle: u32);
 
     /// Get filesystem path of chain's database
     ///
@@ -46,7 +44,7 @@ extern "C" {
     /// It is safe to copy the files to another location on the filesystem. However,
     /// modifying the original files or launching `psinode` on the original files
     /// will corrupt the database and likely crash the `psitest` process running this wasm.
-    pub fn testerGetChainPath(chain_handle: u32, dest: *mut u8, dest_size: usize) -> usize;
+    pub fn getChainPath(chain_handle: u32, dest: *mut u8, dest_size: usize) -> usize;
 
     /// Push a transaction
     ///
@@ -59,7 +57,7 @@ extern "C" {
     /// `testerPushTransaction` does not hold onto the pointer; it fills it with a
     /// packed [`TransactionTrace`](crate::TransactionTrace) then returns.
     /// `testerPushTransaction` passes `alloc_context` to `cb_alloc`.
-    pub fn testerPushTransaction(
+    pub fn pushTransaction(
         chain_handle: u32,
         transaction: *const u8,
         transaction_size: usize,
@@ -84,7 +82,7 @@ extern "C" {
     /// with [`testerGetChainPath`] and [`testerDestroyChain`].
     ///
     /// TODO: `testerShutdownChain` probably isn't useful anymore; it might go away.
-    pub fn testerShutdownChain(chain_handle: u32);
+    pub fn shutdownChain(chain_handle: u32);
 
     /// Start a new block
     ///
@@ -93,12 +91,59 @@ extern "C" {
     /// the most recent.
     ///
     /// TODO: Support sub-second block times
-    pub fn testerStartBlock(chain_handle: u32, time_seconds: u32);
+    pub fn startBlock(chain_handle: u32, time_seconds: u32);
 
     /// Runs an HttpRequest and returns the TransactionTrace
-    pub fn testerHttpRequest(
+    pub fn httpRequest(
         chain_handle: u32,
         request_packed: *const u8,
         request_packed_size: usize,
     ) -> u32;
+}
+
+#[cfg(target_family = "wasm")]
+#[link(wasm_import_module = "psibase")]
+extern "C" {
+    pub fn getResult(dest: *mut u8, dest_size: u32, offset: u32) -> u32;
+    pub fn getKey(dest: *mut u8, dest_size: u32) -> u32;
+    pub fn abortMessage(message: *const u8, len: u32) -> !;
+    pub fn kvGet(chain_handle: u32, db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+    pub fn getSequential(chain_handle: u32, db: crate::DbId, id: u64) -> u32;
+    pub fn kvGreaterEqual(
+        chain_handle: u32,
+        db: crate::DbId,
+        key: *const u8,
+        key_len: u32,
+        match_key_size: u32,
+    ) -> u32;
+    pub fn kvLessThan(
+        chain_handle: u32,
+        db: crate::DbId,
+        key: *const u8,
+        key_len: u32,
+        match_key_size: u32,
+    ) -> u32;
+    pub fn kvMax(chain_handle: u32, db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+}
+
+thread_local! {
+    static SELECTED_CHAIN: std::cell::Cell<Option<u32>> = std::cell::Cell::new(None);
+}
+
+pub fn get_selected_chain() -> u32 {
+    SELECTED_CHAIN.with(|c| c.get().unwrap())
+}
+
+pub fn tester_select_chain_for_db(chain_handle: u32) {
+    SELECTED_CHAIN.with(|c| c.set(Some(chain_handle)));
+}
+
+pub fn tester_clear_chain_for_db(chain_handle: u32) {
+    SELECTED_CHAIN.with(|c| {
+        if let Some(current) = c.get() {
+            if chain_handle == current {
+                c.set(None)
+            }
+        }
+    });
 }
