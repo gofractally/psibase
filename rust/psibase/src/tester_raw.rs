@@ -19,10 +19,6 @@ extern "C" {
 extern "C" {
     /// Create a new chain and make it active for database native functions.
     ///
-    /// `max_objects` is the maximum number of objects the database can hold.
-    /// The remaining arguments are log-base-2 of file sizes for the database's
-    /// various files. e.g. `32` is 4 GB.
-    ///
     /// Returns a chain handle
     pub fn createChain(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> u32;
 
@@ -51,37 +47,20 @@ extern "C" {
     /// `chain_handle` identifies the chain to push to. `transaction/transaction_size`
     /// contains a fracpacked [`SignedTransaction`](crate::SignedTransaction).
     ///
-    /// The callback `cb_alloc` must allocate `size` bytes and return a pointer to it.
-    /// If it can't allocate the memory, then it must abort, either by `panic`,
-    /// [`raw::abortMessage`](crate::native_raw::abortMessage), or the `unreachable` instruction.
-    /// `testerPushTransaction` does not hold onto the pointer; it fills it with a
-    /// packed [`TransactionTrace`](crate::TransactionTrace) then returns.
-    /// `testerPushTransaction` passes `alloc_context` to `cb_alloc`.
+    /// Stores the transaction trace into result and returns the result size
     pub fn pushTransaction(
         chain_handle: u32,
         transaction: *const u8,
         transaction_size: usize,
     ) -> u32;
 
-    /// Select chain for database native functions
-    ///
-    /// After you call `testerSelectChainForDb`, the following functions will use
-    /// this chain's database:
-    ///
-    /// * [`raw::kvGet`](crate::native_raw::kvGet)
-    /// * [`raw::getSequential`](crate::native_raw::getSequential)
-    /// * [`raw::kvGreaterEqual`](crate::native_raw::kvGreaterEqual)
-    /// * [`raw::kvLessThan`](crate::native_raw::kvLessThan)
-    /// * [`raw::kvMax`](crate::native_raw::kvMax)
-    pub fn testerSelectChainForDb(chain_handle: u32);
-
     /// Shutdown chain without deleting database
     ///
     /// This shuts down a chain, but doesn't destroy it or remove the
     /// database. `chain_handle` still exists, but isn't usable except
-    /// with [`testerGetChainPath`] and [`testerDestroyChain`].
+    /// with [`getChainPath`] and [`destroyChain`].
     ///
-    /// TODO: `testerShutdownChain` probably isn't useful anymore; it might go away.
+    /// TODO: `shutdownChain` probably isn't useful anymore; it might go away.
     pub fn shutdownChain(chain_handle: u32);
 
     /// Start a new block
@@ -134,6 +113,16 @@ pub fn get_selected_chain() -> u32 {
     SELECTED_CHAIN.with(|c| c.get().unwrap())
 }
 
+/// Select chain for database native functions
+///
+/// After you call `tester_select_chain_for_db`, the following functions will use
+/// this chain's database:
+///
+/// * [`raw::kvGet`](crate::native_raw::kvGet)
+/// * [`raw::getSequential`](crate::native_raw::getSequential)
+/// * [`raw::kvGreaterEqual`](crate::native_raw::kvGreaterEqual)
+/// * [`raw::kvLessThan`](crate::native_raw::kvLessThan)
+/// * [`raw::kvMax`](crate::native_raw::kvMax)
 pub fn tester_select_chain_for_db(chain_handle: u32) {
     SELECTED_CHAIN.with(|c| c.set(Some(chain_handle)));
 }
