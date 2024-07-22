@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { websocketURL } from "../helpers";
 import { LogFilterInputs, LogRecord } from "./interfaces";
@@ -13,12 +13,37 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { z } from "zod";
 
 const MAX_LOGS_ROWS = 20;
 
+export const LogRecordSchema = z.object({
+    TimeStamp: z.string(),
+    Severity: z.string(),
+    Message: z.string(),
+    RemoteEndpoint: z.string().optional(),
+    BlockId: z.string().optional(),
+    Request: z
+        .object({
+            Method: z.string(),
+            Target: z.string(),
+            Host: z.string(),
+        })
+        .optional(),
+    Response: z
+        .object({
+            Status: z.number(),
+            Bytes: z.number().optional(),
+            Time: z.number().optional(),
+        })
+        .optional(),
+});
+
 export const LogsPage = () => {
     const [logFilter, setLogFilter] = useState("Severity >= info");
-    const [logData, setLogData] = useState<LogRecord[]>();
+    const [logData, setLogData] = useState<LogRecord[]>([]);
 
     const [logConnectionError, setLogConnectionError] = useState<string>();
     const [logSocket, setLogSocket] = useState<WebSocket | null>(null);
@@ -34,6 +59,8 @@ export const LogsPage = () => {
         },
     });
 
+    const keepAllLogs = useRef(false);
+
     useEffect(() => {
         if (logSocket === null && logTimeout === null) {
             const newSocket = new WebSocket(websocketURL("/native/admin/log"));
@@ -46,10 +73,17 @@ export const LogsPage = () => {
                 }
             });
             newSocket.addEventListener("message", (event: MessageEvent) => {
-                setLogData((prev: LogRecord[] | undefined) => [
-                    ...(prev ?? []).slice(-MAX_LOGS_ROWS + 1),
-                    JSON.parse(event.data) as LogRecord,
-                ]);
+                setLogData((prev) => {
+                    const newRecord = LogRecordSchema.parse(
+                        JSON.parse(event.data)
+                    );
+                    return [
+                        newRecord,
+                        ...(keepAllLogs.current
+                            ? prev
+                            : prev.slice(0, MAX_LOGS_ROWS - 1)),
+                    ];
+                });
             });
             newSocket.addEventListener("close", (event: CloseEvent) => {
                 if (event.code == 1008) {
@@ -64,7 +98,7 @@ export const LogsPage = () => {
         //  else if (!logEnabled && logSocket) {
         //     logSocket.close();
         // }
-    }, [logSocket, logTimeout]);
+    }, [logSocket, logTimeout, keepAllLogs]);
 
     const onFilter = (input: LogFilterInputs) => {
         setLogFilter(input.filter);
@@ -79,53 +113,68 @@ export const LogsPage = () => {
     };
 
     return (
-        <>
-            <h1 className="mb-2">Logs</h1>
+        <div className="h-dvh ">
             {logConnectionError && (
-                <p className=" p-4">
-                    🔴 {logConnectionError || "Unknown log connection error"}
-                </p>
+                <Alert variant="destructive">
+                    <AlertDescription>
+                        {logConnectionError || "Unknown log connection error"}
+                    </AlertDescription>
+                </Alert>
             )}
+            <div className="flex justify-between py-3">
+                <h1 className="">Logs</h1>
+                <div className="flex">
+                    <Label className="my-auto mr-2">Keep all logs</Label>
+                    <Switch
+                        onCheckedChange={(checked) =>
+                            (keepAllLogs.current = checked)
+                        }
+                    />
+                </div>
+            </div>
+
             <form onSubmit={filterForm.handleSubmit(onFilter)}>
                 <Label>Filter</Label>
                 <Input {...filterForm.register("filter")} />
                 {filterError && <Label>{filterError}</Label>}
             </form>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Time</TableHead>
-                        <TableHead>Severity</TableHead>
-                        <TableHead>Message</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {(logData || []).map((row: LogRecord, idx) => (
-                        <TableRow
-                            key={idx}
-                            className={`log log-${row.Severity}`}
-                        >
-                            <TableCell>
-                                {new Date(row.TimeStamp).toLocaleString()}
-                            </TableCell>
-                            <TableCell>{row.Severity}</TableCell>
-                            <TableCell className="log-message">
-                                {formatLog(row)}
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-                {(logData || []).length == 0 && (
-                    <TableFooter>
+            <div className="max-h-full overflow-y-scroll">
+                <Table className="">
+                    <TableHeader>
                         <TableRow>
-                            <TableCell colSpan={3}>
-                                No logs to display.
-                            </TableCell>
+                            <TableHead>Time</TableHead>
+                            <TableHead>Severity</TableHead>
+                            <TableHead>Message</TableHead>
                         </TableRow>
-                    </TableFooter>
-                )}
-            </Table>
-        </>
+                    </TableHeader>
+                    <TableBody>
+                        {(logData || []).map((row: LogRecord, index) => (
+                            <TableRow
+                                key={index}
+                                className={`log log-${row.Severity}`}
+                            >
+                                <TableCell>
+                                    {new Date(row.TimeStamp).toLocaleString()}
+                                </TableCell>
+                                <TableCell>{row.Severity}</TableCell>
+                                <TableCell className="log-message">
+                                    {formatLog(row)}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                    {(logData || []).length == 0 && (
+                        <TableFooter>
+                            <TableRow>
+                                <TableCell colSpan={3}>
+                                    No logs to display.
+                                </TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    )}
+                </Table>
+            </div>
+        </div>
     );
 };
 
