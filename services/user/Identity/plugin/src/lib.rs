@@ -20,6 +20,12 @@ struct Attestation {
     score: f32,
 }
 
+// #[derive(Serialize, Deserialize, Debug)]
+// struct IdentityClaimsSummary {
+//     highConfidenceClaims: u16,
+//     lowConfidenceClaims: u16,
+// }
+
 impl Guest for IdentityPlugin {
     fn attest_identity_claim(subject: String, score: f32) -> Result<(), CommonTypes::Error> {
         if !(score >= 0.0 && score <= 1.0) {
@@ -38,6 +44,12 @@ impl Guest for IdentityPlugin {
 
         CommonServer::add_action_to_transaction("attest", &packed_a)
     }
+    // fn summary_identity_claims(
+    //     subject: String,
+    // ) -> Result<IdentityClaimsSummary, CommonTypes::Error> {
+    //     let graphqlStr = String::new("query attestations_by_attestee(attestee:\"${subject}\"");
+    //     let summary = CommonServer::post_graphql_get_json(graphqlStr);
+    // }
 }
 
 // CONSIDER: Query definition here for attestations for each user access, to complete the abstraction from the Attestation service

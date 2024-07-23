@@ -56,8 +56,7 @@ interface queries {
             5 I’m very confident they are who they claim (90%+) --> 0.90
         */
     graph: func() -> result<attestation-graph, error>;
-    // graph: func(subject: string, depth: u8) -> result<attestation-graph, error>;
-    get-summary: func(subject: string) -> result<identity-summary, error>;
+    summary-identity-claims: func(subject: string) -> result<identity-summary, error>;
     get-history: func(subject: string) -> result<list<identity-attestation>, error>;
 }
 

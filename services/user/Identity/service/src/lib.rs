@@ -78,9 +78,7 @@ mod service {
         };
 
         // TODO: Update summary stats
-        // Q: Will this *update* or just add?
-        // Perhaps the attester should be the primary key? because we're only interested in the *latest* attestation from each attester;
-        // all other attestation data will be history, accessed via event queries
+        // Q: Will this *update* or just add? Add; should always update
         attestation_table
             .put(&Attestation {
                 id: next_id,
@@ -151,18 +149,6 @@ mod service {
                 .after(after)
                 .query()
                 .await
-        }
-
-        async fn summary(
-            &self,
-            attestation_type: String,
-            attestee: String,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
-            return Err(async_graphql::Error::new("summary() not yet implemented"));
         }
 
         async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
